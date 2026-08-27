@@ -672,9 +672,9 @@ codecs-opentelemetry = ["vector-lib/opentelemetry"]
 codecs-syslog = ["vector-lib/syslog"]
 
 # Secrets
-secrets = ["secrets-aws-secrets-manager"]
+secrets = ["secrets-aws_secrets_manager"]
 
-secrets-aws-secrets-manager = ["aws-core", "dep:aws-sdk-secretsmanager"]
+secrets-aws_secrets_manager = ["aws-core", "dep:aws-sdk-secretsmanager"]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -774,10 +774,10 @@ sources-opentelemetry = [
   "sources-vector",
 ]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
-sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-write", "sources-prometheus-pushgateway"]
-sources-prometheus-scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
-sources-prometheus-remote-write = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
-sources-prometheus-pushgateway = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
+sources-prometheus = ["sources-prometheus_scrape", "sources-prometheus_remote_write", "sources-prometheus_pushgateway"]
+sources-prometheus_scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
+sources-prometheus_remote_write = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
+sources-prometheus_pushgateway = ["sinks-prometheus", "sources-utils-http", "vector-lib/prometheus"]
 sources-pulsar = ["dep:pulsar"]
 sources-redis = ["dep:redis"]
 sources-socket = ["sources-utils-net", "tokio-util/net"]
@@ -817,7 +817,7 @@ transforms-logs = [
   "transforms-reduce",
   "transforms-remap",
   "transforms-route",
-  "transforms-exclusive-route",
+  "transforms-exclusive_route",
   "transforms-sample",
   "transforms-throttle",
   "transforms-trace_to_log"
@@ -848,7 +848,7 @@ transforms-metric_to_log = []
 transforms-reduce = ["transforms-impl-reduce"]
 transforms-remap = []
 transforms-route = []
-transforms-exclusive-route = []
+transforms-exclusive_route = []
 transforms-sample = ["transforms-impl-sample"]
 transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
@@ -878,7 +878,7 @@ sinks-logs = [
   "sinks-clickhouse",
   "sinks-console",
   "sinks-databend",
-  "sinks-databricks-zerobus",
+  "sinks-databricks_zerobus",
   "sinks-datadog_events",
   "sinks-datadog_logs",
   "sinks-datadog_traces",
@@ -910,7 +910,7 @@ sinks-logs = [
   "sinks-vector",
   "sinks-webhdfs",
   "sinks-websocket",
-  "sinks-websocket-server",
+  "sinks-websocket_server",
 ]
 sinks-metrics = [
   "sinks-appsignal",
@@ -946,7 +946,7 @@ sinks-chronicle = []
 sinks-clickhouse = ["dep:nom", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
-sinks-databricks-zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow", "arrow/ipc_compression"]
+sinks-databricks_zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow", "arrow/ipc_compression"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
@@ -983,7 +983,7 @@ sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
 sinks-websocket = ["dep:tokio-tungstenite"]
-sinks-websocket-server = ["dep:tokio-tungstenite", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
+sinks-websocket_server = ["dep:tokio-tungstenite", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
 sinks-webhdfs = ["dep:opendal"]
 
 # Identifies that the build is a nightly build
