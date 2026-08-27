@@ -47,7 +47,7 @@ generated: components: sinks: vector: configuration: {
 		required: false
 		required_one_of: ["address", "routing"]
 		required_one_of_group: "address_or_routing"
-		type: string: examples: ["https://127.0.0.1:6000", "https://somehost:6000"]
+		type: string: examples: ["http://127.0.0.1:6000", "https://somehost:6000"]
 	}
 	batch: {
 		description: "Event batching behavior."

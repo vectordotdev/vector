@@ -69,7 +69,7 @@ pub struct VectorConfig {
     #[configurable(
         deprecated = "This option has been deprecated, use `routing.endpoints` instead."
     )]
-    #[configurable(metadata(docs::examples = "https://127.0.0.1:6000"))]
+    #[configurable(metadata(docs::examples = "http://127.0.0.1:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[configurable(required_one_of = "address_or_routing")]
     #[serde(default)]
@@ -208,9 +208,10 @@ impl VectorConfig {
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> serde_json::Value {
-        // `address` is deprecated, so the generated example specifies the
-        // scheme explicitly rather than relying on the scheme-less default.
-        serde_json::to_value(default_config("https://127.0.0.1:6000")).unwrap()
+        // Scheme-less endpoints are deprecated, so the generated example
+        // specifies the scheme explicitly rather than relying on the
+        // scheme-less default.
+        serde_json::to_value(default_config("http://127.0.0.1:6000")).unwrap()
     }
 }
 

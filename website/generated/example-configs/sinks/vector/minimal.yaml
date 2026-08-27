@@ -3,4 +3,4 @@ sinks:
     type: vector
     inputs:
       - my-source-or-transform-id
-    address: https://127.0.0.1:6000
+    address: http://127.0.0.1:6000
