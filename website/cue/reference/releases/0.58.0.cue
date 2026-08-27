@@ -540,7 +540,7 @@ releases: "0.58.0": {
 			description: #"""
 				Sink `endpoint` options now require an absolute URL that includes a host. Endpoints without a scheme are defaulted to `https://` (for example `endpoint: "localhost:8080"` becomes `https://localhost:8080`). Previously, partial or empty endpoints (for example `endpoint: ""` or `endpoint: "localhost:8080"` without a scheme) were accepted at configuration load and only failed when the sink attempted to send data, or were silently completed with a default scheme and host. Empty, host-less, or non-`http(s)` endpoints (for example `endpoint: ""`, `endpoint: "/path"`, or `endpoint: "ftp://example.com"`) are now rejected at configuration load with a clear error, including with `vector validate --no-environment`. This affects the `appsignal`, `azure_logs_ingestion`, `datadog_events`, `datadog_logs`, `datadog_metrics`, `datadog_traces`, `elasticsearch`, `gcp_cloud_storage`, `gcp_pubsub`, `gcp_stackdriver_logs`, `gcp_stackdriver_metrics`, `honeycomb`, `humio`, `influxdb`, `loki`, `prometheus_remote_write`, `sematext`, `splunk_hec`, and `webhdfs` sinks.
 				"""#
-			pr_numbers: [26116]
+			pr_numbers: [26195, 26177, 26180, 26152, 26130, 26116]
 			contributors: ["thomasqueirozb"]
 		},
 		{
@@ -558,7 +558,7 @@ releases: "0.58.0": {
 			description: #"""
 				Fixed the `tls.server_name` option so that it is used for certificate hostname verification in addition to SNI. Previously, on the OpenSSL path (used by HTTP-based sinks such as `datadog_logs`), the certificate was still verified against the connection URL host, causing a "hostname mismatch" verification failure when `server_name` differed from the endpoint host. The override applies only to the upstream destination, so an HTTPS forward proxy's own certificate is verified against the proxy host.
 				"""#
-			pr_numbers: [25881]
+			pr_numbers: [25899, 25881]
 			contributors: ["gwenaskell"]
 		},
 		{

@@ -322,9 +322,7 @@ fn read_changelog_fragments(repo_root: &Path, dir: &Path) -> Result<Vec<Changelo
     paths.sort();
     for path in paths {
         let mut entry = parse_changelog_fragment(&path)?;
-        entry
-            .pr_numbers
-            .push(lookup_pull_request(repo_root, &path)?);
+        entry.pr_numbers = lookup_pull_requests(repo_root, &path)?;
         entries.push(entry);
     }
     Ok(entries)
@@ -387,11 +385,11 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
     })
 }
 
-/// Find the PR that introduced a changelog fragment from the adding commit's
-/// `... (#12345)` title. The commit remains available after release preparation
-/// deletes the fragment, so the same lookup can also backfill release metadata.
+/// Find every PR that added or edited a changelog fragment from each commit's
+/// `... (#12345)` title. Deletion commits are excluded so this also works after
+/// release preparation removes the fragment.
 #[cfg(not(test))]
-fn lookup_pull_request(repo_root: &Path, fragment_path: &Path) -> Result<u64> {
+fn lookup_pull_requests(repo_root: &Path, fragment_path: &Path) -> Result<Vec<u64>> {
     let relative_path = fragment_path.strip_prefix(repo_root).with_context(|| {
         format!(
             "Fragment path {} is outside the repository root {}",
@@ -406,29 +404,41 @@ fn lookup_pull_request(repo_root: &Path, fragment_path: &Path) -> Result<u64> {
         )
     })?;
 
-    let commit_title = run_command(
+    let commit_titles = run_command(
         "git",
         &[
             "log",
-            "-1",
             "--format=%s",
-            "--diff-filter=A",
+            "--diff-filter=AM",
             "--follow",
             "--",
             relative_path,
         ],
         repo_root,
     )?;
-    let commit_title = commit_title.trim();
-    if commit_title.is_empty() {
+    if commit_titles.trim().is_empty() {
         bail!(
-            "Could not find the commit that added {relative_path}; cannot determine its pull request."
+            "Could not find commits that added or edited {relative_path}; cannot determine its pull requests."
         );
     }
 
-    parse_pull_request_number(commit_title).with_context(|| {
-        format!("Could not determine the PR that added {relative_path} from commit title `{commit_title}`")
+    parse_pull_request_numbers(&commit_titles).with_context(|| {
+        format!("Could not determine every PR that added or edited {relative_path}")
     })
+}
+
+fn parse_pull_request_numbers(commit_titles: &str) -> Result<Vec<u64>> {
+    let mut numbers = Vec::new();
+    for commit_title in commit_titles
+        .lines()
+        .filter(|title| !title.trim().is_empty())
+    {
+        let number = parse_pull_request_number(commit_title)?;
+        if !numbers.contains(&number) {
+            numbers.push(number);
+        }
+    }
+    Ok(numbers)
 }
 
 fn parse_pull_request_number(commit_title: &str) -> Result<u64> {
@@ -457,9 +467,9 @@ fn ensure_full_git_history(repo_root: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
-fn lookup_pull_request(_: &Path, _: &Path) -> Result<u64> {
+fn lookup_pull_requests(_: &Path, _: &Path) -> Result<Vec<u64>> {
     // Unit tests exercise local parsing and rendering without requiring a Git repository.
-    Ok(42)
+    Ok(vec![42])
 }
 
 #[cfg(not(test))]
@@ -729,6 +739,19 @@ mod tests {
         assert_eq!(
             parse_pull_request_number("feat(foo): add bar (#12345)").unwrap(),
             12345
+        );
+    }
+
+    #[test]
+    fn parses_and_deduplicates_pull_requests_from_commit_titles() {
+        let titles = indoc::indoc! {"
+            fix(foo): adjust bar (#23456)
+            feat(foo): add bar (#12345)
+            feat(foo): add bar (#12345)
+        "};
+        assert_eq!(
+            parse_pull_request_numbers(titles).unwrap(),
+            vec![23456, 12345]
         );
     }
 
