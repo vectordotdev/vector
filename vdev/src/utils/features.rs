@@ -361,6 +361,7 @@ fn system_sasl_available() -> bool {
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
     use std::{fs, path::Path, sync::LazyLock};
 
     use super::{
@@ -390,37 +391,37 @@ mod tests {
 
     #[test]
     fn derives_exact_or_shared_component_features() {
-        let config = r"
-sources:
-  gcp:
-    type: gcp_pubsub
-  prometheus:
-    type: prometheus_scrape
-transforms:
-  route:
-    type: exclusive_route
-sinks:
-  databricks:
-    type: databricks_zerobus
-  chronicle:
-    type: gcp_chronicle_unstructured
-  humio_logs:
-    type: humio_logs
-  humio_metrics:
-    type: humio_metrics
-  influxdb_logs:
-    type: influxdb_logs
-  influxdb_metrics:
-    type: influxdb_metrics
-  sematext_logs:
-    type: sematext_logs
-  sematext_metrics:
-    type: sematext_metrics
-  splunk:
-    type: splunk_hec_metrics
-  websocket:
-    type: websocket_server
-";
+        let config = indoc! {"
+            sources:
+              gcp:
+                type: gcp_pubsub
+              prometheus:
+                type: prometheus_scrape
+            transforms:
+              route:
+                type: exclusive_route
+            sinks:
+              databricks:
+                type: databricks_zerobus
+              chronicle:
+                type: gcp_chronicle_unstructured
+              humio_logs:
+                type: humio_logs
+              humio_metrics:
+                type: humio_metrics
+              influxdb_logs:
+                type: influxdb_logs
+              influxdb_metrics:
+                type: influxdb_metrics
+              sematext_logs:
+                type: sematext_logs
+              sematext_metrics:
+                type: sematext_metrics
+              splunk:
+                type: splunk_hec_metrics
+              websocket:
+                type: websocket_server
+        "};
 
         assert_eq!(
             features(config),
@@ -446,20 +447,20 @@ sinks:
 
     #[test]
     fn extracts_top_level_feature_gates() {
-        let config = r"
-enrichment_tables:
-  memory:
-    type: memory
-  geoip:
-    type: geoip
-  file:
-    type: file
-secret:
-  aws:
-    type: aws_secrets_manager
-  file:
-    type: file
-";
+        let config = indoc! {"
+            enrichment_tables:
+              memory:
+                type: memory
+              geoip:
+                type: geoip
+              file:
+                type: file
+            secret:
+              aws:
+                type: aws_secrets_manager
+              file:
+                type: file
+        "};
 
         assert_eq!(
             features(config),
@@ -474,7 +475,11 @@ secret:
     #[test]
     fn extracts_log_to_metric_feature() {
         assert_eq!(
-            features("transforms:\n  metrics:\n    type: log_to_metric\n"),
+            features(indoc! {"
+                transforms:
+                  metrics:
+                    type: log_to_metric
+            "}),
             [
                 "sources-dnstap",
                 "transforms-log_to_metric",
@@ -488,18 +493,18 @@ secret:
 
     #[test]
     fn extracts_nested_codec_and_enables_all_vrl_function_features() {
-        let config = r#"
-transforms:
-  remap:
-    type: remap
-    source: |
-      .message = "hello"
-sinks:
-  s3:
-    type: aws_s3
-    batch_encoding:
-      codec: parquet
-"#;
+        let config = indoc! {r#"
+            transforms:
+              remap:
+                type: remap
+                source: |
+                  .message = "hello"
+            sinks:
+              s3:
+                type: aws_s3
+                batch_encoding:
+                  codec: parquet
+        "#};
 
         assert_eq!(
             features(config),
@@ -518,20 +523,20 @@ sinks:
 
     #[test]
     fn extracts_all_gated_codecs_and_aws_auth() {
-        let config = r"
-sources:
-  socket:
-    type: socket
-    decoding:
-      codec: syslog
-sinks:
-  http:
-    type: http
-    encoding:
-      codec: otlp
-    auth:
-      strategy: aws
-";
+        let config = indoc! {"
+            sources:
+              socket:
+                type: socket
+                decoding:
+                  codec: syslog
+            sinks:
+              http:
+                type: http
+                encoding:
+                  codec: otlp
+                auth:
+                  strategy: aws
+        "};
 
         assert_eq!(
             features(config),
@@ -549,13 +554,14 @@ sinks:
     fn enables_available_gssapi_implementation_for_kafka() {
         for key in ["sasl.mechanism", "sasl.mechanisms"] {
             let config = format!(
-                r"
-sources:
-  kafka:
-    type: kafka
-    librdkafka_options:
-      {key}: GSSAPI
-"
+                indoc! {"
+                    sources:
+                      kafka:
+                        type: kafka
+                        librdkafka_options:
+                          {key}: GSSAPI
+                "},
+                key = key,
             );
             assert_eq!(
                 features(&config),
@@ -573,7 +579,11 @@ sources:
 
     #[test]
     fn enables_all_vrl_function_features_for_any_transform() {
-        let config = "transforms:\n  transform:\n    type: dedupe\n";
+        let config = indoc! {"
+            transforms:
+              transform:
+                type: dedupe
+        "};
         let features = features(config);
 
         for feature in [
@@ -593,10 +603,36 @@ sources:
     #[test]
     fn enables_all_vrl_function_features_for_nested_vrl_configuration() {
         for config in [
-            "sources:\n  input:\n    type: http_client\n    query:\n      host:\n        type: vrl\n        value: get_hostname!()\n",
-            "sources:\n  input:\n    type: stdin\n    decoding:\n      codec: vrl\n      vrl:\n        source: get_hostname!()\n",
-            "sources:\n  input:\n    type: http_server\n    auth:\n      strategy: custom\n      source: get_hostname!() == \"host\"\n",
-            "tests:\n  - condition: .message == \"hello\"\n",
+            indoc! {"
+                sources:
+                  input:
+                    type: http_client
+                    query:
+                      host:
+                        type: vrl
+                        value: get_hostname!()
+            "},
+            indoc! {"
+                sources:
+                  input:
+                    type: stdin
+                    decoding:
+                      codec: vrl
+                      vrl:
+                        source: get_hostname!()
+            "},
+            indoc! {r#"
+                sources:
+                  input:
+                    type: http_server
+                    auth:
+                      strategy: custom
+                      source: get_hostname!() == "host"
+            "#},
+            indoc! {r#"
+                tests:
+                  - condition: .message == "hello"
+            "#},
         ] {
             let features = features(config);
 
@@ -617,9 +653,11 @@ sources:
 
     #[test]
     fn rejects_configuration_providers() {
-        let config = serde_yaml::from_str::<FeatureConfig>(
-            "provider:\n  type: http\n  url: https://example.com/vector.yaml\n",
-        )
+        let config = serde_yaml::from_str::<FeatureConfig>(indoc! {"
+            provider:
+              type: http
+              url: https://example.com/vector.yaml
+        "})
         .expect("config must parse");
         let error =
             from_config(&config, &DECLARED_FEATURES).expect_err("configuration provider must fail");
