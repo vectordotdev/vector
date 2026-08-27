@@ -1,6 +1,6 @@
 ---
 what: "scheme-less `address` and `routing.endpoints` values in the `vector` sink defaulting to `http`"
-deprecated_since: "0.58.0"
+deprecated_since: "0.59.0"
 ---
 
 A `vector` sink endpoint such as `127.0.0.1` without an explicit scheme currently defaults to `http`.

@@ -22,7 +22,7 @@
     },
     {
       "what": "scheme-less `address` and `routing.endpoints` values in the `vector` sink defaulting to `http`",
-      "deprecated_since": "0.58.0",
+      "deprecated_since": "0.59.0",
       "description": "A `vector` sink endpoint such as `127.0.0.1` without an explicit scheme currently defaults to `http`.\nThis behavior is deprecated and will change to `https` in a future release.\nNote that when TLS is enabled, a scheme-less address already defaults to `https`.\n\nMigrate by specifying the scheme explicitly:\n\n```yaml\nsinks:\n  my_sink:\n    type: vector\n    address: http://127.0.0.1:6000\n```"
     }
   ],
