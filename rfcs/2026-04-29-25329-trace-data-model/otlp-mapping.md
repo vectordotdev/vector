@@ -228,12 +228,10 @@ A span with reversed timestamps (`end_time_unix_nano < start_time_unix_nano`) is
 duration on ingress, a counter is incremented, and a warning log is emitted; this is one of the
 OTLP-side zero-loss exclusions listed above.
 
-On egress, the encoder computes `start_time_unix_nano + duration.as_nanos()` in `u128`
-and clamps the resulting `end_time_unix_nano` to `u64::MAX` before narrowing to the OTLP
-`fixed64`. This handles both a `Duration` exceeding `u64::MAX` nanoseconds and a smaller
-duration whose addition to a positive start time exceeds the end field. A clamp
-increments a counter and emits a warning log identifying the affected span; the encoded
-duration is effectively reduced to `u64::MAX - start_time_unix_nano`.
+On egress, a computed end timestamp that exceeds the OTLP `fixed64` domain is clamped to
+`u64::MAX`. A clamp increments a counter and emits a warning log identifying the affected
+span; the encoded duration is effectively reduced to
+`u64::MAX - start_time_unix_nano`.
 
 A pre-epoch `DateTime<Utc>` value in `Span.start_time` or `SpanEvent.time` (writable via
 the Rust API or VRL but never produced by OTLP ingress, since `fixed64` is unsigned) is
@@ -386,23 +384,8 @@ before applying its value; if all chunk keys are absent, `TraceEvent.chunk` is `
 
 ## Alternatives
 
-### `Span.flags` as `u8`
-
-OTLP defines `Span.flags` as `fixed32` and Vector stores the full word in `TraceFlags(u32)`.
-A narrower `u8` storage matching only the W3C trace-flags byte would discard OTLP's bits
-8-9 (the parent-remote tristate) and bits 10-31 (reserved for future spec additions). This
-would round-trip incorrectly for any span carrying the OTLP tristate or any future flag the
-spec defines. The wider `u32` storage is the parent RFC's choice; this sub-RFC inherits it.
-
-### Status as a closed enum without escape hatch
-
-Defining `SpanStatus` without an escape hatch would silently coerce any unrecognized status
-code introduced by a future OpenTelemetry version to `Unset` (the proto3 default),
-breaking the `OTLP -> Vector -> OTLP` relay guarantee for those spans. The
-`Other(i32, String)` variant stores the raw code and message verbatim and egresses them
-unchanged, preserving relay fidelity by the same mechanism the parent RFC uses for
-`SpanKind`. Rationale and VRL surface are in the parent RFC; the OTLP-side consequence is
-that the relay guarantee holds for spec-future codes.
+Wire-format-specific alternatives are in the parent RFC (`TraceFlags` width, `SpanStatus`
+escape hatch). This sub-RFC inherits those choices.
 
 ## Outstanding Questions
 
@@ -410,34 +393,26 @@ that the relay guarantee holds for spec-future codes.
 
 ## Plan Of Attack
 
-The OTLP-mapping PRs sequence as follows. The format-agnostic prerequisites (fallible
-proto decode boundary, migration enum, legacy-layout hint precursor, internal `TypedTrace`
-proto extension) are owned by the parent RFC's Plan of Attack and must land first.
+The format-agnostic prerequisites (fallible proto decode boundary, migration enum,
+legacy-layout hint precursor, and internal `TypedTrace` proto extension) are owned by the
+parent RFC's Plan of Attack and must land first. OTLP work then proceeds through these
+obligations:
 
-- [ ] OTLP `Legacy -> Typed` shim in `lib/opentelemetry-proto`. Registers under the OTLP
-  legacy-layout hint emitted by the precursor step in the parent and provides a
-  format-shape detector for pre-hint records. Fixture tests prove that the detector
-  accepts the historical OTLP `LogEvent` layout and rejects Datadog and malformed
-  layouts. Consumed by any OTLP-aware downstream component once the shim ships.
-- [ ] `Typed -> OTLP-wire` encoder in `lib/opentelemetry-proto`. Implements the egress
-  mapping table, the typed-slot-precedence rule, the `AttrValue` -> `AnyValue` mapping,
-  the reserved-key emission for Datadog state, and the empty-`ScopeSpans` rule.
-- [ ] Property-based round-trip unit tests for `OTLP -> Vector -> OTLP` asserting
-  effective equivalence per Scope: typed-slot promotion (non-empty, empty, and non-string
-  cases), `deployment.environment` legacy-key handling, reversed-timestamp clamping,
-  oversized duration and positive-start end-timestamp overflow clamping, default-valued /
-  absent equivalence for `Resource` / `Scope` / `Status`, `chunk = None` and reserved-key
-  `Some` materialization, and unknown enum-number forward compatibility for `SpanKind`
-  and `SpanStatus`.
-- [ ] Migrate the `opentelemetry` sink to consume `Typed` natively; wire the
-  `lib/opentelemetry-proto` encoder into the sink's trace path and cover the end-to-end
-  HTTP export flow with typed-input tests.
-- [ ] Migrate the `opentelemetry` source to produce `Typed` natively. Lands after the
-  parent's "remove untyped forwarding methods" step so the build catches any unmigrated
-  consumer.
-- [ ] Document the OTLP mapping in the trace migration guide section the parent RFC's
-  Plan of Attack owns: which OTLP wire fields land in which typed slots, how to write
-  VRL against the typed surface, and the reserved-key conventions for cross-format relay.
+1. Implement `Legacy -> Typed` conversion and unique detection of historical pre-hint
+   OTLP layouts, with fixtures demonstrating that only OTLP input selects the converter
+   and that Datadog, malformed, zero-match, and ambiguous input fails controllably.
+2. Implement `Typed -> OTLP` encoding for the complete mapping and reserved-key
+   contracts above, giving every in-scope wire field a bidirectional disposition,
+   including empty `ScopeSpans` and typed-slot precedence.
+3. Establish the `OTLP -> Vector -> OTLP` guarantee with property tests covering
+   promotion, timing bounds, absent/default equivalence, reserved-key materialization,
+   and unknown enum values. The tests must demonstrate effective equivalence for all
+   declared in-scope values and explicitly cover every exclusion.
+4. Migrate the OTLP sink and then, after the parent RFC's compile-time consumer gate, the
+   source. Typed input must pass end-to-end through OTLP export before the source emits
+   typed events.
+5. Add the field mapping, typed VRL paths, and cross-format reserved-key conventions to
+   the user migration guide.
 
 ## Future Improvements
 
