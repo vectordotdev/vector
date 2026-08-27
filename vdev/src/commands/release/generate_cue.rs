@@ -18,6 +18,12 @@ const RELEASES_DIR: &str = "website/cue/reference/releases";
 const CHANGELOG_DIR: &str = "changelog.d";
 const HIGHLIGHTS_DIR: &str = "website/content/en/highlights";
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum PullRequestMetadata {
+    Optional,
+    Required,
+}
+
 /// Generate the release CUE file (and, if there are breaking fragments, the upgrade guide)
 /// for the given version. Handy for testing the changelog pipeline without running the
 /// full `release prepare` flow.
@@ -34,7 +40,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        run(&self.version)?;
+        run(&self.version, PullRequestMetadata::Optional)?;
         Ok(())
     }
 }
@@ -43,7 +49,10 @@ impl Cli {
 ///
 /// Pure generation: does not touch `changelog.d/`. Callers that want the fragments retired
 /// after a successful release run should call [`retire_all_fragments`] afterward.
-pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
+pub(super) fn run(
+    new_version: &Version,
+    pull_request_metadata: PullRequestMetadata,
+) -> Result<PathBuf> {
     let repo_root = paths::find_repo_root()?;
     env::set_current_dir(&repo_root)?;
 
@@ -88,7 +97,8 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     // breaking fragments.
 
     let changelog_dir = repo_root.join(CHANGELOG_DIR);
-    let changelog_entries = read_changelog_fragments(&repo_root, &changelog_dir)?;
+    let changelog_entries =
+        read_changelog_fragments(&repo_root, &changelog_dir, pull_request_metadata)?;
 
     // Validate + render everything IN MEMORY before touching disk, so a validation
     // failure doesn't leave a partial CUE file behind (which would then trip the
@@ -305,13 +315,19 @@ struct BreakingDetails {
     migration: String,
 }
 
-fn read_changelog_fragments(repo_root: &Path, dir: &Path) -> Result<Vec<ChangelogEntry>> {
+fn read_changelog_fragments(
+    repo_root: &Path,
+    dir: &Path,
+    pull_request_metadata: PullRequestMetadata,
+) -> Result<Vec<ChangelogEntry>> {
     if !dir.is_dir() {
         return Ok(Vec::new());
     }
 
     #[cfg(not(test))]
-    ensure_full_git_history(repo_root)?;
+    if pull_request_metadata == PullRequestMetadata::Required {
+        ensure_full_git_history(repo_root)?;
+    }
 
     let mut entries = Vec::new();
     let mut paths: Vec<PathBuf> = fs::read_dir(dir)?
@@ -322,7 +338,7 @@ fn read_changelog_fragments(repo_root: &Path, dir: &Path) -> Result<Vec<Changelo
     paths.sort();
     for path in paths {
         let mut entry = parse_changelog_fragment(&path)?;
-        entry.pr_numbers = lookup_pull_requests(repo_root, &path)?;
+        entry.pr_numbers = lookup_pull_requests(repo_root, &path, pull_request_metadata)?;
         entries.push(entry);
     }
     Ok(entries)
@@ -385,11 +401,23 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
     })
 }
 
-/// Find every PR that added or edited a changelog fragment from each commit's
-/// `... (#12345)` title. Deletion commits are excluded so this also works after
-/// release preparation removes the fragment.
+/// Find every PR that added or edited the current lifetime of a changelog fragment
+/// from each commit's `... (#12345)` title. Deletion commits are excluded so this
+/// also works after release preparation removes the fragment.
 #[cfg(not(test))]
-fn lookup_pull_requests(repo_root: &Path, fragment_path: &Path) -> Result<Vec<u64>> {
+fn lookup_pull_requests(
+    repo_root: &Path,
+    fragment_path: &Path,
+    pull_request_metadata: PullRequestMetadata,
+) -> Result<Vec<u64>> {
+    lookup_pull_requests_from_git(repo_root, fragment_path, pull_request_metadata)
+}
+
+fn lookup_pull_requests_from_git(
+    repo_root: &Path,
+    fragment_path: &Path,
+    pull_request_metadata: PullRequestMetadata,
+) -> Result<Vec<u64>> {
     let relative_path = fragment_path.strip_prefix(repo_root).with_context(|| {
         format!(
             "Fragment path {} is outside the repository root {}",
@@ -404,41 +432,78 @@ fn lookup_pull_requests(repo_root: &Path, fragment_path: &Path) -> Result<Vec<u6
         )
     })?;
 
-    let commit_titles = run_command(
+    let addition_commits = run_command(
         "git",
         &[
             "log",
-            "--format=%s",
-            "--diff-filter=AM",
+            "--format=%H",
+            "--diff-filter=A",
             "--follow",
             "--",
             relative_path,
         ],
         repo_root,
     )?;
-    if commit_titles.trim().is_empty() {
-        bail!(
-            "Could not find commits that added or edited {relative_path}; cannot determine its pull requests."
-        );
-    }
+    let Some(latest_addition) = addition_commits.lines().next() else {
+        return match pull_request_metadata {
+            PullRequestMetadata::Optional => Ok(Vec::new()),
+            PullRequestMetadata::Required => bail!(
+                "Could not find the commit that added {relative_path}; cannot determine its pull requests."
+            ),
+        };
+    };
 
-    parse_pull_request_numbers(&commit_titles).with_context(|| {
-        format!("Could not determine every PR that added or edited {relative_path}")
-    })
+    let commit_history = run_command(
+        "git",
+        &[
+            "log",
+            "--format=%H%x09%s",
+            "--diff-filter=AMR",
+            "--follow",
+            "--",
+            relative_path,
+        ],
+        repo_root,
+    )?;
+
+    parse_pull_request_history(&commit_history, latest_addition, pull_request_metadata)
+        .with_context(|| {
+            format!("Could not determine every PR that added or edited {relative_path}")
+        })
 }
 
-fn parse_pull_request_numbers(commit_titles: &str) -> Result<Vec<u64>> {
+fn parse_pull_request_history(
+    commit_history: &str,
+    latest_addition: &str,
+    pull_request_metadata: PullRequestMetadata,
+) -> Result<Vec<u64>> {
     let mut numbers = Vec::new();
-    for commit_title in commit_titles
+    for line in commit_history
         .lines()
-        .filter(|title| !title.trim().is_empty())
+        .filter(|line| !line.trim().is_empty())
     {
-        let number = parse_pull_request_number(commit_title)?;
-        if !numbers.contains(&number) {
-            numbers.push(number);
+        let (commit, title) = line
+            .split_once('\t')
+            .ok_or_else(|| anyhow!("Malformed git log entry `{line}`"))?;
+
+        match parse_pull_request_number(title) {
+            Ok(number) if !numbers.contains(&number) => numbers.push(number),
+            Ok(_) => {}
+            Err(_) if pull_request_metadata == PullRequestMetadata::Optional => {}
+            Err(error) => return Err(error.context(format!("Commit {commit}: `{title}`"))),
+        }
+
+        if commit == latest_addition {
+            return Ok(numbers);
         }
     }
-    Ok(numbers)
+
+    match pull_request_metadata {
+        PullRequestMetadata::Optional => Ok(Vec::new()),
+        PullRequestMetadata::Required => {
+            bail!("Could not find latest addition commit {latest_addition} in the fragment history")
+        }
+    }
 }
 
 fn parse_pull_request_number(commit_title: &str) -> Result<u64> {
@@ -467,12 +532,11 @@ fn ensure_full_git_history(repo_root: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
-fn lookup_pull_requests(_: &Path, _: &Path) -> Result<Vec<u64>> {
+fn lookup_pull_requests(_: &Path, _: &Path, _: PullRequestMetadata) -> Result<Vec<u64>> {
     // Unit tests exercise local parsing and rendering without requiring a Git repository.
     Ok(vec![42])
 }
 
-#[cfg(not(test))]
 fn run_command(cmd: &str, args: &[&str], cwd: &Path) -> Result<String> {
     let display = format!("{cmd} {}", args.join(" "));
     let output = Command::new(cmd)
@@ -744,15 +808,116 @@ mod tests {
 
     #[test]
     fn parses_and_deduplicates_pull_requests_from_commit_titles() {
-        let titles = indoc::indoc! {"
-            fix(foo): adjust bar (#23456)
-            feat(foo): add bar (#12345)
-            feat(foo): add bar (#12345)
+        let history = indoc::indoc! {"
+            c3	fix(foo): adjust bar (#23456)
+            c2	feat(foo): add bar (#12345)
+            c1	feat(foo): add bar (#12345)
         "};
         assert_eq!(
-            parse_pull_request_numbers(titles).unwrap(),
+            parse_pull_request_history(history, "c1", PullRequestMetadata::Required).unwrap(),
             vec![23456, 12345]
         );
+    }
+
+    #[test]
+    fn pull_request_history_stops_at_latest_addition() {
+        let history = indoc::indoc! {"
+            current-edit	fix(foo): adjust bar (#300)
+            current-add	feat(foo): add bar (#298)
+            old-edit	fix(foo): old adjustment (#120)
+            old-add	feat(foo): old addition (#119)
+        "};
+
+        assert_eq!(
+            parse_pull_request_history(history, "current-add", PullRequestMetadata::Required,)
+                .unwrap(),
+            vec![300, 298]
+        );
+    }
+
+    #[test]
+    fn pull_request_lookup_includes_renamed_fragment_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let repo = tmp.path();
+        let changelog_dir = repo.join("changelog.d");
+        fs::create_dir(&changelog_dir).unwrap();
+
+        run_command("git", &["init", "--quiet"], repo).unwrap();
+        run_command("git", &["config", "core.hooksPath", "/dev/null"], repo).unwrap();
+        run_command("git", &["config", "user.name", "Vector Test"], repo).unwrap();
+        run_command("git", &["config", "user.email", "vector@example.com"], repo).unwrap();
+        run_command("git", &["config", "commit.gpgsign", "false"], repo).unwrap();
+
+        let original = changelog_dir.join("original.enhancement.md");
+        let renamed = changelog_dir.join("renamed.enhancement.md");
+        fs::write(
+            &original,
+            "Original entry.\nIt documents the first behavior.\nIt includes migration details.\n",
+        )
+        .unwrap();
+        run_command("git", &["add", "changelog.d/original.enhancement.md"], repo).unwrap();
+        run_command(
+            "git",
+            &["commit", "--quiet", "-m", "feat(foo): add entry (#100)"],
+            repo,
+        )
+        .unwrap();
+
+        run_command(
+            "git",
+            &[
+                "mv",
+                "changelog.d/original.enhancement.md",
+                "changelog.d/renamed.enhancement.md",
+            ],
+            repo,
+        )
+        .unwrap();
+        fs::write(
+            &renamed,
+            "Original entry.\nIt documents the first behavior.\nIt includes migration details.\nOne more detail.\n",
+        )
+        .unwrap();
+        run_command("git", &["add", "changelog.d/renamed.enhancement.md"], repo).unwrap();
+        run_command(
+            "git",
+            &[
+                "commit",
+                "--quiet",
+                "-m",
+                "fix(foo): rename and edit entry (#101)",
+            ],
+            repo,
+        )
+        .unwrap();
+
+        assert_eq!(
+            lookup_pull_requests_from_git(repo, &renamed, PullRequestMetadata::Required).unwrap(),
+            vec![101, 100]
+        );
+    }
+
+    #[test]
+    fn optional_pull_request_metadata_skips_unmerged_commits() {
+        let history = indoc::indoc! {"
+            edit	fix(foo): adjust bar
+            add	feat(foo): add bar (#12345)
+        "};
+
+        assert_eq!(
+            parse_pull_request_history(history, "add", PullRequestMetadata::Optional).unwrap(),
+            vec![12345]
+        );
+        assert!(parse_pull_request_history(history, "add", PullRequestMetadata::Required).is_err());
+    }
+
+    #[test]
+    fn optional_pull_request_metadata_tolerates_missing_history() {
+        assert_eq!(
+            parse_pull_request_history("", "missing", PullRequestMetadata::Optional).unwrap(),
+            Vec::<u64>::new()
+        );
+        assert!(parse_pull_request_history("", "missing", PullRequestMetadata::Required).is_err());
     }
 
     #[test]
@@ -815,7 +980,7 @@ mod tests {
         .unwrap();
         fs::write(dir.join("sec.security.md"), "Patched a CVE.\n").unwrap();
 
-        let entries = read_changelog_fragments(dir, dir).unwrap();
+        let entries = read_changelog_fragments(dir, dir, PullRequestMetadata::Optional).unwrap();
         assert_eq!(entries.len(), 3);
 
         // Sorted by filename
@@ -849,7 +1014,10 @@ mod tests {
     fn read_changelog_fragments_rejects_unknown_type() {
         let tmp = tempfile::tempdir().unwrap();
         fs::write(tmp.path().join("foo.bogus.md"), "x").unwrap();
-        assert!(read_changelog_fragments(tmp.path(), tmp.path()).is_err());
+        assert!(
+            read_changelog_fragments(tmp.path(), tmp.path(), PullRequestMetadata::Optional)
+                .is_err()
+        );
     }
 
     #[test]
