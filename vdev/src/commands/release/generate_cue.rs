@@ -456,8 +456,6 @@ fn render_release_cue(version: &Version, changelog: &[ChangelogEntry]) -> String
         releases: \"{version}\": {{
         \tdate:     \"{date}\"
 
-        \twhats_next: []
-
         \tchangelog: [
         {changelog_block}
         \t]
@@ -737,7 +735,6 @@ mod tests {
 
         assert!(out.starts_with("package metadata\n"));
         assert!(out.contains("releases: \"0.99.0\":"));
-        assert!(out.contains("\twhats_next: []\n"));
         assert!(out.contains("\t\t\ttype: \"feat\"\n"));
         assert!(out.contains("\t\t\t\tAdds a thing.\n"));
         assert!(out.contains("\t\t\t\tMulti-line.\n"));
