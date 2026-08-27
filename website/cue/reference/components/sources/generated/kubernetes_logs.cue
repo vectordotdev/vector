@@ -190,6 +190,17 @@ generated: components: sources: kubernetes_logs: configuration: {
 		required: false
 		type: string: examples: ["/path/to/.kube/config"]
 	}
+	log_collection_strategy: {
+		description: "The strategy to use for log collection."
+		required:    false
+		type: string: {
+			default: "file"
+			enum: {
+				api:  "Collect logs via the Kubernetes Logs API."
+				file: "Collect logs by reading log files from the filesystem."
+			}
+		}
+	}
 	max_line_bytes: {
 		description: """
 			The maximum number of bytes a line can contain before being discarded.
