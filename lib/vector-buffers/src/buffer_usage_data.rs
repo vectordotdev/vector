@@ -400,10 +400,6 @@ impl BufferUsage {
     }
 
     /// Reports usage for the given stages every 2 seconds until they have all been dropped.
-    ///
-    /// Reporting has to stop once the buffer is gone. Looping forever would keep a buffer replaced
-    /// by a configuration reload reporting under the same `buffer_id` as its replacement, and would
-    /// retain both the stages and this task for the life of the process.
     async fn report_buffer_usage(
         mut stages: Vec<(Arc<BufferUsageData>, ReporterCurrentMetrics)>,
         buffer_id: String,
