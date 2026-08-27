@@ -167,6 +167,30 @@ async fn topology_shutdown_while_active() {
 }
 
 #[tokio::test]
+async fn dropping_shutdown_future_aborts_component_tasks() {
+    trace_init();
+
+    let (input, source) = basic_source();
+    let (mut output, sink) = basic_sink(1);
+
+    let mut config = Config::builder();
+    config.add_source("in", source);
+    config.add_sink("out", &["in"], sink);
+
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+    let shutdown = topology.stop();
+    drop(shutdown);
+    drop(input);
+
+    assert!(
+        tokio::time::timeout(ASYNC_TEST_TIMEOUT, output.next())
+            .await
+            .expect("aborted sink did not close its output")
+            .is_none()
+    );
+}
+
+#[tokio::test]
 async fn topology_source_and_sink() {
     trace_init();
 
@@ -444,7 +468,7 @@ async fn shutdown_waits_for_removed_disk_buffered_sink() {
 }
 
 #[tokio::test]
-async fn shutdown_deadline_expires_with_retired_disk_buffered_sink() {
+async fn shutdown_deadline_aborts_retired_disk_buffered_sink() {
     trace_init();
 
     let tmpdir = tempfile::tempdir().expect("no tmpdir");
@@ -501,12 +525,11 @@ async fn shutdown_deadline_expires_with_retired_disk_buffered_sink() {
             .await
             .expect("topology did not stop after graceful shutdown deadline")
     );
-    release.add_permits(1);
     assert!(
         tokio::time::timeout(ASYNC_TEST_TIMEOUT, output.next())
             .await
-            .expect("sink did not emit gated event")
-            .is_some()
+            .expect("aborted sink did not close its output")
+            .is_none()
     );
 }
 
