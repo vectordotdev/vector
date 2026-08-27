@@ -1,6 +1,5 @@
 use std::{
     collections::{BTreeSet, HashMap},
-    env,
     ffi::OsStr,
     fs,
     path::Path,
@@ -78,7 +77,6 @@ const STRATEGY_KEY: &str = "strategy";
 const CUSTOM_STRATEGY: &str = "custom";
 const CONDITION_KEY: &str = "condition";
 const SOURCE_KEY: &str = "source";
-const CARGO_CONFIG_FILENAMES: &[&str] = &["config.toml", "config"];
 
 const UNSUPPORTED_PROVIDER: &str = "cargo vdev feature selection does not support configuration providers; use `cargo run` instead";
 
@@ -279,77 +277,11 @@ fn get_nested_features(
 }
 
 fn kafka_gssapi_feature() -> &'static str {
-    let configured_target = cargo_build_target();
-    let host_target = rustc_host_target();
-    let native_build = configured_target
-        .as_ref()
-        .is_none_or(|target| host_target.as_ref() == Some(target));
-    let target_is_linux = configured_target
-        .as_deref()
-        .or(host_target.as_deref())
-        .map_or(cfg!(target_os = "linux"), |target| {
-            target.split('-').any(|part| part == "linux")
-        });
-
-    select_kafka_gssapi_feature(target_is_linux, native_build && system_sasl_available())
-}
-
-fn select_kafka_gssapi_feature(
-    target_is_linux: bool,
-    target_system_sasl_available: bool,
-) -> &'static str {
-    if target_is_linux && !target_system_sasl_available {
+    if cfg!(target_os = "linux") && !system_sasl_available() {
         GSSAPI_VENDORED_FEATURE
     } else {
         GSSAPI_FEATURE
     }
-}
-
-fn cargo_build_target() -> Option<String> {
-    env::var("CARGO_BUILD_TARGET")
-        .ok()
-        .filter(|target| !target.is_empty())
-        .or_else(configured_cargo_build_target)
-}
-
-fn configured_cargo_build_target() -> Option<String> {
-    let mut directory = env::current_dir().ok()?;
-
-    loop {
-        for filename in CARGO_CONFIG_FILENAMES {
-            let path = directory.join(".cargo").join(filename);
-            let target = fs::read_to_string(path)
-                .ok()
-                .and_then(|config| toml::from_str::<toml::Value>(&config).ok())
-                .and_then(|config| {
-                    config
-                        .get("build")?
-                        .get("target")?
-                        .as_str()
-                        .map(str::to_owned)
-                });
-            if target.is_some() {
-                return target;
-            }
-        }
-
-        if !directory.pop() {
-            return None;
-        }
-    }
-}
-
-fn rustc_host_target() -> Option<String> {
-    let rustc = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-    let output = Command::new(rustc).arg("-vV").output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-
-    String::from_utf8(output.stdout)
-        .ok()?
-        .lines()
-        .find_map(|line| line.strip_prefix("host: ").map(str::to_owned))
 }
 
 fn system_sasl_available() -> bool {
@@ -364,10 +296,7 @@ mod tests {
     use indoc::indoc;
     use std::{fs, path::Path, sync::LazyLock};
 
-    use super::{
-        CargoToml, FeatureConfig, FeatureSet, from_config, kafka_gssapi_feature,
-        select_kafka_gssapi_feature,
-    };
+    use super::{CargoToml, FeatureConfig, FeatureSet, from_config, kafka_gssapi_feature};
 
     static DECLARED_FEATURES: LazyLock<FeatureSet> = LazyLock::new(|| {
         let manifest = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -571,10 +500,6 @@ mod tests {
                 ]
             );
         }
-
-        assert_eq!(select_kafka_gssapi_feature(true, true), "gssapi");
-        assert_eq!(select_kafka_gssapi_feature(true, false), "gssapi-vendored");
-        assert_eq!(select_kafka_gssapi_feature(false, false), "gssapi");
     }
 
     #[test]

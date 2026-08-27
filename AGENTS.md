@@ -79,6 +79,9 @@ Automatic feature selection does not support configuration providers or feature 
 through an environment variable or a `SECRET[...]` reference. It also does not apply YAML merge
 keys (`<<`). Use vanilla Cargo instead:
 
+If automatic feature selection cannot handle the local build environment, use vanilla Cargo as
+the fallback as well.
+
 ```bash
 # Environment variable interpolation
 cargo run -- --config path/to/config.yaml --dangerously-allow-env-var-interpolation
