@@ -71,7 +71,12 @@ impl MaybeTlsSettings {
 
         let acceptor = match (self, reloader) {
             (Self::Raw(()), _) => None,
-            (Self::Tls(_), Some(reloader)) => Some(reloader.shared()),
+            (Self::Tls(tls), Some(reloader)) => {
+                // `reloader`'s acceptor may have been built from settings that predate any
+                // defaults applied to `self` (e.g. the `h2` ALPN default), so refresh it here.
+                reloader.reload(tls)?;
+                Some(reloader.shared())
+            }
             (Self::Tls(tls), None) => Some(Arc::new(ArcSwap::from_pointee(tls.acceptor()?))),
         };
 
