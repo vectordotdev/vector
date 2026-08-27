@@ -371,9 +371,7 @@ where
 {
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
-    // gRPC always runs over HTTP/2, and gRPC clients require the server to confirm `h2` via ALPN
-    // post-handshake (RFC 7540 Section 3.3). None of this function's callers expose an
-    // `alpn_protocols` config option, so the default has to be forced here.
+    // gRPC clients require the server to confirm `h2` via ALPN.
     tls_settings.set_default_alpn_protocols(&["h2"])?;
     let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
     let max_connection_lifetime = keepalive.max_connection_lifetime();
@@ -417,8 +415,7 @@ pub async fn run_grpc_server_with_routes(
 ) -> crate::Result<()> {
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
-    // See the comment in `run_grpc_server` above: gRPC requires `h2` confirmed via ALPN, and
-    // this function's callers don't expose an `alpn_protocols` config option.
+    // See the comment in `run_grpc_server` above.
     tls_settings.set_default_alpn_protocols(&["h2"])?;
     let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
     let max_connection_lifetime = keepalive.max_connection_lifetime();

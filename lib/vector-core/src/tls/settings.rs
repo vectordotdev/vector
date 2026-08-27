@@ -786,7 +786,7 @@ mod test {
         settings.set_default_alpn_protocols(&["h2"]).unwrap();
         assert_eq!(
             settings.alpn_protocols,
-            Some(vec![8, 104, 116, 116, 112, 47, 49, 46, 49])
+            Some(vec![8, 104, 116, 116, 112, 47, 49, 46, 49]) // ALPN-encoded "http/1.1"
         );
     }
 
