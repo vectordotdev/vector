@@ -310,7 +310,7 @@ fn generate_avro_test_case_named_record_reference() -> Result<()> {
                     "type": "record",
                     "name": "Inner",
                     "fields": [
-                        {"name": "date", "type": "int", "logicalType": "date"}
+                        {"name": "date", "type": {"type": "int", "logicalType": "date"}}
                     ]
                 }
             },
