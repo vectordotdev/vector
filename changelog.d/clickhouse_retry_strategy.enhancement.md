@@ -10,6 +10,6 @@ retry_strategy:
   status_codes: [401, 403, 404, 408, 429]
 ```
 
-ClickHouse reports malformed data as a 500 with a `Code: 117` or `Code: 53` body. Those remain non-retriable under every strategy, since retrying a poison pill would block every batch queued behind it.
+ClickHouse reports malformed data as a 500 with a `Code: 117` or `Code: 53` body. Those remain non-retriable under every strategy, since retrying a poison pill would block every batch queued behind it. Every other response, other 500s included, follows the configured strategy.
 
 authors: jamesdangercarpenter
