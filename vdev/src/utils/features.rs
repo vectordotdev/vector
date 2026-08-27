@@ -78,6 +78,9 @@ const CUSTOM_STRATEGY: &str = "custom";
 const CONDITION_KEY: &str = "condition";
 const SOURCE_KEY: &str = "source";
 
+const UNSUPPORTED_DYNAMIC_COMPONENT_TYPE: &str = "cargo vdev feature selection does not support environment or secret interpolation in component types; use `cargo run` instead";
+const UNSUPPORTED_YAML_MERGE_KEY: &str =
+    "cargo vdev feature selection does not support YAML merge keys; use `cargo run` instead";
 const UNSUPPORTED_PROVIDER: &str = "cargo vdev feature selection does not support configuration providers; use `cargo run` instead";
 
 /// Partial configuration used to discover the features needed to compile Vector.
@@ -125,7 +128,13 @@ pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
         None => bail!("Invalid filename {}, no extension", filename.display()),
         Some("json") => serde_json::from_str(&config)?,
         Some("toml") => toml::from_str(&config)?,
-        Some("yaml" | "yml") => serde_yaml::from_str(&config)?,
+        Some("yaml" | "yml") => {
+            let value: serde_yaml::Value = serde_yaml::from_str(&config)?;
+            if contains_yaml_merge_key(&value) {
+                bail!(UNSUPPORTED_YAML_MERGE_KEY);
+            }
+            serde_yaml::from_value(value)?
+        }
         Some(_) => bail!("Invalid filename {}, unknown extension", filename.display()),
     };
 
@@ -137,9 +146,33 @@ pub fn load_and_extract(filename: &Path) -> Result<Vec<String>> {
     from_config(&config, &declared_features)
 }
 
+fn contains_yaml_merge_key(value: &serde_yaml::Value) -> bool {
+    match value {
+        serde_yaml::Value::Sequence(values) => values.iter().any(contains_yaml_merge_key),
+        serde_yaml::Value::Mapping(mapping) => mapping
+            .iter()
+            .any(|(key, value)| key.as_str() == Some("<<") || contains_yaml_merge_key(value)),
+        serde_yaml::Value::Tagged(tagged) => contains_yaml_merge_key(&tagged.value),
+        _ => false,
+    }
+}
+
 fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result<Vec<String>> {
     if config.provider.is_some() {
         bail!(UNSUPPORTED_PROVIDER);
+    }
+    if [
+        &config.enrichment_tables,
+        &config.secret,
+        &config.sources,
+        &config.transforms,
+        &config.sinks,
+    ]
+    .into_iter()
+    .flat_map(|section| section.values())
+    .any(|component| component.r#type.contains('$') || component.r#type.contains("SECRET["))
+    {
+        bail!(UNSUPPORTED_DYNAMIC_COMPONENT_TYPE);
     }
     let mut features = FeatureSet::default();
     add_option(&mut features, "api", config.api.as_ref());
@@ -296,7 +329,9 @@ mod tests {
     use indoc::indoc;
     use std::{fs, path::Path, sync::LazyLock};
 
-    use super::{CargoToml, FeatureConfig, FeatureSet, from_config, kafka_gssapi_feature};
+    use super::{
+        CargoToml, FeatureConfig, FeatureSet, from_config, kafka_gssapi_feature, load_and_extract,
+    };
 
     static DECLARED_FEATURES: LazyLock<FeatureSet> = LazyLock::new(|| {
         let manifest = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -587,6 +622,50 @@ mod tests {
         let error =
             from_config(&config, &DECLARED_FEATURES).expect_err("configuration provider must fail");
 
+        assert!(error.to_string().contains("use `cargo run` instead"));
+    }
+
+    #[test]
+    fn rejects_dynamic_component_types() {
+        for component_type in ["${SOURCE_TYPE}", "SECRET[features.source_type]"] {
+            let config = format!(
+                indoc! {"
+                    sources:
+                      input:
+                        type: '{component_type}'
+                "},
+                component_type = component_type,
+            );
+            let config = serde_yaml::from_str::<FeatureConfig>(&config).expect("config must parse");
+            let error = from_config(&config, &DECLARED_FEATURES)
+                .expect_err("dynamic component type must fail");
+
+            assert!(error.to_string().contains("component types"));
+            assert!(error.to_string().contains("use `cargo run` instead"));
+        }
+    }
+
+    #[test]
+    fn rejects_yaml_merge_keys() {
+        let config = tempfile::Builder::new()
+            .suffix(".yaml")
+            .tempfile()
+            .expect("temporary config must be created");
+        fs::write(
+            config.path(),
+            indoc! {"
+                defaults: &defaults
+                  type: console
+                sinks:
+                  output:
+                    <<: *defaults
+            "},
+        )
+        .expect("temporary config must be written");
+
+        let error = load_and_extract(config.path()).expect_err("YAML merge key must fail");
+
+        assert!(error.to_string().contains("YAML merge keys"));
         assert!(error.to_string().contains("use `cargo run` instead"));
     }
 
