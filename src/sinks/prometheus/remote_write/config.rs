@@ -9,6 +9,7 @@ use super::{
     sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
 };
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     http::HttpClient,
     sinks::{
         prelude::*,
@@ -185,6 +186,22 @@ fn validate_headers(
     Ok(headers)
 }
 
+/// Validates that `aws.region` is set when AWS authentication is selected.
+///
+/// Mirrors the check in `build`.
+#[cfg(feature = "aws-core")]
+fn validate_aws_region(
+    auth: &Option<PrometheusRemoteWriteAuth>,
+    aws: &Option<crate::aws::RegionOrEndpoint>,
+) -> crate::Result<()> {
+    if matches!(auth, Some(PrometheusRemoteWriteAuth::Aws(_)))
+        && aws.as_ref().and_then(|config| config.region()).is_none()
+    {
+        return Err(Errors::AwsRegionRequired.into());
+    }
+    Ok(())
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_remote_write")]
 impl SinkConfig for RemoteWriteConfig {
@@ -192,7 +209,31 @@ impl SinkConfig for RemoteWriteConfig {
         &self.acknowledgements
     }
 
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
+    }
+
+    fn input(&self) -> Input {
+        Input::metric()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedRemoteWrite {
+    tenant_id: Option<ConfinedTemplate>,
+    validated_headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for RemoteWriteConfig {
+    type Validated = ValidatedRemoteWrite;
+
+    fn validate(&self) -> crate::Result<ValidatedRemoteWrite> {
         let tenant_id = self
             .tenant_id
             .clone()
@@ -201,13 +242,39 @@ impl SinkConfig for RemoteWriteConfig {
             })
             .transpose()?;
 
-        let endpoint = self.endpoint.clone();
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let request_settings = self.request.tower.into_settings();
         let validated_headers = Arc::new(validate_headers(
             &self.request.headers,
             self.auth.is_some(),
         )?);
+        let batch_settings = self
+            .batch
+            .batch_settings
+            .validate()?
+            .into_batcher_settings()?;
+
+        #[cfg(feature = "aws-core")]
+        validate_aws_region(&self.auth, &self.aws)?;
+
+        Ok(ValidatedRemoteWrite {
+            tenant_id,
+            validated_headers,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedRemoteWrite,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedRemoteWrite {
+            tenant_id,
+            validated_headers,
+            batch_settings,
+        } = validated;
+
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let request_settings = self.request.tower.into_settings();
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
         let default_namespace = self.default_namespace.clone();
@@ -228,12 +295,12 @@ impl SinkConfig for RemoteWriteConfig {
             }
             #[cfg(feature = "aws-core")]
             Some(PrometheusRemoteWriteAuth::Aws(aws_auth)) => {
-                let region = self
-                    .aws
-                    .as_ref()
-                    .map(|config| config.region())
-                    .ok_or(Errors::AwsRegionRequired)?
-                    .ok_or(Errors::AwsRegionRequired)?;
+                let region = match self.aws.as_ref().and_then(|config| config.region()) {
+                    Some(region) => region,
+                    None => {
+                        unreachable!("aws.region validated by validate() when AWS auth is selected")
+                    }
+                };
                 Some(Auth::Aws {
                     credentials_provider: aws_auth
                         .credentials_provider(region.clone(), cx.proxy(), self.tls.as_ref())
@@ -246,7 +313,7 @@ impl SinkConfig for RemoteWriteConfig {
 
         let healthcheck_endpoint = match cx.healthcheck.uri {
             Some(uri) => uri.uri,
-            None => endpoint.as_uri().clone(),
+            None => self.endpoint.as_uri().clone(),
         };
 
         let healthcheck = healthcheck(
@@ -254,16 +321,16 @@ impl SinkConfig for RemoteWriteConfig {
             healthcheck_endpoint,
             self.compression,
             auth.clone(),
-            Arc::clone(&validated_headers),
+            Arc::clone(validated_headers),
         )
         .boxed();
 
         let service = RemoteWriteService {
-            endpoint,
+            endpoint: self.endpoint.clone(),
             client,
             auth,
             compression: self.compression,
-            headers: validated_headers,
+            headers: Arc::clone(validated_headers),
         };
         let service = ServiceBuilder::new()
             .settings(
@@ -273,14 +340,10 @@ impl SinkConfig for RemoteWriteConfig {
             .service(service);
 
         let sink = RemoteWriteSink {
-            tenant_id,
+            tenant_id: tenant_id.clone(),
             compression: self.compression,
             aggregate: self.batch.aggregate,
-            batch_settings: self
-                .batch
-                .batch_settings
-                .validate()?
-                .into_batcher_settings()?,
+            batch_settings: *batch_settings,
             buckets,
             quantiles,
             default_namespace,
@@ -288,14 +351,6 @@ impl SinkConfig for RemoteWriteConfig {
             service,
         };
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
-        Some(&self.confinement)
-    }
-
-    fn input(&self) -> Input {
-        Input::metric()
     }
 }
 
@@ -371,6 +426,96 @@ mod tests {
         assert!(
             rendered.starts_with("team-"),
             "operator-controlled prefix must be preserved in rendered tenant_id"
+        );
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = RemoteWriteConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
+            tenant_id: Some("team-{{ org }}".try_into().unwrap()),
+            ..Default::default()
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            config.endpoint.to_string(),
+            "http://localhost:8087/api/v1/write"
+        );
+        assert!(validated.tenant_id.is_some());
+        assert!(validated.validated_headers.is_empty());
+    }
+
+    #[test]
+    fn validate_rejects_relative_endpoint() {
+        // The config field is `HttpEndpoint`, whose type-level validation rejects
+        // relative endpoints at load time, so `validate()` never sees them.
+        assert!(
+            HttpEndpoint::parse("/api/v1/write").is_err(),
+            "a relative endpoint must be rejected"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_authority() {
+        // HttpEndpoint rejects endpoints without a host at load time.
+        assert!(
+            HttpEndpoint::parse("https:///api/v1/write").is_err(),
+            "an endpoint without a host must be rejected"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_rejects_aws_auth_without_region() {
+        use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+
+        let config = RemoteWriteConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
+            auth: Some(PrometheusRemoteWriteAuth::Aws(AwsAuthentication::default())),
+            aws: Some(RegionOrEndpoint::default()),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "AWS auth without aws.region must be rejected by validate()"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_accepts_aws_auth_with_region() {
+        use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+
+        let config = RemoteWriteConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
+            auth: Some(PrometheusRemoteWriteAuth::Aws(AwsAuthentication::default())),
+            aws: Some(RegionOrEndpoint::with_region("us-east-1".to_string())),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_ok(),
+            "AWS auth with aws.region must be accepted by validate()"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_accepts_non_aws_auth_without_region() {
+        let config = RemoteWriteConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:8087/api/v1/write").unwrap(),
+            auth: Some(PrometheusRemoteWriteAuth::Basic {
+                user: "user".to_string(),
+                password: "password".to_string(),
+            }),
+            ..Default::default()
+        };
+
+        assert!(
+            config.validate().is_ok(),
+            "non-AWS auth without aws.region must be accepted by validate()"
         );
     }
 }

@@ -734,7 +734,7 @@ generated: components: sources: http_server: configuration: {
 		type: uint: {
 			default: 200
 			examples: [
-				202,
+				202
 			]
 		}
 	}

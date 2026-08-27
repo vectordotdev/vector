@@ -14,7 +14,7 @@ use crate::{
         elasticsearch::{
             BulkConfig, ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig,
         },
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
     template::Template,
     test_util::{
@@ -83,7 +83,7 @@ async fn firehose_put_records_without_partition_key() {
             imds: ImdsAuthentication::default(),
             region: None,
         })),
-        endpoints: vec![elasticsearch_address()],
+        endpoints: vec![HttpEndpoint::parse(&elasticsearch_address()).unwrap()],
         bulk: BulkConfig {
             index: Template::try_from(stream.clone()).expect("unable to parse Template"),
             ..Default::default()
@@ -196,7 +196,7 @@ async fn firehose_put_records_with_partition_key() {
             imds: ImdsAuthentication::default(),
             region: None,
         })),
-        endpoints: vec![elasticsearch_address()],
+        endpoints: vec![HttpEndpoint::parse(&elasticsearch_address()).unwrap()],
         bulk: BulkConfig {
             index: Template::try_from(stream.clone()).expect("unable to parse Template"),
             ..Default::default()

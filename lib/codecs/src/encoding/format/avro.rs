@@ -221,7 +221,9 @@ impl Encoder<Event> for AvroSerializer {
                 .expect("named schemas are initialized above"),
         )?;
         let value = value.resolve(&self.schema)?;
-        let bytes = apache_avro::to_avro_datum(&self.schema, value)?;
+        let writer =
+            apache_avro::writer::datum::GenericDatumWriter::builder(&self.schema).build()?;
+        let bytes = writer.write_value_to_vec(value)?;
         buffer.put_slice(&bytes);
         Ok(())
     }

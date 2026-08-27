@@ -30,9 +30,12 @@ cue-build:
 cue-%:
 	${CUE} $*
 
-.PHONY: config-examples
-config-examples: setup-vdev
+.PHONY: component-examples
+component-examples: setup-vdev
 	$(VDEV) build component-examples website/generated/example-configs
+
+.PHONY: config-examples
+config-examples: component-examples
 
 generate-vrl-docs:
 	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
@@ -41,7 +44,7 @@ generate-vrl-docs:
 generate-deprecations-json:
 	$(VDEV) deprecation generate
 
-structured-data: generate-vrl-docs generate-deprecations-json config-examples
+structured-data: generate-vrl-docs generate-deprecations-json component-examples
 
 serve: clean setup cargo-data structured-data
 	hugo server \
