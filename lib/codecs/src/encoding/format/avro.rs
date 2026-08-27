@@ -111,7 +111,12 @@ fn coerce_logical_types(
                     other => other,
                 };
                 match coerce_logical_types(value.clone(), variant, names) {
-                    Ok(coerced) if coerced.clone().resolve(resolved_variant).is_ok() => {
+                    Ok(coerced)
+                        if coerced
+                            .clone()
+                            .resolve_with_names(resolved_variant, names)
+                            .is_ok() =>
+                    {
                         return Ok(AvroValue::Union(index as u32, Box::new(coerced)));
                     }
                     Ok(_) => {}
