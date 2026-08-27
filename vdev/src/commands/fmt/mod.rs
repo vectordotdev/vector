@@ -2,16 +2,32 @@ use anyhow::Result;
 
 use crate::{app, utils::git::git_ls_files};
 
+mod yaml_in_markdown;
+
 pub(crate) const PRETTIER_EXTENSIONS: &[&str] =
     &["*.yml", "*.yaml", "*.js", "*.ts", "*.tsx", "*.json"];
+
+#[derive(clap::Subcommand, Debug)]
+enum Commands {
+    /// Auto-fix YAML code blocks inside Markdown files
+    YamlInMarkdown(yaml_in_markdown::Cli),
+}
 
 /// Apply format changes across the repository
 #[derive(clap::Args, Debug)]
 #[command()]
-pub struct Cli {}
+pub struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        match self.command {
+            Some(Commands::YamlInMarkdown(cli)) => return cli.exec(),
+            None => {}
+        }
+
         info!("Checking style (trailing spaces, line endings)...");
         app::exec("scripts/check-style.sh", ["--fix"], true)?;
 

@@ -31,7 +31,8 @@ sinks:
     type: "..." # any http-based sink
     request:
       concurrency: "adaptive"
-    # and remove the request.rate_limit_* settings
+      # and remove the request.rate_limit_* settings
+      # rate_limit_*
 ```
 
 [announcement]: /blog/adaptive-request-concurrency/

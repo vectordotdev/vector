@@ -80,7 +80,7 @@ usage of a Boolean expression passed to an `assert` function:
 ```yaml
 conditions:
   - type: "vrl"
-    source: |
+    source: |-
       assert!(is_string(.message) && is_timestamp(.timestamp) && !exists(.other))
 ```
 
@@ -94,7 +94,7 @@ following:
 It's also possible to break a test up into multiple `assert` or `assert_eq` statements:
 
 ```yaml
-source: |
+source: |-
   assert!(exists(.message), "no message field provided")
   assert!(!is_nullish(.message), "message field is an empty string")
   assert!(is_string(.message), "message field has as unexpected type")
@@ -108,11 +108,10 @@ You can also store the Boolean expressions in variables rather than passing the 
 the `assert` function:
 
 ```yaml
-source: |
+source: |-
   message_field_valid = exists(.message) &&
     !is_nullish(.message) &&
     .message == "success"
-
   assert!(message_field_valid)
 ```
 
@@ -127,7 +126,6 @@ sources:
     type: "docker_logs"
     docker_host: "http://localhost:2375"
     include_images: ["web_frontend", "web_backend", "auth_service"]
-
 # The transform being tested is a Vector Remap Language (VRL) transform that
 # adds two fields to each incoming log event: a timestamp and a unique ID
 transforms:
@@ -137,7 +135,6 @@ transforms:
     source: |
       .timestamp = now()
       .id = uuid_v4()
-
 # Here we begin configuring our test suite
 tests:
   - name: "Test for the add_metadata transform"
@@ -159,7 +156,7 @@ tests:
         # The declaration of what we expect
         conditions:
           - type: "vrl"
-            source: |
+            source: |-
               assert!(is_timestamp(.timestamp))
               assert!(is_string(.id))
               assert_eq!(.message, "successful transaction")
@@ -198,10 +195,9 @@ Unit tests need are specified inside of a `tests` array. Each test requires a `n
 ```yaml
 tests:
   - name: "test 1"
-    # Other test config
-
+  # Other test config
   - name: "test_2"
-    # Other test config
+  # Other test config
 
   # etc.
 ```
@@ -230,13 +226,11 @@ Here's an example `inputs` declaration:
 transforms:
   add_metadata:
     # transform config
-
+    key: "value"
 tests:
   - name: "Test add_metadata transform"
-
     inputs:
       - insert_at: "add_metadata"
-
         log_fields:
           message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
 ```
@@ -262,10 +256,9 @@ Here's an example `outputs` declaration:
 ```yaml
 outputs:
   - extract_from: "add_metadata"
-
     conditions:
       - type: "vrl"
-        source: |
+        source: |-
           assert!(is_string(.id))
           assert!(exists(.tags))
 ```
@@ -300,15 +293,12 @@ transforms:
     type: "filter"
     inputs: ["log_source"]
     condition: '.env == "production"'
-
 tests:
   - name: "Filter out non-production events"
     no_outputs_from: ["log_filter"]
-
     inputs:
       - type: "log"
         insert_at: "log_filter"
-
         log_fields:
           message: "success"
           code: 202
@@ -347,6 +337,7 @@ log_fields:
 If there are hyphens in the field name, you will need to quote this part (at least in YAML):
 
 ```yaml
+tests:
   - name: hyphens
     inputs:
       - insert_at: hyphens
@@ -373,7 +364,7 @@ To specify a program to construct the log event, use `source`:
 inputs:
   - insert_at: "canary"
     type: "vrl"
-    source: |
+    source: |-
       . = {"a": {"b": "c"}, "d": now()}
 ```
 
@@ -385,7 +376,6 @@ You can specify the fields in a metric event to be unit tested using a `metric` 
 inputs:
   - insert_at: "my_metric_transform"
     type: "metric"
-
     metric:
       name: "count"
       kind: "absolute"
@@ -422,26 +412,21 @@ transforms:
         log(err, level: "error")
       }
       tags.environment = env
-
 tests:
   - name: "add_unique_id_test"
-
     inputs:
       - insert_at: "add_env_to_metric"
         type: "metric"
-
         metric:
           name: "website_hits"
           kind: "absolute"
           counter:
             value: 1
-
     outputs:
       - extract_from: "add_env_to_metric"
-
         conditions:
           - type: "vrl"
-            source: |
+            source: |-
               assert_eq!(.name, "website_hits")
               assert_eq!(.kind, "absolute")
               assert_eq!(.tags.environment, "production")
@@ -468,7 +453,6 @@ sources:
     type: "docker_logs"
     docker_host: "http://localhost:2375"
     include_images: ["web_backend"]
-
 # The first transform in the chain
 transforms:
   add_env_metadata:
@@ -491,10 +475,8 @@ transforms:
     inputs: ["sanitize"]
     source: |
       .tags.host = "web-backend1.vector-user.biz"
-
 tests:
   - name: "Multiple chained remap transforms"
-
     inputs:
       - type: "log"
         # Insert test input events into the first transform
@@ -507,24 +489,20 @@ tests:
           username: "tonydanza1337"
           email: "tony@whostheboss.com"
           transaction_id: "bcef6a6a-2b72-4a9a-99a0-97ae89d82815"
-
     outputs:
-      - # Extract test outputs from the last transform
-        extract_from: "add_host_metadata"
-
+      # Extract test outputs from the last transform
+      - extract_from: "add_host_metadata"
         conditions:
           - type: "vrl"
             # Our VRL assertions for the test output
-            source: |
+            source: |-
               assert_eq!(.tags.environment, "production", "incorrect environment tag")
               assert_eq!(.tags.host, "web-backend1.vector-user.biz", "incorrect host tag")
               assert!(!exists(.username))
               assert!(!exists(.email))
-
               valid_transaction_id = exists(.transaction_id) &&
                 is_string(.transaction_id) &&
                 length!(.transaction_id) == 36
-
               assert!(valid_transaction_id, "transaction ID invalid")
 ```
 
@@ -539,7 +517,6 @@ only the first two transforms (`add_env_metadata` and `sanitize`):
 ```yaml
 tests:
   - name: "First two transforms"
-
     inputs:
       - type: "log"
         # Insert test input into the first transform
@@ -552,23 +529,19 @@ tests:
           username: "tonydanza1337"
           email: "tony@whostheboss.com"
           transaction_id: "bcef6a6a-2b72-4a9a-99a0-97ae89d82815"
-
     outputs:
-      - # Extract test output from the second transform rather than the last
-        extract_from: "sanitize"
-
+      # Extract test output from the second transform rather than the last
+      - extract_from: "sanitize"
         conditions:
           - type: "vrl"
-            source: |
+            source: |-
               assert_eq!(.tags.environment, "production", "incorrect environment tag")
               assert!(!exists(.tags.host), "host tag included")
               assert!(!exists(.username))
               assert!(!exists(.email))
-
               valid_transaction_id = exists(.transaction_id) &&
                 is_string(.transaction_id) &&
                 length!(.transaction_id) == 36
-
               assert!(valid_transaction_id, "transaction ID invalid")
 ```
 

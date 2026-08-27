@@ -29,7 +29,7 @@ helm show values vector/vector
 
 This example configuration file deploys Vector as an Agent, the [full default configuration](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml) is available in the helm-charts repository. For more information about configuration options, see the [configuration] docs page.
 
-```yaml
+```shell
 cat <<-'VALUES' > values.yaml
 role: Agent
 VALUES

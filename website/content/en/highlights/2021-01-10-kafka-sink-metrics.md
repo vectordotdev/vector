@@ -22,7 +22,6 @@ other end. Getting started is easy:
 sources:
   host_metrics:
     type: "host_metrics"
-
 sinks:
   kafka:
     type: "kafka"
