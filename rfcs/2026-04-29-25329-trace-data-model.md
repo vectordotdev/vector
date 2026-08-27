@@ -128,11 +128,14 @@ declared in the corresponding sub-RFC's Scope section.
 - **All-zero `TraceId` or `SpanId`** are rejected on every ingress path; the span (or
   link) carrying the zero ID is dropped. See "Identifiers" for the drop granularity and
   the sub-RFCs for per-format detection.
-- **`Span.duration` exceeding the encoding wire field's representable maximum** (constructible via
-  the Rust API or VRL integer-nanosecond writes once that view lands) is clamped on encode; each
-  encoder increments a counter and emits a warning log identifying the affected span. The internal `TypedTrace` `fixed64`
-  encoder clamps to `u64::MAX` nanoseconds (~584 years); per-wire-format clamps are documented in
-  the sub-RFCs.
+- **`Span.duration` exceeding an encoding wire field's representable range**
+  (constructible via the Rust API or VRL integer-nanosecond writes once that view lands)
+  is clamped on encode; each encoder increments a counter and emits a warning log
+  identifying the affected span. A direct duration field is clamped to that field's
+  maximum. A derived end timestamp is computed in a wider integer and the result is
+  clamped to the timestamp field's maximum. The internal `TypedTrace` `fixed64` duration
+  encoder clamps to `u64::MAX` nanoseconds (~584 years); per-wire-format clamps are
+  documented in the sub-RFCs.
 - **Pre-epoch timestamps** (negative nanoseconds-since-epoch) are clamped to epoch-zero
   on encode at every wire boundary. The internal `TypedTrace` proto's `fixed64`
   timestamp fields enforce this directly; OTLP and Datadog egress apply the same clamp
@@ -980,20 +983,18 @@ the typed migration must run a release line that includes at least the migration
 boundary release (the fallible decode boundary plus the legacy-layout hint precursor,
 shipped together; see "Plan of Attack").
 
-Single-event encoding via `EventWrapper` is 1:1. Array encoding is 1:1-or-2: in-memory
+Single-event encoding via `EventWrapper` is 1:1. Array encoding is 1:1-or-N: in-memory
 `TraceArray` (a `Vec<TraceEvent>`) can hold a mix of variants when a source that emits
 `Typed` natively and one that still emits `Legacy` fan in to the same downstream
 component, but the wire `EventArray.events` oneof must select one variant. The encoder
-splits mixed arrays into a homogeneous-`Legacy` half and a homogeneous-`Typed` half,
-emitting two consecutive `EventArray`s. `From` for the wire `EventArray` returns a
+splits a mixed array into maximal contiguous homogeneous runs, preserving the original
+interleaving: `[Legacy1, Typed1, Legacy2, Typed2]` emits four one-element `EventArray`s,
+while `[Legacy1, Legacy2, Typed1]` emits two. `From` for the wire `EventArray` returns a
 `SmallVec<[event::EventArray; 1]>` so the homogeneous case is allocation-free, and the
-disk-buffer write and `vector`-sink encode sites loop over the result. `Finalizable` is
-per-event, so split halves carry their own finalizers and ack independently. Decoders
-see only homogeneous wire arrays; mixing reappears at fan-in points downstream. Per-
-event ordering across variants within a mixed batch is not preserved by the split
-(`[Legacy, Typed, Legacy, Typed]` emerges as `[Legacy, Legacy, Typed, Typed]`); trace
-event ordering across a batch is not a spec-defined property, and no Vector sink derives
-partition keys from event position within a batch.
+disk-buffer write and `vector`-sink encode sites loop over the runs in order.
+`Finalizable` is per-event, so each run carries its own finalizers and acknowledges
+independently. Decoders see only homogeneous wire arrays; mixing reappears at fan-in
+points downstream without changing event order observed by stateful components.
 
 Removing the `Legacy` Rust variant does not immediately retire the proto: `LegacyTrace`,
 `LegacyTraceArray`, and the `legacy_*` oneof variants are first marked
@@ -1013,14 +1014,13 @@ deleted.
 
 Verification covers five cases: (1) both `EventWrapper` variants round-trip byte-exact;
 (2) all-`Legacy` and all-`Typed` `TraceArray`s each round-trip byte-exact through
-`EventArray`; (3) a mixed in-memory `TraceArray` encodes to two homogeneous wire
-`EventArray`s and decodes back containing the same events (per-variant ordering
-preserved within each half, across-variant interleaving not); (4) an older-Vector
-simulation reads a `typed_*`-tagged message against a schema in which those variants are
-unknown and surfaces a controlled `DecodeError::UnknownEventVariant` from which the
-consumer recovers by logging a warning and dropping the message; and (5) pre-hint OTLP
-and Datadog `LegacyTrace` fixtures uniquely select their decoders after the Rust
-`Legacy` arm is removed, while zero-match and ambiguous fixtures fail controllably.
+`EventArray`; (3) mixed arrays with adjacent and alternating variants encode to maximal
+homogeneous runs and decode back in exact original order; (4) an older-Vector simulation
+reads a `typed_*`-tagged message against a schema in which those variants are unknown and
+surfaces a controlled `DecodeError::UnknownEventVariant` from which the consumer
+recovers by logging a warning and dropping the message; and (5) pre-hint OTLP and
+Datadog `LegacyTrace` fixtures uniquely select their decoders after the Rust `Legacy`
+arm is removed, while zero-match and ambiguous fixtures fail controllably.
 This pins the failure-mode property that motivated the sibling-variant design over the
 alternatives in "Alternatives".
 
@@ -1418,10 +1418,10 @@ require duplicate code paths in performance-sensitive components.
 
 The chosen design is selected against two imperatives: incompatibility with older
 Vector instances must surface loudly (not as silent data drops), and the post-migration
-wire schema should carry no vestiges of the migration. The encoder's 1:1-or-2 boundary
--- a mixed in-memory array splits into a homogeneous-`Legacy` half and a
-homogeneous-`Typed` half on encode -- is the cost paid for both imperatives. Each
-rejected alternative fails at least one:
+wire schema should carry no vestiges of the migration. The encoder's 1:1-or-N boundary
+-- a mixed in-memory array splits into maximal contiguous homogeneous runs on encode --
+is the cost paid for both imperatives while preserving event order. Each rejected
+alternative fails at least one:
 
 - **Extend `Trace` with a typed-fields field**, discriminator by field-presence. Fails
   loud-incompatibility: an older Vector ignores the unknown field and decodes the rest

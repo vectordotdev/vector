@@ -84,7 +84,7 @@ below.
 
 The OTLP-side consequences of model-level exclusions defined in the parent RFC (zero-ID
 rejection and pre-epoch timestamps via the internal proto's `fixed64` encoding) also
-apply. The OTLP-specific duration-overflow clamp is documented under "Span timing"
+apply. The OTLP-specific end-timestamp overflow clamp is documented under "Span timing"
 below.
 
 ## Pain
@@ -228,9 +228,12 @@ A span with reversed timestamps (`end_time_unix_nano < start_time_unix_nano`) is
 duration on ingress, a counter is incremented, and a warning log is emitted; this is one of the
 OTLP-side zero-loss exclusions listed above.
 
-A `Duration` exceeding `u64::MAX` nanoseconds (~584 years) is clamped to `u64::MAX` on
-encode through the OTLP `fixed64` `start_time_unix_nano` and `end_time_unix_nano` wire
-fields per the parent RFC's guideline; no additional OTLP-specific behaviour.
+On egress, the encoder computes `start_time_unix_nano + duration.as_nanos()` in `u128`
+and clamps the resulting `end_time_unix_nano` to `u64::MAX` before narrowing to the OTLP
+`fixed64`. This handles both a `Duration` exceeding `u64::MAX` nanoseconds and a smaller
+duration whose addition to a positive start time exceeds the end field. A clamp
+increments a counter and emits a warning log identifying the affected span; the encoded
+duration is effectively reduced to `u64::MAX - start_time_unix_nano`.
 
 A pre-epoch `DateTime<Utc>` value in `Span.start_time` or `SpanEvent.time` (writable via
 the Rust API or VRL but never produced by OTLP ingress, since `fixed64` is unsigned) is
@@ -422,9 +425,10 @@ proto extension) are owned by the parent RFC's Plan of Attack and must land firs
 - [ ] Property-based round-trip unit tests for `OTLP -> Vector -> OTLP` asserting
   effective equivalence per Scope: typed-slot promotion (non-empty, empty, and non-string
   cases), `deployment.environment` legacy-key handling, reversed-timestamp clamping,
-  oversized duration clamping, default-valued / absent equivalence for `Resource` /
-  `Scope` / `Status`, `chunk = None` and reserved-key `Some` materialization, and unknown
-  enum-number forward compatibility for `SpanKind` and `SpanStatus`.
+  oversized duration and positive-start end-timestamp overflow clamping, default-valued /
+  absent equivalence for `Resource` / `Scope` / `Status`, `chunk = None` and reserved-key
+  `Some` materialization, and unknown enum-number forward compatibility for `SpanKind`
+  and `SpanStatus`.
 - [ ] Migrate the `opentelemetry` sink to consume `Typed` natively; wire the
   `lib/opentelemetry-proto` encoder into the sink's trace path and cover the end-to-end
   HTTP export flow with typed-input tests.
