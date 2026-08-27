@@ -215,6 +215,65 @@ mod test {
             .unwrap()
     }
 
+    /// A reloader built before ALPN defaults are applied to its settings (mirroring
+    /// `run_grpc_server`, which receives an already-built reloader and only then calls
+    /// `set_default_alpn_protocols`) must still serve those defaults once bound: `bind_reloadable`
+    /// has to refresh the reloader's acceptor from the settings passed into that call, not just
+    /// reuse whatever acceptor the reloader already held.
+    #[tokio::test]
+    async fn bind_reloadable_applies_alpn_default_set_after_reloader_is_built() {
+        let (crt, key) = self_signed("alpn.example");
+        let mut settings = server_settings(&crt, &key);
+
+        // Build the reloader from settings that don't have the `h2` default applied yet.
+        let reloader = settings
+            .reloadable_acceptor()
+            .unwrap()
+            .expect("tls enabled, so an acceptor should exist");
+
+        // Only now apply the default, as `run_grpc_server` does, right before binding.
+        settings.set_default_alpn_protocols(&["h2"]).unwrap();
+
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut listener = settings
+            .bind_reloadable(&addr, Some(reloader))
+            .await
+            .unwrap();
+        let local_addr = listener.local_addr().unwrap();
+
+        let server = tokio::spawn(async move {
+            while let Ok(mut stream) = listener.accept().await {
+                stream.handshake().await.ok();
+            }
+        });
+
+        assert_eq!(
+            negotiated_alpn_protocol(local_addr).await,
+            Some(b"h2".to_vec()),
+            "acceptor served through the reloader must reflect the ALPN default applied after the \
+             reloader was built"
+        );
+
+        server.abort();
+    }
+
+    /// Connect as a TLS client offering `h2` via ALPN and return the protocol the server selected.
+    async fn negotiated_alpn_protocol(addr: SocketAddr) -> Option<Vec<u8>> {
+        let tcp = tokio::net::TcpStream::connect(addr).await.unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder.set_verify(SslVerifyMode::NONE);
+        builder.set_alpn_protos(&[2, b'h', b'2']).unwrap();
+        let mut config = builder.build().configure().unwrap();
+        config.set_verify_hostname(false);
+        let ssl = config.into_ssl("localhost").unwrap();
+
+        let mut stream = tokio_openssl::SslStream::new(ssl, tcp).unwrap();
+        Pin::new(&mut stream).connect().await.unwrap();
+
+        stream.ssl().selected_alpn_protocol().map(<[u8]>::to_vec)
+    }
+
     fn server_settings(crt_pem: &str, key_pem: &str) -> MaybeTlsSettings {
         // `crt_file`/`key_file` accept inline PEM (detected by the `-----BEGIN ` marker), so no
         // temp files are needed.
