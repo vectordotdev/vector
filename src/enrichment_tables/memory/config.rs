@@ -257,7 +257,7 @@ impl MemoryConfig {
         }
     }
 
-    fn validate_filter_compat(&self) -> crate::Result<()> {
+    fn validate_filter(&self) -> crate::Result<()> {
         match &self.filter {
             Some(TableFilter::Cuckoo(_)) if self.source_config.is_some() => {
                 return Err("Source functionality is not supported for cuckoo filter".into());
@@ -293,7 +293,7 @@ impl EnrichmentTableConfig for MemoryConfig {
         _globals: &crate::config::GlobalOptions,
         prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        self.validate_filter_compat()?;
+        self.validate_filter()?;
         match &self.filter {
             Some(TableFilter::Cuckoo(_)) => {
                 Ok(Box::new(self.get_or_build_cuckoo(prev_state).await?))
@@ -353,7 +353,7 @@ impl ValidatedSink for MemoryConfig {
     type Validated = ();
 
     fn validate(&self) -> crate::Result<Self::Validated> {
-        self.validate_filter_compat()?;
+        self.validate_filter()?;
         Ok(())
     }
 
