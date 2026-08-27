@@ -208,7 +208,9 @@ impl VectorConfig {
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> serde_json::Value {
-        serde_json::to_value(default_config("127.0.0.1:6000")).unwrap()
+        // `address` is deprecated, so the generated example specifies the
+        // scheme explicitly rather than relying on the scheme-less default.
+        serde_json::to_value(default_config("https://127.0.0.1:6000")).unwrap()
     }
 }
 
@@ -247,6 +249,24 @@ pub struct ValidatedVector {
     request_settings: TowerRequestSettings,
     batch_settings: BatcherSettings,
     endpoints: Vec<ValidatedEndpoint>,
+}
+
+impl ValidatedVector {
+    /// Emits a `DEPRECATION` warning for each scheme-less endpoint that
+    /// defaults to `http`. Scheme-less `address` and `routing.endpoints`
+    /// values default to `http`, or `https` when TLS is enabled; only the
+    /// `http` default is deprecated, as it will be reinterpreted as `https`
+    /// in a future release. Users should specify the scheme explicitly.
+    fn warn_on_scheme_defaulted_endpoints(&self, tls: bool) {
+        for endpoint in &self.endpoints {
+            if endpoint.scheme_defaulted && !tls {
+                warn!(
+                    message = "[DEPRECATED] scheme-less `address` or `routing.endpoints` value in the `vector` sink defaults to `http`. This behavior is deprecated and will change to `https` in a future release. Specify the scheme explicitly.",
+                    endpoint = %endpoint.endpoint.as_uri(),
+                );
+            }
+        }
+    }
 }
 
 /// An endpoint parsed during validation, ready for `build` to apply the
@@ -319,12 +339,13 @@ impl ValidatedSink for VectorConfig {
         validated: &ValidatedVector,
         cx: SinkContext,
     ) -> crate::Result<(VectorSinkType, Healthcheck)> {
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
+        validated.warn_on_scheme_defaulted_endpoints(tls.is_tls());
         let ValidatedVector {
             request_settings,
             batch_settings,
             endpoints,
         } = validated.clone();
-        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let uris = endpoints
             .iter()
             .map(|endpoint| endpoint.with_scheme(tls.is_tls()))
@@ -1685,5 +1706,87 @@ mod tests {
             err.downcast_ref::<HttpEndpointError>().is_some(),
             "expected an endpoint parse error, got: {err}"
         );
+    }
+
+    #[test]
+    fn build_warns_on_scheme_less_endpoint() {
+        let config = VectorConfig {
+            address: Some("127.0.0.1:6000".to_owned()),
+            ..default_config("127.0.0.1:6000")
+        };
+        let validated = config.validate().expect("validation should succeed");
+
+        let warnings = capture_warn_logs(|| validated.warn_on_scheme_defaulted_endpoints(false));
+        assert_eq!(warnings.len(), 1, "expected one warning, got: {warnings:?}");
+        assert!(
+            warnings[0].contains("[DEPRECATED]"),
+            "warning should lead with [DEPRECATED]: {warnings:?}"
+        );
+        assert!(
+            warnings[0].contains("127.0.0.1:6000"),
+            "warning should name the endpoint: {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn build_does_not_warn_on_explicit_scheme() {
+        let config = VectorConfig::from_address("http://127.0.0.1:6000".parse().unwrap());
+        let validated = config.validate().expect("validation should succeed");
+
+        let warnings = capture_warn_logs(|| validated.warn_on_scheme_defaulted_endpoints(false));
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+    }
+    #[test]
+    fn build_does_not_warn_on_scheme_less_endpoint_with_tls() {
+        // With TLS enabled, a scheme-less endpoint defaults to `https`, which
+        // is the future behavior, so no deprecation warning is emitted.
+        let config = VectorConfig {
+            address: Some("127.0.0.1:6000".to_owned()),
+            ..default_config("127.0.0.1:6000")
+        };
+        let validated = config.validate().expect("validation should succeed");
+
+        let warnings = capture_warn_logs(|| validated.warn_on_scheme_defaulted_endpoints(true));
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+    }
+
+    /// Runs `f` under a subscriber that renders `WARN`-level logs to a buffer
+    /// and returns the rendered lines.
+    fn capture_warn_logs<F: FnOnce()>(f: F) -> Vec<String> {
+        use parking_lot::Mutex;
+        use tracing_subscriber::{Layer, fmt::MakeWriter, layer::SubscriberExt};
+
+        #[derive(Clone, Default)]
+        struct Capture(Arc<Mutex<Vec<u8>>>);
+
+        impl std::io::Write for Capture {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        impl<'a> MakeWriter<'a> for Capture {
+            type Writer = Capture;
+            fn make_writer(&'a self) -> Self::Writer {
+                self.clone()
+            }
+        }
+
+        let capture = Capture::default();
+        let subscriber = tracing_subscriber::registry().with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(capture.clone())
+                .with_filter(tracing_subscriber::filter::LevelFilter::WARN),
+        );
+        tracing::subscriber::with_default(subscriber, f);
+        String::from_utf8(capture.0.lock().clone())
+            .expect("captured logs should be utf-8")
+            .lines()
+            .map(str::to_owned)
+            .collect()
     }
 }
