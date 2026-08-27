@@ -21,13 +21,20 @@ use super::{MaybeTlsSettings, TlsSettings};
 #[derive(Clone)]
 pub struct TlsAcceptorReloader {
     acceptor: Arc<ArcSwap<SslAcceptor>>,
+    /// ALPN protocol names to apply to every acceptor this reloader builds, unless the settings
+    /// passed to [`reload`](Self::reload) already configure their own. Set by
+    /// [`MaybeTlsSettings::reloadable_acceptor_for_grpc`], since `reload`'s caller (e.g. a
+    /// certificate-rotation watcher) rebuilds `TlsSettings` from scratch and has no reason to know
+    /// this reloader serves a gRPC listener.
+    default_alpn_protocols: Option<Vec<String>>,
 }
 
 impl TlsAcceptorReloader {
     /// Wrap an initial acceptor in a swappable cell.
-    pub(super) fn new(acceptor: SslAcceptor) -> Self {
+    pub(super) fn new(acceptor: SslAcceptor, default_alpn_protocols: Option<Vec<String>>) -> Self {
         Self {
             acceptor: Arc::new(ArcSwap::from_pointee(acceptor)),
+            default_alpn_protocols,
         }
     }
 
@@ -36,9 +43,16 @@ impl TlsAcceptorReloader {
         Arc::clone(&self.acceptor)
     }
 
-    /// Swap in a freshly built acceptor from `settings`. New connections pick it up
-    /// immediately; the previous acceptor is dropped once its last in-flight handshake completes.
+    /// Swap in a freshly built acceptor from `settings`, applying this reloader's ALPN default
+    /// (see [`MaybeTlsSettings::reloadable_acceptor_for_grpc`]) if `settings` doesn't already
+    /// configure `alpn_protocols` itself. New connections pick up the swapped acceptor
+    /// immediately; the previous one is dropped once its last in-flight handshake completes.
     pub fn reload(&self, settings: &TlsSettings) -> crate::tls::Result<()> {
+        let mut settings = settings.clone();
+        if let Some(default) = &self.default_alpn_protocols {
+            let protocols: Vec<&str> = default.iter().map(String::as_str).collect();
+            settings.set_default_alpn_protocols(&protocols)?;
+        }
         self.acceptor.store(Arc::new(settings.acceptor()?));
         Ok(())
     }
@@ -47,6 +61,7 @@ impl TlsAcceptorReloader {
     pub fn downgrade(&self) -> WeakTlsAcceptorReloader {
         WeakTlsAcceptorReloader {
             acceptor: Arc::downgrade(&self.acceptor),
+            default_alpn_protocols: self.default_alpn_protocols.clone(),
         }
     }
 }
@@ -55,14 +70,16 @@ impl TlsAcceptorReloader {
 #[derive(Clone)]
 pub struct WeakTlsAcceptorReloader {
     acceptor: Weak<ArcSwap<SslAcceptor>>,
+    default_alpn_protocols: Option<Vec<String>>,
 }
 
 impl WeakTlsAcceptorReloader {
     /// Return the live [`TlsAcceptorReloader`], or `None` once the bound listener has been dropped.
     pub fn upgrade(&self) -> Option<TlsAcceptorReloader> {
-        self.acceptor
-            .upgrade()
-            .map(|acceptor| TlsAcceptorReloader { acceptor })
+        self.acceptor.upgrade().map(|acceptor| TlsAcceptorReloader {
+            acceptor,
+            default_alpn_protocols: self.default_alpn_protocols.clone(),
+        })
     }
 }
 
@@ -74,7 +91,27 @@ impl MaybeTlsSettings {
     /// certificate material rotates.
     pub fn reloadable_acceptor(&self) -> crate::tls::Result<Option<TlsAcceptorReloader>> {
         match self {
-            Self::Tls(tls) => Ok(Some(TlsAcceptorReloader::new(tls.acceptor()?))),
+            Self::Tls(tls) => Ok(Some(TlsAcceptorReloader::new(tls.acceptor()?, None))),
+            Self::Raw(()) => Ok(None),
+        }
+    }
+
+    /// Like [`reloadable_acceptor`](Self::reloadable_acceptor), but for a gRPC listener: the
+    /// returned reloader defaults every acceptor it builds, including on future
+    /// [`reload`](TlsAcceptorReloader::reload) calls, to advertise `h2` via ALPN unless the
+    /// settings passed to `reload` already configure `alpn_protocols` themselves. gRPC always runs
+    /// over HTTP/2, and strict gRPC clients fail the handshake without a confirmed ALPN protocol
+    /// (RFC 7540 Section 3.3).
+    pub fn reloadable_acceptor_for_grpc(&self) -> crate::tls::Result<Option<TlsAcceptorReloader>> {
+        match self {
+            Self::Tls(tls) => {
+                let mut tls = tls.clone();
+                tls.set_default_alpn_protocols(&["h2"])?;
+                Ok(Some(TlsAcceptorReloader::new(
+                    tls.acceptor()?,
+                    Some(vec!["h2".to_owned()]),
+                )))
+            }
             Self::Raw(()) => Ok(None),
         }
     }
@@ -252,6 +289,57 @@ mod test {
             Some(b"h2".to_vec()),
             "acceptor served through the reloader must reflect the ALPN default applied after the \
              reloader was built"
+        );
+
+        server.abort();
+    }
+
+    /// `reloadable_acceptor_for_grpc`'s `h2` default must survive a later certificate rotation, even
+    /// when whoever triggers the rotation (e.g. a generic file-watcher, unaware this reloader serves
+    /// a gRPC listener) reloads with settings that never went through `set_default_alpn_protocols`.
+    #[tokio::test]
+    async fn reloadable_acceptor_for_grpc_applies_default_across_reload() {
+        let (crt_a, key_a) = self_signed("alpn.example");
+        let (crt_b, key_b) = self_signed("alpn.example");
+        let settings = server_settings(&crt_a, &key_a);
+
+        let reloader = settings
+            .reloadable_acceptor_for_grpc()
+            .unwrap()
+            .expect("tls enabled, so an acceptor should exist");
+
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut listener = settings
+            .bind_reloadable(&addr, Some(reloader.clone()))
+            .await
+            .unwrap();
+        let local_addr = listener.local_addr().unwrap();
+
+        let server = tokio::spawn(async move {
+            while let Ok(mut stream) = listener.accept().await {
+                stream.handshake().await.ok();
+            }
+        });
+
+        assert_eq!(
+            negotiated_alpn_protocol(local_addr).await,
+            Some(b"h2".to_vec()),
+            "h2 must be negotiated before any reload"
+        );
+
+        // Rotate the certificate with settings that don't know about the `h2` default, mirroring a
+        // generic reload path (e.g. a certificate-file watcher shared with non-gRPC listeners).
+        let settings_b = server_settings(&crt_b, &key_b);
+        let tls_b = match &settings_b {
+            MaybeTls::Tls(tls) => tls.clone(),
+            MaybeTls::Raw(()) => unreachable!(),
+        };
+        reloader.reload(&tls_b).unwrap();
+
+        assert_eq!(
+            negotiated_alpn_protocol(local_addr).await,
+            Some(b"h2".to_vec()),
+            "h2 must still be negotiated after a reload that didn't itself request it"
         );
 
         server.abort();
