@@ -74,7 +74,7 @@ below.
   `datadog.span.resource`, `datadog.span.type`): lifted from `Span.attributes` into
   typed `TraceEvent.chunk` / `Span.resource_name` / `Span.span_type` slots on OTLP
   ingress and stripped; synthesized into `Span.attributes` from the typed slots on OTLP
-  egress, overwriting any existing attribute at the same key. The Datadog sub-RFC
+  egress, removing or replacing any existing attribute at the same key. The Datadog sub-RFC
   specifies the contents these keys carry; this sub-RFC reserves the keys.
 - **OTLP fields at `Development` or `Alpha` stability tier** are dropped on OTLP ingress.
 - **`Span.end_time_unix_nano < start_time_unix_nano`** is clamped to zero duration on
@@ -116,7 +116,8 @@ decoders.
 
 Each OTLP `ScopeSpans` is one `TraceEvent`. The containing `ResourceSpans.resource`
 populates `TraceEvent.resource`; the `ScopeSpans.scope` populates `TraceEvent.scope`; the
-spans inside populate `TraceEvent.spans`; `TraceEvent.chunk` is default-empty. A
+spans inside populate `TraceEvent.spans`; `TraceEvent.chunk` is `None` unless reserved
+`datadog.chunk.*` attributes are lifted as specified below. A
 `ScopeSpans` with an empty `spans` repeated field produces a `TraceEvent` with
 `spans = []`, forwarded per the parent RFC's empty-spans guideline; on OTLP egress an
 empty-spans `TraceEvent` becomes one `ScopeSpans { spans: [] }`.
@@ -149,7 +150,7 @@ identical `Resource` content but different `schema_url` values produce separate
 `ResourceSpans` messages; the grouping key includes `schema_url`. The `_dd.*` reserved
 keys in `Resource.attributes` (`_dd.payload`, `_dd.tracer`) and `Span.attributes`
 (`_dd.meta_struct`) egress through the generic `AttrValue` -> `AnyValue` mapping under
-their model-level keys. Typed-only Datadog state (`TraceEvent.chunk.*`,
+their model-level keys. Typed-only Datadog state (`TraceEvent.chunk`,
 `Span.resource_name`, `Span.span_type`) has no attribute-map representation; the OTLP
 sink synthesizes it into `Span.attributes` under reserved keys (see "Reserved OTLP-egress
 keys" below) for best-effort cross-format relay.
@@ -294,7 +295,7 @@ bytes differ:
 
 #### Reserved OTLP-egress keys for typed-only Datadog state
 
-`TraceEvent.chunk.*`, `Span.resource_name`, and `Span.span_type` are typed-only fields
+`TraceEvent.chunk`, `Span.resource_name`, and `Span.span_type` are typed-only fields
 with no attribute-map representation, so the generic `AttrValue` -> `AnyValue` mapping
 does not carry them through OTLP. The OTLP sink synthesizes them into `Span.attributes`
 under the following reserved keys, and OTLP ingress lifts the same keys back into the
@@ -313,24 +314,26 @@ contents these keys carry; this sub-RFC reserves the keys at OTLP-wire-level:
   `string_value`.
 - `Span.attributes."datadog.span.type"` -- carries `Span.span_type` as `string_value`.
 
-Each reserved key is omitted when the typed source is `None` or default-valued, so an
-OTLP-sourced span with default chunk state carries no `datadog.chunk.*` attributes. On
-OTLP ingress, an absent reserved key restores the typed slot to its default
-(`None` / `false` / `{}`), so the egress-omit-on-default pairs with an
-ingress-default-on-absent rule and the round trip is preserved.
+Chunk keys are synthesized only when `TraceEvent.chunk` is `Some`; optional or
+default-valued fields within that context are omitted. An all-default `Some` therefore
+emits no chunk keys and re-ingests as `None`; preserving Datadog chunk presence through
+an OTLP hop is part of the explicitly best-effort cross-format path, not the OTLP
+round-trip guarantee. `Span.resource_name` and `Span.span_type` keys are omitted when
+their typed slot is `None`.
 
-Reserved-key semantics: any existing attribute at one of the reserved keys above on
-OTLP egress is overwritten by the synthesized value (the typed slot is the single source
-of truth). On OTLP ingress, the keys are lifted into their typed slots and stripped from
-`Span.attributes` so OTLP egress through the same Vector emits them once under the typed
-path, not twice. Cross-format recovery via these keys is best-effort and is explicitly
-outside the OTLP round-trip guarantee (see "Out of scope" above).
+Reserved-key semantics: on OTLP egress the typed slot is the single source of truth, so
+any existing attribute at a reserved key is removed and replaced only when the typed
+value requires emission. On OTLP ingress, the keys are lifted into their typed slots and
+stripped from `Span.attributes` so OTLP egress through the same Vector emits them once
+under the typed path, not twice. Cross-format recovery via these keys is best-effort and
+is explicitly outside the OTLP round-trip guarantee (see "Out of scope" above).
 
 For per-span chunk-context recovery on OTLP ingress: spans within the same `ScopeSpans` typically
 share chunk-context values (the wire shape mirrors the original `TraceChunk` on the Datadog side of
 the relay), but in the degenerate case where spans within a `ScopeSpans` carry conflicting values
 for the same `datadog.chunk.*` key, the wire-order- first value wins, a counter is incremented, and
-a warning log is emitted; if the keys are absent on all spans, `ChunkContext` is default-empty.
+a warning log is emitted. Any chunk key materializes `Some(ChunkContext::default())`
+before applying its value; if all chunk keys are absent, `TraceEvent.chunk` is `None`.
 
 ## Rationale
 
@@ -373,7 +376,7 @@ a warning log is emitted; if the keys are absent on all spans, `ChunkContext` is
 
 - [OTLP traces protocol](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto)
   -- the primary shape this RFC adopts. The container `TraceEvent` is structurally one
-  `ScopeSpans` plus its `Resource` and the Datadog-only `ChunkContext`.
+  `ScopeSpans` plus its `Resource` and an optional Datadog-only `ChunkContext`.
 - The OpenTelemetry [Collector OTLP receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
   is the reference implementation of the OTLP ingress semantics; Vector's OTLP source
   follows the same wire decoding.
@@ -418,8 +421,8 @@ proto extension) are owned by the parent RFC's Plan of Attack and must land firs
   effective equivalence per Scope: typed-slot promotion (non-empty, empty, and non-string
   cases), `deployment.environment` legacy-key handling, reversed-timestamp clamping,
   oversized duration clamping, default-valued / absent equivalence for `Resource` /
-  `Scope` / `Status`, and unknown enum-number forward compatibility for `SpanKind` and
-  `SpanStatus`.
+  `Scope` / `Status`, `chunk = None` and reserved-key `Some` materialization, and unknown
+  enum-number forward compatibility for `SpanKind` and `SpanStatus`.
 - [ ] Migrate the `opentelemetry` sink to consume `Typed` natively; wire the
   `lib/opentelemetry-proto` encoder into the sink's trace path and cover the end-to-end
   HTTP export flow with typed-input tests.

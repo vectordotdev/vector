@@ -85,8 +85,8 @@ Trace Context, and other informational entries are defined in the
 - The two resource-scoped reserved keys (`Resource.attributes."_dd.payload"` and
   `Resource.attributes."_dd.tracer"`) carrying the agent-payload envelope and
   tracer-payload tags.
-- The chunk-scoped typed state on `TraceEvent.chunk` (`priority`, `origin`, `dropped`,
-  `tags`).
+- The chunk-scoped typed state in `TraceEvent.chunk = Some(...)` (`priority`, `origin`,
+  `dropped`, `tags`).
 - The multi-service chunk split rule on ingress and the corresponding re-coalescence rule
   on egress, including the cross-grouping invariant for non-conforming multi-trace chunks.
 - The envelope reconstruction policy for `AgentPayload` and `TracerPayload` on egress, both
@@ -217,10 +217,10 @@ The grouping rules are:
   `Span.service` is split into one event per distinct service; egress re-coalesces such
   events back into a single chunk (see below). A `TraceChunk` whose `spans` repeated
   field is empty produces one `TraceEvent` with `spans = []` (the chunk envelope still
-  populates `TraceEvent.chunk` and the enclosing `TracerPayload` / `AgentPayload`
-  populate `Resource`); `Resource.service` is `None` because no `Span.service` is
-  available. The event is forwarded per the empty-spans rule under the parent RFC's
-  Identifiers.
+  populates `TraceEvent.chunk = Some(...)` and the enclosing `TracerPayload` /
+  `AgentPayload` populate `Resource`); `Resource.service` is `None` because no
+  `Span.service` is available. The event is forwarded per the empty-spans rule under the
+  parent RFC's Identifiers.
 - The enclosing `TracerPayload`'s metadata (`hostname`, `env`, `containerID`,
   `languageName`, `tracerVersion`, etc.) populates the event's `Resource`. Per-span
   `Span.service` populates `Resource.service`.
@@ -229,7 +229,8 @@ The grouping rules are:
   `Resource.attributes."_dd.payload"` as a structured sub-object;
   `TracerPayload.tags` populates `Resource.attributes."_dd.tracer"` (see "Datadog
   resource-scoped state" below).
-- `TraceChunk.{priority, origin, droppedTrace, tags}` populate `TraceEvent.chunk`.
+- `TraceChunk.{priority, origin, droppedTrace, tags}` populate
+  `TraceEvent.chunk = Some(ChunkContext { ... })`, including when every field is default.
 - `Scope` is left default; Datadog has no scope concept.
 
 | Datadog                                                       | Internal                                              |
@@ -239,7 +240,7 @@ The grouping rules are:
 | `Span.service` (per span)                                     | `Resource.service` of the event holding the span      |
 | `AgentPayload` envelope (whole message; see below)            | `Resource.attributes."_dd.payload"`                   |
 | `TracerPayload.tags`                                          | `Resource.attributes."_dd.tracer"`                    |
-| `TraceChunk.{priority, origin, droppedTrace, tags}`           | `TraceEvent.chunk`                                    |
+| `TraceChunk.{priority, origin, droppedTrace, tags}`           | `TraceEvent.chunk = Some(...)`                        |
 | `TracerPayload` non-host/env scalar fields (see below)        | `Resource.attributes` under defined keys              |
 | `Span.traceID` (u64)                                          | `Span.trace_id.low_u64`                               |
 | `Span.meta["_dd.p.tid"]` (hex u64) if present (see below)     | `Span.trace_id.high_u64`                              |
@@ -515,9 +516,10 @@ The two keys live under the `_dd.*` namespace alongside other Datadog-internal k
 #### Datadog chunk context
 
 Datadog `TraceChunk.priority`, `origin`, `droppedTrace`, and `tags` apply uniformly to
-every span in the chunk. Each `TraceEvent` corresponds to exactly one chunk by
-construction, so these fields live on `TraceEvent.chunk` directly. OTLP-sourced events
-carry a default-empty `ChunkContext` (no Datadog wire concept).
+every span in the chunk. Every Datadog-sourced `TraceEvent` corresponds to exactly one
+chunk by construction and therefore carries `TraceEvent.chunk = Some(...)`, including
+for an explicitly all-default chunk. An OTLP-sourced event with no recovered Datadog
+chunk state carries `None`.
 
 VRL access:
 
@@ -673,12 +675,15 @@ TracerPayload-envelope-equivalent `Resource` into one `TracerPayload`, with each
   `Resource.attributes."_dd.tracer"` per the envelope-reconstruction policy above;
   entries are coerced to the wire `map<string, string>` via `dd_value_to_string`.
 
-**`TraceChunk` grouping and re-coalescence.** Within each `TracerPayload`, group spans across events
-by all `ChunkContext` fields plus `trace_id`, and emit one `TraceChunk` per group.
+**`TraceChunk` grouping and re-coalescence.** Before grouping, map `chunk = None` to
+`ChunkContext::default()`; this synthesizes the Datadog wire's required chunk envelope
+without claiming that one existed on the input. Within each `TracerPayload`, group spans
+across events by the effective `ChunkContext` plus `trace_id`, and emit one `TraceChunk`
+per group. `None` and `Some(ChunkContext::default())` therefore share an egress group.
 
 - Empty events: an event whose `spans` vector is empty contributes no spans to any
   group; it emits one additional `TraceChunk` whose `priority`, `origin`, `tags`, and
-  `dropped` are taken directly from `TraceEvent.chunk` and whose `spans` is empty,
+  `dropped` are taken from the effective chunk context and whose `spans` is empty,
   satisfying the parent RFC's empty-spans guideline.
 - Tags comparison and serialization: the `tags` comparison is `BTreeMap` structural
   equality, which is canonical because `Attributes` is BTreeMap-backed and key
@@ -800,7 +805,7 @@ not authoritative.
   two without the other; in that case the typed value is selected and the divergence is
   observable, matching the precedent set on the other Datadog typed slot/attribute pairs
   (`Resource.{service,environment,host}` and `Span.trace_id.high_u64`).
-- The Datadog egress chunk-grouping rule `(ChunkContext, trace_id)` relies on a
+- The Datadog egress chunk-grouping rule `(effective ChunkContext, trace_id)` relies on a
   producer-side convention parallel to the `meta` / `metrics` story: the `TraceChunk`
   proto describes a chunk as "a list of spans with the same trace ID", and Datadog
   producers honor this by construction. For the conforming case, multi-service chunks
@@ -963,7 +968,8 @@ land first.
   single-trace chunks, non-conforming multi-trace chunks, 128-bit `SpanLink` trace
   IDs, `_dd.p.tid` consumption and emission, `_dd.meta_struct` byte preservation,
   `_dd.payload` envelope reconstruction across `vector` source/sink hops, `Span.error`
-  normalization, empty Datadog string scalars, NaN round-trip through `Span.metrics` /
+  normalization, empty Datadog string scalars, `Some(default)` chunk preservation and
+  `None`-to-default egress, NaN round-trip through `Span.metrics` /
   `SpanEvent.attributes` / `_dd.payload.{target_tps,error_tps}`, two
   same-`TracerPayload` chunks with identical `(priority, origin, tags, trace_id)` but
   differing `droppedTrace` values (must egress as two distinct chunks each preserving
@@ -974,7 +980,7 @@ land first.
   alongside the tests; updates to the upstream agent track via test refresh.
 - [ ] Migrate the `datadog_traces` sink to consume `Typed` natively; update APM stats
   aggregation to read typed fields (`Resource.service`, `Span.duration`,
-  `TraceEvent.chunk.priority`, etc.).
+  optional `TraceEvent.chunk` state, etc.).
 - [ ] Migrate the `datadog_agent` source to produce `Typed` natively. Lands after the
   parent's "remove untyped forwarding methods" step so the build catches any
   unmigrated consumer.

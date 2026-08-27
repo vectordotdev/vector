@@ -2,8 +2,8 @@
 
 This RFC replaces the inner representation of Vector's `TraceEvent`, today a thin newtype over
 `LogEvent`, with a strongly-typed container that mirrors the wire-level batching of OTLP and
-Datadog APM traces. Each `TraceEvent` carries one `Resource`, one `Scope`, one Datadog-specific
-`ChunkContext`, and the `Vec<Span>` belonging to that grouping, plus the existing
+Datadog APM traces. Each `TraceEvent` carries one `Resource`, one `Scope`, an optional
+Datadog-specific `ChunkContext`, and the `Vec<Span>` belonging to that grouping, plus the existing
 `EventMetadata`. The container shape, together with the wire-format mappings specified in the
 two sub-RFCs below, yields zero-loss `OTLP -> Vector -> OTLP` and
 `Datadog -> Vector -> Datadog` round trips, including across Vector's disk buffers, and gives
@@ -90,6 +90,8 @@ the entries below are the format-agnostic shared vocabulary.
 - Define the VRL surface for the typed `TraceEvent`, including the `del()` semantics and
   the typed-slot/attribute-map pairs (with precedence semantics owned by each mapping
   sub-RFC).
+- Add the fallible `trace_span_status`, `trace_span_link`, `trace_span_event`, and
+  `trace_flags` VRL functions for atomic construction and related-field updates.
 - Define the migration strategy that lets each trace-producing or trace-consuming component
   migrate independently: the `enum TraceEvent { Legacy(LogEvent), Typed { … } }`
   coexistence, the per-source `Legacy -> Typed` shim mechanism keyed on
@@ -108,7 +110,6 @@ the entries below are the format-agnostic shared vocabulary.
 
 ### Out of scope
 
-- VRL function additions for trace-specific operations (e.g. `decode_trace_state`).
 - New trace sources/sinks (Zipkin, Jaeger, etc.).
 - APM stats computation semantics (already covered by RFC 9862).
 - Zero-loss cross-format round-trip (`Datadog -> OTLP -> Datadog` or
@@ -162,8 +163,8 @@ declared in the corresponding sub-RFC's Scope section.
 
 ### User Experience
 
-A `TraceEvent` carries one `Resource`, one `Scope`, one `ChunkContext`, and a `Vec<Span>`.
-VRL accesses these directly:
+A `TraceEvent` carries one `Resource`, one `Scope`, an optional `ChunkContext`, and a
+`Vec<Span>`. VRL accesses these directly:
 
 ```coffee
 # Route by resource service.
@@ -178,8 +179,7 @@ decision_maker = .chunk.tags."_dd.p.dm"
 # Mark slow DB spans as errors.
 .spans = map_values(.spans, |span| {
     if span.span_type == "db" && span.duration > 1.0 {
-        span.status.code = "error"
-        span.status.message = "slow query"
+        span.status = trace_span_status!("error", message: "slow query")
     }
     span
 })
@@ -189,10 +189,9 @@ decision_maker = .chunk.tags."_dd.p.dm"
 .user_id = .spans[0].attributes."user.id" || .spans[0].attributes."usr.id"
 ```
 
-The typed surface is uniform across both wire formats: a VRL program reading
-`.resource.service`, `.spans[i].name`, or `.chunk.priority` behaves the same whether the
-event originated from the `opentelemetry` source or the `datadog_agent` source. Format-
-specific encoding details (how Datadog's three span-attribute partitions merge into
+The typed surface is uniform across both wire formats: the same paths are valid regardless
+of source, with `.chunk` reading as `null` when the event has no Datadog chunk context.
+Format-specific encoding details (how Datadog's three span-attribute partitions merge into
 `Span.attributes`, how the agent and tracer envelopes populate
 `Resource.attributes."_dd.payload"` and `Resource.attributes."_dd.tracer"`) are documented
 in the OTLP mapping and Datadog mapping sub-RFCs and do not affect VRL semantics.
@@ -217,10 +216,9 @@ field-by-field mapping.
 pub struct TraceEvent {
     resource: Resource,
     scope:    Scope,
-    /// Datadog-only chunk-scoped state. Default-empty when the event is
-    /// OTLP-sourced.
-    chunk:    ChunkContext,
-    /// Spans belonging to this resource/scope/chunk grouping.
+    /// Datadog-only chunk-scoped state; absent when the source has no chunk concept.
+    chunk:    Option<ChunkContext>,
+    /// Spans belonging to this resource/scope and, when present, chunk grouping.
     spans:    Vec<Span>,
     metadata: EventMetadata,
 }
@@ -402,7 +400,7 @@ pub enum SpanStatus {
     Other(i32, String),
 }
 
-/// Datadog `TraceChunk`-scoped state. Default-empty for OTLP-sourced events.
+/// Datadog `TraceChunk`-scoped state.
 pub struct ChunkContext {
     pub priority: Option<SamplingPriority>,
     pub origin:   Option<String>,
@@ -435,25 +433,39 @@ variants are exhaustive for the known-value space.
 
 ##### VRL surface for the closed-with-escape-hatch enums
 
-`SpanKind`, `SpanStatus`, and `SamplingPriority` share a single VRL access pattern:
+`SpanKind` and `SamplingPriority` share a VRL access pattern:
 
 - The discriminator is a snake_case string for each known variant (`SpanKind`:
   `"unspecified"` / `"internal"` / `"server"` / `"client"` / `"producer"` / `"consumer"`;
-  `SpanStatus`: `"unset"` / `"ok"` / `"error"`; `SamplingPriority`: `"user_reject"` /
-  `"auto_reject"` / `"auto_keep"` / `"user_keep"`) and an integer for the `Other`
+  `SamplingPriority`: `"user_reject"` / `"auto_reject"` / `"auto_keep"` / `"user_keep"`)
+  and an integer for the `Other`
   variant. Reading returns the snake_case string when the value matches a known variant
   and the raw integer otherwise. Writing a recognized string sets the corresponding
   variant; writing an integer that matches a known variant's wire number sets that
   variant (so `.spans[i].kind = 3` is equivalent to `.spans[i].kind = "client"`); other
   integers set `Other(n)`. Writing any other value (e.g. a non-canonical string) raises a
   VRL runtime error.
-- `SpanStatus` exposes `code` and `message` as two independent fields. Reading `message`
-  returns the inner string for `Error(s)` and `Other(_, s)`, and the empty string for
-  `Unset` / `Ok`. Writing `message` to a non-empty value when `code` is `"unset"` or
-  `"ok"` promotes `code` to `"error"` (matching the OpenTelemetry
-  [Set Status](https://opentelemetry.io/docs/specs/otel/trace/api/#set-status) rule that
-  only `Error` carries a description); writing `message` to the empty string is a no-op
-  for `Unset` / `Ok`. Writing `code` to `"unset"` or `"ok"` clears any existing message.
+- On typed event paths, `SpanStatus.code` and `SpanStatus.message` are read-only
+  projections. `code` reads as `"unset"` / `"ok"` / `"error"` for known variants and as
+  the raw integer for `Other(n)`; `message` reads the inner string for `Error(s)` /
+  `Other(_, s)` and `""` for `Unset` / `Ok`. Writing or deleting either child path
+  raises a VRL runtime error. Status values are replaced atomically:
+
+  ```coffee
+  .spans[i].status = trace_span_status!("error", message: "slow query")
+  .spans[i].status = trace_span_status!("ok")
+  del(.spans[i].status) # resets to Unset
+  ```
+
+  `trace_span_status` returns the canonical `{ code, message }` object accepted by
+  whole-status assignment and accepts the same string / integer discriminator domain as
+  `SpanStatus`. An `"error"` code requires a non-empty `message`; `"unset"` / `"ok"`
+  reject a `message`; `Other(n)` accepts an optional message defaulting to `""`.
+  Invalid combinations return a descriptive error before assignment, so the target
+  remains unchanged. `del(.spans[i].status)` atomically replaces the status with `Unset`
+  and returns the previous status value. Local copies (for example, `span` inside
+  `map_values`) remain ordinary VRL objects; their complete status is validated when
+  written back to the typed event.
 
 #### Empty strings in optional string slots
 
@@ -501,6 +513,23 @@ impl TraceFlags {
     }
 }
 ```
+
+VRL reads and writes `Span.flags` / `SpanLink.flags` as the raw `u32`. The fallible
+`trace_flags` function returns an atomically updated raw integer without losing unknown
+bits:
+
+```coffee
+.spans[i].flags = trace_flags!(
+    raw: .spans[i].flags,
+    sampled: true,
+    context_is_remote: false,
+)
+```
+
+`raw` defaults to `0`; omitted derived arguments preserve their bits in `raw`.
+`context_is_remote: null` clears both remoteness bits, `false` sets known-local, and
+`true` sets known-remote. Values outside the `u32` range or arguments of the wrong type
+return a descriptive error before assignment.
 
 `TraceState` stores the W3C `tracestate` header verbatim and exposes map-like accessors
 that parse on demand. Sources copy the header in unchanged; sinks emit it unchanged
@@ -561,6 +590,28 @@ pub struct SpanLink {
     pub dropped_attributes_count: u32,
 }
 ```
+
+VRL constructs complete events and links before inserting them into their vectors:
+
+```coffee
+span.events = push(span.events, trace_span_event!(
+    name: "exception",
+    time: now(),
+    attributes: { "exception.type": "Timeout" },
+))
+
+span.links = push(span.links, trace_span_link!(
+    trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
+    span_id: "00f067aa0ba902b7",
+))
+```
+
+`trace_span_event` requires `name` and `time`; `attributes` and
+`dropped_attributes_count` default to `{}` and `0`. `trace_span_link` requires non-zero
+`trace_id` and `span_id`; `trace_state`, `flags`, `attributes`, and
+`dropped_attributes_count` default to `""`, `0`, `{}`, and `0`. Both functions validate
+all arguments before returning the canonical object, so a failed construction does not
+partially modify the destination vector.
 
 #### `Attributes` and `AttrValue`
 
@@ -627,26 +678,31 @@ resolves to:
 
 - **`Option`-wrapped typed slot** (`Span.parent_span_id`, `Resource.service` /
   `environment` / `host` / `schema_url`, `Scope.name` / `version` / `schema_url`,
-  `Span.resource_name`, `Span.span_type`, `ChunkContext.priority` / `origin`): `del()`
-  clears the slot to `None`. Writing `""` to an `Option<String>` slot sets `Some("")`;
-  it is distinct from `del()`. The analogous rule for `Span.parent_span_id` is
-  documented under "VRL surface for `TraceId` and `SpanId`".
+  `Span.resource_name`, `Span.span_type`, `TraceEvent.chunk`, and
+  `ChunkContext.priority` / `origin`): `del()` clears the slot to `None`. Writing `""`
+  to an `Option<String>` slot sets `Some("")`; it is distinct from `del()`. The
+  analogous rule for `Span.parent_span_id` is documented under "VRL surface for
+  `TraceId` and `SpanId`".
 - **`Attributes` map entry** (e.g. `.spans[i].attributes."foo"`,
   `.resource.attributes."bar"`, `.scope.attributes.*`, `.chunk.tags.*`,
   `.spans[i].events[j].attributes.*`, `.spans[i].links[j].attributes.*`): `del()` removes
   the entry from its map.
 - **`Vec` element** (`.spans[i]`, `.spans[i].events[j]`, `.spans[i].links[j]`): `del()`
   removes the i-th / j-th element; the vector shrinks and subsequent indices renumber.
+- **Semantically unset required slot** (`Span.status`): `del()` atomically writes
+  `SpanStatus::Unset` and returns the previous status.
 - **Required typed field or container**: `del()` raises a VRL runtime error, whether or
   not the field has a representable default. Write the replacement explicitly (for
-  example, `.spans[i].duration = 0`, `.spans[i].status.code = "unset"`,
-  `.chunk.tags = {}`, or `.spans = []`).
+  example, `.spans[i].duration = 0`, `.chunk.tags = {}`, or `.spans = []`).
 - **Root path (`del(.)`)**: raises a VRL runtime error.
+
+Writing any `.chunk.*` path while `.chunk` is `null` first materializes
+`Some(ChunkContext::default())`, then applies the write.
 
 Reading through the same paths is the inverse: `Option`-wrapped slots that are `None`
 read as `null`, absent attribute-map entries read as `null`, out-of-bounds vector indices
-read as `null`, and required typed fields are always present and always read a concrete
-value.
+read as `null`, and required typed fields within present containers always read a
+concrete value.
 
 #### Retention of `TraceEvent` and `Event::Trace`
 
@@ -677,7 +733,7 @@ pub enum TraceEvent {
     Typed {
         resource: Resource,
         scope:    Scope,
-        chunk:    ChunkContext,
+        chunk:    Option<ChunkContext>,
         spans:    Vec<Span>,
         metadata: EventMetadata,
     },
@@ -797,7 +853,7 @@ message LegacyTraceArray {
 message TypedTrace {
   Resource resource = 1;
   Scope scope = 2;
-  ChunkContext chunk = 3;
+  ChunkContext chunk = 3;              // singular message presence: absent -> None
   repeated Span spans = 4;
   Metadata metadata_full = 5;
 }
@@ -959,8 +1015,11 @@ alternatives in "Alternatives".
 ### Architectural choices
 
 - The container shape mirrors the wire-level batching of both OTLP and Datadog: each
-  `TraceEvent` is one `(resource, scope, chunk)` grouping. Source ingest and sink egress
-  are pure mechanical translations between the wire shape and the container.
+  `TraceEvent` is one `(resource, scope, optional chunk)` grouping. Source ingest and
+  sink egress are pure mechanical translations between the wire shape and the container.
+- `Option<ChunkContext>` distinguishes a source with no chunk concept from an explicitly
+  default-valued Datadog `TraceChunk`; internal protobuf message presence preserves the
+  distinction across disk-buffer and `vector` hops.
 - Sharing `Resource` / `Scope` / `ChunkContext` across sibling spans is structural (a
   struct field), not pointer-based (an `Arc`). Disk-buffer serialization preserves the
   sharing for free; no `Arc` reconstruction or read-side interning is needed.
@@ -999,15 +1058,16 @@ alternatives in "Alternatives".
   across W3C `traceparent` headers, OTLP debug logs, the Datadog UI, and Jaeger / Zipkin
   search APIs, so VRL programs comparing IDs against external sources do not need to
   format-convert at the boundary.
-- The closed-with-escape-hatch enum VRL surface (`SpanKind`, `SpanStatus`,
-  `SamplingPriority`) exposes a single shared access pattern: a snake_case string for
-  known variants and a raw integer for `Other(n)`. This lets VRL construct an error
-  status with two field assignments (`.status.code = "error"; .status.message = "..."`)
-  without any helper functions, and gives `Other(n)` values typed access through the
-  integer form without an additional accessor surface.
+- The closed-with-escape-hatch enum VRL surface exposes known variants as snake_case
+  strings and `Other(n)` as raw integers. `SpanKind` and `SamplingPriority` permit direct
+  discriminator writes. `SpanStatus` instead uses atomic whole-value construction via
+  `trace_span_status`; its child projections are read-only, preventing intermediate or
+  partially authored status values. `del(.status)` is the narrow exception to required-
+  field deletion because `Unset` is the domain's semantic absence, not merely a default.
 - VRL `del()` against typed paths follows the existing `Metric` VRL surface: it clears
   `Option`-wrapped slots, removes attribute-map entries, shrinks vectors at the element,
-  and raises a runtime error on required-by-construction fields and on the root path.
+  maps the semantically absent `Span.status` to `Unset`, and raises a runtime error on
+  other required-by-construction fields and on the root path.
   Reusing the established `Metric` pattern keeps a single mental model for typed-event
   VRL access across event variants and means the underlying `VrlTarget` implementation
   can share the same `MetricPathError::InvalidPath` strategy that already errors loudly
@@ -1024,6 +1084,11 @@ alternatives in "Alternatives".
   without changing the type or its serialization. The W3C trace-flags byte is exposed as
   a derived view via `flags.w3c_byte()` for emission in `traceparent` headers, and the
   OTLP parent-remote tristate is exposed via `flags.context_is_remote() -> Option<bool>`.
+- `trace_span_link` and `trace_span_event` validate complete vector elements before
+  insertion; `trace_flags` updates the correlated remoteness bits while retaining every
+  unknown bit in the caller-provided raw word. A full `trace_span` constructor is
+  intentionally omitted: it would mirror most of the large `Span` structure for an
+  operation expected to be rare in VRL.
 - `Span.duration` is stored as `std::time::Duration` (nanosecond integer). Both wire
   formats carry non-negative durations as integer nanoseconds (OTLP as the difference
   between two `fixed64` epoch nanoseconds, Datadog as a single `int64` nanoseconds
@@ -1116,7 +1181,7 @@ alternatives in "Alternatives".
 
 - [OTLP traces protocol](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto)
   -- the primary shape this RFC adopts. The container `TraceEvent` is structurally one
-  `ScopeSpans` plus its `Resource` and the Datadog-only `ChunkContext`.
+  `ScopeSpans` plus its `Resource` and an optional Datadog-only `ChunkContext`.
 - [Datadog APM agent-to-backend protobuf](https://github.com/DataDog/datadog-agent/tree/main/pkg/proto/datadog/trace)
   -- the second native format Vector targets.
 - [Datadog Agent OTLP ingest](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/api/otlp.go)
@@ -1166,8 +1231,9 @@ surface:
   than by container traversal. Promotion to `Resource.attributes` is not a workaround: a
   Datadog `TracerPayload` may contain multiple chunks against the same resource, so the
   resource grouping does not coincide with the chunk grouping. The proposed
-  `TraceEvent.chunk` field reflects the structural fact directly; the encoding is one
-  slot per chunk-scoped value rather than `N spans × one entry per chunk-scoped value`.
+  `TraceEvent.chunk` field reflects the structural fact directly when present; the
+  encoding is one slot per chunk-scoped value rather than
+  `N spans × one entry per chunk-scoped value`.
 - **Datadog-native span fields lose typed access.** `Span.resource_name` and
   `Span.span_type` are core inputs to Datadog routing and APM stats aggregation.
   Encoding them as `Span.attributes."_dd.span.resource"` / `"_dd.span.type"` is
@@ -1185,7 +1251,7 @@ surface:
   egress. The proposal's typed fields make the partition once at the type level.
 - **The round-trip guarantee weakens from structural to conventional.** The proposal's
   `Datadog -> Vector -> Datadog` guarantee rests on structural identity:
-  `TraceEvent.chunk` is read back into one `TraceChunk` per event by container
+  `TraceEvent.chunk = Some(...)` is read back into one `TraceChunk` per event by container
   traversal. Under the alternative, the guarantee rests on every transform respecting
   the reserved-key convention; any transform that drops `_dd.chunk.priority` from a
   span's attributes silently loses the chunk's sampling priority on egress. Today's
@@ -1415,8 +1481,9 @@ The format-agnostic PRs owned by this RFC are:
   continues to produce and consume `Legacy`; no functional change.
 - [ ] Extend Vector's internal event proto with the typed wire shape, per "Wire
   serialization", including round-trip tests distinguishing `None` from `Some("")` in
-  optional string slots. Hard prerequisite for any source-flip step: without it, disk
-  buffers and the `vector` source/sink panic on the first `Typed` event.
+  optional string slots and `chunk = None` from `Some(ChunkContext::default())`. Hard
+  prerequisite for any source-flip step: without it, disk buffers and the `vector`
+  source/sink panic on the first `Typed` event.
 - [ ] Migration guide for users (consolidated across all three RFCs):
   - field-by-key VRL programs against the old `TraceEvent` (must move to typed paths;
     legacy paths break against `Typed` events);
@@ -1429,10 +1496,18 @@ The format-agnostic PRs owned by this RFC are:
     release line that includes at least the migration-boundary release (see Drawbacks).
 - [ ] Add VRL typed-path dispatch for `.resource.*`, `.scope.*`, `.chunk.*`, and
   `.spans[*].*` on `VrlTarget`. Typed paths against `Typed` events resolve normally.
+  Tests cover null reads for `None`, `del(.chunk)`, and default-context materialization
+  on nested `.chunk.*` writes; read-only `SpanStatus` child paths; atomic whole-status
+  assignment; and `del(.status)` reset to `Unset`.
   Typed paths against `Legacy` events return `null` without attempting conversion (the
   shim registry is not yet populated at this step). Untyped paths against `Typed` events
   return a deterministic runtime error. Lands after the migration enum step; no
   dependency on the per-format shims.
+- [ ] Add the fallible `trace_span_status`, `trace_span_link`, `trace_span_event`, and
+  `trace_flags` functions to `vector-vrl`. Include compile-time validation for constant
+  arguments, runtime validation for dynamic arguments, fail-before-mutation tests, and
+  descriptive field-specific errors. Cover `trace_flags` unknown-bit retention and
+  remoteness tristate transitions, plus constructor defaults and required fields.
 - [ ] Enable VRL auto-convert in `VrlTarget`: replace the `Legacy`-event `null` return
   introduced in the previous step with an in-place call to `to_typed()` on first
   typed-path access (`VrlTarget` has `&mut self` access). If `to_typed()` fails (absent
