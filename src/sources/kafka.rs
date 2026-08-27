@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Cursor,
+    num::NonZeroUsize,
     pin::Pin,
     sync::{
         Arc, OnceLock, Weak,
@@ -49,7 +50,7 @@ use vector_lib::{
     event::BatchStatus,
     finalizer::OrderedFinalizer,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
-    source_sender::CHUNK_SIZE,
+    source_sender::DEFAULT_CHUNK_SIZE_EVENTS,
 };
 use vrl::value::{Kind, ObjectMap, kind::Collection};
 
@@ -261,6 +262,12 @@ pub struct KafkaSourceConfig {
     #[configurable(derived)]
     #[serde(default)]
     metrics: Metrics,
+
+    /// The number of records to read from Kafka in a chunk.
+    ///
+    /// Can be set to 1 to disable chunking and read records one-by-one.
+    #[serde(default)]
+    chunk_size: Option<NonZeroUsize>,
 }
 
 impl KafkaSourceConfig {
@@ -618,12 +625,17 @@ impl ConsumerStateInner<Consuming> {
         let decoder = self.decoder.clone();
         let decompressor = self.decompressor.clone();
         let log_namespace = self.log_namespace;
+        let chunk_size = self
+            .config
+            .chunk_size
+            .map(Into::into)
+            .unwrap_or(DEFAULT_CHUNK_SIZE_EVENTS);
         let mut out = self.out.clone();
 
         let (end_tx, end_signal) = oneshot::channel::<()>();
 
         let handle = join_set.spawn(async move {
-            let mut messages = ReadyChunksUntilCondition::new(p.stream().take_until(end_signal), CHUNK_SIZE, move |msg: &Result<BorrowedMessage<'_>, KafkaError>| msg.as_ref().is_err_and(|err| matches!(err, rdkafka::error::KafkaError::PartitionEOF(_))));
+            let mut messages = ReadyChunksUntilCondition::new(p.stream().take_until(end_signal), chunk_size, move |msg: &Result<BorrowedMessage<'_>, KafkaError>| msg.as_ref().is_err_and(|err| matches!(err, rdkafka::error::KafkaError::PartitionEOF(_))));
             let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(None);
 
             // finalizer is the entry point for new pending acknowledgements;
@@ -1060,21 +1072,21 @@ fn parse_stream<'a>(
     let rmsg = ReceivedMessage::from(&msg);
 
     let payload = match decompressor {
-        Some(decompressor) => match decompressor.decompress(msg.payload) {
+        Some(decompressor) => match decompressor.decompress(&msg.payload) {
             Ok(decompressed) => Bytes::from(decompressed),
             Err(error) => {
                 emit!(KafkaPayloadDecompressionError {
                     error: &error,
-                    topic: msg.topic(),
-                    partition: msg.partition(),
-                    offset: msg.offset(),
+                    topic: &msg.topic,
+                    partition: msg.partition,
+                    offset: msg.offset,
                 });
                 // Skip messages that cannot be decompressed, but still return an (empty) stream to commit the offset.
                 // Decompression failures are generally deterministic, so redelivery doesn't help.
                 return Some((0, futures::stream::empty().boxed()));
             }
         },
-        None => Bytes::from_owner(payload),
+        None => Bytes::from_owner(msg.payload),
     };
 
     let payload_len = payload.len();

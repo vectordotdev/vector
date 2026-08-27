@@ -46,6 +46,15 @@ generated: components: sources: kafka: configuration: {
 		required: true
 		type: string: examples: ["10.14.22.123:9092,10.14.23.332:9092"]
 	}
+	chunk_size: {
+		description: """
+			The number of records to read from Kafka in a chunk.
+
+			Can be set to 1 to disable chunking and read records one-by-one.
+			"""
+		required: false
+		type: uint: {}
+	}
 	commit_interval_ms: {
 		description: "The frequency that the consumer offsets are committed (written) to offset storage."
 		required:    false
