@@ -364,6 +364,11 @@ impl HttpEndpoint {
     pub const fn as_uri(&self) -> &Uri {
         &self.0
     }
+    /// Returns the URI as a string, redacting any userinfo credentials so
+    /// they are never written to logs.
+    pub fn redacted_uri(&self) -> String {
+        redact_uri(&self.0)
+    }
 
     /// Consumes the endpoint, returning the underlying `Uri`.
     pub fn into_uri(self) -> Uri {

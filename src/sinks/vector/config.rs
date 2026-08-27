@@ -69,7 +69,7 @@ pub struct VectorConfig {
     #[configurable(
         deprecated = "This option has been deprecated, use `routing.endpoints` instead."
     )]
-    #[configurable(metadata(docs::examples = "127.0.0.1:6000"))]
+    #[configurable(metadata(docs::examples = "https://127.0.0.1:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[configurable(required_one_of = "address_or_routing")]
     #[serde(default)]
@@ -261,8 +261,8 @@ impl ValidatedVector {
         for endpoint in &self.endpoints {
             if endpoint.scheme_defaulted && !tls {
                 warn!(
-                    message = "[DEPRECATED] scheme-less `address` or `routing.endpoints` value in the `vector` sink defaults to `http`. This behavior is deprecated and will change to `https` in a future release. Specify the scheme explicitly.",
-                    endpoint = %endpoint.endpoint.as_uri(),
+                    message = "DEPRECATED, scheme-less `address` or `routing.endpoints` value in the `vector` sink defaults to `http`. This behavior is deprecated and will change to `https` in a future release. Specify the scheme explicitly.",
+                    endpoint = %endpoint.endpoint.redacted_uri(),
                 );
             }
         }
@@ -1719,12 +1719,31 @@ mod tests {
         let warnings = capture_warn_logs(|| validated.warn_on_scheme_defaulted_endpoints(false));
         assert_eq!(warnings.len(), 1, "expected one warning, got: {warnings:?}");
         assert!(
-            warnings[0].contains("[DEPRECATED]"),
-            "warning should lead with [DEPRECATED]: {warnings:?}"
+            warnings[0].contains("DEPRECATED"),
+            "warning should lead with DEPRECATED: {warnings:?}"
         );
         assert!(
             warnings[0].contains("127.0.0.1:6000"),
             "warning should name the endpoint: {warnings:?}"
+        );
+    }
+    #[test]
+    fn build_warns_on_scheme_less_endpoint_with_userinfo_redacted() {
+        let config = VectorConfig {
+            address: Some("user:secret@127.0.0.1:6000".to_owned()),
+            ..default_config("127.0.0.1:6000")
+        };
+        let validated = config.validate().expect("validation should succeed");
+
+        let warnings = capture_warn_logs(|| validated.warn_on_scheme_defaulted_endpoints(false));
+        assert_eq!(warnings.len(), 1, "expected one warning, got: {warnings:?}");
+        assert!(
+            !warnings[0].contains("secret"),
+            "warning must not leak credentials: {warnings:?}"
+        );
+        assert!(
+            warnings[0].contains("<redacted endpoint>"),
+            "warning should redact the endpoint: {warnings:?}"
         );
     }
 

@@ -3,5 +3,5 @@ sinks:
     type: vector
     inputs:
       - my-source-or-transform-id
-    address: 127.0.0.1:6000
+    address: https://127.0.0.1:6000
     compression: none
