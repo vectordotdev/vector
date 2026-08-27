@@ -474,6 +474,10 @@ fn render_changelog(entries: &[ChangelogEntry]) -> String {
             writeln!(s, "\t\t\ttype: {}", json!(e.cue_type)).unwrap();
             if e.breaking {
                 s.push_str("\t\t\tbreaking: true\n");
+                if let Some(details) = &e.breaking_details {
+                    writeln!(s, "\t\t\ttitle: {}", json!(details.title)).unwrap();
+                    writeln!(s, "\t\t\tanchor: {}", json!(details.anchor)).unwrap();
+                }
             }
             s.push_str("\t\t\tdescription: #\"\"\"\n");
             for line in e.description.lines() {
@@ -716,6 +720,18 @@ mod tests {
                 contributors: vec![],
                 breaking_details: None,
             },
+            ChangelogEntry {
+                cue_type: "chore".into(),
+                breaking: true,
+                description: "Removed legacy thing.".into(),
+                contributors: vec![],
+                breaking_details: Some(BreakingDetails {
+                    title: "Legacy thing removed".into(),
+                    anchor: "legacy-thing-removed".into(),
+                    summary: "Removed legacy thing.".into(),
+                    migration: "N/A".into(),
+                }),
+            },
         ];
         let out = render_release_cue(&Version::new(0, 99, 0), &entries);
 
@@ -727,6 +743,10 @@ mod tests {
         assert!(out.contains("\t\t\t\tMulti-line.\n"));
         assert!(out.contains("contributors: [\"alice\"]"));
         assert!(out.contains("\t\t\ttype: \"fix\"\n"));
+        assert!(out.contains("\t\t\ttype: \"chore\"\n"));
+        assert!(out.contains("\t\t\tbreaking: true\n"));
+        assert!(out.contains("\t\t\ttitle: \"Legacy thing removed\"\n"));
+        assert!(out.contains("\t\t\tanchor: \"legacy-thing-removed\"\n"));
         assert!(!out.contains("commits:"));
     }
 
