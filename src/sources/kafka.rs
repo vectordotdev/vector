@@ -1565,6 +1565,7 @@ mod test {
             socket_timeout_ms: Duration::from_millis(60000),
             fetch_wait_max_ms: Duration::from_millis(100),
             log_namespace: Some(log_namespace == LogNamespace::Vector),
+            chunk_size: NonZeroUsize::new(1),
             ..Default::default()
         }
     }
