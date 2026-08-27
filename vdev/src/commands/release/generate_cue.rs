@@ -9,8 +9,6 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail};
 use chrono::Utc;
 use semver::Version;
-#[cfg(not(test))]
-use serde::Deserialize;
 use serde_json::json;
 
 use crate::commands::changelog::FRAGMENT_TYPES;
@@ -296,12 +294,6 @@ struct ChangelogEntry {
     breaking_details: Option<BreakingDetails>,
 }
 
-#[cfg(not(test))]
-#[derive(Deserialize)]
-struct PullRequest {
-    number: u64,
-}
-
 #[derive(Debug, Clone)]
 struct BreakingDetails {
     title: String,
@@ -395,9 +387,9 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
     })
 }
 
-/// Find the merged PR that introduced a changelog fragment. The adding commit
-/// remains available after release preparation deletes the fragment, so the
-/// same lookup can also be used when backfilling release metadata.
+/// Find the PR that introduced a changelog fragment from the adding commit's
+/// `... (#12345)` title. The commit remains available after release preparation
+/// deletes the fragment, so the same lookup can also backfill release metadata.
 #[cfg(not(test))]
 fn lookup_pull_request(repo_root: &Path, fragment_path: &Path) -> Result<u64> {
     let relative_path = fragment_path.strip_prefix(repo_root).with_context(|| {
@@ -414,12 +406,12 @@ fn lookup_pull_request(repo_root: &Path, fragment_path: &Path) -> Result<u64> {
         )
     })?;
 
-    let commit = run_command(
+    let commit_title = run_command(
         "git",
         &[
             "log",
             "-1",
-            "--format=%H",
+            "--format=%s",
             "--diff-filter=A",
             "--follow",
             "--",
@@ -427,41 +419,30 @@ fn lookup_pull_request(repo_root: &Path, fragment_path: &Path) -> Result<u64> {
         ],
         repo_root,
     )?;
-    let commit = commit.trim();
-    if commit.is_empty() {
+    let commit_title = commit_title.trim();
+    if commit_title.is_empty() {
         bail!(
             "Could not find the commit that added {relative_path}; cannot determine its pull request."
         );
     }
 
-    let output = run_command(
-        "gh",
-        &[
-            "pr",
-            "list",
-            "--repo",
-            "vectordotdev/vector",
-            "--state",
-            "merged",
-            "--search",
-            commit,
-            "--json",
-            "number",
-            "--limit",
-            "2",
-        ],
-        repo_root,
-    )?;
-    let pull_requests: Vec<PullRequest> = serde_json::from_str(&output)
-        .with_context(|| format!("Could not parse GitHub PR lookup for commit {commit}"))?;
+    parse_pull_request_number(commit_title).with_context(|| {
+        format!("Could not determine the PR that added {relative_path} from commit title `{commit_title}`")
+    })
+}
 
-    match pull_requests.as_slice() {
-        [pull_request] => Ok(pull_request.number),
-        [] => bail!("No merged GitHub PR found for commit {commit} that added {relative_path}."),
-        _ => bail!(
-            "Multiple merged GitHub PRs found for commit {commit} that added {relative_path}."
-        ),
-    }
+fn parse_pull_request_number(commit_title: &str) -> Result<u64> {
+    let number = commit_title
+        .trim()
+        .strip_suffix(')')
+        .and_then(|title| title.rsplit_once("(#"))
+        .map(|(_, number)| number)
+        .filter(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
+        .ok_or_else(|| anyhow!("Commit title must end with `(#<PR number>)`"))?;
+
+    number
+        .parse()
+        .with_context(|| format!("Invalid PR number in commit title `{commit_title}`"))
 }
 
 #[cfg(not(test))]
@@ -477,8 +458,7 @@ fn ensure_full_git_history(repo_root: &Path) -> Result<()> {
 
 #[cfg(test)]
 fn lookup_pull_request(_: &Path, _: &Path) -> Result<u64> {
-    // Unit tests exercise local parsing and rendering. A release dry run checks
-    // the real GitHub lookup without requiring network access in unit tests.
+    // Unit tests exercise local parsing and rendering without requiring a Git repository.
     Ok(42)
 }
 
@@ -743,6 +723,21 @@ fn render_upgrade_guide(date: &str, version: &Version, breaking: &[&BreakingDeta
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_pull_request_from_commit_title() {
+        assert_eq!(
+            parse_pull_request_number("feat(foo): add bar (#12345)").unwrap(),
+            12345
+        );
+    }
+
+    #[test]
+    fn rejects_commit_title_without_pull_request_suffix() {
+        assert!(parse_pull_request_number("feat(foo): add bar").is_err());
+        assert!(parse_pull_request_number("feat(foo): add bar (#abc)").is_err());
+        assert!(parse_pull_request_number("feat(foo): add bar (#123) trailing").is_err());
+    }
 
     #[test]
     fn bump_type_patch_minor_major() {
