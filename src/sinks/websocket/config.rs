@@ -1,4 +1,5 @@
 use snafu::ResultExt;
+use tokio_tungstenite::tungstenite::http::Uri;
 use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component};
 
 use crate::{
@@ -65,8 +66,7 @@ impl SinkConfig for WebSocketSinkConfig {
 
 #[derive(Clone, Debug)]
 pub struct ValidatedWebSocketSink {
-    host: String,
-    port: u16,
+    uri: Uri,
     transformer: Transformer,
 }
 
@@ -75,13 +75,9 @@ impl ValidatedSink for WebSocketSinkConfig {
     type Validated = ValidatedWebSocketSink;
 
     fn validate(&self) -> crate::Result<ValidatedWebSocketSink> {
-        let (host, port) = WebSocketConnector::parse_uri(&self.common.uri)?;
+        let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
         let transformer = self.encoding.transformer();
-        Ok(ValidatedWebSocketSink {
-            host,
-            port,
-            transformer,
-        })
+        Ok(ValidatedWebSocketSink { uri, transformer })
     }
 
     async fn build(
@@ -91,12 +87,8 @@ impl ValidatedSink for WebSocketSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         // TLS settings may read certificate files from disk, so the connector is
         // resolved at build time rather than during validation.
-        let ValidatedWebSocketSink {
-            host,
-            port,
-            transformer,
-        } = validated.clone();
-        let connector = self.build_connector(host, port)?;
+        let ValidatedWebSocketSink { uri, transformer } = validated.clone();
+        let connector = self.build_connector(uri)?;
         let serializer = self.encoding.build()?;
         let ws_sink = WebSocketSink::new(self, connector.clone(), transformer, serializer)?;
 
@@ -108,17 +100,11 @@ impl ValidatedSink for WebSocketSinkConfig {
 }
 
 impl WebSocketSinkConfig {
-    fn build_connector(
-        &self,
-        host: String,
-        port: u16,
-    ) -> Result<WebSocketConnector, WebSocketError> {
+    fn build_connector(&self, uri: Uri) -> Result<WebSocketConnector, WebSocketError> {
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
         Ok(WebSocketConnector::from_validated(
-            self.common.uri.clone(),
-            host,
-            port,
+            uri,
             tls,
             self.common.auth.clone(),
         ))
