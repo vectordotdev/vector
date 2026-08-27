@@ -32,7 +32,10 @@ use super::{
     task::{Task, TaskOutput},
 };
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
+    config::{
+        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OrphanedDiskBufferScanner,
+        OutputId, Resource,
+    },
     event::EventArray,
     extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
@@ -77,6 +80,7 @@ pub struct RunningTopology {
     metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
     sink_confinement_gauges: HashMap<ComponentKey, Gauge>,
+    orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner,
 }
 
 impl RunningTopology {
@@ -102,6 +106,7 @@ impl RunningTopology {
             metrics_task_shutdown_trigger: None,
             pending_reload: None,
             sink_confinement_gauges: HashMap::new(),
+            orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner::new(),
         }
     }
 
@@ -348,6 +353,10 @@ impl RunningTopology {
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
+                let previous_disk_buffer_directories =
+                    crate::config::referenced_disk_buffer_directories(&self.config);
+                self.orphaned_disk_buffer_scanner
+                    .scan(&new_config, previous_disk_buffer_directories);
                 self.config = new_config;
                 self.refresh_confinement_gauges();
 
@@ -1514,6 +1523,9 @@ impl RunningTopology {
         running_topology.spawn_diff(&diff, pieces);
         // `running_topology.config` was set from the initial config in `new()`.
         running_topology.refresh_confinement_gauges();
+        running_topology
+            .orphaned_disk_buffer_scanner
+            .scan(&running_topology.config, HashSet::new());
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
             ShutdownSignal::new_wired();

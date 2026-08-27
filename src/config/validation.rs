@@ -1,4 +1,13 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs, io,
+    path::{Path, PathBuf},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+        mpsc::{self, SyncSender},
+    },
+};
 
 use futures_util::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, stream};
 use heim::{disk::Partition, units::information::byte};
@@ -388,6 +397,272 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
         .await
 }
 
+// Scan for unreferenced disk buffers on a dedicated thread so blocking filesystem
+// operations cannot delay the async runtime. While a scan is running, retain only
+// the latest reload request because the results are diagnostic only.
+pub(crate) struct OrphanedDiskBufferScanner {
+    sender: SyncSender<()>,
+    pending: Arc<Mutex<Option<ScanRequest>>>,
+    generation: Arc<AtomicU64>,
+}
+
+struct ScanRequest {
+    generation: u64,
+    data_dir: PathBuf,
+    configured_buffer_paths: HashSet<PathBuf>,
+}
+
+impl OrphanedDiskBufferScanner {
+    pub(crate) fn new() -> Self {
+        Self::spawn(scan_orphaned_disk_buffers, report_orphaned_disk_buffers)
+    }
+
+    fn spawn<S, R>(scan: S, report: R) -> Self
+    where
+        S: Fn(&ScanRequest) -> io::Result<Vec<PathBuf>> + Send + 'static,
+        R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>) + Send + 'static,
+    {
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let pending = Arc::new(Mutex::new(None));
+        let generation = Arc::new(AtomicU64::new(0));
+        let worker_pending = Arc::clone(&pending);
+        let worker_generation = Arc::clone(&generation);
+        if let Err(error) = std::thread::Builder::new()
+            .name("orphaned-disk-buffer-scanner".into())
+            .spawn(move || run_scanner(receiver, worker_pending, worker_generation, scan, report))
+        {
+            warn!(%error, message = "Failed to start unreferenced disk buffer scanner.");
+        }
+        Self {
+            sender,
+            pending,
+            generation,
+        }
+    }
+
+    pub(crate) fn scan(&self, config: &Config, temporary_exclusions: HashSet<PathBuf>) {
+        let Some(data_dir) = config.global.data_dir.clone() else {
+            return;
+        };
+        let configured_buffer_paths = referenced_disk_buffer_directories(config)
+            .into_iter()
+            .chain(temporary_exclusions)
+            .collect();
+        self.schedule(data_dir, configured_buffer_paths);
+    }
+
+    fn schedule(&self, data_dir: PathBuf, configured_buffer_paths: HashSet<PathBuf>) {
+        let mut pending = self.pending.lock().expect("scanner mutex poisoned");
+        let generation = self
+            .generation
+            .fetch_add(1, Ordering::AcqRel)
+            .wrapping_add(1);
+        *pending = Some(ScanRequest {
+            generation,
+            data_dir,
+            configured_buffer_paths,
+        });
+        drop(pending);
+        let _send_result = self.sender.try_send(());
+    }
+}
+
+impl Drop for OrphanedDiskBufferScanner {
+    fn drop(&mut self) {
+        self.generation.fetch_add(1, Ordering::Release);
+    }
+}
+
+fn scan_orphaned_disk_buffers(request: &ScanRequest) -> io::Result<Vec<PathBuf>> {
+    find_orphaned_disk_buffers(&request.data_dir, &request.configured_buffer_paths)
+}
+
+fn report_orphaned_disk_buffers(request: &ScanRequest, result: io::Result<Vec<PathBuf>>) {
+    let orphaned_buffers = match result {
+        Ok(orphaned_buffers) => orphaned_buffers,
+        Err(error) => {
+            warn!(
+                data_dir = request.data_dir.to_string_lossy().as_ref(),
+                %error,
+                message = "Failed to scan for unreferenced disk buffers.",
+            );
+            return;
+        }
+    };
+
+    let disk_buffer_root = request.data_dir.join("buffer").join("v2");
+    for orphaned_buffer in orphaned_buffers {
+        let orphaned_buffer_id = orphaned_buffer
+            .strip_prefix(&disk_buffer_root)
+            .expect("orphaned buffer must be under the disk buffer root");
+        warn!(
+            buffer_id = orphaned_buffer_id.to_string_lossy().as_ref(),
+            buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
+            message = "Found disk buffer not referenced by the current configuration; any data in it will not be delivered by the current topology.",
+        );
+    }
+}
+
+fn run_scanner<S, R>(
+    receiver: mpsc::Receiver<()>,
+    pending: Arc<Mutex<Option<ScanRequest>>>,
+    generation: Arc<AtomicU64>,
+    scan: S,
+    report: R,
+) where
+    S: Fn(&ScanRequest) -> io::Result<Vec<PathBuf>>,
+    R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>),
+{
+    while receiver.recv().is_ok() {
+        let request = pending.lock().expect("scanner mutex poisoned").take();
+        let Some(request) = request else {
+            continue;
+        };
+        let result = scan(&request);
+        if generation.load(Ordering::Acquire) == request.generation {
+            report(&request, result);
+        }
+    }
+}
+
+pub(crate) fn referenced_disk_buffer_directories(config: &Config) -> HashSet<PathBuf> {
+    let data_dir = config.global.data_dir.clone();
+    config
+        .sinks()
+        .flat_map(|(id, sink)| {
+            sink.buffer
+                .stages()
+                .iter()
+                .filter_map(|stage| stage.disk_usage(data_dir.clone(), id))
+        })
+        .map(|usage| usage.data_dir().to_path_buf())
+        .collect()
+}
+
+fn find_orphaned_disk_buffers(
+    data_dir: &Path,
+    configured_buffer_paths: &HashSet<PathBuf>,
+) -> io::Result<Vec<PathBuf>> {
+    let disk_buffer_root = data_dir.join("buffer").join("v2");
+    let canonical_root = match fs::canonicalize(&disk_buffer_root) {
+        Ok(root) => root,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    let configured_canonical_paths = configured_buffer_paths
+        .iter()
+        .filter_map(|path| fs::canonicalize(path).ok())
+        .collect::<HashSet<_>>();
+
+    let mut pending = vec![disk_buffer_root.clone()];
+    let mut visited = HashSet::new();
+    let mut orphaned_buffers = Vec::new();
+    while let Some(path) = pending.pop() {
+        let Some(canonical_path) = canonical_path_within_root(&path, &canonical_root) else {
+            continue;
+        };
+        if !visited.insert(canonical_path.clone()) {
+            continue;
+        }
+
+        let entries = match fs::read_dir(&path) {
+            Ok(entries) => entries,
+            Err(error) => {
+                warn!(
+                    path = path.to_string_lossy().as_ref(),
+                    %error,
+                    message = "Failed to read disk buffer directory.",
+                );
+                continue;
+            }
+        };
+        let mut child_directories = Vec::new();
+        let mut has_disk_buffer_file = false;
+        for entry in entries {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) => {
+                    warn!(
+                        path = path.to_string_lossy().as_ref(),
+                        %error,
+                        message = "Failed to read disk buffer directory entry.",
+                    );
+                    continue;
+                }
+            };
+            let entry_path = entry.path();
+            let Some(canonical_entry_path) =
+                canonical_path_within_root(&entry_path, &canonical_root)
+            else {
+                continue;
+            };
+            let metadata = match fs::metadata(&entry_path) {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    warn!(
+                        path = entry_path.to_string_lossy().as_ref(),
+                        %error,
+                        message = "Failed to read disk buffer entry metadata.",
+                    );
+                    continue;
+                }
+            };
+            if metadata.is_dir() {
+                if !visited.contains(&canonical_entry_path) {
+                    child_directories.push(entry_path);
+                }
+            } else if metadata.is_file() && is_disk_buffer_file(&entry.file_name()) {
+                has_disk_buffer_file = true;
+            }
+        }
+        if path != disk_buffer_root
+            && has_disk_buffer_file
+            && !configured_buffer_paths.contains(&path)
+            && !configured_canonical_paths.contains(&canonical_path)
+        {
+            orphaned_buffers.push(path);
+        }
+        child_directories.sort_by(|left, right| right.cmp(left));
+        pending.extend(child_directories);
+    }
+    orphaned_buffers.sort();
+    Ok(orphaned_buffers)
+}
+
+fn canonical_path_within_root(path: &Path, canonical_root: &Path) -> Option<PathBuf> {
+    match fs::canonicalize(path) {
+        Ok(path) if path.starts_with(canonical_root) => Some(path),
+        Ok(target) => {
+            warn!(
+                path = path.to_string_lossy().as_ref(),
+                target = target.to_string_lossy().as_ref(),
+                message = "Skipping disk buffer path outside the buffer root.",
+            );
+            None
+        }
+        Err(error) => {
+            warn!(
+                path = path.to_string_lossy().as_ref(),
+                %error,
+                message = "Failed to resolve disk buffer path.",
+            );
+            None
+        }
+    }
+}
+
+fn is_disk_buffer_file(file_name: &std::ffi::OsStr) -> bool {
+    if file_name == "buffer.db" {
+        return true;
+    }
+    file_name
+        .to_str()
+        .and_then(|name| name.strip_prefix("buffer-data-"))
+        .and_then(|name| name.strip_suffix(".dat"))
+        .and_then(|file_id| file_id.parse::<u16>().ok())
+        .is_some_and(|file_id| file_id < u16::MAX)
+}
+
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
@@ -459,4 +734,197 @@ fn capitalize(s: &str) -> String {
         r.make_ascii_uppercase();
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashSet,
+        fs,
+        path::PathBuf,
+        sync::{Arc, mpsc},
+        thread,
+        time::Duration,
+    };
+
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+
+    use tempfile::tempdir;
+
+    use super::{OrphanedDiskBufferScanner, find_orphaned_disk_buffers};
+
+    fn recv<T>(receiver: &mpsc::Receiver<T>) -> T {
+        receiver.recv_timeout(Duration::from_secs(1)).unwrap()
+    }
+
+    #[test]
+    fn scanner_coalesces_requests_and_suppresses_stale_results() {
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let (reported_tx, reported_rx) = mpsc::channel();
+        let scanner = OrphanedDiskBufferScanner::spawn(
+            move |request| {
+                started_tx.send(request.data_dir.clone()).unwrap();
+                release_rx.recv().unwrap();
+                Ok(vec![request.data_dir.clone()])
+            },
+            move |request, _| reported_tx.send(request.data_dir.clone()).unwrap(),
+        );
+
+        scanner.schedule("first".into(), HashSet::new());
+        assert_eq!(recv(&started_rx), PathBuf::from("first"));
+        scanner.schedule("superseded".into(), HashSet::new());
+        scanner.schedule("latest".into(), HashSet::new());
+        release_tx.send(()).unwrap();
+
+        assert_eq!(recv(&started_rx), PathBuf::from("latest"));
+        assert!(reported_rx.try_recv().is_err());
+        release_tx.send(()).unwrap();
+        assert_eq!(recv(&reported_rx), PathBuf::from("latest"));
+        assert!(started_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn scanner_schedule_and_drop_do_not_wait_for_reporter() {
+        let (report_started_tx, report_started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let scanner = Arc::new(OrphanedDiskBufferScanner::spawn(
+            |request| Ok(vec![request.data_dir.clone()]),
+            move |_, _| {
+                report_started_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+            },
+        ));
+        scanner.schedule("scan".into(), HashSet::new());
+        recv(&report_started_rx);
+
+        let schedule_scanner = Arc::clone(&scanner);
+        let (scheduled_tx, scheduled_rx) = mpsc::channel();
+        thread::spawn(move || {
+            schedule_scanner.schedule("latest".into(), HashSet::new());
+            drop(schedule_scanner);
+            scheduled_tx.send(()).unwrap();
+        });
+        recv(&scheduled_rx);
+
+        let (dropped_tx, dropped_rx) = mpsc::channel();
+        thread::spawn(move || {
+            drop(scanner);
+            dropped_tx.send(()).unwrap();
+        });
+        recv(&dropped_rx);
+        release_tx.send(()).unwrap();
+    }
+
+    #[test]
+    fn finds_only_unconfigured_disk_buffer_directories() {
+        let data_dir = tempdir().unwrap();
+        let buffer_root = data_dir.path().join("buffer").join("v2");
+        let namespace = buffer_root.join("namespace");
+        let configured = namespace.join("configured");
+        let nested_orphaned = configured.join("nested-orphaned");
+        let orphaned = namespace.join("orphaned");
+        let damaged = namespace.join("damaged");
+        let overlapping_orphan = namespace.join("overlapping-orphan");
+        let configured_descendant = overlapping_orphan.join("configured-descendant");
+        let unrelated = buffer_root.join("unrelated");
+        fs::create_dir_all(&configured).unwrap();
+        fs::create_dir(&nested_orphaned).unwrap();
+        fs::create_dir(&orphaned).unwrap();
+        fs::create_dir(&damaged).unwrap();
+        fs::create_dir_all(&configured_descendant).unwrap();
+        fs::create_dir(&unrelated).unwrap();
+        fs::write(configured.join("buffer.db"), b"configured").unwrap();
+        fs::write(nested_orphaned.join("buffer.db"), b"nested orphan").unwrap();
+        fs::write(orphaned.join("buffer.db"), b"ledger").unwrap();
+        fs::write(damaged.join("buffer-data-42.dat"), b"data").unwrap();
+        fs::write(overlapping_orphan.join("buffer.db"), b"overlapping orphan").unwrap();
+        fs::write(configured_descendant.join("buffer.db"), b"configured").unwrap();
+        fs::write(unrelated.join("other.db"), b"unrelated").unwrap();
+        fs::write(unrelated.join("buffer-data-65535.dat"), b"reserved").unwrap();
+        fs::write(buffer_root.join("not-a-buffer"), b"ignored").unwrap();
+
+        let configured_paths = HashSet::from([configured, configured_descendant]);
+        let actual = find_orphaned_disk_buffers(data_dir.path(), &configured_paths).unwrap();
+
+        assert_eq!(
+            actual,
+            vec![nested_orphaned, damaged, orphaned, overlapping_orphan]
+        );
+    }
+
+    #[test]
+    fn missing_disk_buffer_root_has_no_orphans() {
+        let data_dir = tempdir().unwrap();
+
+        let actual = find_orphaned_disk_buffers(data_dir.path(), &HashSet::new()).unwrap();
+
+        assert!(actual.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn safely_follows_symlinked_buffer_directories_and_files() {
+        let data_dir = tempdir().unwrap();
+        let external_dir = tempdir().unwrap();
+        let buffer_root = data_dir.path().join("buffer").join("v2");
+        let namespace = buffer_root.join("namespace");
+        let linked_buffer = namespace.join("a-linked-buffer");
+        let buffer_target = namespace.join("z-buffer-target");
+        let linked_file_buffer = namespace.join("linked-file-buffer");
+        let file_target = namespace.join("ledger-target");
+        fs::create_dir_all(&buffer_target).unwrap();
+        fs::create_dir(&linked_file_buffer).unwrap();
+        fs::write(buffer_target.join("buffer.db"), b"linked directory").unwrap();
+        fs::write(&file_target, b"linked file").unwrap();
+        fs::write(external_dir.path().join("buffer.db"), b"outside root").unwrap();
+        symlink(&buffer_target, &linked_buffer).unwrap();
+        symlink(&file_target, linked_file_buffer.join("buffer.db")).unwrap();
+        symlink(&namespace, namespace.join("cycle")).unwrap();
+        symlink(external_dir.path(), namespace.join("outside-root")).unwrap();
+
+        let actual = find_orphaned_disk_buffers(data_dir.path(), &HashSet::new()).unwrap();
+
+        assert_eq!(actual, vec![linked_buffer, linked_file_buffer]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn matches_configured_buffers_by_symlink_target() {
+        let data_dir = tempdir().unwrap();
+        let buffer_root = data_dir.path().join("buffer").join("v2");
+        let target = buffer_root.join("z-target");
+        let configured_link = buffer_root.join("a-configured-link");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(target.join("buffer.db"), b"configured").unwrap();
+        symlink(&target, &configured_link).unwrap();
+
+        let configured_paths = HashSet::from([configured_link]);
+        let actual = find_orphaned_disk_buffers(data_dir.path(), &configured_paths).unwrap();
+
+        assert!(actual.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn supports_a_symlinked_disk_buffer_root() {
+        let data_dir = tempdir().unwrap();
+        let storage_dir = tempdir().unwrap();
+        let buffer_parent = data_dir.path().join("buffer");
+        let buffer_root = buffer_parent.join("v2");
+        let orphaned = buffer_root.join("orphaned");
+        fs::create_dir(&buffer_parent).unwrap();
+        fs::create_dir(storage_dir.path().join("orphaned")).unwrap();
+        fs::write(
+            storage_dir.path().join("orphaned").join("buffer.db"),
+            b"orphaned",
+        )
+        .unwrap();
+        symlink(storage_dir.path(), &buffer_root).unwrap();
+
+        let actual = find_orphaned_disk_buffers(data_dir.path(), &HashSet::new()).unwrap();
+
+        assert_eq!(actual, vec![orphaned]);
+    }
 }
