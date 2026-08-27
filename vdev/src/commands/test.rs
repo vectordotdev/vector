@@ -18,8 +18,8 @@ pub struct Cli {
     #[arg(short, long)]
     env: Option<Vec<String>>,
 
-    /// Features to activate (comma-separated, or set FEATURES env var)
-    #[arg(short = 'F', long, value_delimiter = ',', env = "FEATURES")]
+    /// Features to activate explicitly (comma-separated, additive with FEATURES)
+    #[arg(short = 'F', long, value_delimiter = ',')]
     features: Vec<String>,
 
     /// Derive the minimum feature set from a configuration file
@@ -42,23 +42,59 @@ fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
         .collect()
 }
 
+fn select_features(
+    explicit: Vec<String>,
+    environment: Option<&str>,
+    derived: Vec<String>,
+    config_selected: bool,
+) -> (Vec<String>, bool) {
+    let mut ignored_environment_default = false;
+    let mut selected: Vec<_> = explicit
+        .into_iter()
+        .filter(|feature| !feature.is_empty())
+        .collect();
+    if let Some(environment) = environment {
+        for feature in environment
+            .split(|character: char| character == ',' || character.is_ascii_whitespace())
+            .filter(|feature| !feature.is_empty())
+        {
+            if config_selected && feature == "default" {
+                ignored_environment_default = true;
+            } else {
+                selected.push(feature.to_owned());
+            }
+        }
+    }
+    selected.extend(derived);
+    selected.sort();
+    selected.dedup();
+
+    (selected, ignored_environment_default)
+}
+
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let mut selected_features: Vec<String> = self
-            .features
-            .into_iter()
-            .filter(|f| !f.is_empty())
-            .collect();
-
-        if let Some(config) = &self.config {
-            selected_features.extend(features::load_and_extract(config)?);
-            selected_features.sort();
-            selected_features.dedup();
+        let config_selected = self.config.is_some();
+        let derived_features = self
+            .config
+            .as_deref()
+            .map(features::load_and_extract)
+            .transpose()?
+            .unwrap_or_default();
+        let environment_features = std::env::var("FEATURES").ok();
+        let (selected_features, ignored_environment_default) = select_features(
+            self.features,
+            environment_features.as_deref(),
+            derived_features,
+            config_selected,
+        );
+        if ignored_environment_default {
+            warn!("Ignoring `default` from FEATURES because --config uses --no-default-features");
         }
 
         let mut args = vec!["--workspace".to_string()];
 
-        if self.no_default_features || self.config.is_some() {
+        if self.no_default_features || config_selected {
             args.push("--no-default-features".to_string());
         }
         if !selected_features.is_empty() {
@@ -87,7 +123,7 @@ mod tests {
 
     use clap::Parser;
 
-    use super::Cli;
+    use super::{Cli, select_features};
 
     #[derive(Parser)]
     struct TestCli {
@@ -119,5 +155,26 @@ mod tests {
         .expect_err("missing configuration must fail");
 
         assert!(error.to_string().contains("failed to read"));
+    }
+
+    #[test]
+    fn config_ignores_only_environment_default() {
+        let (features, ignored_default) = select_features(
+            vec!["default".to_string(), "sinks-console".to_string()],
+            Some("default,rdkafka/dynamic-linking"),
+            vec!["sources-file".to_string()],
+            true,
+        );
+
+        assert!(ignored_default);
+        assert_eq!(
+            features,
+            [
+                "default",
+                "rdkafka/dynamic-linking",
+                "sinks-console",
+                "sources-file",
+            ]
+        );
     }
 }
