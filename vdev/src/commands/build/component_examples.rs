@@ -396,12 +396,15 @@ fn exclusive_group<'a>(param: &'a Value, key: &str) -> Option<Vec<&'a str>> {
 /// `make_example_params` does at the top level. Selection requires renderability, since a member
 /// that yields no value would drop the rest and leave the group with nothing set.
 ///
-/// Forcing never *creates* an object, though. The chosen member is only added to an object that is
-/// non-empty on its own account, so a nested struct whose sole content is an unfilterable group
-/// still yields an empty object and falls back to the item's own example in `get_example_value`.
+/// Forcing avoids *creating* an object where the item's own example would be used instead: when
+/// nothing else keeps the object present and `has_item_example` says `get_example_value` has a
+/// fallback, the group is left out and that example wins, preserving today's output. Without a
+/// fallback there is nothing to prefer — returning an empty object would drop the field entirely,
+/// omitting it even when it is required — so the chosen member is forced in regardless.
 fn build_nested_object(
     options: &Map<String, Value>,
     item_kind: &str,
+    has_item_example: bool,
     deep_filter: impl Fn(&Value) -> bool,
 ) -> Option<Map<String, Value>> {
     // At most one: the chosen member is subject to `deep_filter` like any other field, so a
@@ -424,9 +427,9 @@ fn build_nested_object(
         insert_nested_value(&mut object, key, option, item_kind)?;
     }
 
-    // Nothing else keeps the object present, so leave it empty rather than forcing a member in and
-    // materializing an object where the item's own example would be used.
-    if object.is_empty() {
+    // Nothing else keeps the object present, and the item's own example will be used instead, so
+    // leave the object empty rather than displacing that example with a forced member.
+    if object.is_empty() && has_item_example {
         return Some(object);
     }
 
@@ -548,14 +551,20 @@ where
                 for (item_kind, item_type) in item_types {
                     if matches!(item_kind.as_str(), "array" | "object") {
                         let options = item_type.get("options").and_then(Value::as_object)?;
-                        let object = build_nested_object(options, item_kind, &deep_filter)?;
+                        let fallback = first_example(item_type);
+                        let object = build_nested_object(
+                            options,
+                            item_kind,
+                            fallback.is_some(),
+                            &deep_filter,
+                        )?;
                         if !object.is_empty() {
                             value = Some(if kind == "array" {
                                 Value::Array(vec![Value::Object(object)])
                             } else {
                                 Value::Object(object)
                             });
-                        } else if let Some(example) = first_example(item_type) {
+                        } else if let Some(example) = fallback {
                             value = Some(if kind == "array" {
                                 Value::Array(vec![example])
                             } else {
@@ -1083,8 +1092,8 @@ mod tests {
 
     #[test]
     fn forced_nested_member_does_not_create_an_object() {
-        // The group is the nested struct's only content, so nothing else keeps the object present.
-        // Forcing a member in here would emit an object where the item's own example is used today,
+        // The group is the nested struct's only content, so nothing else keeps the object present,
+        // and the item carries its own example. Forcing a member in would displace that example,
         // shifting output for fields that are already valid.
         let member = |example: &str| {
             serde_json::json!({
@@ -1113,6 +1122,38 @@ mod tests {
             serde_json::json!({ "source": ". = parse_json!(.message)" }),
             "expected the item example, got {:?}",
             minimal["config"]
+        );
+    }
+
+    #[test]
+    fn forced_nested_member_keeps_a_required_parent() {
+        // Same shape, but the item has no example of its own. Leaving the object empty here would
+        // make `get_example_value` yield nothing at all, dropping a required field from the minimal
+        // example, so the chosen member is forced in rather than preferring a fallback that does
+        // not exist.
+        let member = |example: &str| {
+            serde_json::json!({
+                "required": false,
+                "required_one_of": ["source", "file"],
+                "type": { "string": { "examples": [example] } }
+            })
+        };
+        let params = Map::from_iter([(
+            "config".to_owned(),
+            serde_json::json!({
+                "required": true,
+                "type": { "object": { "items": { "type": { "object": { "options": {
+                    "source": member("stdin"),
+                    "file": member("/var/log/syslog"),
+                } } } } } }
+            }),
+        )]);
+
+        let minimal = make_example_params(&params, selected_for_minimal, selected_for_minimal);
+        assert_eq!(
+            minimal.get("config"),
+            Some(&serde_json::json!({ "source": "stdin" })),
+            "expected the required parent with one forced member, got {minimal:?}"
         );
     }
 
