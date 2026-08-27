@@ -34,7 +34,7 @@ vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 assert-json-diff = { version = "2", default-features = false }
-jsonschema = { version = "0.38.1", default-features = false }
+jsonschema = { version = "0.46.8", default-features = false }
 proptest.workspace = true
 proptest-derive.workspace = true
 serde_with.workspace = true
