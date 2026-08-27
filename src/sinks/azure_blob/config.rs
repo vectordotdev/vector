@@ -77,28 +77,17 @@ pub enum AzureBlobType {
 
     /// Stores data as append blobs.
     ///
-    /// Batches are appended to an existing blob rather than creating a new one.
-    /// The blob name stays stable across flushes — suited for continuous log streaming
-    /// where you want a single growing file per time window.
+    /// Each flush appends to a stable-named blob instead of creating a new one, which suits
+    /// continuous log streaming: one growing file per time window.
     ///
-    /// Each batch is compressed on its own, so a compressed blob is a sequence of concatenated
-    /// streams. Read it with a multi-stream-aware decompressor such as `gunzip` or `zstd -d`.
-    /// Only `gzip`, `zstd`, and `none` are supported: `snappy` and `zlib` cannot be concatenated
-    /// and are rejected at startup.
+    /// Batches land verbatim, one after the other, so `compression` must be concatenation-safe
+    /// (`gzip`, `zstd`, or `none`; read such a blob with a multi-stream decompressor like `gunzip`)
+    /// and `framing` must terminate every record — `codec = "json"` therefore defaults to
+    /// newline-delimited JSON rather than the one array per blob that `block` emits. Settings that
+    /// cannot be appended safely are rejected at startup.
     ///
-    /// Because a batch is appended to whatever is already in the blob, `append` uses the same
-    /// stream-oriented framing defaults as the `file` sink: with `codec = "json"` and no explicit
-    /// `framing`, it writes newline-delimited JSON, whereas `block` emits one JSON array per blob.
-    ///
-    /// Explicitly configured `framing` is always used as given. Azure concatenates the appended
-    /// payloads with nothing in between, so framing that separates records without terminating them
-    /// — `character_delimited`, for example — leaves a batch's last record joined to the next
-    /// batch's first record. A codec whose own default framing separates rather than terminates
-    /// records, such as `gelf`, is rejected at startup unless `framing` is set explicitly.
-    ///
-    /// Changing `encoding` while a blob is still being appended mixes formats within that blob,
-    /// whose `Content-Type` is set when the blob is created. Change `blob_prefix` or
-    /// `blob_time_format`, or wait for the next time window, to start a new blob instead.
+    /// Changing `encoding` mixes formats inside a blob whose `Content-Type` is already set. Change
+    /// `blob_prefix` or `blob_time_format`, or wait for the next time window, to start a new blob.
     Append,
 }
 
