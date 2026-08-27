@@ -155,18 +155,23 @@
   margin: 0;
 }
 
-/* VRL release entries end with linked PR and author attribution. */
-.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]) {
+/* VRL release entries end with a paragraph linking both the author and PR. */
+.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
   @apply mb-0 mt-4 min-w-0 list-none rounded-t-lg border border-b-0 border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm md:px-5;
 }
-.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]) > li {
+.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])) > li,
+.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) > li {
   @apply m-0;
 }
-.vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]) {
+.vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
   @apply mt-0 rounded-b-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm italic shadow-sm md:px-5;
 }
-.dark .vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]),
-.dark .vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]) {
+.dark .vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.dark .vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]),
+.dark .vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.dark .vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
   @apply border-gray-700 bg-gray-800/40;
 }
 

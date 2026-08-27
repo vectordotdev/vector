@@ -9,6 +9,8 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail};
 use chrono::Utc;
 use semver::Version;
+#[cfg(not(test))]
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::commands::changelog::FRAGMENT_TYPES;
@@ -88,7 +90,7 @@ pub(super) fn run(new_version: &Version) -> Result<PathBuf> {
     // breaking fragments.
 
     let changelog_dir = repo_root.join(CHANGELOG_DIR);
-    let changelog_entries = read_changelog_fragments(&changelog_dir)?;
+    let changelog_entries = read_changelog_fragments(&repo_root, &changelog_dir)?;
 
     // Validate + render everything IN MEMORY before touching disk, so a validation
     // failure doesn't leave a partial CUE file behind (which would then trip the
@@ -288,9 +290,16 @@ struct ChangelogEntry {
     cue_type: String,
     breaking: bool,
     description: String,
+    pr_numbers: Vec<u64>,
     contributors: Vec<String>,
     /// For `*.breaking.md` fragments, the structured upgrade-guide details.
     breaking_details: Option<BreakingDetails>,
+}
+
+#[cfg(not(test))]
+#[derive(Deserialize)]
+struct PullRequest {
+    number: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -304,10 +313,14 @@ struct BreakingDetails {
     migration: String,
 }
 
-fn read_changelog_fragments(dir: &Path) -> Result<Vec<ChangelogEntry>> {
+fn read_changelog_fragments(repo_root: &Path, dir: &Path) -> Result<Vec<ChangelogEntry>> {
     if !dir.is_dir() {
         return Ok(Vec::new());
     }
+
+    #[cfg(not(test))]
+    ensure_full_git_history(repo_root)?;
+
     let mut entries = Vec::new();
     let mut paths: Vec<PathBuf> = fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -316,7 +329,10 @@ fn read_changelog_fragments(dir: &Path) -> Result<Vec<ChangelogEntry>> {
         .collect();
     paths.sort();
     for path in paths {
-        let entry = parse_changelog_fragment(&path)?;
+        let mut entry = parse_changelog_fragment(&path)?;
+        entry
+            .pr_numbers
+            .push(lookup_pull_request(repo_root, &path)?);
         entries.push(entry);
     }
     Ok(entries)
@@ -363,6 +379,7 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
             cue_type: cue_type.to_string(),
             breaking,
             description: summary,
+            pr_numbers: Vec::new(),
             contributors,
             breaking_details: Some(details),
         });
@@ -372,9 +389,118 @@ fn parse_changelog_fragment(path: &Path) -> Result<ChangelogEntry> {
         cue_type: cue_type.to_string(),
         breaking,
         description: body.trim().to_string(),
+        pr_numbers: Vec::new(),
         contributors,
         breaking_details: None,
     })
+}
+
+/// Find the merged PR that introduced a changelog fragment. The adding commit
+/// remains available after release preparation deletes the fragment, so the
+/// same lookup can also be used when backfilling release metadata.
+#[cfg(not(test))]
+fn lookup_pull_request(repo_root: &Path, fragment_path: &Path) -> Result<u64> {
+    let relative_path = fragment_path.strip_prefix(repo_root).with_context(|| {
+        format!(
+            "Fragment path {} is outside the repository root {}",
+            fragment_path.display(),
+            repo_root.display()
+        )
+    })?;
+    let relative_path = relative_path.to_str().ok_or_else(|| {
+        anyhow!(
+            "Fragment path is not valid UTF-8: {}",
+            fragment_path.display()
+        )
+    })?;
+
+    let commit = run_command(
+        "git",
+        &[
+            "log",
+            "-1",
+            "--format=%H",
+            "--diff-filter=A",
+            "--follow",
+            "--",
+            relative_path,
+        ],
+        repo_root,
+    )?;
+    let commit = commit.trim();
+    if commit.is_empty() {
+        bail!(
+            "Could not find the commit that added {relative_path}; cannot determine its pull request."
+        );
+    }
+
+    let output = run_command(
+        "gh",
+        &[
+            "pr",
+            "list",
+            "--repo",
+            "vectordotdev/vector",
+            "--state",
+            "merged",
+            "--search",
+            commit,
+            "--json",
+            "number",
+            "--limit",
+            "2",
+        ],
+        repo_root,
+    )?;
+    let pull_requests: Vec<PullRequest> = serde_json::from_str(&output)
+        .with_context(|| format!("Could not parse GitHub PR lookup for commit {commit}"))?;
+
+    match pull_requests.as_slice() {
+        [pull_request] => Ok(pull_request.number),
+        [] => bail!("No merged GitHub PR found for commit {commit} that added {relative_path}."),
+        _ => bail!(
+            "Multiple merged GitHub PRs found for commit {commit} that added {relative_path}."
+        ),
+    }
+}
+
+#[cfg(not(test))]
+fn ensure_full_git_history(repo_root: &Path) -> Result<()> {
+    let is_shallow = run_command("git", &["rev-parse", "--is-shallow-repository"], repo_root)?;
+    if is_shallow.trim() == "true" {
+        bail!(
+            "Release generation requires full Git history to find the PRs that introduced changelog fragments."
+        );
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+fn lookup_pull_request(_: &Path, _: &Path) -> Result<u64> {
+    // Unit tests exercise local parsing and rendering. A release dry run checks
+    // the real GitHub lookup without requiring network access in unit tests.
+    Ok(42)
+}
+
+#[cfg(not(test))]
+fn run_command(cmd: &str, args: &[&str], cwd: &Path) -> Result<String> {
+    let display = format!("{cmd} {}", args.join(" "));
+    let output = Command::new(cmd)
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .with_context(|| format!("Failed to run `{display}`"))?;
+
+    if !output.status.success() {
+        bail!(
+            "`{display}` failed (exit {}):\n{}{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// Split off the trailing `authors: <handles...>` line, returning the body preceding it
@@ -484,6 +610,10 @@ fn render_changelog(entries: &[ChangelogEntry]) -> String {
                 writeln!(s, "\t\t\t\t{line}").unwrap();
             }
             s.push_str("\t\t\t\t\"\"\"#\n");
+            if !e.pr_numbers.is_empty() {
+                let json_prs = serde_json::to_string(&e.pr_numbers).unwrap();
+                writeln!(s, "\t\t\tpr_numbers: {json_prs}").unwrap();
+            }
             if !e.contributors.is_empty() {
                 let json_contribs = serde_json::to_string(&e.contributors).unwrap();
                 writeln!(s, "\t\t\tcontributors: {json_contribs}").unwrap();
@@ -667,7 +797,7 @@ mod tests {
         .unwrap();
         fs::write(dir.join("sec.security.md"), "Patched a CVE.\n").unwrap();
 
-        let entries = read_changelog_fragments(dir).unwrap();
+        let entries = read_changelog_fragments(dir, dir).unwrap();
         assert_eq!(entries.len(), 3);
 
         // Sorted by filename
@@ -681,6 +811,7 @@ mod tests {
         );
         assert!(feat.description.starts_with("Adds a thing."));
         assert!(!feat.description.contains("authors:"));
+        assert_eq!(feat.pr_numbers, vec![42]);
 
         // Breaking fragments must be marked as such and carry structured details.
         let breaking = &entries[1];
@@ -700,7 +831,7 @@ mod tests {
     fn read_changelog_fragments_rejects_unknown_type() {
         let tmp = tempfile::tempdir().unwrap();
         fs::write(tmp.path().join("foo.bogus.md"), "x").unwrap();
-        assert!(read_changelog_fragments(tmp.path()).is_err());
+        assert!(read_changelog_fragments(tmp.path(), tmp.path()).is_err());
     }
 
     #[test]
@@ -710,6 +841,7 @@ mod tests {
                 cue_type: "feat".into(),
                 breaking: false,
                 description: "Adds a thing.\nMulti-line.".into(),
+                pr_numbers: vec![123],
                 contributors: vec!["alice".into()],
                 breaking_details: None,
             },
@@ -717,6 +849,7 @@ mod tests {
                 cue_type: "fix".into(),
                 breaking: false,
                 description: "Fixed it.".into(),
+                pr_numbers: vec![],
                 contributors: vec![],
                 breaking_details: None,
             },
@@ -724,6 +857,7 @@ mod tests {
                 cue_type: "chore".into(),
                 breaking: true,
                 description: "Removed legacy thing.".into(),
+                pr_numbers: vec![456],
                 contributors: vec![],
                 breaking_details: Some(BreakingDetails {
                     title: "Legacy thing removed".into(),
@@ -742,6 +876,8 @@ mod tests {
         assert!(out.contains("\t\t\t\tAdds a thing.\n"));
         assert!(out.contains("\t\t\t\tMulti-line.\n"));
         assert!(out.contains("contributors: [\"alice\"]"));
+        assert!(out.contains("pr_numbers: [123]"));
+        assert!(out.contains("pr_numbers: [456]"));
         assert!(out.contains("\t\t\ttype: \"fix\"\n"));
         assert!(out.contains("\t\t\ttype: \"chore\"\n"));
         assert!(out.contains("\t\t\tbreaking: true\n"));
