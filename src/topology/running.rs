@@ -61,6 +61,8 @@ pub struct RunningTopology {
     component_type_names: HashMap<ComponentKey, String>,
     source_tasks: HashMap<ComponentKey, TaskHandle>,
     tasks: HashMap<ComponentKey, TaskHandle>,
+    retired_disk_sink_tasks: Vec<(ComponentKey, TaskHandle)>,
+    retired_disk_sink_task_failed: bool,
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<ComponentKey, DisabledTrigger>,
     pub(crate) config: Config,
@@ -88,6 +90,8 @@ impl RunningTopology {
             detach_triggers: HashMap::new(),
             source_tasks: HashMap::new(),
             tasks: HashMap::new(),
+            retired_disk_sink_tasks: Vec::new(),
+            retired_disk_sink_task_failed: false,
             abort_tx,
             watch: watch::channel(TapResource::default()),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
@@ -141,15 +145,14 @@ impl RunningTopology {
     /// transforms, and sinks) have finished shutting down. Transforms and sinks
     /// will shut down automatically once their input tasks finish.
     ///
-    /// This function takes ownership of `self`, so once it returns everything
-    /// in the [`RunningTopology`] instance has been dropped except for the
-    /// `tasks` map. This map gets moved into the returned future and is used to
-    /// poll for when the tasks have completed. Once the returned future is
-    /// dropped then everything from this RunningTopology instance is fully
-    /// dropped.
+    /// This function takes ownership of `self`. Component task handles, including handles for
+    /// retired disk-buffered sinks that are still draining after a reload, are moved into the
+    /// returned future and polled until completion. Dropping the returned future drops those
+    /// handles and everything else owned by this [`RunningTopology`].
     ///
-    /// The returned future resolves to `true` if every component finished on its own before
-    /// the graceful shutdown deadline, or `false` if any component had to be forcefully killed.
+    /// The returned future resolves to `true` if every component task completed successfully
+    /// before the graceful shutdown deadline, or `false` if any task failed or had to be
+    /// forcefully killed.
     pub fn stop(self) -> impl Future<Output = bool> {
         // Create handy handles collections of all tasks for the subsequent
         // operations.
@@ -163,7 +166,12 @@ impl RunningTopology {
 
         // We need to give some time to the sources to gracefully shutdown, so
         // we will merge them with other tasks.
-        for (key, task) in self.tasks.into_iter().chain(self.source_tasks) {
+        for (key, task) in self
+            .tasks
+            .into_iter()
+            .chain(self.source_tasks)
+            .chain(self.retired_disk_sink_tasks)
+        {
             let task = task.map(map_closure).shared();
 
             wait_handles.push(task.clone());
@@ -261,12 +269,13 @@ impl RunningTopology {
 
         // Aggregate future that ends once anything detects that all tasks have shutdown.
         // Resolves to `true` only if the winning branch got there without forcing anything.
+        let retired_disk_sink_task_failed = self.retired_disk_sink_task_failed;
         let shutdown_complete_future = future::select_all(vec![
             Box::pin(timeout) as future::BoxFuture<'static, bool>,
             Box::pin(reporter) as future::BoxFuture<'static, bool>,
             Box::pin(success) as future::BoxFuture<'static, bool>,
         ])
-        .map(|(graceful, _index, _remaining)| graceful);
+        .map(move |(graceful, _index, _remaining)| graceful && !retired_disk_sink_task_failed);
 
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
@@ -316,6 +325,7 @@ impl RunningTopology {
         } else {
             ConfigDiff::new(&self.config, &new_config, HashSet::new())
         };
+        self.reap_completed_retired_disk_sink_tasks();
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
@@ -387,6 +397,26 @@ impl RunningTopology {
         );
 
         Err(ReloadError::FailedToRestore)
+    }
+
+    /// Reaps completed tasks while preserving active handles and observed failure status.
+    fn reap_completed_retired_disk_sink_tasks(&mut self) {
+        let mut still_running = Vec::with_capacity(self.retired_disk_sink_tasks.len());
+        for (key, mut task) in std::mem::take(&mut self.retired_disk_sink_tasks) {
+            if task.is_finished()
+                && let Some(result) = (&mut task).now_or_never()
+            {
+                self.retired_disk_sink_task_failed |= !matches!(result, Ok(Ok(_)));
+            } else {
+                still_running.push((key, task));
+            }
+        }
+        self.retired_disk_sink_tasks = still_running;
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn retired_disk_sink_task_count(&self) -> usize {
+        self.retired_disk_sink_tasks.len()
     }
 
     /// Attempts to reload enrichment tables.
@@ -701,6 +731,13 @@ impl RunningTopology {
             if wait_for_sinks.contains(key) {
                 debug!(message = "Waiting for sink to shutdown.", component_id = %key);
                 previous.await.unwrap().unwrap();
+            } else if self
+                .config
+                .sink(key)
+                .is_some_and(|sink| sink.buffer.has_disk_stage())
+            {
+                self.retired_disk_sink_tasks
+                    .push(((*key).clone(), previous));
             } else {
                 drop(previous); // detach and forget
             }

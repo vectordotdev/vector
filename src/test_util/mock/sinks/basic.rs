@@ -1,7 +1,11 @@
 use async_trait::async_trait;
 use futures_util::{FutureExt, StreamExt, stream::BoxStream};
 use snafu::Snafu;
+#[cfg(test)]
+use std::sync::Arc;
 use tokio::sync::oneshot;
+#[cfg(test)]
+use tokio::sync::{Barrier, Semaphore};
 use vector_lib::{
     config::{AcknowledgementsConfig, Input},
     configurable::configurable_component,
@@ -31,6 +35,10 @@ pub struct BasicSinkConfig {
     #[serde(skip)]
     confinement: Option<crate::template::ConfinementConfig>,
 
+    #[cfg(test)]
+    #[serde(skip)]
+    event_gate: Option<(Arc<Barrier>, Arc<Semaphore>)>,
+
     /// Dummy field used for generating unique configurations to trigger reloads.
     data: Option<String>,
 }
@@ -51,6 +59,8 @@ impl BasicSinkConfig {
             sink: Mode::Normal(sink),
             healthy,
             confinement: None,
+            #[cfg(test)]
+            event_gate: None,
             data: None,
         }
     }
@@ -60,6 +70,8 @@ impl BasicSinkConfig {
             sink: Mode::Normal(sink),
             healthy,
             confinement: None,
+            #[cfg(test)]
+            event_gate: None,
             data: Some(data.into()),
         }
     }
@@ -72,6 +84,12 @@ impl BasicSinkConfig {
         self.confinement = Some(crate::template::ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: allowed,
         });
+        self
+    }
+
+    #[cfg(test)]
+    pub fn with_event_gate(mut self, entered: Arc<Barrier>, release: Arc<Semaphore>) -> Self {
+        self.event_gate = Some((entered, release));
         self
     }
 }
@@ -101,6 +119,8 @@ impl SinkConfig for BasicSinkConfig {
         let sink = MockSink {
             sink: self.sink.clone(),
             health_tx,
+            #[cfg(test)]
+            event_gate: self.event_gate.clone(),
         };
 
         let healthcheck = async move { rx.await.unwrap() };
@@ -124,6 +144,8 @@ impl SinkConfig for BasicSinkConfig {
 struct MockSink {
     sink: Mode,
     health_tx: Option<oneshot::Sender<crate::Result<()>>>,
+    #[cfg(test)]
+    event_gate: Option<(Arc<Barrier>, Arc<Semaphore>)>,
 }
 
 #[async_trait]
@@ -137,6 +159,15 @@ impl StreamSink<Event> for MockSink {
 
                 // We have an inner sink, so forward the input normally
                 while let Some(mut event) = input.next().await {
+                    #[cfg(test)]
+                    if let Some((entered, release)) = self.event_gate.take() {
+                        entered.wait().await;
+                        release
+                            .acquire()
+                            .await
+                            .expect("event gate semaphore closed")
+                            .forget();
+                    }
                     let finalizers = event.take_finalizers();
                     if let Err(error) = sink.send_event(event).await {
                         error!(message = "Ingesting an event failed at mock sink.", %error);
