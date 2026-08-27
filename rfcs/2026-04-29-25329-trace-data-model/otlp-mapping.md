@@ -412,8 +412,10 @@ proto decode boundary, migration enum, legacy-layout hint precursor, internal `T
 proto extension) are owned by the parent RFC's Plan of Attack and must land first.
 
 - [ ] OTLP `Legacy -> Typed` shim in `lib/opentelemetry-proto`. Registers under the OTLP
-  legacy-layout hint emitted by the precursor step in the parent. Consumed by any OTLP-aware
-  downstream component once the shim ships.
+  legacy-layout hint emitted by the precursor step in the parent and provides a
+  format-shape detector for pre-hint records. Fixture tests prove that the detector
+  accepts the historical OTLP `LogEvent` layout and rejects Datadog and malformed
+  layouts. Consumed by any OTLP-aware downstream component once the shim ships.
 - [ ] `Typed -> OTLP-wire` encoder in `lib/opentelemetry-proto`. Implements the egress
   mapping table, the typed-slot-precedence rule, the `AttrValue` -> `AnyValue` mapping,
   the reserved-key emission for Datadog state, and the empty-`ScopeSpans` rule.

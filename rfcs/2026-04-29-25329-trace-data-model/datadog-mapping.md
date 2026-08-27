@@ -955,7 +955,10 @@ land first.
   ingest with an `unsupported_payload_version` component-spec error counter increment
   and an error log. Lands independently of the typed migration.
 - [ ] Datadog `Legacy -> Typed` shim in `src/sources/datadog_agent/traces.rs`. Registers
-  under the Datadog legacy-layout hint emitted by the precursor step in the parent.
+  under the Datadog legacy-layout hint emitted by the precursor step in the parent and
+  provides a format-shape detector for pre-hint records. Fixture tests prove that the
+  detector accepts the historical Datadog `LogEvent` layout and rejects OTLP and
+  malformed layouts.
 - [ ] `Typed -> Datadog-wire` encoder in `src/sinks/datadog/traces/`. Implements the
   egress derivation rules above (`Span.type` and `Span.resource` derivation from
   `Span.kind` / `Span.attributes`, `Span.error` from `Span.status`, the typed-slot

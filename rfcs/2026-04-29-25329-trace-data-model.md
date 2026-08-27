@@ -743,8 +743,12 @@ pub enum TraceEvent {
 Trace event-producing sources each set the reserved sub-key `vector.trace_legacy_layout`
 in `EventMetadata.value` to a static string identifying themselves on every `Legacy`
 trace they emit. `to_typed()` reads this sub-key to select the corresponding
-`Legacy -> Typed` shim. A `Legacy` event whose hint is absent or maps to no registered
-shim returns an error, increments a counter, and emits a warning log.
+`Legacy -> Typed` shim. For a pre-precursor record with no hint, `to_typed()` runs each
+registered shim's format-shape detector. Exactly one match selects
+that shim; zero or multiple matches return an error, increment a counter, and emit a
+warning log. A present but unrecognized hint errors without attempting detection.
+Per-format shim tests use pre-hint fixtures to prove that the built-in OTLP and Datadog
+legacy layouts are detected uniquely.
 
 The end-state `struct TraceEvent { resource, scope, chunk, spans, metadata }` shown above
 is reached by deleting the `Legacy` arm once every component has migrated; the `Typed`
@@ -766,21 +770,22 @@ Both accessor families coexist on `TraceEvent` and dispatch on the variant:
   accessor (as opposed to implicit conversion) is in "Migration approach" under
   Rationale. The VRL boundary is the exception: `VrlTarget` has `&mut self` access, so
   it auto-converts Legacy -> Typed on first typed-path access, ensuring VRL programs
-  work uniformly regardless of source migration state. If `to_typed()` fails (absent or
-  unrecognized `vector.trace_legacy_layout` hint), `VrlTarget` aborts the VRL expression
-  with a runtime error; the event is forwarded to the topology error path unchanged,
-  a counter is incremented, and a warning log identifies the failing event.
-- Explicit `to_typed(&mut self)` rewrites a `Legacy` variant in place into `Typed` by reading the
-  `vector.trace_legacy_layout` hint from `EventMetadata.value` and invoking the corresponding
-  source-specific shim. Already-`Typed` events are a no-op. There is no symmetric `to_legacy`. When
-  called by a typed-aware sink or transform (i.e. outside `VrlTarget`), a `to_typed()` failure
-  causes the consumer to drop the event, increment a counter, and emit a warning log. Once
-  dead-letter routing lands, failed events may instead be forwarded to an error path; until then,
-  dropping is the uniform fallback.
+  work uniformly regardless of source migration state. If `to_typed()` cannot resolve a
+  present hint or uniquely detect a hintless legacy layout, `VrlTarget` aborts the VRL
+  expression with a runtime error; the event is forwarded to the topology error path
+  unchanged, a counter is incremented, and a warning log identifies the failing event.
+- Explicit `to_typed(&mut self)` rewrites a `Legacy` variant in place into `Typed` by
+  selecting a source-specific shim from the hint or, for a hintless record, the unique
+  format-shape detector match. Already-`Typed` events are a no-op. There is no
+  symmetric `to_legacy`. When called by a typed-aware sink or transform (i.e. outside
+  `VrlTarget`), a `to_typed()` failure causes the consumer to drop the event, increment
+  a counter, and emit a warning log. Once dead-letter routing lands, failed events may
+  instead be forwarded to an error path; until then, dropping is the uniform fallback.
 
 Per-component shims are unidirectional (`Legacy -> Typed` only). The `datadog_agent`
-source ships with a shim that knows the source's `LogEvent` key layout and produces a
-typed container; the OTLP source ships with the equivalent shim for its layout.
+source ships with a shim and format-shape detector that know the source's `LogEvent` key
+layout and produce a typed container; the OTLP source ships with the equivalent shim and
+detector for its layout.
 
 The removal of untyped forwarders (above) is a compile-time gate that catches unmigrated
 call sites. Enforcement against a missed `to_typed()` call at runtime is layered:
@@ -806,8 +811,9 @@ call sites. Enforcement against a missed `to_typed()` call at runtime is layered
 VRL programs are exempt from this layering: `VrlTarget` auto-converts on typed-path
 access, so operators never need to reason about the migration state of upstream sources.
 
-After every source, sink, and transform has been migrated, the `Legacy` variant and the
-shims are deleted, leaving only the typed struct.
+After every source, sink, and transform has been migrated, the `Legacy` Rust variant is
+deleted, leaving only the typed struct. The conversion routines and detectors remain
+temporarily as deprecated-proto wire decoders, as described below.
 
 #### Wire serialization
 
@@ -991,22 +997,30 @@ partition keys from event position within a batch.
 
 Removing the `Legacy` Rust variant does not immediately retire the proto: `LegacyTrace`,
 `LegacyTraceArray`, and the `legacy_*` oneof variants are first marked
-`deprecated = true` for a release window so events written by older Vector instances
-continue to decode. The per-component shim functions persist alongside the deprecated
-proto as wire decoders -- dispatched on the `vector.trace_legacy_layout` hint (which
-travels in `EventMetadata.value` inside `LegacyTrace`) -- so that decoded legacy records
-materialise as typed events through the same per-source conversion logic the migration
-used in-process. After the window passes, the proto messages are removed, field tag 3 is
-added to `reserved` in both oneofs, and the shim functions are deleted.
+`deprecated = true` for a release window so records written by older Vector instances
+continue to decode when their layout can be identified safely. The per-component
+conversion routines and detectors persist alongside the deprecated proto as wire
+decoders. A
+`vector.trace_legacy_layout` hint (which travels in `EventMetadata.value` inside
+`LegacyTrace`) selects the decoder directly; a pre-hint record is accepted only when
+exactly one registered detector recognizes its legacy `LogEvent` shape. Zero or multiple
+matches produce a controlled decode error, counter, and warning rather than guessing.
+Deployments carrying a legacy layout that cannot be detected uniquely must drain or
+segregate those pre-hint disk buffers and older-peer streams before installing the
+typed-only release. After the window passes, the proto messages are removed, field tag
+3 is added to `reserved` in both oneofs, and the conversion routines and detectors are
+deleted.
 
-Verification covers four cases: (1) both `EventWrapper` variants round-trip byte-exact;
+Verification covers five cases: (1) both `EventWrapper` variants round-trip byte-exact;
 (2) all-`Legacy` and all-`Typed` `TraceArray`s each round-trip byte-exact through
 `EventArray`; (3) a mixed in-memory `TraceArray` encodes to two homogeneous wire
 `EventArray`s and decodes back containing the same events (per-variant ordering
 preserved within each half, across-variant interleaving not); (4) an older-Vector
 simulation reads a `typed_*`-tagged message against a schema in which those variants are
 unknown and surfaces a controlled `DecodeError::UnknownEventVariant` from which the
-consumer recovers by logging a warning and dropping the message.
+consumer recovers by logging a warning and dropping the message; and (5) pre-hint OTLP
+and Datadog `LegacyTrace` fixtures uniquely select their decoders after the Rust
+`Legacy` arm is removed, while zero-match and ambiguous fixtures fail controllably.
 This pins the failure-mode property that motivated the sibling-variant design over the
 alternatives in "Alternatives".
 
@@ -1131,8 +1145,11 @@ alternatives in "Alternatives".
   immutable typed accessors panic on `Legacy` rather than converting on demand, because
   returning typed references through a `&self` accessor would require either mutating
   `self` or returning owned / `Cow` shapes that would have to be torn out again post-
-  migration. The convention lives only for the duration of the migration and disappears
-  with the `Legacy` variant; no new struct field or wire-format extension is needed.
+  migration. Hintless records written before the precursor use format-shape detectors
+  and convert only on exactly one match; this fallback
+  does not rely on `EventMetadata.source_type`, which is unstable across `vector` hops.
+  The convention lives only for the duration of the migration and deprecated-proto
+  window; no new struct field or wire-format extension is needed.
 
 ## Drawbacks
 
@@ -1160,6 +1177,10 @@ alternatives in "Alternatives".
   `TypedTrace` variant surfaces a controlled `DecodeError::UnknownEventVariant` and
   drops the message; the pipeline continues running. See "Wire serialization" for
   details. This is documented in the release notes alongside the VRL-path migration.
+- Pre-hint legacy records depend on unique format-shape detection after consumers become
+  typed-only. The built-in OTLP and Datadog layouts have fixture-backed detectors, but
+  any unrecognized or ambiguous historical layout must be drained or segregated before
+  the typed-only release rather than being converted heuristically.
 - Every trace source and sink must be rewritten to produce/consume the typed container.
   The Plan of Attack sequences this so each component migrates independently, but it is
   non-trivial work.
@@ -1475,7 +1496,9 @@ The format-agnostic PRs owned by this RFC are:
   ship in the same release line as the fallible decode boundary above so that "the
   migration-boundary release" is a single version operators can target -- a producer at
   this version emits hints for any future receiver that consumes them, and a receiver
-  at this version handles unknown variants gracefully.
+  at this version handles unknown variants gracefully. The precursor does not modify
+  records already present in disk buffers; those use the format-shape detector fallback
+  below.
 - [ ] Convert `TraceEvent` to the migration enum and introduce the supporting types per
   "Migration: coexistence of `LogEvent` and typed representations". Every component
   continues to produce and consume `Legacy`; no functional change.
@@ -1494,6 +1517,8 @@ The format-agnostic PRs owned by this RFC are:
     Datadog mapping sub-RFC's Plan of Attack).
   - cross-version `vector` source/sink chains spanning the typed migration must run a
     release line that includes at least the migration-boundary release (see Drawbacks).
+  - pre-hint records that do not uniquely match a built-in format-shape detector must be
+    drained or segregated before upgrading consumers to a typed-only release.
 - [ ] Add VRL typed-path dispatch for `.resource.*`, `.scope.*`, `.chunk.*`, and
   `.spans[*].*` on `VrlTarget`. Typed paths against `Typed` events resolve normally.
   Tests cover null reads for `None`, `del(.chunk)`, and default-context materialization
@@ -1510,10 +1535,10 @@ The format-agnostic PRs owned by this RFC are:
   remoteness tristate transitions, plus constructor defaults and required fields.
 - [ ] Enable VRL auto-convert in `VrlTarget`: replace the `Legacy`-event `null` return
   introduced in the previous step with an in-place call to `to_typed()` on first
-  typed-path access (`VrlTarget` has `&mut self` access). If `to_typed()` fails (absent
-  or unrecognized `vector.trace_legacy_layout` hint), `VrlTarget` aborts the VRL
-  expression with a runtime error; the event is forwarded to the topology error path
-  unchanged, a counter is incremented, and a warning log identifies the failing event.
+  typed-path access (`VrlTarget` has `&mut self` access). If `to_typed()` cannot resolve
+  the hint or uniquely detect a hintless layout, `VrlTarget` aborts the VRL expression
+  with a runtime error; the event is forwarded to the topology error path unchanged, a
+  counter is incremented, and a warning log identifies the failing event.
   Lands after both per-format shims (sub-RFC Plans of Attack) so that auto-convert
   succeeds for all registered layout hints.
 - [ ] Migrate the `sample` transform (and tests) to typed access. The `sample`
@@ -1532,12 +1557,13 @@ The format-agnostic PRs owned by this RFC are:
   pattern-matches into the `Legacy(LogEvent)` arm explicitly. The build must be green
   before the source-flip steps in the sub-RFC Plans of Attack.
 - [ ] Collapse the `TraceEvent` enum to a struct with only the typed variant's fields,
-  after both source flips land. The per-component shim functions are retained as wire
-  decoders for the deprecation window so that `LegacyTrace`-encoded events from disk
-  buffers and older peers continue to decode. Mark the legacy proto messages
-  `deprecated = true` per "Wire serialization".
+  after both source flips land. The per-component conversion routines and layout
+  detectors are retained as wire decoders for the deprecation window so that hinted and
+  uniquely detectable pre-hint `LegacyTrace` records from disk buffers and older peers
+  continue to decode. Mark the legacy proto messages `deprecated = true` per "Wire
+  serialization".
 - [ ] A follow-up PR after the deprecation window removes the legacy proto messages,
-  reserves the field tags, and retires the shim functions.
+  reserves the field tags, and retires the conversion routines and detectors.
 
 ## Future Improvements
 
