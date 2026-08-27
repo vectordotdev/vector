@@ -43,15 +43,16 @@ fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
 }
 
 fn select_features(
-    explicit: Vec<String>,
+    explicit: &[String],
     environment: Option<&str>,
     derived: Vec<String>,
     config_selected: bool,
 ) -> (Vec<String>, bool) {
     let mut ignored_environment_default = false;
     let mut selected: Vec<_> = explicit
-        .into_iter()
+        .iter()
         .filter(|feature| !feature.is_empty())
+        .cloned()
         .collect();
     if let Some(environment) = environment {
         for feature in environment
@@ -73,7 +74,7 @@ fn select_features(
 }
 
 impl Cli {
-    pub fn exec(self) -> Result<()> {
+    fn resolve_features(&self) -> Result<Vec<String>> {
         let config_selected = self.config.is_some();
         let derived_features = self
             .config
@@ -83,7 +84,7 @@ impl Cli {
             .unwrap_or_default();
         let environment_features = std::env::var("FEATURES").ok();
         let (selected_features, ignored_environment_default) = select_features(
-            self.features,
+            &self.features,
             environment_features.as_deref(),
             derived_features,
             config_selected,
@@ -91,6 +92,13 @@ impl Cli {
         if ignored_environment_default {
             warn!("Ignoring `default` from FEATURES because --config uses --no-default-features");
         }
+
+        Ok(selected_features)
+    }
+
+    pub fn exec(self) -> Result<()> {
+        let config_selected = self.config.is_some();
+        let selected_features = self.resolve_features()?;
 
         let mut args = vec!["--workspace".to_string()];
 
@@ -143,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn propagates_config_loading_errors_before_starting_tests() {
+    fn resolve_features_propagates_config_loading_errors() {
         let error = Cli {
             args: None,
             env: None,
@@ -151,7 +159,7 @@ mod tests {
             config: Some(PathBuf::from("missing-vector-config.yaml")),
             no_default_features: false,
         }
-        .exec()
+        .resolve_features()
         .expect_err("missing configuration must fail");
 
         assert!(error.to_string().contains("failed to read"));
@@ -160,7 +168,7 @@ mod tests {
     #[test]
     fn config_ignores_only_environment_default() {
         let (features, ignored_default) = select_features(
-            vec!["default".to_string(), "sinks-console".to_string()],
+            &["default".to_string(), "sinks-console".to_string()],
             Some("default,rdkafka/dynamic-linking"),
             vec!["sources-file".to_string()],
             true,

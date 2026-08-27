@@ -98,17 +98,16 @@ cargo run -- --config path/to/config-with-merge-keys.yaml
 
 #### Running tests
 
-Start with the minimum feature set required by the configuration:
-
-```bash
-# Derive the required features and run the relevant tests
-cargo vdev test --config path/to/config.yaml test_some_function
-```
-
-If there is no configuration file, specify the relevant component feature directly:
+For most Rust changes, specify the relevant component feature directly:
 
 ```bash
 make test FEATURES="sources-file" SCOPE="truncate"
+```
+
+If you have a representative configuration file, derive its required features automatically:
+
+```bash
+cargo vdev test --config path/to/config.yaml test_some_function
 ```
 
 Other testing methods, from targeted to broad:
