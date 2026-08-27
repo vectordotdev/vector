@@ -49,8 +49,8 @@ use crate::{
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
-            SinkBatchSettings, TowerRequestConfig, partitioner::KeyPartitioner,
-            retries::RetryLogic, service::TowerRequestConfigDefaults,
+            SinkBatchSettings, TowerRequestConfig, TowerRequestSettings,
+            partitioner::KeyPartitioner, retries::RetryLogic, service::TowerRequestConfigDefaults,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
@@ -388,6 +388,8 @@ pub struct ValidatedAzureBlob {
     #[derivative(Debug(format_with = "fmt_container_url"))]
     container_url: Url,
     batcher_settings: BatcherSettings,
+    request_settings: TowerRequestSettings,
+    encoder: Encoder<Framer>,
     blob_time_format: String,
     blob_append_uuid: bool,
     #[derivative(Debug(format_with = "fmt_confined_blob_prefix"))]
@@ -415,15 +417,14 @@ impl ValidatedSink for AzureBlobSinkConfig {
     type Validated = ValidatedAzureBlob;
 
     fn validate(&self) -> crate::Result<ValidatedAzureBlob> {
-        if self.blob_type == AzureBlobType::Append
-            && let Some(algorithm) = unappendable_compression(self.compression)
-        {
+        if self.blob_type == AzureBlobType::Append && !supports_append(self.compression) {
             // An error rather than a warning because of zlib: standard zlib decoders return only
             // the first block and report success, so the loss is invisible to the consumer.
             return Err(format!(
-                "`compression` = `{algorithm}` cannot be used with `blob_type` = `append`: each \
-                 batch is appended as an independent compressed stream, and concatenated \
-                 `{algorithm}` streams cannot be decoded. Use `gzip`, `zstd`, or `none`."
+                "`compression` = `{}` cannot be used with `blob_type` = `append`: each batch is \
+                 appended as an independent compressed stream, and concatenated streams of this \
+                 algorithm cannot be decoded. Use `gzip`, `zstd`, or `none`.",
+                self.compression
             )
             .into());
         }
@@ -521,6 +522,12 @@ impl ValidatedSink for AzureBlobSinkConfig {
         };
         let batcher_settings = validated_batch.into_batcher_settings()?;
 
+        // Resolved here rather than in `build_processor` so that every `blob_type`-dependent
+        // combination is settled — and rejected, in the case of a framing an append blob cannot
+        // use — during validation, before anything is built.
+        let request_settings = self.resolved_request_settings();
+        let encoder = self.build_encoder()?;
+
         let (blob_append_uuid, blob_time_format) = self.resolved_blob_naming();
 
         let confined_blob_prefix = self.confined_blob_prefix()?;
@@ -529,6 +536,8 @@ impl ValidatedSink for AzureBlobSinkConfig {
             parsed_connection_string,
             container_url,
             batcher_settings,
+            request_settings,
+            encoder,
             blob_time_format,
             blob_append_uuid,
             confined_blob_prefix,
@@ -565,15 +574,14 @@ const DEFAULT_APPEND_BLOB_TIME_FORMAT: &str = "%Y-%m-%dT%H";
 const DEFAULT_APPEND_BLOB_APPEND_UUID: bool = false;
 const APPEND_BLOB_MAX_BLOCK_BYTES: usize = 4 * 1024 * 1024;
 
-/// The name of `compression`, if it cannot be used for append blobs.
+/// Whether `compression` can be used for append blobs.
 ///
 /// An append blob holds one independently compressed stream per flush, so the format must support
 /// concatenation: `gzip` (multi-member) and `zstd` (multi-frame) do, raw Snappy and zlib do not.
-const fn unappendable_compression(compression: Compression) -> Option<&'static str> {
+const fn supports_append(compression: Compression) -> bool {
     match compression {
-        Compression::None | Compression::Gzip(_) | Compression::Zstd(_) => None,
-        Compression::Snappy => Some("snappy"),
-        Compression::Zlib(_) => Some("zlib"),
+        Compression::None | Compression::Gzip(_) | Compression::Zstd(_) => true,
+        Compression::Snappy | Compression::Zlib(_) => false,
     }
 }
 
@@ -583,20 +591,11 @@ impl AzureBlobSinkConfig {
         client: Arc<BlobContainerClient>,
         validated: &ValidatedAzureBlob,
     ) -> crate::Result<VectorSink> {
-        let mut request_limits = self.request.into_settings();
-        // Append blobs must be written in order: Azure orders appended blocks by the order the
-        // service receives them, not by event order. With the default adaptive concurrency, two
-        // flushes targeting the same blob can be in flight at once and land out of order. Pin
-        // concurrency to 1 for append mode unless the user explicitly chose a fixed value.
-        // (Same approach the loki sink uses for its order-sensitive modes.)
-        if self.blob_type == AzureBlobType::Append && request_limits.concurrency.is_none() {
-            request_limits.concurrency = Some(1);
-        }
         let service = ServiceBuilder::new()
-            .settings(request_limits, AzureBlobRetryLogic)
+            .settings(validated.request_settings.clone(), AzureBlobRetryLogic)
             .service(AzureBlobService::new(client));
 
-        let encoder = self.build_encoder()?;
+        let encoder = validated.encoder.clone();
 
         let request_options = AzureBlobRequestOptions {
             container_name: self.container_name.clone(),
@@ -654,6 +653,23 @@ impl AzureBlobSinkConfig {
         }
 
         Ok(Encoder::<Framer>::new(framer, serializer))
+    }
+
+    /// The request settings actually in effect, after the `blob_type`-specific default is applied.
+    ///
+    /// Append blobs must be written in order: Azure orders appended blocks by the order the
+    /// service receives them, not by event order. With the default adaptive concurrency, two
+    /// flushes targeting the same blob can be in flight at once and land out of order. Pin
+    /// concurrency to 1 for append mode unless the user explicitly chose a fixed value.
+    /// (Same approach the loki sink uses for its order-sensitive modes.)
+    pub(super) fn resolved_request_settings(&self) -> TowerRequestSettings {
+        let mut request_settings = self.request.into_settings();
+
+        if self.blob_type == AzureBlobType::Append && request_settings.concurrency.is_none() {
+            request_settings.concurrency = Some(1);
+        }
+
+        request_settings
     }
 
     /// The `blob_append_uuid` and `blob_time_format` values actually in effect, after the

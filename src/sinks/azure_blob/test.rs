@@ -956,6 +956,22 @@ fn azure_blob_append_blob_rejects_unterminated_default_framing() {
     );
 }
 
+/// The framing resolution is a `blob_type`-dependent config combination, so it must be settled by
+/// `validate()` — before anything is built — rather than deep inside sink construction.
+#[test]
+fn azure_blob_append_blob_rejects_unterminated_default_framing_during_validation() {
+    let config = append_blob_config_with_codec("gelf");
+
+    // Fully qualified: `SinkConfig::build` and `ValidatedSink::build` would otherwise collide.
+    let err = crate::config::ValidatedSink::validate(&config)
+        .expect_err("validation must reject a separating default framing")
+        .to_string();
+    assert!(
+        err.contains("framing"),
+        "error must point at `framing`, got: {err}"
+    );
+}
+
 /// Only the JSON default is `blob_type`-aware: codecs that already default to a stream-safe framing
 /// resolve the same in both modes.
 #[test]
@@ -1595,6 +1611,60 @@ async fn azure_blob_block_blob_accepts_any_compression() {
                 panic!("block blob build should succeed for `{compression}`: {e:?}")
             });
     }
+}
+
+fn append_blob_config_with_codec(codec: &str) -> AzureBlobSinkConfig {
+    toml::from_str(&format!(
+        r#"
+            connection_string = "AccountName=mylogstorage"
+            container_name = "my-logs"
+            blob_type = "append"
+
+            [encoding]
+            codec = "{codec}"
+        "#
+    ))
+    .unwrap_or_else(|e| panic!("Config parsing failed: {e:?}"))
+}
+
+/// Azure orders appended blocks by the time it receives them, not by event order, so two flushes
+/// in flight against the same blob can land out of order. Append mode resolves to a concurrency of
+/// 1 instead of the adaptive default.
+#[test]
+fn azure_blob_append_blob_defaults_concurrency_to_one() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Append,
+        ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
+    };
+
+    assert_eq!(config.resolved_request_settings().concurrency, Some(1));
+}
+
+/// Block blobs are written independently of each other, so they keep the adaptive default.
+#[test]
+fn azure_blob_block_blob_keeps_adaptive_concurrency() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Block,
+        ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
+    };
+
+    assert_eq!(config.resolved_request_settings().concurrency, None);
+}
+
+/// Only the default is `blob_type`-aware: an explicitly configured concurrency stays the user's
+/// call, in append mode too.
+#[test]
+fn azure_blob_append_blob_honors_explicit_concurrency() {
+    let config = AzureBlobSinkConfig {
+        blob_type: AzureBlobType::Append,
+        request: TowerRequestConfig {
+            concurrency: Concurrency::Fixed(4),
+            ..Default::default()
+        },
+        ..default_config((None::<FramingConfig>, JsonSerializerConfig::default()).into())
+    };
+
+    assert_eq!(config.resolved_request_settings().concurrency, Some(4));
 }
 
 #[test]
