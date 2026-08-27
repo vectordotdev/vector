@@ -1547,6 +1547,7 @@ mod test {
         topic: &str,
         group: &str,
         log_namespace: LogNamespace,
+        chunk_size: usize,
         librdkafka_options: Option<HashMap<String, String>>,
     ) -> KafkaSourceConfig {
         KafkaSourceConfig {
@@ -1565,14 +1566,14 @@ mod test {
             socket_timeout_ms: Duration::from_millis(60000),
             fetch_wait_max_ms: Duration::from_millis(100),
             log_namespace: Some(log_namespace == LogNamespace::Vector),
-            chunk_size: NonZeroUsize::new(1),
+            chunk_size: NonZeroUsize::new(chunk_size),
             ..Default::default()
         }
     }
 
     #[test]
     fn test_output_schema_definition_vector_namespace() {
-        let definitions = make_config("topic", "group", LogNamespace::Vector, None)
+        let definitions = make_config("topic", "group", LogNamespace::Vector, 1, None)
             .outputs(LogNamespace::Vector)
             .remove(0)
             .schema_definition(true);
@@ -1620,7 +1621,7 @@ mod test {
 
     #[test]
     fn test_output_schema_definition_legacy_namespace() {
-        let definitions = make_config("topic", "group", LogNamespace::Legacy, None)
+        let definitions = make_config("topic", "group", LogNamespace::Legacy, 1, None)
             .outputs(LogNamespace::Legacy)
             .remove(0)
             .schema_definition(true);
@@ -1656,7 +1657,7 @@ mod test {
 
     #[tokio::test]
     async fn consumer_create_ok() {
-        let config = make_config("topic", "group", LogNamespace::Legacy, None);
+        let config = make_config("topic", "group", LogNamespace::Legacy, 1, None);
         assert!(create_consumer(&config, true).is_ok());
     }
 
@@ -1664,7 +1665,7 @@ mod test {
     async fn consumer_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
-            ..make_config("topic", "group", LogNamespace::Legacy, None)
+            ..make_config("topic", "group", LogNamespace::Legacy, 1, None)
         };
         assert!(create_consumer(&config, true).is_err());
     }
@@ -1918,42 +1919,82 @@ mod integration_test {
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        send_receive(true, |_| false, 10, LogNamespace::Legacy).await;
+        send_receive(true, |_| false, 10, 1, LogNamespace::Legacy).await;
     }
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements_vector_namespace() {
-        send_receive(true, |_| false, 10, LogNamespace::Vector).await;
+        send_receive(true, |_| false, 10, 1, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        send_receive(false, |_| false, 10, LogNamespace::Legacy).await;
+        send_receive(false, |_| false, 10, 1, LogNamespace::Legacy).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements_vector_namespace() {
-        send_receive(false, |_| false, 10, LogNamespace::Vector).await;
+        send_receive(false, |_| false, 10, 1, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn handles_one_negative_acknowledgement() {
-        send_receive(true, |n| n == 2, 10, LogNamespace::Legacy).await;
+        send_receive(true, |n| n == 2, 10, 1, LogNamespace::Legacy).await;
     }
 
     #[tokio::test]
     async fn handles_one_negative_acknowledgement_vector_namespace() {
-        send_receive(true, |n| n == 2, 10, LogNamespace::Vector).await;
+        send_receive(true, |n| n == 2, 10, 1, LogNamespace::Vector).await;
     }
 
     #[tokio::test]
     async fn handles_permanent_negative_acknowledgement() {
-        send_receive(true, |n| n >= 2, 2, LogNamespace::Legacy).await;
+        send_receive(true, |n| n >= 2, 2, 1, LogNamespace::Legacy).await;
     }
 
     #[tokio::test]
     async fn handles_permanent_negative_acknowledgement_vector_namespace() {
-        send_receive(true, |n| n >= 2, 2, LogNamespace::Vector).await;
+        send_receive(true, |n| n >= 2, 2, 1, LogNamespace::Vector).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_with_acknowledgements_with_chunking() {
+        send_receive(true, |_| false, 10, 100, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_with_acknowledgements_vector_namespace_with_chunking() {
+        send_receive(true, |_| false, 10, 100, LogNamespace::Vector).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_without_acknowledgements_with_chunking() {
+        send_receive(false, |_| false, 10, 100, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn consumes_event_without_acknowledgements_vector_namespace_with_chunking() {
+        send_receive(false, |_| false, 10, 100, LogNamespace::Vector).await;
+    }
+
+    #[tokio::test]
+    async fn handles_one_negative_acknowledgement_with_chunking() {
+        send_receive(true, |n| n == 2, 10, 100, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn handles_one_negative_acknowledgement_vector_namespace_with_chunking() {
+        send_receive(true, |n| n == 2, 10, 100, LogNamespace::Vector).await;
+    }
+
+    #[tokio::test]
+    async fn handles_permanent_negative_acknowledgement_with_chunking() {
+        send_receive(true, |n| n >= 2, 2, 100, LogNamespace::Legacy).await;
+    }
+
+    #[tokio::test]
+    async fn handles_permanent_negative_acknowledgement_vector_namespace_with_chunking() {
+        send_receive(true, |n| n >= 2, 2, 100, LogNamespace::Vector).await;
     }
 
     fn train_test_dictionary() -> Vec<u8> {
@@ -2010,7 +2051,7 @@ mod integration_test {
         let dictionary = train_test_dictionary();
         let dictionary_file = write_test_dictionary(&dictionary);
 
-        let mut config = make_config(&topic, &group_id, LogNamespace::Legacy, None);
+        let mut config = make_config(&topic, &group_id, LogNamespace::Legacy, 1, None);
         config.decompression = Some(DecompressionConfig {
             algorithm: vector_lib::codecs::DecompressionAlgorithm::Zstd,
             dictionary_path: Some(dictionary_file.path().to_path_buf()),
@@ -2049,19 +2090,16 @@ mod integration_test {
         assert_eq!(messages, expected);
     }
 
-    #[tokio::test]
-    async fn advances_offset_past_poison_messages() {
+    async fn test_advances_offset_past_poison_messages(
+        topic: String,
+        group_id: String,
+        mut config: KafkaSourceConfig,
+    ) {
         const SEND_COUNT: usize = 5;
-
-        let topic = format!("test-topic-{}", random_string(10));
-        let group_id = format!("test-group-{}", random_string(10));
 
         let dictionary = train_test_dictionary();
         let dictionary_file = write_test_dictionary(&dictionary);
 
-        let mut opts = HashMap::new();
-        opts.insert("enable.partition.eof".into(), "true".into());
-        let mut config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts));
         config.decompression = Some(DecompressionConfig {
             algorithm: vector_lib::codecs::DecompressionAlgorithm::Zstd,
             dictionary_path: Some(dictionary_file.path().to_path_buf()),
@@ -2090,17 +2128,40 @@ mod integration_test {
         );
     }
 
+    #[tokio::test]
+    async fn advances_offset_past_poison_messages() {
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+        let mut opts = HashMap::new();
+        opts.insert("enable.partition.eof".into(), "true".into());
+
+        let config = make_config(&topic, &group_id, LogNamespace::Legacy, 1, Some(opts));
+        test_advances_offset_past_poison_messages(topic, group_id, config).await;
+    }
+
+    #[tokio::test]
+    async fn advances_offset_past_poison_messages_with_chunking() {
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+        let mut opts = HashMap::new();
+        opts.insert("enable.partition.eof".into(), "true".into());
+
+        let config = make_config(&topic, &group_id, LogNamespace::Legacy, 100, Some(opts));
+        test_advances_offset_past_poison_messages(topic, group_id, config).await;
+    }
+
     async fn send_receive(
         acknowledgements: bool,
         error_at: impl Fn(usize) -> bool,
         receive_count: usize,
+        chunk_size: usize,
         log_namespace: LogNamespace,
     ) {
         const SEND_COUNT: usize = 10;
 
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id, log_namespace, None);
+        let config = make_config(&topic, &group_id, log_namespace, chunk_size, None);
 
         let now = send_events(topic.clone(), 1, 10).await;
 
@@ -2190,7 +2251,7 @@ mod integration_test {
     fn make_rand_config() -> (String, String, KafkaSourceConfig) {
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let config = make_config(&topic, &group_id, LogNamespace::Legacy, None);
+        let config = make_config(&topic, &group_id, LogNamespace::Legacy, 1, None);
         (topic, group_id, config)
     }
 
@@ -2381,8 +2442,7 @@ mod integration_test {
         // Assert they are all in sequential order and no dupes, TODO
     }
 
-    #[tokio::test]
-    async fn drains_acknowledgements_at_shutdown() {
+    async fn test_drains_acknowledgements_at_shutdown(chunk_size: usize) {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
         let send_count: usize = std::env::var("KAFKA_SEND_COUNT")
             .unwrap_or_else(|_| "125000".into())
@@ -2406,7 +2466,13 @@ mod integration_test {
         opts.insert("enable.partition.eof".into(), "true".into());
         opts.insert("fetch.message.max.bytes".into(), kafka_max_bytes());
         let events1 = {
-            let config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts.clone()));
+            let config = make_config(
+                &topic,
+                &group_id,
+                LogNamespace::Legacy,
+                chunk_size,
+                Some(opts.clone()),
+            );
             let (tx, rx) = SourceSender::new_test_errors(|_| false);
             let (trigger_shutdown, shutdown_done) =
                 spawn_kafka(tx, config, true, false, LogNamespace::Legacy);
@@ -2427,7 +2493,13 @@ mod integration_test {
 
         // 4. Run the kafka source again to finish reading the events
         let events2 = {
-            let config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(opts));
+            let config = make_config(
+                &topic,
+                &group_id,
+                LogNamespace::Legacy,
+                chunk_size,
+                Some(opts),
+            );
             let (tx, rx) = SourceSender::new_test_errors(|_| false);
             let (trigger_shutdown, shutdown_done) =
                 spawn_kafka(tx, config, true, true, LogNamespace::Legacy);
@@ -2458,7 +2530,17 @@ mod integration_test {
         assert_eq!(total, expect_count);
     }
 
-    async fn consume_with_rebalance(rebalance_strategy: String) {
+    #[tokio::test]
+    async fn drains_acknowledgements_at_shutdown() {
+        test_drains_acknowledgements_at_shutdown(1).await;
+    }
+
+    #[tokio::test]
+    async fn drains_acknowledgements_at_shutdown_with_chunking() {
+        test_drains_acknowledgements_at_shutdown(100).await;
+    }
+
+    async fn consume_with_rebalance(rebalance_strategy: String, chunk_size: usize) {
         // 1. Send N events (if running against a pre-populated kafka topic, use send_count=0 and expect_count=expected number of messages; otherwise just set send_count)
         // A larger backlog gives the later consumers a bigger margin against being starved
         // (see the `events3` assertion below) as CI runners get faster at draining the topic.
@@ -2489,6 +2571,7 @@ mod integration_test {
             &topic,
             &group_id,
             LogNamespace::Legacy,
+            chunk_size,
             Some(kafka_options.clone()),
         );
         let config2 = config1.clone();
@@ -2617,13 +2700,25 @@ mod integration_test {
     #[tokio::test]
     async fn drains_acknowledgements_during_rebalance_default_assignments() {
         // the default, eager rebalance strategies generally result in more revocations
-        consume_with_rebalance("range,roundrobin".into()).await;
+        consume_with_rebalance("range,roundrobin".into(), 1).await;
     }
     #[tokio::test]
     async fn drains_acknowledgements_during_rebalance_sticky_assignments() {
         // Cooperative rebalance strategies generally result in fewer revokes,
         // as only reassigned partitions are revoked
-        consume_with_rebalance("cooperative-sticky".into()).await;
+        consume_with_rebalance("cooperative-sticky".into(), 1).await;
+    }
+
+    #[tokio::test]
+    async fn drains_acknowledgements_during_rebalance_default_assignments_with_chunking() {
+        // the default, eager rebalance strategies generally result in more revocations
+        consume_with_rebalance("range,roundrobin".into(), 100).await;
+    }
+    #[tokio::test]
+    async fn drains_acknowledgements_during_rebalance_sticky_assignments_with_chunking() {
+        // Cooperative rebalance strategies generally result in fewer revokes,
+        // as only reassigned partitions are revoked
+        consume_with_rebalance("cooperative-sticky".into(), 100).await;
     }
 
     fn map_logs(events: EventArray) -> impl Iterator<Item = String> {
