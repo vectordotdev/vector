@@ -48,6 +48,12 @@ use crate::{
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
+/// Deadline for reading a PROXY protocol header. The header is the first bytes
+/// a proxy writes after connect, so it is round-trip-time bound and unrelated
+/// to how long the connection may subsequently live. A peer that has not sent
+/// a complete header within this window is treated as stalled and dropped.
+const PROXY_HEADER_READ_TIMEOUT_SECS: u64 = 2;
+
 pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
@@ -112,6 +118,13 @@ where
     fn decoder(&self) -> Self::Decoder;
 
     fn handle_events(&self, _events: &mut [Event], _host: std::net::SocketAddr) {}
+
+    /// Whether to parse and strip a PROXY protocol v2 header at the start of
+    /// each connection. Sources that support a trusted upstream proxy override
+    /// this; the default is off so behavior is unchanged for everyone else.
+    fn proxy_protocol(&self) -> bool {
+        false
+    }
 
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
@@ -260,7 +273,7 @@ async fn handle_stream<T>(
     tls_handshake_timeout_secs: Option<NonZeroU64>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
-    peer_addr: SocketAddr,
+    mut peer_addr: SocketAddr,
     mut out: SourceSender,
     acknowledgements: bool,
     request_limiter: RequestLimiter,
@@ -308,6 +321,49 @@ async fn handle_stream<T>(
     {
         warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
     }
+
+    // Parse and strip a PROXY protocol v2 header, if the source opts in. Done
+    // after the TLS handshake so a plaintext hop and a re-encrypted hop share
+    // one code path, and before wrapping the socket so only header bytes are
+    // consumed and the payload reaches the decoder untouched.
+    let proxy_metadata = if source.proxy_protocol() {
+        // Bound the header read so a peer that connects but stalls before
+        // sending the header cannot pin this task (and its connection-limit
+        // permit) indefinitely. Honor shutdown, the connection tripwire, and
+        // the configured max connection duration (falling back to a short
+        // default, since a valid header arrives immediately after connect).
+        let header_deadline =
+            tokio::time::sleep(Duration::from_secs(PROXY_HEADER_READ_TIMEOUT_SECS));
+        tokio::select! {
+            result = super::proxy_protocol::read_v2_header(&mut socket) => match result {
+                Ok(header) => {
+                    if let Some(source_addr) = header.source {
+                        peer_addr = source_addr;
+                    }
+                    Some(header.into_metadata())
+                }
+                Err(error) => {
+                    warn!(
+                        message = "Failed to read PROXY protocol v2 header; closing connection.",
+                        %error,
+                        %peer_addr,
+                    );
+                    return;
+                }
+            },
+            _ = header_deadline => {
+                warn!(
+                    message = "Timed out reading PROXY protocol v2 header; closing connection.",
+                    %peer_addr,
+                );
+                return;
+            }
+            _ = &mut shutdown_signal => return,
+            _ = &mut tripwire => return,
+        }
+    } else {
+        None
+    };
 
     let socket = socket.after_read(move |byte_size| {
         emit!(TcpBytesReceived {
@@ -413,6 +469,15 @@ async fn handle_stream<T>(
                                     metadata.clone()
                                 );
                             }
+                        }
+
+                        if let Some(proxy_metadata) = &proxy_metadata {
+                            super::proxy_protocol::inject_metadata(
+                                &mut events,
+                                proxy_metadata,
+                                log_namespace,
+                                source_name,
+                            );
                         }
 
                         source.handle_events(&mut events, peer_addr);
