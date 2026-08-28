@@ -60,7 +60,7 @@ const ALWAYS_COMPILED_FEATURES: &[&str] = &[
     "secrets-test",
 ];
 const VRL_FEATURES: &[&str] = &[
-    "sources-dnstap",
+    "vector-vrl-functions/dnstap",
     "vrl-functions-crypto",
     "vrl-functions-env",
     "vrl-functions-network",
@@ -397,10 +397,10 @@ mod tests {
                 "sinks-sematext",
                 "sinks-splunk_hec",
                 "sinks-websocket_server",
-                "sources-dnstap",
                 "sources-gcp_pubsub",
                 "sources-prometheus_scrape",
                 "transforms-exclusive_route",
+                "vector-vrl-functions/dnstap",
                 "vrl-functions-crypto",
                 "vrl-functions-env",
                 "vrl-functions-network",
@@ -445,8 +445,8 @@ mod tests {
                     type: log_to_metric
             "}),
             [
-                "sources-dnstap",
                 "transforms-log_to_metric",
+                "vector-vrl-functions/dnstap",
                 "vrl-functions-crypto",
                 "vrl-functions-env",
                 "vrl-functions-network",
@@ -475,8 +475,8 @@ mod tests {
             [
                 "codecs-parquet",
                 "sinks-aws_s3",
-                "sources-dnstap",
                 "transforms-remap",
+                "vector-vrl-functions/dnstap",
                 "vrl-functions-crypto",
                 "vrl-functions-env",
                 "vrl-functions-network",
@@ -547,7 +547,7 @@ mod tests {
         let features = features(config);
 
         for feature in [
-            "sources-dnstap",
+            "vector-vrl-functions/dnstap",
             "vrl-functions-crypto",
             "vrl-functions-env",
             "vrl-functions-network",
@@ -597,7 +597,7 @@ mod tests {
             let features = features(config);
 
             for feature in [
-                "sources-dnstap",
+                "vector-vrl-functions/dnstap",
                 "vrl-functions-crypto",
                 "vrl-functions-env",
                 "vrl-functions-network",
@@ -693,7 +693,8 @@ mod tests {
                 let path = path.expect("example path must be readable");
                 let config = fs::read_to_string(&path).expect("example config must be readable");
                 for feature in features(&config) {
-                    if !DECLARED_FEATURES.contains(&feature) {
+                    // Cargo also accepts dependency features as `dependency/feature`.
+                    if !feature.contains('/') && !DECLARED_FEATURES.contains(&feature) {
                         missing.push(format!("{} -> {feature}", path.display()));
                     }
                 }
