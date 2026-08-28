@@ -52,12 +52,22 @@ serve: clean setup cargo-data structured-data
 	--buildFuture \
 	--environment "development"
 	$(MAKE) pagefind
-	hugo server \
-	--bind $(SERVER_BIND) \
-	--port $(SERVER_PORT) \
-	--buildDrafts \
-	--buildFuture \
-	--environment "development"
+	@hugo server \
+		--bind $(SERVER_BIND) \
+		--port $(SERVER_PORT) \
+		--buildDrafts \
+		--buildFuture \
+		--environment "development" & \
+	server_pid=$$!; \
+	trap 'kill $$server_pid 2>/dev/null || true' EXIT INT TERM; \
+	while kill -0 $$server_pid 2>/dev/null; do \
+		if find public -type f -name '*.html' -newer public/pagefind/pagefind-entry.json -print -quit | grep -q .; then \
+			sleep 1; \
+			$(MAKE) pagefind; \
+		fi; \
+		sleep 1; \
+	done; \
+	wait $$server_pid
 
 # Live site
 production-build:
