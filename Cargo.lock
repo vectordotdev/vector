@@ -2866,6 +2866,7 @@ dependencies = [
  "pin-project",
  "prost 0.12.6",
  "prost-reflect 0.14.7",
+ "quickcheck",
  "rand 0.10.1",
  "regex",
  "rstest",

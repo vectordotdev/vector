@@ -777,3 +777,135 @@ fn encode_array(items: Vec<super::Value>) -> ValueArray {
         items: items.into_iter().map(encode_value).collect(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::event::{MetricValue as EventMetricValue, metric};
+
+    #[test]
+    fn decodes_pre_v24_histogram_and_summary_variants() {
+        let cases = [
+            (
+                MetricValue::AggregatedHistogram1(AggregatedHistogram1 {
+                    buckets: vec![1.5],
+                    counts: vec![2],
+                    count: 2,
+                    sum: 3.0,
+                }),
+                EventMetricValue::AggregatedHistogram {
+                    buckets: vec![metric::Bucket {
+                        upper_limit: 1.5,
+                        count: 2,
+                    }],
+                    count: 2,
+                    sum: 3.0,
+                },
+            ),
+            (
+                MetricValue::AggregatedHistogram2(AggregatedHistogram2 {
+                    buckets: vec![HistogramBucket {
+                        upper_limit: 1.5,
+                        count: 2,
+                    }],
+                    count: 2,
+                    sum: 3.0,
+                }),
+                EventMetricValue::AggregatedHistogram {
+                    buckets: vec![metric::Bucket {
+                        upper_limit: 1.5,
+                        count: 2,
+                    }],
+                    count: 2,
+                    sum: 3.0,
+                },
+            ),
+            (
+                MetricValue::AggregatedSummary1(AggregatedSummary1 {
+                    quantiles: vec![0.5],
+                    values: vec![1.5],
+                    count: 2,
+                    sum: 3.0,
+                }),
+                EventMetricValue::AggregatedSummary {
+                    quantiles: vec![metric::Quantile {
+                        quantile: 0.5,
+                        value: 1.5,
+                    }],
+                    count: 2,
+                    sum: 3.0,
+                },
+            ),
+            (
+                MetricValue::AggregatedSummary2(AggregatedSummary2 {
+                    quantiles: vec![SummaryQuantile {
+                        quantile: 0.5,
+                        value: 1.5,
+                    }],
+                    count: 2,
+                    sum: 3.0,
+                }),
+                EventMetricValue::AggregatedSummary {
+                    quantiles: vec![metric::Quantile {
+                        quantile: 0.5,
+                        value: 1.5,
+                    }],
+                    count: 2,
+                    sum: 3.0,
+                },
+            ),
+        ];
+
+        for (encoded, expected) in cases {
+            assert_eq!(EventMetricValue::from(encoded), expected);
+        }
+    }
+
+    #[test]
+    fn decodes_pre_v27_single_valued_metric_tags() {
+        let encoded = Metric {
+            name: "requests".to_owned(),
+            tags_v1: BTreeMap::from([("service".to_owned(), "api".to_owned())]),
+            value: Some(MetricValue::Counter(Counter { value: 1.0 })),
+            ..Default::default()
+        };
+
+        let decoded = crate::event::Metric::from(encoded);
+
+        assert_eq!(decoded.tag_value("service").as_deref(), Some("api"));
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn decodes_pre_v34_metadata_for_all_event_types() {
+        let expected = VrlValue::from("legacy metadata");
+
+        let log = crate::event::LogEvent::from(Log {
+            metadata: Some(encode_value(expected.clone())),
+            ..Default::default()
+        });
+        let trace = crate::event::TraceEvent::from(Trace {
+            metadata: Some(encode_value(expected.clone())),
+            ..Default::default()
+        });
+        let metric = crate::event::Metric::from(Metric {
+            name: "requests".to_owned(),
+            value: Some(MetricValue::Counter(Counter { value: 1.0 })),
+            metadata: Some(encode_value(expected.clone())),
+            ..Default::default()
+        });
+
+        assert_eq!(log.metadata().value(), &expected);
+        assert_eq!(trace.metadata().value(), &expected);
+        assert_eq!(metric.metadata().value(), &expected);
+    }
+
+    #[test]
+    fn decodes_pre_v41_metadata_without_source_event_id() {
+        let decoded = EventMetadata::from(Metadata::default());
+
+        assert_eq!(decoded.source_event_id(), None);
+    }
+}
