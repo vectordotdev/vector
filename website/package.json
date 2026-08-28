@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "pagefind": "pagefind",
+    "pagefind:watch": "chokidar 'public/**/*.html' -c 'make pagefind' --debounce 1000 --silent",
     "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev"
   },
   "dependencies": {
@@ -45,6 +46,8 @@
     "not op_mini all"
   ],
   "devDependencies": {
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^10.0.5",
     "pagefind": "1.5.2",
     "prettier": "^3.9.6",
     "prettier-plugin-go-template": "^0.0.15"
