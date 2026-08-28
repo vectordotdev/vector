@@ -6,9 +6,10 @@ The default strategy treats any non-5xx other than 429/408 as non-retriable, inc
 
 ```yaml
 retry_strategy:
-  type: custom
-  status_codes: [401, 403, 404, 408, 429]
+  type: all
 ```
+
+With `type: custom`, only the listed status codes are retried, so a custom list must also include the server errors the default would have retried (for example `[401, 403, 404, 408, 429, 500, 502, 503, 504]`); otherwise a transient 5xx drops the batch.
 
 ClickHouse reports malformed data as a 500 with a `Code: 117` or `Code: 53` body. Those remain non-retriable under every strategy, since retrying a poison pill would block every batch queued behind it. Every other response, other 500s included, follows the configured strategy.
 

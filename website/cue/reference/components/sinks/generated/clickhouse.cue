@@ -669,9 +669,16 @@ generated: components: sinks: clickhouse: configuration: {
 
 			```yaml
 			retry_strategy:
-			  type: custom
-			  status_codes: [401, 403, 404, 408, 429]
+			  type: all
 			```
+
+			With `type: custom`, only the listed status codes are retried, so the
+			list must also include the server errors the default would have
+			retried (for example `[401, 403, 404, 408, 429, 500, 502, 503, 504]`);
+			otherwise a transient 5xx drops the batch.
+
+			Malformed-data responses (a 500 with a `Code: 117` or `Code: 53` body)
+			stay non-retriable under every strategy.
 			"""
 		required: false
 		type: object: options: {
