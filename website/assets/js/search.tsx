@@ -75,7 +75,7 @@ const pagefindResults = async (query: string): Promise<PagefindHit[]> => {
         category: pagefindCategories[section] ?? "Website",
         content: subResult?.excerpt ?? data.excerpt ?? "",
         title: data.meta.title ?? data.url,
-        url: data.url
+        url: subResult?.url ?? data.url
       };
     })
   );

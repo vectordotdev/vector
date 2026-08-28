@@ -57,9 +57,9 @@ delimiter = ""
 mediaType = "text/netlify"
 baseName = "_redirects"
 
-# Outputs (including _redirects files)
+# Outputs (including the VRL JSON endpoint and _redirects files)
 [outputs]
-home = ["HTML", "RSS", "REDIRECTS"]
+home = ["HTML", "JSON", "RSS", "REDIRECTS"]
 
 # CSS generation
 [[params.css]]
