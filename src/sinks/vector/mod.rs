@@ -46,6 +46,18 @@ mod test {
             assert!(result.is_err(), "{field} = 0 should be rejected");
         }
     }
+
+    #[test]
+    fn config_rejects_boolean_compression() {
+        for compression in [true, false] {
+            let result: Result<super::VectorConfig, _> =
+                toml::from_str(&format!("compression = {compression}"));
+            assert!(
+                result.is_err(),
+                "compression = {compression} should be rejected"
+            );
+        }
+    }
 }
 
 #[cfg(test)]
