@@ -47,6 +47,10 @@ generate-deprecations-json:
 structured-data: generate-vrl-docs generate-deprecations-json component-examples
 
 serve: clean setup cargo-data structured-data
+	$(MAKE) serve-development
+
+.PHONY: serve-development
+serve-development:
 	hugo \
 	--buildDrafts \
 	--buildFuture \

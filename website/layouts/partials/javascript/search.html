@@ -5,7 +5,7 @@
 {{ $compiled := resources.Get $searchJs | js.Build $jsOpts | babel $babelOpts | fingerprint "sha256" }}
 
 {{ $exactSearchRecords := slice }}
-{{ range where site.RegularPages "Layout" "component" }}
+{{ range where (where site.RegularPages "Layout" "component") "Params.noindex" "ne" true }}
   {{ $name := .File.BaseFileName }}
   {{ $nameWords := replace $name "_" " " }}
   {{ $kind := .Params.component_kind }}
