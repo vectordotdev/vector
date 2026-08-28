@@ -45,9 +45,10 @@ Trace Context, and other informational entries are defined in the
   [`pkg/trace/api/otlp.go`](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/api/otlp.go)
   (and supporting code under
   [`pkg/trace/transform/`](https://github.com/DataDog/datadog-agent/tree/main/pkg/trace/transform)).
-  This is the **normative reference** for every cross-format derivation Vector applies
-  between OTLP and Datadog. The "Cross-format conformance" section below specifies the
-  conformance rule and the asymmetry of the inverse direction.
+  Current `main` is the normative reference for the enumerated Agent-aligned
+  derivations below and governs their details if a prose summary lags an upstream
+  change. The RFC's explicit mapping remains normative for all other fields; exact
+  reproduction of the Agent's complete OTLP converter output is not required.
 - **Datadog tracer-to-agent API** (informational): the SDK-to-agent hop upstream of the
   agent-to-backend format Vector targets. Vector does not consume these endpoints
   directly.
@@ -89,10 +90,9 @@ Trace Context, and other informational entries are defined in the
   during the migration (`vector.trace_legacy_layout`-keyed) and post-migration
   (`EventMetadata.source_type`-keyed).
 - The cross-format conformance rule for `OTLP -> Vector -> datadog_traces`: a
-  non-`datadog_agent`-sourced event reaching the `datadog_traces` sink produces the wire
-  output the Datadog Agent itself would produce for the same OTLP input. This is a positive
-  specification mirroring the Datadog Agent OTLP ingest reference (see the parent RFC's
-  Glossary).
+  non-`datadog_agent`-sourced event reaching the `datadog_traces` sink follows the
+  enumerated Datadog-Agent derivations below and is backend-effectively equivalent under
+  Vector's typed mapping. It need not reproduce the Agent converter's exact wire shape.
 
 ### Out of scope
 
@@ -101,9 +101,12 @@ Trace Context, and other informational entries are defined in the
   Out of scope.
 - `TracerPayload.containerDebug` (Datadog-internal container-tag-resolution diagnostic);
   dropped on ingest, not synthesized on egress.
-- `AgentPayload.idxTracerPayloads = 11` (the indexed/deduplicated tracer-payload form);
-  rejected on ingest with `unsupported_payload_version`, with a typed mapping deferred to
-  Future Improvements.
+- Typed decoding of `AgentPayload.idxTracerPayloads = 11` (the indexed/deduplicated
+  tracer-payload form). Until support lands, standard `tracerPayloads` entries are
+  processed while indexed entries are discarded and reported; see "Ingress and egress
+  mapping."
+- Exact wire parity with the Datadog Agent's complete OTLP converter, including its
+  legacy metadata encodings and configuration-dependent synthetic tags.
 
 ### Zero-loss round-trip exclusions
 
@@ -114,21 +117,21 @@ Rationale section below.
 - **`Span.error` values other than `0` or `1`** ingest as `SpanStatus::Error(...)` and
   egress as `Span.error = 1`, normalizing the specific integer to the conforming
   bivalent representation.
-- **`Span.duration` wire-domain corner cases**: negative values on ingress (the wire field is
-  `int64`) are clamped to zero, and values exceeding `i64::MAX` nanoseconds (~292 years) on egress
-  are clamped to `i64::MAX`. Both clamps increment a counter and emit a warning log identifying the
-  affected span.
+- **Malformed non-empty `meta["_dd.p.tid"]`** rejects the enclosing span even when its
+  low 64-bit `Span.traceID` is non-zero; the rejection is reported.
+- **Datadog wire-domain normalization**: negative wire durations are clamped to zero on
+  ingress; durations and timestamps outside their destination fields' domains are
+  clamped to the nearest endpoint on egress. These normalizations are reported.
 - **`meta`/`metrics` producer-side non-disjointness**: the round-trip guarantee is conditional on
   these two scalar maps being keyset-disjoint. If a producer emits the same key in both, the Datadog
-  source resolves the collision deterministically (`metrics` wins), increments a counter, and emits
-  a warning log; the dropped scalar is not recoverable on egress.
+  source resolves the collision deterministically (`metrics` wins),
+  saturating-increments `Span.dropped_attributes_count`, and reports the dropped scalar,
+  which is not recoverable on egress.
 - **Producer `meta` or `metrics` key `_dd.meta_struct`** collides with the reserved
   sub-object for the `meta_struct` partition; the `meta_struct` content wins on both
-  ingress and egress and the scalar is dropped. A counter is incremented and a warning log is emitted.
-- **`SamplingPriority::Other(n)` where `n` happens to equal one of the four known wire
-  values (-1, 0, 1, 2)** is unrepresentable by the parent RFC's closed-with-escape-hatch
-  invariant. This is a model-level constraint and is mentioned here only for completeness;
-  no round-trip data is at risk.
+  ingress and egress, and the scalar is dropped and reported.
+  Ingress saturating-increments `Span.dropped_attributes_count`; Datadog egress has no
+  wire field for that count.
 - **Multi-hop topologies that relay traces through intermediate `vector` source/sink
   hops** may lose Datadog agent-envelope state (`_dd.payload` / `_dd.tracer`)
   post-migration: `vector` hops reset `EventMetadata.source_type` to `"vector"`, so the
@@ -136,12 +139,11 @@ Rationale section below.
   originated and synthesizes a defaults-only envelope on egress. Operators can restore
   envelope passthrough via sink configuration; see "Envelope reconstruction policy"
   below.
-- **Pre-epoch `Span.start` and `SpanEvent.time`** are clamped to epoch-zero on Datadog
-  egress; a counter is incremented and a warning log identifies the affected span. See
-  the "Pre-epoch `Span.start` and `SpanEvent.time` handling" subsection.
-The Datadog-side consequences of model-level exclusions defined in the parent RFC
-(zero-ID rejection and pre-epoch timestamps via the internal proto's `fixed64` encoding)
-also apply.
+- **Unknown `AttributeAnyValue` or array-element type discriminators** drop the
+  containing span-event attribute, saturating-increment
+  `SpanEvent.dropped_attributes_count`, and are reported.
+The Datadog-side consequences of the parent RFC's zero-ID rejection and wire-domain
+normalization also apply.
 
 ## Pain
 
@@ -187,12 +189,19 @@ meta_struct_event = .spans[0].attributes."_dd.meta_struct"."dd.event_payload"
 
 #### Ingress and egress mapping
 
-An `AgentPayload` whose `tracerPayloads` repeated field is empty, or a `TracerPayload`
-whose `chunks` repeated field is empty, produces zero `TraceEvent`s: there is no
+Until indexed decoding is implemented, the source discards every non-empty
+`idxTracerPayloads` entry and reports the discard. Standard `tracerPayloads` in the same
+`AgentPayload` continue through the mapping below. An indexed-only payload consequently
+produces zero events and is acknowledged after the discard is reported, avoiding retries
+that cannot succeed on the same Vector version.
+
+After indexed entries are handled as above, a standard `AgentPayload` whose
+`tracerPayloads` repeated field is empty, or a `TracerPayload` whose `chunks` repeated
+field is empty, produces zero `TraceEvent`s: there is no
 `TraceChunk` from which to populate `TraceEvent.chunk` and no `Resource` envelope is
 well-defined in isolation, so the wire input has no `TraceEvent` representation. The
-discard is lossless because the payload carries no span data the Datadog backend would
-observe.
+standard-empty case is lossless because it carries no span data the Datadog backend
+would observe.
 
 An `AgentPayload` with at least one `TracerPayload` carrying at least one `TraceChunk`
 expands into one `TraceEvent` per `(TracerPayload, distinct Span.service, TraceChunk)`
@@ -218,6 +227,9 @@ The grouping rules are:
   resource-scoped state" below).
 - `TraceChunk.{priority, origin, droppedTrace, tags}` populate
   `TraceEvent.chunk = Some(ChunkContext { ... })`, including when every field is default.
+  Every decoded `priority` value is present internally: `0` maps to
+  `Some(SamplingPriority::AutoReject)` and every other `i32` maps through the parent
+  RFC's canonical constructor.
 - `Scope` is left default; Datadog has no scope concept.
 
 | Datadog                                                       | Internal                                              |
@@ -253,8 +265,8 @@ The cross-format derivation rules later in this section (`span_type` from
 `Span.kind` / `Span.attributes`, `resource_name` from `Span.attributes` / `Span.name`, the
 `TracerPayload` semantic-convention key set, and the flattening of unmapped
 `Resource.attributes` into per-span `meta`) are projections of the Datadog Agent OTLP
-ingest reference (see Glossary above). The precise key sets and lookup orders track the
-upstream reference without requiring a specification amendment.
+ingest reference in the Glossary. The precise key sets and lookup orders track current
+upstream behavior without requiring a specification amendment.
 
 #### `TracerPayload` semantic-convention key mapping
 
@@ -262,10 +274,8 @@ upstream reference without requiring a specification amendment.
 semantic-convention keys: `containerID`, `languageName`, `languageVersion`,
 `tracerVersion`, `runtimeID`, `appVersion`. The specific OpenTelemetry attribute key each
 wire field maps to is defined by the Datadog Agent OTLP-ingest reference, which the
-Vector mapping mirrors. The RFC does not pin a separate key set, so the mapping tracks
-upstream changes without a specification amendment. The `TracerPayload`-envelope-
-equivalence rule in the egress section consequently keys off the attribute set defined
-by the upstream reference.
+Vector mapping mirrors. The `TracerPayload`-envelope-equivalence rule in the egress
+section consequently keys off the attribute set defined by the current reference.
 
 `TracerPayload.hostname` and `TracerPayload.env` map to typed
 `Resource.host` / `Resource.environment` directly and are not part of the deferred
@@ -286,17 +296,14 @@ was available. Datadog egress therefore reproduces the empty value, and the
 `Span.duration` on the wire is `int64` nanoseconds. Two corner cases sit outside the
 wire field's representable range:
 
-- A negative wire value on ingress is clamped to zero (`std::time::Duration` is
-  non-negative); a counter is incremented and a warning log identifies the affected span.
-- A `Duration` value exceeding `i64::MAX` nanoseconds (~292 years) on egress is clamped to
-  `i64::MAX`; a counter is incremented and a warning log identifies the affected span. This
-  clamp is tighter than the OTLP and internal `TypedTrace` `fixed64` wire clamps
-  (`u64::MAX` nanoseconds, ~584 years), which both carry every value up to `u64::MAX`
-  exactly.
+- A negative wire value on ingress is clamped to zero and reported.
+- A typed duration outside the Datadog `int64` field's domain is clamped on egress and
+  reported. This destination is narrower than the corresponding OTLP and internal
+  `TypedTrace` fields.
 
 Both cases are declared as Datadog-side round-trip exclusions above.
 
-#### Pre-epoch `Span.start` and `SpanEvent.time` handling
+#### `Span.start` and `SpanEvent.time` wire bounds
 
 Datadog's `Span.start` and `SpanEvent.time_unix_nano` wire fields are `int64` and
 `uint64` respectively; a negative wire `Span.start` is technically representable on the
@@ -306,14 +313,11 @@ negative `Span.start` is preserved as a pre-epoch `DateTime<Utc>` in the typed m
 RFC's pre-epoch internal-proto clamp on any subsequent disk-buffer or `vector`
 source/sink hop.
 
-On Datadog egress, a pre-epoch `DateTime<Utc>` in `Span.start_time` or `SpanEvent.time`
-(writable via the Rust API or VRL) is clamped to epoch-zero on encode; a counter is
-incremented and a warning log identifies the affected span. This matches the parent
-RFC's internal-proto clamp and the OTLP-side clamp, keeping Datadog egress consistent
-with the model-level pre-epoch exclusion. A `Datadog -> Vector -> Datadog` round trip
-through a pipeline that does not cross a disk-buffer or `vector` hop will therefore
-preserve a pre-epoch `Span.start` only on the typed-model side; the clamped egress is
-the documented behaviour.
+On Datadog egress, `Span.start_time` and `SpanEvent.time` are clamped to their respective
+wire domains and reported. This matches the parent RFC and OTLP-side policy. A
+`Datadog -> Vector -> Datadog` round trip through a pipeline that does not cross a disk
+buffer or `vector` hop can preserve a negative wire `Span.start` in memory, but Datadog
+egress applies the documented clamp.
 
 #### `Span.error` and `Span.status`
 
@@ -334,8 +338,9 @@ wire `meta` map, parsed, and removed before the remaining `meta` entries flow in
 hex-encoded `u64`: trimmed of whitespace and parsed case-insensitively, accepting 1-16
 hex characters (with or without zero-padding). Values that contain non-hex
 characters or exceed 16 hex digits indicate a malformed span -- the span is dropped under the parent
-RFC's Identifiers zero-`TraceId` handling (counter incremented, warning log identifying the dropped
-span). A well-formed value is consumed into `Span.trace_id.high_u64`. Absent `_dd.p.tid`, or a key
+RFC's malformed-input rule and reported even when the low half is non-zero. A well-formed
+value is consumed into `Span.trace_id.high_u64`.
+Absent `_dd.p.tid`, or a key
 present with a whitespace-only value (empty after trimming), is treated as equivalent to absent: the
 high half is zero and the span is not dropped. This yields a valid 64-bit trace ID (high half zero).
 
@@ -346,7 +351,8 @@ padded 16-character lowercase hex string to match the Datadog Agent's canonical 
 zero, the tag is omitted. Before writing the trace_id-derived value, any `_dd.p.tid`
 entry placed into `meta` by the attribute partition step is removed, so the
 trace_id-derived write is the sole source for this key regardless of what a transform
-may have written to `attributes["_dd.p.tid"]`.
+may have written to `attributes["_dd.p.tid"]`. Removing such an entry is reported;
+Datadog has no wire dropped-attribute count to update.
 
 #### `SpanLink.traceID_high`
 
@@ -369,8 +375,8 @@ and `meta["_dd.p.tid"]` is absent or parses to zero, since the resulting `TraceI
 be all-zero; a `Span.traceID == 0` paired with a non-zero `_dd.p.tid` high half is valid
 and is not rejected. A `Span` is also dropped when `Span.spanID == 0`. `SpanLink` is
 dropped when `(spanLinks[*].traceID == 0 && spanLinks[*].traceID_high == 0)` or when
-`spanLinks[*].spanID == 0`. All drops increment a counter
-and emit a warning log defined by the parent RFC's Identifiers section.
+`spanLinks[*].spanID == 0`. All drops use the disposition, count updates, and reporting
+requirements defined by the parent RFC's Identifiers section.
 
 Datadog `Span.parentID == 0` is a "no parent" sentinel and is not a zero-ID failure: it
 maps to `Span.parent_span_id = None` rather than to a zero `SpanId`. On egress, a `None`
@@ -407,8 +413,16 @@ Datadog's `AttributeAnyValue` has no native `bytes` or `kvlist` form. On Datadog
 `AttrValue::Bytes` is stringified to `STRING_VALUE` via `dd_value_to_string` (defined
 below) and `AttrValue::Map` is stringified to a JSON `STRING_VALUE`. `AttrValue::Null`
 entries are dropped from the wire map (the wire has no representation for "key present,
-value absent"), parallel to the `Null` handling on the `meta` / `metrics` and `SpanLink`
-egress paths.
+value absent") and reported, parallel to the `Null` handling on the `meta` / `metrics`
+and `SpanLink` egress paths. An `AttrValue::Array` maps scalar elements directly.
+Elements without an
+array-scalar representation (`Bytes`, nested `Array`, `Map`, or `Null`) become
+`STRING_VALUE` using `dd_value_to_string`; `Null` uses the literal `"null"`.
+
+On ingress, an unknown `AttributeAnyValue.type` or an unknown type on any element of its
+`array_value` makes the containing map attribute unrepresentable. The source drops only
+that attribute, saturating-increments `SpanEvent.dropped_attributes_count`, and reports
+the drop; other attributes and the event continue through the mapping.
 
 #### Datadog attribute partitions: convention versus invariant
 
@@ -420,18 +434,20 @@ Datadog spans carry attributes in three independent wire-level maps:
 
 Datadog ingress maps each partition into `Span.attributes`:
 
-- `meta` entries become top-level entries with `AttrValue::String` (or
-  `AttrValue::Bytes` if the wire bytes fail UTF-8 validation, a non-conforming-producer
-  case).
+- `meta` entries become top-level entries with `AttrValue::String`.
 - `metrics` entries become top-level entries with `AttrValue::Double`.
 - `meta_struct` entries are placed under the reserved key
   `Span.attributes."_dd.meta_struct"`, whose value is an `AttrValue::Map` mapping each
   `meta_struct` key to an `AttrValue::Bytes` payload.
 
+The protobuf decoder rejects invalid UTF-8 in `map<string, string>` keys or values at
+the payload boundary, before this attribute mapping runs; no raw-string fallback decoder
+is introduced.
+
 If a producer emits the same key in both `meta` and `metrics`, the Datadog source
-resolves the collision deterministically (`metrics` wins), increments a counter,
-and emits a warning log. A key emitted in `meta_struct` and
-either `meta` or `metrics`
+resolves the collision deterministically (`metrics` wins), saturating-increments
+`Span.dropped_attributes_count`, and reports the drop. A key emitted in `meta_struct`
+and either `meta` or `metrics`
 normally retains both values (the `meta_struct` entry under
 `attributes."_dd.meta_struct"`, the scalar entry as a top-level attribute) because the
 two surfaces target different keys: the `meta_struct` sub-object lives at the reserved
@@ -443,32 +459,34 @@ The single exception is a producer that emits the literal key `_dd.meta_struct` 
 `Span.attributes."_dd.meta_struct"`. In this collision `meta_struct` wins on both ingress and
 egress: on ingress the sub-object is placed after the scalar merge, overwriting any scalar at that
 key; on egress step 1 drains the sub-object first, and step 2 skips the key because it has already
-been consumed, so the `meta` scalar at `_dd.meta_struct` is dropped. A counter is incremented and a
-  warning log is emitted in either direction for visibility. This case is declared as an explicit
-round-trip exclusion above.
+been consumed, so the `meta` scalar at `_dd.meta_struct` is dropped.
+The drop is reported in either direction; ingress additionally saturating-increments
+`Span.dropped_attributes_count`. This case is declared as an explicit round-trip
+exclusion above.
 
 Datadog egress, in order:
 
 1. Drain `Span.attributes."_dd.meta_struct"` into the wire `meta_struct` map (each
    sub-entry's `AttrValue::Bytes` payload becomes one `meta_struct` entry). A
    non-`Map` value at the reserved key, or a non-`Bytes` sub-entry within it, is
-   dropped; a counter is incremented and a warning log identifies the dropped
-   entry.
+   dropped and reported.
 2. Partition the remaining attributes by `AttrValue` variant: `String` and `Bytes` to
    `meta` (the latter as a UTF-8-lossy string), `Double` and `Int` (coerced to `f64`)
    to `metrics`. `Null` is dropped (the wire has no representation for "key present,
-   value absent"). Variants with no native Datadog partition (`Bool`, `Array`, `Map`)
-   are stringified into `meta` via `dd_value_to_string`.
+   value absent") and reported. Variants with no native Datadog partition (`Bool`,
+   `Array`, `Map`) are stringified into `meta` via `dd_value_to_string`.
 
 The result is one entry per non-`Null` key in exactly one wire partition.
 
 **`dd_value_to_string` rule.** Wherever a Datadog `map<string, string>` wire field
-requires every `AttrValue` to be coerced to a plain `String`, the following rule
-applies: `String` is emitted verbatim; `Bytes` is emitted as its UTF-8 lossy string;
-all other variants are emitted as their JSON encoding. The rule is total over
-non-`Null` variants. `Null` entries are filtered out by every callsite -- map
-iterations drop the entry rather than emit a wire string, since the wire
-`map<string, string>` has no representation for "key present, value absent."
+requires every `AttrValue` to be coerced to a plain `String`, `String` is emitted
+verbatim and `Bytes` as its UTF-8 lossy string. `Bool`, `Int`, and finite `Double` use
+their JSON scalar spelling; non-finite doubles use `"NaN"`, `"Infinity"`, and
+`"-Infinity"`. `Array` and `Map` use deterministic JSON with recursively sorted map
+keys, lossy UTF-8 for bytes, the same quoted strings for non-finite doubles, and JSON
+`null` for nested nulls. Top-level `Null` map entries are filtered out because the wire
+map has no representation for "key present, value absent," and are reported. These rules
+are total and do not depend on a JSON library's non-finite-number behavior.
 
 #### Datadog resource-scoped state
 
@@ -507,6 +525,12 @@ every span in the chunk. Every Datadog-sourced `TraceEvent` corresponds to exact
 chunk by construction and therefore carries `TraceEvent.chunk = Some(...)`, including
 for an explicitly all-default chunk. An OTLP-sourced event with no recovered Datadog
 chunk state carries `None`.
+
+Because proto3 provides no scalar presence for `TraceChunk.priority`, every decoded
+wire value maps to `Some(SamplingPriority)`: zero is `Some(AutoReject)`, known non-zero
+values use their canonical variants, and other `i32` values use `Other`. `None` is
+reserved for events with no source priority, such as an OTLP event without recovered
+Datadog chunk state. On Datadog egress, `None` emits the wire default zero.
 
 VRL access:
 
@@ -558,7 +582,9 @@ On Datadog egress, the sink:
     convention keys per "`TracerPayload` semantic-convention key mapping" above.
   - Tie-breaker: a per-span `Span.attributes` entry at the same key wins over a
     `Resource.attributes` entry; the wire format has no resource-attribute scope, so
-    the per-span duplication is the wire shape's nature, not Vector's choice.
+    the per-span duplication is the wire shape's nature, not Vector's choice. Each
+    discarded resource-scoped value is reported; Datadog has no wire dropped-attribute
+    count to update.
   - For Datadog-sourced events these unmapped keys are empty by construction (Datadog
     ingest places non-promoted resource state in `_dd.payload` / `_dd.tracer`), so the
     round-trip is unaffected.
@@ -576,15 +602,16 @@ On Datadog egress, the sink:
   - When `Span.status` is `Error(message)` or `Other(_, message)` and `message` is
     non-empty, `meta["error.message"]` is set to the typed message, overwriting
     whatever the attribute partitioning step placed there. If the previous value
-    differed from the typed message, the sink increments a counter and emits a warning log.
+    differed from the typed message, the overwrite is reported.
   - When `Span.status.message` is empty (`Unset`, `Ok`, `Error("")`, or `Other(_, "")`),
     the sink does not synthesize a `meta["error.message"]` tag and any value the
     attribute partitioning step placed there is left in place. This empty-message guard
     preserves the round trip for the conforming input `error = 1, no
     meta["error.message"]`, which ingests as `Error("")` with no attribute and must
     egress identically.
-- Emits `SpanLink.attributes` as the wire `map<string, string>`: all `AttrValue`
-  variants are stringified via `dd_value_to_string`.
+- Emits `SpanLink.attributes` as the wire `map<string, string>`: non-`Null`
+  `AttrValue` variants are stringified via `dd_value_to_string`, and `Null` entries are
+  omitted and reported.
   - The `meta` / `metrics` partitioning rule used for `Span.attributes` does not apply
     to links because the Datadog `SpanLink.attributes` wire type is a flat string map,
     not the `meta` / `metrics` / `meta_struct` triple.
@@ -592,7 +619,27 @@ On Datadog egress, the sink:
     `AttrValue::String` on ingress due to the wire type, so the `dd_value_to_string`
     conversion on egress is lossless for `Datadog -> Vector -> Datadog` round trips.
 
+Datadog `Span`, `SpanEvent`, and `SpanLink` provide no dropped-attribute count fields.
+Consequently, Datadog-egress attribute losses are reported but cannot propagate an
+updated in-band count on that wire.
+
 #### Envelope reconstruction and chunk re-coalescence
+
+Before grouping, Datadog egress normalizes the reserved envelope values into their wire
+shapes. A non-`Map` `_dd.payload` or `_dd.tracer` is ignored; Datadog-originated events
+then use the same typed-slot-and-defaults fallback as an absent envelope. Within a map,
+string, numeric, and boolean wire fields accept only their matching `AttrValue` variant
+(`Bytes` is accepted for strings via lossy UTF-8); a mismatched field uses its proto3
+default. A non-`Map` `tags` value becomes an empty map, while tag entries use
+`dd_value_to_string` and omit top-level `Null`. Every ignored, defaulted, or coerced
+value is reported. Grouping keys and wire serialization both use this normalized result,
+so malformed transform-authored state cannot produce inconsistent grouping or a sink
+failure.
+
+All equality used by the nested Datadog grouping steps is structural. Double values are
+compared by their IEEE-754 `to_bits()` representation, so a NaN equals the same preserved
+NaN payload and positive and negative zero remain distinct. This applies to normalized
+envelope doubles and doubles nested in resource or chunk attributes.
 
 Datadog egress groups events into wire `AgentPayload` / `TracerPayload` / `TraceChunk`
 structures by nested grouping keys:
@@ -600,8 +647,9 @@ structures by nested grouping keys:
 **`AgentPayload` grouping.** Groups events by their envelope and emits one
 `AgentPayload` per group. The envelope used as the grouping key is origin-dependent,
 matching the envelope-reconstruction policy below: for Datadog-originated events it is
-`Resource.attributes."_dd.payload"`; for all other events it is the synthesized envelope
-from typed `Resource` slots and proto3 defaults (per the Fallback sub-bullet below). A
+the normalized `Resource.attributes."_dd.payload"`; for all other events it is the
+synthesized envelope from typed `Resource` slots and proto3 defaults (per the Fallback
+sub-bullet below). A
 `_dd.payload` attribute on a non-Datadog-originated event (e.g. set by a transform) does
 not contribute to the grouping key, consistent with the reconstruction policy ignoring
 it. This is the outermost grouping step, so every downstream `TracerPayload` and
@@ -632,13 +680,21 @@ events identified as Datadog-originated; all other events use the typed-slot-and
 defaults derivation specified in the Fallback sub-bullet above for `_dd.payload`, and
 emit an empty `TracerPayload.tags` for `_dd.tracer`.
 
-During the migration the sink reads `vector.trace_legacy_layout` to identify
-Datadog-originated events; because the hint is preserved across `vector` source/sink
-hops, relay pipelines continue to forward the original agent envelope without operator
-intervention. Post-migration the sink reads `EventMetadata.source_type` (set by the
-topology source pump on every emission and reset to `"vector"` at each hop); operators
-who want to relay Datadog envelope state across `vector` hops must enable that
-explicitly in the sink configuration.
+During the coexistence and deprecated-proto window the `datadog_agent` source writes
+`vector.trace_legacy_layout` on both `Legacy` and `Typed` events, and the sink reads it
+to identify Datadog-originated events. Because the hint is preserved across `vector`
+source/sink hops, relay pipelines continue to forward the original agent envelope
+without operator intervention while either representation can be present. After that
+window, typed sources stop emitting the migration hint and the sink reads
+`EventMetadata.source_type` (set by the topology source pump on every emission and reset
+to `"vector"` at each hop); operators who want to relay Datadog envelope state across
+`vector` hops must enable that explicitly in the sink configuration.
+
+That post-migration opt-in treats a `source_type == "vector"` event as
+Datadog-originated for the sole purpose of consulting its normalized `_dd.payload` and
+`_dd.tracer` envelopes. Direct events from any other non-Datadog source continue to
+ignore those reserved keys even when passthrough is enabled. The eventual configuration
+key is an implementation detail; this trust rule is its required behavior.
 
 **`TracerPayload` grouping.** Within each `AgentPayload`, gather events with a
 TracerPayload-envelope-equivalent `Resource` into one `TracerPayload`, with each span's
@@ -689,11 +745,11 @@ per group. `None` and `Some(ChunkContext::default())` therefore share an egress 
 
 #### Cross-format conformance: `OTLP -> Vector -> datadog_traces`
 
-A non-`datadog_agent`-sourced event reaching the `datadog_traces` sink produces the
-wire output the Datadog Agent itself would produce for the same OTLP input; for
-OTLP-sourced fields on Datadog egress, Datadog-Agent parity is the normative
-requirement. The specific derivations are projections of the Datadog Agent OTLP
-ingest reference (see Glossary above):
+A non-`datadog_agent`-sourced event reaching the `datadog_traces` sink follows the
+enumerated Agent-aligned derivations below. Conformance means backend-effective
+equivalence under Vector's typed mapping, not exact reproduction of every field the
+Datadog Agent OTLP converter would place on the wire. Current Agent `main`, as linked in
+the Glossary, is the reference for these derivations:
 
 - The `Span.type` derivation (`SpanKind2Type` logic) and the `Span.resource` derivation
   (attribute-key lookup with `Span.name` fallback) follow the upstream Agent code.
@@ -704,6 +760,14 @@ ingest reference (see Glossary above):
   `targetTPS`, `errorTPS`, `rareSamplerEnabled`, agent-level `tags`) because the OTLP
   input has none, matching the Datadog Agent's own behaviour when serving as an OTLP
   receiver.
+
+The rest follows this RFC's explicit typed mapping. In particular, Vector emits
+`SpanEvent` and `SpanLink` through their native Datadog protobuf fields and preserves a
+128-bit trace ID through `_dd.p.tid`; it does not reproduce the Agent converter's legacy
+`meta["events"]`, `meta["_dd.span_links"]`, `meta["otel.trace_id"]`, or
+`meta["span.kind"]` encodings unless a separate mapping rule above requires the same
+field. Those wire-shape differences are permitted only where the Datadog backend
+observes equivalent trace data.
 
 `datadog_agent -> Vector -> OTLP` is the inverse of the forward mapping for fields the
 reference covers. Datadog-only concepts that the Datadog Agent does not produce on its
@@ -837,12 +901,9 @@ not authoritative.
   -- the wire format this sub-RFC targets.
 - [Datadog Agent OTLP
   ingest](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/api/otlp.go) --
-  the normative reference for OTLP-to-Datadog field mappings (see the parent RFC's
-  Glossary for the full role specification). Adopting an existing reference rather
-  than defining a parallel mapping minimises divergence between Vector's
-  `OTLP -> datadog_traces` path and the Datadog Agent's own OTLP ingest, so users
-  moving traffic from the Agent's OTLP receiver to Vector see no change in attribution
-  at the Datadog backend.
+  the moving reference for the enumerated Agent-aligned derivations. Reusing those
+  derivations minimises attribution differences without requiring Vector to reproduce
+  the Agent converter's complete wire output.
 - The OpenTelemetry Collector
   [`datadogreceiver`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/datadogreceiver)
   -- a secondary reference for the reverse direction (Datadog wire -> OTLP), used only
@@ -892,15 +953,13 @@ class: no stable OpenTelemetry semantic-convention attribute uses a `_dd.*`-pref
 key, so convention-defined attributes cannot collide. However, OTLP permits any custom
 key, so a producer or transform may legitimately set
 `Resource.attributes["_dd.payload"]` or `Resource.attributes["_dd.tracer"]`. When that
-occurs, the value is interpreted as a Datadog envelope on Datadog egress; on OTLP egress
-the key flows through under its model-level name via the generic attribute mapping. The
-bare-keys design would produce the same collision class for any `payload` or `tracer`
-attribute, with no path to distinguishing user data from envelope data. The `_dd.*`
-namespace limits the collision to two specific reserved keys whose names signal
-Datadog-internal intent; the residual collision is declared as an explicit exclusion
-under "Datadog-specific zero-loss round-trip exclusions" rather than being silent, and
-operators are advised to avoid setting these two keys outside of Datadog-sourced
-pipelines.
+occurs on a non-Datadog-originated event, the default origin filter ignores it for
+envelope reconstruction; on OTLP egress the key flows through under its model-level name
+via the generic attribute mapping. An operator who explicitly enables `vector`
+passthrough opts into trusting such state after a hop. The bare-keys design would produce
+the same collision class for far more ordinary `payload` or `tracer` attributes. The
+`_dd.*` namespace limits the reserved surface to two names that signal
+Datadog-internal intent.
 
 ### `ChunkContext.priority` as a raw `i32`
 
@@ -919,43 +978,35 @@ range value.
 ## Plan Of Attack
 
 Removing the obsolete `tracerPayloads`-empty ingest branch and adopting the upstream
-Datadog protos may land independently. An empty standard payload must follow the
-zero-event rule above, while an unsupported indexed-only payload reports
-`unsupported_payload_version` and is rejected.
+Datadog protos may land independently.
 
 The remaining work starts after the format-agnostic prerequisites (fallible proto decode
 boundary, migration enum, legacy-layout hint precursor, and internal `TypedTrace` proto
 extension) in the parent RFC:
 
 1. Implement `Legacy -> Typed` conversion and unique detection of historical pre-hint
-   Datadog layouts, with fixtures demonstrating that only Datadog input selects the
-   converter and that OTLP, malformed, zero-match, and ambiguous input fails
-   controllably.
-2. Implement `Typed -> Datadog` encoding for the complete mapping, derivation,
-   partitioning, grouping, and envelope-reconstruction contracts above, giving every
-   in-scope wire field a bidirectional disposition, including the status/message
-   precedence and `_dd.p.tid` ownership rules.
-3. Establish the `Datadog -> Vector -> Datadog` guarantee with property tests spanning
-   grouping, IDs, reserved state, typed attributes, normalization, absent/default
-   distinctions, and numeric edge cases. The tests must demonstrate effective
-   equivalence for all declared in-scope values and explicitly cover every exclusion.
-4. Establish `OTLP -> Vector -> datadog_traces` conformance against representative
-   outputs from the Datadog Agent OTLP receiver, demonstrating that the upstream-tracking
-   derivations and envelope defaults match the normative reference and can be refreshed
-   when it changes.
-5. Migrate the `datadog_traces` sink and APM stats aggregation, then migrate the source
-   after the parent RFC's compile-time consumer gate. Typed input must pass end-to-end
-   through Datadog export before `datadog_agent` emits typed events.
-6. Add the attribute partitioning, reserved envelope state, chunk context, typed-slot
-   precedence, and `Span.error` normalization to the user migration guide.
+   Datadog layouts.
+2. Implement `Typed -> Datadog` encoding satisfying the mapping and egress contracts
+   above.
+3. Establish the `Datadog -> Vector -> Datadog` effective-equivalence guarantee,
+   and validate every declared exclusion.
+4. Establish the enumerated `OTLP -> Vector -> datadog_traces` conformance rules against
+   the current Datadog Agent reference.
+5. Migrate the `datadog_traces` sink and APM stats aggregation after the parent RFC's
+   compile-time consumer gate.
+6. Publish the user migration guide, then migrate the `datadog_agent` source after typed
+   input passes end-to-end through Datadog export. Typed source events retain the
+   migration hint for the parent RFC's deprecation window.
 
 ## Future Improvements
 
 - Datadog `AgentPayload.idxTracerPayloads = 11` (indexed / deduplicated tracer-payload form): map
-  the indexed shape through the same typed model. Until that support is added,
-  `idxTracerPayloads`-only payloads are rejected (see Plan of Attack). The indexed shape has been reviewed
-  against the typed slots and fits field-for-field with no structural changes required; remaining
-  work is string-table codec at the wire boundary.
+  the indexed shape through the same typed model. Until that support is added, indexed
+  entries are discarded while standard entries continue. A stricter mode may instead
+  reject any payload containing indexed entries when operators prefer all-or-nothing
+  acceptance. The indexed shape has been reviewed against the typed slots and fits
+  field-for-field with no structural changes required; remaining work is string-table
+  codec at the wire boundary.
 - VRL helper for decoding raw Datadog `Span` protobuf into the typed surface
   (`decode_datadog_span`), parallel to the OTLP mapping sub-RFC's `decode_otlp_span`
   helper.

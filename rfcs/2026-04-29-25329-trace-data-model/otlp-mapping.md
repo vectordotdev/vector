@@ -78,14 +78,17 @@ below.
   specifies the contents these keys carry; this sub-RFC reserves the keys.
 - **OTLP fields at `Development` or `Alpha` stability tier** are dropped on OTLP ingress.
 - **`Span.end_time_unix_nano < start_time_unix_nano`** is clamped to zero duration on
-  ingress; the source increments a counter and emits a warning log
-  identifying the affected span. The egress reconstruction emits `end_time_unix_nano = start_time_unix_nano`,
-  byte-different from the original input.
+  ingress and reported. The egress reconstruction emits
+  `end_time_unix_nano = start_time_unix_nano`, byte-different from the original input.
+- **`Status.message` paired with `UNSET` or `OK`** is dropped and reported on ingress;
+  OpenTelemetry permits a description only for `ERROR`.
+- **Duplicate keys in an OTLP attribute list or nested `KeyValueList`** use wire-order
+  last-wins normalization. Each overwritten value saturating-increments the nearest
+  enclosing item's `dropped_attributes_count` and is reported.
 
-The OTLP-side consequences of model-level exclusions defined in the parent RFC (zero-ID
-rejection and pre-epoch timestamps via the internal proto's `fixed64` encoding) also
-apply. The OTLP-specific end-timestamp overflow clamp is documented under "Span timing"
-below.
+The OTLP-side consequences of the parent RFC's zero-ID rejection and wire-domain
+normalization also apply. The derived end-timestamp case is documented under "Span
+timing" below.
 
 ## Pain
 
@@ -157,13 +160,19 @@ keys" below) for best-effort cross-format relay.
 
 #### Zero-ID detection
 
-OTLP wire IDs are raw byte arrays; an all-zero `Span.trace_id`, `Span.span_id`,
-`Link.trace_id`, or `Link.span_id` is invalid per the OTLP specification and triggers the
-parent RFC's drop rule (per-span or per-link, with the corresponding
-`invalid_trace_id` / `invalid_span_id` `component_errors_total` increment). An absent
-`Span.parent_span_id` deserializes to an empty byte sequence, which the ingest treats
-identically to all-zero and maps to `Span.parent_span_id = None`; this is not a zero-ID
-failure. On egress, a `None` parent emits an empty `parent_span_id`.
+OTLP wire IDs are raw byte arrays interpreted in big-endian order. A trace ID must be
+exactly 16 bytes and a span ID exactly 8 bytes. An ID with the wrong length or an
+all-zero value is malformed: for `Span.trace_id` / `Span.span_id` the source rejects the
+span, and for `Link.trace_id` / `Link.span_id` it rejects only the link and increments
+`Span.dropped_links_count`. Each rejection applies the parent RFC's identifier
+disposition and reporting requirements.
+
+`Span.parent_span_id` has one explicit normalization because the model represents root
+spans with `None`: an empty sequence or exactly eight zero bytes maps to `None`, and
+exactly eight non-zero bytes maps to `Some(SpanId)`. Any other non-empty length is
+malformed and rejects the enclosing span with the same invalid-ID telemetry. On egress,
+IDs use the same fixed-width big-endian encoding and a `None` parent emits an empty
+`parent_span_id`.
 
 #### Semantic-convention promotion and the typed-slot precedence
 
@@ -189,12 +198,13 @@ and the promotion rule above left it in place.
 
 On OTLP egress specifically, the typed slot wins for the three pairs above: the canonical key is
 emitted once with the typed value and any duplicate at the same key in `Resource.attributes` is
-dropped; a counter is incremented and a warning log is emitted for visibility. This is required for
-spec conformance: OTLP `Resource.attributes` mandates that "attribute keys MUST be unique." If the
-typed slot is `None` and the attribute key is present, the attribute value is emitted unchanged (the
-non-promotion rule above applies). The other typed slot/attribute-map pairs from the parent
-RFC do not apply on OTLP egress: `Span.trace_id` is a single 16-byte wire field (no `_dd.p.tid`
-duplication), `Span.status` egresses through OTLP's `Status.message` field with any `error.message`
+discarded and reported; the emitted `Resource.dropped_attributes_count` is
+saturating-incremented. This is required for spec conformance: OTLP
+`Resource.attributes` mandates that "attribute keys MUST be unique." If the typed slot
+is `None` and the attribute key is present, the attribute value is emitted unchanged (the
+non-promotion rule above applies). The other typed slot/attribute-map pairs from the
+parent RFC do not apply on OTLP egress: `Span.trace_id` is a single 16-byte wire field
+(no `_dd.p.tid` duplication), `Span.status` egresses through OTLP's `Status.message` field with any `error.message`
 attribute left in place as a regular attribute, and the chunk-state pair is the cross-format
 synthesis covered under "Reserved OTLP-egress keys for typed-only Datadog state" below.
 
@@ -207,11 +217,13 @@ the attribute as `deployment.environment.name` in semantic conventions
 ([PR #3584](https://github.com/open-telemetry/semantic-conventions/pull/3584)), with
 `deployment.environment` listed as "Replaced by `deployment.environment.name`."
 
-The stable key wins when both are present and the deprecated value is dropped. The
-selected key is then subject to the promotion rule above: a non-empty string promotes,
-while an empty or non-string value remains under its original key. On OTLP egress, a
-promoted `Resource.environment` uses `deployment.environment.name`; an unpromoted
-attribute retains its original key and value.
+The stable key wins when both are present; dropping the deprecated value
+saturating-increments `Resource.dropped_attributes_count` and is reported. The selected
+key is then subject to the promotion rule above: a non-empty string promotes, while an
+empty or non-string value remains under its original key. On OTLP egress, a promoted
+`Resource.environment` uses
+`deployment.environment.name`; an unpromoted attribute retains its original key and
+value.
 
 The Rationale for accepting both keys is in the Rationale section.
 
@@ -225,18 +237,12 @@ nanoseconds in memory and on the wire; the round trip is bit-exact for any span 
 `end_time_unix_nano >= start_time_unix_nano`.
 
 A span with reversed timestamps (`end_time_unix_nano < start_time_unix_nano`) is clamped to zero
-duration on ingress, a counter is incremented, and a warning log is emitted; this is one of the
-OTLP-side zero-loss exclusions listed above.
+duration and reported on ingress; this is one of the OTLP-side zero-loss exclusions
+listed above.
 
-On egress, a computed end timestamp that exceeds the OTLP `fixed64` domain is clamped to
-`u64::MAX`. A clamp increments a counter and emits a warning log identifying the affected
-span; the encoded duration is effectively reduced to
-`u64::MAX - start_time_unix_nano`.
-
-A pre-epoch `DateTime<Utc>` value in `Span.start_time` or `SpanEvent.time` (writable via
-the Rust API or VRL but never produced by OTLP ingress, since `fixed64` is unsigned) is
-clamped to epoch-zero on OTLP encode; a counter is incremented and a warning log
-identifies the affected span. This mirrors the parent RFC's internal-proto clamp.
+On egress, `Span.start_time` and `SpanEvent.time` are clamped to the OTLP timestamp
+domain and reported. A reconstructed `Span.end_time_unix_nano` outside that domain is
+likewise clamped and reported.
 
 #### `Span.flags` / `Link.flags` layout
 
@@ -253,9 +259,8 @@ round-trip unchanged.
 UNSET` or `OK` the message is dropped on ingest because the OpenTelemetry [Set
 Status](https://opentelemetry.io/docs/specs/otel/trace/api/#set-status) rule restricts `Description`
 to the `Error` code. A wire `Status.message` paired with `code = UNSET` or `OK` is non-conformant
-and is dropped on ingest; a counter is incremented and a warning log is emitted for visibility. See
-the Rationale subsection below for the closed-enum-with-escape-hatch choice that makes future status
-codes round-trip unchanged.
+and is dropped and reported on ingest. See the Rationale subsection below for the
+closed-enum-with-escape-hatch choice that makes future status codes round-trip unchanged.
 
 #### Attribute encoding: `AttrValue` <-> `AnyValue`
 
@@ -266,6 +271,13 @@ mapping applies recursively into `Array` and `Map`. Conversion from VRL `Value` 
 example `Value::Timestamp` and `Value::Regex` written by transforms) happens at the
 VRL-write boundary per the parent RFC's "VRL surface for `AttrValue`" rules; OTLP
 egress never sees those variants in storage.
+
+OTLP attribute fields and nested `KeyValueList` values are repeated key-value sequences,
+while the typed model requires unique map keys. Ingest processes each sequence in wire
+order before promotion or reserved-key lifting; when a key repeats, the last value wins.
+Each overwritten earlier value saturating-increments the nearest enclosing resource,
+scope, span, event, or link's `dropped_attributes_count` and is reported. OTLP egress is
+unique-keyed by construction.
 
 #### Default-valued / absent equivalence
 
@@ -315,6 +327,14 @@ contents these keys carry; this sub-RFC reserves the keys at OTLP-wire-level:
   `string_value`.
 - `Span.attributes."datadog.span.type"` -- carries `Span.span_type` as `string_value`.
 
+On ingress, a reserved key is lifted only when its `AnyValue` uses the exact variant
+listed above. `datadog.chunk.priority` additionally requires its `int_value` to fit the
+internal sampling-priority discriminator domain. A wrong-typed or out-of-range reserved
+value is stripped from `Span.attributes`, saturating-increments
+`Span.dropped_attributes_count`, does not update the typed slot, and is reported. Valid
+reserved keys on the same span are still lifted; no coercion or whole-span rejection
+occurs.
+
 Chunk keys are synthesized only when `TraceEvent.chunk` is `Some`; optional or
 default-valued fields within that context are omitted. An all-default `Some` therefore
 emits no chunk keys and re-ingests as `None`; preserving Datadog chunk presence through
@@ -324,17 +344,20 @@ their typed slot is `None`.
 
 Reserved-key semantics: on OTLP egress the typed slot is the single source of truth, so
 any existing attribute at a reserved key is removed and replaced only when the typed
-value requires emission. On OTLP ingress, the keys are lifted into their typed slots and
-stripped from `Span.attributes` so OTLP egress through the same Vector emits them once
-under the typed path, not twice. Cross-format recovery via these keys is best-effort and
-is explicitly outside the OTLP round-trip guarantee (see "Out of scope" above).
+value requires emission. Removing an existing conflicting value saturating-increments
+the emitted `Span.dropped_attributes_count` and is reported. On OTLP ingress, the keys
+are lifted into their typed slots and stripped from `Span.attributes` so OTLP egress
+through the same Vector emits them once under the typed path, not twice. Cross-format
+recovery via these keys is best-effort and is explicitly outside the OTLP round-trip
+guarantee (see "Out of scope" above).
 
 For per-span chunk-context recovery on OTLP ingress: spans within the same `ScopeSpans` typically
 share chunk-context values (the wire shape mirrors the original `TraceChunk` on the Datadog side of
 the relay), but in the degenerate case where spans within a `ScopeSpans` carry conflicting values
-for the same `datadog.chunk.*` key, the wire-order- first value wins, a counter is incremented, and
-a warning log is emitted. Any chunk key materializes `Some(ChunkContext::default())`
-before applying its value; if all chunk keys are absent, `TraceEvent.chunk` is `None`.
+for the same `datadog.chunk.*` key, the wire-order-first value wins and the conflict is
+reported. Any successfully lifted chunk key materializes
+`Some(ChunkContext::default())` before applying its value; if all chunk keys are absent
+or malformed, `TraceEvent.chunk` is `None`.
 
 ## Rationale
 
@@ -399,20 +422,17 @@ parent RFC's Plan of Attack and must land first. OTLP work then proceeds through
 obligations:
 
 1. Implement `Legacy -> Typed` conversion and unique detection of historical pre-hint
-   OTLP layouts, with fixtures demonstrating that only OTLP input selects the converter
-   and that Datadog, malformed, zero-match, and ambiguous input fails controllably.
-2. Implement `Typed -> OTLP` encoding for the complete mapping and reserved-key
-   contracts above, giving every in-scope wire field a bidirectional disposition,
-   including empty `ScopeSpans` and typed-slot precedence.
-3. Establish the `OTLP -> Vector -> OTLP` guarantee with property tests covering
-   promotion, timing bounds, absent/default equivalence, reserved-key materialization,
-   and unknown enum values. The tests must demonstrate effective equivalence for all
-   declared in-scope values and explicitly cover every exclusion.
+   OTLP layouts.
+2. Implement `Typed -> OTLP` encoding satisfying the mapping and reserved-key contracts
+   above.
+3. Establish the `OTLP -> Vector -> OTLP` effective-equivalence guarantee and validate
+   every declared exclusion.
 4. Migrate the OTLP sink and then, after the parent RFC's compile-time consumer gate, the
    source. Typed input must pass end-to-end through OTLP export before the source emits
-   typed events.
-5. Add the field mapping, typed VRL paths, and cross-format reserved-key conventions to
-   the user migration guide.
+   typed events; typed source events retain the migration hint for the window specified
+   by the parent RFC.
+5. Publish the OTLP field mapping and reserved-key conventions in the user migration
+   guide.
 
 ## Future Improvements
 
