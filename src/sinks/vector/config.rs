@@ -208,9 +208,9 @@ impl VectorConfig {
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> serde_json::Value {
-        // Scheme-less endpoints are deprecated, so the generated example
-        // specifies the scheme explicitly rather than relying on the
-        // scheme-less default.
+        // Scheme-less endpoints default to `http`, which is deprecated; the
+        // generated example specifies the scheme explicitly rather than
+        // relying on the scheme-less default.
         serde_json::to_value(default_config("http://127.0.0.1:6000")).unwrap()
     }
 }
