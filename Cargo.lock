@@ -13321,6 +13321,7 @@ dependencies = [
  "openssl-probe",
  "openssl-src",
  "ordered-float 5.3.0",
+ "parking_lot",
  "parquet",
  "percent-encoding",
  "pin-project",
