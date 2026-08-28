@@ -109,7 +109,13 @@ impl MaybeTlsListener {
             }
         }
 
-        let listener = MaybeTlsIncomingStream::new(stream, peer_addr, self.acceptor.as_ref().map(|accptr| accptr.load().as_ref().clone()));
+        let listener = MaybeTlsIncomingStream::new(
+            stream,
+            peer_addr,
+            self.acceptor
+                .as_ref()
+                .map(|accptr| accptr.load().as_ref().clone()),
+        );
 
         if let Some(origin_filter) = &self.origin_filter {
             if origin_filter
