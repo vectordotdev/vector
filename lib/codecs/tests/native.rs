@@ -5,6 +5,7 @@ use std::{
     io::{Read, Write},
     num::NonZeroU32,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -20,11 +21,12 @@ use proptest::{
 };
 use similar_asserts::assert_eq;
 use tokio_util::codec::Encoder;
+use uuid::Uuid;
 use vector_core::{
-    config::LogNamespace,
+    config::{ComponentKey, LogNamespace, OutputId},
     event::{
-        Event, EventMetadata, LogEvent, Metric, MetricKind, MetricTags, MetricValue, ObjectMap,
-        TraceEvent, Value,
+        DatadogMetricOriginMetadata, Event, EventMetadata, LogEvent, Metric, MetricKind,
+        MetricTags, MetricValue, ObjectMap, TraceEvent, Value, metric::TagValue,
     },
 };
 use vrl::event_path;
@@ -92,8 +94,66 @@ fn metric_value() -> BoxedStrategy<MetricValue> {
 }
 
 fn metric_tags() -> BoxedStrategy<Option<MetricTags>> {
-    btree_map(bounded_string(), bounded_string(), 0..4)
-        .prop_map(|tags| MetricTags::from(tags).as_option())
+    let tag_value = prop_oneof![
+        Just(TagValue::Bare),
+        bounded_string().prop_map(TagValue::Value),
+    ];
+
+    proptest::option::of(btree_map(
+        bounded_string(),
+        proptest::collection::vec(tag_value, 0..4),
+        1..4,
+    ))
+    .prop_map(|entries| {
+        entries.map(|entries| {
+            let mut tags = MetricTags::default();
+            for (name, values) in entries {
+                tags.set_multi_value(name, values);
+            }
+            tags
+        })
+    })
+    .boxed()
+}
+
+fn event_metadata() -> BoxedStrategy<EventMetadata> {
+    (
+        json_safe_value(),
+        proptest::option::of(bounded_string()),
+        proptest::option::of(bounded_string()),
+        proptest::option::of((bounded_string(), proptest::option::of(bounded_string()))),
+        btree_map(bounded_string(), bounded_string(), 0..4),
+        proptest::option::of((
+            proptest::option::of(any::<u32>()),
+            proptest::option::of(any::<u32>()),
+            proptest::option::of(any::<u32>()),
+        )),
+        proptest::option::of(any::<[u8; 16]>().prop_map(Uuid::from_bytes)),
+    )
+        .prop_map(
+            |(value, source_id, source_type, upstream_id, secrets, origin, source_event_id)| {
+                let mut metadata =
+                    EventMetadata::default_with_value(value).with_source_event_id(source_event_id);
+                if let Some(source_id) = source_id {
+                    metadata.set_source_id(Arc::new(ComponentKey::from(source_id)));
+                }
+                if let Some(source_type) = source_type {
+                    metadata.set_source_type(source_type);
+                }
+                if let Some((component, port)) = upstream_id {
+                    metadata.set_upstream_id(Arc::new(OutputId::from((component, port))));
+                }
+                for (key, value) in secrets {
+                    metadata.secrets_mut().insert(key, value);
+                }
+                if let Some((product, category, service)) = origin {
+                    metadata = metadata.with_origin_metadata(DatadogMetricOriginMetadata::new(
+                        product, category, service,
+                    ));
+                }
+                metadata
+            },
+        )
         .boxed()
 }
 
@@ -112,7 +172,7 @@ fn interval() -> BoxedStrategy<Option<NonZeroU32>> {
 }
 
 fn event_strategy() -> BoxedStrategy<Event> {
-    let metadata = json_safe_value().prop_map(EventMetadata::default_with_value);
+    let metadata = event_metadata();
     let log = (object_map(), metadata.clone())
         .prop_map(|(fields, metadata)| Event::Log(LogEvent::from_map(fields, metadata)));
     let trace = (object_map(), metadata.clone())
@@ -196,7 +256,7 @@ proptest! {
 #[test]
 fn native_json_decodes_legacy_u32_metric_counts() {
     let input = Bytes::from_static(
-        br#"{"metric":{"name":"requests","kind":"absolute","aggregated_histogram":{"buckets":[{"upper_limit":1.0,"count":2}],"count":2,"sum":2.0}}}"#,
+        br#"{"metric":{"name":"requests","kind":"absolute","aggregated_histogram":{"buckets":[{"upper_limit":1.0,"count":4294967295}],"count":4294967295,"sum":2.0}}}"#,
     );
 
     let mut events = NativeJsonDeserializerConfig::default()
@@ -210,9 +270,9 @@ fn native_json_decodes_legacy_u32_metric_counts() {
         &MetricValue::AggregatedHistogram {
             buckets: vec![vector_core::event::metric::Bucket {
                 upper_limit: 1.0,
-                count: 2,
+                count: u64::from(u32::MAX),
             }],
-            count: 2,
+            count: u64::from(u32::MAX),
             sum: 2.0,
         }
     );

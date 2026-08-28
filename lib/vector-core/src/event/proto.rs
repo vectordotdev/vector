@@ -241,9 +241,13 @@ impl From<Metric> for super::Metric {
                 .collect(),
         );
         // The current Vector encoding includes copies of the "single" values of tags in `tags_v2`
-        // above. This `extend` will re-add those values, forcing them to become the last added in
-        // the value set.
-        tags.extend(metric.tags_v1);
+        // above. Only re-add a v1 value when it disagrees with v2; inserting an already-selected
+        // value would reorder an otherwise canonical enhanced tag set.
+        for (tag, value) in metric.tags_v1 {
+            if tags.get(&tag) != Some(value.as_str()) {
+                tags.insert(tag, value);
+            }
+        }
         let tags = (!tags.is_empty()).then_some(tags);
 
         let value = super::MetricValue::from(metric.value.unwrap());
@@ -871,6 +875,34 @@ mod tests {
         let decoded = crate::event::Metric::from(encoded);
 
         assert_eq!(decoded.tag_value("service").as_deref(), Some("api"));
+    }
+
+    #[test]
+    fn current_metric_tags_preserve_enhanced_value_order() {
+        let mut tags = metric::MetricTags::default();
+        tags.set_multi_value(
+            "service".to_owned(),
+            [
+                metric::TagValue::Value(String::new()),
+                metric::TagValue::Bare,
+            ],
+        );
+        let event = crate::event::Metric::new(
+            "requests",
+            metric::Kind::Absolute,
+            EventMetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags));
+
+        let decoded = crate::event::Metric::from(Metric::from(event));
+        let values = decoded
+            .tags()
+            .unwrap()
+            .iter_all()
+            .map(|(_, value)| value.map(str::to_owned))
+            .collect::<Vec<_>>();
+
+        assert_eq!(values, [Some(String::new()), None]);
     }
 
     #[test]
