@@ -75,9 +75,7 @@ When building and running Vector with a configuration file, use `cargo vdev run 
 automatically selects the minimum set of features required by the configuration, reducing compile
 times.
 
-Automatic feature selection does not support configuration providers, component types supplied
-through environment or secret references, or YAML merge keys (`<<`). If it cannot handle a
-configuration or the local build environment, use vanilla Cargo instead.
+If `cargo vdev run <config>` fails, fall back to `cargo run -- --config <config>`.
 
 #### Running tests
 
