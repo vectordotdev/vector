@@ -67,6 +67,10 @@ impl ValidatedSink for BlackholeConfig {
     type Validated = ();
 
     fn validate(&self) -> crate::Result<()> {
+        if self.rate == Some(0) {
+            return Err("`rate` must be greater than zero".into());
+        }
+
         Ok(())
     }
 
@@ -102,5 +106,15 @@ mod tests {
     fn validate_ok() {
         let config = BlackholeConfig::default();
         config.validate().expect("validation should succeed");
+    }
+
+    #[test]
+    fn validate_rejects_zero_rate() {
+        let config = BlackholeConfig {
+            rate: Some(0),
+            ..Default::default()
+        };
+
+        assert!(config.validate().is_err());
     }
 }
