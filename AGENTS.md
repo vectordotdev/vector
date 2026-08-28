@@ -75,26 +75,9 @@ When building and running Vector with a configuration file, use `cargo vdev run 
 automatically selects the minimum set of features required by the configuration, reducing compile
 times.
 
-Automatic feature selection does not support configuration providers or feature selectors supplied
-through an environment variable or a `SECRET[...]` reference. It also does not apply YAML merge
-keys (`<<`). Use vanilla Cargo instead:
-
-If automatic feature selection cannot handle the local build environment, use vanilla Cargo as
-the fallback as well.
-
-```bash
-# Environment variable interpolation
-cargo run -- --config path/to/config.yaml --dangerously-allow-env-var-interpolation
-
-# Secret substitution
-cargo run -- --config path/to/config.yaml
-
-# Configuration provider
-cargo run -- --config path/to/provider-config.yaml
-
-# YAML merge keys
-cargo run -- --config path/to/config-with-merge-keys.yaml
-```
+Automatic feature selection does not support configuration providers, component types supplied
+through environment or secret references, or YAML merge keys (`<<`). If it cannot handle a
+configuration or the local build environment, use vanilla Cargo instead.
 
 #### Running tests
 
