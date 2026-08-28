@@ -63,7 +63,7 @@ After the task is complete run the following `make` commands to check for errors
 targets.
 
 1. Run `make fmt` to format your code.
-2. Run `make test SCOPE="<scope>"` to run tests. `<scope>` is a test filter passed to `cargo nextest`.
+2. Run the narrowest relevant tests using the minimum feature set as described below.
 
 ## Code change workflows and validation
 
@@ -71,26 +71,34 @@ targets.
 
 If you're working on Vector's Rust codebase:
 
+When building and running Vector with a configuration file, use `cargo vdev run <config>`. It
+automatically selects the minimum set of features required by the configuration, reducing compile
+times.
+
+If `cargo vdev run <config>` fails, fall back to `cargo run -- --config <config>`.
+
 #### Running tests
 
+For most Rust changes, specify the relevant component feature directly:
+
 ```bash
-# Run all tests
-make test
+make test FEATURES="sources-file" SCOPE="truncate"
+```
 
-# Target a single test
-make test SCOPE="test_some_function"
+If you have a representative configuration file, derive its required features automatically:
 
-# Filter to a specific package
-make test SCOPE="-p vector"
+```bash
+cargo vdev test --config path/to/config.yaml test_some_function
+```
 
+Other testing methods, from targeted to broad:
+
+```bash
 # Use a nextest filter expression (note the quoting)
 make test SCOPE="-E 'test(foo) and not test(bar)'"
 
-# Run tests for a specific feature only
-make test FEATURES="sources-file"
-
-# Run tests matching a substring for a specific feature only
-make test FEATURES="sources-file" SCOPE="truncate"
+# Run all tests
+make test
 ```
 
 #### Running integration tests
