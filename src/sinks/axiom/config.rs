@@ -10,8 +10,8 @@ use vector_lib::{
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     http::Auth as HttpAuthConfig,
     sinks::{
@@ -165,10 +165,6 @@ impl SinkConfig for AxiomConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -7,7 +7,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
@@ -152,10 +152,6 @@ impl SinkConfig for GreptimeDBLogsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

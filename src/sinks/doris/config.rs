@@ -4,7 +4,7 @@ use super::sink::DorisSink;
 
 use crate::{
     codecs::EncodingConfigWithFraming,
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         doris::{
@@ -163,10 +163,6 @@ impl SinkConfig for DorisConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

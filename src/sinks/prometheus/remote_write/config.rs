@@ -9,7 +9,7 @@ use super::{
     sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
         prelude::*,
@@ -207,10 +207,6 @@ fn validate_aws_region(
 impl SinkConfig for RemoteWriteConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {

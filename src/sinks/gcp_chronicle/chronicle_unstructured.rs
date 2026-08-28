@@ -30,7 +30,7 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::{self, EncodingConfig},
-    config::{DynValidatedSink, GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
+    config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     schema,
@@ -316,10 +316,6 @@ impl SinkConfig for ChronicleUnstructuredConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -26,8 +26,7 @@ use super::{
 use crate::{
     codecs::Transformer,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, KeyString, MetricTags, Value},
     http::HttpClient,
@@ -239,10 +238,6 @@ impl SinkConfig for InfluxDbLogsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -11,8 +11,7 @@ use super::{
 use crate::{
     common::datadog,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     http::HttpClient,
     sinks::{
@@ -110,10 +109,6 @@ impl SinkConfig for DatadogEventsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.dd_common.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

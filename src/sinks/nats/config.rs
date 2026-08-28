@@ -6,7 +6,7 @@ use vector_lib::{codecs::JsonSerializerConfig, tls::TlsEnableableConfig};
 
 use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config, validate_tls_cert_key_pair},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
@@ -195,10 +195,6 @@ impl SinkConfig for NatsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 
