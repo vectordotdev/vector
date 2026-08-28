@@ -1,0 +1,1 @@
+{"metric":{"name":"b","namespace":"c","tags":{"h":"m","z":"z"},"timestamp":"1970-01-01T06:27:26.000026979Z","kind":"incremental","gauge":{"value":485632.0}}}

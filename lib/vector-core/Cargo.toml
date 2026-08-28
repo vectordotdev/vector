@@ -101,6 +101,12 @@ vector-common = { path = "../vector-common", default-features = false, features 
 default = []
 lua = ["dep:mlua", "dep:tokio-stream", "vrl/lua"]
 test = ["vector-common/test", "proptest", "dep:quickcheck", "vrl/generate-fixtures"]
+generate-fixtures = ["vrl/generate-fixtures", "dep:quickcheck"]
+
+[[bin]]
+name = "generate-fixtures"
+path = "src/bin/generate_fixtures.rs"
+required-features = ["generate-fixtures"]
 
 [[bench]]
 name = "event"
