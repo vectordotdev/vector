@@ -14,10 +14,7 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, Input, SinkConfig, SinkContext,
-        ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{EventRef, LogEvent, Value},
     http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
@@ -740,10 +737,6 @@ impl SinkConfig for ElasticsearchConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -10,7 +10,7 @@ use vrl::value::Kind;
 use hyper::{Body, client::connect::Connect};
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
-use crate::config::{DynValidatedSink, ValidatedSink};
+use crate::config::ValidatedSink;
 use crate::{
     common::datadog,
     http::HttpClient,
@@ -203,10 +203,6 @@ impl SinkConfig for DatadogLogsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.local_dd_common.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -3,9 +3,7 @@ use vector_config::component::GenerateConfig;
 use vector_lib::{codecs::encoding::SerializerConfig, configurable::configurable_component};
 
 use crate::{
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck, VectorSink,
         http::config::{HttpSinkConfig, ValidatedHttp},
@@ -65,10 +63,6 @@ impl SinkConfig for OpenTelemetryConfig {
         match &self.protocol {
             Protocol::Http(config) => config.acknowledgements(),
         }
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

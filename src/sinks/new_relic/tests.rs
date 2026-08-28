@@ -10,6 +10,7 @@ use super::*;
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     event::{Event, LogEvent, Metric, MetricKind, MetricValue},
+    sinks::util::HttpEndpoint,
     test_util::{
         components::{
             DATA_VOLUME_SINK_TAGS, SINK_TAGS, run_and_assert_data_volume_sink_compliance,
@@ -29,7 +30,7 @@ async fn sink() -> (VectorSink, Event) {
 
     let mut config: NewRelicConfig =
         serde_json::from_value(NewRelicConfig::generate_config()).expect("config should be valid");
-    config.override_uri = Some(mock_endpoint);
+    config.override_uri = Some(HttpEndpoint::new(mock_endpoint).unwrap());
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();

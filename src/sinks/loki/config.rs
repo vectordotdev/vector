@@ -3,16 +3,17 @@ use std::collections::HashMap;
 use vrl::value::Kind;
 
 use super::{
+    append_loki_path,
     healthcheck::healthcheck,
     sink::{LokiSink, confine_template_keys},
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{
         prelude::*,
-        util::{UriSerde, service::TowerRequestSettings},
+        util::{HttpEndpoint, service::TowerRequestSettings},
     },
     template::{ConfinementConfig, Template, UnconfinedTemplate},
 };
@@ -34,7 +35,7 @@ pub struct LokiConfig {
     ///
     /// The `path` value is appended to this.
     #[configurable(metadata(docs::examples = "http://localhost:3100"))]
-    pub endpoint: UriSerde,
+    pub endpoint: HttpEndpoint,
 
     /// The path to use in the URL of the Loki instance.
     #[serde(default = "default_loki_path")]
@@ -238,14 +239,15 @@ impl SinkConfig for LokiConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone, Debug)]
 pub struct ValidatedLokiSink {
+    /// The push URL: `endpoint` with `path` appended. Used by `LokiService`.
+    pub(super) endpoint: HttpEndpoint,
+    /// The credential-free configured endpoint, including any user-supplied base path.
+    /// The healthcheck appends `ready` or `/` to this URL.
+    pub(super) base_endpoint: HttpEndpoint,
     pub(super) auth: Option<Auth>,
     pub(super) request_limits: TowerRequestSettings,
     pub(super) transformer: Transformer,
@@ -270,7 +272,11 @@ impl ValidatedSink for LokiConfig {
             }
         }
 
-        let auth = self.auth.choose_one(&self.endpoint.auth)?;
+        // Extract basic-auth credentials embedded in the endpoint URL and strip
+        // the userinfo, so credentials are sent as an `Authorization` header
+        // rather than in the request URL.
+        let (base_endpoint, endpoint_auth) = self.endpoint.clone().extract_basic_auth()?;
+        let auth = self.auth.choose_one(&endpoint_auth)?;
 
         let request_limits = match self.out_of_order_action {
             OutOfOrderAction::Accept => self.request.into_settings(),
@@ -302,17 +308,15 @@ impl ValidatedSink for LokiConfig {
             "structured_metadata[key]",
         )?;
 
-        if !matches!(self.endpoint.uri.scheme_str(), Some("http" | "https"))
-            || self.endpoint.uri.authority().is_none()
-        {
-            return Err("Loki endpoint must be an absolute http(s) URL".into());
-        }
-
-        self.endpoint.append_path(&self.path)?;
+        // The push URL appends `path`; the healthcheck appends `ready`/`` to the
+        // configured base endpoint, so both are retained.
+        let endpoint = append_loki_path(&base_endpoint, &self.path)?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
         Ok(ValidatedLokiSink {
+            endpoint,
+            base_endpoint,
             auth,
             request_limits,
             transformer,
@@ -330,14 +334,14 @@ impl ValidatedSink for LokiConfig {
     ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
         let client = self.build_client(cx)?;
 
-        let config = LokiConfig {
-            auth: validated.auth.clone(),
-            ..self.clone()
-        };
+        let sink = LokiSink::from_validated(self, validated.clone(), client.clone())?;
 
-        let sink = LokiSink::from_validated(config.clone(), validated.clone(), client.clone())?;
-
-        let healthcheck = healthcheck(config, client).boxed();
+        let healthcheck = healthcheck(
+            validated.base_endpoint.clone(),
+            validated.auth.clone(),
+            client,
+        )
+        .boxed();
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
@@ -435,6 +439,26 @@ mod tests {
     }
 
     #[test]
+    fn deserialize_rejects_non_http_endpoint() {
+        let result = serde_yaml::from_str::<LokiConfig>(
+            r#"
+            endpoint: "ftp://localhost:3100"
+            labels:
+              test_name: "placeholder"
+            encoding:
+              codec: json
+            "#,
+        );
+
+        assert!(
+            result.is_err(),
+            "non-http endpoints must fail at config load"
+        );
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("ftp://localhost:3100"), "{message}");
+    }
+
+    #[test]
     fn validate_returns_usable_values() {
         let config: LokiConfig = serde_yaml::from_str(
             r#"
@@ -454,10 +478,38 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_non_http_endpoint() {
+    fn validate_extracts_endpoint_basic_auth() {
         let config: LokiConfig = serde_yaml::from_str(
             r#"
-            endpoint: "ftp://example.com"
+            endpoint: "http://user:pass@localhost:3100"
+            labels:
+              test_name: "placeholder"
+            encoding:
+              codec: json
+            "#,
+        )
+        .unwrap();
+
+        let validated = config.validate().expect("validation should succeed");
+        assert!(
+            validated.auth.is_some(),
+            "credentials embedded in the endpoint must be extracted as auth"
+        );
+        assert!(
+            !validated.endpoint.to_string().contains('@'),
+            "userinfo must be stripped from the endpoint retained for build"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_conflicting_auth() {
+        let config: LokiConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "http://user:pass@localhost:3100"
+            auth:
+              strategy: "basic"
+              user: "other"
+              password: "other"
             labels:
               test_name: "placeholder"
             encoding:
@@ -468,7 +520,7 @@ mod tests {
 
         assert!(
             config.validate().is_err(),
-            "a non-http(s) endpoint must be rejected before it reaches the HTTP client"
+            "explicit auth and endpoint-embedded auth must not both be configured"
         );
     }
 

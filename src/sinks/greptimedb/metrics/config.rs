@@ -1,7 +1,7 @@
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     sinks::{
         greptimedb::{
             GreptimeDBDefaultBatchSettings, GrpcCompression, default_dbname,
@@ -15,56 +15,6 @@ use crate::{
         prelude::*,
     },
 };
-
-/// Configuration for the `greptimedb` sink.
-#[configurable_component(sink("greptimedb", "Ingest metrics data into GreptimeDB."))]
-#[configurable(metadata(
-    deprecated = "The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
-))]
-#[derive(Clone, Debug, Default)]
-pub struct GreptimeDBConfig(GreptimeDBMetricsConfig);
-
-impl GenerateConfig for GreptimeDBConfig {
-    fn generate_config() -> serde_json::Value {
-        <GreptimeDBMetricsConfig as GenerateConfig>::generate_config()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "greptimedb")]
-impl SinkConfig for GreptimeDBConfig {
-    fn input(&self) -> Input {
-        self.0.input()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        self.0.acknowledgements()
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-}
-
-#[async_trait::async_trait]
-impl ValidatedSink for GreptimeDBConfig {
-    type Validated = ValidatedGreptimeDBMetrics;
-
-    fn validate(&self) -> crate::Result<ValidatedGreptimeDBMetrics> {
-        self.0.validate()
-    }
-
-    async fn build(
-        &self,
-        validated: &ValidatedGreptimeDBMetrics,
-        cx: SinkContext,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
-        warn!(
-            "DEPRECATED: The `greptimedb` sink has been renamed. Please use `greptimedb_metrics` instead."
-        );
-        ValidatedSink::build(&self.0, validated, cx).await
-    }
-}
 
 /// Configuration items for GreptimeDB
 #[configurable_component(sink("greptimedb_metrics", "Ingest metrics data into GreptimeDB."))]
@@ -159,10 +109,6 @@ impl SinkConfig for GreptimeDBMetricsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

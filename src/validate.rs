@@ -10,7 +10,10 @@ use vector_vrl_metrics::MetricsStorage;
 use vrl::value::ObjectMap;
 
 use crate::{
-    config::{self, Config, ConfigDiff, TransformContext, loading::ConfigBuilderLoader},
+    config::{
+        self, Config, ConfigDiff, DynValidatedSink, SinkContext, TransformContext,
+        loading::ConfigBuilderLoader,
+    },
     schema::Definition,
     topology::{
         self,
@@ -18,10 +21,10 @@ use crate::{
     },
 };
 
-/// Stub enrichment table used during transform validation so VRL can resolve
+/// Stub enrichment table used during config validation so VRL can resolve
 /// table name references without loading actual table data.
 #[derive(Clone)]
-struct StubEnrichmentTable;
+pub(crate) struct StubEnrichmentTable;
 
 impl vector_lib::enrichment::Table for StubEnrichmentTable {
     fn find_table_row<'a>(
@@ -168,6 +171,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     };
 
     validated &= validate_transforms(&config, &mut fmt).await;
+    validated &= validate_sinks_with_context(&config, &mut fmt);
 
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
@@ -231,11 +235,12 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     Some(config)
 }
 
-async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
+/// Builds a `TableRegistry` with stub tables for the configured enrichment tables,
+/// so VRL can resolve table names without loading actual data. This lets config
+/// validation catch real VRL errors (syntax, type, wrong table name) while
+/// deferring data-loading to the environment phase.
+fn stub_enrichment_tables(config: &Config) -> TableRegistry {
     let enrichment_tables = TableRegistry::default();
-    // Register stub tables so VRL can resolve configured enrichment table names
-    // without loading actual data. This lets us catch real VRL errors (syntax,
-    // type, wrong table name) while deferring data-loading to the environment phase.
     let stubs: HashMap<String, Box<dyn vector_lib::enrichment::Table + Send + Sync>> = config
         .enrichment_tables
         .keys()
@@ -253,6 +258,11 @@ async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
         // VRL compilation) both operate on the loading stage. finish_load()
         // would move tables to the ArcSwap and make table_ids() return nothing.
     }
+    enrichment_tables
+}
+
+async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
+    let enrichment_tables = stub_enrichment_tables(config);
     let mut definition_cache = HashMap::new();
     let mut errors = Vec::new();
 
@@ -297,6 +307,30 @@ async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
         true
     } else {
         fmt.title("Transform errors");
+        fmt.sub_error(errors);
+        false
+    }
+}
+
+fn validate_sinks_with_context(config: &Config, fmt: &mut Formatter) -> bool {
+    let cx = SinkContext {
+        enrichment_tables: stub_enrichment_tables(config),
+        ..Default::default()
+    };
+    let mut errors = Vec::new();
+
+    for (key, sink) in config.sinks() {
+        let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
+        if let Err(error) = dyn_sink.validate_with_context_dyn(&cx) {
+            errors.push(format!("Sink \"{key}\": {error}"));
+        }
+    }
+
+    if errors.is_empty() {
+        fmt.success("Sinks configuration");
+        true
+    } else {
+        fmt.title("Sink errors");
         fmt.sub_error(errors);
         false
     }
