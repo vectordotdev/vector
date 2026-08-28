@@ -286,9 +286,10 @@ impl AgentDDSketch {
 
     /// Overrides `sum` and `avg` with arbitrary values.
     ///
-    /// Only available under the `test` or `generate-fixtures` feature, where downstream
-    /// codec tests and fixture generation need independently-randomized summary statistics.
-    #[cfg(any(feature = "test", feature = "generate-fixtures"))]
+    /// Only available under the `generate-fixtures` feature, where we need to
+    /// produce sketches with independently-randomized summary statistics to
+    /// exercise round-trip serialization of those fields.
+    #[cfg(feature = "generate-fixtures")]
     pub fn set_sum_avg(&mut self, sum: f64, avg: f64) {
         self.sum = sum;
         self.avg = avg;

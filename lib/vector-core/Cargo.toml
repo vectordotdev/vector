@@ -100,7 +100,7 @@ vector-common = { path = "../vector-common", default-features = false, features 
 [features]
 default = []
 lua = ["dep:mlua", "dep:tokio-stream", "vrl/lua"]
-test = ["vector-common/test", "proptest", "dep:quickcheck", "vrl/generate-fixtures"]
+test = ["vector-common/test", "proptest"]
 generate-fixtures = ["vrl/generate-fixtures", "dep:quickcheck"]
 
 [[bin]]

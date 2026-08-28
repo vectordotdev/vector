@@ -11,20 +11,84 @@ use codecs::{
     NativeDeserializerConfig, NativeJsonDeserializerConfig, NativeJsonSerializerConfig,
     NativeSerializerConfig, decoding::format::Deserializer, encoding::format::Serializer,
 };
-use quickcheck::{QuickCheck, TestResult};
+use proptest::{collection::btree_map, prelude::*, test_runner::Config as ProptestConfig};
 use similar_asserts::assert_eq;
 use tokio_util::codec::Encoder;
 use vector_core::{
     config::LogNamespace,
-    event::{Event, MetricValue},
+    event::{
+        Event, EventMetadata, LogEvent, Metric, MetricKind, MetricTags, MetricValue, ObjectMap,
+        TraceEvent, Value,
+    },
 };
 use vrl::event_path;
 
-const PROPERTY_TESTS: u64 = 1_000;
+const PROPERTY_TESTS: u32 = 1_000;
 
-#[test]
-fn native_proto_is_canonical_for_arbitrary_events() {
-    fn canonicalizes(event: Event) -> TestResult {
+fn json_safe_value() -> BoxedStrategy<Value> {
+    let leaf = prop_oneof![
+        "[[:^cntrl:]]{0,16}".prop_map(Value::from),
+        any::<i64>().prop_map(Value::from),
+        (-1_000_000.0_f64..=1_000_000.0).prop_map(|value| {
+            let rounded = (value * 10_000.0).round() / 10_000.0;
+            Value::from(if rounded == -0.0 { 0.0 } else { rounded })
+        }),
+        any::<bool>().prop_map(Value::from),
+        Just(Value::Null),
+    ];
+
+    leaf.prop_recursive(3, 32, 4, |inner| {
+        prop_oneof![
+            proptest::collection::vec(inner.clone(), 0..4).prop_map(Value::Array),
+            btree_map("[a-z_][a-z0-9_]{0,15}", inner, 0..4).prop_map(|entries| {
+                Value::Object(
+                    entries
+                        .into_iter()
+                        .map(|(key, value)| (key.into(), value))
+                        .collect(),
+                )
+            }),
+        ]
+    })
+    .boxed()
+}
+
+fn object_map() -> BoxedStrategy<ObjectMap> {
+    btree_map("[a-z_][a-z0-9_]{0,15}", json_safe_value(), 0..4)
+        .prop_map(|entries| {
+            entries
+                .into_iter()
+                .map(|(key, value)| (key.into(), value))
+                .collect()
+        })
+        .boxed()
+}
+
+fn event_strategy() -> BoxedStrategy<Event> {
+    let metadata = json_safe_value().prop_map(EventMetadata::default_with_value);
+    let log = (object_map(), metadata.clone())
+        .prop_map(|(fields, metadata)| Event::Log(LogEvent::from_map(fields, metadata)));
+    let trace = (object_map(), metadata.clone())
+        .prop_map(|(fields, metadata)| Event::Trace(TraceEvent::from_parts(fields, metadata)));
+    let metric = (
+        "[a-z_][a-z0-9_]{0,15}",
+        prop_oneof![Just(MetricKind::Absolute), Just(MetricKind::Incremental)],
+        any::<MetricValue>(),
+        any::<Option<MetricTags>>(),
+        metadata,
+    )
+        .prop_map(|(name, kind, value, tags, metadata)| {
+            Event::Metric(Metric::new_with_metadata(name, kind, value, metadata).with_tags(tags))
+        });
+
+    prop_oneof![log, metric, trace].boxed()
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(PROPERTY_TESTS))]
+
+    #[test]
+    fn native_proto_is_canonical_for_arbitrary_events(event in event_strategy()) {
         let serializer = &mut NativeSerializerConfig.build();
         let mut encoded = BytesMut::new();
         serializer.encode(event, &mut encoded).unwrap();
@@ -33,26 +97,18 @@ fn native_proto_is_canonical_for_arbitrary_events() {
             .build()
             .parse(encoded.clone().freeze(), LogNamespace::Legacy)
             .unwrap();
-        if decoded.len() != 1 {
-            return TestResult::failed();
-        }
+        prop_assert_eq!(decoded.len(), 1);
 
         let mut reencoded = BytesMut::new();
         serializer
             .encode(decoded.pop().unwrap(), &mut reencoded)
             .unwrap();
 
-        TestResult::from_bool(encoded == reencoded)
+        prop_assert_eq!(encoded, reencoded);
     }
 
-    QuickCheck::new()
-        .tests(PROPERTY_TESTS)
-        .quickcheck(canonicalizes as fn(Event) -> TestResult);
-}
-
-#[test]
-fn native_json_is_canonical_for_arbitrary_events() {
-    fn canonicalizes(event: Event) -> TestResult {
+    #[test]
+    fn native_json_is_canonical_for_arbitrary_events(event in event_strategy()) {
         let serializer = &mut NativeJsonSerializerConfig.build();
         let mut encoded = BytesMut::new();
         serializer.encode(event, &mut encoded).unwrap();
@@ -61,21 +117,15 @@ fn native_json_is_canonical_for_arbitrary_events() {
             .build()
             .parse(encoded.clone().freeze(), LogNamespace::Legacy)
             .unwrap();
-        if decoded.len() != 1 {
-            return TestResult::failed();
-        }
+        prop_assert_eq!(decoded.len(), 1);
 
         let mut reencoded = BytesMut::new();
         serializer
             .encode(decoded.pop().unwrap(), &mut reencoded)
             .unwrap();
 
-        TestResult::from_bool(encoded == reencoded)
+        prop_assert_eq!(encoded, reencoded);
     }
-
-    QuickCheck::new()
-        .tests(PROPERTY_TESTS)
-        .quickcheck(canonicalizes as fn(Event) -> TestResult);
 }
 
 #[test]
