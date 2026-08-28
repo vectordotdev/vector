@@ -71,7 +71,7 @@ const CUSTOM_STRATEGY: &str = "custom";
 const CONDITION_KEY: &str = "condition";
 const SOURCE_KEY: &str = "source";
 
-const UNSUPPORTED_DYNAMIC_COMPONENT_TYPE: &str = "cargo vdev feature selection does not support environment or secret interpolation in component types; use `cargo run` instead";
+const UNSUPPORTED_DYNAMIC_FEATURE_SELECTOR: &str = "cargo vdev feature selection does not support environment or secret interpolation in feature selectors; use `cargo run` instead";
 const UNSUPPORTED_YAML_MERGE_KEY: &str =
     "cargo vdev feature selection does not support YAML merge keys; use `cargo run` instead";
 const UNSUPPORTED_PROVIDER: &str = "cargo vdev feature selection does not support configuration providers; use `cargo run` instead";
@@ -163,9 +163,9 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
     ]
     .into_iter()
     .flat_map(|section| section.values())
-    .any(|component| component.r#type.contains('$') || component.r#type.contains("SECRET["))
+    .any(|component| has_dynamic_reference(&component.r#type))
     {
-        bail!(UNSUPPORTED_DYNAMIC_COMPONENT_TYPE);
+        bail!(UNSUPPORTED_DYNAMIC_FEATURE_SELECTOR);
     }
     let mut features = FeatureSet::default();
     add_option(&mut features, "api", config.api.as_ref());
@@ -197,12 +197,12 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
     ] {
         for component in section.values() {
             for (key, value) in &component.options {
-                get_nested_features(&mut features, &mut uses_vrl, Some(key.as_str()), value);
+                get_nested_features(&mut features, &mut uses_vrl, Some(key.as_str()), value)?;
             }
         }
     }
     for (key, value) in &config.other {
-        get_nested_features(&mut features, &mut uses_vrl, Some(key.as_str()), value);
+        get_nested_features(&mut features, &mut uses_vrl, Some(key.as_str()), value)?;
     }
 
     if uses_vrl {
@@ -255,11 +255,11 @@ fn get_nested_features(
     uses_vrl: &mut bool,
     parent_key: Option<&str>,
     value: &Value,
-) {
+) -> Result<()> {
     match value {
         Value::Array(values) => {
             for value in values {
-                get_nested_features(features, uses_vrl, parent_key, value);
+                get_nested_features(features, uses_vrl, parent_key, value)?;
             }
         }
         Value::Object(object) => {
@@ -292,11 +292,34 @@ fn get_nested_features(
                 *uses_vrl = true;
             }
             for (key, value) in object {
-                get_nested_features(features, uses_vrl, Some(key.as_str()), value);
+                if is_feature_selector(parent_key, key)
+                    && value.as_str().is_some_and(has_dynamic_reference)
+                {
+                    bail!(UNSUPPORTED_DYNAMIC_FEATURE_SELECTOR);
+                }
+                get_nested_features(features, uses_vrl, Some(key.as_str()), value)?;
             }
         }
         Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
     }
+
+    Ok(())
+}
+
+fn is_feature_selector(parent_key: Option<&str>, key: &str) -> bool {
+    NESTED_FEATURE_RULES.iter().any(|rule| {
+        rule.key == key
+            && rule
+                .parent_key
+                .is_none_or(|required| parent_key == Some(required))
+    }) || VRL_DISCRIMINATORS
+        .iter()
+        .any(|(selector, _)| *selector == key)
+        || (parent_key == Some(KAFKA_OPTIONS_KEY) && KAFKA_GSSAPI_KEYS.contains(&key))
+}
+
+fn has_dynamic_reference(value: &str) -> bool {
+    value.contains('$') || value.contains("SECRET[")
 }
 
 fn kafka_gssapi_feature() -> &'static str {
@@ -616,21 +639,38 @@ mod tests {
     }
 
     #[test]
-    fn rejects_dynamic_component_types() {
-        for component_type in ["${SOURCE_TYPE}", "SECRET[features.source_type]"] {
-            let config = format!(
-                indoc! {"
+    fn rejects_dynamic_feature_selectors() {
+        for config in [
+            indoc! {"
                     sources:
                       input:
-                        type: '{component_type}'
+                        type: '${SOURCE_TYPE}'
                 "},
-                component_type = component_type,
-            );
-            let config = serde_yaml::from_str::<FeatureConfig>(&config).expect("config must parse");
+            indoc! {"
+                    sources:
+                      input:
+                        type: 'SECRET[features.source_type]'
+                "},
+            indoc! {"
+                    sources:
+                      input:
+                        type: socket
+                        decoding:
+                          codec: '${CODEC}'
+                "},
+            indoc! {"
+                    sources:
+                      input:
+                        type: socket
+                        decoding:
+                          codec: 'SECRET[features.codec]'
+                "},
+        ] {
+            let config = serde_yaml::from_str::<FeatureConfig>(config).expect("config must parse");
             let error = from_config(&config, &DECLARED_FEATURES)
-                .expect_err("dynamic component type must fail");
+                .expect_err("dynamic feature selector must fail");
 
-            assert!(error.to_string().contains("component types"));
+            assert!(error.to_string().contains("feature selectors"));
             assert!(error.to_string().contains("use `cargo run` instead"));
         }
     }
