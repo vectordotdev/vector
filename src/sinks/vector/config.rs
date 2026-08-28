@@ -176,7 +176,7 @@ struct RoutingConfig {
     ///
     /// Each endpoint _must_ include a port.
     #[configurable(validation(format = "uri"))]
-    #[configurable(metadata(docs::examples = "127.0.0.1:6000"))]
+    #[configurable(metadata(docs::examples = "https://127.0.0.1:6000"))]
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     #[serde(default)]
     endpoints: Vec<String>,

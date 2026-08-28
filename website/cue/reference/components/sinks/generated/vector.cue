@@ -351,7 +351,7 @@ generated: components: sinks: vector: configuration: {
 				required: false
 				type: array: {
 					default: []
-					items: type: string: examples: ["127.0.0.1:6000", "https://somehost:6000"]
+					items: type: string: examples: ["https://127.0.0.1:6000", "https://somehost:6000"]
 				}
 			}
 			health: {
