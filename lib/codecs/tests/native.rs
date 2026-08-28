@@ -3,15 +3,21 @@
 use std::{
     fs::{self, File},
     io::{Read, Write},
+    num::NonZeroU32,
     path::{Path, PathBuf},
 };
 
 use bytes::{Bytes, BytesMut};
+use chrono::{DateTime, Utc};
 use codecs::{
     NativeDeserializerConfig, NativeJsonDeserializerConfig, NativeJsonSerializerConfig,
     NativeSerializerConfig, decoding::format::Deserializer, encoding::format::Serializer,
 };
-use proptest::{collection::btree_map, prelude::*, test_runner::Config as ProptestConfig};
+use proptest::{
+    collection::{btree_map, btree_set},
+    prelude::*,
+    test_runner::Config as ProptestConfig,
+};
 use similar_asserts::assert_eq;
 use tokio_util::codec::Encoder;
 use vector_core::{
@@ -25,9 +31,21 @@ use vrl::event_path;
 
 const PROPERTY_TESTS: u32 = 1_000;
 
+fn bounded_string() -> BoxedStrategy<String> {
+    proptest::collection::vec(any::<char>(), 0..16)
+        .prop_map(|characters| characters.into_iter().collect())
+        .boxed()
+}
+
+fn nonempty_bounded_string() -> BoxedStrategy<String> {
+    proptest::collection::vec(any::<char>(), 1..16)
+        .prop_map(|characters| characters.into_iter().collect())
+        .boxed()
+}
+
 fn json_safe_value() -> BoxedStrategy<Value> {
     let leaf = prop_oneof![
-        "[[:^cntrl:]]{0,16}".prop_map(Value::from),
+        bounded_string().prop_map(Value::from),
         any::<i64>().prop_map(Value::from),
         (-1_000_000.0_f64..=1_000_000.0).prop_map(|value| {
             let rounded = (value * 10_000.0).round() / 10_000.0;
@@ -40,7 +58,7 @@ fn json_safe_value() -> BoxedStrategy<Value> {
     leaf.prop_recursive(3, 32, 4, |inner| {
         prop_oneof![
             proptest::collection::vec(inner.clone(), 0..4).prop_map(Value::Array),
-            btree_map("[a-z_][a-z0-9_]{0,15}", inner, 0..4).prop_map(|entries| {
+            btree_map(bounded_string(), inner, 0..4).prop_map(|entries| {
                 Value::Object(
                     entries
                         .into_iter()
@@ -54,13 +72,42 @@ fn json_safe_value() -> BoxedStrategy<Value> {
 }
 
 fn object_map() -> BoxedStrategy<ObjectMap> {
-    btree_map("[a-z_][a-z0-9_]{0,15}", json_safe_value(), 0..4)
+    btree_map(bounded_string(), json_safe_value(), 0..4)
         .prop_map(|entries| {
             entries
                 .into_iter()
                 .map(|(key, value)| (key.into(), value))
                 .collect()
         })
+        .boxed()
+}
+
+fn metric_value() -> BoxedStrategy<MetricValue> {
+    prop_oneof![
+        7 => any::<MetricValue>(),
+        1 => btree_set(bounded_string(), 0..4)
+            .prop_map(|values| MetricValue::Set { values }),
+    ]
+    .boxed()
+}
+
+fn metric_tags() -> BoxedStrategy<Option<MetricTags>> {
+    btree_map(bounded_string(), bounded_string(), 0..4)
+        .prop_map(|tags| MetricTags::from(tags).as_option())
+        .boxed()
+}
+
+fn timestamp() -> BoxedStrategy<Option<DateTime<Utc>>> {
+    proptest::option::of(
+        (-32_000_i64..=32_000, 0_u32..1_000_000_000).prop_map(|(seconds, nanoseconds)| {
+            DateTime::from_timestamp(seconds, nanoseconds).unwrap()
+        }),
+    )
+    .boxed()
+}
+
+fn interval() -> BoxedStrategy<Option<NonZeroU32>> {
+    proptest::option::of((1_u32..=u32::MAX).prop_map(|value| NonZeroU32::new(value).unwrap()))
         .boxed()
 }
 
@@ -71,17 +118,33 @@ fn event_strategy() -> BoxedStrategy<Event> {
     let trace = (object_map(), metadata.clone())
         .prop_map(|(fields, metadata)| Event::Trace(TraceEvent::from_parts(fields, metadata)));
     let metric = (
-        "[a-z_][a-z0-9_]{0,15}",
+        bounded_string(),
         prop_oneof![Just(MetricKind::Absolute), Just(MetricKind::Incremental)],
-        any::<MetricValue>(),
-        any::<Option<MetricTags>>(),
+        metric_value(),
+        metric_tags(),
+        proptest::option::of(nonempty_bounded_string()),
+        timestamp(),
+        interval(),
         metadata,
     )
-        .prop_map(|(name, kind, value, tags, metadata)| {
-            Event::Metric(Metric::new_with_metadata(name, kind, value, metadata).with_tags(tags))
-        });
+        .prop_map(
+            |(name, kind, value, tags, namespace, timestamp, interval, metadata)| {
+                Event::Metric(
+                    Metric::new_with_metadata(name, kind, value, metadata)
+                        .with_tags(tags)
+                        .with_namespace(namespace)
+                        .with_timestamp(timestamp)
+                        .with_interval_ms(interval),
+                )
+            },
+        );
 
     prop_oneof![log, metric, trace].boxed()
+}
+
+fn without_metadata(mut event: Event) -> Event {
+    *event.metadata_mut() = EventMetadata::default();
+    event
 }
 
 proptest! {
@@ -89,6 +152,7 @@ proptest! {
 
     #[test]
     fn native_proto_is_canonical_for_arbitrary_events(event in event_strategy()) {
+        let expected = event.clone();
         let serializer = &mut NativeSerializerConfig.build();
         let mut encoded = BytesMut::new();
         serializer.encode(event, &mut encoded).unwrap();
@@ -98,17 +162,18 @@ proptest! {
             .parse(encoded.clone().freeze(), LogNamespace::Legacy)
             .unwrap();
         prop_assert_eq!(decoded.len(), 1);
+        let decoded = decoded.pop().unwrap();
+        prop_assert_eq!(&decoded, &expected);
 
         let mut reencoded = BytesMut::new();
-        serializer
-            .encode(decoded.pop().unwrap(), &mut reencoded)
-            .unwrap();
+        serializer.encode(decoded, &mut reencoded).unwrap();
 
         prop_assert_eq!(encoded, reencoded);
     }
 
     #[test]
     fn native_json_is_canonical_for_arbitrary_events(event in event_strategy()) {
+        let expected = without_metadata(event.clone());
         let serializer = &mut NativeJsonSerializerConfig.build();
         let mut encoded = BytesMut::new();
         serializer.encode(event, &mut encoded).unwrap();
@@ -118,11 +183,11 @@ proptest! {
             .parse(encoded.clone().freeze(), LogNamespace::Legacy)
             .unwrap();
         prop_assert_eq!(decoded.len(), 1);
+        let decoded = decoded.pop().unwrap();
+        prop_assert_eq!(&decoded, &expected);
 
         let mut reencoded = BytesMut::new();
-        serializer
-            .encode(decoded.pop().unwrap(), &mut reencoded)
-            .unwrap();
+        serializer.encode(decoded, &mut reencoded).unwrap();
 
         prop_assert_eq!(encoded, reencoded);
     }
