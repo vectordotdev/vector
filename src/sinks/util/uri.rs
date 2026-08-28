@@ -271,12 +271,29 @@ fn redact_uri(uri: &Uri) -> String {
     }
 }
 
-fn redact_unparsed_endpoint(endpoint: &str) -> String {
-    if endpoint.contains('@') {
+/// Redacts credentials from an endpoint string for error messages.
+///
+/// Redacts the whole endpoint when it may carry credentials: userinfo in the
+/// authority (`@`) or a `password` query parameter, which some backends (for
+/// example PostgreSQL) accept as an alternative to userinfo.
+pub(crate) fn redact_unparsed_endpoint(endpoint: &str) -> String {
+    if endpoint.contains('@') || has_password_query_param(endpoint) {
         "<redacted endpoint>".to_owned()
     } else {
         endpoint.to_owned()
     }
+}
+
+/// Returns `true` if the query portion of `endpoint` contains a `password`
+/// parameter (for example `postgres://host/db?password=secret`). Query keys
+/// are percent-decoded, matching how SQLx parses them.
+fn has_password_query_param(endpoint: &str) -> bool {
+    endpoint.split_once('?').is_some_and(|(_, query)| {
+        query.split('&').any(|pair| {
+            pair.split_once('=')
+                .is_some_and(|(key, _)| percent_decode_str(key).decode_utf8_lossy() == "password")
+        })
+    })
 }
 
 impl TryFrom<String> for HttpEndpoint {
@@ -808,6 +825,34 @@ mod tests {
             assert!(message.contains("<redacted endpoint>"), "{message}");
             assert!(!message.contains("secret"), "{message}");
         }
+    }
+
+    #[test]
+    fn redact_unparsed_endpoint_redacts_credentials() {
+        // Userinfo in the authority.
+        assert_eq!(
+            redact_unparsed_endpoint("postgres://user:secret@host/db"),
+            "<redacted endpoint>"
+        );
+        // A percent-encoded `password` query key, which SQLx decodes.
+        assert_eq!(
+            redact_unparsed_endpoint("postgres://host/db?pass%77ord=secret"),
+            "<redacted endpoint>"
+        );
+        // Both forms together.
+        assert_eq!(
+            redact_unparsed_endpoint("postgres://user:secret@host/db?password=secret"),
+            "<redacted endpoint>"
+        );
+        // Endpoints without credentials are left intact.
+        assert_eq!(
+            redact_unparsed_endpoint("postgres://host/db"),
+            "postgres://host/db"
+        );
+        assert_eq!(
+            redact_unparsed_endpoint("postgres://host/db?user=alice"),
+            "postgres://host/db?user=alice"
+        );
     }
 
     #[test]
