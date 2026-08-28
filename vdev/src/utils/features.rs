@@ -52,13 +52,6 @@ const NESTED_FEATURE_RULES: &[NestedFeatureRule] = &[
         feature: "aws-core",
     },
 ];
-const ALWAYS_COMPILED_FEATURES: &[&str] = &[
-    "enrichment-tables-file",
-    "secrets-directory",
-    "secrets-exec",
-    "secrets-file",
-    "secrets-test",
-];
 const VRL_FEATURES: &[&str] = &[
     "vector-vrl-functions/dnstap",
     "vrl-functions-crypto",
@@ -216,10 +209,6 @@ fn from_config(config: &FeatureConfig, declared_features: &FeatureSet) -> Result
         features.extend(VRL_FEATURES.iter().map(|feature| (*feature).into()));
     }
 
-    for feature in ALWAYS_COMPILED_FEATURES {
-        features.remove(*feature);
-    }
-
     Ok(features.into_iter().collect())
 }
 
@@ -240,22 +229,23 @@ fn get_features(
     features.extend(
         section
             .values()
-            .map(|component| component_feature(key, &component.r#type, declared_features)),
+            .filter_map(|component| component_feature(key, &component.r#type, declared_features)),
     );
 }
 
-fn component_feature(key: &str, component_type: &str, declared_features: &FeatureSet) -> String {
-    let exact = format!("{key}-{component_type}");
+fn component_feature(
+    key: &str,
+    component_type: &str,
+    declared_features: &FeatureSet,
+) -> Option<String> {
     let mut prefix = component_type;
 
     loop {
         let candidate = format!("{key}-{prefix}");
         if declared_features.contains(&candidate) {
-            return candidate;
+            return Some(candidate);
         }
-        let Some((shorter, _)) = prefix.rsplit_once('_') else {
-            return exact;
-        };
+        let (shorter, _) = prefix.rsplit_once('_')?;
         prefix = shorter;
     }
 }
