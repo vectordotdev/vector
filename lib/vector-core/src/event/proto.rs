@@ -780,97 +780,93 @@ fn encode_array(items: Vec<super::Value>) -> ValueArray {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use prost::Message as _;
 
     use super::*;
     use crate::event::{MetricValue as EventMetricValue, metric};
 
+    // Frozen payloads emitted by the historical protobuf schema. These must not be regenerated
+    // from the current Rust types: their purpose is to pin the legacy field numbers on the wire.
+    const PRE_V24_METRICS: &[u8] = &[
+        18, 170, 1, 10, 38, 10, 10, 104, 105, 115, 116, 111, 103, 114, 97, 109, 49, 74, 24, 10, 8,
+        0, 0, 0, 0, 0, 0, 248, 63, 18, 1, 2, 24, 2, 33, 0, 0, 0, 0, 0, 0, 8, 64, 10, 38, 10, 10,
+        104, 105, 115, 116, 111, 103, 114, 97, 109, 50, 106, 24, 10, 11, 9, 0, 0, 0, 0, 0, 0, 248,
+        63, 16, 2, 16, 2, 25, 0, 0, 0, 0, 0, 0, 8, 64, 10, 43, 10, 8, 115, 117, 109, 109, 97, 114,
+        121, 49, 82, 31, 10, 8, 0, 0, 0, 0, 0, 0, 224, 63, 18, 8, 0, 0, 0, 0, 0, 0, 248, 63, 24, 2,
+        33, 0, 0, 0, 0, 0, 0, 8, 64, 10, 43, 10, 8, 115, 117, 109, 109, 97, 114, 121, 50, 114, 31,
+        10, 18, 9, 0, 0, 0, 0, 0, 0, 224, 63, 17, 0, 0, 0, 0, 0, 0, 248, 63, 16, 2, 25, 0, 0, 0, 0,
+        0, 0, 8, 64,
+    ];
+    const PRE_V27_TAGS: &[u8] = &[
+        10, 8, 114, 101, 113, 117, 101, 115, 116, 115, 26, 14, 10, 7, 115, 101, 114, 118, 105, 99,
+        101, 18, 3, 97, 112, 105, 42, 9, 9, 0, 0, 0, 0, 0, 0, 240, 63,
+    ];
+    const PRE_V34_LOG_METADATA: &[u8] = &[
+        26, 17, 10, 15, 108, 101, 103, 97, 99, 121, 32, 109, 101, 116, 97, 100, 97, 116, 97,
+    ];
+    const PRE_V34_TRACE_METADATA: &[u8] = &[
+        18, 17, 10, 15, 108, 101, 103, 97, 99, 121, 32, 109, 101, 116, 97, 100, 97, 116, 97,
+    ];
+    const PRE_V34_METRIC_METADATA: &[u8] = &[
+        10, 8, 114, 101, 113, 117, 101, 115, 116, 115, 42, 9, 9, 0, 0, 0, 0, 0, 0, 240, 63, 154, 1,
+        17, 10, 15, 108, 101, 103, 97, 99, 121, 32, 109, 101, 116, 97, 100, 97, 116, 97,
+    ];
+    const PRE_V41_METADATA: &[u8] = &[34, 6, 108, 101, 103, 97, 99, 121];
+
     #[test]
     fn decodes_pre_v24_histogram_and_summary_variants() {
-        let cases = [
-            (
-                MetricValue::AggregatedHistogram1(AggregatedHistogram1 {
-                    buckets: vec![1.5],
-                    counts: vec![2],
+        let expected = [
+            EventMetricValue::AggregatedHistogram {
+                buckets: vec![metric::Bucket {
+                    upper_limit: 1.5,
                     count: 2,
-                    sum: 3.0,
-                }),
-                EventMetricValue::AggregatedHistogram {
-                    buckets: vec![metric::Bucket {
-                        upper_limit: 1.5,
-                        count: 2,
-                    }],
+                }],
+                count: 2,
+                sum: 3.0,
+            },
+            EventMetricValue::AggregatedHistogram {
+                buckets: vec![metric::Bucket {
+                    upper_limit: 1.5,
                     count: 2,
-                    sum: 3.0,
-                },
-            ),
-            (
-                MetricValue::AggregatedHistogram2(AggregatedHistogram2 {
-                    buckets: vec![HistogramBucket {
-                        upper_limit: 1.5,
-                        count: 2,
-                    }],
-                    count: 2,
-                    sum: 3.0,
-                }),
-                EventMetricValue::AggregatedHistogram {
-                    buckets: vec![metric::Bucket {
-                        upper_limit: 1.5,
-                        count: 2,
-                    }],
-                    count: 2,
-                    sum: 3.0,
-                },
-            ),
-            (
-                MetricValue::AggregatedSummary1(AggregatedSummary1 {
-                    quantiles: vec![0.5],
-                    values: vec![1.5],
-                    count: 2,
-                    sum: 3.0,
-                }),
-                EventMetricValue::AggregatedSummary {
-                    quantiles: vec![metric::Quantile {
-                        quantile: 0.5,
-                        value: 1.5,
-                    }],
-                    count: 2,
-                    sum: 3.0,
-                },
-            ),
-            (
-                MetricValue::AggregatedSummary2(AggregatedSummary2 {
-                    quantiles: vec![SummaryQuantile {
-                        quantile: 0.5,
-                        value: 1.5,
-                    }],
-                    count: 2,
-                    sum: 3.0,
-                }),
-                EventMetricValue::AggregatedSummary {
-                    quantiles: vec![metric::Quantile {
-                        quantile: 0.5,
-                        value: 1.5,
-                    }],
-                    count: 2,
-                    sum: 3.0,
-                },
-            ),
+                }],
+                count: 2,
+                sum: 3.0,
+            },
+            EventMetricValue::AggregatedSummary {
+                quantiles: vec![metric::Quantile {
+                    quantile: 0.5,
+                    value: 1.5,
+                }],
+                count: 2,
+                sum: 3.0,
+            },
+            EventMetricValue::AggregatedSummary {
+                quantiles: vec![metric::Quantile {
+                    quantile: 0.5,
+                    value: 1.5,
+                }],
+                count: 2,
+                sum: 3.0,
+            },
         ];
 
-        for (encoded, expected) in cases {
-            assert_eq!(EventMetricValue::from(encoded), expected);
-        }
+        let encoded = EventArray::decode(PRE_V24_METRICS).unwrap();
+        let Some(event_array::Events::Metrics(metrics)) = encoded.events else {
+            panic!("legacy payload did not contain metrics");
+        };
+        let decoded = metrics
+            .metrics
+            .into_iter()
+            .map(crate::event::Metric::from)
+            .map(|metric| metric.value().clone())
+            .collect::<Vec<_>>();
+
+        assert_eq!(decoded, expected);
     }
 
     #[test]
     fn decodes_pre_v27_single_valued_metric_tags() {
-        let encoded = Metric {
-            name: "requests".to_owned(),
-            tags_v1: BTreeMap::from([("service".to_owned(), "api".to_owned())]),
-            value: Some(MetricValue::Counter(Counter { value: 1.0 })),
-            ..Default::default()
-        };
+        let encoded = Metric::decode(PRE_V27_TAGS).unwrap();
 
         let decoded = crate::event::Metric::from(encoded);
 
@@ -882,20 +878,9 @@ mod tests {
     fn decodes_pre_v34_metadata_for_all_event_types() {
         let expected = VrlValue::from("legacy metadata");
 
-        let log = crate::event::LogEvent::from(Log {
-            metadata: Some(encode_value(expected.clone())),
-            ..Default::default()
-        });
-        let trace = crate::event::TraceEvent::from(Trace {
-            metadata: Some(encode_value(expected.clone())),
-            ..Default::default()
-        });
-        let metric = crate::event::Metric::from(Metric {
-            name: "requests".to_owned(),
-            value: Some(MetricValue::Counter(Counter { value: 1.0 })),
-            metadata: Some(encode_value(expected.clone())),
-            ..Default::default()
-        });
+        let log = crate::event::LogEvent::from(Log::decode(PRE_V34_LOG_METADATA).unwrap());
+        let trace = crate::event::TraceEvent::from(Trace::decode(PRE_V34_TRACE_METADATA).unwrap());
+        let metric = crate::event::Metric::from(Metric::decode(PRE_V34_METRIC_METADATA).unwrap());
 
         assert_eq!(log.metadata().value(), &expected);
         assert_eq!(trace.metadata().value(), &expected);
@@ -904,8 +889,9 @@ mod tests {
 
     #[test]
     fn decodes_pre_v41_metadata_without_source_event_id() {
-        let decoded = EventMetadata::from(Metadata::default());
+        let decoded = EventMetadata::from(Metadata::decode(PRE_V41_METADATA).unwrap());
 
         assert_eq!(decoded.source_event_id(), None);
+        assert_eq!(decoded.source_type(), Some("legacy"));
     }
 }
