@@ -8,7 +8,7 @@ use crate::{
     codecs::EncodingConfig,
     config::AcknowledgementsConfig,
     sinks::util::TowerRequestConfig,
-    template::{Template, TemplateParseError},
+    template::{TemplateParseError, UnconfinedTemplate},
     tls::TlsConfig,
 };
 
@@ -33,8 +33,6 @@ pub(super) struct BaseSSSinkConfig {
     /// The tag that specifies that a message belongs to a specific message group.
     ///
     /// Can be applied only to FIFO queues.
-    #[configurable(metadata(docs::examples = "vector"))]
-    #[configurable(metadata(docs::examples = "vector-%Y-%m-%d"))]
     pub(super) message_group_id: Option<String>,
 
     /// The message deduplication ID value to allow AWS to identify duplicate messages.
@@ -43,7 +41,6 @@ pub(super) struct BaseSSSinkConfig {
     /// documentation][deduplication_id_docs] for more about how AWS does message deduplication.
     ///
     /// [deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
-    #[configurable(metadata(docs::examples = "{{ transaction_id }}"))]
     pub(super) message_deduplication_id: Option<String>,
 
     #[configurable(derived)]
@@ -76,10 +73,10 @@ pub(super) struct BaseSSSinkConfig {
 pub(super) fn message_group_id(
     message_group_id: Option<String>,
     fifo: bool,
-) -> crate::Result<Option<Template>> {
+) -> crate::Result<Option<UnconfinedTemplate>> {
     match (message_group_id.as_ref(), fifo) {
         (Some(value), true) => Ok(Some(
-            Template::try_from(value.clone()).context(TopicTemplateSnafu)?,
+            UnconfinedTemplate::try_from(value.clone()).context(TopicTemplateSnafu)?,
         )),
         (Some(_), false) => Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
         (None, true) => Err(Box::new(BuildError::MessageGroupIdMissing)),
@@ -88,9 +85,9 @@ pub(super) fn message_group_id(
 }
 pub(super) fn message_deduplication_id(
     message_deduplication_id: Option<String>,
-) -> crate::Result<Option<Template>> {
+) -> crate::Result<Option<UnconfinedTemplate>> {
     Ok(message_deduplication_id
         .clone()
-        .map(Template::try_from)
+        .map(UnconfinedTemplate::try_from)
         .transpose()?)
 }

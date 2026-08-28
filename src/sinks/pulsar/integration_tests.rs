@@ -11,7 +11,7 @@ use crate::{
             sink::PulsarSink,
         },
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
     test_util::{
         components::{SINK_TAGS, assert_sink_compliance},
         random_lines_with_stream, random_string, trace_init,
@@ -72,7 +72,19 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
         .unwrap();
 
     assert_sink_compliance(&SINK_TAGS, async move {
-        let sink = PulsarSink::new(pulsar, cnf).unwrap();
+        let sink = PulsarSink::new(
+            pulsar,
+            cnf.clone(),
+            topic
+                .clone()
+                .confine(
+                    &ConfinementConfig::default(),
+                    PulsarSinkConfig::NAME,
+                    "topic",
+                )
+                .unwrap(),
+        )
+        .unwrap();
         let sink = VectorSink::from_event_streamsink(sink);
         sink.run(input_events).await
     })

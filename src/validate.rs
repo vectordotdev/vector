@@ -1,18 +1,69 @@
 #![allow(missing_docs)]
 
-use std::{fmt, fs::remove_dir_all, path::PathBuf};
+use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
 use colored::*;
 use exitcode::ExitCode;
+use vector_lib::enrichment::{Case, IndexHandle, TableRegistry};
+use vector_vrl_metrics::MetricsStorage;
+use vrl::value::ObjectMap;
 
 use crate::{
-    config::{self, Config, ConfigDiff, loading::ConfigBuilderLoader},
+    config::{
+        self, Config, ConfigDiff, SinkContext, TransformContext, loading::ConfigBuilderLoader,
+    },
+    schema::Definition,
     topology::{
         self,
         builder::{TopologyPieces, TopologyPiecesBuilder},
     },
 };
+
+/// Stub enrichment table used during config validation so VRL can resolve
+/// table name references without loading actual table data.
+#[derive(Clone)]
+pub(crate) struct StubEnrichmentTable;
+
+impl vector_lib::enrichment::Table for StubEnrichmentTable {
+    fn find_table_row<'a>(
+        &self,
+        _: Case,
+        _: &'a [vector_lib::enrichment::Condition<'a>],
+        _: Option<&[String]>,
+        _: Option<&vrl::value::Value>,
+        _: Option<IndexHandle>,
+    ) -> Result<ObjectMap, vector_lib::enrichment::Error> {
+        unreachable!("stub table is compile-time only")
+    }
+
+    fn find_table_rows<'a>(
+        &self,
+        _: Case,
+        _: &'a [vector_lib::enrichment::Condition<'a>],
+        _: Option<&[String]>,
+        _: Option<&vrl::value::Value>,
+        _: Option<IndexHandle>,
+    ) -> Result<Vec<ObjectMap>, vector_lib::enrichment::Error> {
+        unreachable!("stub table is compile-time only")
+    }
+
+    fn add_index(
+        &mut self,
+        _: Case,
+        _: &[&str],
+    ) -> Result<IndexHandle, vector_lib::enrichment::Error> {
+        Ok(IndexHandle(0))
+    }
+
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        vec![]
+    }
+
+    fn needs_reload(&self) -> bool {
+        false
+    }
+}
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 
@@ -79,13 +130,14 @@ pub struct Opts {
     )]
     pub config_dirs: Vec<PathBuf>,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -116,6 +168,9 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
         Some(config) => config,
         None => return exitcode::CONFIG,
     };
+
+    validated &= validate_transforms(&config, &mut fmt).await;
+    validated &= validate_sinks_with_context(&config, &mut fmt);
 
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
@@ -152,7 +207,6 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.sub_error(errors);
     };
     let builder = ConfigBuilderLoader::default()
-        .interpolate_env(!opts.disable_env_var_interpolation)
         .load_from_paths(&paths)
         .map_err(&mut report_error)
         .ok()?;
@@ -178,6 +232,108 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     }
 
     Some(config)
+}
+
+/// Builds a `TableRegistry` with stub tables for the configured enrichment tables,
+/// so VRL can resolve table names without loading actual data. This lets config
+/// validation catch real VRL errors (syntax, type, wrong table name) while
+/// deferring data-loading to the environment phase.
+fn stub_enrichment_tables(config: &Config) -> TableRegistry {
+    let enrichment_tables = TableRegistry::default();
+    let stubs: HashMap<String, Box<dyn vector_lib::enrichment::Table + Send + Sync>> = config
+        .enrichment_tables
+        .keys()
+        .map(|key| {
+            (
+                key.to_string(),
+                Box::new(StubEnrichmentTable)
+                    as Box<dyn vector_lib::enrichment::Table + Send + Sync>,
+            )
+        })
+        .collect();
+    if !stubs.is_empty() {
+        enrichment_tables.load(stubs);
+        // Do not call finish_load(): table_ids() and add_index() (used during
+        // VRL compilation) both operate on the loading stage. finish_load()
+        // would move tables to the ArcSwap and make table_ids() return nothing.
+    }
+    enrichment_tables
+}
+
+async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
+    let enrichment_tables = stub_enrichment_tables(config);
+    let mut definition_cache = HashMap::new();
+    let mut errors = Vec::new();
+
+    for (key, transform) in config.transforms() {
+        let input_definitions = topology::schema::input_definitions(
+            &transform.inputs,
+            config,
+            enrichment_tables.clone(),
+            &mut definition_cache,
+        )
+        .unwrap_or_default();
+
+        let merged_schema_definition = input_definitions
+            .iter()
+            .map(|(_, definition)| definition.clone())
+            .reduce(Definition::merge)
+            .unwrap_or_else(Definition::any);
+
+        let context = TransformContext {
+            key: Some(key.clone()),
+            globals: config.global.clone(),
+            enrichment_tables: enrichment_tables.clone(),
+            metrics_storage: MetricsStorage::default(),
+            merged_schema_definition,
+            schema: config.schema,
+            ..Default::default()
+        };
+
+        for err in transform
+            .inner
+            .validate_with_context(&context)
+            .err()
+            .into_iter()
+            .flatten()
+        {
+            errors.push(format!("Transform \"{key}\": {err}"));
+        }
+    }
+
+    if errors.is_empty() {
+        fmt.success("Transforms configuration");
+        true
+    } else {
+        fmt.title("Transform errors");
+        fmt.sub_error(errors);
+        false
+    }
+}
+
+fn validate_sinks_with_context(config: &Config, fmt: &mut Formatter) -> bool {
+    let cx = SinkContext {
+        enrichment_tables: stub_enrichment_tables(config),
+        ..Default::default()
+    };
+    let mut errors = Vec::new();
+
+    for (key, sink) in config.sinks() {
+        if let Some(dyn_sink) = sink.inner.as_dyn_validated()
+            && let Err(error) = dyn_sink.validate_with_context_dyn(&cx)
+        {
+            errors.push(format!("Sink \"{key}\": {error}"));
+        }
+    }
+
+    if errors.is_empty() {
+        fmt.success("Sinks configuration");
+        true
+    } else {
+        fmt.title("Sink errors");
+        fmt.sub_error(errors);
+        false
+    }
 }
 
 async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {

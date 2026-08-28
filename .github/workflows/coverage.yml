@@ -79,7 +79,7 @@ jobs:
 
       - name: Merge coverage reports
         run: |
-          sudo apt-get install -y --no-install-recommends lcov
+          timeout 30m sudo apt-get install -y --no-install-recommends lcov
 
           mapfile -t FILES < <(find coverage-artifacts -name '*.info')
           echo "Merging ${#FILES[@]} coverage file(s)"

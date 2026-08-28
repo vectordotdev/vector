@@ -6,12 +6,14 @@ edition = "2024"
 publish = false
 license = "MIT"
 
+[lints]
+workspace = true
+
 [target.'cfg(windows)'.dependencies]
 libc.workspace = true
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
-glob.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 crc = "3.3.0"
@@ -28,4 +30,4 @@ tokio = { workspace = true, features = ["full"] }
 [dev-dependencies]
 quickcheck.workspace = true
 tempfile.workspace = true
-similar-asserts = "1.7.0"
+similar-asserts = "2.0.0"

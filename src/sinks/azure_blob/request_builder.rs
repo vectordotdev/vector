@@ -1,15 +1,16 @@
+use std::collections::{BTreeMap, HashMap};
+
 use bytes::Bytes;
 use chrono::Utc;
+use percent_encoding::{NON_ALPHANUMERIC, utf8_percent_encode};
 use uuid::Uuid;
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf, codecs::encoding::Framer, request_metadata::RequestMetadata,
-};
+use vector_lib::{codecs::encoding::Framer, request_metadata::RequestMetadata};
 
 use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, Finalizable},
     sinks::{
-        azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
+        azure_blob::config::{AzureBlobMetadata, AzureBlobRequest, AzureBlobType},
         util::{
             Compression, RequestBuilder, metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
@@ -22,8 +23,11 @@ pub struct AzureBlobRequestOptions {
     pub container_name: String,
     pub blob_time_format: String,
     pub blob_append_uuid: bool,
+    pub blob_type: AzureBlobType,
     pub encoder: (Transformer, Encoder<Framer>),
     pub compression: Compression,
+    pub tags: Option<BTreeMap<String, String>>,
+    pub metadata: Option<HashMap<String, String>>,
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
@@ -51,7 +55,6 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         let azure_metadata = AzureBlobMetadata {
             partition_key,
             count: events.len(),
-            byte_size: events.estimated_json_encoded_size_of(),
             finalizers,
         };
 
@@ -95,6 +98,30 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
             content_type: self.encoder.1.content_type(),
             metadata: azure_metadata,
             request_metadata,
+            // SDK 0.10.1 has no `with_tags()` helper, so we set the pre-encoded
+            // `x-ms-tags` header value directly. Match the Azure SDK's own encoding
+            // (`percent_encoding::NON_ALPHANUMERIC`, which emits `%20` for spaces) rather
+            // than `url::form_urlencoded` (which emits `+`).
+            tags: self
+                .tags
+                .as_ref()
+                .filter(|m| !m.is_empty())
+                .map(encode_tags),
+            blob_metadata: self.metadata.as_ref().filter(|m| !m.is_empty()).cloned(),
+            blob_type: self.blob_type,
         }
     }
+}
+
+fn encode_tags(tags: &BTreeMap<String, String>) -> String {
+    let mut out = String::new();
+    for (k, v) in tags {
+        if !out.is_empty() {
+            out.push('&');
+        }
+        out.push_str(&utf8_percent_encode(k, NON_ALPHANUMERIC).to_string());
+        out.push('=');
+        out.push_str(&utf8_percent_encode(v, NON_ALPHANUMERIC).to_string());
+    }
+    out
 }

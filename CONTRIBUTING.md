@@ -14,7 +14,6 @@ Vector team member will find this document useful.
   - [Git Commits](#git-commits)
     - [Style](#style)
   - [GitHub Pull Requests](#github-pull-requests)
-    - [Title](#title)
     - [Reviews & Approvals](#reviews--approvals)
     - [Merge Style](#merge-style)
   - [CI](#ci)
@@ -150,8 +149,7 @@ make check-deny
 make check-docs
 make check-examples
 make check-scripts
-
-./scripts/check_changelog_fragments.sh
+make check-changelog-fragments
 
 # Spell-check the codebase (fast, requires typos-cli: cargo install typos-cli)
 typos
@@ -167,28 +165,6 @@ relevant to your PR. This command is defined in the
 ### GitHub Pull Requests
 
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
-
-#### Title
-
-The pull request title must follow the format outlined in the [conventional commits spec](https://www.conventionalcommits.org).
-[Conventional commits](https://www.conventionalcommits.org) is a standardized
-format for commit messages. Vector only requires this format for commits on
-the `master` branch. And because Vector squashes commits before merging
-branches, this means that only the pull request title must conform to this
-format. Vector performs a pull request check to verify the pull request title
-in case you forget.
-
-A scope is optional but appreciated. Use it to identify the component or subsystem affected, for example `feat(kafka source): ...` or `fix(loki sink): ...`.
-
-The following are all good examples of pull request titles:
-
-```text
-feat(new sink): new `xyz` sink
-feat(tcp source): add foo bar baz feature
-fix(tcp source): fix foo bar baz bug
-chore: improve build process
-docs: fix typos
-```
 
 #### Reviews & Approvals
 
@@ -313,7 +289,7 @@ git push
 
 ### Deprecations
 
-When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.md).
+When deprecating functionality in Vector, see [DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md).
 
 ### Dependencies
 
@@ -329,7 +305,7 @@ documents:
 
 1. **[DEVELOPING.md](docs/DEVELOPING.md)** - Everything necessary to develop
 2. **[DOCUMENTING.md](docs/DOCUMENTING.md)** - Preparing your change for Vector users
-3. **[DEPRECATION.md](docs/DEPRECATION.md)** - Deprecating functionality in Vector
+3. **[DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md)** - Deprecating functionality in Vector
 
 ## Legal
 

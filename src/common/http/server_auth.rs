@@ -11,7 +11,8 @@ use serde::{
 use vector_config::configurable_component;
 use vector_lib::{
     TimeZone, compile_vrl,
-    event::{Event, LogEvent, VrlTarget},
+    enrichment::TableRegistry,
+    event::{Event, LogEvent, MetricTagMode, VrlTarget},
     lookup::OwnedTargetPath,
     sensitive_string::SensitiveString,
 };
@@ -176,6 +177,14 @@ impl HttpServerAuthConfig {
             }
         }
     }
+
+    /// Validates the auth configuration against the given enrichment tables,
+    /// compiling any custom VRL program so `vector validate --no-environment`
+    /// catches syntax/type errors while resolving enrichment table names.
+    pub fn validate(&self, enrichment_tables: &TableRegistry) -> crate::Result<()> {
+        self.build(enrichment_tables, &MetricsStorage::default())
+            .map(|_| ())
+    }
 }
 
 /// Built auth matcher with validated configuration
@@ -260,7 +269,7 @@ impl HttpServerAuthMatcher {
                 Default::default(),
             )),
             program.info(),
-            false,
+            MetricTagMode::Single,
         );
         let timezone = TimeZone::default();
 

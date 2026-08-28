@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 //! Rate limiting for tracing events.
 //!
 //! This crate provides a tracing-subscriber layer that rate limits log events to prevent

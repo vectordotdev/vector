@@ -4,10 +4,17 @@ use bytes::{Buf, BufMut};
 use quickcheck::{Arbitrary, Gen};
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, Finalizable},
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, Finalizable,
+        MergeFinalizable,
+    },
 };
 
-use crate::{EventCount, encoding::FixedEncodable};
+use crate::{Bufferable, EventCount, encoding::FixedEncodable};
+
+impl Bufferable for SizedRecord {}
+impl Bufferable for UndecodableRecord {}
+impl Bufferable for MultiEventRecord {}
 
 macro_rules! message_wrapper {
     ($id:ident: $ty:ty, $event_count:expr) => {
@@ -42,6 +49,12 @@ macro_rules! message_wrapper {
         impl Finalizable for $id {
             fn take_finalizers(&mut self) -> EventFinalizers {
                 std::mem::take(&mut self.1)
+            }
+        }
+
+        impl MergeFinalizable for $id {
+            fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+                self.1.merge(finalizers);
             }
         }
 
@@ -192,6 +205,18 @@ pub(crate) struct UndecodableRecord;
 impl AddBatchNotifier for UndecodableRecord {
     fn add_batch_notifier(&mut self, batch: BatchNotifier) {
         drop(batch); // We never check acknowledgements for this type
+    }
+}
+
+impl Finalizable for UndecodableRecord {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        EventFinalizers::DEFAULT
+    }
+}
+
+impl MergeFinalizable for UndecodableRecord {
+    fn merge_finalizers(&mut self, _finalizers: EventFinalizers) {
+        // We never check acknowledgements for this type.
     }
 }
 

@@ -17,7 +17,6 @@ components: sinks: redis: {
 			compression: enabled: false
 			batch: {
 				enabled:      true
-				common:       true
 				max_bytes:    null
 				max_events:   1
 				timeout_secs: 1.0

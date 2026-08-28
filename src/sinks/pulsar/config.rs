@@ -18,11 +18,13 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
+    config::{DynValidatedSink, ValidatedSink},
     schema,
     sinks::{
         prelude::*,
         pulsar::sink::{PulsarSink, healthcheck},
     },
+    template::ConfinementConfig,
 };
 
 /// Configuration for the `pulsar` sink.
@@ -89,6 +91,10 @@ pub struct PulsarSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub(crate) tls: Option<PulsarTlsOptions>,
+
+    #[configurable(derived)]
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 /// Event batching behavior.
@@ -247,6 +253,7 @@ impl Default for PulsarSinkConfig {
             acknowledgements: Default::default(),
             connection_retry_options: None,
             tls: None,
+            confinement: ConfinementConfig::default(),
         }
     }
 }
@@ -255,6 +262,7 @@ impl PulsarSinkConfig {
     pub(crate) async fn create_pulsar_client(&self) -> crate::Result<Pulsar<TokioExecutor>> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
+            validate_auth_shape(auth)?;
             builder = match (
                 auth.name.as_ref(),
                 auth.token.as_ref(),
@@ -272,10 +280,7 @@ impl PulsarSinkConfig {
                         scope: oauth2.scope.clone(),
                     }),
                 ),
-                _ => return Err(Box::new(PulsarError::Authentication(AuthenticationError::Custom(
-                    "Invalid auth config: can only specify name and token or oauth2 configuration"
-                        .to_string(),
-                ))))?,
+                _ => unreachable!("auth shape validated by validate_auth_shape"),
             };
         }
 
@@ -378,25 +383,38 @@ impl PulsarSinkConfig {
     }
 }
 
+/// Validate the Pulsar auth configuration shape without touching the network.
+///
+/// Only `name` + `token` (basic/JWT) or `oauth2` alone are valid; partial fields
+/// (e.g. `name` without `token`) or mixing basic/JWT with `oauth2` are rejected.
+/// Mirrors the match in `create_pulsar_client`.
+pub(super) fn validate_auth_shape(auth: &PulsarAuthConfig) -> crate::Result<()> {
+    match (
+        auth.name.as_ref(),
+        auth.token.as_ref(),
+        auth.oauth2.as_ref(),
+    ) {
+        (Some(_), Some(_), None) | (None, None, Some(_)) => Ok(()),
+        _ => Err(Box::new(PulsarError::Authentication(
+            AuthenticationError::Custom(
+                "Invalid auth config: can only specify name and token or oauth2 configuration"
+                    .to_string(),
+            ),
+        ))),
+    }
+}
+
 impl GenerateConfig for PulsarSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::default()).unwrap()
     }
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self
-            .create_pulsar_client()
-            .await
-            .map_err(|e| super::sink::BuildError::CreatePulsarSink { source: e })?;
-
-        let sink = PulsarSink::new(client, self.clone())?;
-        let hc = healthcheck(self.clone()).boxed();
-
-        Ok((VectorSink::from_event_streamsink(sink), hc))
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -409,5 +427,215 @@ impl SinkConfig for PulsarSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+
+    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
+        Some(self)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedPulsarSink {
+    topic: ConfinedTemplate,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for PulsarSinkConfig {
+    type Validated = ValidatedPulsarSink;
+
+    fn validate(&self) -> crate::Result<ValidatedPulsarSink> {
+        if let Some(auth) = &self.auth {
+            validate_auth_shape(auth)?;
+        }
+        let url = url::Url::parse(&self.endpoint)
+            .map_err(|e| format!("Invalid Pulsar endpoint `{}`: {}", self.endpoint, e))?;
+        if !matches!(url.scheme(), "pulsar" | "pulsar+ssl") {
+            return Err(format!(
+                "Invalid Pulsar endpoint `{}`: scheme must be pulsar or pulsar+ssl",
+                self.endpoint
+            )
+            .into());
+        }
+        if url.host().is_none() {
+            return Err(
+                format!("Invalid Pulsar endpoint `{}`: missing host", self.endpoint).into(),
+            );
+        }
+        let topic = self
+            .topic
+            .clone()
+            .confine(&self.confinement, Self::NAME, "topic")?;
+        Ok(ValidatedPulsarSink { topic })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedPulsarSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedPulsarSink { topic } = validated;
+
+        let client = self
+            .create_pulsar_client()
+            .await
+            .map_err(|e| super::sink::BuildError::CreatePulsarSink { source: e })?;
+
+        let sink = PulsarSink::new(client, self.clone(), topic.clone())?;
+        let hc = healthcheck(self.clone(), topic.clone()).boxed();
+        Ok((VectorSink::from_event_streamsink(sink), hc))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ValidatedSink;
+    use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn validate_returns_confined_topic() {
+        let config = PulsarSinkConfig {
+            topic: Template::try_from("test-topic").unwrap(),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.topic.to_string(), "test-topic");
+    }
+
+    #[test]
+    fn validate_rejects_name_without_token() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: Some("name".to_string()),
+                token: None,
+                oauth2: None,
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_token_without_name() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: None,
+                token: Some(SensitiveString::from("token".to_string())),
+                oauth2: None,
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_mixing_basic_with_oauth2() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: Some("name".to_string()),
+                token: Some(SensitiveString::from("token".to_string())),
+                oauth2: Some(OAuth2Config {
+                    issuer_url: "https://oauth2.issuer".to_string(),
+                    credentials_url: "https://oauth2.credentials".to_string(),
+                    audience: None,
+                    scope: None,
+                }),
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_valid_basic_auth() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: Some("name".to_string()),
+                token: Some(SensitiveString::from("token".to_string())),
+                oauth2: None,
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_accepts_valid_oauth2_auth() {
+        let config = PulsarSinkConfig {
+            auth: Some(PulsarAuthConfig {
+                name: None,
+                token: None,
+                oauth2: Some(OAuth2Config {
+                    issuer_url: "https://oauth2.issuer".to_string(),
+                    credentials_url: "https://oauth2.credentials".to_string(),
+                    audience: None,
+                    scope: None,
+                }),
+            }),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = PulsarSinkConfig {
+            endpoint: "not a valid endpoint".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_unsupported_endpoint_scheme() {
+        let config = PulsarSinkConfig {
+            endpoint: "ftp://127.0.0.1:6650".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_host() {
+        let config = PulsarSinkConfig {
+            endpoint: "pulsar:topic".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_valid_endpoint() {
+        let config = PulsarSinkConfig {
+            endpoint: "pulsar://127.0.0.1:6650".to_string(),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_topic() {
+        let template = Template::try_from("{{ topic }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "pulsar", "topic");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_topic() {
+        let template = Template::try_from("{{ topic }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "pulsar", "topic");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_topic() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "pulsar", "topic");
+        assert!(result.is_ok());
     }
 }

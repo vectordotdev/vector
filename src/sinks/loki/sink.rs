@@ -3,10 +3,10 @@ use std::{collections::HashMap, num::NonZeroUsize};
 use bytes::{Bytes, BytesMut};
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
-use vrl::path::parse_target_path;
+use vrl::path::{OwnedTargetPath, parse_target_path};
 
 use super::{
-    config::{LokiConfig, OutOfOrderAction},
+    config::{LokiConfig, OutOfOrderAction, ValidatedLokiSink},
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
@@ -18,14 +18,61 @@ use crate::{
         LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,
     },
     sinks::{loki::event::LokiBatchEncoding, prelude::*},
+    template::ConfinementConfig,
 };
 
+#[cfg(test)]
+use crate::config::ValidatedSink;
+
+/// Attach the sink's confinement config to every key template in a
+/// `label`-style HashMap. Values are metadata and remain unconfined.
+pub(super) fn confine_template_keys(
+    map: HashMap<Template, UnconfinedTemplate>,
+    config: &ConfinementConfig,
+    component_name: &'static str,
+    key_field_name: &'static str,
+) -> crate::Result<HashMap<ConfinedTemplate, UnconfinedTemplate>> {
+    map.into_iter()
+        .map(|(k, v)| {
+            let k = k.confine(config, component_name, key_field_name)?;
+            Ok((k, v))
+        })
+        .collect()
+}
+
 #[derive(Clone)]
-pub struct KeyPartitioner(Option<Template>);
+pub struct KeyPartitioner(Option<ConfinedTemplate>);
 
 impl KeyPartitioner {
-    pub const fn new(template: Option<Template>) -> Self {
+    pub const fn new(template: Option<ConfinedTemplate>) -> Self {
         Self(template)
+    }
+
+    /// Render the tenant ID for an event.
+    ///
+    /// Returns:
+    /// - `Ok(Some(t))` — rendered successfully
+    /// - `Ok(None)` — no template configured
+    /// - `Err(())` — render failed with `Confined`; caller must drop the event
+    fn render_tenant_id(&self, event: &Event) -> Result<Option<String>, ()> {
+        match &self.0 {
+            None => Ok(None),
+            Some(t) => match t.render_string(event) {
+                Ok(s) => Ok(Some(s)),
+                Err(error) => {
+                    let confined = matches!(
+                        error,
+                        crate::template::TemplateRenderingError::Confined { .. }
+                    );
+                    emit!(TemplateRenderingError {
+                        error,
+                        field: Some("tenant_id"),
+                        drop_event: confined,
+                    });
+                    if confined { Err(()) } else { Ok(None) }
+                }
+            },
+        }
     }
 }
 
@@ -34,17 +81,9 @@ impl Partitioner for KeyPartitioner {
     type Key = Option<String>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        self.0.as_ref().and_then(|t| {
-            t.render_string(item)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("tenant_id"),
-                        drop_event: false,
-                    })
-                })
-                .ok()
-        })
+        // Non-confined render failures fall back to "no tenant"; Confined is
+        // handled via render_tenant_id in encode_event which actually drops.
+        self.render_tenant_id(item).unwrap_or(None)
     }
 }
 
@@ -130,176 +169,192 @@ pub(super) struct EventEncoder {
     key_partitioner: KeyPartitioner,
     transformer: Transformer,
     encoder: Encoder<()>,
-    labels: HashMap<Template, Template>,
+    labels: HashMap<ConfinedTemplate, UnconfinedTemplate>,
     remove_label_fields: bool,
-    structured_metadata: HashMap<Template, Template>,
+    structured_metadata: HashMap<ConfinedTemplate, UnconfinedTemplate>,
     remove_structured_metadata_fields: bool,
     remove_timestamp: bool,
 }
 
+/// Returns `true` if a `TemplateRenderingError` is a confinement violation.
+const fn is_confined(err: &crate::template::TemplateRenderingError) -> bool {
+    matches!(
+        err,
+        crate::template::TemplateRenderingError::Confined { .. }
+    )
+}
+
+/// Renders a map of template key-value pairs into a resolved `Vec<(String, String)>`.
+///
+/// `key_kind` / `value_kind` are used in `TemplateRenderingError` field names.
+/// `pair_kind` is used in warning messages (e.g. `"label"` or `"structured_metadata"`).
+/// Returns `Err(())` if a key template triggers a confinement violation.
+fn build_template_pair_map(
+    pairs: &HashMap<ConfinedTemplate, UnconfinedTemplate>,
+    key_kind: &str,
+    value_kind: &str,
+    pair_kind: &str,
+    event: &Event,
+) -> Result<Vec<(String, String)>, ()> {
+    let mut static_map: HashMap<String, String> = HashMap::new();
+    let mut dynamic_map: HashMap<String, String> = HashMap::new();
+
+    for (key_template, value_template) in pairs.iter() {
+        match (
+            key_template.render_string(event),
+            value_template.render_string(event),
+        ) {
+            (Ok(key_s), Ok(value_s)) => {
+                if let Err(err) =
+                    pair_expansion(&key_s, &value_s, &mut static_map, &mut dynamic_map)
+                {
+                    warn!(
+                        value = %value_s,
+                        error = %err,
+                        "Failed to expand dynamic {pair_kind}."
+                    );
+                }
+            }
+            (Err(key_err), Err(val_err)) => {
+                let key_confined = is_confined(&key_err);
+                emit!(TemplateRenderingError {
+                    field: Some(
+                        format!(
+                            "{key_kind} \"{key_template}\" with {value_kind} \"{value_template}\""
+                        )
+                        .as_str()
+                    ),
+                    drop_event: key_confined,
+                    error: key_err,
+                });
+                emit!(TemplateRenderingError {
+                    field: Some(
+                        format!(
+                            "{value_kind} \"{value_template}\" with {key_kind} \"{key_template}\""
+                        )
+                        .as_str()
+                    ),
+                    drop_event: false,
+                    error: val_err,
+                });
+                if key_confined {
+                    return Err(());
+                }
+            }
+            (Err(key_err), Ok(_)) => {
+                let key_confined = is_confined(&key_err);
+                emit!(TemplateRenderingError {
+                    field: Some(
+                        format!(
+                            "{key_kind} \"{key_template}\" with {value_kind} \"{value_template}\""
+                        )
+                        .as_str()
+                    ),
+                    drop_event: key_confined,
+                    error: key_err,
+                });
+                if key_confined {
+                    return Err(());
+                }
+            }
+            (Ok(_), Err(val_err)) => {
+                emit!(TemplateRenderingError {
+                    field: Some(
+                        format!(
+                            "{value_kind} \"{value_template}\" with {key_kind} \"{key_template}\""
+                        )
+                        .as_str()
+                    ),
+                    drop_event: false,
+                    error: val_err,
+                });
+            }
+        }
+    }
+
+    for (k, v) in static_map {
+        if let Some(discarded_v) = dynamic_map.insert(k.clone(), v.clone()) {
+            warn!(
+                key = %k,
+                value = %v,
+                discarded_value = %discarded_v,
+                "Static {pair_kind} overrides dynamic {pair_kind}."
+            );
+        };
+    }
+
+    Ok(Vec::from_iter(dynamic_map))
+}
+
+fn remove_event_fields(event: &mut Event, enabled: bool, paths: &[OwnedTargetPath]) {
+    if enabled {
+        for path in paths {
+            event.as_mut_log().remove(path);
+        }
+    }
+}
+
 impl EventEncoder {
-    fn build_labels(&self, event: &Event) -> Vec<(String, String)> {
-        let mut static_labels: HashMap<String, String> = HashMap::new();
-        let mut dynamic_labels: HashMap<String, String> = HashMap::new();
-
-        for (key_template, value_template) in self.labels.iter() {
-            let key = key_template.render_string(event);
-            let value = value_template.render_string(event);
-
-            if key.is_err() || value.is_err() {
-                if key.is_err() {
-                    emit!(TemplateRenderingError {
-                        field: Some(
-                            format!(
-                                "label_key \"{key_template}\" with label_value \"{value_template}\""
-                            )
-                            .as_str()
-                        ),
-                        drop_event: false,
-                        error: key.err().unwrap(),
-                    });
-                }
-                if value.is_err() {
-                    emit!(TemplateRenderingError {
-                        field: Some(
-                            format!(
-                                "label_value \"{value_template}\" with label_key \"{key_template}\""
-                            )
-                            .as_str()
-                        ),
-                        drop_event: false,
-                        error: value.err().unwrap(),
-                    });
-                }
-                continue;
-            }
-
-            let key_s = key.unwrap();
-            let value_s = value.unwrap();
-            let result = pair_expansion(&key_s, &value_s, &mut static_labels, &mut dynamic_labels);
-            // we just need to check the error since the result have been inserted in the static_pairs or dynamic_pairs
-            if let Err(err) = result {
-                warn!(
-                    "Failed to expand dynamic label. value: {}, err: {}",
-                    value_s, err
-                );
-            }
-        }
-
-        for (k, v) in static_labels {
-            if let Some(discarded_v) = dynamic_labels.insert(k.clone(), v.clone()) {
-                warn!(
-                    "Static label overrides dynamic label. \
-                key: {}, value: {}, discarded value: {}",
-                    k, v, discarded_v
-                );
-            };
-        }
-
-        Vec::from_iter(dynamic_labels)
+    /// Renders each label pair. Returns `Err(())` if a key template rendered a
+    /// confined value — the caller must drop the event as an intentional
+    /// security discard (matches the tenant_id contract).
+    fn build_labels(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
+        build_template_pair_map(&self.labels, "label_key", "label_value", "label", event)
     }
 
     fn remove_label_fields(&self, event: &mut Event) {
         if self.remove_label_fields {
-            for template in self.labels.values() {
-                if let Some(fields) = template.get_fields() {
-                    for field in fields {
-                        if let Ok(path) = parse_target_path(field.as_str()) {
-                            event.as_mut_log().remove(&path);
-                        }
-                    }
-                }
-            }
+            let paths: Vec<OwnedTargetPath> = self
+                .labels
+                .values()
+                .filter_map(|t| t.get_fields())
+                .flatten()
+                .filter_map(|f| parse_target_path(f.as_str()).ok())
+                .collect();
+            remove_event_fields(event, true, &paths);
         }
     }
 
-    fn build_structured_metadata(&self, event: &Event) -> Vec<(String, String)> {
-        let mut static_structured_metadata: HashMap<String, String> = HashMap::new();
-        let mut dynamic_structured_metadata: HashMap<String, String> = HashMap::new();
-
-        for (key_template, value_template) in self.structured_metadata.iter() {
-            let key = key_template.render_string(event);
-            let value = value_template.render_string(event);
-
-            if key.is_err() || value.is_err() {
-                if key.is_err() {
-                    emit!(TemplateRenderingError {
-                        field: Some(
-                            format!(
-                        "structured_metadata_key \"{key_template}\" with structured_metadata_value \"{value_template}\""
-                    )
-                            .as_str()
-                        ),
-                        drop_event: false,
-                        error: key.err().unwrap(),
-                    });
-                }
-                if value.is_err() {
-                    emit!(TemplateRenderingError {
-                        field: Some(
-                            format!(
-                        "structured_metadata_value \"{value_template}\" with structured_metadata_key \"{key_template}\""
-                    )
-                            .as_str()
-                        ),
-                        drop_event: false,
-                        error: value.err().unwrap(),
-                    });
-                }
-                continue;
-            }
-
-            let key_s = key.unwrap();
-            let value_s = value.unwrap();
-            let result = pair_expansion(
-                &key_s,
-                &value_s,
-                &mut static_structured_metadata,
-                &mut dynamic_structured_metadata,
-            );
-            // we just need to check the error since the result have been inserted in the static_pairs or dynamic_pairs
-            if let Err(err) = result {
-                warn!(
-                    "Failed to expand dynamic structured metadata. value: {}, err: {}",
-                    value_s, err
-                );
-            }
-        }
-
-        for (k, v) in static_structured_metadata {
-            if let Some(discarded_v) = dynamic_structured_metadata.insert(k.clone(), v.clone()) {
-                warn!(
-                    "Static structured_metadata overrides dynamic structured_metadata. \
-        key: {}, value: {}, discarded value: {}",
-                    k, v, discarded_v
-                );
-            };
-        }
-
-        Vec::from_iter(dynamic_structured_metadata)
+    fn build_structured_metadata(&self, event: &Event) -> Result<Vec<(String, String)>, ()> {
+        build_template_pair_map(
+            &self.structured_metadata,
+            "structured_metadata_key",
+            "structured_metadata_value",
+            "structured_metadata",
+            event,
+        )
     }
 
     fn remove_structured_metadata_fields(&self, event: &mut Event) {
         if self.remove_structured_metadata_fields {
-            for template in self.structured_metadata.values() {
-                if let Some(fields) = template.get_fields() {
-                    for field in fields {
-                        if let Ok(path) = parse_target_path(field.as_str()) {
-                            event.as_mut_log().remove(&path);
-                        }
-                    }
-                }
-            }
+            let paths: Vec<OwnedTargetPath> = self
+                .structured_metadata
+                .values()
+                .filter_map(|t| t.get_fields())
+                .flatten()
+                .filter_map(|f| parse_target_path(f.as_str()).ok())
+                .collect();
+            remove_event_fields(event, true, &paths);
         }
     }
 
     pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
-        let tenant_id = self.key_partitioner.partition(&event);
+        let tenant_id = match self.key_partitioner.render_tenant_id(&event) {
+            Ok(t) => t,
+            Err(()) => return None, // Confined — intentional security drop
+        };
         let finalizers = event.take_finalizers();
         let json_byte_size = event.estimated_json_encoded_size_of();
-        let mut labels: Vec<(String, String)> = self.build_labels(&event);
+        let mut labels: Vec<(String, String)> = match self.build_labels(&event) {
+            Ok(labels) => labels,
+            Err(()) => return None, // Confined label — intentional security drop
+        };
         self.remove_label_fields(&mut event);
-        let structured_metadata: Vec<(String, String)> = self.build_structured_metadata(&event);
+        let structured_metadata: Vec<(String, String)> =
+            match self.build_structured_metadata(&event) {
+                Ok(md) => md,
+                Err(()) => return None, // Confined structured_metadata — intentional security drop
+            };
         self.remove_structured_metadata_fields(&mut event);
 
         let timestamp = match event.as_log().get_timestamp() {
@@ -341,7 +396,7 @@ impl EventEncoder {
             event: LokiEvent {
                 timestamp,
                 event: bytes.freeze(),
-                structured_metadata: structured_metadata.clone(),
+                structured_metadata,
             },
             partition,
             finalizers,
@@ -434,44 +489,40 @@ pub struct LokiSink {
 }
 
 impl LokiSink {
+    #[cfg(test)]
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
+        let validated = config.validate()?;
+        Self::from_validated(&config, validated, client)
+    }
+
+    /// Builds the sink from already-validated state. No pure validation is
+    /// repeated here: auth, request limits, encoder, confined templates and
+    /// batch settings all come from `validated`.
+    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
+    pub fn from_validated(
+        config: &LokiConfig,
+        validated: ValidatedLokiSink,
+        client: HttpClient,
+    ) -> crate::Result<Self> {
         let compression = config.compression;
 
-        // if Vector is configured to allow events with out of order timestamps, then we can
-        // safely enable concurrency settings.
-        //
-        // For rewritten timestamps, we use a static concurrency of 1 to avoid out-of-order
-        // timestamps across requests. We used to support concurrency across partitions (Loki
-        // streams) but this was lost in #9506. Rather than try to re-add it, since Loki no longer
-        // requires in-order processing for version >= 2.4, instead we just keep the static limit
-        // of 1 for now.
-        let request_limits = match config.out_of_order_action {
-            OutOfOrderAction::Accept => config.request.into_settings(),
-            OutOfOrderAction::Drop | OutOfOrderAction::RewriteTimestamp => {
-                let mut settings = config.request.into_settings();
-                settings.concurrency = Some(1);
-                settings
-            }
-        };
-
-        let protocol = get_http_scheme_from_uri(&config.endpoint.uri);
+        let protocol = get_http_scheme_from_uri(validated.endpoint.as_uri());
         let service = tower::ServiceBuilder::new()
-            .settings(request_limits, LokiRetryLogic)
+            .settings(validated.request_limits.clone(), LokiRetryLogic)
             .service(LokiService::new(
                 client,
-                config.endpoint,
-                config.path,
-                config.auth,
-            )?);
+                validated.endpoint.clone(),
+                validated.auth.clone(),
+            ));
 
-        let transformer = config.encoding.transformer();
-        let serializer = config.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
         let batch_encoder = match config.compression {
             Compression::Snappy => LokiBatchEncoder(LokiBatchEncoding::Protobuf),
             _ => LokiBatchEncoder(LokiBatchEncoding::Json),
         };
+
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
             request_builder: LokiRequestBuilder {
@@ -479,16 +530,16 @@ impl LokiSink {
                 encoder: batch_encoder,
             },
             encoder: EventEncoder {
-                key_partitioner: KeyPartitioner::new(config.tenant_id),
-                transformer,
+                key_partitioner: KeyPartitioner::new(validated.tenant_id),
+                transformer: validated.transformer,
                 encoder,
-                labels: config.labels,
-                structured_metadata: config.structured_metadata,
+                labels: validated.labels,
+                structured_metadata: validated.structured_metadata,
                 remove_label_fields: config.remove_label_fields,
                 remove_structured_metadata_fields: config.remove_structured_metadata_fields,
                 remove_timestamp: config.remove_timestamp,
             },
-            batch_settings: config.batch.into_batcher_settings()?,
+            batch_settings: validated.batch_settings,
             out_of_order_action: config.out_of_order_action,
             service,
             protocol,
@@ -564,7 +615,7 @@ impl StreamSink<Event> for LokiSink {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, convert::TryFrom};
+    use std::collections::HashMap;
 
     use futures::stream::StreamExt;
     use vector_lib::{
@@ -573,11 +624,64 @@ mod tests {
         lookup::PathPrefix,
     };
 
-    use super::{EventEncoder, KeyPartitioner, RecordFilter};
+    use vrl::event_path;
+
+    use super::{EventEncoder, KeyPartitioner, RecordFilter, confine_template_keys};
     use crate::{
-        codecs::Encoder, config::log_schema, sinks::loki::config::OutOfOrderAction,
-        template::Template, test_util::random_lines,
+        codecs::Encoder,
+        config::log_schema,
+        sinks::loki::config::{LokiConfig, OutOfOrderAction},
+        template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
+        test_util::random_lines,
     };
+
+    // Tests exercise the encoder, not confinement; build a checkerless confined label template.
+    fn confined_label(s: &str) -> ConfinedTemplate {
+        Template::try_from(s)
+            .unwrap()
+            .confine(&ConfinementConfig::unconfined(), LokiConfig::NAME, "labels")
+            .unwrap()
+    }
+
+    fn unconfined_value(s: &str) -> UnconfinedTemplate {
+        UnconfinedTemplate::try_from(s).unwrap()
+    }
+
+    #[test]
+    fn confinement_allows_unprefixed_label_values() {
+        let labels = HashMap::from([(
+            Template::try_from("host").unwrap(),
+            unconfined_value("{{ host }}"),
+        )]);
+
+        assert!(
+            confine_template_keys(
+                labels,
+                &ConfinementConfig::default(),
+                LokiConfig::NAME,
+                "labels[key]",
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn confinement_still_rejects_unprefixed_label_keys() {
+        let labels = HashMap::from([(
+            Template::try_from("{{ label_name }}").unwrap(),
+            unconfined_value("{{ label_value }}"),
+        )]);
+
+        assert!(
+            confine_template_keys(
+                labels,
+                &ConfinementConfig::default(),
+                LokiConfig::NAME,
+                "labels[key]",
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn encoder_no_labels() {
@@ -612,21 +716,15 @@ mod tests {
     #[test]
     fn encoder_with_labels() {
         let mut labels = HashMap::default();
+        labels.insert(confined_label("static"), unconfined_value("value"));
         labels.insert(
-            Template::try_from("static").unwrap(),
-            Template::try_from("value").unwrap(),
+            confined_label("{{ name }}"),
+            unconfined_value("{{ value }}"),
         );
+        labels.insert(confined_label("test_key_*"), unconfined_value("{{ dict }}"));
         labels.insert(
-            Template::try_from("{{ name }}").unwrap(),
-            Template::try_from("{{ value }}").unwrap(),
-        );
-        labels.insert(
-            Template::try_from("test_key_*").unwrap(),
-            Template::try_from("{{ dict }}").unwrap(),
-        );
-        labels.insert(
-            Template::try_from("going_to_fail_*").unwrap(),
-            Template::try_from("{{ value }}").unwrap(),
+            confined_label("going_to_fail_*"),
+            unconfined_value("{{ value }}"),
         );
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -644,13 +742,13 @@ mod tests {
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
-        log.insert("name", "foo");
-        log.insert("value", "bar");
+        log.insert(event_path!("name"), "foo");
+        log.insert(event_path!("value"), "bar");
 
         let mut test_dict = ObjectMap::default();
         test_dict.insert("one".into(), Value::from("foo"));
         test_dict.insert("two".into(), Value::from("baz"));
-        log.insert("dict", Value::from(test_dict));
+        log.insert(event_path!("dict"), Value::from(test_dict));
 
         let record = encoder.encode_event(event).unwrap();
         assert!(
@@ -670,16 +768,13 @@ mod tests {
     fn encoder_with_dynamic_labels() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
         labels.insert(
-            Template::try_from("pod_labels_*").unwrap(),
-            Template::try_from("{{ kubernetes.pod_labels }}").unwrap(),
+            confined_label("pod_labels_*"),
+            unconfined_value("{{ kubernetes.pod_labels }}"),
         );
+        labels.insert(confined_label("*"), unconfined_value("{{ metadata }}"));
         labels.insert(
-            Template::try_from("*").unwrap(),
-            Template::try_from("{{ metadata }}").unwrap(),
-        );
-        labels.insert(
-            Template::try_from("cluster_name").unwrap(),
-            Template::try_from("static_cluster_name").unwrap(),
+            confined_label("cluster_name"),
+            unconfined_value("static_cluster_name"),
         );
 
         let mut encoder = EventEncoder {
@@ -725,14 +820,8 @@ mod tests {
     #[test]
     fn encoder_with_colliding_dynamic_labels() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
-        labels.insert(
-            Template::try_from("l1_*").unwrap(),
-            Template::try_from("{{ map1 }}").unwrap(),
-        );
-        labels.insert(
-            Template::try_from("*").unwrap(),
-            Template::try_from("{{ map2 }}").unwrap(),
-        );
+        labels.insert(confined_label("l1_*"), unconfined_value("{{ map1 }}"));
+        labels.insert(confined_label("*"), unconfined_value("{{ map2 }}"));
 
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -769,10 +858,7 @@ mod tests {
     #[test]
     fn encoder_with_failing_dynamic_label_expansion() -> Result<(), serde_json::Error> {
         let mut labels = HashMap::default();
-        labels.insert(
-            Template::try_from("missing_*").unwrap(),
-            Template::try_from("{{ map }}").unwrap(),
-        );
+        labels.insert(confined_label("missing_*"), unconfined_value("{{ map }}"));
 
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -823,13 +909,10 @@ mod tests {
     #[test]
     fn encoder_no_record_labels() {
         let mut labels = HashMap::default();
+        labels.insert(confined_label("static"), unconfined_value("value"));
         labels.insert(
-            Template::try_from("static").unwrap(),
-            Template::try_from("value").unwrap(),
-        );
-        labels.insert(
-            Template::try_from("{{ name }}").unwrap(),
-            Template::try_from("{{ value }}").unwrap(),
+            confined_label("{{ name }}"),
+            unconfined_value("{{ value }}"),
         );
         let mut encoder = EventEncoder {
             key_partitioner: KeyPartitioner::new(None),
@@ -847,8 +930,8 @@ mod tests {
             (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
             chrono::Utc::now(),
         );
-        log.insert("name", "foo");
-        log.insert("value", "bar");
+        log.insert(event_path!("name"), "foo");
+        log.insert(event_path!("value"), "bar");
         let record = encoder.encode_event(event).unwrap();
         assert!(!String::from_utf8_lossy(&record.event.event).contains("value"));
     }
@@ -857,16 +940,13 @@ mod tests {
     fn encoder_with_structured_metadata() -> Result<(), serde_json::Error> {
         let mut structured_metadata = HashMap::default();
         structured_metadata.insert(
-            Template::try_from("pod_labels_*").unwrap(),
-            Template::try_from("{{ kubernetes.pod_labels }}").unwrap(),
+            confined_label("pod_labels_*"),
+            unconfined_value("{{ kubernetes.pod_labels }}"),
         );
+        structured_metadata.insert(confined_label("*"), unconfined_value("{{ metadata }}"));
         structured_metadata.insert(
-            Template::try_from("*").unwrap(),
-            Template::try_from("{{ metadata }}").unwrap(),
-        );
-        structured_metadata.insert(
-            Template::try_from("cluster_name").unwrap(),
-            Template::try_from("static_cluster_name").unwrap(),
+            confined_label("cluster_name"),
+            unconfined_value("static_cluster_name"),
         );
 
         let mut encoder = EventEncoder {
