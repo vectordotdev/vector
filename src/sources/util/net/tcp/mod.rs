@@ -113,6 +113,13 @@ where
 
     fn handle_events(&self, _events: &mut [Event], _host: std::net::SocketAddr) {}
 
+    fn on_connect<'a>(
+        &'a self,
+        _stream: &'a mut MaybeTlsIncomingStream<TcpStream>,
+    ) -> BoxFuture<'a, std::io::Result<()>> {
+        Box::pin(async { Ok(()) })
+    }
+
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
     #[allow(clippy::too_many_arguments)]
@@ -296,6 +303,11 @@ async fn handle_stream<T>(
             return;
         }
     };
+
+    if let Err(error) = source.on_connect(&mut socket).await {
+        warn!(message = "Error in on_connect hook.", %error);
+        return;
+    }
 
     if let Some(keepalive) = keepalive
         && let Err(error) = socket.set_keepalive(keepalive)
