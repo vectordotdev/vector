@@ -87,15 +87,8 @@ pub struct VectorConfig {
     /// Compression algorithm for requests.
     ///
     /// Supports `"none"`, `"gzip"`, or `"zstd"`.
-    ///
-    /// For backward compatibility, boolean values are still accepted:
-    /// - `true` defaults to gzip compression
-    /// - `false` disables compression (deprecated syntax)
     #[configurable(derived)]
-    #[serde(
-        default,
-        deserialize_with = "super::compression::bool_or_vector_compression"
-    )]
+    #[serde(default)]
     compression: VectorCompression,
 
     #[configurable(derived)]

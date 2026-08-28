@@ -86,10 +86,6 @@ generated: components: sinks: vector: configuration: {
 			Compression algorithm for requests.
 
 			Supports `"none"`, `"gzip"`, or `"zstd"`.
-
-			For backward compatibility, boolean values are still accepted:
-			- `true` defaults to gzip compression
-			- `false` disables compression (deprecated syntax)
 			"""
 		required: false
 		type: string: {
