@@ -4,6 +4,6 @@ Previously, partial or empty endpoints (for example `endpoint: ""` or `endpoint:
 
 Empty, host-less, or non-`http(s)` endpoints (for example `endpoint: ""`, `endpoint: "/path"`, or `endpoint: "ftp://example.com"`) are now rejected at configuration load with a clear error, including with `vector validate --no-environment`.
 
-This affects the `keep`, `new_relic`, and `vector` sinks.
+This affects the `keep` and `new_relic` sinks.
 
 authors: thomasqueirozb
