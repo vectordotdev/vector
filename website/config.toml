@@ -46,15 +46,6 @@ site_generation = 2
 # Search
 [params.search]
 algolia_autocomplete_theme = "classic"
-typesense_index = "vector_docs"
-
-# Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
-typesense_public_dev_apikey = "aTFLzhfCVeTj619Pxkhmz18798Nsau0Z"
-typesense_dev_host = "dnm1k9zrpctsvjowp"
-
-# Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
-typesense_public_prod_apikey = "BdepvpnczVgPL008lqhuBlkZo5s0rrWE"
-typesense_prod_host = "gk6e3zbyuntvc5dap"
 
 # VRL JSON server
 
@@ -66,9 +57,9 @@ delimiter = ""
 mediaType = "text/netlify"
 baseName = "_redirects"
 
-# Outputs (including search.json and _redirects files)
+# Outputs (including _redirects files)
 [outputs]
-home = ["HTML", "JSON", "RSS", "REDIRECTS"]
+home = ["HTML", "RSS", "REDIRECTS"]
 
 # CSS generation
 [[params.css]]
