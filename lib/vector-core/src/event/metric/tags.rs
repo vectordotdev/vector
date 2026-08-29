@@ -617,7 +617,7 @@ impl ByteSizeOf for MetricTags {
     }
 }
 
-#[cfg(any(test, feature = "generate-fixtures"))]
+#[cfg(test)]
 mod test_support {
     use std::collections::HashSet;
 
