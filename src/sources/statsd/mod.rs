@@ -82,18 +82,15 @@ pub enum ConversionUnit {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The size of the receive buffer used for each connection.
     receive_buffer_bytes: Option<usize>,
 
     #[serde(default = "default_sanitize")]
-    #[configurable(derived)]
     sanitize: bool,
 
     #[serde(default = "default_convert_to")]
-    #[configurable(derived)]
     convert_to: ConversionUnit,
 }
 
@@ -113,16 +110,12 @@ impl UdpConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsSourceConfig>,
 
@@ -153,11 +146,9 @@ pub struct TcpConfig {
     /// - All whitespace is replaced with "_"
     /// - All non alphanumeric characters (A-Z, a-z, 0-9, _, or -) are removed.
     #[serde(default = "default_sanitize")]
-    #[configurable(derived)]
     sanitize: bool,
 
     #[serde(default = "default_convert_to")]
-    #[configurable(derived)]
     convert_to: ConversionUnit,
 }
 

@@ -164,17 +164,14 @@ mod deser {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FluentTcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
     /// The size of the receive buffer used for each connection.
@@ -192,10 +189,8 @@ pub struct FluentTcpConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     tls_handshake_timeout_secs: Option<NonZeroU64>,
 
-    #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 }

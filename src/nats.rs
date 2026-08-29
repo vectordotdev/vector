@@ -35,28 +35,18 @@ NATS [documentation][nats_auth_docs]. For TLS client certificate authentication 
 ))]
 pub enum NatsAuthConfig {
     /// Username/password authentication.
-    UserPassword {
-        #[configurable(derived)]
-        user_password: NatsAuthUserPassword,
-    },
+    UserPassword { user_password: NatsAuthUserPassword },
 
     /// Token authentication.
-    Token {
-        #[configurable(derived)]
-        token: NatsAuthToken,
-    },
+    Token { token: NatsAuthToken },
 
     /// Credentials file authentication. (JWT-based)
     CredentialsFile {
-        #[configurable(derived)]
         credentials_file: NatsAuthCredentialsFile,
     },
 
     /// NKey authentication.
-    Nkey {
-        #[configurable(derived)]
-        nkey: NatsAuthNKey,
-    },
+    Nkey { nkey: NatsAuthNKey },
 }
 
 impl std::fmt::Display for NatsAuthConfig {

@@ -56,20 +56,16 @@ pub struct DatadogLogsConfig {
     #[serde(flatten)]
     pub local_dd_common: LocalDatadogCommonConfig,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_compression()"))]
     #[serde(default = "default_compression")]
     pub compression: Option<Compression>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
 

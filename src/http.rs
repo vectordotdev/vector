@@ -574,7 +574,6 @@ pub struct KeepaliveConfig {
     /// will send keepalive probes after the specified idle time has elapsed, detecting and
     /// closing connections where the remote peer has disappeared without sending a FIN or
     /// RST packet (for example, due to an abrupt machine failure or network partition).
-    #[configurable(derived)]
     #[serde(default)]
     pub tcp_keepalive: Option<TcpKeepaliveConfig>,
 }

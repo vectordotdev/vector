@@ -63,15 +63,12 @@ pub struct PostgresConfig {
     /// can be defined at a database level to change the behavior of the insert operation on specific tables.
     /// Alternatively, setting `max_events` batch setting to `1` will make each event to be inserted independently,
     /// so events that trigger a constraint violation will not affect the rest of the events.
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

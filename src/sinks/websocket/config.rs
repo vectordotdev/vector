@@ -22,10 +22,8 @@ pub struct WebSocketSinkConfig {
     #[serde(flatten)]
     pub common: WebSocketCommonConfig,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

@@ -80,27 +80,21 @@ pub struct DorisConfig {
     #[serde(default = "default_max_retries")]
     pub max_retries: isize,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// Options for determining the health of Doris endpoints.
     #[serde(default)]
-    #[configurable(derived)]
     #[serde(rename = "distribution")]
     pub endpoint_health: Option<HealthConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -108,7 +102,6 @@ pub struct DorisConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }

@@ -67,7 +67,6 @@ pub struct MezmoConfig {
     #[configurable(metadata(docs::examples = "tag2"))]
     tags: Option<Vec<UnconfinedTemplate>>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
@@ -81,15 +80,12 @@ pub struct MezmoConfig {
     #[configurable(metadata(docs::examples = "staging"))]
     default_env: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

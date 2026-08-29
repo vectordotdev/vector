@@ -78,7 +78,6 @@ struct LimitParams {
     /// The level above which more requests will be denied.
     limit: Option<usize>,
 
-    #[configurable(derived)]
     #[serde(default)]
     action: Action,
 }
@@ -125,19 +124,15 @@ struct TestParams {
     #[serde(default)]
     jitter: f64,
 
-    #[configurable(derived)]
     #[serde(default)]
     concurrency_limit_params: LimitParams,
 
-    #[configurable(derived)]
     #[serde(default)]
     rate: LimitParams,
 
-    #[configurable(derived)]
     #[serde(default = "default_concurrency")]
     concurrency: Concurrency,
 
-    #[configurable(derived)]
     #[serde(default)]
     adaptive_concurrency: AdaptiveConcurrencySettings,
 }
@@ -154,10 +149,8 @@ const fn default_concurrency() -> Concurrency {
 #[configurable_component(sink("test_arc", "Test (adaptive concurrency)."))]
 #[derive(Clone, Debug, Default)]
 pub struct TestConfig {
-    #[configurable(derived)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     params: TestParams,
 
     // The statistics collected by running a test must be local to that

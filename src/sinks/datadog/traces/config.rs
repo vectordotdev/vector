@@ -60,15 +60,12 @@ pub struct DatadogTracesConfig {
     #[serde(flatten)]
     pub local_dd_common: LocalDatadogCommonConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Option<Compression>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogTracesDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 }

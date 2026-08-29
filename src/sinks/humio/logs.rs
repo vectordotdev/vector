@@ -61,7 +61,6 @@ pub struct HumioLogsConfig {
     /// Typically the filename the logs originated from. Maps to `@source` in Humio.
     pub source: Option<Template>,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
@@ -109,26 +108,21 @@ pub struct HumioLogsConfig {
     ))]
     pub index: Option<Template>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// Overrides the name of the log field used to retrieve the nanosecond-enabled timestamp to send to Humio.
     #[serde(default = "timestamp_nanos_key")]
     pub timestamp_nanos_key: Option<String>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

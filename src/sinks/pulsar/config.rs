@@ -62,21 +62,16 @@ pub struct PulsarSinkConfig {
     /// If omitted, no properties will be written.
     pub properties_key: Option<OptionalTargetPath>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(crate) batch: PulsarBatchConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: PulsarCompression,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     pub(crate) auth: Option<PulsarAuthConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -84,15 +79,12 @@ pub struct PulsarSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub connection_retry_options: Option<CustomConnectionRetryOptions>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(crate) tls: Option<PulsarTlsOptions>,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -134,7 +126,6 @@ pub(crate) struct PulsarAuthConfig {
     #[configurable(metadata(docs::examples = "123456789"))]
     token: Option<SensitiveString>,
 
-    #[configurable(derived)]
     oauth2: Option<OAuth2Config>,
 }
 

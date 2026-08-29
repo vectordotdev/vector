@@ -63,7 +63,6 @@ pub struct AwsKinesisFirehoseConfig {
     ///
     /// If set to `true`, when incoming requests contains an access key sent by AWS Firehose, it is kept in the
     /// event secrets as "aws_kinesis_firehose_access_key".
-    #[configurable(derived)]
     store_access_key: bool,
 
     /// The compression scheme to use for decompressing records within the Firehose message.
@@ -80,18 +79,14 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default)]
     record_compression: Compression,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -100,7 +95,6 @@ pub struct AwsKinesisFirehoseConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 

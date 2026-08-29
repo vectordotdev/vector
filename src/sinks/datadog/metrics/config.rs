@@ -183,11 +183,9 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub series_api_version: SeriesApiVersion,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 }

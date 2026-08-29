@@ -15,7 +15,6 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct OpenTelemetryConfig {
     /// Protocol configuration
-    #[configurable(derived)]
     protocol: Protocol,
 }
 

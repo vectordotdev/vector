@@ -52,24 +52,19 @@ pub struct HoneycombConfig {
     // but this limits us in how we can do our healthcheck.
     dataset: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<HoneycombDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
 
     /// The compression algorithm to use.
-    #[configurable(derived)]
     #[serde(default = "Compression::zstd_default")]
     compression: Compression,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -77,7 +72,6 @@ pub struct HoneycombConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 }

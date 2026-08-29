@@ -66,25 +66,20 @@ pub struct MemoryConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
     /// Configuration of internal metrics
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
     /// Configuration for source functionality.
-    #[configurable(derived)]
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub source_config: Option<MemorySourceConfig>,
     /// Field in the incoming value used as the TTL override.
-    #[configurable(derived)]
     #[serde(default)]
     pub ttl_field: OptionalValuePath,
     /// Behavior for memory table state on configuration reload.
-    #[configurable(derived)]
     #[serde(default)]
     pub reload_behavior: ReloadBehavior,
 
     /// Set to make the table act as a probabilistic filter instead of storing original values. This
     /// will prevent reading values from the table - found keys will have empty value.
-    #[configurable(derived)]
     #[serde(default)]
     pub filter: Option<TableFilter>,
 
