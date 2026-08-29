@@ -6,9 +6,7 @@ use super::{buffering::MessageBufferingConfig, sink::WebSocketListenerSink};
 use crate::{
     codecs::{EncodingConfig, Transformer},
     common::http::server_auth::HttpServerAuthConfig,
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, SinkConfig, SinkContext, ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -152,10 +150,6 @@ impl SinkConfig for WebSocketListenerSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

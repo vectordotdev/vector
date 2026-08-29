@@ -11,8 +11,7 @@ use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     http::HttpClient,
     sinks::{
@@ -167,10 +166,6 @@ impl SinkConfig for HecMetricsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements.inner
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -29,10 +29,7 @@ use crate::{
     aws::{
         ClientBuilder, RegionOrEndpoint, auth::AwsAuthentication, create_client, is_retriable_error,
     },
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, ProxyConfig, SinkConfig, SinkContext,
-        ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, ValidatedSink},
     event::{
         Event,
         metric::{Metric, MetricTags, MetricValue},
@@ -152,10 +149,6 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

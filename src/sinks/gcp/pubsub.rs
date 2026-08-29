@@ -12,8 +12,7 @@ use vector_lib::configurable::configurable_component;
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
@@ -127,10 +126,6 @@ impl SinkConfig for PubsubConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

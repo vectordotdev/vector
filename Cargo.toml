@@ -327,7 +327,12 @@ azure_identity = { version = "1.0", default-features = false, features = ["clien
 azure_storage_blob = { version = "1.0", default-features = false, optional = true }
 
 # OpenDAL
-opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
+# Use native-tls for the HTTP transport so we do not enable rustls's aws-lc-rs
+# provider alongside Vector's existing ring-based rustls users (e.g. sqlx).
+# Install the transport explicitly in the webhdfs sink: the facade only
+# auto-installs it under the `http-transport-reqwest` alias, which pulls aws-lc.
+opendal = { version = "0.58.2", default-features = false, features = ["services-webhdfs", "layers-logging", "executors-tokio", "http-transport-reqwest-native-tls"], optional = true }
+opendal-http-transport-reqwest = { version = "0.58.2", default-features = false, features = ["native-tls"], optional = true }
 
 # Tower
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
@@ -526,6 +531,7 @@ test-generator = "0.3.1"
 tokio = { workspace = true, features = ["test-util"] }
 tokio-test.workspace = true
 tower-test = "0.4.0"
+parking_lot = { version = "0.12.5", default-features = false }
 vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
 
@@ -984,7 +990,7 @@ sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
 sinks-websocket = ["dep:tokio-tungstenite"]
 sinks-websocket_server = ["dep:tokio-tungstenite", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
-sinks-webhdfs = ["dep:opendal"]
+sinks-webhdfs = ["dep:opendal", "dep:opendal-http-transport-reqwest"]
 
 # Identifies that the build is a nightly build
 nightly = []

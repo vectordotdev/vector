@@ -9,7 +9,7 @@ use super::{
     sink::{RedisConnection, RedisSink},
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     serde::OneOrMany,
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
@@ -214,10 +214,6 @@ impl SinkConfig for RedisSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

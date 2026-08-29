@@ -8,7 +8,7 @@ use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         azure_common::config::AzureAuthentication,
@@ -200,10 +200,6 @@ impl SinkConfig for AzureLogsIngestionConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

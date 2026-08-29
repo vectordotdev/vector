@@ -10,7 +10,7 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{DynValidatedSink, GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
+    config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck,
         opendal_common::*,
@@ -122,10 +122,6 @@ impl SinkConfig for WebHdfsConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -165,15 +161,15 @@ impl ValidatedSink for WebHdfsConfig {
 
 impl WebHdfsConfig {
     pub fn build_operator(&self) -> crate::Result<Operator> {
+        install_opendal_defaults();
+
         // Build OpenDal Operator
         let mut builder = Webhdfs::default();
         // Prefix logic will be handled by key_partitioner.
         builder = builder.root(&self.root);
         builder = builder.endpoint(&self.endpoint.to_string());
 
-        let op = Operator::new(builder)?
-            .layer(LoggingLayer::default())
-            .finish();
+        let op = Operator::new(builder)?.layer(LoggingLayer::default());
         Ok(op)
     }
 
@@ -217,6 +213,17 @@ impl WebHdfsConfig {
         let prefix = self.confined_prefix()?;
         Ok(KeyPartitioner::new(prefix, None))
     }
+}
+
+/// Register OpenDAL services and install the native-tls HTTP transport.
+///
+/// `opendal::install_default` registers enabled services, but HTTP-transport
+/// auto-install is gated on the `http-transport-reqwest` alias (rustls/aws-lc).
+/// We use `http-transport-reqwest-native-tls` instead, so the transport is
+/// installed separately. Both calls are idempotent.
+fn install_opendal_defaults() {
+    opendal::install_default();
+    opendal_http_transport_reqwest::install_default();
 }
 
 #[cfg(test)]
