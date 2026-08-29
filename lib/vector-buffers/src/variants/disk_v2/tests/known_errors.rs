@@ -42,6 +42,21 @@ impl AsMetadata for u32 {
     }
 }
 
+/// Byte length of the record length delimiter that a torn write leaves behind.
+const TORN_TAIL_LEN: u64 = size_of::<u64>() as u64;
+
+async fn data_file_size(data_file_path: &PathBuf) -> u64 {
+    OpenOptions::new()
+        .read(true)
+        .open(data_file_path)
+        .await
+        .expect("open should not fail")
+        .metadata()
+        .await
+        .expect("metadata should not fail")
+        .len()
+}
+
 async fn corrupt_record_checksum(data_file_path: &PathBuf, record_start: usize, record_end: usize) {
     let data_file = OpenOptions::new()
         .read(true)
@@ -1857,15 +1872,20 @@ async fn writer_and_reader_handle_when_last_record_has_scrambled_archive_data() 
 ///
 /// # Recovery Behavior Under Test
 ///
-/// Startup recovery (see `checkpoint_recovery.rs`) now reconciles data files against the durable
-/// ledger checkpoints before normal reads begin: `validate_last_write()` detects the undecodable
-/// tail, and `reconcile_current_data_file_with_checkpoint()` truncates it at the last complete
-/// record boundary. The torn tail is therefore gone before the reader can ever observe it, and the
-/// writer continues appending to the same data file.
+/// Startup recovery (see `checkpoint_recovery.rs`, added in #25845) now reconciles data files
+/// against the durable ledger checkpoints before normal reads begin: `validate_last_write()`
+/// detects the undecodable tail, and `reconcile_current_data_file_with_checkpoint()` truncates it
+/// at the last complete record boundary. The torn tail is therefore gone before the reader can
+/// ever observe it, and the writer continues appending to the same data file.
 ///
-/// This test verifies the end-to-end symptom from the issue report: after restarting on a buffer
-/// with valid-but-unread records followed by a torn tail, the reader must deliver the existing
-/// records and then resume delivering newly written records promptly, instead of wedging forever.
+/// This test asserts both halves of that behavior:
+///
+/// 1. The data file shrinks back to the last complete record boundary across the restart. This
+///    pins the mechanism directly -- before the fix the torn tail survived recovery and the file
+///    stayed oversized.
+/// 2. The end-to-end symptom from the issue report is gone: after restarting on a buffer with
+///    valid-but-unread records followed by a torn tail, the reader delivers the existing records
+///    and then resumes delivering newly written records, instead of wedging forever.
 #[tokio::test]
 async fn reader_resumes_after_restart_with_torn_tail_beyond_unread_records() {
     let fut = with_temp_dir(|dir| {
@@ -1876,17 +1896,20 @@ async fn reader_resumes_after_restart_with_torn_tail_beyond_unread_records() {
             // acknowledged, so both remain unread after restart.
             let (mut writer, reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
 
-            writer
+            let bytes_a = writer
                 .write_record(SizedRecord::new(64))
                 .await
                 .expect("write A should not fail");
             writer.flush().await.expect("flush should not fail");
 
-            writer
+            let bytes_b = writer
                 .write_record(SizedRecord::new(64))
                 .await
                 .expect("write B should not fail");
             writer.flush().await.expect("flush should not fail");
+
+            // The size the data file must return to once recovery truncates the torn tail.
+            let clean_data_file_size = (bytes_a + bytes_b) as u64;
 
             // Flush the ledger so both records are covered by the durable writer checkpoint.
             ledger.flush().expect("should not fail to flush ledger");
@@ -1915,11 +1938,29 @@ async fn reader_resumes_after_restart_with_torn_tail_beyond_unread_records() {
                 data_file.sync_all().await.expect("sync should not fail");
             }
 
+            // Both complete records must be on disk before the torn tail, otherwise the rest of
+            // this test is not exercising the scenario it describes.
+            assert_eq!(
+                clean_data_file_size + TORN_TAIL_LEN,
+                data_file_size(&data_file_path).await,
+                "data file should hold both complete records plus the torn tail"
+            );
+
             // Reopen the buffer, simulating a process restart. Startup recovery truncates the torn
             // tail at the last complete record boundary and leaves the writer positioned to append
             // new records to the same data file.
             let (mut writer, mut reader, _) =
                 create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+
+            // Startup recovery must have truncated the torn tail back to the last complete record
+            // boundary. This is the mechanism that prevents the original hang: with the tail gone,
+            // the reader can never observe a length delimiter promising bytes that never arrive.
+            // Before the upstream fix, the tail survived recovery and the file stayed oversized.
+            assert_eq!(
+                clean_data_file_size,
+                data_file_size(&data_file_path).await,
+                "startup recovery should truncate the torn tail from the data file"
+            );
 
             // The valid-but-unread records A and B must be delivered normally.
             let read_a = await_timeout!(reader.next(), 2)
