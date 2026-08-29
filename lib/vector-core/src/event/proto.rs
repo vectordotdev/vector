@@ -889,7 +889,7 @@ mod tests {
         );
         let event = crate::event::Metric::new(
             "requests",
-            metric::Kind::Absolute,
+            crate::event::MetricKind::Absolute,
             EventMetricValue::Counter { value: 1.0 },
         )
         .with_tags(Some(tags));

@@ -686,7 +686,7 @@ mod tests {
         let value = TagValueSet::from([TagValue::Bare]);
 
         let encoded = serde_json::to_string(&value).unwrap();
-        let decoded = serde_json::from_str(&encoded).unwrap();
+        let decoded: TagValueSet = serde_json::from_str(&encoded).unwrap();
 
         assert_eq!(encoded, "null");
         assert_eq!(decoded, value);
