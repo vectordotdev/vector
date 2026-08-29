@@ -1839,7 +1839,7 @@ async fn writer_and_reader_handle_when_last_record_has_scrambled_archive_data() 
     fut.instrument(parent.or_current()).await;
 }
 
-/// Reproducer for <https://github.com/vectordotdev/vector/issues/18336>
+/// Regression test for <https://github.com/vectordotdev/vector/issues/18336>
 ///
 /// # Bug Description
 ///
@@ -1848,52 +1848,34 @@ async fn writer_and_reader_handle_when_last_record_has_scrambled_archive_data() 
 /// was flushed to disk but the actual record data was not (because it was still in the OS page
 /// cache or the writer's internal buffer when the process died).
 ///
-/// On restart, `validate_last_write()` correctly detects the corrupted last record and marks the
-/// writer to skip to the next data file (`skip_to_next = true`). However, the ledger's
-/// `writer_current_data_file` is NOT updated at this point — it is only updated lazily when the
-/// writer actually opens the next file (i.e., on the first successful write after restart).
+/// Historically, on restart `validate_last_write()` detected the corrupted tail and marked the
+/// writer to lazily skip to the next data file, without advancing the ledger's writer file ID. A
+/// reader that had valid but unacknowledged records before the partial write would deliver those
+/// records, reach the torn tail while still on the writer's current (unfinalized) file, and
+/// busy-spin forever inside `try_next_record` waiting for bytes that would never arrive -- pinning
+/// a core at 100% and wedging the sink so it stopped forwarding data entirely.
 ///
-/// Meanwhile, `seek_to_next_record()` initializes the reader to the last acknowledged position.
-/// If there were valid but unacknowledged records BEFORE the partial write, the reader's seek
-/// stops short of the corrupted region. After seek completes, `ready_to_read = true`, and the
-/// reader and writer both appear to be on the same file ID (both = 0 from the ledger).
+/// # Recovery Behavior Under Test
 ///
-/// During normal operation, the `is_finalized` flag is computed as:
-/// ```text
-/// is_finalized = (reader_file_id != writer_file_id) || !self.ready_to_read
-/// ```
-/// Since both IDs are 0 and `ready_to_read = true`, `is_finalized = false`.
+/// Startup recovery (see `checkpoint_recovery.rs`) now reconciles data files against the durable
+/// ledger checkpoints before normal reads begin: `validate_last_write()` detects the undecodable
+/// tail, and `reconcile_current_data_file_with_checkpoint()` truncates it at the last complete
+/// record boundary. The torn tail is therefore gone before the reader can ever observe it, and the
+/// writer continues appending to the same data file.
 ///
-/// When the reader eventually reaches the partial write, it reads the 8-byte length delimiter
-/// (claiming 1024 bytes follow), then enters the `try_next_record` inner loop. Since the file is
-/// at EOF, `fill_buf()` returns an empty buffer. But because `is_finalized = false`, the code
-/// does NOT return a `PartialWrite` error — it busy-spins forever, never making progress. This
-/// manifests as ~100% CPU on a single core and the affected sink stopping all output.
-///
-/// # Test Setup
-///
-/// 1. Write two records (A and B), flushing both to disk.
-/// 2. Read and acknowledge only record A (leaving B as valid but unacknowledged).
-/// 3. Flush the ledger to persist the acknowledgement (`reader_last_record_id = 0`).
-/// 4. Simulate a crash by appending only the 8-byte length delimiter of a new record (no data).
-/// 5. Reopen the buffer (simulate restart).
-///    - `validate_last_write()` detects `FailedDeserialization`, calls `mark_for_skip()`.
-///    - Ledger still says `writer_current_data_file = 0` (not updated yet).
-///    - `seek_to_next_record()`: `ledger_last = 0`, `last_reader_record_id starts at 0`,
-///      condition `0 < 0` is false, so seek does nothing. Reader positioned at start of file 0.
-/// 6. Normal reads: record A succeeds, record B succeeds, then the reader hits the partial write.
-/// 7. With the bug: `is_finalized = false`, so the third read busy-spins (timeout fires = FAIL).
-/// 8. With a fix: the third read returns `Err(ReaderError::PartialWrite)` within the timeout.
+/// This test verifies the end-to-end symptom from the issue report: after restarting on a buffer
+/// with valid-but-unread records followed by a torn tail, the reader must deliver the existing
+/// records and then resume delivering newly written records promptly, instead of wedging forever.
 #[tokio::test]
-async fn reader_hangs_after_partial_write_beyond_last_acked_record() {
+async fn reader_resumes_after_restart_with_torn_tail_beyond_unread_records() {
     let fut = with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();
 
         async move {
-            // Create a buffer with default settings.
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            // Create a buffer and write two records (A and B), flushing both to disk. Neither is
+            // acknowledged, so both remain unread after restart.
+            let (mut writer, reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
 
-            // Write two records (A and B) and flush them both to disk.
             writer
                 .write_record(SizedRecord::new(64))
                 .await
@@ -1906,18 +1888,7 @@ async fn reader_hangs_after_partial_write_beyond_last_acked_record() {
                 .expect("write B should not fail");
             writer.flush().await.expect("flush should not fail");
 
-            // Read and acknowledge only record A. Record B remains valid but unacknowledged.
-            // The ledger's `reader_last_record_id` is set to 0 (record A's ID).
-            let record_a = reader
-                .next()
-                .await
-                .expect("should not fail to read")
-                .expect("should contain record A");
-            assert_eq!(SizedRecord::new(64), record_a);
-            acknowledge(record_a).await;
-
-            // Flush the ledger to persist the acknowledgement.
-            // After this point: ledger `reader_last_record_id = 0`.
+            // Flush the ledger so both records are covered by the durable writer checkpoint.
             ledger.flush().expect("should not fail to flush ledger");
 
             let data_file_path = ledger.get_current_writer_data_file_path();
@@ -1944,55 +1915,40 @@ async fn reader_hangs_after_partial_write_beyond_last_acked_record() {
                 data_file.sync_all().await.expect("sync should not fail");
             }
 
-            // Reopen the buffer, simulating a process restart. During `Buffer::from_config_inner`:
-            //
-            //   1. `validate_last_write()` mmaps the data file. `check_archived_root::<Record>`
-            //      fails on the last 8 bytes (not a valid archived Record structure) and returns
-            //      FailedDeserialization. The writer calls `reset()` + `mark_for_skip()`.
-            //      Crucially, the ledger's `writer_current_data_file` remains 0.
-            //
-            //   2. `seek_to_next_record()` with `ledger_last = 0`. Since `last_reader_record_id`
-            //      starts at 0 and the loop condition is `0 < 0 = false`, the seek loop does not
-            //      execute. Reader is positioned at the beginning of file 0. `ready_to_read = true`.
-            let (_, mut reader, _) = create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            // Reopen the buffer, simulating a process restart. Startup recovery truncates the torn
+            // tail at the last complete record boundary and leaves the writer positioned to append
+            // new records to the same data file.
+            let (mut writer, mut reader, _) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
 
-            // Record A: valid record at the start of file 0. Should succeed.
-            // `is_finalized = false` (reader_file_id=0 == writer_file_id=0), but there is real
-            // data to read so fill_buf() returns data immediately rather than spinning.
-            let read_a =
-                await_timeout!(reader.next(), 2).expect("reading record A should not fail");
-            assert_eq!(read_a, Some(SizedRecord::new(64)));
+            // The valid-but-unread records A and B must be delivered normally.
+            let read_a = await_timeout!(reader.next(), 2)
+                .expect("reading record A should not fail")
+                .expect("record A should be present");
+            assert_eq!(read_a, SizedRecord::new(64));
 
-            // Record B: valid record after A in file 0. Should also succeed.
-            let read_b =
-                await_timeout!(reader.next(), 2).expect("reading record B should not fail");
-            assert_eq!(read_b, Some(SizedRecord::new(64)));
+            let read_b = await_timeout!(reader.next(), 2)
+                .expect("reading record B should not fail")
+                .expect("record B should be present");
+            assert_eq!(read_b, SizedRecord::new(64));
 
-            // Third read: hits the partial write (8-byte length delimiter with no data).
-            //
-            // With the bug:
-            //   - `is_finalized = false` because reader_file_id (0) == writer_file_id (0).
-            //     The writer has `skip_to_next = true` internally but has NOT yet updated the
-            //     ledger (the update happens lazily on the first actual write).
-            //   - The reader calls `try_next_record(false)`: reads the 8-byte delimiter (1024),
-            //     then enters the inner loop trying to read 1024 bytes.
-            //   - `fill_buf()` returns empty (EOF) but `is_finalized = false` means no
-            //     PartialWrite error is returned. The reader busy-spins indefinitely.
-            //   - Each `fill_buf()` briefly suspends the task via tokio's blocking thread pool
-            //     (the underlying tokio::fs::File dispatches reads there), so the timeout CAN fire.
-            //   - After 2 seconds the timeout fires and `third_read` is `Err(Elapsed)`.
-            //   - The assertion below fails: bug confirmed.
-            //
-            // With a fix, `is_finalized` should become true when the reader detects it is behind
-            // the writer, and the read should return `Err(ReaderError::PartialWrite)` promptly.
-            let third_read = timeout(Duration::from_secs(2), reader.next()).await;
-            assert!(
-                third_read.is_ok(),
-                "reader timed out when reading past a partial write — \
-                 is_finalized was false because the ledger's writer_current_data_file \
-                 was not updated by validate_last_write() \
-                 (reproducer for https://github.com/vectordotdev/vector/issues/18336)"
-            );
+            // Write a new record after the restart. With the original bug, the reader was busy-
+            // spinning at the torn tail and would never observe this write: the sink wedged and
+            // stopped forwarding data (the symptom reported in #18336). Recovery must instead let
+            // the reader pick up new records promptly.
+            writer
+                .write_record(SizedRecord::new(96))
+                .await
+                .expect("write C should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let read_c = await_timeout!(reader.next(), 2)
+                .expect("reader must resume delivering records after restart with a torn tail")
+                .expect("record C should be present");
+            assert_eq!(read_c, SizedRecord::new(96));
+
+            drop(reader);
+            drop(writer);
         }
     });
 
