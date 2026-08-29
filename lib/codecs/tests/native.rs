@@ -26,7 +26,8 @@ use vector_core::{
     config::{ComponentKey, LogNamespace, OutputId},
     event::{
         DatadogMetricOriginMetadata, Event, EventMetadata, LogEvent, Metric, MetricKind,
-        MetricTags, MetricValue, ObjectMap, TraceEvent, Value, metric::TagValue,
+        MetricTags, MetricValue, ObjectMap, TraceEvent, Value,
+        metric::{Bucket, Quantile, TagValue},
     },
 };
 use vrl::event_path;
@@ -45,8 +46,8 @@ fn nonempty_bounded_string() -> BoxedStrategy<String> {
         .boxed()
 }
 
-fn json_safe_value() -> BoxedStrategy<Value> {
-    let leaf = prop_oneof![
+fn json_safe_leaf() -> BoxedStrategy<Value> {
+    prop_oneof![
         bounded_string().prop_map(Value::from),
         any::<i64>().prop_map(Value::from),
         (-1_000_000.0_f64..=1_000_000.0).prop_map(|value| {
@@ -55,8 +56,11 @@ fn json_safe_value() -> BoxedStrategy<Value> {
         }),
         any::<bool>().prop_map(Value::from),
         Just(Value::Null),
-    ];
+    ]
+    .boxed()
+}
 
+fn value_strategy(leaf: BoxedStrategy<Value>) -> BoxedStrategy<Value> {
     leaf.prop_recursive(3, 32, 4, |inner| {
         prop_oneof![
             proptest::collection::vec(inner.clone(), 0..4).prop_map(Value::Array),
@@ -73,8 +77,28 @@ fn json_safe_value() -> BoxedStrategy<Value> {
     .boxed()
 }
 
-fn object_map() -> BoxedStrategy<ObjectMap> {
-    btree_map(bounded_string(), json_safe_value(), 0..4)
+fn json_safe_value() -> BoxedStrategy<Value> {
+    value_strategy(json_safe_leaf())
+}
+
+fn datetime() -> BoxedStrategy<DateTime<Utc>> {
+    (-32_000_i64..=32_000, 0_u32..1_000_000_000)
+        .prop_map(|(seconds, nanoseconds)| DateTime::from_timestamp(seconds, nanoseconds).unwrap())
+        .boxed()
+}
+
+fn proto_value() -> BoxedStrategy<Value> {
+    value_strategy(
+        prop_oneof![
+            5 => json_safe_leaf(),
+            1 => datetime().prop_map(Value::Timestamp),
+        ]
+        .boxed(),
+    )
+}
+
+fn object_map(value: BoxedStrategy<Value>) -> BoxedStrategy<ObjectMap> {
+    btree_map(bounded_string(), value, 0..4)
         .prop_map(|entries| {
             entries
                 .into_iter()
@@ -84,11 +108,47 @@ fn object_map() -> BoxedStrategy<ObjectMap> {
         .boxed()
 }
 
+fn metric_float() -> BoxedStrategy<f64> {
+    (proptest::num::f64::POSITIVE | proptest::num::f64::NEGATIVE | proptest::num::f64::ZERO).boxed()
+}
+
+fn quantile_value() -> BoxedStrategy<f64> {
+    (0_u32..=10_000)
+        .prop_map(|value| f64::from(value) / 10_000.0)
+        .boxed()
+}
+
 fn metric_value() -> BoxedStrategy<MetricValue> {
     prop_oneof![
         7 => any::<MetricValue>(),
         1 => btree_set(bounded_string(), 0..4)
             .prop_map(|values| MetricValue::Set { values }),
+        1 => (
+            proptest::collection::vec(
+                (metric_float(), any::<u64>())
+                    .prop_map(|(upper_limit, count)| Bucket { upper_limit, count }),
+                0..8,
+            ),
+            any::<u64>(),
+            metric_float(),
+        ).prop_map(|(buckets, count, sum)| MetricValue::AggregatedHistogram {
+            buckets,
+            count,
+            sum,
+        }),
+        1 => (
+            proptest::collection::vec(
+                (quantile_value(), metric_float())
+                    .prop_map(|(quantile, value)| Quantile { quantile, value }),
+                0..8,
+            ),
+            any::<u64>(),
+            metric_float(),
+        ).prop_map(|(quantiles, count, sum)| MetricValue::AggregatedSummary {
+            quantiles,
+            count,
+            sum,
+        }),
     ]
     .boxed()
 }
@@ -116,9 +176,9 @@ fn metric_tags() -> BoxedStrategy<Option<MetricTags>> {
     .boxed()
 }
 
-fn event_metadata() -> BoxedStrategy<EventMetadata> {
+fn event_metadata(value: BoxedStrategy<Value>) -> BoxedStrategy<EventMetadata> {
     (
-        json_safe_value(),
+        value,
         proptest::option::of(bounded_string()),
         proptest::option::of(bounded_string()),
         proptest::option::of((bounded_string(), proptest::option::of(bounded_string()))),
@@ -158,12 +218,7 @@ fn event_metadata() -> BoxedStrategy<EventMetadata> {
 }
 
 fn timestamp() -> BoxedStrategy<Option<DateTime<Utc>>> {
-    proptest::option::of(
-        (-32_000_i64..=32_000, 0_u32..1_000_000_000).prop_map(|(seconds, nanoseconds)| {
-            DateTime::from_timestamp(seconds, nanoseconds).unwrap()
-        }),
-    )
-    .boxed()
+    proptest::option::of(datetime()).boxed()
 }
 
 fn interval() -> BoxedStrategy<Option<NonZeroU32>> {
@@ -171,11 +226,11 @@ fn interval() -> BoxedStrategy<Option<NonZeroU32>> {
         .boxed()
 }
 
-fn event_strategy() -> BoxedStrategy<Event> {
-    let metadata = event_metadata();
-    let log = (object_map(), metadata.clone())
+fn event_strategy(value: BoxedStrategy<Value>) -> BoxedStrategy<Event> {
+    let metadata = event_metadata(value.clone());
+    let log = (object_map(value.clone()), metadata.clone())
         .prop_map(|(fields, metadata)| Event::Log(LogEvent::from_map(fields, metadata)));
-    let trace = (object_map(), metadata.clone())
+    let trace = (object_map(value), metadata.clone())
         .prop_map(|(fields, metadata)| Event::Trace(TraceEvent::from_parts(fields, metadata)));
     let metric = (
         bounded_string(),
@@ -211,7 +266,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(PROPERTY_TESTS))]
 
     #[test]
-    fn native_proto_is_canonical_for_arbitrary_events(event in event_strategy()) {
+    fn native_proto_is_canonical_for_arbitrary_events(event in event_strategy(proto_value())) {
         let expected = event.clone();
         let serializer = &mut NativeSerializerConfig.build();
         let mut encoded = BytesMut::new();
@@ -223,6 +278,10 @@ proptest! {
             .unwrap();
         prop_assert_eq!(decoded.len(), 1);
         let decoded = decoded.pop().unwrap();
+        prop_assert_eq!(
+            decoded.metadata().source_event_id(),
+            expected.metadata().source_event_id()
+        );
         prop_assert_eq!(&decoded, &expected);
 
         let mut reencoded = BytesMut::new();
@@ -232,7 +291,7 @@ proptest! {
     }
 
     #[test]
-    fn native_json_is_canonical_for_arbitrary_events(event in event_strategy()) {
+    fn native_json_is_canonical_for_arbitrary_events(event in event_strategy(json_safe_value())) {
         let expected = without_metadata(event.clone());
         let serializer = &mut NativeJsonSerializerConfig.build();
         let mut encoded = BytesMut::new();
