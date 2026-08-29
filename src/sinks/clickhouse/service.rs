@@ -15,7 +15,9 @@ use crate::{
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+            http::{
+                HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder, RetryStrategy,
+            },
             retries::RetryAction,
         },
     },
@@ -24,6 +26,20 @@ use crate::{
 #[derive(Debug, Default, Clone)]
 pub struct ClickhouseRetryLogic {
     inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
+}
+
+impl ClickhouseRetryLogic {
+    /// Build the logic with the sink's configured strategy. The only thing the
+    /// strategy does not govern is malformed data: ClickHouse reports it as a
+    /// 500 with a `Code: 117`/`Code: 53` body, and those stay non-retriable
+    /// whatever the strategy, because retrying a poison pill forever would
+    /// wedge the partition behind it. Every other response, 500s included, is
+    /// delegated to the strategy.
+    pub const fn new(retry_strategy: RetryStrategy) -> Self {
+        Self {
+            inner: HttpRetryLogic::new(retry_strategy),
+        }
+    }
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
@@ -35,29 +51,30 @@ impl RetryLogic for ClickhouseRetryLogic {
         self.inner.is_retriable_error(error)
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        match response.http_response.status() {
-            StatusCode::INTERNAL_SERVER_ERROR => {
-                let body = response.http_response.body();
+    fn is_retriable_timeout(&self) -> bool {
+        self.inner.is_retriable_timeout()
+    }
 
-                // Currently, ClickHouse returns 500's incorrect data and type mismatch errors.
-                // This attempts to check if the body starts with `Code: {code_num}` and to not
-                // retry those errors.
-                //
-                // Reference: https://github.com/vectordotdev/vector/pull/693#issuecomment-517332654
-                // Error code definitions: https://github.com/ClickHouse/ClickHouse/blob/master/dbms/src/Common/ErrorCodes.cpp
-                //
-                // Fix already merged: https://github.com/ClickHouse/ClickHouse/pull/6271
-                if body.starts_with(b"Code: 117") {
-                    RetryAction::DontRetry("incorrect data".into())
-                } else if body.starts_with(b"Code: 53") {
-                    RetryAction::DontRetry("type mismatch".into())
-                } else {
-                    RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
-                }
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
+        if response.http_response.status() == StatusCode::INTERNAL_SERVER_ERROR {
+            let body = response.http_response.body();
+
+            // Currently, ClickHouse returns 500's incorrect data and type mismatch errors.
+            // This attempts to check if the body starts with `Code: {code_num}` and to not
+            // retry those errors.
+            //
+            // Reference: https://github.com/vectordotdev/vector/pull/693#issuecomment-517332654
+            // Error code definitions: https://github.com/ClickHouse/ClickHouse/blob/master/dbms/src/Common/ErrorCodes.cpp
+            //
+            // Fix already merged: https://github.com/ClickHouse/ClickHouse/pull/6271
+            if body.starts_with(b"Code: 117") {
+                return RetryAction::DontRetry("incorrect data".into());
+            } else if body.starts_with(b"Code: 53") {
+                return RetryAction::DontRetry("type mismatch".into());
             }
-            _ => self.inner.should_retry_response(&response.http_response),
         }
+
+        self.inner.should_retry_response(&response.http_response)
     }
 }
 
@@ -402,5 +419,113 @@ mod tests {
             QuerySettingsConfig::default(),
         )
         .unwrap_err();
+    }
+
+    fn response(status: StatusCode, body: &'static str) -> HttpResponse {
+        HttpResponse {
+            http_response: http::Response::builder()
+                .status(status)
+                .body(Bytes::from_static(body.as_bytes()))
+                .unwrap(),
+            events_byte_size: GroupedCountByteSize::new_untagged(),
+            raw_byte_size: 0,
+        }
+    }
+
+    // A 404 is what ClickHouse returns for an unknown table. Under the default
+    // strategy the sink drops that batch, which finalizes it as `Rejected` — and
+    // because Kafka commits a single offset watermark per partition, the next
+    // batch that succeeds stores an offset past it and the dropped events are
+    // gone silently. Retrying instead means the batch never resolves, so the
+    // watermark cannot move past it.
+    #[test]
+    fn default_strategy_drops_unknown_table() {
+        let logic = ClickhouseRetryLogic::default();
+        assert!(matches!(
+            logic.should_retry_response(&response(StatusCode::NOT_FOUND, "")),
+            RetryAction::DontRetry(_)
+        ));
+    }
+
+    #[test]
+    fn custom_strategy_retries_unknown_table() {
+        let logic = ClickhouseRetryLogic::new(RetryStrategy::Custom {
+            status_codes: vec![StatusCode::NOT_FOUND],
+        });
+        assert!(matches!(
+            logic.should_retry_response(&response(StatusCode::NOT_FOUND, "")),
+            RetryAction::Retry(_)
+        ));
+    }
+
+    // Malformed data must stay non-retriable whatever the strategy: ClickHouse
+    // reports it as a 500 with a `Code: N` body, and retrying a poison pill
+    // forever would wedge every batch queued behind it.
+    #[test]
+    fn strategy_does_not_override_malformed_data() {
+        for logic in [
+            ClickhouseRetryLogic::default(),
+            ClickhouseRetryLogic::new(RetryStrategy::All),
+        ] {
+            for body in ["Code: 117, e.displayText() = DB::Exception", "Code: 53"] {
+                assert!(
+                    matches!(
+                        logic.should_retry_response(&response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            body
+                        )),
+                        RetryAction::DontRetry(_)
+                    ),
+                    "expected {body} to stay non-retriable"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn strategy_retries_other_server_errors() {
+        let logic = ClickhouseRetryLogic::default();
+        assert!(matches!(
+            logic.should_retry_response(&response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Code: 999, something transient"
+            )),
+            RetryAction::Retry(_)
+        ));
+    }
+
+    // Outside the malformed-data exception, 500s are the strategy's call like
+    // any other status: a strategy that excludes them must not be overridden by
+    // an unconditional retry, or ingest stalls on a response the operator
+    // explicitly asked not to retry.
+    #[test]
+    fn strategy_governs_other_server_errors() {
+        for strategy in [
+            RetryStrategy::None,
+            RetryStrategy::Custom {
+                status_codes: vec![StatusCode::NOT_FOUND],
+            },
+        ] {
+            let logic = ClickhouseRetryLogic::new(strategy.clone());
+            assert!(
+                matches!(
+                    logic.should_retry_response(&response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Code: 999, something transient"
+                    )),
+                    RetryAction::DontRetry(_)
+                ),
+                "expected {strategy:?} to leave a 500 non-retriable"
+            );
+        }
+    }
+
+    // `none` promises not to retry request timeouts either, so the wrapper has
+    // to forward the decision instead of inheriting the trait default of `true`.
+    #[test]
+    fn strategy_governs_timeouts() {
+        assert!(!ClickhouseRetryLogic::new(RetryStrategy::None).is_retriable_timeout());
+        assert!(ClickhouseRetryLogic::default().is_retriable_timeout());
+        assert!(ClickhouseRetryLogic::new(RetryStrategy::All).is_retriable_timeout());
     }
 }
