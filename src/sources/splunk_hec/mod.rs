@@ -274,7 +274,10 @@ impl SplunkConfig {
             )
             .or_else(finish_err);
 
-        let listener = tls.bind_reloadable(&self.address, tls_reloader).await?;
+        let listener = tls
+            .bind_reloadable(&self.address, tls_reloader)
+            .await?
+            .with_keepalive(self.keepalive.tcp_keepalive);
 
         let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
