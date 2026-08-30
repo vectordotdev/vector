@@ -211,6 +211,24 @@ generated: components: sources: prometheus_scrape: configuration: {
 		required: false
 		type: bool: default: false
 	}
+	headers: {
+		description: """
+			Headers to apply to the scrape requests.
+
+			One or more values for the same header can be provided.
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				"X-My-Header": ["value1", "value2"]
+			}]
+			options: "*": {
+				description: "An HTTP request header and its value(s)."
+				required:    true
+				type: array: items: type: string: {}
+			}
+		}
+	}
 	instance_tag: {
 		description: """
 			The tag name added to each event representing the scraped instance's `host:port`.
