@@ -12,6 +12,11 @@ pub(crate) mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
+#[allow(warnings, clippy::pedantic, clippy::nursery)]
+pub(crate) mod ddmetric_v3_proto {
+    include!(concat!(env!("OUT_DIR"), "/datadoghq.api.metrics.v3.rs"));
+}
+
 #[allow(warnings)]
 pub(crate) mod ddtrace_proto {
     include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));

@@ -49,7 +49,7 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
         DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto,
-        ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
+        ddmetric_v3_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
         addr::{PortGuard, next_addr},
@@ -63,6 +63,7 @@ const DD_API_LOGS_V1_PATH: &str = "/v1/input/";
 const DD_API_LOGS_V2_PATH: &str = "/api/v2/logs";
 const DD_API_SERIES_V1_PATH: &str = "/api/v1/series";
 const DD_API_SERIES_V2_PATH: &str = "/api/v2/series";
+const DD_API_SERIES_V3_PATH: &str = "/api/intake/metrics/v3/series";
 const DD_API_SKETCHES_PATH: &str = "/api/beta/sketches";
 const DD_API_TRACES_PATH: &str = "/api/v0.2/traces";
 const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
@@ -350,6 +351,35 @@ async fn send_and_collect(
     spawn_collect_n(
         async move {
             assert_eq!(200, send_with_path(address, &body, headers, path).await);
+        },
+        rx,
+        expected_count,
+    )
+    .await
+}
+
+async fn send_bytes_and_collect(
+    address: SocketAddr,
+    body: Vec<u8>,
+    headers: HeaderMap,
+    path: &'static str,
+    rx: impl Stream<Item = Event> + Unpin,
+    expected_count: usize,
+) -> Vec<Event> {
+    spawn_collect_n(
+        async move {
+            let response = timeout(
+                HTTP_REQUEST_TIMEOUT,
+                reqwest::Client::new()
+                    .post(format!("http://{address}{path}"))
+                    .headers(headers)
+                    .body(body)
+                    .send(),
+            )
+            .await
+            .expect("send_bytes_and_collect request timed out")
+            .unwrap();
+            assert_eq!(200, response.status().as_u16());
         },
         rx,
         expected_count,
@@ -2328,6 +2358,117 @@ async fn decode_series_endpoint_v2() {
                 42
             );
         }
+    })
+    .await;
+}
+
+fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
+    values
+        .iter()
+        .flat_map(|value| {
+            let mut length = value.len() as u64;
+            let mut encoded = Vec::new();
+            while length >= 0x80 {
+                encoded.push((length as u8 & 0x7f) | 0x80);
+                length >>= 7;
+            }
+            encoded.push(length as u8);
+            encoded.extend_from_slice(value.as_bytes());
+            encoded
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn decode_series_endpoint_v3() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let payload = ddmetric_v3_proto::Payload {
+            metadata: Some(ddmetric_v3_proto::Metadata {
+                tags: vec!["team:core".to_string()],
+                resources: Vec::new(),
+            }),
+            metric_data: Some(ddmetric_v3_proto::MetricData {
+                dict_name_str: v3_string_dictionary(&["namespace.dd_gauge"]),
+                dict_tag_str: v3_string_dictionary(&["foo:bar"]),
+                dict_tagsets: vec![1, 1],
+                dict_resource_str: v3_string_dictionary(&["host", "random_host"]),
+                dict_resource_len: vec![1],
+                dict_resource_type: vec![1],
+                dict_resource_name: vec![2],
+                dict_source_type_name: v3_string_dictionary(&["system"]),
+                dict_origin_info: vec![10, 10, 42],
+                dict_unit_str: Vec::new(),
+                types: vec![3 | 0x30],
+                name_refs: vec![1],
+                tagset_refs: vec![1],
+                resources_refs: vec![1],
+                intervals: vec![10],
+                num_points: vec![2],
+                source_type_name_refs: vec![1],
+                origin_info_refs: vec![1],
+                unit_refs: Vec::new(),
+                timestamps: vec![1542182950, 1],
+                vals_sint64: Vec::new(),
+                vals_float32: Vec::new(),
+                vals_float64: vec![3.14, 3.1415],
+                sketch_num_bins: Vec::new(),
+                sketch_bin_keys: Vec::new(),
+                sketch_bin_cnts: Vec::new(),
+            }),
+        };
+        let mut body = Vec::new();
+        payload.encode(&mut body).unwrap();
+        let events = send_bytes_and_collect(
+            addr,
+            body,
+            dd_api_key_headers(),
+            DD_API_SERIES_V3_PATH,
+            rx,
+            2,
+        )
+        .await;
+
+        let metric = events[0].as_metric();
+        assert_eq!(metric.name(), "dd_gauge");
+        assert_eq!(metric.namespace(), Some("namespace"));
+        assert_eq!(metric.kind(), MetricKind::Absolute);
+        assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
+        assert_tags(
+            metric,
+            metric_tags!(
+                "foo" => "bar",
+                "team" => "core",
+                "host" => "random_host",
+                "source_type_name" => "system"
+            ),
+        );
+        assert_eq!(
+            metric
+                .metadata()
+                .datadog_origin_metadata()
+                .unwrap()
+                .product(),
+            Some(10)
+        );
+        assert_eq!(
+            metric
+                .metadata()
+                .datadog_origin_metadata()
+                .unwrap()
+                .category(),
+            Some(10)
+        );
+        assert_eq!(
+            metric
+                .metadata()
+                .datadog_origin_metadata()
+                .unwrap()
+                .service(),
+            Some(42)
+        );
     })
     .await;
 }
