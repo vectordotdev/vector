@@ -24,7 +24,7 @@ pub use reload::{TlsAcceptorReloader, WeakTlsAcceptorReloader};
 pub use settings::{
     MaybeTlsSettings, PEM_START_MARKER, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH,
     TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH, TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
-    TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
+    TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig, TlsVersion,
 };
 
 pub type Result<T> = std::result::Result<T, TlsError>;
@@ -101,6 +101,14 @@ pub enum TlsError {
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
+    #[snafu(display("Error setting the TLS protocol version: {}", source))]
+    SetTlsVersion { source: ErrorStack },
+    #[snafu(display(
+        "`min_tls_version` ({}) must not be greater than `max_tls_version` ({})",
+        min,
+        max
+    ))]
+    InvalidTlsVersionRange { min: TlsVersion, max: TlsVersion },
     #[snafu(display("Error setting SNI: {}", source))]
     SetSni { source: ErrorStack },
     #[snafu(display("Error setting ALPN protocols: {}", source))]

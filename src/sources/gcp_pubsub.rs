@@ -287,6 +287,11 @@ impl SourceConfig for PubsubConfig {
         auth.apply_uri(&mut uri);
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        if tls.has_protocol_version_bounds() {
+            warn!(
+                message = "`tls.min_tls_version` and `tls.max_tls_version` are not supported by the gRPC client used to reach Pub/Sub and are ignored."
+            );
+        }
         let host = uri.host().unwrap_or("pubsub.googleapis.com");
         let mut tls_config = ClientTlsConfig::new().domain_name(host);
         if let Some((cert, key)) = tls.identity_pem() {

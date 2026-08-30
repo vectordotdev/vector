@@ -149,6 +149,12 @@ impl MqttSourceConfig {
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
             let client_auth = tls.identity_pem();
+            if tls.has_protocol_version_bounds() {
+                warn!(
+                    message = "`tls.min_tls_version` and `tls.max_tls_version` are not supported by the MQTT client and are ignored."
+                );
+            }
+
             // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
             // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
             let alpn = self
