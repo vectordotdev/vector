@@ -938,6 +938,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
@@ -949,6 +950,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("another_random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
@@ -960,6 +962,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("a_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
@@ -971,6 +974,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
@@ -982,6 +986,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
             ],
@@ -1150,6 +1155,7 @@ async fn decode_sketches() {
             }],
             metadata: Some(ddmetric_proto::Metadata {
                 origin: Some(ddmetric_proto::Origin {
+                    metric_type: 0,
                     origin_product: 10,
                     origin_category: 11,
                     origin_service: 9,
@@ -1507,6 +1513,7 @@ async fn split_outputs() {
                 host: Some("random_host".to_string()),
                 source_type_name: None,
                 device: None,
+                unit: None,
                 metadata: None,
             }],
         };
@@ -2177,6 +2184,7 @@ async fn decode_series_endpoint_v2() {
                 interval: 0,
                 metadata: Some(ddmetric_proto::Metadata {
                     origin: Some(ddmetric_proto::Origin {
+                        metric_type: 0,
                         origin_product: 10,
                         origin_category: 10,
                         origin_service: 42,
@@ -2379,6 +2387,54 @@ fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
         .collect()
 }
 
+fn minimal_v3_metric_data() -> ddmetric_v3_proto::MetricData {
+    ddmetric_v3_proto::MetricData {
+        dict_name_str: v3_string_dictionary(&["metric"]),
+        dict_tag_str: Vec::new(),
+        dict_tagsets: Vec::new(),
+        dict_resource_str: Vec::new(),
+        dict_resource_len: Vec::new(),
+        dict_resource_type: Vec::new(),
+        dict_resource_name: Vec::new(),
+        dict_source_type_name: Vec::new(),
+        dict_origin_info: Vec::new(),
+        dict_unit_str: Vec::new(),
+        types: vec![3 | 0x30],
+        name_refs: vec![1],
+        tagset_refs: vec![0],
+        resources_refs: vec![0],
+        intervals: vec![0],
+        num_points: vec![1],
+        source_type_name_refs: vec![0],
+        origin_info_refs: vec![0],
+        unit_refs: Vec::new(),
+        timestamps: vec![1],
+        vals_sint64: Vec::new(),
+        vals_float32: Vec::new(),
+        vals_float64: vec![1.0],
+        sketch_num_bins: Vec::new(),
+        sketch_bin_keys: Vec::new(),
+        sketch_bin_cnts: Vec::new(),
+    }
+}
+
+#[test]
+fn decode_v3_rejects_point_count_larger_than_columns() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = u64::MAX;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_negative_origin_values() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_origin_info = vec![-1, 0, 0];
+    data.origin_info_refs[0] = 1;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
 #[tokio::test]
 async fn decode_series_endpoint_v3() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
@@ -2394,22 +2450,27 @@ async fn decode_series_endpoint_v3() {
                 dict_name_str: v3_string_dictionary(&["namespace.dd_gauge"]),
                 dict_tag_str: v3_string_dictionary(&["foo:bar"]),
                 dict_tagsets: vec![1, 1],
-                dict_resource_str: v3_string_dictionary(&["host", "random_host"]),
-                dict_resource_len: vec![1],
-                dict_resource_type: vec![1],
-                dict_resource_name: vec![2],
+                dict_resource_str: v3_string_dictionary(&[
+                    "host",
+                    "random_host",
+                    "container",
+                    "container_id",
+                ]),
+                dict_resource_len: vec![2, 1],
+                dict_resource_type: vec![1, 2, 3],
+                dict_resource_name: vec![2, 2, 4],
                 dict_source_type_name: v3_string_dictionary(&["system"]),
                 dict_origin_info: vec![10, 10, 42],
-                dict_unit_str: Vec::new(),
-                types: vec![3 | 0x30],
-                name_refs: vec![1],
-                tagset_refs: vec![1],
-                resources_refs: vec![1],
-                intervals: vec![10],
-                num_points: vec![2],
-                source_type_name_refs: vec![1],
-                origin_info_refs: vec![1],
-                unit_refs: Vec::new(),
+                dict_unit_str: v3_string_dictionary(&["byte"]),
+                types: vec![3 | 0x30 | 0x100 | 0x200, 3 | 0x30],
+                name_refs: vec![1, 0],
+                tagset_refs: vec![1, 0],
+                resources_refs: vec![1, 1],
+                intervals: vec![10, 10],
+                num_points: vec![1, 1],
+                source_type_name_refs: vec![1, 0],
+                origin_info_refs: vec![1, 0],
+                unit_refs: vec![1],
                 timestamps: vec![1542182950, 1],
                 vals_sint64: Vec::new(),
                 vals_float32: Vec::new(),
@@ -2442,6 +2503,7 @@ async fn decode_series_endpoint_v3() {
                 "foo" => "bar",
                 "team" => "core",
                 "host" => "random_host",
+                "resource.container" => "container_id",
                 "source_type_name" => "system"
             ),
         );
@@ -2469,6 +2531,15 @@ async fn decode_series_endpoint_v3() {
                 .service(),
             Some(42)
         );
+        assert_eq!(
+            metric
+                .metadata()
+                .datadog_origin_metadata()
+                .unwrap()
+                .metric_type(),
+            Some(9)
+        );
+        assert_eq!(metric.metadata().datadog_metric_unit(), Some("byte"));
     })
     .await;
 }
@@ -2697,6 +2768,7 @@ async fn test_series_v1_split_metric_namespace_impl(
             host: Some("test_host".to_string()),
             source_type_name: None,
             device: None,
+            unit: None,
             metadata: None,
         }],
     };

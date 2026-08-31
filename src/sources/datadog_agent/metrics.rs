@@ -300,12 +300,10 @@ pub(crate) fn decode_ddseries_v3(
     let series = payload.metric_data.map_or(Ok(Vec::new()), |metric_data| {
         decode_v3_metric_data(&metric_data, payload.metadata.as_ref())
     })?;
-    let mut frame = Vec::new();
-    MetricPayload { series }.encode(&mut frame)?;
-    decode_ddseries_v2(Bytes::from(frame), api_key, split_metric_namespace)
+    decode_ddseries(series, api_key, split_metric_namespace)
 }
 
-fn decode_v3_metric_data(
+pub(super) fn decode_v3_metric_data(
     data: &super::ddmetric_v3_proto::MetricData,
     metadata: Option<&super::ddmetric_v3_proto::Metadata>,
 ) -> crate::Result<Vec<super::ddmetric_proto::metric_payload::MetricSeries>> {
@@ -385,6 +383,17 @@ fn decode_v3_metric_data(
 
         let point_count = usize::try_from(data.num_points[index])
             .map_err(|_| "invalid Datadog v3 point count")?;
+        let remaining_timestamps = data.timestamps.len().saturating_sub(timestamp_idx);
+        let remaining_values = match value_type {
+            0 => remaining_timestamps,
+            0x10 => data.vals_sint64.len().saturating_sub(sint64_idx),
+            0x20 => data.vals_float32.len().saturating_sub(float32_idx),
+            0x30 => data.vals_float64.len().saturating_sub(float64_idx),
+            _ => return Err("invalid Datadog v3 value type".into()),
+        };
+        if point_count > remaining_timestamps || point_count > remaining_values {
+            return Err("invalid Datadog v3 point count".into());
+        }
         let mut points = Vec::with_capacity(point_count);
         for _ in 0..point_count {
             if timestamp_idx >= data.timestamps.len() {
@@ -431,15 +440,29 @@ fn decode_v3_metric_data(
             3 => metric_payload::MetricType::Gauge,
             _ => metric_payload::MetricType::Unspecified,
         };
-        let metadata = if origin_ref == 0 {
+        let no_index = packed_type & 0x100 != 0;
+        let metadata = if origin_ref == 0 && !no_index {
             None
         } else {
-            let offset = (origin_ref as usize - 1) * 3;
+            let (origin_product, origin_category, origin_service) = if origin_ref == 0 {
+                (0, 0, 0)
+            } else {
+                let offset = (origin_ref as usize - 1) * 3;
+                (
+                    u32::try_from(data.dict_origin_info[offset])
+                        .map_err(|_| "invalid Datadog v3 origin product")?,
+                    u32::try_from(data.dict_origin_info[offset + 1])
+                        .map_err(|_| "invalid Datadog v3 origin category")?,
+                    u32::try_from(data.dict_origin_info[offset + 2])
+                        .map_err(|_| "invalid Datadog v3 origin service")?,
+                )
+            };
             Some(Metadata {
                 origin: Some(super::ddmetric_proto::Origin {
-                    origin_product: data.dict_origin_info[offset] as u32,
-                    origin_category: data.dict_origin_info[offset + 1] as u32,
-                    origin_service: data.dict_origin_info[offset + 2] as u32,
+                    metric_type: if no_index { 9 } else { 0 },
+                    origin_product,
+                    origin_category,
+                    origin_service,
                 }),
             })
         };
@@ -577,11 +600,10 @@ fn decode_v3_resources(
 ) -> crate::Result<Vec<Vec<(String, String)>>> {
     let dictionary = decode_v3_strings(&data.dict_resource_str, false)?;
     let mut resources = vec![Vec::new()];
-    let mut offset = 0;
-    while offset < data.dict_resource_len.len() {
-        let size = usize::try_from(data.dict_resource_len[offset])
-            .map_err(|_| "invalid Datadog v3 resource size")?;
-        let end = offset
+    let mut entry_offset: usize = 0;
+    for &resource_len in &data.dict_resource_len {
+        let size = usize::try_from(resource_len).map_err(|_| "invalid Datadog v3 resource size")?;
+        let end = entry_offset
             .checked_add(size)
             .ok_or("Datadog v3 resource length overflow")?;
         if end > data.dict_resource_type.len() || end > data.dict_resource_name.len() {
@@ -590,7 +612,7 @@ fn decode_v3_resources(
         let mut set = Vec::with_capacity(size);
         let mut type_ref: i64 = 0;
         let mut name_ref: i64 = 0;
-        for index in offset..end {
+        for index in entry_offset..end {
             type_ref = type_ref
                 .checked_add(data.dict_resource_type[index])
                 .ok_or("Datadog v3 resource reference overflow")?;
@@ -612,7 +634,7 @@ fn decode_v3_resources(
             ));
         }
         resources.push(set);
-        offset += size;
+        entry_offset = end;
     }
     if let Some(metadata) = metadata {
         if metadata.resources.len() % 2 != 0 {
@@ -637,11 +659,14 @@ fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
                 "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
                 origin.origin_product, origin.origin_category, origin.origin_service,
             );
-            EventMetadata::default().with_origin_metadata(DatadogMetricOriginMetadata::new(
-                Some(origin.origin_product),
-                Some(origin.origin_category),
-                Some(origin.origin_service),
-            ))
+            EventMetadata::default().with_origin_metadata(
+                DatadogMetricOriginMetadata::new(
+                    Some(origin.origin_product),
+                    Some(origin.origin_category),
+                    Some(origin.origin_service),
+                )
+                .with_metric_type((origin.metric_type != 0).then_some(origin.metric_type)),
+            )
         })
 }
 
@@ -651,8 +676,15 @@ pub(crate) fn decode_ddseries_v2(
     split_metric_namespace: bool,
 ) -> crate::Result<Vec<Event>> {
     let payload = MetricPayload::decode(frame)?;
-    let decoded_metrics: Vec<Event> = payload
-        .series
+    decode_ddseries(payload.series, api_key, split_metric_namespace)
+}
+
+fn decode_ddseries(
+    series: Vec<metric_payload::MetricSeries>,
+    api_key: &Option<Arc<str>>,
+    split_metric_namespace: bool,
+) -> crate::Result<Vec<Event>> {
+    let decoded_metrics: Vec<Event> = series
         .into_iter()
         .flat_map(|serie| {
             let (namespace, name) = if split_metric_namespace {
@@ -662,7 +694,10 @@ pub(crate) fn decode_ddseries_v2(
             };
             let mut tags = into_metric_tags(serie.tags);
 
-            let event_metadata = get_event_metadata(serie.metadata.as_ref());
+            let mut event_metadata = get_event_metadata(serie.metadata.as_ref());
+            if !serie.unit.is_empty() {
+                event_metadata.set_datadog_metric_unit(serie.unit.clone());
+            }
 
             // It is possible to receive non-rate metrics from the Agent with an interval set.
             // That interval can be applied with the `as_rate` function in the Datadog UI.
@@ -712,8 +747,6 @@ pub(crate) fn decode_ddseries_v2(
             });
             (!serie.source_type_name.is_empty())
                 .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
-            // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
-            // serie.unit is omitted
             match metric_payload::MetricType::try_from(serie.r#type) {
                 Ok(metric_payload::MetricType::Count) => serie
                     .points
@@ -854,6 +887,16 @@ fn into_vector_metric(
     split_metric_namespace: bool,
 ) -> Vec<Event> {
     let mut tags = into_metric_tags(dd_metric.tags.unwrap_or_default());
+    let mut event_metadata = dd_metric
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.origin.as_ref())
+        .map_or_else(EventMetadata::default, |origin| {
+            EventMetadata::default().with_origin_metadata(origin.clone())
+        });
+    if let Some(unit) = dd_metric.unit.filter(|unit| !unit.is_empty()) {
+        event_metadata.set_datadog_metric_unit(unit);
+    }
 
     if let Some(key) = log_schema().host_key() {
         dd_metric
@@ -879,10 +922,11 @@ fn into_vector_metric(
             .points
             .iter()
             .map(|dd_point| {
-                Metric::new(
+                Metric::new_with_metadata(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter { value: dd_point.1 },
+                    event_metadata.clone(),
                 )
                 .with_timestamp(Some(
                     Utc.timestamp_opt(dd_point.0, 0)
@@ -897,10 +941,11 @@ fn into_vector_metric(
             .points
             .iter()
             .map(|dd_point| {
-                Metric::new(
+                Metric::new_with_metadata(
                     name.to_string(),
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: dd_point.1 },
+                    event_metadata.clone(),
                 )
                 .with_timestamp(Some(
                     Utc.timestamp_opt(dd_point.0, 0)
@@ -918,12 +963,13 @@ fn into_vector_metric(
             .iter()
             .map(|dd_point| {
                 let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1);
-                Metric::new(
+                Metric::new_with_metadata(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter {
                         value: dd_point.1 * (i as f64),
                     },
+                    event_metadata.clone(),
                 )
                 .with_timestamp(Some(
                     Utc.timestamp_opt(dd_point.0, 0)
