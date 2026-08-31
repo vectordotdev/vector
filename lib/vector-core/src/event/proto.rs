@@ -789,8 +789,16 @@ mod tests {
     use super::*;
     use crate::event::{MetricValue as EventMetricValue, metric};
 
-    // Frozen payloads emitted by the historical protobuf schema. These must not be regenerated
-    // from the current Rust types: their purpose is to pin the legacy field numbers on the wire.
+    // These payloads are frozen to pin legacy protobuf field numbers on the wire. Do not
+    // regenerate them from the current Rust types; each payload's exact contents are documented
+    // below and mirrored by its test assertions.
+
+    // EventArray.metrics containing four pre-v24 metrics:
+    // - AggregatedHistogram1 (field 9): bucket 1.5/count 2, total count 2, sum 3.0.
+    // - AggregatedHistogram2 (field 13): bucket 1.5/count 2, total count 2, sum 3.0.
+    // - AggregatedSummary1 (field 10): quantile 0.5/value 1.5, count 2, sum 3.0.
+    // - AggregatedSummary2 (field 14): quantile 0.5/value 1.5, count 2, sum 3.0.
+    // These variants use the legacy u32 count representation.
     const PRE_V24_METRICS: &[u8] = &[
         18, 170, 1, 10, 38, 10, 10, 104, 105, 115, 116, 111, 103, 114, 97, 109, 49, 74, 24, 10, 8,
         0, 0, 0, 0, 0, 0, 248, 63, 18, 1, 2, 24, 2, 33, 0, 0, 0, 0, 0, 0, 8, 64, 10, 38, 10, 10,
@@ -801,20 +809,33 @@ mod tests {
         10, 18, 9, 0, 0, 0, 0, 0, 0, 224, 63, 17, 0, 0, 0, 0, 0, 0, 248, 63, 16, 2, 25, 0, 0, 0, 0,
         0, 0, 8, 64,
     ];
+
+    // Pre-v27 Metric named "requests" with tags_v1 field 3 set to service="api" and a
+    // Counter value of 1.0. This pins the legacy single-valued metric-tag representation.
     const PRE_V27_TAGS: &[u8] = &[
         10, 8, 114, 101, 113, 117, 101, 115, 116, 115, 26, 14, 10, 7, 115, 101, 114, 118, 105, 99,
         101, 18, 3, 97, 112, 105, 42, 9, 9, 0, 0, 0, 0, 0, 0, 240, 63,
     ];
+
+    // Pre-v34 Log with deprecated metadata field 3 containing the bytes "legacy metadata".
     const PRE_V34_LOG_METADATA: &[u8] = &[
         26, 17, 10, 15, 108, 101, 103, 97, 99, 121, 32, 109, 101, 116, 97, 100, 97, 116, 97,
     ];
+
+    // Pre-v34 Trace with deprecated metadata field 2 containing the bytes "legacy metadata".
     const PRE_V34_TRACE_METADATA: &[u8] = &[
         18, 17, 10, 15, 108, 101, 103, 97, 99, 121, 32, 109, 101, 116, 97, 100, 97, 116, 97,
     ];
+
+    // Pre-v34 Metric named "requests" with a Counter value of 1.0 and deprecated metadata
+    // field 19 containing the bytes "legacy metadata".
     const PRE_V34_METRIC_METADATA: &[u8] = &[
         10, 8, 114, 101, 113, 117, 101, 115, 116, 115, 42, 9, 9, 0, 0, 0, 0, 0, 0, 240, 63, 154, 1,
         17, 10, 15, 108, 101, 103, 97, 99, 121, 32, 109, 101, 116, 97, 100, 97, 116, 97,
     ];
+
+    // Pre-v41 Metadata with source_type field 4 set to "legacy" and no source_event_id field 7.
+    // This pins the expected default when decoding payloads created before event IDs existed.
     const PRE_V41_METADATA: &[u8] = &[34, 6, 108, 101, 103, 97, 99, 121];
 
     #[test]
