@@ -28,6 +28,12 @@ const pagefindCategories = {
   releases: "Release notes"
 };
 
+const componentCategories = {
+  sinks: "Sinks",
+  sources: "Sources",
+  transforms: "Transforms"
+};
+
 let pagefindModule: Promise<any> | undefined;
 let exactSearchIndex: Promise<ExactSearchRecord[]> | undefined;
 
@@ -57,6 +63,16 @@ const getPagefind = async () => {
   return pagefindModule;
 };
 
+const pagefindCategory = (url: string) => {
+  const path = new URL(url, window.location.origin).pathname.split("/").filter(Boolean);
+
+  if (path.slice(0, 3).join("/") === "docs/reference/configuration") {
+    return componentCategories[path[3]] ?? "Documentation";
+  }
+
+  return pagefindCategories[path[0]] ?? "Website";
+};
+
 const pagefindResults = async (query: string): Promise<PagefindHit[]> => {
   const pagefind = await getPagefind();
   const search = await pagefind.debouncedSearch(query);
@@ -69,10 +85,9 @@ const pagefindResults = async (query: string): Promise<PagefindHit[]> => {
     search.results.slice(0, 10).map(async (result) => {
       const data = await result.data();
       const subResult = data.sub_results[0];
-      const section = data.url.split("/").filter(Boolean)[0];
 
       return {
-        category: pagefindCategories[section] ?? "Website",
+        category: pagefindCategory(data.url),
         content: subResult?.excerpt ?? data.excerpt ?? "",
         title: data.meta.title ?? data.url,
         url: subResult?.url ?? data.url

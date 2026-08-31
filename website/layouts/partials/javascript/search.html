@@ -24,7 +24,7 @@
     (printf "%s %s" $kindPlural .Title) }}
   {{ $exactSearchRecords = $exactSearchRecords | append (dict
     "aliases" $aliases
-    "category" "Component"
+    "category" ($kindPlural | title)
     "content" (.Description | markdownify | plainify)
     "title" (printf "%s %s" .Title $kind)
     "url" .RelPermalink) }}
