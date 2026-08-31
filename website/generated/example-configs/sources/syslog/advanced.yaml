@@ -2,6 +2,7 @@ sources:
   my_source_id:
     type: syslog
     address: 0.0.0.0:9000
+    disconnect_mode: drain
     max_length: 102400
     mode: tcp
     permit_origin:

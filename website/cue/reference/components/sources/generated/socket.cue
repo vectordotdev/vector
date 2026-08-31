@@ -332,6 +332,18 @@ generated: components: sources: socket: configuration: {
 			}
 		}
 	}
+	disconnect_mode: {
+		description:   "Controls how Vector closes TCP connections during shutdown or connection expiry."
+		relevant_when: "mode = \"tcp\""
+		required:      false
+		type: string: {
+			default: "drain"
+			enum: {
+				abort: "Immediately terminate the connection, without waiting for the client."
+				drain: "Gracefully signal the end of the connection and wait for the client to close."
+			}
+		}
+	}
 	framing: {
 		description: """
 			Framing configuration.
