@@ -1002,6 +1002,41 @@ mod test {
         }
     }
 
+    #[tokio::test]
+    async fn tcp_disconnect_mode_abort_on_max_connection_duration() {
+        let (tx, _) = SourceSender::new_test();
+        let (guard, addr) = next_addr();
+
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_max_connection_duration_secs(Some(1));
+        source_config.set_disconnect_mode(DisconnectMode::Abort);
+        let source_task = SocketConfig::from(source_config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        drop(tokio::spawn(source_task));
+        wait_for_tcp_and_release(guard, addr).await;
+
+        let mut stream: TcpStream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let start = Instant::now();
+
+        let mut buffer = [0u8; 10];
+        let read_result = timeout(Duration::from_millis(1200), stream.read(&mut buffer))
+            .await
+            .expect("timed out waiting for connection to be reset");
+
+        match read_result {
+            Err(e) => {
+                assert_eq!(e.kind(), std::io::ErrorKind::ConnectionReset);
+                assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3);
+            }
+            Ok(n) => panic!("expected connection reset, got Ok({n})"),
+        }
+    }
+
     //////// UDP TESTS ////////
     async fn send_lines_udp(to: SocketAddr, lines: impl IntoIterator<Item = String>) -> UdpSocket {
         send_lines_udp_from(bind_unused_udp(), to, lines)
