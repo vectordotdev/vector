@@ -92,7 +92,7 @@ check-links: production-build run-link-checker
 
 # Search
 pagefind:
-	yarn pagefind --site public --root-selector "#page-content"
+	yarn pagefind --site public
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:

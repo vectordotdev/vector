@@ -41,7 +41,7 @@
 {{ end }}
 
 {{ with .Params.tags }}
-<meta name="keywords" content="{{ delimit . "," }}">
+<meta name="keywords" content="{{ delimit . "," }}" data-pagefind-meta="tags[content]">
 {{ end }}
 
 {{/*  facebook domain verification  */}}

@@ -4,6 +4,7 @@
 
 {{ define "main" }}
 {{ $version := .File.BaseFileName }}
+{{ $noindex := .Params.noindex }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
 {{ $breaking := where ($release.changelog | default slice) "breaking" true }}
@@ -13,7 +14,7 @@
 {{ $orderedGroups := slice "security" "feat" "enhancement" "fix" "deprecation" "chore" }}
 
 <div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
-  <main id="page-content" aria-label="Release notes" class="lg:col-span-4 md:px-0 pb-32">
+  <main{{ if not $noindex }} id="page-content" data-pagefind-body{{ end }} aria-label="Release notes" class="lg:col-span-4 md:px-0 pb-32">
     <div class="mb-4 md:mb-6">
       {{ partial "breadcrumb.html" . }}
     </div>
