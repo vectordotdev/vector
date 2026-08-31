@@ -160,16 +160,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
-    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
-    let secrets = secrets_backends_loader
-        .retrieve_secrets(signal_handler)
-        .await
-        .map_err(|e| vec![e])?;
-
-    let mut builder = ConfigBuilderLoader::default()
-        .allow_empty(allow_empty)
-        .secrets(secrets)
-        .load_from_paths(config_paths)?;
+    let mut builder =
+        load_builder_from_paths_with_secrets(config_paths, signal_handler, allow_empty).await?;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -181,6 +173,25 @@ pub async fn load_from_paths_with_provider_and_secrets(
     }
 
     finalize_config(builder).await
+}
+
+/// Loads a `ConfigBuilder` from paths, resolving `SECRET[...]` placeholders
+/// from the configured backends first, like the run path does.
+pub(crate) async fn load_builder_from_paths_with_secrets(
+    config_paths: &[ConfigPath],
+    signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
+) -> Result<ConfigBuilder, Vec<String>> {
+    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
+
+    ConfigBuilderLoader::default()
+        .allow_empty(allow_empty)
+        .secrets(secrets)
+        .load_from_paths(config_paths)
 }
 
 pub async fn load_from_str_with_secrets(

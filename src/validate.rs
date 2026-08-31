@@ -72,8 +72,15 @@ const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 #[command(rename_all = "kebab-case")]
 pub struct Opts {
     /// Disables environment checks. That includes component checks and health checks.
+    /// Secret placeholders are not resolved unless `--resolve-secrets` is also given.
     #[arg(long)]
     pub no_environment: bool,
+
+    /// Resolves `SECRET[...]` placeholders from the configured secret backends
+    /// before validating. Only applies together with `--no-environment`;
+    /// without it, secrets are always resolved.
+    #[arg(long, requires = "no_environment")]
+    pub resolve_secrets: bool,
 
     /// Disables health checks during validation.
     #[arg(long)]
@@ -165,7 +172,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 
     let mut validated = true;
 
-    let mut config = match validate_config(opts, &mut fmt) {
+    let mut config = match validate_config(opts, &mut fmt).await {
         Some(config) => config,
         None => return exitcode::CONFIG,
     };
@@ -190,7 +197,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
+pub async fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
     let paths = if let Some(paths) = config::process_paths(&paths) {
@@ -207,10 +214,21 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    let builder = ConfigBuilderLoader::default()
-        .load_from_paths(&paths)
-        .map_err(&mut report_error)
-        .ok()?;
+
+    // `--no-environment` keeps the config textually unmodified unless
+    // `--resolve-secrets` is also given: no secret backends are contacted and
+    // `SECRET[...]` placeholders stay in place. Otherwise resolve them like
+    // the run path, so validation checks the config that would actually run.
+    let mut signal_handler = crate::signal::SignalHandler::new().0;
+    let builder = if opts.no_environment && !opts.resolve_secrets {
+        ConfigBuilderLoader::default().load_from_paths(&paths)
+    } else {
+        config::loading::load_builder_from_paths_with_secrets(&paths, &mut signal_handler, false)
+            .await
+    }
+    .map_err(&mut report_error)
+    .ok()?;
+
     config::init_log_schema(builder.global.log_schema.clone(), true);
 
     // Build
