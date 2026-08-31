@@ -51,7 +51,7 @@ mod test;
 /// Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 /// configuration reload process.
 #[allow(clippy::large_enum_variant)]
-#[configurable_component]
+#[configurable_component(global_option("secret"))]
 #[derive(Clone, Debug)]
 #[enum_dispatch(SecretBackend)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -75,25 +75,28 @@ pub enum SecretBackends {
     Test(test::TestBackend),
 }
 
-// Manual NamedComponent impl required because enum_dispatch doesn't support it yet.
-impl vector_lib::configurable::NamedComponent for SecretBackends {
-    fn get_component_name(&self) -> &'static str {
-        match self {
-            Self::File(config) => config.get_component_name(),
-            Self::Directory(config) => config.get_component_name(),
-            Self::Exec(config) => config.get_component_name(),
-            #[cfg(feature = "secrets-aws_secrets_manager")]
-            Self::AwsSecretsManager(config) => config.get_component_name(),
-            Self::Test(config) => config.get_component_name(),
-        }
-    }
-}
-
 impl GenerateConfig for SecretBackends {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self::File(file::FileBackend {
             path: "path/to/file".into(),
         }))
         .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::secrets::SecretBackends;
+
+    #[test]
+    fn interpolation() {
+        let ok = serde_json::from_value::<SecretBackends>(serde_json::json!({
+            "type": "file",
+            "path": "/tmp/foo"
+        }));
+        assert!(
+            ok.is_ok(),
+            "expected flat SecretBackends to parse, got: {ok:?}"
+        );
     }
 }
