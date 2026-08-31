@@ -24,7 +24,7 @@ use vrl::value::{KeyString, Kind, kind::Collection};
 use super::util::decompression::{
     CappedDecoder, max_decompressed_size_bytes, max_zlib_compressed_frame_size_bytes,
 };
-use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::net::{DisconnectMode, SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -69,6 +69,10 @@ pub struct LogstashConfig {
     /// connection but never complete (or never start) a handshake.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     tls_handshake_timeout_secs: Option<NonZeroU64>,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    disconnect_mode: DisconnectMode,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -134,6 +138,7 @@ impl Default for LogstashConfig {
             acknowledgements: Default::default(),
             connection_limit: None,
             tls_handshake_timeout_secs: None,
+            disconnect_mode: DisconnectMode::Drain,
             log_namespace: None,
         }
     }
@@ -174,6 +179,7 @@ impl SourceConfig for LogstashConfig {
             self.receive_buffer_bytes,
             None,
             self.tls_handshake_timeout_secs,
+            self.disconnect_mode,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -941,6 +947,7 @@ mod test {
             acknowledgements: true.into(),
             connection_limit: None,
             tls_handshake_timeout_secs: None,
+            disconnect_mode: DisconnectMode::Drain,
             log_namespace: None,
         }
         .build(SourceContext::new_test(sender, None))
@@ -1805,6 +1812,7 @@ mod integration_tests {
                 acknowledgements: false.into(),
                 connection_limit: None,
                 tls_handshake_timeout_secs: None,
+                disconnect_mode: DisconnectMode::Drain,
                 log_namespace: None,
             }
             .build(SourceContext::new_test(sender, None))

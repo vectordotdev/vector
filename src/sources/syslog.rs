@@ -36,7 +36,9 @@ use crate::{
     },
     net,
     shutdown::ShutdownSignal,
-    sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket},
+    sources::util::net::{
+        DisconnectMode, SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket,
+    },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
 };
@@ -108,6 +110,10 @@ pub enum Mode {
         /// connection but never complete (or never start) a handshake.
         #[configurable(metadata(docs::type_unit = "seconds"))]
         tls_handshake_timeout_secs: Option<NonZeroU64>,
+
+        #[configurable(derived)]
+        #[serde(default)]
+        disconnect_mode: DisconnectMode,
     },
 
     /// Listen on UDP.
@@ -164,6 +170,7 @@ impl Default for SyslogConfig {
                 receive_buffer_bytes: None,
                 connection_limit: None,
                 tls_handshake_timeout_secs: None,
+                disconnect_mode: DisconnectMode::Drain,
             },
             host_key: None,
             max_length: crate::serde::default_max_length(),
@@ -198,6 +205,7 @@ impl SourceConfig for SyslogConfig {
                 receive_buffer_bytes,
                 connection_limit,
                 tls_handshake_timeout_secs,
+                disconnect_mode,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -221,6 +229,7 @@ impl SourceConfig for SyslogConfig {
                     receive_buffer_bytes,
                     None,
                     tls_handshake_timeout_secs,
+                    disconnect_mode,
                     cx,
                     false.into(),
                     connection_limit,
@@ -1161,6 +1170,7 @@ mod test {
                 receive_buffer_bytes: None,
                 connection_limit: None,
                 tls_handshake_timeout_secs: None,
+                disconnect_mode: DisconnectMode::Drain,
             });
 
             let key = ComponentKey::from("in");
@@ -1373,6 +1383,7 @@ mod test {
                 receive_buffer_bytes: None,
                 connection_limit: None,
                 tls_handshake_timeout_secs: None,
+                disconnect_mode: DisconnectMode::Drain,
             });
 
             let key = ComponentKey::from("in");

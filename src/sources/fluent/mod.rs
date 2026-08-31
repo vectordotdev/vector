@@ -18,7 +18,7 @@ use vector_lib::{
 use vrl::value::{Kind, Value, kind::Collection};
 
 use super::util::decompression::{CappedDecoder, max_decompressed_size_bytes};
-use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
+use super::util::net::{DisconnectMode, SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
@@ -198,6 +198,10 @@ pub struct FluentTcpConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    disconnect_mode: DisconnectMode,
 }
 
 impl FluentTcpConfig {
@@ -225,6 +229,7 @@ impl FluentTcpConfig {
             self.receive_buffer_bytes,
             None,
             self.tls_handshake_timeout_secs,
+            self.disconnect_mode,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -289,6 +294,7 @@ impl GenerateConfig for FluentConfig {
                 tls_handshake_timeout_secs: None,
                 acknowledgements: Default::default(),
                 connection_limit: Some(2),
+                disconnect_mode: DisconnectMode::Drain,
             }),
             log_namespace: None,
         })
@@ -1180,6 +1186,7 @@ mod tests {
                 tls_handshake_timeout_secs: None,
                 acknowledgements: true.into(),
                 connection_limit: None,
+                disconnect_mode: DisconnectMode::Drain,
             }),
             log_namespace: None,
         }
@@ -1254,6 +1261,7 @@ mod tests {
                 tls_handshake_timeout_secs: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
+                disconnect_mode: DisconnectMode::Drain,
             }),
             log_namespace: Some(true),
         };
@@ -1313,6 +1321,7 @@ mod tests {
                 tls_handshake_timeout_secs: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
+                disconnect_mode: DisconnectMode::Drain,
             }),
             log_namespace: None,
         };
@@ -1543,6 +1552,7 @@ mod integration_tests {
                     tls_handshake_timeout_secs: None,
                     acknowledgements: false.into(),
                     connection_limit: None,
+                    disconnect_mode: DisconnectMode::Drain,
                 }),
                 log_namespace: None,
             }

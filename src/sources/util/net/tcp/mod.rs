@@ -20,6 +20,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{ReadyFrames, StreamDecodingError, internal_events::DecoderFramingError},
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    configurable::configurable_component,
     event::{BatchNotifier, BatchStatus, Event},
     finalization::AddBatchNotifier,
     lookup::{OwnedValuePath, path},
@@ -70,6 +71,18 @@ pub async fn try_bind_tcp_listener(
         },
     }
     .map(|listener| listener.with_allowlist(allowlist))
+}
+
+/// Controls how Vector closes TCP connections during shutdown or connection expiry.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum DisconnectMode {
+    /// Gracefully signal the end of the connection and wait for the client to close.
+    #[default]
+    Drain,
+    /// Immediately terminate the connection, without waiting for the client.
+    Abort,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -127,6 +140,7 @@ where
         receive_buffer_bytes: Option<usize>,
         max_connection_duration_secs: Option<u64>,
         tls_handshake_timeout_secs: Option<NonZeroU64>,
+        disconnect_mode: DisconnectMode,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
@@ -217,6 +231,7 @@ where
                                 receive_buffer_bytes,
                                 max_connection_duration_secs,
                                 tls_handshake_timeout_secs,
+                                disconnect_mode,
                                 source,
                                 tripwire,
                                 peer_addr,
@@ -258,6 +273,7 @@ async fn handle_stream<T>(
     receive_buffer_bytes: Option<usize>,
     max_connection_duration_secs: Option<u64>,
     tls_handshake_timeout_secs: Option<NonZeroU64>,
+    disconnect_mode: DisconnectMode,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
     peer_addr: SocketAddr,
@@ -335,15 +351,22 @@ async fn handle_stream<T>(
 
     loop {
         let mut permit = tokio::select! {
-            _ = &mut tripwire => break,
+            _ = &mut tripwire => {
+                // The tripwire is the hard shutdown deadline, so the loop must
+                // exit regardless of what `close_socket` returns; it is called
+                // only to apply the configured disconnect mode (e.g. SO_LINGER=0
+                // for `abort`) before the socket is dropped.
+                close_socket(reader.get_ref().get_ref().get_ref(), disconnect_mode);
+                break;
+            },
             Some(_) = &mut connection_close_timeout  => {
-                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref(), disconnect_mode) {
                     break;
                 }
                 None
             },
             _ = &mut shutdown_signal => {
-                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref(), disconnect_mode) {
                     break;
                 }
                 None
@@ -358,9 +381,14 @@ async fn handle_stream<T>(
         tokio::pin!(timeout);
 
         tokio::select! {
-            _ = &mut tripwire => break,
+            _ = &mut tripwire => {
+                // See the comment on the tripwire branch above: always break,
+                // calling `close_socket` only for its disconnect-mode side effect.
+                close_socket(reader.get_ref().get_ref().get_ref(), disconnect_mode);
+                break;
+            },
             _ = &mut shutdown_signal => {
-                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref(), disconnect_mode) {
                     break;
                 }
             },
@@ -478,12 +506,26 @@ async fn handle_stream<T>(
     }
 }
 
-fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
-    debug!("Start graceful shutdown.");
-    // Close our write part of TCP socket to signal the other side
-    // that it should stop writing and close the channel.
+fn close_socket(
+    socket: &MaybeTlsIncomingStream<TcpStream>,
+    disconnect_mode: DisconnectMode,
+) -> bool {
+    // Signal to the client that we are done with this connection
+    // according to the configured disconnect mode.
     if let Some(stream) = socket.get_ref() {
         let socket = SockRef::from(stream);
+        match disconnect_mode {
+            DisconnectMode::Drain => {
+                debug!("Closing connection gracefully.");
+            }
+            DisconnectMode::Abort => {
+                debug!("Terminating connection.");
+                if let Err(error) = socket.set_linger(Some(std::time::Duration::ZERO)) {
+                    warn!(message = "Failed to set SO_LINGER=0 on TCP socket.", %error);
+                }
+                return true;
+            }
+        }
         if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
             warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
         }
@@ -492,5 +534,97 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
         // Connection hasn't yet been established so we are done here.
         debug!("Closing connection that hasn't yet been fully established.");
         true
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use futures::future;
+    use tokio::io::AsyncReadExt;
+    use vector_lib::codecs::Decoder;
+
+    use super::*;
+    use crate::SourceSender;
+
+    #[derive(Clone)]
+    struct MockTcpSource;
+
+    impl TcpSource for MockTcpSource {
+        type Error = vector_lib::codecs::decoding::Error;
+        type Item = SmallVec<[Event; 1]>;
+        type Decoder = Decoder;
+        type Acker = TcpNullAcker;
+
+        fn decoder(&self) -> Self::Decoder {
+            Decoder::default()
+        }
+
+        fn build_acker(&self, _: &[Self::Item]) -> Self::Acker {
+            TcpNullAcker
+        }
+    }
+
+    /// Runs `handle_stream` for a connected client with a tripwire that has already fired
+    /// and a shutdown signal that never fires, deterministically driving the connection
+    /// loop into the force-shutdown-timeout (tripwire) branch, and returns the result of
+    /// the client's subsequent read.
+    async fn read_after_forced_shutdown(disconnect_mode: DisconnectMode) -> io::Result<usize> {
+        let addr = "127.0.0.1:0".parse().unwrap();
+        let mut listener = MaybeTlsSettings::Raw(())
+            .bind(&addr)
+            .await
+            .expect("listener should bind");
+        let addr = listener
+            .local_addr()
+            .expect("listener should have a local address");
+
+        let mut client = TcpStream::connect(addr)
+            .await
+            .expect("client should connect");
+        let socket = listener
+            .accept()
+            .await
+            .expect("connection should be accepted");
+        let peer_addr = socket.peer_addr();
+
+        let (out, _rx) = SourceSender::new_test();
+        handle_stream(
+            ShutdownSignal::noop(),
+            socket,
+            None,
+            None,
+            None,
+            None,
+            disconnect_mode,
+            MockTcpSource,
+            future::ready(()).boxed(),
+            peer_addr,
+            out,
+            false,
+            RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, 1),
+            None,
+            "test",
+            LogNamespace::Legacy,
+        )
+        .await;
+
+        let mut buffer = [0u8; 10];
+        client.read(&mut buffer).await
+    }
+
+    #[tokio::test]
+    async fn forced_shutdown_applies_abort_disconnect_mode() {
+        match read_after_forced_shutdown(DisconnectMode::Abort).await {
+            Err(e) => assert_eq!(e.kind(), io::ErrorKind::ConnectionReset),
+            Ok(n) => panic!("expected connection reset, got Ok({n})"),
+        }
+    }
+
+    #[tokio::test]
+    async fn forced_shutdown_applies_drain_disconnect_mode() {
+        let read = read_after_forced_shutdown(DisconnectMode::Drain)
+            .await
+            .expect("drain should close the connection gracefully");
+        assert_eq!(read, 0, "expected EOF from graceful close");
     }
 }

@@ -18,6 +18,18 @@ generated: components: sources: syslog: configuration: {
 		required:      false
 		type: uint: {}
 	}
+	disconnect_mode: {
+		description:   "Controls how Vector closes TCP connections during shutdown or connection expiry."
+		relevant_when: "mode = \"tcp\""
+		required:      false
+		type: string: {
+			default: "drain"
+			enum: {
+				abort: "Immediately terminate the connection, without waiting for the client."
+				drain: "Gracefully signal the end of the connection and wait for the client to close."
+			}
+		}
+	}
 	host_key: {
 		description: """
 			Overrides the name of the log field used to add the peer host to each event.

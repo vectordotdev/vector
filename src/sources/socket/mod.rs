@@ -144,6 +144,7 @@ impl SourceConfig for SocketConfig {
                     config.receive_buffer_bytes(),
                     config.max_connection_duration_secs(),
                     config.tls_handshake_timeout_secs(),
+                    config.disconnect_mode(),
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -376,7 +377,7 @@ mod test {
         event::{Event, LogEvent},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
-        sources::util::net::SocketListenAddr,
+        sources::util::net::{DisconnectMode, SocketListenAddr},
         test_util::{
             addr::{PortGuard, next_addr, next_addr_any},
             collect_n, collect_n_limited,
@@ -967,6 +968,73 @@ mod test {
 
         assert_eq!(bytes_read, 0, "unexpectedly read data from stream");
         assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.5);
+    }
+
+    #[tokio::test]
+    async fn tcp_disconnect_mode_abort_on_shutdown() {
+        let source_id = ComponentKey::from("tcp_disconnect_mode_abort_on_shutdown");
+        let (tx, _) = SourceSender::new_test();
+        let (guard, addr) = next_addr();
+        let (cx, mut shutdown) = SourceContext::new_shutdown(&source_id, tx);
+
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_disconnect_mode(DisconnectMode::Abort);
+        let source_task = SocketConfig::from(source_config).build(cx).await.unwrap();
+
+        drop(tokio::spawn(source_task));
+        wait_for_tcp_and_release(guard, addr).await;
+
+        let mut stream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let mut buffer = [0u8; 10];
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        tokio::spawn(shutdown.shutdown_source(&source_id, deadline));
+
+        let read_result = tokio::time::timeout(Duration::from_secs(5), stream.read(&mut buffer))
+            .await
+            .expect("timed out waiting for connection to close");
+
+        match read_result {
+            Err(e) => assert_eq!(e.kind(), std::io::ErrorKind::ConnectionReset),
+            Ok(n) => panic!("expected connection reset, got Ok({n})"),
+        }
+    }
+
+    #[tokio::test]
+    async fn tcp_disconnect_mode_abort_on_max_connection_duration() {
+        let (tx, _) = SourceSender::new_test();
+        let (guard, addr) = next_addr();
+
+        let mut source_config = TcpConfig::from_address(addr.into());
+        source_config.set_max_connection_duration_secs(Some(1));
+        source_config.set_disconnect_mode(DisconnectMode::Abort);
+        let source_task = SocketConfig::from(source_config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        drop(tokio::spawn(source_task));
+        wait_for_tcp_and_release(guard, addr).await;
+
+        let mut stream: TcpStream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let start = Instant::now();
+
+        let mut buffer = [0u8; 10];
+        let read_result = timeout(Duration::from_millis(1200), stream.read(&mut buffer))
+            .await
+            .expect("timed out waiting for connection to be reset");
+
+        match read_result {
+            Err(e) => {
+                assert_eq!(e.kind(), std::io::ErrorKind::ConnectionReset);
+                assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.3);
+            }
+            Ok(n) => panic!("expected connection reset, got Ok({n})"),
+        }
     }
 
     //////// UDP TESTS ////////
