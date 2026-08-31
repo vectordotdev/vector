@@ -99,7 +99,6 @@ pub enum AzureBlobType {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: Option<AzureAuthentication>,
 
@@ -240,7 +239,6 @@ pub struct AzureBlobSinkConfig {
     /// the block is appended twice. Setting `request.retry_attempts` to `0` disables sink-level
     /// retries, but it does not give at-most-once delivery — upstream retries and resending
     /// sources can still produce duplicates.
-    #[configurable(derived)]
     #[serde(default)]
     pub blob_type: AzureBlobType,
 
@@ -253,7 +251,6 @@ pub struct AzureBlobSinkConfig {
     ///
     /// Some cloud storage API clients and browsers handle decompression transparently, so
     /// depending on how they are accessed, files may not always appear to be compressed.
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
@@ -294,15 +291,12 @@ pub struct AzureBlobSinkConfig {
     #[serde(default)]
     pub metadata: Option<HashMap<String, String>>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig<AzureBlobTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -310,7 +304,6 @@ pub struct AzureBlobSinkConfig {
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<AzureBlobTlsConfig>,
 

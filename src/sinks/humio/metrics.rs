@@ -120,22 +120,17 @@ pub struct HumioMetricsConfig {
     ))]
     index: Option<Template>,
 
-    #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<SplunkHecDefaultBatchSettings>,
 
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

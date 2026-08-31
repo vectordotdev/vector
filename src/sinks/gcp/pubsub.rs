@@ -77,22 +77,17 @@ pub struct PubsubConfig {
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<PubsubDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

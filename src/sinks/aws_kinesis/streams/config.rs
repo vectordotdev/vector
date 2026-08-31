@@ -67,7 +67,6 @@ pub struct KinesisStreamsSinkConfig {
     #[serde(flatten)]
     pub base: KinesisSinkBaseConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
 }

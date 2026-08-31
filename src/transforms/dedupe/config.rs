@@ -22,15 +22,12 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
-    #[configurable(derived)]
     #[serde(default)]
     pub fields: Option<FieldMatchConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_cache_config")]
     pub cache: CacheConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub time_settings: Option<TimedCacheConfig>,
 }

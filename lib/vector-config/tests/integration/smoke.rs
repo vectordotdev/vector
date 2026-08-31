@@ -370,11 +370,9 @@ pub struct SimpleSinkConfig {
     #[serde(default = "default_simple_sink_endpoint")]
     endpoint: String,
 
-    #[configurable(derived)]
     #[serde(default = "default_simple_sink_batch")]
     batch: BatchConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_simple_sink_encoding")]
     encoding: Encoding,
 
@@ -425,7 +423,6 @@ fn default_simple_sink_endpoint() -> String {
 #[configurable(metadata(status = "stable"))]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AwsBleepBloopSinkConfig {
-    #[configurable(derived)]
     #[serde(default)]
     auth: AwsAuthentication,
 
@@ -433,16 +430,14 @@ pub struct AwsBleepBloopSinkConfig {
     #[configurable(validation(pattern = "foo\\d+"))]
     folder_id: String,
 
-    #[configurable(derived)]
     #[serde(default = "default_aws_bleep_bloop_sink_batch")]
     batch: BatchConfig,
 
-    #[configurable(deprecated, derived)]
+    #[configurable(deprecated)]
     #[serde(default = "default_aws_bleep_bloop_sink_encoding")]
     encoding: Encoding,
 
     /// Overridden TLS description.
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
     /// The partition key to use for each event.
@@ -624,7 +619,6 @@ pub struct GlobalOptions {
 #[derive(Clone)]
 #[configurable_component]
 pub struct VectorConfig {
-    #[configurable(derived)]
     global: GlobalOptions,
 
     /// Any configured sources.

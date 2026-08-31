@@ -100,31 +100,25 @@ pub struct AxiomConfig {
 
     /// Configuration for the URL or regional edge endpoint.
     #[serde(flatten)]
-    #[configurable(derived)]
     pub endpoint: UrlOrRegion,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
 
     /// The compression algorithm to use.
-    #[configurable(derived)]
     #[serde(default = "Compression::zstd_default")]
     pub compression: Compression,
 
     /// The TLS settings for the connection.
     ///
     /// Optional, constrains TLS settings for this sink.
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The batch settings for the sink.
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     /// Controls how acknowledgements are handled for this sink.
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -132,7 +126,6 @@ pub struct AxiomConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 

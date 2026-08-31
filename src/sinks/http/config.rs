@@ -59,10 +59,8 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub method: HttpMethod,
 
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
 
@@ -87,18 +85,14 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub payload_suffix: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -106,7 +100,6 @@ pub struct HttpSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 

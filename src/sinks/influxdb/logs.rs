@@ -150,22 +150,17 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::minimal = true))]
     pub token: Option<SensitiveString>,
 
-    #[configurable(derived)]
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

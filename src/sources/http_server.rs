@@ -76,7 +76,6 @@ pub struct SimpleHttpConfig {
     /// When using the `custom` strategy, the VRL program may write `%field = value` to enrich
     /// authenticated events. These metadata fields are injected into the event body (legacy
     /// namespace) or under `http_server.<field>` in event metadata (Vector namespace).
-    #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
     /// Whether or not to treat the configured `path` as an absolute path.
@@ -116,16 +115,12 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_response_code")]
     response_code: StatusCode,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     decoding: Option<DeserializerConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -134,7 +129,6 @@ pub struct SimpleHttpConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 }

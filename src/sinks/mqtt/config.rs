@@ -35,10 +35,8 @@ pub struct MqttSinkConfig {
     #[serde(default = "default_retain")]
     pub retain: bool,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -46,11 +44,9 @@ pub struct MqttSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_qos")]
     pub quality_of_service: MqttQoS,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }

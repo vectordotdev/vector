@@ -64,10 +64,8 @@ pub struct TcpSinkConfig {
     #[configurable(metadata(docs::examples = "https://somehost:5000"))]
     address: String,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
     /// The size of the socket's send buffer.

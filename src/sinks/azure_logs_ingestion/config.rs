@@ -64,7 +64,6 @@ pub struct AzureLogsIngestionConfig {
     #[configurable(metadata(docs::examples = "Custom-MyTable"))]
     pub stream_name: String,
 
-    #[configurable(derived)]
     pub auth: AzureAuthentication,
 
     /// [Token scope][token_scope] for dedicated Azure regions.
@@ -86,22 +85,17 @@ pub struct AzureLogsIngestionConfig {
     #[serde(default = "default_timestamp_field")]
     pub timestamp_field: String,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -109,7 +103,6 @@ pub struct AzureLogsIngestionConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 }
