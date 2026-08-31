@@ -51,7 +51,10 @@ const exactSearchResults = async (query: string): Promise<PagefindHit[]> => {
     return [];
   }
 
-  exactSearchIndex ??= window.loadExactSearch();
+  exactSearchIndex ??= window.loadExactSearch().catch((error) => {
+    exactSearchIndex = undefined;
+    throw error;
+  });
   const normalizedQuery = normalizeSearchTerm(query);
   const records = await exactSearchIndex;
 
@@ -80,7 +83,10 @@ const getPagefind = async () => {
     throw new Error("Pagefind is unavailable.");
   }
 
-  pagefindModule ??= window.loadPagefind();
+  pagefindModule ??= window.loadPagefind().catch((error) => {
+    pagefindModule = undefined;
+    throw error;
+  });
   return pagefindModule;
 };
 
@@ -116,7 +122,7 @@ const pagefindResults = async (query: string): Promise<PagefindHit[]> => {
       return {
         category: pagefindCategory(url),
         content: subResult?.excerpt ?? data.excerpt ?? "",
-        title: data.meta.title ?? data.url,
+        title: subResult?.title ?? data.meta.title ?? data.url,
         url
       };
     })
@@ -124,7 +130,18 @@ const pagefindResults = async (query: string): Promise<PagefindHit[]> => {
 };
 
 const searchResults = async (query: string): Promise<PagefindHit[]> => {
-  const [exactResults, rankedResults] = await Promise.all([exactSearchResults(query), pagefindResults(query)]);
+  const recoverResults = async (results: Promise<PagefindHit[]>, source: string) => {
+    try {
+      return await results;
+    } catch (error) {
+      console.warn(`${source} search is unavailable.`, error);
+      return [];
+    }
+  };
+  const [exactResults, rankedResults] = await Promise.all([
+    recoverResults(exactSearchResults(query), "Exact"),
+    recoverResults(pagefindResults(query), "Pagefind")
+  ]);
   const exactPages = new Set(exactResults.map((result) => result.url.split("#")[0]));
   const otherResults = rankedResults.filter((result) => !exactPages.has(result.url.split("#")[0]));
 
