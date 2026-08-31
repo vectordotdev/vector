@@ -36,6 +36,7 @@ const componentCategories = {
 
 let pagefindModule: Promise<any> | undefined;
 let exactSearchIndex: Promise<ExactSearchRecord[]> | undefined;
+const minVrlPrefixLength = 3;
 
 const normalizeSearchTerm = (value: string) =>
   value.trim().toLocaleLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
@@ -49,8 +50,23 @@ const exactSearchResults = async (query: string): Promise<PagefindHit[]> => {
   const normalizedQuery = normalizeSearchTerm(query);
   const records = await exactSearchIndex;
 
+  if (!normalizedQuery) {
+    return [];
+  }
+
   return records
-    .filter((record) => record.aliases.some((alias) => normalizeSearchTerm(alias) === normalizedQuery))
+    .filter((record) =>
+      record.aliases.some((alias) => {
+        const normalizedAlias = normalizeSearchTerm(alias);
+        const exactMatch = normalizedAlias === normalizedQuery;
+        const vrlPrefixMatch =
+          record.category === "VRL function" &&
+          normalizedQuery.length >= minVrlPrefixLength &&
+          normalizedAlias.startsWith(normalizedQuery);
+
+        return exactMatch || vrlPrefixMatch;
+      })
+    )
     .map(({ aliases: _, ...record }) => record);
 };
 
