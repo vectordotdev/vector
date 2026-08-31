@@ -1,1 +1,0 @@
-{"metric":{"name":"x","namespace":"q","timestamp":"1970-01-01T08:05:59.000020708Z","kind":"incremental","aggregated_summary":{"quantiles":[],"count":5148602828208196254,"sum":-547520.0}}}
