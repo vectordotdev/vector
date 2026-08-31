@@ -84,17 +84,19 @@ struct FlattenedOptionalEnumWithFallback {
     mode: Option<InternallyTaggedModeWithFallback>,
 }
 
-/// Same `Option<InternallyTaggedMode>` used twice so the definition stays shared.
-///
-/// The flattened use carries field-specific metadata (`docs::hidden`); overwriting
-/// the `$ref` with the resolved definition would drop that and make the field
-/// visible to generated docs.
+/// Same `Option<InternallyTaggedMode>` used twice: as a flattened field and as a
+/// normal property. Flatten is generated from `T`, so the property keeps the
+/// nullable `Option<T>` encoding (inlined when it is the only remaining use).
+/// Field-specific metadata (`docs::hidden`) belongs on the flatten wrapper.
 #[derive(Clone, Debug)]
 #[configurable_component]
 struct SharedFlattenedHiddenOptional {
     /// A required sibling so the parent is not entirely flattened.
     name: String,
 
+    /// Hidden mode.
+    ///
+    /// Not shown in docs.
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]
     mode: Option<InternallyTaggedMode>,
@@ -167,6 +169,28 @@ fn shared_flattened_hidden_optional_schema_snapshot() {
     assert_schema_matches_snapshot::<SharedFlattenedHiddenOptional>(include_str!(
         "snapshots/shared_flattened_hidden_optional.json"
     ));
+}
+
+#[test]
+fn flattened_optional_field_docs_stay_on_wrapper() {
+    let root = generate_root_schema::<SharedFlattenedHiddenOptional>().expect("should generate");
+    let schema = serde_json::to_value(root).expect("serialize schema to JSON");
+    let wrapper = schema
+        .pointer("/allOf/1")
+        .expect("flattened optional should be the second allOf member");
+
+    assert_eq!(
+        wrapper.get("title").and_then(serde_json::Value::as_str),
+        Some("Hidden mode.")
+    );
+    assert_eq!(
+        wrapper
+            .get("description")
+            .and_then(serde_json::Value::as_str),
+        Some("Not shown in docs.")
+    );
+    assert_eq!(wrapper["_metadata"]["docs::hidden"], true);
+    assert_eq!(wrapper["_metadata"]["docs::optional"], true);
 }
 
 #[test]

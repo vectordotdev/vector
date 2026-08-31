@@ -519,7 +519,7 @@ mod tests {
 
     #[test]
     fn optional_absence_sentinel_with_inner_enum_resolves() {
-        // Shape produced by RewriteFlattenedOptionalVisitor: optional wrapper with
+        // Shape produced by `generate_flattened_optional_schema`: optional wrapper with
         // an absence sentinel plus the real internally-tagged enum. Without
         // discarding the sentinel, this bails for missing `docs::enum_tagging`.
         let schema = json!({

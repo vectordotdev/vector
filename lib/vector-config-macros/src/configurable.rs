@@ -226,12 +226,25 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
     let field_schema_ty = get_field_schema_ty(field);
 
-    let spanned_generate_schema = quote_spanned! {field.span()=>
-        ::vector_config::schema::get_or_generate_schema(
-            &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
-            schema_gen,
-            Some(#field_metadata_ref),
-        )?
+    // Flattened `Option<T>` cannot use `Option`'s nullable-property schema: `allOf` merge
+    // validates the parent object, which is never JSON `null`. Tagged enums get an absence
+    // encoding instead; other `Option<T>` flatten fields fall back to the property schema.
+    let spanned_generate_schema = match (field.flatten(), option_inner_type(field_schema_ty)) {
+        (true, Some(inner_ty)) => quote_spanned! {field.span()=>
+            ::vector_config::schema::generate_flattened_optional_schema(
+                &<#inner_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                schema_gen,
+                Some(#field_metadata_ref),
+            )?
+        },
+        _ => quote_spanned! {field.span()=>
+            ::vector_config::schema::get_or_generate_schema(
+                &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                schema_gen,
+                Some(#field_metadata_ref),
+            )?
+        },
     };
 
     quote! {
@@ -343,8 +356,30 @@ fn generate_named_struct_field(
 }
 
 fn is_option_type(ty: &syn::Type) -> bool {
-    matches!(ty, syn::Type::Path(tp)
-        if tp.path.segments.last().is_some_and(|s| s.ident == "Option"))
+    option_inner_type(ty).is_some()
+}
+
+fn option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
+    match ty {
+        syn::Type::Path(tp) => {
+            let segment = tp.path.segments.last()?;
+            if segment.ident == "Option"
+                && let PathArguments::AngleBracketed(args) = &segment.arguments
+            {
+                args.args.iter().find_map(generic_argument_type)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn generic_argument_type(arg: &syn::GenericArgument) -> Option<&syn::Type> {
+    match arg {
+        syn::GenericArgument::Type(inner) => Some(inner),
+        _ => None,
+    }
 }
 
 fn generate_tuple_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {

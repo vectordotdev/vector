@@ -8,8 +8,17 @@
       ],
       "properties": {
         "extra": {
-          "$ref": "#/definitions/core::option::Option<integration::schema_snapshots::InternallyTaggedMode>",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/integration::schema_snapshots::InternallyTaggedMode"
+            }
+          ],
+          "unevaluatedProperties": false,
           "_metadata": {
+            "docs::optional": true,
             "docs::human_name": "Extra"
           }
         },
@@ -42,20 +51,6 @@
   ],
   "unevaluatedProperties": false,
   "definitions": {
-    "core::option::Option<integration::schema_snapshots::InternallyTaggedMode>": {
-      "oneOf": [
-        {
-          "type": "null"
-        },
-        {
-          "$ref": "#/definitions/integration::schema_snapshots::InternallyTaggedMode"
-        }
-      ],
-      "unevaluatedProperties": false,
-      "_metadata": {
-        "docs::optional": true
-      }
-    },
     "integration::schema_snapshots::InternallyTaggedMode": {
       "oneOf": [
         {
