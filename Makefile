@@ -393,7 +393,7 @@ check-clippy: ## Check code with Clippy
 .PHONY: check-clippy-no-default-features
 check-clippy-no-default-features: ## Check code with Clippy using only FEATURES
 	cargo clippy --locked --workspace --all-targets \
-		--no-default-features --features ${FEATURES}
+		--no-default-features --features "${FEATURES}"
 
 .PHONY: check-docs
 check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
