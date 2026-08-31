@@ -8,6 +8,7 @@ use super::{
     sink::StackdriverMetricsSink,
 };
 use crate::{
+    config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
@@ -101,15 +102,48 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::metric()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for StackdriverConfig {
+    type Validated = ValidatedStackdriverMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedStackdriverMetrics> {
+        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
+
+        let uri = self
+            .endpoint
+            .append_path(&format!("/v3/projects/{}/timeSeries", self.project_id))?;
+
+        Ok(ValidatedStackdriverMetrics {
+            batch_settings,
+            uri,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedStackdriverMetrics,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedStackdriverMetrics {
+            batch_settings,
+            uri,
+        } = validated.clone();
+
         let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
-
-        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
         let request_builder = StackdriverMetricsRequestBuilder {
             encoder: StackdriverMetricsEncoder {
@@ -121,15 +155,12 @@ impl SinkConfig for StackdriverConfig {
 
         let request_limits = self.request.into_settings();
 
-        let uri = self
-            .endpoint
-            .append_path(&format!("/v3/projects/{}/timeSeries", self.project_id))?
-            .into_uri();
-
         auth.spawn_regenerate_token();
 
-        let stackdriver_metrics_service_request_builder =
-            StackdriverMetricsServiceRequestBuilder { uri, auth };
+        let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
+            uri: uri.into_uri(),
+            auth,
+        };
 
         let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
 
@@ -144,13 +175,31 @@ impl SinkConfig for StackdriverConfig {
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
+}
 
-    fn input(&self) -> Input {
-        Input::metric()
-    }
+#[derive(Clone, Debug)]
+pub struct ValidatedStackdriverMetrics {
+    batch_settings: BatcherSettings,
+    uri: HttpEndpoint,
+}
 
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ValidatedSink;
+
+    #[test]
+    fn validate_produces_usable_values() {
+        let config = StackdriverConfig {
+            project_id: "test-project".into(),
+            endpoint: default_endpoint(),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.uri.to_string(),
+            "https://monitoring.googleapis.com/v3/projects/test-project/timeSeries"
+        );
     }
 }
 

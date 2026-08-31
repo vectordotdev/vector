@@ -33,8 +33,6 @@ pub(super) struct BaseSSSinkConfig {
     /// The tag that specifies that a message belongs to a specific message group.
     ///
     /// Can be applied only to FIFO queues.
-    #[configurable(metadata(docs::examples = "vector"))]
-    #[configurable(metadata(docs::examples = "vector-%Y-%m-%d"))]
     pub(super) message_group_id: Option<String>,
 
     /// The message deduplication ID value to allow AWS to identify duplicate messages.
@@ -43,7 +41,6 @@ pub(super) struct BaseSSSinkConfig {
     /// documentation][deduplication_id_docs] for more about how AWS does message deduplication.
     ///
     /// [deduplication_id_docs]: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/using-messagededuplicationid-property.html
-    #[configurable(metadata(docs::examples = "{{ transaction_id }}"))]
     pub(super) message_deduplication_id: Option<String>,
 
     #[configurable(derived)]

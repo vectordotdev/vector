@@ -1,8 +1,12 @@
-//! Configuration for the `honeycomb` sink.
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
+)]
 
 use bytes::Bytes;
+use derivative::Derivative;
 use futures::FutureExt;
-use http::{Request, StatusCode};
+use http::{HeaderValue, Request, StatusCode};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
@@ -11,11 +15,12 @@ use super::{
     service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
 };
 use crate::{
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
         prelude::*,
         util::{
-            BatchConfig, BoxedRawValue, HttpEndpoint,
+            BatchConfig, BoxedRawValue, HttpEndpoint, TowerRequestSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
         },
     },
@@ -104,44 +109,6 @@ impl GenerateConfig for HoneycombConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
-
-        let request_builder = HoneycombRequestBuilder {
-            encoder: HoneycombEncoder {
-                transformer: self.encoding.clone(),
-            },
-            compression: self.compression,
-        };
-
-        let uri = self.build_uri()?;
-
-        let honeycomb_service_request_builder = HoneycombSvcRequestBuilder {
-            uri: uri.clone(),
-            api_key: self.api_key.clone(),
-            compression: self.compression,
-        };
-
-        let client = HttpClient::new(None, cx.proxy())?;
-
-        let service = HttpService::new(client.clone(), honeycomb_service_request_builder);
-
-        let request_limits = self.request.into_settings();
-
-        let service = ServiceBuilder::new()
-            .settings(
-                request_limits,
-                http_response_retry_logic(self.retry_strategy.clone()),
-            )
-            .service(service);
-
-        let sink = HoneycombSink::new(service, batch_settings, request_builder);
-
-        let healthcheck = healthcheck(uri, self.api_key.clone(), client).boxed();
-
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         let requirement = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
 
@@ -150,6 +117,82 @@ impl SinkConfig for HoneycombConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub struct ValidatedHoneycomb {
+    batch_settings: BatcherSettings,
+    uri: HttpEndpoint,
+    request_limits: TowerRequestSettings,
+    // Omitted: `api_key` is sent as the `X-Honeycomb-Team` header on every
+    // request.
+    #[derivative(Debug = "ignore")]
+    api_key: HeaderValue,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for HoneycombConfig {
+    type Validated = ValidatedHoneycomb;
+
+    fn validate(&self) -> crate::Result<ValidatedHoneycomb> {
+        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
+        let uri = self.build_uri()?;
+        let request_limits = self.request.into_settings();
+        // The API key becomes the `X-Honeycomb-Team` header on every request.
+        let api_key = HeaderValue::from_str(self.api_key.inner())
+            .map_err(|e| format!("invalid `api_key`: {e}"))?;
+
+        Ok(ValidatedHoneycomb {
+            batch_settings,
+            uri,
+            request_limits,
+            api_key,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedHoneycomb,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedHoneycomb {
+            batch_settings,
+            uri,
+            request_limits,
+            api_key,
+        } = validated;
+
+        let request_builder = HoneycombRequestBuilder {
+            encoder: HoneycombEncoder {
+                transformer: self.encoding.clone(),
+            },
+            compression: self.compression,
+        };
+
+        let honeycomb_service_request_builder = HoneycombSvcRequestBuilder {
+            uri: uri.clone(),
+            api_key: api_key.clone(),
+            compression: self.compression,
+        };
+
+        let client = HttpClient::new(None, cx.proxy())?;
+
+        let service = HttpService::new(client.clone(), honeycomb_service_request_builder);
+
+        let service = ServiceBuilder::new()
+            .settings(
+                request_limits.clone(),
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
+            .service(service);
+
+        let sink = HoneycombSink::new(service, *batch_settings, request_builder);
+
+        let healthcheck = healthcheck(uri.clone(), api_key.clone(), client).boxed();
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -163,10 +206,10 @@ impl HoneycombConfig {
 
 async fn healthcheck(
     uri: HttpEndpoint,
-    api_key: SensitiveString,
+    api_key: HeaderValue,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let request = Request::post(uri.as_uri()).header(HTTP_HEADER_HONEYCOMB, api_key.inner());
+    let request = Request::post(uri.as_uri()).header(HTTP_HEADER_HONEYCOMB, api_key);
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();
@@ -198,5 +241,40 @@ async fn healthcheck(
         let body = String::from_utf8_lossy(&body[..]);
 
         Err(format!("Server returned unexpected error status: {status} body: {body}").into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_returns_usable_values() {
+        let config: HoneycombConfig = serde_json::from_value(HoneycombConfig::generate_config())
+            .expect("config should be valid");
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.uri.to_string(),
+            "https://api.honeycomb.io/1/batch/my-honeycomb-dataset"
+        );
+        // Default batch settings from `HoneycombDefaultBatchSettings`.
+        assert_eq!(
+            validated.batch_settings.timeout,
+            std::time::Duration::from_secs(1)
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_api_key() {
+        // A key with a newline cannot be a header value.
+        let config = HoneycombConfig {
+            api_key: "key\nwith_newline".to_string().into(),
+            ..serde_json::from_value(HoneycombConfig::generate_config())
+                .expect("config should be valid")
+        };
+
+        let err = config.validate().unwrap_err().to_string();
+        assert!(err.contains("invalid `api_key`"), "unexpected error: {err}");
     }
 }
