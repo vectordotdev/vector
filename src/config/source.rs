@@ -53,11 +53,9 @@ impl<T: SourceConfig + 'static> From<T> for BoxedSource {
 #[configurable(metadata(docs::component_base_type = "source"))]
 #[derive(Clone, Debug)]
 pub struct SourceOuter {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 

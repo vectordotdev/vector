@@ -11,8 +11,7 @@ use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     http::HttpClient,
     sinks::{
@@ -109,26 +108,20 @@ pub struct HecMetricsSinkConfig {
     ))]
     pub source: Option<Template>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: crate::template::ConfinementConfig,
 }
@@ -167,10 +160,6 @@ impl SinkConfig for HecMetricsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements.inner
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 
