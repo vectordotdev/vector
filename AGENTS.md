@@ -51,7 +51,9 @@ reduction and improved data quality for observability infrastructure.
 When working on Vector's Rust codebase, follow this iterative development cycle:
 
 1. Make code changes
-2. Run `make check-clippy` to check for linting issues
+2. Run `FEATURES="<features>" make check-clippy-no-default-features` to check the same
+   focused feature set used by the relevant tests. Use `make check-clippy` when a full
+   all-feature Clippy run is required.
 3. Fix any issues found (use `make clippy-fix` for auto-fixes)
 4. Continue to next task or mark current task complete
 
@@ -76,6 +78,15 @@ automatically selects the minimum set of features required by the configuration,
 times.
 
 If `cargo vdev run <config>` fails, fall back to `cargo run -- --config <config>`.
+
+For focused Clippy iteration, reuse the feature set selected for the relevant tests:
+
+```bash
+FEATURES="sources-file" make check-clippy-no-default-features
+```
+
+`FEATURES` is required for this target. It runs Clippy for the workspace and all targets with
+default features disabled; `make check-clippy` remains the full validation command.
 
 #### Running tests
 
