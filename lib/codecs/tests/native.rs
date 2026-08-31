@@ -6,7 +6,7 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use codecs::{
     NativeDeserializerConfig, NativeJsonDeserializerConfig, NativeJsonSerializerConfig,
-    NativeSerializerConfig,
+    NativeSerializerConfig, decoding::format::Deserializer,
 };
 use proptest::{
     collection::{btree_map, btree_set},
