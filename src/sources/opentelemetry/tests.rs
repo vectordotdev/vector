@@ -780,11 +780,92 @@ async fn receive_histogram_metric() {
                         },
                     ],
                     count: 9,
-                    sum: 123.45,
+                    sum: Some(123.45),
                 },
             )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
             .with_tags(Some(tags)),
+        );
+        expected_event.set_upstream_id(Arc::new(OutputId {
+            component: "test".into(),
+            port: Some("metrics".into()),
+        }));
+        assert_eq!(actual_event, expected_event);
+    })
+    .await;
+}
+
+/// OTLP's `HistogramDataPoint.sum` is optional, and the spec tells producers to leave it unset when
+/// recording negative values so as to stay compatible with OpenMetrics. An unset sum must reach the
+/// event as `None` rather than a fabricated zero, so that downstream consumers can tell it apart
+/// from a histogram whose sum genuinely is zero.
+#[tokio::test]
+async fn receive_histogram_metric_without_sum() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let env = build_otlp_test_env(METRICS, None).await;
+
+        let mut client = MetricsServiceClient::connect(format!("http://{}", env.grpc_addr))
+            .await
+            .unwrap();
+        let (event_time, event_time_nanos) = current_time_and_nanos();
+
+        let req = Request::new(ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                resource: None,
+                schema_url: "".to_string(),
+                scope_metrics: vec![ScopeMetrics {
+                    scope: None,
+                    schema_url: "".to_string(),
+                    metrics: vec![Metric {
+                        name: "some.random.metric".to_string(),
+                        description: "Some random metric we use for test".to_string(),
+                        unit: "1".to_string(),
+                        data: Some(Data::Histogram(Histogram {
+                            aggregation_temporality: AggregationTemporality::Cumulative as i32,
+                            data_points: vec![HistogramDataPoint {
+                                attributes: vec![],
+                                start_time_unix_nano: 0,
+                                time_unix_nano: event_time_nanos,
+                                count: 3,
+                                sum: None,
+                                bucket_counts: vec![1, 2],
+                                explicit_bounds: vec![50.0],
+                                exemplars: vec![],
+                                flags: 0,
+                                min: None,
+                                max: None,
+                            }],
+                        })),
+                    }],
+                }],
+            }],
+        });
+        _ = client.export(req).await;
+        let mut output = test_util::collect_ready(env.output).await;
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+
+        let mut expected_event = Event::from(
+            MetricEvent::new(
+                "some.random.metric",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: vec![
+                        Bucket {
+                            count: 1,
+                            upper_limit: 50.0,
+                        },
+                        Bucket {
+                            count: 2,
+                            upper_limit: f64::INFINITY,
+                        },
+                    ],
+                    count: 3,
+                    sum: None,
+                },
+            )
+            .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
+            .with_tags(Some(MetricTags::default())),
         );
         expected_event.set_upstream_id(Arc::new(OutputId {
             component: "test".into(),
@@ -907,7 +988,7 @@ async fn receive_histogram_delta_metric() {
                         },
                     ],
                     count: 9,
-                    sum: 123.45,
+                    sum: Some(123.45),
                 },
             )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))
@@ -1047,7 +1128,7 @@ async fn receive_exponential_histogram_metric() {
                         },
                     ],
                     count: 7,
-                    sum: 700.00,
+                    sum: Some(700.00),
                 },
             )
             .with_timestamp(Some(DateTime::<Utc>::from(event_time)))

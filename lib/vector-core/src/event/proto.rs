@@ -162,20 +162,27 @@ impl From<MetricValue> for super::MetricValue {
                 statistic: dist.statistic().into(),
                 samples: dist.samples.into_iter().map(Into::into).collect(),
             },
+            // Versions 1 through 3 have no way to encode an absent sum, so whatever they carry was
+            // reported by the source.
             MetricValue::AggregatedHistogram1(hist) => Self::AggregatedHistogram {
                 buckets: super::metric::zip_buckets(
                     hist.buckets,
                     hist.counts.iter().map(|h| u64::from(*h)),
                 ),
                 count: u64::from(hist.count),
-                sum: hist.sum,
+                sum: Some(hist.sum),
             },
             MetricValue::AggregatedHistogram2(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: u64::from(hist.count),
-                sum: hist.sum,
+                sum: Some(hist.sum),
             },
             MetricValue::AggregatedHistogram3(hist) => Self::AggregatedHistogram {
+                buckets: hist.buckets.into_iter().map(Into::into).collect(),
+                count: hist.count,
+                sum: Some(hist.sum),
+            },
+            MetricValue::AggregatedHistogram4(hist) => Self::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: hist.count,
                 sum: hist.sum,
@@ -376,14 +383,28 @@ impl From<super::MetricValue> for MetricValue {
                     .into(),
                 })
             }
+            // Only reach for `AggregatedHistogram4` when there is no sum to report. Its `sum` has
+            // explicit presence, which `AggregatedHistogram3` cannot express, but emitting it
+            // unconditionally would change the encoding of every histogram -- invalidating the
+            // byte-exact native-encoding fixtures and leaving older peers unable to decode
+            // histograms they can otherwise represent perfectly well.
             super::MetricValue::AggregatedHistogram {
                 buckets,
                 count,
-                sum,
+                sum: Some(sum),
             } => Self::AggregatedHistogram3(AggregatedHistogram3 {
                 buckets: buckets.into_iter().map(Into::into).collect(),
                 count,
                 sum,
+            }),
+            super::MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum: None,
+            } => Self::AggregatedHistogram4(AggregatedHistogram4 {
+                buckets: buckets.into_iter().map(Into::into).collect(),
+                count,
+                sum: None,
             }),
             super::MetricValue::AggregatedSummary {
                 quantiles,
