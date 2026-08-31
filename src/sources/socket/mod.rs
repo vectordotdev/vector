@@ -99,10 +99,10 @@ impl From<udp::UdpConfig> for SocketConfig {
 
 impl GenerateConfig for SocketConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"mode = "tcp"
-            address = "0.0.0.0:9000""#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"mode: tcp
+            address: "0.0.0.0:9000""#,
+        })
         .unwrap()
     }
 }
@@ -143,6 +143,7 @@ impl SourceConfig for SocketConfig {
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
                     config.max_connection_duration_secs(),
+                    config.tls_handshake_timeout_secs(),
                     config.disconnect_mode(),
                     cx,
                     false.into(),
@@ -323,6 +324,7 @@ mod test {
     use std::{
         collections::HashMap,
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
+        num::NonZeroU64,
         sync::{
             Arc,
             atomic::{AtomicBool, Ordering},
@@ -929,6 +931,43 @@ mod test {
                  }
              }
         }
+    }
+
+    #[tokio::test]
+    async fn tcp_tls_handshake_timeout() {
+        let (tx, _) = SourceSender::new_test();
+        let (guard, addr) = next_addr();
+
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_tls(Some(TlsSourceConfig {
+            tls_config: TlsEnableableConfig::test_config(),
+            client_metadata_key: None,
+        }));
+        config.set_tls_handshake_timeout_secs(Some(NonZeroU64::new(1).unwrap()));
+
+        let source_task = SocketConfig::from(config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        // Spawn the source task and wait until we're sure it's listening:
+        drop(tokio::spawn(source_task));
+        wait_for_tcp_and_release(guard, addr).await;
+
+        // Open a plain TCP connection but deliberately never send a TLS
+        // ClientHello, so the server's handshake never completes on its own.
+        let mut stream: TcpStream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let start = Instant::now();
+
+        let bytes_read = timeout(Duration::from_secs(2), stream.read(&mut [0]))
+            .await
+            .expect("timed out waiting for stream to close")
+            .expect("failed to read from stream");
+
+        assert_eq!(bytes_read, 0, "unexpectedly read data from stream");
+        assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.5);
     }
 
     #[tokio::test]

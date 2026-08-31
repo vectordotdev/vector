@@ -1,5 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    num::NonZeroU64,
     time::Duration,
 };
 
@@ -141,6 +142,14 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
+
     #[configurable(derived)]
     #[serde(default)]
     disconnect_mode: DisconnectMode,
@@ -169,6 +178,7 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
             connection_limit: None,
+            tls_handshake_timeout_secs: None,
             disconnect_mode: DisconnectMode::Drain,
             sanitize: default_sanitize(),
             convert_to: default_convert_to(),
@@ -230,6 +240,7 @@ impl SourceConfig for StatsdConfig {
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     None,
+                    config.tls_handshake_timeout_secs,
                     config.disconnect_mode,
                     cx,
                     false.into(),

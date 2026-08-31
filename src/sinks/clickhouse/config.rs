@@ -19,7 +19,7 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
-    config::{DynValidatedSink, SinkContext, ValidatedSink},
+    config::{SinkContext, ValidatedSink},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
@@ -221,10 +221,6 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

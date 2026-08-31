@@ -22,7 +22,7 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use antithesis_harness::{decode_payload_field, payload_for};
+use antithesis_harness::{decode_payload_field, endpoint_healthy, payload_for, OracleReport};
 use antithesis_sdk::{antithesis_init, assert_always, assert_reachable, lifecycle};
 use axum::extract::{DefaultBodyLimit, RawQuery, State};
 use axum::http::StatusCode;
@@ -124,7 +124,7 @@ async fn acked(State(st): State<Arc<AppState>>, body: String) -> StatusCode {
 
 async fn ingest(State(st): State<Arc<AppState>>, body: String) -> StatusCode {
     let (records, understood) = parse_delivered(&body);
-    // 200 only if understood, so the sink never counts an unparseable body as
+    // 200 only if understood, so the sink never counts an unparsable body as
     // delivered — keeps the delivered set honest.
     if !understood {
         return StatusCode::INTERNAL_SERVER_ERROR;
@@ -172,17 +172,31 @@ async fn report(State(st): State<Arc<AppState>>) -> String {
         .copied()
         .take(20)
         .collect();
-    json!({
-        "issued": sets.issued.len(),
-        "acked": sets.acked.len(),
-        "delivered": sets.delivered.len(),
-        "delivered_total": sets.delivered_total,
-        "missing_count": sets.acked.difference(&sets.delivered).count(),
-        "missing_sample": missing,
-        "spurious_count": sets.delivered.difference(&sets.issued).count(),
-        "corrupted_count": sets.corrupted,
-    })
-    .to_string()
+    let report = OracleReport {
+        issued: sets.issued.len().try_into().expect("issued count fits u64"),
+        acked: sets.acked.len().try_into().expect("acked count fits u64"),
+        delivered: sets
+            .delivered
+            .len()
+            .try_into()
+            .expect("delivered count fits u64"),
+        delivered_total: sets.delivered_total,
+        missing_count: sets
+            .acked
+            .difference(&sets.delivered)
+            .count()
+            .try_into()
+            .expect("missing count fits u64"),
+        missing_sample: missing,
+        spurious_count: sets
+            .delivered
+            .difference(&sets.issued)
+            .count()
+            .try_into()
+            .expect("spurious count fits u64"),
+        corrupted_count: sets.corrupted,
+    };
+    serde_json::to_string(&report).expect("oracle report serializes")
 }
 
 async fn delivered(State(st): State<Arc<AppState>>, RawQuery(q): RawQuery) -> String {
@@ -199,15 +213,8 @@ async fn wait_for_vector(metrics_url: &str, timeout: time::Duration) {
     let client = reqwest::Client::new();
     let deadline = time::Instant::now() + timeout;
     while time::Instant::now() < deadline {
-        if let Ok(resp) = client
-            .get(metrics_url)
-            .timeout(time::Duration::from_secs(2))
-            .send()
-            .await
-        {
-            if resp.status().is_success() {
-                return;
-            }
+        if endpoint_healthy(&client, metrics_url, time::Duration::from_secs(2)).await {
+            return;
         }
         time::sleep(time::Duration::from_millis(500)).await;
     }

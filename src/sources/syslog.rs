@@ -1,6 +1,6 @@
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -103,6 +103,14 @@ pub enum Mode {
         /// The maximum number of TCP connections that are allowed at any given time.
         connection_limit: Option<u32>,
 
+        /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+        ///
+        /// This bounds how long a connection can hold its slot against `connection_limit`
+        /// before the TLS handshake finishes, protecting against clients that open a
+        /// connection but never complete (or never start) a handshake.
+        #[configurable(metadata(docs::type_unit = "seconds"))]
+        tls_handshake_timeout_secs: Option<NonZeroU64>,
+
         #[configurable(derived)]
         #[serde(default)]
         disconnect_mode: DisconnectMode,
@@ -161,6 +169,7 @@ impl Default for SyslogConfig {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
                 disconnect_mode: DisconnectMode::Drain,
             },
             host_key: None,
@@ -195,6 +204,7 @@ impl SourceConfig for SyslogConfig {
                 tls,
                 receive_buffer_bytes,
                 connection_limit,
+                tls_handshake_timeout_secs,
                 disconnect_mode,
             } => {
                 let source = SyslogTcpSource {
@@ -218,6 +228,7 @@ impl SourceConfig for SyslogConfig {
                     tls_client_metadata_key,
                     receive_buffer_bytes,
                     None,
+                    tls_handshake_timeout_secs,
                     disconnect_mode,
                     cx,
                     false.into(),
@@ -1158,6 +1169,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
                 disconnect_mode: DisconnectMode::Drain,
             });
 
@@ -1370,6 +1382,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
                 disconnect_mode: DisconnectMode::Drain,
             });
 

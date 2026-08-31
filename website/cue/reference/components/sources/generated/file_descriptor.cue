@@ -319,7 +319,7 @@ generated: components: sources: file_descriptor: configuration: {
 		description: "The file descriptor number to read from."
 		required:    true
 		type: uint: examples: [
-			10,
+			10
 		]
 	}
 	framing: {

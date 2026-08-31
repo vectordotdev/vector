@@ -548,7 +548,7 @@ generated: components: sinks: gcp_pubsub: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "https://pubsub.googleapis.com"
+			default: "https://pubsub.googleapis.com/"
 			examples: ["https://us-central1-pubsub.googleapis.com"]
 		}
 	}

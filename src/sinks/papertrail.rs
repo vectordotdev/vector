@@ -5,7 +5,10 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     event::Event,
     internal_events::TemplateRenderingError,
     schema,
@@ -56,10 +59,11 @@ fn default_process() -> UnconfinedTemplate {
 
 impl GenerateConfig for PapertrailConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"endpoint = "logs.papertrailapp.com:12345"
-            encoding.codec = "json""#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"endpoint: "logs.papertrailapp.com:12345"
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }
@@ -67,10 +71,30 @@ impl GenerateConfig for PapertrailConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
-    async fn build(
-        &self,
-        _cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    fn input(&self) -> Input {
+        let requirement = schema::Requirement::empty().optional_meaning("host", Kind::bytes());
+
+        Input::new(self.encoding.config().input_type() & DataType::Log)
+            .with_schema_requirement(requirement)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedPapertrail {
+    address: String,
+    tls: Option<TlsEnableableConfig>,
+    transformer: Transformer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for PapertrailConfig {
+    type Validated = ValidatedPapertrail;
+
+    fn validate(&self) -> crate::Result<ValidatedPapertrail> {
         let host = self
             .endpoint
             .uri
@@ -90,12 +114,31 @@ impl SinkConfig for PapertrailConfig {
                 .unwrap_or_else(TlsEnableableConfig::enabled),
         );
 
+        let transformer = self.encoding.transformer();
+
+        Ok(ValidatedPapertrail {
+            address,
+            tls,
+            transformer,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedPapertrail,
+        _cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let ValidatedPapertrail {
+            address,
+            tls,
+            transformer,
+        } = validated.clone();
+
         let pid = std::process::id();
         let process = self.process.clone();
 
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
-        let transformer = self.encoding.transformer();
         let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
@@ -108,17 +151,6 @@ impl SinkConfig for PapertrailConfig {
                 encoder,
             },
         )
-    }
-
-    fn input(&self) -> Input {
-        let requirement = schema::Requirement::empty().optional_meaning("host", Kind::bytes());
-
-        Input::new(self.encoding.config().input_type() & DataType::Log)
-            .with_schema_requirement(requirement)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -202,6 +234,15 @@ mod tests {
         crate::test_util::test_generate_config::<PapertrailConfig>();
     }
 
+    #[test]
+    fn validate_produces_usable_state() {
+        let config: PapertrailConfig = serde_json::from_value(PapertrailConfig::generate_config())
+            .expect("config should be valid");
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.address, "logs.papertrailapp.com:12345");
+        assert!(validated.tls.is_some());
+    }
+
     #[tokio::test]
     async fn component_spec_compliance() {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
@@ -213,7 +254,7 @@ mod tests {
         config.tls = Some(TlsEnableableConfig::default());
 
         let context = SinkContext::default();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
+        let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;

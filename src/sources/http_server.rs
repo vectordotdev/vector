@@ -6,11 +6,7 @@ use http::StatusCode;
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vector_lib::{
-    codecs::{
-        BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
-        NewlineDelimitedDecoderConfig,
-        decoding::{DeserializerConfig, FramingConfig},
-    },
+    codecs::decoding::{DeserializerConfig, FramingConfig},
     config::{DataType, LegacyKey, LogNamespace},
     configurable::configurable_component,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
@@ -22,51 +18,16 @@ use warp::http::HeaderMap;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
-    config::{
-        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
-    },
+    config::{Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     http::KeepaliveConfig,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
-        Encoding, HttpSource,
+        HttpSource,
         http::{HttpMethod, add_headers, add_query_parameters},
     },
     tls::TlsEnableableConfig,
 };
-
-/// Configuration for the `http` source.
-#[configurable_component(source("http", "Host an HTTP endpoint to receive logs."))]
-#[configurable(metadata(deprecated))]
-#[derive(Clone, Debug)]
-pub struct HttpConfig(SimpleHttpConfig);
-
-impl GenerateConfig for HttpConfig {
-    fn generate_config() -> serde_json::Value {
-        <SimpleHttpConfig as GenerateConfig>::generate_config()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "http")]
-impl SourceConfig for HttpConfig {
-    async fn build(&self, cx: SourceContext) -> vector_lib::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        self.0.outputs(global_log_namespace)
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        self.0.resources()
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        self.0.can_acknowledge()
-    }
-}
 
 /// Configuration for the `http_server` source.
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
@@ -78,13 +39,6 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
     #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
-
-    /// The expected encoding of received data.
-    ///
-    /// For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
-    #[configurable(deprecated)]
-    #[serde(default)]
-    encoding: Option<Encoding>,
 
     /// A list of HTTP headers to include in the log event.
     ///
@@ -241,37 +195,11 @@ impl SimpleHttpConfig {
     }
 
     fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
-        if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
-            return Err("Using `encoding` is deprecated and does not have any effect when `decoding` or `framing` is provided. Configure `framing` and `decoding` instead.".into());
-        }
-
-        let (framing, decoding) = if let Some(encoding) = self.encoding {
-            match encoding {
-                Encoding::Text => (
-                    NewlineDelimitedDecoderConfig::new().into(),
-                    BytesDeserializerConfig::new().into(),
-                ),
-                Encoding::Json => (
-                    BytesDecoderConfig::new().into(),
-                    JsonDeserializerConfig::default().into(),
-                ),
-                Encoding::Ndjson => (
-                    NewlineDelimitedDecoderConfig::new().into(),
-                    JsonDeserializerConfig::default().into(),
-                ),
-                Encoding::Binary => (
-                    BytesDecoderConfig::new().into(),
-                    BytesDeserializerConfig::new().into(),
-                ),
-            }
-        } else {
-            let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
-            let framing = self
-                .framing
-                .clone()
-                .unwrap_or_else(|| decoding.default_stream_framing());
-            (framing, decoding)
-        };
+        let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
+        let framing = self
+            .framing
+            .clone()
+            .unwrap_or_else(|| decoding.default_stream_framing());
 
         Ok(DecodingConfig::new(
             framing,
@@ -285,7 +213,6 @@ impl Default for SimpleHttpConfig {
     fn default() -> Self {
         Self {
             address: "0.0.0.0:8080".parse().unwrap(),
-            encoding: None,
             headers: Vec::new(),
             query_parameters: Vec::new(),
             tls: None,
@@ -628,7 +555,6 @@ mod tests {
             SimpleHttpConfig {
                 address,
                 headers,
-                encoding: None,
                 query_parameters,
                 response_code,
                 tls: None,
