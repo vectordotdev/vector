@@ -167,12 +167,16 @@ impl Opts {
 }
 
 /// Performs topology, component, and health checks.
-pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
+pub async fn validate(
+    opts: &Opts,
+    signal_handler: &mut crate::signal::SignalHandler,
+    color: bool,
+) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
 
-    let mut config = match validate_config(opts, &mut fmt).await {
+    let mut config = match validate_config(opts, signal_handler, &mut fmt).await {
         Some(config) => config,
         None => return exitcode::CONFIG,
     };
@@ -197,7 +201,11 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-pub async fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
+pub async fn validate_config(
+    opts: &Opts,
+    signal_handler: &mut crate::signal::SignalHandler,
+    fmt: &mut Formatter,
+) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
     let paths = if let Some(paths) = config::process_paths(&paths) {
@@ -219,12 +227,10 @@ pub async fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config>
     // `--resolve-secrets` is also given: no secret backends are contacted and
     // `SECRET[...]` placeholders stay in place. Otherwise resolve them like
     // the run path, so validation checks the config that would actually run.
-    let mut signal_handler = crate::signal::SignalHandler::new().0;
     let builder = if opts.no_environment && !opts.resolve_secrets {
         ConfigBuilderLoader::default().load_from_paths(&paths)
     } else {
-        config::loading::load_builder_from_paths_with_secrets(&paths, &mut signal_handler, false)
-            .await
+        config::loading::load_builder_from_paths_with_secrets(&paths, signal_handler, false).await
     }
     .map_err(&mut report_error)
     .ok()?;
