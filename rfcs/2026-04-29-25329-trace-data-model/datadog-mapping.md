@@ -681,11 +681,12 @@ defaults derivation specified in the Fallback sub-bullet above for `_dd.payload`
 emit an empty `TracerPayload.tags` for `_dd.tracer`.
 
 During the coexistence and deprecated-proto window the `datadog_agent` source writes
-`vector.trace_legacy_layout` on both `Legacy` and `Typed` events, and the sink reads it
-to identify Datadog-originated events. Because the hint is preserved across `vector`
-source/sink hops, relay pipelines continue to forward the original agent envelope
-without operator intervention while either representation can be present. After that
-window, typed sources stop emitting the migration hint and the sink reads
+`vector.trace_legacy_layout` on both `TraceEventCompat::Legacy` and
+`TraceEventCompat::Typed` events, and the sink reads it to identify
+Datadog-originated events. Because the hint is preserved across `vector` source/sink
+hops, relay pipelines continue to forward the original agent envelope without
+operator intervention while either representation can be present. After that window,
+typed sources stop emitting the migration hint and the sink reads
 `EventMetadata.source_type` (set by the topology source pump on every emission and reset
 to `"vector"` at each hop); operators who want to relay Datadog envelope state across
 `vector` hops must enable that explicitly in the sink configuration.
@@ -981,12 +982,12 @@ Removing the obsolete `tracerPayloads`-empty ingest branch and adopting the upst
 Datadog protos may land independently.
 
 The remaining work starts after the format-agnostic prerequisites (fallible proto decode
-boundary, migration enum, legacy-layout hint precursor, and internal `TypedTrace` proto
-extension) in the parent RFC:
+boundary, temporary `TraceEventCompat` enum, legacy-layout hint precursor, and internal
+`TypedTrace` proto extension) in the parent RFC:
 
-1. Implement `Legacy -> Typed` conversion and unique detection of historical pre-hint
-   Datadog layouts.
-2. Implement `Typed -> Datadog` encoding satisfying the mapping and egress contracts
+1. Implement `LegacyTraceEvent -> TraceEvent` conversion and unique detection of
+   historical pre-hint Datadog layouts.
+2. Implement `TraceEvent -> Datadog` encoding satisfying the mapping and egress contracts
    above.
 3. Establish the `Datadog -> Vector -> Datadog` effective-equivalence guarantee,
    and validate every declared exclusion.

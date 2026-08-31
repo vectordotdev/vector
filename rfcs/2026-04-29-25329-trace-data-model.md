@@ -11,8 +11,9 @@ transforms a uniform typed surface across the two source formats.
 
 The full proposal is split across three documents:
 
-- This document defines the typed data model, the VRL surface, the migration coexistence
-  enum and shim mechanism, and Vector's internal protobuf serialization.
+- This document defines the typed data model, the VRL surface, the temporary
+  `TraceEventCompat` coexistence enum and shim mechanism, and Vector's internal
+  protobuf serialization.
 - [Trace Data Model: OTLP Mapping](2026-04-29-25329-trace-data-model/otlp-mapping.md)
   specifies the bidirectional mapping between `TraceEvent` and the OTLP wire format.
 - [Trace Data Model: Datadog Mapping](2026-04-29-25329-trace-data-model/datadog-mapping.md)
@@ -93,10 +94,11 @@ the entries below are the format-agnostic shared vocabulary.
 - Add the fallible `trace_span_status`, `trace_span_link`, `trace_span_event`, and
   `trace_flags` VRL functions for atomic construction and related-field updates.
 - Define the migration strategy that lets each trace-producing or trace-consuming component
-  migrate independently: the `enum TraceEvent { Legacy(LogEvent), Typed { … } }`
-  coexistence, the per-source `Legacy -> Typed` shim mechanism keyed on
+  migrate independently: the temporary
+  `enum TraceEventCompat { Legacy(LegacyTraceEvent), Typed(TraceEvent) }`
+  coexistence, the per-source `Legacy -> TraceEvent` shim mechanism keyed on
   `vector.trace_legacy_layout`, and the compile-time gating that catches unmigrated
-  consumers.
+  consumers. The permanent `TraceEvent` type is always the typed structure.
 - Extend Vector's internal event protobuf with a `TypedTrace` variant alongside the renamed
   `LegacyTrace` so trace events cross disk-buffer and `vector` source/sink boundaries
   unchanged.
@@ -691,92 +693,86 @@ concrete value.
 
 #### Retention of `TraceEvent` and `Event::Trace`
 
-The outer `Event::Trace(TraceEvent)` variant is retained. Only the inner representation
-changes.
+The outer `Event::Trace` variant is retained. During coexistence its payload temporarily
+changes from today's `TraceEvent(LogEvent)` to `TraceEventCompat`; after coexistence
+`TraceEventCompat` becomes an alias for the typed `TraceEvent`. This avoids adding a
+second trace dispatch arm to `Event`.
 
 #### Migration: coexistence of `LogEvent` and typed representations
 
-During the migration, `TraceEvent` is an enum:
+`TraceEvent` is permanently the typed struct defined above. During migration, the public
+temporary compatibility enum carried by `Event::Trace` and `TraceArray` is:
 
 ```rust
-pub enum TraceEvent {
+pub struct LegacyTraceEvent(LogEvent);
+
+pub enum TraceEventCompat {
     /// Pre-migration source output: an untyped `LogEvent` whose key layout is
     /// defined by the producing source. The producing source identifies its
     /// layout in `LogEvent.metadata().value()` under the reserved sub-key
     /// `vector.trace_legacy_layout` so the correct shim can be selected
     /// after fan-in, disk-buffer round-trips, or `vector` source/sink hops.
-    Legacy(LogEvent),
-    /// Post-migration typed container.
-    Typed {
-        resource: Resource,
-        scope:    Scope,
-        chunk:    Option<ChunkContext>,
-        spans:    Vec<Span>,
-        metadata: EventMetadata,
-    },
+    Legacy(LegacyTraceEvent),
+    /// The permanent typed container.
+    Typed(TraceEvent),
 }
 ```
 
 Trace event-producing sources each set the reserved sub-key `vector.trace_legacy_layout`
-in `EventMetadata.value` to a static string identifying themselves on every `Legacy`
-trace they emit. A source that flips to `Typed` continues setting the same hint until
-the coexistence and deprecated-proto window ends, so independently migrated producers
-retain durable origin across disk buffers and `vector` hops. Conversion reads this
-sub-key to select the corresponding
-`Legacy -> Typed` shim. For a pre-precursor record with no hint, conversion runs each
-registered shim's format-shape detector. Exactly one match selects
-that shim; zero or multiple matches return a reported error.
+in `EventMetadata.value` to a static string identifying themselves on every
+`TraceEventCompat::Legacy` trace they emit. A source that flips to
+`TraceEventCompat::Typed` continues setting the same hint until the coexistence and
+deprecated-proto window ends, so independently migrated producers retain durable
+origin across disk buffers and `vector` hops. Conversion reads this sub-key to select
+the corresponding `LegacyTraceEvent -> TraceEvent` shim. For a pre-precursor record
+with no hint, conversion runs each registered shim's format-shape detector. Exactly
+one match selects that shim; zero or multiple matches return a reported error.
 A present but unrecognized hint returns the same error without attempting detection.
 
-The end-state `struct TraceEvent { resource, scope, chunk, spans, metadata }` shown above
-is reached by deleting the `Legacy` arm once every component has migrated; the `Typed`
-arm's fields become the struct's fields verbatim.
+`TraceEventCompat` owns only migration-boundary behavior:
 
-Both accessor families coexist on `TraceEvent` and dispatch on the variant:
+- Metadata, finalizer, allocation-size, and event-count operations dispatch to either
+  variant so generic topology and buffering code can operate without converting.
+- Temporary untyped forwarding methods (`get(path)`, `insert(path, value)`, `as_map()`,
+  etc.) preserve the legacy component API while every producer still emits
+  `TraceEventCompat::Legacy`. They are removed before any producer flips to typed
+  output; the resulting compiler errors locate every remaining consumer of the legacy
+  layout.
+- Typed field accessors exist only on `TraceEvent`. `TraceEventCompat` does not expose
+  typed accessors, so typed code cannot accidentally access an unconverted legacy event
+  or enter a migration-only panic state.
+- A typed-aware sink or transform consumes `TraceEventCompat` at every trace-event
+  intake path and invokes a fallible `try_into_typed()` conversion. The `Typed` arm
+  returns its `TraceEvent` without migration work; the `Legacy` arm selects a
+  source-specific shim from the hint or, for a hintless record, the unique
+  format-shape detector match. A conversion error retains the original
+  `LegacyTraceEvent`, including metadata and finalizers, so the caller can report and
+  drop it according to normal acknowledgement semantics. There is no reverse
+  conversion. A transform that emits the converted event wraps it as
+  `TraceEventCompat::Typed`.
+- VRL uses a fallible mutable compatibility-boundary method that converts a `Legacy`
+  arm in place and returns `&mut TraceEvent`. An already-`Typed` arm only returns the
+  contained reference. If conversion cannot resolve a present hint or uniquely detect
+  a hintless legacy layout, VRL aborts the expression with a runtime error; the event
+  is forwarded to the topology error path unchanged and the failure is reported.
 
-- Metadata and finalizer accessors return the inner `LogEvent`'s metadata when
-  `Legacy`, and the typed `metadata` field when `Typed`. Callers see no behaviour
-  change.
-- The existing untyped accessors (`get(path)`, `insert(path, value)`, `as_map()`, etc.)
-  are not forwarded on `TraceEvent` itself; they are accessible only by pattern-matching
-  into the `Legacy(LogEvent)` arm directly. Any call site that invokes them through the
-  `TraceEvent` type therefore fails to compile as soon as these forwarding methods are
-  removed, making the migration of remaining consumers a compile-error-driven mechanical
-  task rather than a runtime-failure audit.
-- The new typed accessors operate on the `Typed` form only. Calling them on a `Legacy`
-  variant panics with a clear diagnostic message; the design rationale for the panicking
-  accessor (as opposed to implicit conversion) is in "Migration approach" under
-  Rationale. The VRL boundary is the exception: it auto-converts Legacy -> Typed on
-  first typed-path access, so VRL programs work uniformly regardless of source
-  migration state. If conversion cannot resolve a present hint or uniquely detect a
-  hintless legacy layout, VRL aborts the expression with a runtime error; the event is
-  forwarded to the topology error path unchanged and the failure is reported.
-- Explicit conversion rewrites a `Legacy` variant in place into `Typed` by selecting a
-  source-specific shim from the hint or, for a hintless record, the unique format-shape
-  detector match. Already-`Typed` events are a no-op. There is no reverse conversion.
-  When a typed-aware sink or transform (outside VRL) fails to convert, it drops the
-  event and reports the failure. Once dead-letter routing lands, failed events may
-  instead be forwarded to an error path; until then, dropping is the uniform fallback.
+Per-component shims are unidirectional (`LegacyTraceEvent -> TraceEvent` only). The
+`datadog_agent` source ships with a shim and format-shape detector that know the
+source's `LogEvent` key layout and produce a typed container; the OTLP source ships
+with the equivalent shim and detector for its layout.
 
-Per-component shims are unidirectional (`Legacy -> Typed` only). The `datadog_agent`
-source ships with a shim and format-shape detector that know the source's `LogEvent` key
-layout and produce a typed container; the OTLP source ships with the equivalent shim and
-detector for its layout.
+The removal of the temporary untyped forwarders is the compile-time gate for unmigrated
+call sites. Each migrated consumer must accept `TraceEventCompat` and fallibly produce
+a `TraceEvent` at every trace-event intake path. Once conversion succeeds, all of its
+internal trace operations are statically typed.
 
-The removal of untyped forwarders is the compile-time gate for unmigrated call sites.
-Each migrated consumer must convert at every trace-event intake path and continue to
-accept legacy input. Typed access on an unconverted legacy event remains a fail-loud
-runtime backstop: it panics the affected task with a diagnostic rather than permitting a
-silent mixed-representation error. This is an implementation-defect detector, not normal
-error handling; see Drawbacks for the production consequence.
+VRL programs perform the same conversion implicitly at their mutable target boundary,
+so operators never need to reason about the migration state of upstream sources.
 
-VRL programs are exempt from the explicit-conversion enforcement: typed-path access
-auto-converts, so operators never need to reason about the migration state of upstream
-sources.
-
-After every source, sink, and transform has been migrated, the `Legacy` Rust variant is
-deleted, leaving only the typed struct. The conversion routines and detectors remain
-temporarily as deprecated-proto wire decoders, as described below.
+After every source, sink, and transform has been migrated, the compatibility enum and
+`LegacyTraceEvent` are removed and `TraceEventCompat` becomes a type alias for
+`TraceEvent`. The legacy conversion routines and detectors remain temporarily as
+deprecated-proto wire decoders, as described below.
 
 #### Wire serialization
 
@@ -810,21 +806,29 @@ migration-boundary release (fallible decode plus the legacy-layout hint precurso
 crash-safe but not lossless for typed traffic; it does not satisfy the receiver
 prerequisite.
 
-Single-event encoding via `EventWrapper` is 1:1. Array encoding is 1:1-or-N: in-memory
-`TraceArray` (a `Vec<TraceEvent>`) can hold a mix of variants when a source that emits
-`Typed` natively and one that still emits `Legacy` fan in to the same downstream
+Single-event encoding via `EventWrapper` is 1:1:
+`TraceEventCompat::Legacy` encodes as `LegacyTrace` at tag 3 and
+`TraceEventCompat::Typed` encodes as `TypedTrace` at tag 4. Array encoding is
+1:1-or-N: during coexistence, in-memory `TraceArray` (a
+`Vec<TraceEventCompat>`) can hold a mix of variants when a source that emits typed
+events natively and one that still emits legacy events fan in to the same downstream
 component, but the wire `EventArray.events` oneof must select one variant. The encoder
 must therefore emit one or more homogeneous arrays while preserving the original event
 order and per-event finalizer and acknowledgement behavior. Decoders see only
 homogeneous wire arrays; mixing reappears at fan-in points downstream without changing
 the order observed by stateful components.
 
-Removing the `Legacy` Rust variant does not immediately retire the proto: `LegacyTrace`,
+Retiring the `TraceEventCompat` enum does not immediately retire the proto:
+`LegacyTrace`,
 `LegacyTraceArray`, and the `legacy_*` oneof variants are first marked
 `deprecated = true` for a release window so records written by older Vector instances
 continue to decode when their layout can be identified safely. The per-component
 conversion routines and detectors persist alongside the deprecated proto as wire
-decoders. A
+decoders. During coexistence, a tag 3 record decodes as
+`TraceEventCompat::Legacy` and converts at a typed consumer boundary. After the
+compatibility enum is retired, the tag 3 decoder performs that same fallible conversion
+immediately and returns a `TraceEvent`; a tag 4 record decodes directly to
+`TraceEvent` after the typed proto's own validation. A
 `vector.trace_legacy_layout` hint (which travels in `EventMetadata.value` inside
 `LegacyTrace`) selects the decoder directly; a pre-hint record is accepted only when
 exactly one registered detector recognizes its legacy `LogEvent` shape. Zero or multiple
@@ -859,9 +863,10 @@ conversion routines and detectors deleted.
   `Metric` already demonstrates this in Vector; extending it to traces unblocks RFC 11851.
   Typed-first ingest keeps cross-format egress a projection from that shared model rather
   than a translation from source-specific layouts.
-- Keeping the outer `Event::Trace` variant unchanged contains the migration inside
-  `TraceEvent` and avoids a second dispatch arm at every topology, buffer, and finalizer
-  site.
+- Keeping the outer `Event::Trace` variant unchanged and temporarily changing only its
+  payload to `TraceEventCompat` avoids a second dispatch arm at every topology, buffer,
+  and finalizer site. Separating the wrapper from `TraceEvent` keeps the permanent type
+  statically typed throughout the migration.
 
 ### Per-type design choices
 
@@ -912,19 +917,23 @@ conversion routines and detectors deleted.
 
 ### Migration approach
 
-- The migration uses an `enum TraceEvent { Legacy, Typed }` so each trace source, sink,
-  and transform can migrate in its own PR while the rest of the system continues to
-  operate against the representation it expects. See "Wholesale migration" under
+- The migration uses a temporary
+  `enum TraceEventCompat { Legacy(LegacyTraceEvent), Typed(TraceEvent) }` as the
+  `Event::Trace` payload so each trace source, sink, and transform can migrate in its
+  own PR while the rest of the system continues to operate against the representation
+  it expects. `TraceEvent` itself is always typed. See "Wholesale migration" under
   Alternatives for why a single atomic replacement was rejected.
-- Per-component shims convert `Legacy -> Typed` only, never the reverse: the temporary
+- Per-component shims convert `LegacyTraceEvent -> TraceEvent` only, never the reverse:
+  the temporary
   migration hint is not stable post-migration provenance, and the typed model does not
   retain enough source-layout detail to reconstruct a source-specific `LogEvent` shape
   after arbitrary transforms. This forces the migration sequencing in the Plan of Attack --
-  trace-aware consumers (sinks, transforms, VRL programs) must accept `Typed` input
-  before any source flips to emitting `Typed` natively. The untyped forwarding methods
-  (`get(path)`, `as_map()`, etc.) are removed from `TraceEvent` before the source steps;
-  every remaining call site then fails to compile, making the consumer migration a
-  mechanical fix-the-build task rather than a runtime-failure audit.
+  trace-aware consumers (sinks, transforms, VRL programs) must accept
+  `TraceEventCompat` and convert it before any source flips to emitting typed events
+  natively. The temporary untyped forwarding methods (`get(path)`, `as_map()`, etc.)
+  are removed from `TraceEventCompat` before the source steps; every remaining call
+  site then fails to compile, making the consumer migration a mechanical
+  fix-the-build task rather than a runtime-failure audit.
 - Shim selection is keyed on a reserved sub-key `vector.trace_legacy_layout` in
   `EventMetadata.value` set by the producing trace source. The `vector` metadata
   namespace is read-only to VRL, so transforms between source and sink cannot
@@ -932,12 +941,12 @@ conversion routines and detectors deleted.
   every event record and passes through fan-in, disk buffers, and `vector` source/sink
   hops unchanged (unlike `EventMetadata.source_type`, which the topology rewrites on
   every emission and so cannot serve as the selector across a serialised hop).
-  Conversion is explicit outside VRL; immutable typed accessors fail loudly on
-  `Legacy` rather than converting on demand. Hintless records written before the
-  precursor use format-shape detectors and convert only on exactly one match; this
-  fallback does not rely on `EventMetadata.source_type`. The convention lives only for
-  the duration of the migration and deprecated-proto window; no new struct field or
-  wire-format extension is needed.
+  Conversion is explicit outside VRL; only the resulting `TraceEvent` exposes typed
+  accessors. Hintless records written before the precursor use format-shape detectors
+  and convert only on exactly one match; this fallback does not rely on
+  `EventMetadata.source_type`. The convention lives only for the duration of the
+  migration and deprecated-proto window; no new permanent struct field or wire-format
+  extension is needed.
 
 ## Drawbacks
 
@@ -968,15 +977,11 @@ conversion routines and detectors deleted.
 - Every trace source and sink must be rewritten to produce/consume the typed container.
   The Plan of Attack sequences this so each component migrates independently, but it is
   non-trivial work.
-- If the compile-time gate and migration validation fail to catch a missed conversion,
-  the runtime backstop panics the affected task on the first `Legacy`
-  event. This is a task crash rather than a controlled error; it is production-
-  reachable via fan-in from sources that have not yet migrated to `Typed`, disk-buffer
-  replay, and `vector` source traffic from older peers. The intent is that the earlier
-  layers prevent this from occurring; the panic is a fail-loud safety net, not the
-  primary enforcement. A panicked task may leave in-flight event finalizers unfired,
-  causing upstream backpressure to stall until the task is restarted by the topology
-  supervisor. VRL programs are not affected (typed-path access auto-converts).
+- The temporary public `TraceEventCompat` type and its wrapping and unwrapping at
+  component boundaries add migration-only API and mechanical changes. The foundational
+  migration step must rename today's untyped `TraceEvent` representation to
+  `LegacyTraceEvent` and adapt existing producers to wrap it, and the cleanup step must
+  replace the compatibility enum with an alias to `TraceEvent`.
 - Wire-format-specific drawbacks (Datadog producer-side keyset-disjointness convention,
   Datadog `Span.error` normalization, OTLP `deployment.environment` legacy-key rewrite,
   etc.) are listed in the corresponding mapping sub-RFC.
@@ -1177,9 +1182,9 @@ accessor call.
 Replace `TraceEvent(LogEvent)` with the typed container in one PR. Rejected because the
 resulting PR would touch every trace source, every trace sink, the APM stats
 aggregator, every trace-aware transform, and a large body of tests simultaneously. The
-chosen `enum TraceEvent { Legacy, Typed }` coexistence design lets each component
-migrate in its own PR, subject to a partial-order constraint that consumers migrate
-before producers (see "Plan Of Attack").
+chosen temporary `TraceEventCompat` coexistence design lets each component migrate in
+its own PR while keeping the permanent `TraceEvent` typed, subject to a partial-order
+constraint that consumers migrate before producers (see "Plan Of Attack").
 
 ### Feature-flagged switch
 
@@ -1226,8 +1231,9 @@ this RFC. Per-format shims, encoders, and source and sink flips are sequenced in
 [Datadog mapping](2026-04-29-25329-trace-data-model/datadog-mapping.md) sub-RFCs.
 Format-agnostic prerequisites land first; per-format shims may then land in either
 order; this RFC's consumer and VRL work and the compile-time gate follow; source flips
-are independent after that gate; cleanup is last. Consumers must accept `Typed` before
-any source emits it, because shims are unidirectional.
+are independent after that gate; cleanup is last. Consumers must accept
+`TraceEventCompat` and fallibly convert it to `TraceEvent` before any source emits
+typed events, because shims are unidirectional.
 
 The format-agnostic work is organized into six stages. A stage may span multiple PRs;
 its exit criteria, rather than a prescribed internal implementation, gate the next
@@ -1240,33 +1246,42 @@ stage.
    tolerate future event variants and identify every newly written legacy trace layout,
    and must precede every `TypedTrace` producer.
 2. **Introduce the model without changing behavior.** Add the supporting types and the
-   `TraceEvent::{Legacy, Typed}` migration enum while all components continue to use
-   `Legacy`, then add the typed internal-wire variant. Before any source emits `Typed`,
-   legacy behavior must remain unchanged, typed events must survive disk-buffer and
-   `vector` source/sink boundaries, and optional-value and chunk-presence distinctions
-   must survive those boundaries.
+   permanent typed `TraceEvent`, rename today's untyped representation to
+   `LegacyTraceEvent`, and make the temporary
+   `TraceEventCompat::{Legacy, Typed}` enum the payload of `Event::Trace` and
+   `TraceArray` while all components continue to use `Legacy`. Adapt existing producers
+   mechanically to wrap their unchanged output, then add the typed internal-wire
+   variant. Before any source emits typed events, legacy behavior must remain
+   unchanged, both compatibility variants must survive disk-buffer and `vector`
+   source/sink boundaries, and optional-value and chunk-presence distinctions must
+   survive those boundaries.
 3. **Land both format mappings.** Implement and register both format shims and
    format-shape detectors, then implement both typed encoders per the sub-RFCs. No typed
    VRL path is exposed until both legacy layouts can auto-convert.
 4. **Establish typed VRL and migrate consumers.** Implement the typed paths and fallible
-   trace constructors. Typed-path access to `Legacy` auto-converts on first access or
-   returns a controlled error; it never returns a transitional `null`. Untyped paths
-   against `Typed` fail deterministically. Then migrate `sample` and `trace_to_log`.
+   trace constructors. At the VRL target boundary,
+   `TraceEventCompat::Legacy` auto-converts on first typed-path access or returns a
+   controlled error; it never returns a transitional `null`. Then migrate `sample` and
+   `trace_to_log`. Each typed consumer fallibly converts `TraceEventCompat` at every
+   intake path and operates only on the resulting `TraceEvent`.
    `sample` remains per-event,
    so a multi-service Datadog chunk changes from incidental whole-chunk atomicity to one
    decision per `(TraceChunk, Span.service)` event; `trace_to_log` emits a uniform
    source-independent layout. Before the next stage, every migrated consumer must accept
    both legacy and typed input and all typed VRL and round-trip contracts must hold.
 5. **Use the compile-time gate and flip producers.** Remove untyped forwarding methods
-   from `TraceEvent` and migrate every resulting call site. The OTLP and Datadog sources
-   may begin emitting `Typed` independently once no trace-aware consumer depends on the
-   legacy key layout and both source formats have typed production paths. Each typed
+   from `TraceEventCompat` and migrate every resulting call site. The OTLP and Datadog
+   sources may begin emitting `TraceEventCompat::Typed` independently once no
+   trace-aware consumer depends on the legacy key layout and both source formats have
+   typed production paths. Each typed
    source retains its `vector.trace_legacy_layout` hint through the coexistence and
    deprecated-proto window. Across `vector` network hops, each downstream receiver must
    support `TypedTrace` before its upstream sender emits typed trace records.
 6. **Complete user migration and retire coexistence.** Publish the user migration and
-   compatibility requirements, then collapse the Rust enum after both source flips.
-   Retain legacy proto decoders, shape detectors, and typed-source hints until the wire
+   compatibility requirements, then remove the compatibility enum and
+   `LegacyTraceEvent` after both source flips, replacing `TraceEventCompat` with an alias
+   to `TraceEvent`. Legacy proto decoding now converts directly to `TraceEvent`. Retain
+   those proto decoders, shape detectors, and typed-source hints until the wire
    retirement criteria above hold; then reserve the legacy tags and stop emitting the
    migration hint.
 

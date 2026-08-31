@@ -416,15 +416,15 @@ escape hatch). This sub-RFC inherits those choices.
 
 ## Plan Of Attack
 
-The format-agnostic prerequisites (fallible proto decode boundary, migration enum,
-legacy-layout hint precursor, and internal `TypedTrace` proto extension) are owned by the
-parent RFC's Plan of Attack and must land first. OTLP work then proceeds through these
-obligations:
+The format-agnostic prerequisites (fallible proto decode boundary, temporary
+`TraceEventCompat` enum, legacy-layout hint precursor, and internal `TypedTrace` proto
+extension) are owned by the parent RFC's Plan of Attack and must land first. OTLP work
+then proceeds through these obligations:
 
-1. Implement `Legacy -> Typed` conversion and unique detection of historical pre-hint
-   OTLP layouts.
-2. Implement `Typed -> OTLP` encoding satisfying the mapping and reserved-key contracts
-   above.
+1. Implement `LegacyTraceEvent -> TraceEvent` conversion and unique detection of
+   historical pre-hint OTLP layouts.
+2. Implement `TraceEvent -> OTLP` encoding satisfying the mapping and reserved-key
+   contracts above.
 3. Establish the `OTLP -> Vector -> OTLP` effective-equivalence guarantee and validate
    every declared exclusion.
 4. Migrate the OTLP sink and then, after the parent RFC's compile-time consumer gate, the
