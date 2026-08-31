@@ -729,6 +729,9 @@ pub struct HttpStatusRetryLogic<F, Req, Res, E = HttpError> {
     retry_strategy: RetryStrategy,
 }
 
+// TODO: Remove this compatibility trait, the generic error parameter on
+// `HttpStatusRetryLogic`, and `new_with_error` once the HTTP v1 migration is complete:
+// https://github.com/vectordotdev/vector/issues/19179
 pub trait HttpErrorClassify {
     fn is_retriable(&self) -> bool;
 }
