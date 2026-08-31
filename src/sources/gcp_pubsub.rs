@@ -1,6 +1,7 @@
 use std::{
     error::Error as _,
     future::Future,
+    num::NonZeroU64,
     pin::Pin,
     sync::{
         Arc, LazyLock,
@@ -116,9 +117,60 @@ pub(crate) enum PubsubError {
         MAX_ACK_DEADLINE_SECS
     ))]
     InvalidAckDeadline,
+    #[snafu(display(
+        "`idle_timeout_secs` ({}) must be larger than `keepalive_secs` ({})",
+        idle_timeout_secs,
+        keepalive_secs
+    ))]
+    InvalidIdleTimeout {
+        idle_timeout_secs: f64,
+        keepalive_secs: f64,
+    },
 }
 
 static CLIENT_ID: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
+
+/// HTTP/2 keepalive configuration for the `gcp_pubsub` source's gRPC connection.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct PubsubKeepaliveConfig {
+    /// How often, in seconds, to send a keepalive PING on the connection.
+    ///
+    /// Shorter intervals detect dead connections faster at the cost of additional traffic.
+    /// Pub/Sub enforces gRPC's default minimum of one ping every 5 minutes, so lowering this
+    /// below `300` risks the server closing the stream with `too_many_pings`.
+    #[serde(default = "default_keepalive_interval_secs")]
+    #[configurable(metadata(docs::human_name = "Keepalive Interval"))]
+    pub interval_secs: NonZeroU64,
+
+    /// How long, in seconds, to wait for a keepalive PING acknowledgement before treating
+    /// the connection as dead and closing it.
+    #[serde(default = "default_keepalive_timeout_secs")]
+    #[configurable(metadata(docs::human_name = "Keepalive Timeout"))]
+    pub timeout_secs: NonZeroU64,
+}
+
+const fn default_keepalive_interval_secs() -> NonZeroU64 {
+    // Pub/Sub follows gRPC's default server enforcement, which closes streams pinged more often
+    // than once every 5 minutes with `too_many_pings`. Google's own Pub/Sub clients keepalive at
+    // this same interval.
+    NonZeroU64::new(300).expect("keepalive interval default must be nonzero")
+}
+
+const fn default_keepalive_timeout_secs() -> NonZeroU64 {
+    // Matches hyper's default keepalive timeout.
+    NonZeroU64::new(20).expect("keepalive timeout default must be nonzero")
+}
+
+impl Default for PubsubKeepaliveConfig {
+    fn default() -> Self {
+        Self {
+            interval_secs: default_keepalive_interval_secs(),
+            timeout_secs: default_keepalive_timeout_secs(),
+        }
+    }
+}
 
 /// Configuration for the `gcp_pubsub` source.
 #[serde_as]
@@ -204,6 +256,43 @@ pub struct PubsubConfig {
     #[configurable(metadata(docs::human_name = "Keepalive"))]
     pub keepalive_secs: Duration,
 
+    /// The maximum amount of time, in seconds, to wait for a response on an
+    /// active stream before assuming the connection has stalled and
+    /// reconnecting.
+    ///
+    /// GCP Pub/Sub can leave a streaming pull in a state where the
+    /// connection looks healthy but no further responses are delivered and
+    /// the stream never errors. This bounds that inactivity. When set, it
+    /// must be larger than `keepalive_secs`; when unset, it defaults to `900`
+    /// or just above `keepalive_secs`, whichever is larger.
+    #[serde_as(as = "Option<serde_with::DurationSecondsWithFrac<f64>>")]
+    #[derivative(Default(value = "Option::None"))]
+    #[configurable(metadata(docs::human_name = "Idle Timeout"))]
+    pub idle_timeout_secs: Option<Duration>,
+
+    /// The number of consecutive stream failures, with no successful fetch in
+    /// between, before a fetch error is reported as a component error.
+    ///
+    /// GCP Pub/Sub routinely ends a streaming pull with a transient error
+    /// (for example, an `Unavailable` status when an idle subscription has no
+    /// messages). These are retried automatically and logged at `debug`
+    /// until this threshold is reached. A successful fetch resets the count.
+    /// Set to `1` to report every failure as an error.
+    #[serde(default = "default_max_retry_errors")]
+    #[derivative(Default(value = "default_max_retry_errors()"))]
+    #[configurable(metadata(docs::human_name = "Max Retry Errors Before Alerting"))]
+    pub max_retry_errors: usize,
+
+    /// HTTP/2 keepalive settings for the source's gRPC connection.
+    ///
+    /// The source sends HTTP/2 PING frames on the connection so that one which has gone away
+    /// (for example, dropped by Pub/Sub or cut off by a network partition) is detected and
+    /// torn down instead of silently delivering no further messages.
+    #[configurable(derived)]
+    #[serde(default)]
+    #[derivative(Default(value = "PubsubKeepaliveConfig::default()"))]
+    pub keepalive: PubsubKeepaliveConfig,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
@@ -237,6 +326,18 @@ const fn default_keepalive() -> Duration {
     Duration::from_secs(60)
 }
 
+const fn default_idle_timeout() -> Duration {
+    Duration::from_secs(900)
+}
+
+/// Margin over `keepalive_secs` for the derived default idle timeout, keeping it
+/// strictly larger when `keepalive_secs` is at or above `default_idle_timeout`.
+const IDLE_TIMEOUT_KEEPALIVE_MARGIN: Duration = Duration::from_secs(60);
+
+const fn default_max_retry_errors() -> usize {
+    5
+}
+
 const fn default_max_concurrency() -> usize {
     10
 }
@@ -266,6 +367,21 @@ impl SourceConfig for PubsubConfig {
         if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs.as_secs()) {
             return Err(PubsubError::InvalidAckDeadline.into());
         }
+
+        // Only an explicitly set idle timeout is validated; when unset, derive
+        // one that is always larger than the keepalive so upgrades with a long
+        // `keepalive_secs` keep starting.
+        let idle_timeout = match self.idle_timeout_secs {
+            Some(idle_timeout) if idle_timeout <= self.keepalive_secs => {
+                return Err(PubsubError::InvalidIdleTimeout {
+                    idle_timeout_secs: idle_timeout.as_secs_f64(),
+                    keepalive_secs: self.keepalive_secs.as_secs_f64(),
+                }
+                .into());
+            }
+            Some(idle_timeout) => idle_timeout,
+            None => default_idle_timeout().max(self.keepalive_secs + IDLE_TIMEOUT_KEEPALIVE_MARGIN),
+        };
 
         let retry_delay_secs = match self.retry_delay_seconds {
             None => self.retry_delay_secs,
@@ -297,6 +413,14 @@ impl SourceConfig for PubsubConfig {
             endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
         }
 
+        // Send HTTP/2 keepalive PINGs so a silently broken connection (for
+        // example, one dropped by Pub/Sub but left open) is detected and
+        // torn down instead of delivering no further messages.
+        endpoint = endpoint
+            .http2_keep_alive_interval(Duration::from_secs(self.keepalive.interval_secs.get()))
+            .keep_alive_timeout(Duration::from_secs(self.keepalive.timeout_secs.get()))
+            .keep_alive_while_idle(true);
+
         let token_generator = auth.spawn_regenerate_token();
 
         let protocol = uri
@@ -324,6 +448,9 @@ impl SourceConfig for PubsubConfig {
             ack_deadline_secs,
             retry_delay: retry_delay_secs,
             keepalive: self.keepalive_secs,
+            idle_timeout,
+            max_retry_errors: self.max_retry_errors.max(1),
+            consecutive_failures: Default::default(),
             concurrency: Default::default(),
             full_response_size: self.full_response_size,
             log_namespace,
@@ -389,6 +516,11 @@ struct PubsubSource {
     out: SourceSender,
     retry_delay: Duration,
     keepalive: Duration,
+    idle_timeout: Duration,
+    max_retry_errors: usize,
+    // Consecutive stream failures since the last successful fetch, shared across
+    // all concurrent streams so a success on any stream resets the count.
+    consecutive_failures: Arc<AtomicUsize>,
     // The current concurrency is shared across all tasks. It is used
     // by the streams to avoid shutting down the last stream, which
     // would result in repeatedly re-opening the stream on idle.
@@ -403,6 +535,17 @@ enum State {
     RetryNow,
     RetryDelay,
     Shutdown,
+}
+
+/// Aborts the wrapped task when dropped, tying the ack worker's lifetime to a
+/// single `run_once` so a reconnect cannot strand workers that keep draining a
+/// finalizer (and hold a `ShutdownSignal`) after their request stream is gone.
+struct AbortOnDrop(tokio::task::JoinHandle<()>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 impl PubsubSource {
@@ -473,7 +616,9 @@ impl PubsubSource {
         let connection = match self.endpoint.connect().await {
             Ok(connection) => connection,
             Err(error) => {
-                emit!(GcpPubsubConnectError { error });
+                if self.should_escalate_failure("connecting", &error) {
+                    emit!(GcpPubsubConnectError { error });
+                }
                 return State::RetryDelay;
             }
         };
@@ -498,58 +643,117 @@ impl PubsubSource {
 
         let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
 
+        // Reconnect if no response arrives within the idle timeout, to
+        // recover from a stream that stalls without ever erroring. Reset
+        // whenever a response arrives. Armed before the streaming-pull call so
+        // it also bounds a startup that Pub/Sub accepts but never resolves.
+        let idle_deadline = tokio::time::sleep(self.idle_timeout);
+        tokio::pin!(idle_deadline);
+
         // Handle shutdown during startup, the streaming pull doesn't
         // start if there is no data in the subscription.
         let request_stream = self.request_stream(ack_ids_receiver);
         debug!("Starting streaming pull.");
         let stream = tokio::select! {
             _ = &mut self.shutdown => return State::Shutdown,
+            _ = &mut idle_deadline => {
+                debug!("Streaming pull did not start within the idle timeout, restarting stream.");
+                return State::RetryDelay;
+            }
             result = client.streaming_pull(request_stream) => match result {
                 Ok(stream) => stream,
                 Err(error) => {
-                    emit!(GcpPubsubStreamingPullError { error });
+                    if self.should_escalate_failure("setting up streaming pull", &error) {
+                        emit!(GcpPubsubStreamingPullError { error });
+                    }
                     return State::RetryDelay;
                 }
             }
         };
         let mut stream = stream.into_inner();
 
-        let (finalizer, mut ack_stream) =
-            Finalizer::maybe_new(self.acknowledgements, Some(self.shutdown.clone()));
-        let mut pending_acks = 0;
+        // When acknowledgements are enabled, forward finalized acks to the
+        // request stream from a dedicated task, so a slow request stream
+        // backpressures the finalizer instead of the main loop (which must stay
+        // free for the idle timeout). `pending_acks` is shared so the loop can
+        // still tell when acknowledgements are in flight. The worker is aborted
+        // when this `run_once` returns, so a reconnect cannot strand it draining
+        // a finalizer after the request stream is gone. When acks are disabled
+        // the finalizer is `None` and no worker is spawned (its `ack_stream`
+        // would never resolve).
+        let pending_acks = Arc::new(AtomicUsize::new(0));
+        // Woken by the worker when `pending_acks` reaches zero, so the main loop
+        // re-evaluates its shutdown guard immediately instead of waiting for the
+        // next keepalive or idle timer.
+        let acks_drained = Arc::new(tokio::sync::Notify::new());
+        let mut finalizer = None;
+        let _ack_worker = if self.acknowledgements {
+            let (new_finalizer, mut ack_stream) =
+                Finalizer::maybe_new(true, Some(self.shutdown.clone()));
+            finalizer = new_finalizer;
+            let ack_ids_sender = ack_ids_sender.clone();
+            let pending_acks = Arc::clone(&pending_acks);
+            let acks_drained = Arc::clone(&acks_drained);
+            Some(AbortOnDrop(crate::spawn_in_current_span(async move {
+                while let Some((status, receipts)) = ack_stream.next().await {
+                    let sent = status != BatchStatus::Delivered
+                        // Keep the ack pending until its send resolves, so the
+                        // main task's guards don't drop the stream mid-flush.
+                        || ack_ids_sender.send(receipts).await.is_ok();
+                    if pending_acks.fetch_sub(1, Ordering::Relaxed) == 1 {
+                        acks_drained.notify_one();
+                    }
+                    if !sent {
+                        break;
+                    }
+                }
+            })))
+        } else {
+            None
+        };
 
         loop {
             tokio::select! {
                 biased;
-                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
-                    pending_acks -= 1;
-                    if status == BatchStatus::Delivered {
-                        ack_ids_sender
-                            .send(receipts)
-                            .await
-                            .unwrap_or_else(|_| unreachable!("request stream never closes"));
-                    }
-                },
                 response = stream.next() => match response {
                     Some(Ok(response)) => {
-                        self.handle_response(
+                        self.consecutive_failures.store(0, Ordering::Relaxed);
+                        idle_deadline
+                            .as_mut()
+                            .reset(tokio::time::Instant::now() + self.idle_timeout);
+                        if let Some(state) = self.handle_response(
                             response,
                             &finalizer,
                             &ack_ids_sender,
-                            &mut pending_acks,
+                            &pending_acks,
                             busy_flag,
-                        ).await;
+                        ).await {
+                            break state;
+                        }
                     }
-                    Some(Err(error)) => break translate_error(error),
+                    Some(Err(error)) => break self.handle_stream_error(error),
                     None => break State::RetryNow,
                 },
-                _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
+                _ = &mut self.shutdown, if pending_acks.load(Ordering::Relaxed) == 0 => {
+                    return State::Shutdown;
+                }
+                // Re-evaluate the shutdown guard promptly once acks drain.
+                _ = acks_drained.notified() => {}
                 _ = self.token_generator.changed() => {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
+                // Recover a stream that stalls without erroring. Unflushed acks
+                // are redelivered (at-least-once).
+                _ = &mut idle_deadline => {
+                    debug!(
+                        message = "No activity on the stream within the idle timeout, restarting stream.",
+                        timeout_secs = self.idle_timeout.as_secs_f64(),
+                    );
+                    break State::RetryDelay;
+                },
                 _ = tokio::time::sleep(self.keepalive) => {
-                    if pending_acks == 0 {
+                    if pending_acks.load(Ordering::Relaxed) == 0 {
                         // No pending acks, and no new data, so drop
                         // this stream if we aren't the only active
                         // one.
@@ -560,17 +764,15 @@ impl PubsubSource {
                         // Otherwise, mark this stream as idle.
                         busy_flag.store(false, Ordering::Relaxed);
                     }
-                    // GCP Pub/Sub likes to time out connections after
-                    // about 75 seconds of inactivity. To forestall
-                    // the resulting error, send an empty array of
-                    // acknowledgement IDs to the request stream if no
-                    // other activity has happened. This will result
-                    // in a new request with empty fields, effectively
-                    // a keepalive.
-                    ack_ids_sender
-                        .send(Vec::new())
-                        .await
-                        .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                    // GCP Pub/Sub times out connections after ~75s of
+                    // inactivity. Send an empty ack ID array as a keepalive to
+                    // forestall that, without blocking the loop: a full channel
+                    // means the request stream stalled, so reconnect.
+                    match ack_ids_sender.try_send(Vec::new()) {
+                        Ok(()) => {}
+                        Err(mpsc::error::TrySendError::Full(_)) => break State::RetryDelay,
+                        Err(mpsc::error::TrySendError::Closed(_)) => break State::RetryNow,
+                    }
                 }
             }
         }
@@ -608,14 +810,15 @@ impl PubsubSource {
         }))
     }
 
+    // Returns `Some(state)` when the stream should be torn down and restarted.
     async fn handle_response(
         &mut self,
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
         ack_ids: &mpsc::Sender<Vec<String>>,
-        pending_acks: &mut usize,
+        pending_acks: &Arc<AtomicUsize>,
         busy_flag: &Arc<AtomicBool>,
-    ) {
+    ) -> Option<State> {
         if response.received_messages.len() >= self.full_response_size {
             busy_flag.store(true, Ordering::Relaxed);
         }
@@ -628,19 +831,66 @@ impl PubsubSource {
         match self.out.send_batch(events).await {
             Err(_) => emit!(StreamClosedError { count }),
             Ok(()) => match notifier {
-                None => ack_ids
-                    .send(ids)
-                    .await
-                    .unwrap_or_else(|_| unreachable!("request stream never closes")),
+                // Auto-ack runs on the main loop, so send without blocking to
+                // keep the idle timer live. A full channel means the request
+                // stream stalled and a closed channel means it is already gone;
+                // reconnect either way rather than drop acknowledgements.
+                None => match ack_ids.try_send(ids) {
+                    Ok(()) => {}
+                    Err(mpsc::error::TrySendError::Full(_)) => return Some(State::RetryDelay),
+                    Err(mpsc::error::TrySendError::Closed(_)) => return Some(State::RetryNow),
+                },
                 Some(notifier) => {
+                    // Count the ack before publishing it to the finalizer: the
+                    // worker may finalize and decrement it immediately, which
+                    // would underflow the counter if it ran first.
+                    pending_acks.fetch_add(1, Ordering::Relaxed);
                     finalizer
                         .as_ref()
                         .expect("Finalizer must have been set up for acknowledgements")
                         .add(ids, notifier);
-                    *pending_acks += 1;
                 }
             },
         }
+        None
+    }
+
+    // GCP frequently fails a connect, stream setup, or streaming pull with a
+    // transient, auto-retried error (a reset, or `Unavailable` when an idle
+    // subscription has no messages). Count a failure and report whether it
+    // should escalate to a component error, so all three paths only flood the
+    // logs once failures persist. Suppressed failures are still logged at
+    // `debug` with the error and operation so there is an actionable record.
+    // Escalation stays on while the streak persists (so a genuinely broken
+    // source stays visible and `max_retry_errors: 1` reports every failure); a
+    // successful fetch resets the counter.
+    fn should_escalate_failure(&self, operation: &str, error: &dyn std::fmt::Display) -> bool {
+        let consecutive_failures = self.consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
+        let escalate = consecutive_failures >= self.max_retry_errors;
+        if !escalate {
+            debug!(
+                message = "Transient error, retrying.",
+                operation,
+                %error,
+                consecutive_failures,
+                max_retry_errors = self.max_retry_errors,
+            );
+        }
+        escalate
+    }
+
+    fn handle_stream_error(&self, error: tonic::Status) -> State {
+        // A server-side reset is not really an error, so retry immediately
+        // without counting it.
+        if is_reset(&error) {
+            debug!("Stream reset by server.");
+            return State::RetryNow;
+        }
+
+        if self.should_escalate_failure("fetching events", &error) {
+            emit!(GcpPubsubReceiveError { error });
+        }
+        State::RetryDelay
     }
 
     async fn parse_messages(
@@ -708,22 +958,6 @@ impl PubsubSource {
     }
 }
 
-fn translate_error(error: tonic::Status) -> State {
-    // GCP occasionally issues a connection reset
-    // in the middle of the streaming pull. This
-    // reset is not technically an error, so we
-    // want to retry immediately, but it is
-    // reported to us as an error from the
-    // underlying library (`tonic`).
-    if is_reset(&error) {
-        debug!("Stream reset by server.");
-        State::RetryNow
-    } else {
-        emit!(GcpPubsubReceiveError { error });
-        State::RetryDelay
-    }
-}
-
 fn is_reset(error: &Status) -> bool {
     error
         .source()
@@ -756,6 +990,73 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PubsubConfig>();
+    }
+
+    #[test]
+    fn default_idle_timeout_is_larger_than_keepalive() {
+        assert!(
+            default_idle_timeout() > default_keepalive(),
+            "the default idle timeout must be larger than the default keepalive"
+        );
+    }
+
+    #[test]
+    fn programmatic_default_preserves_max_retry_errors() {
+        // `Default` must match the serde default so generated/programmatic
+        // configs keep the retry threshold instead of collapsing to 0.
+        assert_eq!(
+            PubsubConfig::default().max_retry_errors,
+            default_max_retry_errors()
+        );
+    }
+
+    #[tokio::test]
+    async fn accepts_long_keepalive_without_explicit_idle_timeout() {
+        // A large `keepalive_secs` with no `idle_timeout_secs` must still build:
+        // the derived default stays larger than the keepalive.
+        let config: PubsubConfig = serde_yaml::from_str(
+            r#"
+            project: my-project
+            subscription: my-subscription
+            skip_authentication: true
+            keepalive_secs: 900
+            "#,
+        )
+        .unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let context = SourceContext::new_test(tx, None);
+        assert!(
+            config.build(context).await.is_ok(),
+            "build should accept a long keepalive when idle_timeout_secs is unset"
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_idle_timeout_not_larger_than_keepalive() {
+        let config: PubsubConfig = serde_yaml::from_str(
+            r#"
+            project: my-project
+            subscription: my-subscription
+            skip_authentication: true
+            keepalive_secs: 60
+            idle_timeout_secs: 60
+            "#,
+        )
+        .unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let context = SourceContext::new_test(tx, None);
+        let error = match config.build(context).await {
+            Ok(_) => {
+                panic!("build should reject an idle timeout that is not larger than keepalive")
+            }
+            Err(error) => error.to_string(),
+        };
+        assert!(
+            error.contains("idle_timeout_secs"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
