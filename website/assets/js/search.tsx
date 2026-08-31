@@ -28,7 +28,12 @@ const pagefindCategories = {
   releases: "Release notes"
 };
 
-const componentCategories = {
+const configurationCategories = {
+  api: "API",
+  "global-options": "Global options",
+  "pipeline-components": "Pipeline components",
+  schema: "Schema",
+  secrets: "Secrets",
   sinks: "Sinks",
   sources: "Sources",
   transforms: "Transforms"
@@ -80,10 +85,15 @@ const getPagefind = async () => {
 };
 
 const pagefindCategory = (url: string) => {
-  const path = new URL(url, window.location.origin).pathname.split("/").filter(Boolean);
+  const resultUrl = new URL(url, window.location.origin);
+  const path = resultUrl.pathname.split("/").filter(Boolean);
 
   if (path.slice(0, 3).join("/") === "docs/reference/configuration") {
-    return componentCategories[path[3]] ?? "Documentation";
+    if (/^#enrichment[-_]tables(?:[._-]|$)/.test(resultUrl.hash)) {
+      return "Enrichment tables";
+    }
+
+    return configurationCategories[path[3]] ?? "Documentation";
   }
 
   return pagefindCategories[path[0]] ?? "Website";
@@ -101,12 +111,13 @@ const pagefindResults = async (query: string): Promise<PagefindHit[]> => {
     search.results.slice(0, 10).map(async (result) => {
       const data = await result.data();
       const subResult = data.sub_results[0];
+      const url = subResult?.url ?? data.url;
 
       return {
-        category: pagefindCategory(data.url),
+        category: pagefindCategory(url),
         content: subResult?.excerpt ?? data.excerpt ?? "",
         title: data.meta.title ?? data.url,
-        url: subResult?.url ?? data.url
+        url
       };
     })
   );
