@@ -34,15 +34,6 @@ use crate::{
 pub static COLLECTOR: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]\-]+)\.([[:word:].\-/]+)\]").unwrap());
 
-/// Returns `true` if `input` contains a `SECRET[...]` placeholder matching the
-/// [`COLLECTOR`] grammar, i.e. one that config loading would resolve.
-///
-/// Text that merely resembles a placeholder without matching the grammar is
-/// left in the config as a literal and does not count.
-pub fn contains_placeholder(input: &str) -> bool {
-    COLLECTOR.is_match(input)
-}
-
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub(crate) struct SecretBackendOuter {

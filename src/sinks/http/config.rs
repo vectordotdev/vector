@@ -358,13 +358,8 @@ impl ValidatedSink for HttpSinkConfig {
         }
 
         // A static URI can be parsed and checked for embedded credentials up
-        // front; dynamic URIs are only validated at render time. An unresolved
-        // `SECRET[...]` placeholder behaves like a dynamic URI: the run path
-        // resolves it before parsing, but `vector validate --no-environment`
-        // leaves it in place, so parsing it here would always fail.
-        if !self.uri.is_dynamic()
-            && !crate::config::loading::contains_placeholder(self.uri.get_ref())
-        {
+        // front; dynamic URIs are only validated at render time.
+        if !self.uri.is_dynamic() {
             let uri_serde: UriSerde = self.uri.get_ref().parse()?;
             self.auth.choose_one(&uri_serde.auth)?;
             if uri_serde.uri.scheme().is_none() || uri_serde.uri.authority().is_none() {
@@ -672,50 +667,6 @@ mod tests {
         config
             .validate()
             .expect("dynamic uri validation is deferred to render time");
-    }
-
-    #[test]
-    fn validate_accepts_unresolved_secret_uri() {
-        use crate::config::ValidatedSink;
-        // `vector validate --no-environment` leaves `SECRET[...]` placeholders
-        // unresolved; they must be treated like dynamic URIs, not parsed as a
-        // URL (https://github.com/vectordotdev/vector/issues/26256).
-        for uri in [
-            "SECRET[file_backend.database_url]/foo",
-            "SECRET[file_backend.database_url]",
-            "http://example.com/SECRET[file_backend.token]",
-        ] {
-            let config: HttpSinkConfig = serde_yaml::from_str(&format!(
-                r#"
-                uri: "{uri}"
-                encoding:
-                  codec: json
-                "#
-            ))
-            .unwrap();
-            config
-                .validate()
-                .unwrap_or_else(|e| panic!("unresolved secret uri `{uri}` should validate: {e}"));
-        }
-    }
-
-    #[test]
-    fn validate_still_rejects_non_placeholder_secret_lookalike() {
-        use crate::config::ValidatedSink;
-        // Text resembling a placeholder without matching the grammar stays a
-        // literal, so it must still be parsed and rejected as a static URI.
-        let config: HttpSinkConfig = serde_yaml::from_str(
-            r#"
-            uri: "SECRET[non_matching_syntax]"
-            encoding:
-              codec: json
-            "#,
-        )
-        .unwrap();
-        assert!(
-            config.validate().is_err(),
-            "a secret lookalike that is not a valid placeholder must not pass validation"
-        );
     }
 
     #[test]
