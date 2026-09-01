@@ -367,11 +367,12 @@ item is saturating-incremented and the drop is reported. All in-band dropped cou
 saturating addition while every additional drop is still reported out of band. The relay
 never silently shrinks an in-band count relative to what was received.
 
-A `TraceEvent` whose `spans` vector is otherwise empty -- a wire-level empty grouping forwarded
-as-is, or a transform filtering every span out -- passes through unchanged. Sinks emit the
+A `TraceEvent` whose `spans` vector is otherwise empty -- an OTLP `ScopeSpans` carrying no
+spans, or a transform filtering every span out -- passes through unchanged. Sinks emit the
 corresponding empty wire shape, fire finalizers on successful delivery, and report the
-condition without breaking ack-chain durability semantics (Kafka offset commits, source
-disk buffers, etc.). The internal proto encoder applies the same rule.
+condition. The internal proto encoder applies the same rule. Whether an ingress synthesizes
+such an event from an empty wire grouping is a per-format decision: the OTLP mapping does,
+while the Datadog mapping produces no event at all.
 
 ##### VRL surface for `TraceId` and `SpanId`
 

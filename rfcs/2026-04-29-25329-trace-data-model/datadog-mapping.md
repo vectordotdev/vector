@@ -204,19 +204,21 @@ standard-empty case is lossless because it carries no span data the Datadog back
 would observe.
 
 An `AgentPayload` with at least one `TracerPayload` carrying at least one `TraceChunk`
-expands into one `TraceEvent` per `(TracerPayload, distinct Span.service, TraceChunk)`
-triple.
+with at least one span expands into one `TraceEvent` per
+`(TracerPayload, distinct Span.service, TraceChunk)` triple.
 
 The grouping rules are:
 
-- Each `TraceChunk` becomes one `TraceEvent`. A chunk whose spans use more than one
-  `Span.service` is split into one event per distinct service; egress re-coalesces such
-  events back into a single chunk (see below). A `TraceChunk` whose `spans` repeated
-  field is empty produces one `TraceEvent` with `spans = []` (the chunk envelope still
-  populates `TraceEvent.chunk = Some(...)` and the enclosing `TracerPayload` /
-  `AgentPayload` populate `Resource`); `Resource.service` is `None` because no
-  `Span.service` is available. The event is forwarded per the empty-spans rule under the
-  parent RFC's Identifiers.
+- Each `TraceChunk` carrying at least one span becomes one `TraceEvent`. A chunk whose
+  spans use more than one `Span.service` is split into one event per distinct service;
+  egress re-coalesces such events back into a single chunk (see below). A `TraceChunk`
+  whose `spans` repeated field is empty produces zero `TraceEvent`s and the discard is
+  reported, extending the empty-`tracerPayloads` and empty-`chunks` rule above one level
+  down: no `Span.service` is available to populate `Resource.service`, and a chunk
+  envelope with no spans carries nothing the Datadog backend would observe. Datadog
+  ingress therefore never synthesizes an event that exists only to satisfy the parent
+  RFC's empty-spans rule; that rule still governs Datadog egress, which receives empty
+  events from OTLP-sourced relays and from transforms that filter every span out.
 - The enclosing `TracerPayload`'s metadata (`hostname`, `env`, `containerID`,
   `languageName`, `tracerVersion`, etc.) populates the event's `Resource`. Per-span
   `Span.service` populates `Resource.service`.
@@ -726,7 +728,9 @@ per group. `None` and `Some(ChunkContext::default())` therefore share an egress 
 - Empty events: an event whose `spans` vector is empty contributes no spans to any
   group; it emits one additional `TraceChunk` whose `priority`, `origin`, `tags`, and
   `dropped` are taken from the effective chunk context and whose `spans` is empty,
-  satisfying the parent RFC's empty-spans guideline.
+  satisfying the parent RFC's empty-spans guideline. Datadog ingress does not produce
+  such events (see "Ingress and egress mapping"), so they reach this step only from an
+  OTLP-sourced relay or from a transform that filtered every span out.
 - Tags comparison and serialization: the `tags` comparison is canonical structural
   equality with deterministic key ordering. `ChunkContext.tags` entries are serialized to
   the wire `TraceChunk.tags` (`map<string, string>`) via `dd_value_to_string`. For
