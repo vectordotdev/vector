@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::{collections::HashSet, num::NonZeroU32, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -32,6 +32,7 @@ use crate::{
 };
 
 const MAX_V3_EXPANDED_TAGSET_BYTES: usize = 16 * 1024 * 1024;
+const MAX_V3_EXPANDED_RESOURCE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_V3_EXPANDED_SERIES_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
@@ -347,7 +348,7 @@ pub(super) fn decode_v3_metric_data(
     let mut float32_idx = 0;
     let mut float64_idx = 0;
     let mut expanded_series_bytes: usize = 0;
-    let mut series = Vec::with_capacity(data.types.len());
+    let mut series = Vec::new();
 
     for index in 0..data.types.len() {
         name_ref = name_ref
@@ -437,6 +438,15 @@ pub(super) fn decode_v3_metric_data(
             })
             .transpose()?
             .unwrap_or(resource_bytes);
+        let tag_resource_bytes = tag_bytes
+            .checked_add(resource_bytes)
+            .ok_or("Datadog v3 expanded series size overflow")?;
+        let tag_resource_copies = point_count
+            .checked_add(1)
+            .ok_or("Datadog v3 expanded series size overflow")?;
+        let expanded_tag_resource_bytes = tag_resource_bytes
+            .checked_mul(tag_resource_copies)
+            .ok_or("Datadog v3 expanded series size overflow")?;
         let series_bytes =
             std::mem::size_of::<super::ddmetric_proto::metric_payload::MetricSeries>()
                 .checked_add(
@@ -446,8 +456,7 @@ pub(super) fn decode_v3_metric_data(
                         >())
                         .ok_or("Datadog v3 expanded series size overflow")?,
                 )
-                .and_then(|total| total.checked_add(tag_bytes))
-                .and_then(|total| total.checked_add(resource_bytes))
+                .and_then(|total| total.checked_add(expanded_tag_resource_bytes))
                 .ok_or("Datadog v3 expanded series size overflow")?;
         expanded_series_bytes = expanded_series_bytes
             .checked_add(series_bytes)
@@ -675,13 +684,16 @@ fn decode_v3_tagsets(
         offset = end;
     }
     if let Some(metadata) = metadata {
+        let mut seen = HashSet::new();
+        let metadata_tags = metadata
+            .tags
+            .iter()
+            .filter(|tag| seen.insert(tag.as_str()))
+            .collect::<Vec<_>>();
         for tagset in &mut tagsets {
-            for tag in &metadata.tags {
+            for &tag in &metadata_tags {
                 if !tagset.contains(tag) {
-                    expanded_bytes = expanded_bytes
-                        .checked_add(std::mem::size_of::<String>())
-                        .and_then(|total| total.checked_add(tag.len()))
-                        .ok_or("Datadog v3 expanded tagset size overflow")?;
+                    expanded_bytes = checked_v3_string_bytes(expanded_bytes, tag)?;
                     if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
                         return Err("Datadog v3 expanded tagsets exceed size limit".into());
                     }
@@ -698,8 +710,15 @@ fn decode_v3_resources(
 ) -> crate::Result<Vec<Vec<(String, String)>>> {
     let dictionary = decode_v3_strings(&data.dict_resource_str, false)?;
     let mut resources = vec![Vec::new()];
+    let mut expanded_bytes = std::mem::size_of::<Vec<(String, String)>>();
     let mut entry_offset: usize = 0;
     for &resource_len in &data.dict_resource_len {
+        expanded_bytes = expanded_bytes
+            .checked_add(std::mem::size_of::<Vec<(String, String)>>())
+            .ok_or("Datadog v3 expanded resource size overflow")?;
+        if expanded_bytes > MAX_V3_EXPANDED_RESOURCE_BYTES {
+            return Err("Datadog v3 expanded resources exceed size limit".into());
+        }
         let size = usize::try_from(resource_len).map_err(|_| "invalid Datadog v3 resource size")?;
         let end = entry_offset
             .checked_add(size)
@@ -707,7 +726,7 @@ fn decode_v3_resources(
         if end > data.dict_resource_type.len() || end > data.dict_resource_name.len() {
             return Err("truncated Datadog v3 resource dictionary".into());
         }
-        let mut set = Vec::with_capacity(size);
+        let mut set = Vec::new();
         let mut type_ref: i64 = 0;
         let mut name_ref: i64 = 0;
         for index in entry_offset..end {
@@ -720,16 +739,18 @@ fn decode_v3_resources(
             if type_ref < 0 || name_ref < 0 {
                 return Err("invalid Datadog v3 resource reference".into());
             }
-            set.push((
-                dictionary
-                    .get(type_ref as usize)
-                    .ok_or("invalid Datadog v3 resource reference")?
-                    .clone(),
-                dictionary
-                    .get(name_ref as usize)
-                    .ok_or("invalid Datadog v3 resource reference")?
-                    .clone(),
-            ));
+            let resource_type = dictionary
+                .get(type_ref as usize)
+                .ok_or("invalid Datadog v3 resource reference")?;
+            let resource_name = dictionary
+                .get(name_ref as usize)
+                .ok_or("invalid Datadog v3 resource reference")?;
+            expanded_bytes = checked_v3_string_bytes(expanded_bytes, resource_type)?;
+            expanded_bytes = checked_v3_string_bytes(expanded_bytes, resource_name)?;
+            if expanded_bytes > MAX_V3_EXPANDED_RESOURCE_BYTES {
+                return Err("Datadog v3 expanded resources exceed size limit".into());
+            }
+            set.push((resource_type.clone(), resource_name.clone()));
         }
         resources.push(set);
         entry_offset = end;

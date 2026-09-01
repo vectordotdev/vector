@@ -2489,6 +2489,42 @@ fn decode_v3_rejects_excessive_series_tag_cloning() {
 }
 
 #[test]
+fn decode_v3_rejects_excessive_point_tag_cloning() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tag_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_tagsets = vec![1, 1];
+    data.tagset_refs[0] = 1;
+    data.num_points[0] = 17;
+    data.timestamps = vec![1; 17];
+    data.vals_float64 = vec![1.0; 17];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_resource_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_resource_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_resource_len = vec![1; 17];
+    data.dict_resource_type = vec![1; 17];
+    data.dict_resource_name = vec![0; 17];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_deduplicates_metadata_tags() {
+    let data = minimal_v3_metric_data();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: vec!["team:core".to_string(); 10_000],
+        resources: Vec::new(),
+    };
+
+    let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
+    assert_eq!(series[0].tags, ["team:core"]);
+}
+
+#[test]
 fn decode_v3_rejects_reference_accumulator_overflow() {
     let mut data = minimal_v3_metric_data();
     data.types = vec![3 | 0x30; 2];
