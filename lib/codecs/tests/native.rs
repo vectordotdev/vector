@@ -251,6 +251,12 @@ fn event_strategy(value: BoxedStrategy<Value>) -> BoxedStrategy<Event> {
     prop_oneof![log, metric, trace].boxed()
 }
 
+fn nested_object(depth: usize) -> Value {
+    (0..depth).fold(Value::from("leaf"), |value, _| {
+        Value::Object(ObjectMap::from_iter([("nested".into(), value)]))
+    })
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(PROPERTY_TESTS))]
 
@@ -299,6 +305,23 @@ proptest! {
 
         prop_assert_eq!(encoded, reencoded);
     }
+}
+
+#[test]
+fn native_proto_preserves_legacy_object_nesting_headroom() {
+    let mut log = LogEvent::default();
+    log.insert(event_path!("data"), nested_object(32));
+    let expected = Event::Log(log);
+    let mut serializer = NativeSerializerConfig.build();
+    let mut encoded = BytesMut::new();
+
+    serializer.encode(expected.clone(), &mut encoded).unwrap();
+    let mut decoded = NativeDeserializerConfig
+        .build()
+        .parse(encoded.freeze(), LogNamespace::Legacy)
+        .unwrap();
+
+    assert_eq!(decoded.pop(), Some(expected));
 }
 
 #[test]

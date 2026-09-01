@@ -103,14 +103,25 @@ impl Deserializer for NativeJsonDeserializer {
         .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
         let decode = |value: serde_json::Value| {
-            prost_reflect::DynamicMessage::deserialize(descriptor(), value.clone())
-                .map_err(|error| error.to_string())
-                .and_then(|message| {
-                    from_dynamic_message(message).map_err(|error| error.to_string())
-                })
-                // Accept the legacy native JSON shape during the migration to ProtoJSON.
-                .or_else(|_| serde_json::from_value(value).map_err(|error| error.to_string()))
-                .map_err(Into::into)
+            let is_protojson = value
+                .as_object()
+                .is_some_and(|object| object.contains_key("event"));
+
+            if is_protojson {
+                prost_reflect::DynamicMessage::deserialize(descriptor(), value)
+                    .map_err(|error| error.to_string())
+                    .and_then(|message| {
+                        from_dynamic_message(message).map_err(|error| error.to_string())
+                    })
+                    .map_err(Into::into)
+            } else {
+                // The legacy format uses an externally tagged Event with `log`, `metric`, or
+                // `trace` at the top level. Keeping that disjoint from the `event` envelope avoids
+                // guessing when arbitrary legacy log/trace field names resemble Protobuf fields.
+                serde_json::from_value(value)
+                    .map_err(|error| error.to_string())
+                    .map_err(Into::into)
+            }
         };
 
         let events: SmallVec<[Event; 1]> = match json {
@@ -147,5 +158,56 @@ mod test {
         let event2 = Event::from_json_value(json2, LogNamespace::Legacy).unwrap();
         let expected: SmallVec<[Event; 1]> = smallvec![event1, event2];
         assert_eq!(events, expected);
+    }
+
+    #[test]
+    fn preserves_legacy_fields_named_like_protobuf_fields() {
+        let config = NativeJsonDeserializerConfig::default();
+        let deserializer = config.build();
+
+        let legacy_log = json!({
+            "fields": {"nested": true},
+            "metadataFull": {},
+            "value": {"rawBytes": "still a legacy field"}
+        });
+        let input = Bytes::from(serde_json::to_vec(&json!({"log": legacy_log.clone()})).unwrap());
+
+        let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0],
+            Event::from_json_value(legacy_log, LogNamespace::Legacy).unwrap()
+        );
+    }
+
+    #[test]
+    fn rejects_incomplete_protojson_without_panicking() {
+        let deserializer = NativeJsonDeserializerConfig::default().build();
+        let malformed = [
+            json!({}),
+            json!({"event": {}}),
+            json!({"event": {"log": {}}}),
+            json!({"event": {"log": {"value": {}}}}),
+            json!({"event": {"metric": {"name": "missing-value"}}}),
+            json!({"event": {"metric": {"name": "missing-sketch", "sketch": {}}}}),
+            json!({
+                "event": {
+                    "metric": {
+                        "name": "mismatched-sketch",
+                        "sketch": {"agentDdSketch": {"k": [1], "n": []}}
+                    }
+                }
+            }),
+            json!({"event": {"log": {"value": {"float": "NaN"}}}}),
+        ];
+
+        for value in malformed {
+            let input = Bytes::from(serde_json::to_vec(&value).unwrap());
+            assert!(
+                deserializer.parse(input, LogNamespace::Legacy).is_err(),
+                "malformed native JSON unexpectedly decoded: {value}"
+            );
+        }
     }
 }

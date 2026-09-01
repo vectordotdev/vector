@@ -160,13 +160,16 @@ generated: components: sources: gcp_pubsub: configuration: {
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						native_json: """
-															Decodes the raw bytes as [native JSON format][vector_native_json].
+															Decodes the [ProtoJSON mapping][protojson] of Vector's
+															[native event schema][vector_native_protobuf]. The legacy native JSON representation is
+															also accepted for compatibility.
 
 															This decoder can output all types of events: logs, metrics, and traces.
 
 															This codec is **[experimental][experimental]**.
 
-															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+															[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+															[protojson]: https://protobuf.dev/programming-guides/json/
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
 						otlp: """
