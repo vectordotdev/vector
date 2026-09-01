@@ -34,6 +34,7 @@ use crate::{
 const MAX_V3_EXPANDED_TAGSET_BYTES: usize = 16 * 1024 * 1024;
 const MAX_V3_EXPANDED_RESOURCE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_V3_EXPANDED_SERIES_BYTES: usize = 16 * 1024 * 1024;
+const MAX_V3_EXPANDED_EVENT_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesRequest {
@@ -348,6 +349,7 @@ pub(super) fn decode_v3_metric_data(
     let mut float32_idx = 0;
     let mut float64_idx = 0;
     let mut expanded_series_bytes: usize = 0;
+    let mut expanded_event_bytes: usize = 0;
     let mut series = Vec::new();
 
     for index in 0..data.types.len() {
@@ -447,6 +449,12 @@ pub(super) fn decode_v3_metric_data(
         let expanded_tag_resource_bytes = tag_resource_bytes
             .checked_mul(tag_resource_copies)
             .ok_or("Datadog v3 expanded series size overflow")?;
+        let name = &names[name_ref as usize];
+        let source_type = &source_types[source_type_ref as usize];
+        let dictionary_string_bytes = checked_v3_string_bytes(0, name)?;
+        let dictionary_string_bytes = checked_v3_string_bytes(dictionary_string_bytes, &unit)?;
+        let dictionary_string_bytes =
+            checked_v3_string_bytes(dictionary_string_bytes, source_type)?;
         let series_bytes =
             std::mem::size_of::<super::ddmetric_proto::metric_payload::MetricSeries>()
                 .checked_add(
@@ -457,12 +465,29 @@ pub(super) fn decode_v3_metric_data(
                         .ok_or("Datadog v3 expanded series size overflow")?,
                 )
                 .and_then(|total| total.checked_add(expanded_tag_resource_bytes))
+                .and_then(|total| total.checked_add(dictionary_string_bytes))
                 .ok_or("Datadog v3 expanded series size overflow")?;
         expanded_series_bytes = expanded_series_bytes
             .checked_add(series_bytes)
             .ok_or("Datadog v3 expanded series size overflow")?;
         if expanded_series_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
             return Err("Datadog v3 expanded series exceed size limit".into());
+        }
+        let event_bytes = std::mem::size_of::<Event>()
+            .checked_add(name.len())
+            .and_then(|total| total.checked_add(tag_bytes))
+            .and_then(|total| total.checked_add(resource_bytes))
+            .and_then(|total| total.checked_add(unit.len()))
+            .ok_or("Datadog v3 expanded event size overflow")?;
+        expanded_event_bytes = expanded_event_bytes
+            .checked_add(
+                event_bytes
+                    .checked_mul(point_count)
+                    .ok_or("Datadog v3 expanded event size overflow")?,
+            )
+            .ok_or("Datadog v3 expanded event size overflow")?;
+        if expanded_event_bytes > MAX_V3_EXPANDED_EVENT_BYTES {
+            return Err("Datadog v3 expanded events exceed size limit".into());
         }
 
         let mut points = Vec::with_capacity(point_count);
@@ -565,12 +590,12 @@ pub(super) fn decode_v3_metric_data(
             .ok_or("Datadog v3 interval milliseconds overflow")?;
         series.push(super::ddmetric_proto::metric_payload::MetricSeries {
             resources: decoded_resources,
-            metric: names[name_ref as usize].clone(),
+            metric: name.clone(),
             tags: tagsets[tagset_ref as usize].clone(),
             points,
             r#type: metric_type as i32,
             unit,
-            source_type_name: source_types[source_type_ref as usize].clone(),
+            source_type_name: source_type.clone(),
             interval: i64::from(interval),
             metadata: series_metadata,
         });
@@ -580,6 +605,7 @@ pub(super) fn decode_v3_metric_data(
 
 fn decode_v3_strings(raw: &[u8], sanitize: bool) -> crate::Result<Vec<String>> {
     let mut values = vec![String::new()];
+    let mut expanded_bytes = std::mem::size_of::<String>();
     let mut offset = 0;
     while offset < raw.len() {
         let (length, consumed) = decode_v3_varint(&raw[offset..])?;
@@ -597,6 +623,10 @@ fn decode_v3_strings(raw: &[u8], sanitize: bool) -> crate::Result<Vec<String>> {
             Err(_) if sanitize => String::from_utf8_lossy(bytes).into_owned(),
             Err(error) => return Err(error.into()),
         };
+        expanded_bytes = checked_v3_string_bytes(expanded_bytes, &value)?;
+        if expanded_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
+            return Err("Datadog v3 expanded string dictionary exceeds size limit".into());
+        }
         values.push(value);
         offset = end;
     }
@@ -626,9 +656,15 @@ fn decode_v3_tagsets(
     metadata: Option<&super::ddmetric_v3_proto::Metadata>,
 ) -> crate::Result<Vec<Vec<String>>> {
     let mut tagsets: Vec<Vec<String>> = vec![Vec::new()];
-    let mut expanded_bytes: usize = 0;
+    let mut expanded_bytes = std::mem::size_of::<Vec<String>>();
     let mut offset = 0;
     while offset < packed.len() {
+        expanded_bytes = expanded_bytes
+            .checked_add(std::mem::size_of::<Vec<String>>())
+            .ok_or("Datadog v3 expanded tagset size overflow")?;
+        if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
+            return Err("Datadog v3 expanded tagsets exceed size limit".into());
+        }
         let size = usize::try_from(packed[offset]).map_err(|_| "invalid Datadog v3 tagset size")?;
         offset += 1;
         let end = offset

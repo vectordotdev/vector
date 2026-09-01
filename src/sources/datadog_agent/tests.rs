@@ -2502,6 +2502,52 @@ fn decode_v3_rejects_excessive_point_tag_cloning() {
 }
 
 #[test]
+fn decode_v3_rejects_excessive_event_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = 1_000_000;
+    data.timestamps = vec![0; 1_000_000];
+    data.vals_float64 = vec![0.0; 1_000_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_dictionary_string_cloning() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_name_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.types = vec![3 | 0x30; 17];
+    data.name_refs = std::iter::once(1)
+        .chain(std::iter::repeat_n(0, 16))
+        .collect();
+    data.tagset_refs = vec![0; 17];
+    data.resources_refs = vec![0; 17];
+    data.intervals = vec![0; 17];
+    data.num_points = vec![0; 17];
+    data.source_type_name_refs = vec![0; 17];
+    data.origin_info_refs = vec![0; 17];
+    data.timestamps.clear();
+    data.vals_float64.clear();
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_empty_string_entries() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_name_str = vec![0; 700_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_empty_tagsets() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tagsets = vec![0; 700_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
 fn decode_v3_rejects_excessive_resource_expansion() {
     let mut data = minimal_v3_metric_data();
     data.dict_resource_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
