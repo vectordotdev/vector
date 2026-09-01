@@ -593,7 +593,7 @@ generated: components: sinks: socket: configuration: {
 		required:      false
 		type: uint: {
 			examples: [
-				65536,
+				65536
 			]
 			unit: "bytes"
 		}

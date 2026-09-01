@@ -64,10 +64,8 @@ where
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfigWithFraming {
-    #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     encoding: EncodingConfig,
 }
 

@@ -19,7 +19,7 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
-    config::{DynValidatedSink, SinkContext, ValidatedSink},
+    config::{SinkContext, ValidatedSink},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
@@ -117,11 +117,9 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub insert_random_shard: bool,
 
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
@@ -129,25 +127,19 @@ pub struct ClickhouseConfig {
     ///
     /// When specified, events are encoded together as a single batch.
     /// This is mutually exclusive with per-event encoding based on the `format` field.
-    #[configurable(derived)]
     #[serde(default)]
     pub batch_encoding: Option<ClickhouseBatchEncoding>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -155,11 +147,9 @@ pub struct ClickhouseConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub query_settings: QuerySettingsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -221,10 +211,6 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }

@@ -94,7 +94,6 @@ pub struct LuaConfig {
     #[configurable(metadata(docs::human_name = "Search Directories"))]
     search_dirs: Vec<PathBuf>,
 
-    #[configurable(derived)]
     hooks: HooksConfig,
 
     /// A list of timers which should be configured and executed periodically.

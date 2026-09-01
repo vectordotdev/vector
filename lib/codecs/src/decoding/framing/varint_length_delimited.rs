@@ -68,25 +68,18 @@ impl VarintLengthDelimitedDecoder {
         Self { max_frame_length }
     }
 
-    /// Decode a varint from the buffer
-    fn decode_varint(&self, buf: &mut BytesMut) -> Result<Option<u64>, BoxedFramingError> {
-        if buf.is_empty() {
-            return Ok(None);
-        }
-
+    /// Decode a varint from the start of the buffer without consuming it.
+    fn decode_varint(&self, buf: &BytesMut) -> Result<Option<(u64, usize)>, BoxedFramingError> {
         let mut value: u64 = 0;
         let mut shift: u8 = 0;
-        let mut bytes_read = 0;
 
-        for byte in buf.iter() {
-            bytes_read += 1;
+        for (index, byte) in buf.iter().enumerate() {
             let byte_value = (*byte & 0x7F) as u64;
             value |= byte_value << shift;
 
             if *byte & 0x80 == 0 {
                 // Last byte of varint
-                buf.advance(bytes_read);
-                return Ok(Some(value));
+                return Ok(Some((value, index + 1)));
             }
 
             shift += 7;
@@ -111,9 +104,11 @@ impl Decoder for VarintLengthDelimitedDecoder {
     type Error = BoxedFramingError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // First, try to decode the varint length
-        let length = match self.decode_varint(src)? {
-            Some(len) => len as usize,
+        // First, peek at the varint length prefix.
+        let (length, prefix_length) = match self.decode_varint(src)? {
+            Some((length, prefix_length)) => {
+                (usize::try_from(length).unwrap_or(usize::MAX), prefix_length)
+            }
             None => return Ok(None), // Incomplete varint
         };
 
@@ -127,11 +122,12 @@ impl Decoder for VarintLengthDelimitedDecoder {
         }
 
         // Check if we have enough data for the complete frame
-        if src.len() < length {
+        if src.len() - prefix_length < length {
             return Ok(None); // Incomplete frame
         }
 
-        // Extract the frame
+        // Consume the length prefix and extract the frame
+        src.advance(prefix_length);
         let frame = src.split_to(length).freeze();
         Ok(Some(frame))
     }
@@ -199,6 +195,74 @@ mod tests {
         let mut decoder = VarintLengthDelimitedDecoder::default();
 
         assert_eq!(decoder.decode(&mut input).unwrap(), None);
+    }
+
+    #[test]
+    fn decode_frames_split_across_read_buffer() {
+        const FRAME_LENGTH: usize = 87;
+        const FRAME_COUNT: usize = 200;
+        const READ_BUFFER_SIZE: usize = 8 * 1024;
+
+        let mut encoded = Vec::new();
+
+        for index in 0..FRAME_COUNT {
+            let byte = b'A' + (index % 26) as u8;
+
+            // FRAME_LENGTH fits in a single-byte varint.
+            encoded.push(FRAME_LENGTH as u8);
+            encoded.extend_from_slice(&[byte; FRAME_LENGTH]);
+        }
+
+        let mut decoder = VarintLengthDelimitedDecoder::default();
+        let mut input = BytesMut::new();
+        let mut decoded = Vec::new();
+        let mut chunks = encoded.chunks(READ_BUFFER_SIZE);
+
+        input.extend_from_slice(chunks.next().unwrap());
+
+        while let Some(frame) = decoder.decode(&mut input).unwrap() {
+            decoded.push(frame);
+        }
+
+        // 93 complete 88-byte frames fit in the first read, followed by the
+        // length prefix and seven payload bytes of the next frame.
+        assert_eq!(decoded.len(), 93);
+        assert_eq!(input.len(), 8);
+        assert_eq!(input[0], FRAME_LENGTH as u8);
+
+        for chunk in chunks {
+            input.extend_from_slice(chunk);
+
+            while let Some(frame) = decoder.decode(&mut input).unwrap() {
+                decoded.push(frame);
+            }
+        }
+
+        assert_eq!(decoder.decode_eof(&mut input).unwrap(), None);
+        assert!(input.is_empty());
+        assert_eq!(decoded.len(), FRAME_COUNT);
+
+        for (index, frame) in decoded.iter().enumerate() {
+            let expected = b'A' + (index % 26) as u8;
+
+            assert_eq!(frame.len(), FRAME_LENGTH);
+            assert!(frame.iter().all(|byte| *byte == expected));
+        }
+    }
+
+    #[test]
+    fn decode_incomplete_multi_byte_varint_leaves_buffer_intact() {
+        let mut input = BytesMut::from(&[0xAC, 0x02][..]);
+        input.extend_from_slice(&[b'x'; 100]);
+        let mut decoder = VarintLengthDelimitedDecoder::default();
+
+        assert_eq!(decoder.decode(&mut input).unwrap(), None);
+        assert_eq!(input.len(), 102);
+        assert_eq!(&input[..2], &[0xAC, 0x02][..]);
+
+        input.extend_from_slice(&[b'x'; 200]);
+        assert_eq!(decoder.decode(&mut input).unwrap().unwrap().len(), 300);
+        assert!(input.is_empty());
     }
 
     #[test]

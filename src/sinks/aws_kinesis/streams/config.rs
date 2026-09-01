@@ -13,10 +13,7 @@ use super::{
 };
 use crate::{
     aws::{ClientBuilder, create_client, is_retriable_error},
-    config::{
-        AcknowledgementsConfig, DynValidatedSink, Input, ProxyConfig, SinkConfig, SinkContext,
-        ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck, VectorSink,
         prelude::*,
@@ -70,7 +67,6 @@ pub struct KinesisStreamsSinkConfig {
     #[serde(flatten)]
     pub base: KinesisSinkBaseConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
 }
@@ -126,10 +122,6 @@ impl SinkConfig for KinesisStreamsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         self.base.acknowledgements()
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

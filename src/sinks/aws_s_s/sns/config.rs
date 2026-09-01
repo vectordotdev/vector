@@ -10,8 +10,8 @@ use super::{
 use crate::{
     aws::{ClientBuilder, RegionOrEndpoint, create_client},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
     },
     template::UnconfinedTemplate,
 };
@@ -75,10 +75,6 @@ impl SinkConfig for SnsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.base_config.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -59,7 +59,6 @@ pub struct FileSettings {
     pub path: PathBuf,
 
     /// File encoding configuration.
-    #[configurable(derived)]
     pub encoding: Encoding,
 }
 
@@ -68,7 +67,6 @@ pub struct FileSettings {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileConfig {
     /// File-specific settings.
-    #[configurable(derived)]
     pub file: FileSettings,
 
     /// Key/value pairs representing mapped log field names and types.

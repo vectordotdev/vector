@@ -15,6 +15,7 @@ bitmask-enum = { version = "2.2.5", default-features = false }
 bytes = { workspace = true, features = ["serde"] }
 chrono.workspace = true
 chrono-tz.workspace = true
+cidr = { version = "0.3.1", default-features = false, features = ["std"] }
 crossbeam-utils.workspace = true
 derivative.workspace = true
 dyn-clone = { version = "1.0.20", default-features = false }
@@ -33,7 +34,6 @@ metrics.workspace = true
 metrics-tracing-context.workspace = true
 metrics-util.workspace = true
 mlua = { workspace = true, optional = true }
-no-proxy = { version = "0.3.6", default-features = false, features = ["serialize"] }
 ordered-float.workspace = true
 openssl = { version = "0.10.81", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.5", default-features = false }
@@ -66,7 +66,6 @@ vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vrl.workspace = true
 cfg-if.workspace = true
-quickcheck = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "3.6.0"
@@ -95,19 +94,12 @@ noisy_float = "0.2.1"
 rand.workspace = true
 rand_distr.workspace = true
 serde_yaml = { version = "0.9.34", default-features = false }
-tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 
 [features]
 default = []
 lua = ["dep:mlua", "dep:tokio-stream", "vrl/lua"]
 test = ["vector-common/test", "proptest"]
-generate-fixtures = ["vrl/generate-fixtures", "dep:quickcheck"]
-
-[[bin]]
-name = "generate-fixtures"
-path = "src/bin/generate_fixtures.rs"
-required-features = ["generate-fixtures"]
 
 [[bench]]
 name = "event"

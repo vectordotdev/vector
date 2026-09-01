@@ -230,22 +230,18 @@ pub struct KafkaSourceConfig {
     /// transparently by the underlying client library and does not require this option.
     ///
     /// Payloads are decompressed before `framing` and `decoding` are applied.
-    #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     decompression: Option<DecompressionConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -254,7 +250,6 @@ pub struct KafkaSourceConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     metrics: Metrics,
 }

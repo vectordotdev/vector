@@ -1,9 +1,9 @@
 #![allow(dead_code)] // TODO requires optional feature compilation
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 use std::borrow::Cow;
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 use vector_lib::prometheus::parser::ParserError;
 use vector_lib::{
     NamedInternalEvent, counter,
@@ -12,7 +12,7 @@ use vector_lib::{
     },
 };
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 #[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusParseError<'a> {
     pub error: ParserError,
@@ -20,7 +20,7 @@ pub struct PrometheusParseError<'a> {
     pub body: Cow<'a, str>,
 }
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 impl InternalEvent for PrometheusParseError<'_> {
     fn emit(self) {
         error!(

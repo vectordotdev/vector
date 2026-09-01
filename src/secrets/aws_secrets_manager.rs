@@ -29,14 +29,11 @@ pub struct AwsSecretsManagerBackend {
     pub secret_id: String,
 
     #[serde(flatten)]
-    #[configurable(derived)]
     pub region: RegionOrEndpoint,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 }
 

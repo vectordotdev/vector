@@ -8,12 +8,13 @@ use vector_lib::{
     configurable::configurable_component,
     lookup::{event_path, lookup_v2::ConfigValuePath},
     schema::Requirement,
+    stream::BatcherSettings,
 };
 use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{EventRef, LogEvent, Value},
     http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
@@ -21,15 +22,15 @@ use crate::{
         Healthcheck, VectorSink,
         elasticsearch::{
             ElasticsearchApiVersion, ElasticsearchAuthConfig, ElasticsearchCommon,
-            ElasticsearchCommonMode, ElasticsearchMode, VersionType,
+            ElasticsearchCommonMode, ElasticsearchMode, ParseError, VersionType,
             health::ElasticsearchHealthLogic,
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
         },
         util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
-            service::HealthConfig,
+            BatchConfig, Compression, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
+            TowerRequestSettings, http::RequestConfig, service::HealthConfig,
         },
     },
     template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate},
@@ -77,7 +78,8 @@ pub struct ElasticsearchConfig {
     #[configurable(
         deprecated = "This option has been deprecated, the `endpoints` option should be used instead."
     )]
-    pub endpoint: Option<String>,
+    #[configurable(required_one_of = "endpoint")]
+    pub endpoint: Option<HttpEndpoint>,
 
     /// A list of Elasticsearch endpoints to send logs to.
     ///
@@ -93,7 +95,8 @@ pub struct ElasticsearchConfig {
     #[configurable(metadata(docs::examples = "http://10.24.32.122:9000"))]
     #[configurable(metadata(docs::examples = "https://example.com"))]
     #[configurable(metadata(docs::examples = "https://user:password@example.com"))]
-    pub endpoints: Vec<String>,
+    #[configurable(required_one_of = "endpoint")]
+    pub endpoints: Vec<HttpEndpoint>,
 
     /// The [`doc_type`][doc_type] for your index data.
     ///
@@ -108,7 +111,6 @@ pub struct ElasticsearchConfig {
     ///
     /// Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
     #[serde(default)]
-    #[configurable(derived)]
     pub api_version: ElasticsearchApiVersion,
 
     /// Whether or not to send the `type` field to Elasticsearch.
@@ -146,26 +148,20 @@ pub struct ElasticsearchConfig {
     pub pipeline: Option<String>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub mode: ElasticsearchMode,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub compression: Compression,
 
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
-    #[configurable(derived)]
     pub encoding: Transformer,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub request: RequestConfig,
 
-    #[configurable(derived)]
     pub auth: Option<ElasticsearchAuthConfig>,
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
@@ -175,7 +171,6 @@ pub struct ElasticsearchConfig {
     pub query: Option<QueryParameters>,
 
     #[serde(default)]
-    #[configurable(derived)]
     #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
@@ -184,11 +179,9 @@ pub struct ElasticsearchConfig {
     pub opensearch_service_type: OpenSearchServiceType,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     #[serde(default)]
-    #[configurable(derived)]
     #[serde(rename = "distribution")]
     pub endpoint_health: Option<HealthConfig>,
 
@@ -197,15 +190,12 @@ pub struct ElasticsearchConfig {
     // `DataStreamConfig` into the `mode` enum variants. Doing so would remove them from the root
     // of the config here and thus any post serde config parsing manual error prone logic.
     #[serde(alias = "normal", default)]
-    #[configurable(derived)]
     pub bulk: BulkConfig,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub data_stream: Option<DataStreamConfig>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub metrics: Option<MetricToLogConfig>,
 
     #[serde(
@@ -213,10 +203,8 @@ pub struct ElasticsearchConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
-    #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -722,55 +710,6 @@ fn is_valid_data_stream_component(s: &str, field: &str) -> bool {
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // Confinement of the active mode's routing templates happens in
-        // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
-        // parsing. There is therefore nothing to confine up front here.
-        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
-        let common = commons[0].clone();
-
-        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
-
-        let request_limits = self.request.tower.into_settings();
-
-        let health_config = self.endpoint_health.clone().unwrap_or_default();
-
-        let services = commons
-            .iter()
-            .map(|common| {
-                let endpoint = common.base_url.clone();
-
-                let http_request_builder = HttpRequestBuilder::new(common, self);
-                let service = ElasticsearchService::new(client.clone(), http_request_builder);
-
-                (endpoint, service)
-            })
-            .collect::<Vec<_>>();
-
-        let service = request_limits.distributed_service(
-            ElasticsearchRetryLogic {
-                retry_partial: self.request_retry_partial,
-            },
-            services,
-            health_config,
-            ElasticsearchHealthLogic,
-            1,
-        );
-
-        let sink = ElasticsearchSink::new(&common, self, service)?;
-
-        let stream = VectorSink::from_event_streamsink(sink);
-
-        let healthcheck = futures::future::select_ok(
-            commons
-                .into_iter()
-                .map(move |common| common.healthcheck(client.clone()).boxed()),
-        )
-        .map_ok(|((), _)| ())
-        .boxed();
-        Ok((stream, healthcheck))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -786,6 +725,148 @@ impl SinkConfig for ElasticsearchConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedElasticsearch {
+    request_limits: TowerRequestSettings,
+    health_config: HealthConfig,
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for ElasticsearchConfig {
+    type Validated = ValidatedElasticsearch;
+
+    fn validate(&self) -> crate::Result<ValidatedElasticsearch> {
+        // Mirror the pure endpoint-required/exclusive checks from
+        // `ElasticsearchCommon::parse_many` so configs that deterministically
+        // fail at build time are rejected here instead.
+        match (&self.endpoint, self.endpoints.is_empty()) {
+            (Some(_), false) => return Err(ParseError::EndpointsExclusive.into()),
+            (None, true) => return Err(ParseError::EndpointRequired.into()),
+            _ => {}
+        }
+
+        // `HttpEndpoint` validates the scheme (http/https, defaulting a
+        // missing scheme to https) and rejects host-less endpoints at load
+        // time, so the manual checks are no longer needed here.
+
+        // Mirror the pure Serverless checks from `ElasticsearchCommon::parse_config`
+        // (auth strategy, region, and API-version) so configs that deterministically
+        // fail at build time are rejected here instead.
+        if self.opensearch_service_type == OpenSearchServiceType::Serverless {
+            match &self.auth {
+                #[cfg(feature = "aws-core")]
+                Some(ElasticsearchAuthConfig::Aws(_)) => (),
+                _ => return Err(ParseError::OpenSearchServerlessRequiresAwsAuth.into()),
+            }
+        }
+        if self.opensearch_service_type == OpenSearchServiceType::Serverless
+            && self.api_version != ElasticsearchApiVersion::Auto
+        {
+            return Err(ParseError::ServerlessElasticsearchApiVersionMustBeAuto.into());
+        }
+
+        // Mirror the pure region check from `ElasticsearchCommon::extract_auth` so
+        // AWS auth configs without a region are rejected during validation instead
+        // of failing at build time.
+        #[cfg(feature = "aws-core")]
+        if matches!(self.auth, Some(ElasticsearchAuthConfig::Aws(_)))
+            && self.aws.as_ref().and_then(|aws| aws.region()).is_none()
+        {
+            return Err(ParseError::RegionRequired.into());
+        }
+
+        // Run the pure routing-template confinement check for the active mode
+        // so unconfined `bulk.index` / `data_stream.*` templates are rejected
+        // here. The confined mode itself is reconstructed during build (inside
+        // `ElasticsearchCommon::parse_many`).
+        self.common_mode()?;
+
+        // Mirror the pure batch-settings and versioning checks from
+        // `ElasticsearchCommon::parse_config` so configs that deterministically
+        // fail at build time are rejected here instead.
+        let batch_settings = self.batch.into_batcher_settings()?;
+
+        if self.bulk.version.is_some() && self.bulk.version_type == VersionType::Internal {
+            return Err(ParseError::ExternalVersionIgnoredWithInternalVersioning.into());
+        }
+        if self.bulk.version.is_some()
+            && (self.bulk.version_type == VersionType::External
+                || self.bulk.version_type == VersionType::ExternalGte)
+            && self.id_key.is_none()
+        {
+            return Err(ParseError::ExternalVersioningWithoutDocumentID.into());
+        }
+        if self.bulk.version.is_none()
+            && (self.bulk.version_type == VersionType::External
+                || self.bulk.version_type == VersionType::ExternalGte)
+        {
+            return Err(ParseError::ExternalVersioningWithoutVersion.into());
+        }
+
+        let request_limits = self.request.tower.into_settings();
+        let health_config = self.endpoint_health.clone().unwrap_or_default();
+
+        Ok(ValidatedElasticsearch {
+            request_limits,
+            health_config,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedElasticsearch,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        // Confinement of the active mode's routing templates happens in
+        // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
+        // parsing (which performs I/O: AWS credential resolution and API-version autodetection).
+        // The pure request/health settings were resolved during `validate`.
+        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
+        let common = commons[0].clone();
+
+        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
+
+        let health_config = validated.health_config.clone();
+
+        let services = commons
+            .iter()
+            .map(|common| {
+                let endpoint = common.base_url.clone();
+
+                let http_request_builder = HttpRequestBuilder::new(common, self);
+                let service = ElasticsearchService::new(client.clone(), http_request_builder);
+
+                (endpoint, service)
+            })
+            .collect::<Vec<_>>();
+
+        let service = validated.request_limits.clone().distributed_service(
+            ElasticsearchRetryLogic {
+                retry_partial: self.request_retry_partial,
+            },
+            services,
+            health_config,
+            ElasticsearchHealthLogic,
+            1,
+        );
+
+        let sink = ElasticsearchSink::new(&common, self, service, validated.batch_settings)?;
+
+        let stream = VectorSink::from_event_streamsink(sink);
+
+        let healthcheck = futures::future::select_ok(
+            commons
+                .into_iter()
+                .map(move |common| common.healthcheck(client.clone()).boxed()),
+        )
+        .map_ok(|((), _)| ())
+        .boxed();
+        Ok((stream, healthcheck))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -794,6 +875,219 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ElasticsearchConfig>();
+    }
+
+    #[test]
+    fn validate_rejects_missing_endpoints() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str("{}").unwrap();
+        let err = config
+            .validate()
+            .expect_err("an endpoint or endpoints list is required");
+        assert!(
+            err.to_string()
+                .contains("Endpoints option must be specified"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_and_endpoints() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "http://localhost:9200"
+            endpoints: ["http://localhost:9200"]
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("endpoint and endpoints are mutually exclusive");
+        assert!(
+            err.to_string().contains("mutually exclusive"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_endpoints() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            "#,
+        )
+        .unwrap();
+        config.validate().expect("endpoints should validate");
+    }
+
+    #[test]
+    fn validate_rejects_endpoint_without_host() {
+        // `HttpEndpoint` rejects host-less endpoints at deserialization time.
+        let err = serde_yaml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints: ["/path"]
+            "#,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("is not a valid URI"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_non_http_endpoint() {
+        // `HttpEndpoint` rejects non-http(s) schemes at deserialization time.
+        let err = serde_yaml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints: ["ftp://elasticsearch.example.com"]
+            "#,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("must be an absolute http(s) URL"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_batch_settings() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            batch:
+              max_events: 0
+            "#,
+        )
+        .unwrap();
+        config
+            .validate()
+            .expect_err("invalid batch settings should fail validation");
+    }
+
+    #[test]
+    fn validate_rejects_external_versioning_without_version() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            bulk:
+              version_type: external
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("external versioning without a version should fail validation");
+        assert!(
+            err.to_string().contains("version"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_external_versioning_without_id_key() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            bulk:
+              version: "{{ obj_version }}"
+              version_type: external
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("external versioning without an id_key should fail validation");
+        assert!(
+            err.to_string().contains("document ID"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_serverless_without_aws_auth() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            opensearch_service_type: serverless
+            api_version: auto
+            "#,
+        )
+        .unwrap();
+        let err = config.validate().expect_err("serverless requires AWS auth");
+        assert!(
+            err.to_string().contains("auth.strategy"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_rejects_serverless_with_non_auto_api_version() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            opensearch_service_type: serverless
+            auth:
+              strategy: aws
+            api_version: v8
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("serverless requires api_version auto");
+        assert!(
+            err.to_string().contains("api_version"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_rejects_aws_auth_without_region() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            auth:
+              strategy: aws
+            "#,
+        )
+        .unwrap();
+        let err = config.validate().expect_err("AWS auth requires aws.region");
+        assert!(
+            err.to_string().contains("aws.region"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn validate_accepts_serverless_with_aws_auth_and_auto_api_version() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            opensearch_service_type: serverless
+            auth:
+              strategy: aws
+            aws:
+              region: us-east-1
+            api_version: auto
+            "#,
+        )
+        .unwrap();
+        config
+            .validate()
+            .expect("valid serverless config should validate");
     }
 
     #[test]
@@ -913,9 +1207,23 @@ mod tests {
     }
 
     #[test]
+    fn validate_produces_request_limits_and_health() {
+        use crate::config::ValidatedSink;
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: ["http://localhost:9200"]
+        "#})
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        // Default request limits and health settings are resolved during validation.
+        assert_eq!(validated.request_limits.concurrency, None);
+        assert!(validated.request_limits.timeout.as_secs() > 0);
+        assert!(validated.health_config.retry_initial_backoff_secs > 0);
+    }
+
+    #[test]
     fn parse_aws_auth() {
         serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             auth:
               strategy: aws
               assume_role: role
@@ -923,7 +1231,7 @@ mod tests {
         .unwrap();
 
         serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             auth:
               strategy: aws
         "#})
@@ -933,7 +1241,7 @@ mod tests {
     #[test]
     fn parse_mode() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             mode: data_stream
             data_stream:
               type: synthetics
@@ -946,7 +1254,7 @@ mod tests {
     #[test]
     fn parse_distribution() {
         serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: ["", ""]
+            endpoints: ["http://localhost:9200", "http://localhost:9201"]
             distribution:
               retry_initial_backoff_secs: 10
         "#})
@@ -956,7 +1264,7 @@ mod tests {
     #[test]
     fn parse_version() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             api_version: v7
         "#})
         .unwrap();
@@ -966,7 +1274,7 @@ mod tests {
     #[test]
     fn parse_version_auto() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             api_version: auto
         "#})
         .unwrap();
@@ -976,7 +1284,7 @@ mod tests {
     #[test]
     fn parse_default_bulk() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
         "#})
         .unwrap();
         assert_eq!(config.mode, ElasticsearchMode::Bulk);
@@ -986,7 +1294,7 @@ mod tests {
     #[test]
     fn parse_opensearch_service_type_managed() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             opensearch_service_type: managed
         "#})
         .unwrap();
@@ -999,7 +1307,7 @@ mod tests {
     #[test]
     fn parse_opensearch_service_type_serverless() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             opensearch_service_type: serverless
             auth:
               strategy: aws
@@ -1015,7 +1323,7 @@ mod tests {
     #[test]
     fn parse_opensearch_service_type_default() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
         "#})
         .unwrap();
         assert_eq!(
@@ -1028,7 +1336,7 @@ mod tests {
     #[test]
     fn parse_opensearch_serverless_with_aws_auth() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
-            endpoints: [""]
+            endpoints: ["http://localhost:9200"]
             opensearch_service_type: serverless
             auth:
               strategy: aws

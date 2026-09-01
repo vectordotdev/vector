@@ -122,7 +122,7 @@ generated: components: sinks: axiom: configuration: {
 			Cannot be used together with `url`.
 			"""
 		required: false
-		type: string: examples: ["${AXIOM_REGION}", "mumbai.axiom.co", "eu-central-1.aws.edge.axiom.co"]
+		type: string: examples: ["mumbai.axiom.co", "${AXIOM_REGION}", "eu-central-1.aws.edge.axiom.co"]
 	}
 	request: {
 		description: "Outbound HTTP request settings."
@@ -464,6 +464,6 @@ generated: components: sinks: axiom: configuration: {
 			This takes precedence over `region` if both are set (but both should not be set).
 			"""
 		required: false
-		type: string: examples: ["https://api.eu.axiom.co", "http://localhost:3400/ingest", "${AXIOM_URL}"]
+		type: string: {}
 	}
 }

@@ -4,7 +4,7 @@ use vector_lib::config::ComponentKey;
 use vector_lib::id::Inputs;
 
 use super::{
-    Config, OutputId, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
+    Config, DynValidatedSink, OutputId, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
     transform::get_transform_output_ids, validation,
 };
 
@@ -202,19 +202,17 @@ fn validate_sinks(config: &mut Config) -> Vec<String> {
 
     // Validate direct sinks
     for (key, sink) in config.sinks.iter_mut() {
-        if let Some(dyn_sink) = sink.inner.as_dyn_validated() {
-            match dyn_sink.validate_dyn() {
-                Ok(state) => sink.validated = Some(Arc::from(state)),
-                Err(e) => errors.push(format!("Failed to validate sink \"{}\": {}", key, e)),
-            }
+        let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
+        match dyn_sink.validate_dyn() {
+            Ok(state) => sink.validated = Some(Arc::from(state)),
+            Err(e) => errors.push(format!("Failed to validate sink \"{}\": {}", key, e)),
         }
     }
 
     // Validate enrichment table sinks with resolved inputs.
     for (key, table) in config.enrichment_tables.iter_mut() {
-        if let Some((_, sink)) = table.as_sink(key)
-            && let Some(dyn_sink) = sink.inner.as_dyn_validated()
-        {
+        if let Some((_, sink)) = table.as_sink(key) {
+            let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
             match dyn_sink.validate_dyn() {
                 Ok(state) => table.validated = Some(Arc::from(state)),
                 Err(error) => errors.push(format!(

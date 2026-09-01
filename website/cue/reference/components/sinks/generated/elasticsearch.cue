@@ -501,8 +501,12 @@ generated: components: sinks: elasticsearch: configuration: {
 
 			The endpoint must contain an HTTP scheme, and may specify a
 			hostname or IP address and port.
+
+			Exactly one of `endpoint` or `endpoints` must be set.
 			"""
 		required: false
+		required_one_of: ["endpoint", "endpoints"]
+		required_one_of_group: "endpoint"
 		type: string: {}
 	}
 	endpoints: {
@@ -517,8 +521,12 @@ generated: components: sinks: elasticsearch: configuration: {
 
 			If `auth` is specified and the endpoint contains credentials,
 			a configuration error will be raised.
+
+			Exactly one of `endpoint` or `endpoints` must be set.
 			"""
 		required: false
+		required_one_of: ["endpoint", "endpoints"]
+		required_one_of_group: "endpoint"
 		type: array: {
 			default: []
 			items: type: string: examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]

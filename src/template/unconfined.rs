@@ -187,10 +187,9 @@ impl UnconfinedTemplate {
         self.src.split_at(i).0
     }
 
-    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     /// Returns a reference to the template string.
-    pub fn get_ref(&self) -> &str {
-        &self.src
+    pub const fn get_ref(&self) -> &str {
+        self.src.as_str()
     }
 
     /// Returns `true` if this template string has a length of zero, and `false` otherwise.

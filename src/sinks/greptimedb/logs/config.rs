@@ -7,7 +7,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient},
     sinks::{
         greptimedb::{
@@ -91,11 +91,9 @@ pub struct GreptimeDBLogsConfig {
     pub password: Option<SensitiveString>,
     /// Set http compression encoding for the request
     /// Default to none, `gzip` or `zstd` is supported.
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
@@ -113,18 +111,14 @@ pub struct GreptimeDBLogsConfig {
     ))]
     pub extra_headers: Option<HashMap<String, String>>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(crate) batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -132,7 +126,6 @@ pub struct GreptimeDBLogsConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -152,10 +145,6 @@ impl SinkConfig for GreptimeDBLogsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

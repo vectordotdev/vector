@@ -56,7 +56,7 @@ generated: components: sources: logstash: configuration: {
 		required:    false
 		type: uint: {
 			examples: [
-				65536,
+				65536
 			]
 			unit: "bytes"
 		}

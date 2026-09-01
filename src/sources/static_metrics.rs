@@ -42,7 +42,6 @@ pub struct StaticMetricsConfig {
     #[serde(default = "default_namespace")]
     pub namespace: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub metrics: Vec<StaticMetricConfig>,
 }

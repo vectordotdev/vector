@@ -92,10 +92,8 @@ pub struct PrometheusScrapeConfig {
     #[configurable(metadata(docs::examples = "query_example()"))]
     query: QueryParameters,
 
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     auth: Option<Auth>,
 }
 

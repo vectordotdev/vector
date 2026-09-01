@@ -30,7 +30,7 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::{self, EncodingConfig},
-    config::{DynValidatedSink, GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
+    config::{GenerateConfig, SinkConfig, SinkContext, ValidatedSink},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     schema,
@@ -189,7 +189,6 @@ pub struct ChronicleUnstructuredConfig {
     pub endpoint: Option<HttpEndpoint>,
 
     /// The GCP region to use.
-    #[configurable(derived)]
     #[configurable(required_one_of = "region_or_endpoint")]
     pub region: Option<Region>,
 
@@ -214,22 +213,17 @@ pub struct ChronicleUnstructuredConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<ChronicleUnstructuredDefaultBatchSettings>,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub compression: ChronicleCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig<ChronicleUnstructuredTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The type of log entries in a request.
@@ -245,7 +239,6 @@ pub struct ChronicleUnstructuredConfig {
     #[configurable(metadata(docs::examples = "VECTOR_DEV"))]
     pub fallback_log_type: Option<String>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -316,10 +309,6 @@ impl SinkConfig for ChronicleUnstructuredConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

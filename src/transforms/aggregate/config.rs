@@ -24,7 +24,6 @@ pub struct AggregateConfig {
     ///
     /// Some of the functions may only function on incremental and some only on absolute metrics.
     #[serde(default = "default_mode")]
-    #[configurable(derived)]
     pub mode: AggregationMode,
 }
 

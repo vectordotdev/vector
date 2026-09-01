@@ -31,7 +31,7 @@ use vector_lib::{configurable::configurable_component, json_size::JsonSize};
 
 use super::{AdaptiveConcurrencySettings, controller::ControllerStatistics};
 use crate::{
-    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{Event, metric::MetricValue},
     metrics,
     sinks::{
@@ -78,7 +78,6 @@ struct LimitParams {
     /// The level above which more requests will be denied.
     limit: Option<usize>,
 
-    #[configurable(derived)]
     #[serde(default)]
     action: Action,
 }
@@ -125,19 +124,15 @@ struct TestParams {
     #[serde(default)]
     jitter: f64,
 
-    #[configurable(derived)]
     #[serde(default)]
     concurrency_limit_params: LimitParams,
 
-    #[configurable(derived)]
     #[serde(default)]
     rate: LimitParams,
 
-    #[configurable(derived)]
     #[serde(default = "default_concurrency")]
     concurrency: Concurrency,
 
-    #[configurable(derived)]
     #[serde(default)]
     adaptive_concurrency: AdaptiveConcurrencySettings,
 }
@@ -154,10 +149,8 @@ const fn default_concurrency() -> Concurrency {
 #[configurable_component(sink("test_arc", "Test (adaptive concurrency)."))]
 #[derive(Clone, Debug, Default)]
 pub struct TestConfig {
-    #[configurable(derived)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     params: TestParams,
 
     // The statistics collected by running a test must be local to that
@@ -176,7 +169,28 @@ impl_generate_config_from_default!(TestConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "test_arc")]
 impl SinkConfig for TestConfig {
-    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for TestConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let mut batch_settings = BatchSettings::default();
         batch_settings.size.bytes = 9999;
         batch_settings.size.events = 1;
@@ -207,14 +221,6 @@ impl SinkConfig for TestConfig {
 
         #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
     }
 }
 

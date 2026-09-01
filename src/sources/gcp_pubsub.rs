@@ -146,7 +146,6 @@ pub struct PubsubConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The maximum number of concurrent stream connections to open at once.
@@ -210,17 +209,14 @@ pub struct PubsubConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }

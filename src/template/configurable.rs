@@ -60,7 +60,7 @@ impl Template {
     }
 
     /// Returns a reference to the template source string.
-    pub fn get_ref(&self) -> &str {
+    pub const fn get_ref(&self) -> &str {
         self.inner.get_ref()
     }
 

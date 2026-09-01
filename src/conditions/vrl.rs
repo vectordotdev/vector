@@ -23,7 +23,7 @@ pub struct VrlConfig {
     /// The VRL boolean expression.
     pub(crate) source: String,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(crate) runtime: VrlRuntime,
 }

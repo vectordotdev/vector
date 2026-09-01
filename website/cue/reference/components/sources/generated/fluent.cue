@@ -84,7 +84,7 @@ generated: components: sources: fluent: configuration: {
 		required:      false
 		type: uint: {
 			examples: [
-				65536,
+				65536
 			]
 			unit: "bytes"
 		}

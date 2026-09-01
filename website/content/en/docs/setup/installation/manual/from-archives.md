@@ -24,7 +24,7 @@ mkdir -p vector && \
 
 # Nightly
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-nightly-aarch64-unknown-linux-musl.tar.gz | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://dd-cose-releases.s3.amazonaws.com/vector/nightly/latest/vector-nightly-aarch64-unknown-linux-musl.tar.gz | \
   tar xzf - -C vector --strip-components=2
 ```
 
@@ -59,7 +59,7 @@ mkdir -p vector && \
 
 # Nightly
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-nightly-armv7-unknown-linux-gnueabihf.tar.gz | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://dd-cose-releases.s3.amazonaws.com/vector/nightly/latest/vector-nightly-armv7-unknown-linux-gnueabihf.tar.gz | \
   tar xzf - -C vector --strip-components=2
 ```
 
@@ -94,7 +94,7 @@ mkdir -p vector && \
 
 # Nightly
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-nightly-arm64-apple-darwin.tar.gz  | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://dd-cose-releases.s3.amazonaws.com/vector/nightly/latest/vector-nightly-arm64-apple-darwin.tar.gz  | \
   tar xzf - -C vector --strip-components=2
 ```
 
@@ -127,7 +127,7 @@ powershell Invoke-WebRequest https://packages.timber.io/vector/{{< version >}}/v
 
 
 # Nightly
-powershell Invoke-WebRequest https://packages.timber.io/vector/0.12.X/vector-nightly-x86_64-pc-windows-msvc.zip -OutFile vector-nightly-x86_64-pc-windows-msvc.zip
+powershell Invoke-WebRequest https://dd-cose-releases.s3.amazonaws.com/vector/nightly/latest/vector-nightly-x86_64-pc-windows-msvc.zip -OutFile vector-nightly-x86_64-pc-windows-msvc.zip
 ```
 
 Extract files from the archive:
@@ -160,7 +160,7 @@ mkdir -p vector && \
 
 # Nightly
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-musl.tar.gz | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://dd-cose-releases.s3.amazonaws.com/vector/nightly/latest/vector-nightly-x86_64-unknown-linux-musl.tar.gz | \
   tar xzf - -C vector --strip-components=2
 ```
 
