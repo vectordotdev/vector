@@ -122,6 +122,14 @@ pub enum TlsError {
         max
     ))]
     InvalidTlsVersionRange { min: TlsVersion, max: TlsVersion },
+    #[snafu(display(
+        "The effective TLS protocol version window is empty: the minimum ({}) is greater than the \
+         maximum ({}). One of these bounds comes from the host's OpenSSL configuration rather \
+         than from `min_tls_version`/`max_tls_version`.",
+        min,
+        max
+    ))]
+    EmptyTlsVersionWindow { min: TlsVersion, max: TlsVersion },
     #[snafu(display("Error setting SNI: {}", source))]
     SetSni { source: ErrorStack },
     #[snafu(display("Error setting ALPN protocols: {}", source))]

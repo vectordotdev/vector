@@ -123,6 +123,25 @@ impl TlsVersion {
             Self::Tls13 => SslVersion::TLS1_3,
         }
     }
+
+    /// The `TlsVersion` corresponding to `version`, or `None` for a version Vector does not
+    /// model (`SSLv3` and the DTLS versions).
+    ///
+    /// `SslVersion` is not ordered and does not expose its underlying value, so comparing two
+    /// bounds requires mapping them back to this type first.
+    fn from_ssl_version(version: SslVersion) -> Option<Self> {
+        if version == SslVersion::TLS1 {
+            Some(Self::Tls10)
+        } else if version == SslVersion::TLS1_1 {
+            Some(Self::Tls11)
+        } else if version == SslVersion::TLS1_2 {
+            Some(Self::Tls12)
+        } else if version == SslVersion::TLS1_3 {
+            Some(Self::Tls13)
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Display for TlsVersion {
@@ -421,6 +440,21 @@ impl TlsSettings {
         // flags, so clearing them could only relax a restriction configured elsewhere.
         if self.window_contains(TlsVersion::Tls13) {
             context.clear_options(SslOptions::NO_TLSV1_3);
+        }
+
+        // A bound Vector did not set can still be in force, supplied by the host's OpenSSL
+        // configuration. The effective window is the combination of both, so it can be empty
+        // even when the configured options are self-consistent -- a host `MinProtocol = TLSv1.3`
+        // together with `max_tls_version: TLSv1.2`, for instance. Both setters report success in
+        // that case, so without this check Vector would start and then fail every handshake.
+        if let (Some(min), Some(max)) = (context.min_proto_version(), context.max_proto_version())
+            && let (Some(min), Some(max)) = (
+                TlsVersion::from_ssl_version(min),
+                TlsVersion::from_ssl_version(max),
+            )
+            && min > max
+        {
+            return Err(TlsError::EmptyTlsVersionWindow { min, max });
         }
 
         Ok(())
@@ -1271,6 +1305,58 @@ mod test {
             options.contains(SslOptions::NO_TLSV1_1),
             "TLS v1.1 was disabled outside Vector and must stay disabled"
         );
+    }
+
+    // Vector's own two options can be consistent while the effective window -- Vector's bound
+    // combined with one already in force from the host's OpenSSL configuration -- is empty.
+    // Both OpenSSL setters still succeed there, so this must be caught explicitly rather than
+    // letting Vector start and fail every handshake.
+    #[test]
+    fn empty_effective_version_window_is_rejected() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            max_tls_version: Some(TlsVersion::Tls12),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        // Stands in for a host policy of `MinProtocol = TLSv1.3`.
+        builder
+            .set_min_proto_version(Some(SslVersion::TLS1_3))
+            .unwrap();
+
+        let error = settings
+            .apply_context(&mut builder)
+            .expect_err("a minimum above the maximum must be rejected");
+        assert!(
+            matches!(
+                error,
+                TlsError::EmptyTlsVersionWindow {
+                    min: TlsVersion::Tls13,
+                    max: TlsVersion::Tls12
+                }
+            ),
+            "unexpected error: {error}"
+        );
+    }
+
+    // The complement: a host bound that leaves a usable window must be accepted.
+    #[test]
+    fn compatible_host_bound_is_accepted() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            max_tls_version: Some(TlsVersion::Tls13),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder
+            .set_min_proto_version(Some(SslVersion::TLS1_2))
+            .unwrap();
+
+        settings
+            .apply_context(&mut builder)
+            .expect("a host minimum below the configured maximum is a usable window");
     }
 
     // A window that excludes TLS v1.3 must leave the acceptor profile's `NO_TLSV1_3` in place.
