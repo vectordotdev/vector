@@ -253,6 +253,15 @@ pub struct TlsConfig {
 }
 
 impl TlsConfig {
+    /// Whether an explicit TLS protocol version window was configured.
+    ///
+    /// Components that hand this configuration to a third-party TLS stack rather than applying it
+    /// to an OpenSSL context use this to warn instead of ignoring the bounds silently. See
+    /// [`warn_unenforceable_protocol_versions`](super::warn_unenforceable_protocol_versions).
+    pub fn has_protocol_version_bounds(&self) -> bool {
+        self.min_tls_version.is_some() || self.max_tls_version.is_some()
+    }
+
     pub fn test_config() -> Self {
         Self {
             ca_file: Some(TEST_PEM_CA_PATH.into()),
@@ -341,7 +350,8 @@ impl TlsSettings {
     ///
     /// Components that hand the PEM material to a third-party TLS stack instead of applying
     /// these settings to an OpenSSL context cannot honor `min_tls_version`/`max_tls_version`,
-    /// and use this to warn rather than ignore them silently.
+    /// and use this to warn rather than ignore them silently. See
+    /// [`warn_unenforceable_protocol_versions`](super::warn_unenforceable_protocol_versions).
     pub fn has_protocol_version_bounds(&self) -> bool {
         self.min_tls_version.is_some() || self.max_tls_version.is_some()
     }

@@ -150,9 +150,7 @@ impl MqttSourceConfig {
             let ca = tls.authorities_pem().flatten().collect();
             let client_auth = tls.identity_pem();
             if tls.has_protocol_version_bounds() {
-                warn!(
-                    message = "`tls.min_tls_version` and `tls.max_tls_version` are not supported by the MQTT client and are ignored."
-                );
+                vector_lib::tls::warn_unenforceable_protocol_versions("rumqttc");
             }
 
             // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to

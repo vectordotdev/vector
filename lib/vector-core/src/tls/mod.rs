@@ -29,6 +29,19 @@ pub use settings::{
 
 pub type Result<T> = std::result::Result<T, TlsError>;
 
+/// Warns that `tls_stack` cannot honor the configured TLS protocol version bounds.
+///
+/// `min_tls_version`/`max_tls_version` are applied to the OpenSSL context built by
+/// [`TlsSettings::apply_context_base`]. Components that instead pass the configured certificates
+/// to a third-party TLS implementation never reach that code, so the bounds have no effect there.
+/// Because they are a security control, such components warn rather than ignore them silently.
+pub fn warn_unenforceable_protocol_versions(tls_stack: &str) {
+    warn!(
+        message = "`tls.min_tls_version` and `tls.max_tls_version` are not enforced by this component's TLS implementation and are ignored.",
+        tls_stack
+    );
+}
+
 pub type MaybeTlsStream<S> = MaybeTls<S, SslStream<S>>;
 
 #[derive(Debug, Snafu)]

@@ -13,11 +13,14 @@ inside the resulting window, so `min_tls_version: TLSv1.2` makes TLS v1.3 availa
 Both options are optional and unset by default, so existing configurations negotiate exactly the
 same versions as before.
 
-These options apply to components whose TLS settings are applied to an OpenSSL context. Components
-that hand the configured certificates to a third-party TLS stack cannot honor them: the `mqtt`
-source and sink, and the `gcp_pubsub` source, now log a warning when either option is set, and the
-`greptimedb_metrics` sink includes them in its existing unsupported-options warning. Components that
-do not read Vector's `tls` block at all, such as `kafka` (librdkafka) and the AWS SDK-based sinks,
-are unaffected.
+These options take effect for every component whose `tls` settings are applied to an OpenSSL
+context, which includes the HTTP-based sources and sinks and the AWS SDK-based sinks.
+
+Some components pass the configured certificates to a third-party TLS implementation instead, which
+does not expose protocol version selection. Those components cannot enforce the bounds, so they now
+log a warning when either option is set rather than ignoring it silently: the `kafka` source and
+sink (librdkafka), the `nats` source and sink (async-nats), the `amqp` source and sink (lapin), the
+`mqtt` source and sink (rumqttc), and the `gcp_pubsub` source (tonic). The `greptimedb_metrics` sink
+lists them in its existing unsupported-options warning.
 
 authors: sainad2222
