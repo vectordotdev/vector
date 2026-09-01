@@ -1,15 +1,15 @@
 #[derive(Debug, Snafu)]
 #[snafu(module(build_error))]
 pub(crate) enum BuildError {
-    /// Template has event-field references but no literal prefix to confine them to.
+    /// Template has dynamic content but no literal prefix to confine it to.
     #[snafu(display(
-        "template references event fields ({fields:?}) but has no \
+        "template has dynamic content (event fields: {fields:?}) but no \
          literal string prefix to derive a confinement base from. Add a static \
          prefix to your template, or set \
          `dangerously_allow_unconfined_template_resolution: true` to opt out."
     ))]
     NoDerivableBase {
-        /// The event fields referenced by the template.
+        /// The event fields referenced by the template, if any.
         fields: Vec<String>,
     },
 
@@ -184,10 +184,10 @@ impl ConfinementChecker {
     /// confinement. Returns `Ok(None)` if the template is static and needs no
     /// confinement.
     fn validate_common(tpl: &UnconfinedTemplate) -> Result<Option<String>, BuildError> {
-        let fields = match tpl.get_fields() {
-            Some(f) => f,
-            None => return Ok(None),
-        };
+        if !tpl.is_dynamic() {
+            return Ok(None);
+        }
+        let fields = tpl.get_fields().unwrap_or_default();
         let prefix = tpl.literal_prefix();
         if prefix.is_empty() {
             return Err(BuildError::NoDerivableBase { fields });

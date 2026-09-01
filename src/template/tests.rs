@@ -1180,6 +1180,32 @@ fn uri_template_confine_accepts_http_and_https_schemes() {
     );
 }
 
+#[test]
+fn uri_template_confine_accepts_strftime_only_path() {
+    let ts = Utc
+        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+        .single()
+        .expect("invalid timestamp");
+    let mut event = Event::Log(LogEvent::from("x"));
+    event
+        .as_mut_log()
+        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
+
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://logs.example.com/%Y/%m").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://logs.example.com/2001/02"
+    );
+    assert!(
+        confined
+            .check_confinement("https://other.example.com/2001/02")
+            .is_err()
+    );
+}
+
 // Tests for static URI validation
 
 #[test]
