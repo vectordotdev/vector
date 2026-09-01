@@ -177,8 +177,25 @@ Numeric boundary behavior follows one policy throughout the model and mappings:
 
 ### User Experience
 
-A `TraceEvent` carries one `Resource`, one `Scope`, an optional `ChunkContext`, and a
-`Vec<Span>`. VRL accesses these directly:
+During coexistence, a `remap` transform must opt in to the typed VRL surface:
+
+```yaml
+transforms:
+  typed_traces:
+    type: remap
+    inputs:
+      - traces
+    trace_representation: typed
+    source: "."
+```
+
+`trace_representation` initially defaults to `legacy`. Typed mode accepts only trace input and
+converts before running VRL; path access never converts. VRL conditions do not convert,
+so typed conditions require an upstream typed `remap`. Because conversion is one-way,
+legacy mode rejects typed input with a representation-mismatch mapping error.
+
+In `typed` mode, a `TraceEvent` exposes its `Resource`, `Scope`, optional `ChunkContext`,
+and `Vec<Span>` directly:
 
 ```coffee
 # Route by resource service.
@@ -751,29 +768,26 @@ A present but unrecognized hint returns the same error without attempting detect
   drop it according to normal acknowledgement semantics. There is no reverse
   conversion. A transform that emits the converted event wraps it as
   `TraceEventCompat::Typed`.
-- VRL uses a fallible mutable compatibility-boundary method that converts a `Legacy`
-  arm in place and returns `&mut TraceEvent`. An already-`Typed` arm only returns the
-  contained reference. If conversion cannot resolve a present hint or uniquely detect
-  a hintless legacy layout, VRL aborts the expression with a runtime error; the event
-  is forwarded to the topology error path unchanged and the failure is reported.
+- `remap.trace_representation` selects the VRL representation before program execution.
+  Typed mode calls `try_into_typed()` before constructing `VrlTarget`; legacy mode
+  accepts only `Legacy`. Pre-execution failures use the normal mapping-error,
+  `drop_on_error`, and `reroute_dropped` behavior. Once converted, an event remains typed
+  even when later VRL failure forwards it unmodified.
 
 Per-component shims are unidirectional (`LegacyTraceEvent -> TraceEvent` only). The
 `datadog_agent` source ships with a shim and format-shape detector that know the
 source's `LogEvent` key layout and produce a typed container; the OTLP source ships
 with the equivalent shim and detector for its layout.
 
-The removal of the temporary untyped forwarders is the compile-time gate for unmigrated
-call sites. Each migrated consumer must accept `TraceEventCompat` and fallibly produce
-a `TraceEvent` at every trace-event intake path. Once conversion succeeds, all of its
-internal trace operations are statically typed.
-
-VRL programs perform the same conversion implicitly at their mutable target boundary,
-so operators never need to reason about the migration state of upstream sources.
+Removing the temporary untyped forwarders catches unmigrated Rust consumers at compile
+time. It does not migrate user VRL, which must set
+`remap.trace_representation = "typed"` before producers flip.
 
 After every source, sink, and transform has been migrated, the compatibility enum and
 `LegacyTraceEvent` are removed and `TraceEventCompat` becomes a type alias for
-`TraceEvent`. The legacy conversion routines and detectors remain temporarily as
-deprecated-proto wire decoders, as described below.
+`TraceEvent`. This typed-only release changes the `remap` default to `typed`, rejects
+`legacy`, and retains the option for a deprecation window. The legacy converters and
+detectors remain temporarily as deprecated-proto wire decoders.
 
 #### Wire serialization
 
@@ -925,16 +939,11 @@ conversion routines and detectors deleted.
   it expects. `TraceEvent` itself is always typed. See "Wholesale migration" under
   Alternatives for why a single atomic replacement was rejected.
 - Per-component shims convert `LegacyTraceEvent -> TraceEvent` only, never the reverse:
-  the temporary
-  migration hint is not stable post-migration provenance, and the typed model does not
-  retain enough source-layout detail to reconstruct a source-specific `LogEvent` shape
-  after arbitrary transforms. This forces the migration sequencing in the Plan of Attack --
-  trace-aware consumers (sinks, transforms, VRL programs) must accept
-  `TraceEventCompat` and convert it before any source flips to emitting typed events
-  natively. The temporary untyped forwarding methods (`get(path)`, `as_map()`, etc.)
-  are removed from `TraceEventCompat` before the source steps; every remaining call
-  site then fails to compile, making the consumer migration a mechanical
-  fix-the-build task rather than a runtime-failure audit.
+  neither the migration hint nor the typed model can reconstruct a source-specific
+  legacy layout after arbitrary transforms. Built-in consumers therefore migrate before
+  producers; removing the untyped forwarders makes omissions compile errors. User VRL
+  migrates through the explicit `remap` mode, available for an announced interval before
+  producers flip.
 - Shim selection is keyed on a reserved sub-key `vector.trace_legacy_layout` in
   `EventMetadata.value` set by the producing trace source. The `vector` metadata
   namespace is read-only to VRL, so transforms between source and sink cannot
@@ -951,8 +960,9 @@ conversion routines and detectors deleted.
 
 ## Drawbacks
 
-- Breaking change for VRL configurations against today's `TraceEvent` key layout. Users
-  must migrate to typed paths.
+- The eventual typed-source flip remains a breaking change for VRL configurations against
+  today's key layout. Explicit `remap` opt-in provides a migration window but cannot
+  preserve legacy programs after typed-only producers ship.
 - The `trace_to_log` transform's output also changes; downstream VRL programs against
   its output must update.
 - Topology granularity is coarser than per-span: each event carries up to a chunk's
@@ -1194,6 +1204,25 @@ are migrated, then flip the default. Rejected because feature combinations proli
 quickly across every trace source/sink and VRL, and because a runtime flag would
 require duplicate code paths in performance-sensitive components.
 
+### Automatic conversion on typed VRL path access
+
+Detect a typed path such as `.resource` or `.spans` and convert
+`TraceEventCompat::Legacy` in place on its first access. Rejected primarily because a
+read should not silently and permanently change the representation emitted downstream.
+This violates the principle of least surprise, and the conversion point would depend on
+per-event control flow: a path in an untaken branch would leave one event legacy while
+the same program could convert another event after earlier statements had already run.
+
+Typed and legacy paths also are not disjoint. In particular, the existing Datadog
+layout already exposes `.spans`, so path spelling cannot distinguish an old program
+from an intentional request for the typed surface. VRL's immutable target-read operation
+cannot perform an in-place conversion, and its external target type is fixed when the
+program is compiled rather than when a path executes. Performing conversion during a
+read-only condition would additionally mutate the event merely to inspect it. Selecting
+the representation in `remap` configuration and converting before execution avoids
+path ambiguity, control-flow-dependent output, partial execution before conversion
+failure, and disagreement between compile-time and runtime target shapes.
+
 ### Wire serialization shape
 
 The chosen design is selected against two imperatives: incompatibility with older
@@ -1257,37 +1286,42 @@ stage.
    source/sink boundaries, and optional-value and chunk-presence distinctions must
    survive those boundaries.
 3. **Land both format mappings.** Implement and register both format shims and
-   format-shape detectors, then implement both typed encoders per the sub-RFCs. No typed
-   VRL path is exposed until both legacy layouts can auto-convert.
-4. **Establish typed VRL and migrate consumers.** Implement the typed paths and fallible
-   trace constructors. At the VRL target boundary,
-   `TraceEventCompat::Legacy` auto-converts on first typed-path access or returns a
-   controlled error; it never returns a transitional `null`. Then migrate `sample` and
-   `trace_to_log`. Each typed consumer fallibly converts `TraceEventCompat` at every
-   intake path and operates only on the resulting `TraceEvent`.
+   format-shape detectors, then implement both typed encoders per the sub-RFCs. Do not
+   expose the typed `remap` mode until both legacy layouts can be converted explicitly.
+4. **Establish typed VRL and migrate consumers.** Implement the typed paths, fallible
+   trace constructors, and the trace-only
+   `remap.trace_representation = "typed"` mode. The transform converts legacy input
+   before constructing `VrlTarget`; paths never convert. Then migrate `sample` and
+   `trace_to_log`. Each typed built-in consumer converts at intake and uses only
+   `TraceEvent`.
    `sample` remains per-event,
    so a multi-service Datadog chunk changes from incidental whole-chunk atomicity to one
    decision per `(TraceChunk, Span.service)` event; `trace_to_log` emits a uniform
    source-independent layout. Before the next stage, every migrated consumer must accept
    both legacy and typed input and all typed VRL and round-trip contracts must hold.
-5. **Use the compile-time gate and flip producers.** Remove untyped forwarding methods
-   from `TraceEventCompat` and migrate every resulting call site. The OTLP and Datadog
-   sources may begin emitting `TraceEventCompat::Typed` independently once no
-   trace-aware consumer depends on the legacy key layout and both source formats have
-   typed production paths. Each typed
+5. **Use the compile-time gate, publish migration guidance, and flip producers.** Remove
+   untyped forwarding methods from `TraceEventCompat` and migrate every resulting Rust
+   call site. Publish the VRL migration guide, then leave the typed mode available for
+   the announced migration interval. The OTLP and Datadog sources may begin emitting
+   `TraceEventCompat::Typed` independently after that interval, once
+   no built-in trace-aware consumer depends on the legacy key layout and both source
+   formats have typed production paths. Each typed
    source retains its `vector.trace_legacy_layout` hint through the coexistence and
    deprecated-proto window. Across `vector` network hops, each downstream receiver must
    support `TypedTrace` before its upstream sender emits typed trace records.
-6. **Complete user migration and retire coexistence.** Publish the user migration and
-   compatibility requirements, then remove the compatibility enum and
-   `LegacyTraceEvent` after both source flips, replacing `TraceEventCompat` with an alias
-   to `TraceEvent`. Legacy proto decoding now converts directly to `TraceEvent`. Retain
-   those proto decoders, shape detectors, and typed-source hints until the wire
-   retirement criteria above hold; then reserve the legacy tags and stop emitting the
-   migration hint.
+6. **Retire coexistence.** After both source flips, remove the compatibility enum and
+   `LegacyTraceEvent`, replacing `TraceEventCompat` with an alias to `TraceEvent`. Change
+   the `remap` default to `typed`, reject an explicitly configured `legacy` mode, and
+   retain the option through a deprecation window. Legacy proto decoding now converts
+   directly to `TraceEvent`. Retain those proto decoders, shape detectors, and
+   typed-source hints until the wire retirement criteria above hold; then reserve the
+   legacy tags and stop emitting the migration hint.
 
 ## Future Improvements
 
+- Explicit trace-conversion transform: a `convert_trace` transform could provide a
+  graph-visible boundary before transforms with read-only VRL conditions, avoiding a
+  no-op typed `remap`.
 - Topology-level per-span shim: a transform mode that fans out a `TraceEvent` into per-
   span events, runs a downstream transform once per span, and collapses results back
   into the container. Lets single-span transforms be authored without explicit iteration
