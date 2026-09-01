@@ -39,10 +39,10 @@ pub(crate) const TIMESTAMP_FRAME_COST: usize = 1;
 /// [`Value::Timestamp`] leaf, plus a fixed overhead for the proto wrappers outside the
 /// Value tree.
 ///
-/// Some protobuf paths (`Log.fields` and `Trace.fields`) can carry 99 frames, but the
-/// `Log.value` and metadata paths are only safe through 96. We use that highest common
-/// safe limit for every value so validation does not depend on its event type, root type,
-/// or destination protobuf field.
+/// The `Trace.fields` protobuf path can carry 99 frames, but `Log.value` and metadata
+/// paths are only safe through 96. We use that highest common safe limit for every value
+/// so validation does not depend on its event type, root type, or destination protobuf
+/// field.
 pub const MAX_VALUE_NESTING_FRAMES: usize = 96;
 
 /// Walks a [`Value`] tree accumulating prost recursion frame cost, returning

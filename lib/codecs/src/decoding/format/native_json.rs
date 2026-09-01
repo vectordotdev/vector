@@ -10,6 +10,7 @@ use vector_core::{
 use vrl::value::{Kind, kind::Collection};
 
 use super::{Deserializer, default_lossy};
+use crate::native_json::{descriptor, from_dynamic_message};
 
 /// Config used to build a `NativeJsonDeserializer`.
 #[configurable_component]
@@ -101,12 +102,23 @@ impl Deserializer for NativeJsonDeserializer {
         }
         .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
-        let events = match json {
+        let decode = |value: serde_json::Value| {
+            prost_reflect::DynamicMessage::deserialize(descriptor(), value.clone())
+                .map_err(|error| error.to_string())
+                .and_then(|message| {
+                    from_dynamic_message(message).map_err(|error| error.to_string())
+                })
+                // Accept the legacy native JSON shape during the migration to ProtoJSON.
+                .or_else(|_| serde_json::from_value(value).map_err(|error| error.to_string()))
+                .map_err(Into::into)
+        };
+
+        let events: SmallVec<[Event; 1]> = match json {
             serde_json::Value::Array(values) => values
                 .into_iter()
-                .map(serde_json::from_value)
-                .collect::<Result<SmallVec<[Event; 1]>, _>>()?,
-            _ => smallvec![serde_json::from_value(json)?],
+                .map(decode)
+                .collect::<vector_common::Result<_>>()?,
+            value => smallvec![decode(value)?],
         };
 
         Ok(events)
