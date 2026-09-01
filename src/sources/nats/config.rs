@@ -87,7 +87,6 @@ pub struct JetStreamConfig {
     pub consumer: String,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub batch_config: BatchConfig,
 }
 
@@ -136,18 +135,14 @@ pub struct NatsSourceConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     pub auth: Option<NatsAuthConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
@@ -168,7 +163,6 @@ pub struct NatsSourceConfig {
     #[derivative(Default(value = "default_subscription_capacity()"))]
     pub subscriber_capacity: usize,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub jetstream: Option<JetStreamConfig>,
 }

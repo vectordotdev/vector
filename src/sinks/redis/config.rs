@@ -9,6 +9,7 @@ use super::{
     sink::{RedisConnection, RedisSink},
 };
 use crate::{
+    config::ValidatedSink,
     serde::OneOrMany,
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
@@ -121,18 +122,14 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
-    #[configurable(derived)]
     pub(super) encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) data_type: DataTypeConfig,
 
-    #[configurable(derived)]
     #[serde(alias = "list")]
     pub(super) list_option: Option<ListOption>,
 
-    #[configurable(derived)]
     #[serde(alias = "sorted_set")]
     pub(super) sorted_set_option: Option<SortedSetOption>,
 
@@ -151,7 +148,6 @@ pub struct RedisSinkConfig {
     #[configurable]
     pub(super) sentinel_service: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) sentinel_connect: Option<SentinelConnectionSettings>,
 
@@ -160,15 +156,12 @@ pub struct RedisSinkConfig {
     #[configurable(metadata(docs::examples = "syslog:{{ app }}", docs::examples = "vector"))]
     pub(super) key: Template,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) batch: BatchConfig<RedisDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig<RedisTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -176,7 +169,6 @@ pub struct RedisSinkConfig {
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -203,20 +195,6 @@ impl GenerateConfig for RedisSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "redis")]
 impl SinkConfig for RedisSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        if self.key.is_empty() {
-            return Err("`key` cannot be empty.".into());
-        }
-        let key = self
-            .key
-            .clone()
-            .confine(&self.confinement, Self::NAME, "key")?;
-        let conn = self.build_connection().await?;
-        let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
-        let sink = RedisSink::new(self, conn, key)?;
-        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -227,6 +205,55 @@ impl SinkConfig for RedisSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedRedisSink {
+    key: ConfinedTemplate,
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for RedisSinkConfig {
+    type Validated = ValidatedRedisSink;
+
+    fn validate(&self) -> crate::Result<ValidatedRedisSink> {
+        if self.key.is_empty() {
+            return Err("`key` cannot be empty.".into());
+        }
+        let key = self
+            .key
+            .clone()
+            .confine(&self.confinement, Self::NAME, "key")?;
+        if self.endpoint.clone().to_vec().is_empty() {
+            return Err("`endpoint` cannot be empty.".into());
+        }
+        for endpoint in self.endpoint.clone().to_vec() {
+            if redis::parse_redis_url(&endpoint).is_none() {
+                return Err(format!("`endpoint` is not a valid redis URL: {endpoint}").into());
+            }
+        }
+        let batch_settings = self.batch.into_batcher_settings()?;
+        Ok(ValidatedRedisSink {
+            key,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedRedisSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedRedisSink {
+            key,
+            batch_settings,
+        } = validated.clone();
+        let conn = self.build_connection().await?;
+        let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
+        let sink = RedisSink::new(self, conn, key, batch_settings)?;
+        Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -274,11 +301,9 @@ impl RedisSinkConfig {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct SentinelConnectionSettings {
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: MaybeTlsMode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub connections: Option<RedisConnectionSettings>,
 }
@@ -374,7 +399,77 @@ impl From<RedisProtocolVersion> for ProtocolVersion {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::config::ValidatedSink;
     use crate::template::{ConfinementConfig, Template};
+
+    #[test]
+    fn validate_returns_confined_key() {
+        let config: RedisSinkConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "redis://127.0.0.1:6379/0"
+            key: "test-key"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.key.to_string(), "test-key");
+    }
+
+    #[test]
+    fn validate_rejects_invalid_batch_settings() {
+        let config: RedisSinkConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "redis://127.0.0.1:6379/0"
+            key: "test-key"
+            encoding:
+                codec: "json"
+            batch:
+                max_events: 0
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "batch.max_events = 0 should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_empty_endpoint() {
+        let config: RedisSinkConfig = serde_yaml::from_str(
+            r#"
+            endpoint: []
+            key: "test-key"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "an empty endpoint list should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_endpoint() {
+        let config: RedisSinkConfig = serde_yaml::from_str(
+            r#"
+            endpoint: "not a url"
+            key: "test-key"
+            encoding:
+                codec: "json"
+            "#,
+        )
+        .unwrap();
+        assert!(
+            config.validate().is_err(),
+            "an invalid endpoint URL should fail validation"
+        );
+    }
 
     #[test]
     fn confinement_rejects_unconfined_key() {

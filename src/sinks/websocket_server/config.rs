@@ -4,11 +4,11 @@ use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_compon
 
 use super::{buffering::MessageBufferingConfig, sink::WebSocketListenerSink};
 use crate::{
-    codecs::EncodingConfig,
+    codecs::{EncodingConfig, Transformer},
     common::http::server_auth::HttpServerAuthConfig,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     sinks::{Healthcheck, VectorSink},
-    tls::TlsEnableableConfig,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 /// Configuration for the `websocket_server` sink.
@@ -25,17 +25,13 @@ pub struct WebSocketListenerSinkConfig {
     #[configurable(metadata(docs::examples = "localhost:80"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub subprotocol: SubProtocolConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -43,14 +39,11 @@ pub struct WebSocketListenerSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     pub message_buffering: Option<MessageBufferingConfig>,
 
-    #[configurable(derived)]
     pub auth: Option<HttpServerAuthConfig>,
 
     /// Configuration of internal metrics
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
 }
@@ -144,15 +137,6 @@ impl Default for WebSocketListenerSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "websocket_server")]
 impl SinkConfig for WebSocketListenerSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ws_sink = WebSocketListenerSink::new(self.clone(), cx)?;
-
-        Ok((
-            VectorSink::from_event_streamsink(ws_sink),
-            Box::pin(async move { Ok(()) }),
-        ))
-    }
-
     fn input(&self) -> Input {
         Input::new(self.encoding.config().input_type())
     }
@@ -162,14 +146,146 @@ impl SinkConfig for WebSocketListenerSinkConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedWebSocketListenerSink {
+    pub(super) transformer: Transformer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for WebSocketListenerSinkConfig {
+    type Validated = ValidatedWebSocketListenerSink;
+
+    fn validate(&self) -> crate::Result<ValidatedWebSocketListenerSink> {
+        let transformer = self.encoding.transformer();
+        // Custom-auth VRL compilation is deferred to `validate_with_context`, which
+        // has the enrichment tables needed to resolve `get_enrichment_table_record!`.
+        Ok(ValidatedWebSocketListenerSink { transformer })
+    }
+
+    fn validate_with_context(&self, cx: &SinkContext) -> crate::Result<()> {
+        if let Some(auth) = &self.auth {
+            auth.validate(&cx.enrichment_tables)?;
+        }
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedWebSocketListenerSink,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        // TLS settings may read certificate files from disk, so they are
+        // resolved at build time rather than during pure validation.
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
+        let ws_sink = WebSocketListenerSink::from_validated(self.clone(), validated, tls, cx)?;
+
+        Ok((
+            VectorSink::from_event_streamsink(ws_sink),
+            Box::pin(async move { Ok(()) }),
+        ))
+    }
+}
+
 impl_generate_config_from_default!(WebSocketListenerSinkConfig);
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use indoc::indoc;
+    use vector_lib::codecs::encoding::SerializerConfig;
+
+    use crate::config::ValidatedSink;
+
+    fn sink_context_with_allowed_users() -> SinkContext {
+        let cx = SinkContext::default();
+        let mut stubs: HashMap<String, Box<dyn vector_lib::enrichment::Table + Send + Sync>> =
+            HashMap::new();
+        stubs.insert(
+            "allowed_users".to_string(),
+            Box::new(crate::validate::StubEnrichmentTable)
+                as Box<dyn vector_lib::enrichment::Table + Send + Sync>,
+        );
+        cx.enrichment_tables.load(stubs);
+        cx
+    }
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<WebSocketListenerSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = WebSocketListenerSinkConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            ..Default::default()
+        };
+        let _validated = config.validate().expect("validation should succeed");
+        // Serializer construction is deferred to `build`; validation retains the
+        // transformer so `build` can construct the serializer.
+        assert!(matches!(
+            config.encoding.config(),
+            SerializerConfig::Json(_)
+        ));
+    }
+
+    #[test]
+    fn validate_fails_on_invalid_custom_auth_source() {
+        let config = WebSocketListenerSinkConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            auth: Some(HttpServerAuthConfig::Custom {
+                source: "\"unterminated".to_string(),
+            }),
+            ..Default::default()
+        };
+        assert!(
+            config
+                .validate_with_context(&SinkContext::default())
+                .is_err(),
+            "an invalid custom auth VRL source must fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_succeeds_on_valid_custom_auth_source() {
+        let config = WebSocketListenerSinkConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            auth: Some(HttpServerAuthConfig::Custom {
+                source: indoc! {r#"
+                    .headers.authorization == "Basic test"
+                    "#}
+                .to_string(),
+            }),
+            ..Default::default()
+        };
+        assert!(
+            config
+                .validate_with_context(&SinkContext::default())
+                .is_ok(),
+            "a valid custom auth VRL source must pass validation"
+        );
+    }
+
+    #[test]
+    fn validate_succeeds_on_custom_auth_with_enrichment() {
+        // Custom-auth VRL is compiled against the configured enrichment tables
+        // (stubbed during validation); a program referencing a configured table
+        // must pass without loading actual data.
+        let config = WebSocketListenerSinkConfig {
+            address: "0.0.0.0:8080".parse().unwrap(),
+            auth: Some(HttpServerAuthConfig::Custom {
+                source: indoc! {r#"
+                    get_enrichment_table_record!("allowed_users", { "user": .headers.authorization }) != null
+                    "#}
+                .to_string(),
+            }),
+            ..Default::default()
+        };
+        assert!(
+            config
+                .validate_with_context(&sink_context_with_allowed_users())
+                .is_ok(),
+            "custom auth using enrichment tables must pass validation"
+        );
     }
 }

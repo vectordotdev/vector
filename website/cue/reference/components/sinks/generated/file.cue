@@ -596,7 +596,7 @@ generated: components: sinks: file: configuration: {
 		type: uint: {
 			default: 30
 			examples: [
-				600,
+				600
 			]
 			unit: "seconds"
 		}
@@ -623,7 +623,7 @@ generated: components: sinks: file: configuration: {
 			"""
 		required: true
 		type: string: {
-			examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
+			examples: ["/var/log/vector/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log", "/tmp/vector-%Y-%m-%d.log.zst"]
 			syntax: "template"
 		}
 		warnings: ["Rendered paths are confined to `base_dir` (derived from the literal prefix of `path` when unset). See the `base_dir` option."]

@@ -154,11 +154,11 @@ pub struct RemapConfig {
     #[configurable(metadata(docs::human_name = "Reroute Dropped Events"))]
     pub reroute_dropped: bool,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub runtime: VrlRuntime,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
     /// Cache can't be `BTreeMap` or `HashMap` because of `TableRegistry`, which doesn't allow us to inspect tables inside it.
@@ -430,6 +430,8 @@ where
 }
 
 pub trait VrlRunner {
+    fn new() -> Self;
+
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -452,6 +454,12 @@ impl Clone for AstRunner {
 }
 
 impl VrlRunner for AstRunner {
+    fn new() -> Self {
+        Self {
+            runtime: Runtime::default(),
+        }
+    }
+
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -469,16 +477,7 @@ impl Remap<AstRunner> {
         config: RemapConfig,
         context: &TransformContext,
     ) -> crate::Result<(Self, String)> {
-        let (program, warnings, _) = config.compile_vrl_program(
-            context.enrichment_tables.clone(),
-            context.metrics_storage.clone(),
-            context.merged_schema_definition.clone(),
-        )?;
-
-        let runtime = Runtime::default();
-        let runner = AstRunner { runtime };
-
-        Self::new(config, context, program, runner).map(|remap| (remap, warnings))
+        Self::new(config, context)
     }
 }
 
@@ -486,24 +485,30 @@ impl<Runner> Remap<Runner>
 where
     Runner: VrlRunner,
 {
-    fn new(
-        config: RemapConfig,
-        context: &TransformContext,
-        program: Program,
-        runner: Runner,
-    ) -> crate::Result<Self> {
-        Ok(Remap {
-            component_key: context.key.clone(),
-            program,
-            timezone: config
-                .timezone
-                .unwrap_or_else(|| context.globals.timezone()),
-            drop_on_error: config.drop_on_error,
-            drop_on_abort: config.drop_on_abort,
-            reroute_dropped: config.reroute_dropped,
-            runner,
-            metric_tag_values: config.metric_tag_values,
-        })
+    pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<(Self, String)> {
+        let (program, warnings, _) = config.compile_vrl_program(
+            context.enrichment_tables.clone(),
+            context.metrics_storage.clone(),
+            context.merged_schema_definition.clone(),
+        )?;
+
+        let runner = Runner::new();
+
+        Ok((
+            Remap {
+                component_key: context.key.clone(),
+                program,
+                timezone: config
+                    .timezone
+                    .unwrap_or_else(|| context.globals.timezone()),
+                drop_on_error: config.drop_on_error,
+                drop_on_abort: config.drop_on_abort,
+                reroute_dropped: config.reroute_dropped,
+                runner,
+                metric_tag_values: config.metric_tag_values,
+            },
+            warnings,
+        ))
     }
 
     #[cfg(test)]

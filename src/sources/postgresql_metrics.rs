@@ -167,7 +167,6 @@ pub struct PostgresqlMetricsConfig {
     #[serde(default = "default_namespace")]
     namespace: String,
 
-    #[configurable(derived)]
     tls: Option<PostgresqlMetricsTlsConfig>,
 }
 
