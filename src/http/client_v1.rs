@@ -3,6 +3,7 @@
 use std::{
     convert::Infallible,
     error::Error,
+    fmt,
     future::Future,
     io,
     pin::Pin,
@@ -107,6 +108,12 @@ pub(crate) struct HttpClient {
     client: Client<HttpProxyConnectorV1, RequestBody>,
     routes: Arc<RoutePlanner>,
     user_agent: HeaderValue,
+}
+
+impl fmt::Debug for HttpClient {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("HttpClient").finish_non_exhaustive()
+    }
 }
 
 impl HttpClient {

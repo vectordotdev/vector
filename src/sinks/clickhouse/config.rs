@@ -21,7 +21,7 @@ use super::{
 use crate::{
     config::{SinkContext, ValidatedSink},
     http::{
-        Auth, HttpClient as LegacyHttpClient, MaybeAuth,
+        Auth, MaybeAuth,
         client_v1::{HttpClient, empty_body},
     },
     sinks::{
@@ -298,9 +298,7 @@ impl ValidatedSink for ClickhouseConfig {
         } = validated;
         let endpoint = self.endpoint.with_default_parts().uri;
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = LegacyHttpClient::new(tls_settings, &cx.proxy)?;
-        let tls_settings_v1 = TlsSettings::from_options(self.tls.as_ref())?;
-        let client_v1 = HttpClient::new(tls_settings_v1.into(), &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
@@ -313,7 +311,7 @@ impl ValidatedSink for ClickhouseConfig {
         };
 
         let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpService::new(client_v1.clone(), clickhouse_service_request_builder);
+            HttpService::new(client.clone(), clickhouse_service_request_builder);
 
         let request_limits = self.request.into_settings();
 
@@ -342,7 +340,7 @@ impl ValidatedSink for ClickhouseConfig {
             request_builder,
         );
 
-        let healthcheck = Box::pin(healthcheck(client_v1, endpoint, auth.clone()));
+        let healthcheck = Box::pin(healthcheck(client, endpoint, auth.clone()));
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
@@ -354,7 +352,7 @@ impl ClickhouseConfig {
     /// based on the user's configuration, ensuring they are consistent.
     async fn resolve_strategy(
         &self,
-        client: &LegacyHttpClient,
+        client: &HttpClient,
         endpoint: &Uri,
         database: &Template,
         auth: Option<&Auth>,
@@ -398,7 +396,7 @@ impl ClickhouseConfig {
 
     async fn resolve_arrow_schema(
         &self,
-        client: &LegacyHttpClient,
+        client: &HttpClient,
         endpoint: String,
         database: &Template,
         auth: Option<&Auth>,
