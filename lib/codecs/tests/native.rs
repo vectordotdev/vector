@@ -251,11 +251,6 @@ fn event_strategy(value: BoxedStrategy<Value>) -> BoxedStrategy<Event> {
     prop_oneof![log, metric, trace].boxed()
 }
 
-fn without_metadata(mut event: Event) -> Event {
-    *event.metadata_mut() = EventMetadata::default();
-    event
-}
-
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(PROPERTY_TESTS))]
 
@@ -286,7 +281,7 @@ proptest! {
 
     #[test]
     fn native_json_is_canonical_for_arbitrary_events(event in event_strategy(json_safe_value())) {
-        let expected = without_metadata(event.clone());
+        let expected = event.clone();
         let serializer = &mut NativeJsonSerializerConfig.build();
         let mut encoded = BytesMut::new();
         serializer.encode(event, &mut encoded).unwrap();

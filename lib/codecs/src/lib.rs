@@ -11,6 +11,7 @@ pub mod decoding;
 pub mod encoding;
 pub mod gelf;
 pub mod internal_events;
+mod native_json;
 mod ready_frames;
 
 pub use decoder_framed_read::DecoderFramedRead;
