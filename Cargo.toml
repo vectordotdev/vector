@@ -192,10 +192,10 @@ pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
 proptest = { version = "1.11" }
 proptest-derive = { version = "0.8.0" }
-prost = { version = "0.12", default-features = false, features = ["std"] }
-prost-build = { version = "0.12", default-features = false }
-prost-reflect = { version = "0.14", features = ["serde"], default-features = false }
-prost-types = { version = "0.12", default-features = false }
+prost = { version = "0.14", default-features = false, features = ["std"] }
+prost-build = { version = "0.14", default-features = false }
+prost-reflect = { version = "0.16", features = ["serde"], default-features = false }
+prost-types = { version = "0.14", default-features = false }
 quickcheck = { version = "1.1.0" }
 rand = { version = "0.10.1", default-features = false, features = ["thread_rng"] }
 rand_distr = { version = "0.6.0", default-features = false }
@@ -214,15 +214,15 @@ tempfile = "3.27.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
-tokio-tungstenite = { version = "0.20.1", default-features = false }
+tokio-tungstenite = { version = "0.29.0", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
 syn = { version = "3", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip", "zstd"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-tonic-health = { version = "0.11", default-features = false }
-tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
+tonic-health = { version = "0.14", default-features = false }
+tonic-reflection = { version = "0.14", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"] }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
