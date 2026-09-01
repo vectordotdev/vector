@@ -339,6 +339,79 @@ flag's `0.1` default, and holds stable for three consecutive 15-second intervals
 
 <!-- RESULTS-HPA-END -->
 
+Repeated runs can settle at a different replica count because the HPA rounds
+its recommendation up to a whole pod. See [Why the HPA can stabilize at six
+pods](#deep-dive-why-the-hpa-can-stabilize-at-six-pods) for the algorithm and
+an example run that settles at six pods.
+
+## Results summary
+
+| | Phase 1 (1 pod) | Phase 2 (3 pods) | Phase 3 (8 pods) | Phase 4 (HPA) |
+| - | ----------------- | ------------------ | ------------------ | ------------------ |
+| Throughput | 16.93 MiB/s | 49.07 MiB/s | 62.52 MiB/s | **60.69 MiB/s** |
+| Events/s | 133,098 | 385,840 | 491,589 | **477,203** |
+| CPU per pod | 1000m (100%) | ~970m (97%) | ~470m (47%) | **~700m (70%)** |
+| Bottleneck | Vector CPU | Vector CPU | None | None |
+| Scaling vs. Phase 1 | 1× | 2.90× | 3.69× | **3.58×** |
+| Pod count | manual (1) | manual (3) | manual (8) | **auto (5)** |
+
+Phase 4 delivers throughput comparable to Phase 3 with three fewer pods and no manual scaling.
+The HPA scales to five pods, matching the prediction
+and keeping CPU at its 70% target instead of
+leaving each pod with roughly 53% of unused CPU capacity.
+
+## Key takeaways
+
+1. **A CPU-bound workload eventually reaches the processing capacity of a
+   single Vector pod**. When that happens, backpressure prevents any event
+   loss\*.
+
+2. **L7 per-request routing distributes load uniformly.**  Because the NGINX Ingress Controller
+   routes each HTTP request independently, every pod (old or newly
+   Ready) receives a share of traffic proportional to the current replica
+   count, with no idle pods.
+
+3. **Adding pods beyond the saturation point removes the CPU bottleneck entirely.** Once the workload is no longer CPU-bound, throughput increases while CPU utilization per pod decreases.
+
+4. **The HPA determines the right pod count automatically.**  With HTTP and L7 routing,
+   each new pod starts receiving traffic immediately after becoming Ready.
+
+\* This holds only as long as the stalled connection stays open. If the NGINX
+Ingress Controller or the load generator times out and closes a stalled
+connection first, the in-flight request's events are lost along with it.
+
+
+## Replicating these results
+
+The Helm values, charts, and scripts used throughout this guide live in
+[`k8s-autoscaling/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling).
+
+The [`terraform/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling/terraform)
+directory provisions the K3s single-node cluster (EC2 `c5.4xlarge`) that
+we used, if you don't already have a cluster to test
+against.
+
+Once the [Setup](#setup) steps are complete and Phase 1's producer and ingress
+are deployed, `run-experiment.sh` can run all four phases or one selected phase.
+It updates the Vector release, waits for the deployment to become ready,
+measures throughput, and manages the chart-provided HPA for Phase 4.
+
+The script first scales Vector to 0 replicas and waits for its pods to
+terminate, so every invocation starts from the same clean state instead of
+measuring a transition from the replica count left by a previous run.
+
+{{< embed file="content/en/guides/level-up/k8s-autoscaling/scripts/run-experiment.sh" open="false" >}}
+
+```bash
+# Run all phases.
+KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh
+
+# Run one phase (1, 2, 3, or 4).
+KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh 4
+```
+
+## Deep dive: Why the HPA can stabilize at six pods
+
 ### Stabilizing at 6?
 
 All the calculations made and empirical evidence suggests that 5 is the correct
@@ -413,69 +486,4 @@ we observed.
 
 In the original Phase 4 run we're about 7.74% slower than the predicted benchmark.
 
-## Results summary
-
-| | Phase 1 (1 pod) | Phase 2 (3 pods) | Phase 3 (8 pods) | Phase 4 (HPA) |
-| - | ----------------- | ------------------ | ------------------ | ------------------ |
-| Throughput | 16.93 MiB/s | 49.07 MiB/s | 62.52 MiB/s | **60.69 MiB/s** |
-| Events/s | 133,098 | 385,840 | 491,589 | **477,203** |
-| CPU per pod | 1000m (100%) | ~970m (97%) | ~470m (47%) | **~700m (70%)** |
-| Bottleneck | Vector CPU | Vector CPU | None | None |
-| Scaling vs. Phase 1 | 1× | 2.90× | 3.69× | **3.58×** |
-| Pod count | manual (1) | manual (3) | manual (8) | **auto (5)** |
-
-Phase 4 delivers throughput comparable to Phase 3 with three fewer pods and no manual scaling.
-The HPA scales to five pods, matching the prediction
-and keeping CPU at its 70% target instead of
-leaving each pod with roughly 53% of unused CPU capacity.
-
-## Key takeaways
-
-1. **A CPU-bound workload eventually reaches the processing capacity of a
-   single Vector pod**. When that happens, backpressure prevents any event
-   loss\*.
-
-2. **L7 per-request routing distributes load uniformly.**  Because the NGINX Ingress Controller
-   routes each HTTP request independently, every pod (old or newly
-   Ready) receives a share of traffic proportional to the current replica
-   count, with no idle pods.
-
-3. **Adding pods beyond the saturation point removes the CPU bottleneck entirely.** Once the workload is no longer CPU-bound, throughput increases while CPU utilization per pod decreases.
-
-4. **The HPA determines the right pod count automatically.**  With HTTP and L7 routing,
-   each new pod starts receiving traffic immediately after becoming Ready.
-
-\* This holds only as long as the stalled connection stays open. If the NGINX
-Ingress Controller or the load generator times out and closes a stalled
-connection first, the in-flight request's events are lost along with it.
-
 ---
-
-## Replicating these results
-
-The Helm values, charts, and scripts used throughout this guide live in
-[`k8s-autoscaling/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling).
-
-The [`terraform/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling/terraform)
-directory provisions the K3s single-node cluster (EC2 `c5.4xlarge`) that
-we used, if you don't already have a cluster to test
-against.
-
-Once the [Setup](#setup) steps are complete and Phase 1's producer and ingress
-are deployed, `run-experiment.sh` can run all four phases or one selected phase.
-It updates the Vector release, waits for the deployment to become ready,
-measures throughput, and manages the chart-provided HPA for Phase 4.
-
-The script first scales Vector to 0 replicas and waits for its pods to
-terminate, so every invocation starts from the same clean state instead of
-measuring a transition from the replica count left by a previous run.
-
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/scripts/run-experiment.sh" open="false" >}}
-
-```bash
-# Run all phases.
-KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh
-
-# Run one phase (1, 2, 3, or 4).
-KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh 4
-```
