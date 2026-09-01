@@ -115,25 +115,12 @@ pub enum TlsVersion {
 }
 
 impl TlsVersion {
-    /// Every supported protocol version, in ascending order.
-    const ALL: [Self; 4] = [Self::Tls10, Self::Tls11, Self::Tls12, Self::Tls13];
-
     const fn as_ssl_version(self) -> SslVersion {
         match self {
             Self::Tls10 => SslVersion::TLS1,
             Self::Tls11 => SslVersion::TLS1_1,
             Self::Tls12 => SslVersion::TLS1_2,
             Self::Tls13 => SslVersion::TLS1_3,
-        }
-    }
-
-    /// The `SSL_OP_NO_*` option that disables this version.
-    const fn disable_option(self) -> SslOptions {
-        match self {
-            Self::Tls10 => SslOptions::NO_TLSV1,
-            Self::Tls11 => SslOptions::NO_TLSV1_1,
-            Self::Tls12 => SslOptions::NO_TLSV1_2,
-            Self::Tls13 => SslOptions::NO_TLSV1_3,
         }
     }
 }
@@ -408,28 +395,43 @@ impl TlsSettings {
             return Ok(());
         }
 
+        // Each setter is called only when Vector has an explicit bound for that side.
+        // `SSL_CTX_set_min_proto_version(0)` -- which is what passing `None` compiles to --
+        // does not mean "leave unchanged", it clears whatever bound is already in force. That
+        // includes a bound applied from the host's OpenSSL configuration (`MinProtocol` in
+        // `openssl.cnf`), so unconditionally calling both setters would let a config that sets
+        // only one side silently re-enable versions the host policy forbids.
+        if let Some(min) = self.min_tls_version {
+            context
+                .set_min_proto_version(Some(min.as_ssl_version()))
+                .context(SetTlsVersionSnafu)?;
+        }
+        if let Some(max) = self.max_tls_version {
+            context
+                .set_max_proto_version(Some(max.as_ssl_version()))
+                .context(SetTlsVersionSnafu)?;
+        }
+
         // Acceptors are built from `SslAcceptor::mozilla_intermediate`, which sets
         // `SSL_OP_NO_TLSv1_3`. OpenSSL treats the `SSL_OP_NO_*` options as a veto that outranks
-        // the min/max protocol version, so clear the option for every version inside the
-        // requested window first. Versions outside the window stay excluded by the bounds.
-        let mut disabled_in_window = SslOptions::empty();
-        for version in TlsVersion::ALL {
-            let allowed = self.min_tls_version.is_none_or(|min| version >= min)
-                && self.max_tls_version.is_none_or(|max| version <= max);
-            if allowed {
-                disabled_in_window |= version.disable_option();
-            }
+        // the min/max protocol version, so without clearing it a window containing TLS v1.3
+        // would still exclude v1.3 -- and a window of v1.3 alone would leave no usable version.
+        //
+        // Only this one option is cleared. Vector never sets the other `SSL_OP_NO_*` version
+        // flags, so clearing them could only relax a restriction configured elsewhere.
+        if self.window_contains(TlsVersion::Tls13) {
+            context.clear_options(SslOptions::NO_TLSV1_3);
         }
-        context.clear_options(disabled_in_window);
-
-        context
-            .set_min_proto_version(self.min_tls_version.map(TlsVersion::as_ssl_version))
-            .context(SetTlsVersionSnafu)?;
-        context
-            .set_max_proto_version(self.max_tls_version.map(TlsVersion::as_ssl_version))
-            .context(SetTlsVersionSnafu)?;
 
         Ok(())
+    }
+
+    /// Whether `version` falls inside the configured `[min_tls_version, max_tls_version]` window.
+    ///
+    /// An unset bound is unbounded on that side.
+    fn window_contains(&self, version: TlsVersion) -> bool {
+        self.min_tls_version.is_none_or(|min| version >= min)
+            && self.max_tls_version.is_none_or(|max| version <= max)
     }
 
     pub(super) fn apply_context_base(
@@ -1192,6 +1194,104 @@ mod test {
 
         assert_eq!(builder.min_proto_version(), Some(SslVersion::TLS1_2));
         assert_eq!(builder.max_proto_version(), Some(SslVersion::TLS1_2));
+    }
+
+    // `SSL_CTX_set_min_proto_version(0)` -- what `set_min_proto_version(None)` compiles to --
+    // clears any bound already in force rather than leaving it alone. A host that sets
+    // `MinProtocol = TLSv1.2` in `openssl.cnf` has that bound applied when the context is
+    // created, so configuring only `max_tls_version` must not wipe it and silently re-enable
+    // TLS v1.0/v1.1. The pre-set bound here stands in for that host policy.
+    #[test]
+    fn configuring_only_a_maximum_preserves_an_existing_minimum() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            max_tls_version: Some(TlsVersion::Tls13),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder
+            .set_min_proto_version(Some(SslVersion::TLS1_2))
+            .unwrap();
+
+        settings.apply_context(&mut builder).unwrap();
+
+        assert_eq!(
+            builder.min_proto_version(),
+            Some(SslVersion::TLS1_2),
+            "an unconfigured minimum must not clear a bound already in force"
+        );
+        assert_eq!(builder.max_proto_version(), Some(SslVersion::TLS1_3));
+    }
+
+    // The symmetric case: configuring only a minimum must not clear a host-supplied maximum.
+    #[test]
+    fn configuring_only_a_minimum_preserves_an_existing_maximum() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            min_tls_version: Some(TlsVersion::Tls12),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder
+            .set_max_proto_version(Some(SslVersion::TLS1_2))
+            .unwrap();
+
+        settings.apply_context(&mut builder).unwrap();
+
+        assert_eq!(builder.min_proto_version(), Some(SslVersion::TLS1_2));
+        assert_eq!(
+            builder.max_proto_version(),
+            Some(SslVersion::TLS1_2),
+            "an unconfigured maximum must not clear a bound already in force"
+        );
+    }
+
+    // Applying a window must never relax an `SSL_OP_NO_*` restriction Vector did not set itself.
+    #[test]
+    fn version_window_does_not_clear_restrictions_vector_did_not_set() {
+        let settings = TlsSettings::from_options(Some(&TlsConfig {
+            min_tls_version: Some(TlsVersion::Tls10),
+            ..Default::default()
+        }))
+        .unwrap();
+
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder.set_options(SslOptions::NO_TLSV1 | SslOptions::NO_TLSV1_1);
+
+        settings.apply_context(&mut builder).unwrap();
+
+        let options = builder.options();
+        assert!(
+            options.contains(SslOptions::NO_TLSV1),
+            "TLS v1.0 was disabled outside Vector and must stay disabled"
+        );
+        assert!(
+            options.contains(SslOptions::NO_TLSV1_1),
+            "TLS v1.1 was disabled outside Vector and must stay disabled"
+        );
+    }
+
+    // A window that excludes TLS v1.3 must leave the acceptor profile's `NO_TLSV1_3` in place.
+    #[test]
+    fn window_excluding_tls13_leaves_the_no_tls13_option_set() {
+        let settings = TlsSettings::from_options_base(
+            Some(&TlsConfig {
+                crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                key_file: Some(TEST_PEM_KEY_PATH.into()),
+                max_tls_version: Some(TlsVersion::Tls12),
+                ..Default::default()
+            }),
+            true,
+        )
+        .unwrap();
+
+        let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+        settings.apply_context_base(&mut acceptor, true).unwrap();
+
+        assert!(acceptor.options().contains(SslOptions::NO_TLSV1_3));
+        assert_eq!(acceptor.max_proto_version(), Some(SslVersion::TLS1_2));
     }
 
     // The acceptor is built from `SslAcceptor::mozilla_intermediate`, which sets
