@@ -2512,6 +2512,18 @@ fn decode_v3_rejects_excessive_event_expansion() {
 }
 
 #[test]
+fn decode_v3_rejects_excessive_source_type_event_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_source_type_name = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.source_type_name_refs[0] = 1;
+    data.num_points[0] = 17;
+    data.timestamps = vec![1; 17];
+    data.vals_float64 = vec![1.0; 17];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
 fn decode_v3_rejects_excessive_dictionary_string_cloning() {
     let mut data = minimal_v3_metric_data();
     data.dict_name_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
@@ -2568,6 +2580,38 @@ fn decode_v3_deduplicates_metadata_tags() {
 
     let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
     assert_eq!(series[0].tags, ["team:core"]);
+}
+
+#[test]
+fn decode_v3_accepts_many_distinct_metadata_tags() {
+    let data = minimal_v3_metric_data();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: (0..100_000).map(|index| format!("tag:{index}")).collect(),
+        resources: Vec::new(),
+    };
+
+    let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
+    assert_eq!(series[0].tags.len(), 100_000);
+}
+
+#[test]
+fn decode_v3_rejects_excessive_metadata_string_entries_before_decode() {
+    let metadata_entry_count = 16 * 1024 * 1024 / std::mem::size_of::<String>() + 1;
+    let mut metadata = Vec::with_capacity(metadata_entry_count * 2);
+    for _ in 0..metadata_entry_count {
+        metadata.extend([0x0a, 0x00]);
+    }
+    let mut payload = Vec::new();
+    payload.push(0x12);
+    let mut length = metadata.len() as u64;
+    while length >= 0x80 {
+        payload.push((length as u8 & 0x7f) | 0x80);
+        length >>= 7;
+    }
+    payload.push(length as u8);
+    payload.extend(metadata);
+
+    assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
 }
 
 #[test]
