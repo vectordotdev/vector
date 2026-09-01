@@ -11,6 +11,9 @@ use crate::{event, metrics::AgentDDSketch};
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
+/// Protobuf descriptors for the native event wire model and its imports.
+pub const FILE_DESCRIPTOR_SET: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/event_descriptor.bin"));
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
 pub use proto_event::*;
@@ -301,35 +304,10 @@ impl From<super::LogEvent> for WithMetadata<Log> {
     fn from(log_event: super::LogEvent) -> Self {
         let (value, metadata) = log_event.into_parts();
 
-        // Due to the backwards compatibility requirement by the
-        // "event_can_go_from_raw_prost_to_eventarray_encodable" test, "fields" must not
-        // be empty, since that will decode as an empty array. A "dummy" value is placed
-        // in fields instead which is ignored during decoding. To reduce encoding bloat
-        // from a dummy value, it is only used when the root value type is not an object.
-        // Once this backwards compatibility is no longer required, "fields" can
-        // be entirely removed from the Log object
-        let (fields, value) = if let VrlValue::Object(fields) = value {
-            // using only "fields" to prevent having to use the dummy value
-            let fields = fields
-                .into_iter()
-                .map(|(k, v)| (k.into(), encode_value(v)))
-                .collect::<BTreeMap<_, _>>();
-
-            (fields, None)
-        } else {
-            // Must insert at least one field, otherwise the field is omitted entirely on the
-            // Protocol Buffers side. The dummy field value is ultimately ignored in the decoding
-            // step since `value` is provided.
-            let mut dummy_fields = BTreeMap::new();
-            dummy_fields.insert(".".to_owned(), encode_value(VrlValue::Null));
-
-            (dummy_fields, Some(encode_value(value)))
-        };
-
         #[allow(deprecated)]
         let data = Log {
-            fields,
-            value,
+            fields: BTreeMap::new(),
+            value: Some(encode_value(value)),
             metadata: Some(encode_value(metadata.value().clone())),
             metadata_full: Some(metadata.clone().into()),
         };
@@ -794,6 +772,12 @@ mod tests {
     // regenerate them from the current Rust types; each payload's exact contents are documented
     // below and mirrored by its test assertions.
 
+    // Pre-v23 Log with deprecated fields map entry message="hello" and no value field. This pins
+    // decoding for logs produced before object-root logs moved to the Value representation.
+    const PRE_V23_LOG_FIELDS: &[u8] = &[
+        10, 18, 10, 7, 109, 101, 115, 115, 97, 103, 101, 18, 7, 10, 5, 104, 101, 108, 108, 111,
+    ];
+
     // EventArray.metrics containing four pre-v24 metrics:
     // - AggregatedHistogram1 (field 9): bucket 1.5/count 2, total count 2, sum 3.0.
     // - AggregatedHistogram2 (field 13): bucket 1.5/count 2, total count 2, sum 3.0.
@@ -838,6 +822,18 @@ mod tests {
     // Pre-v41 Metadata with source_type field 4 set to "legacy" and no source_event_id field 7.
     // This pins the expected default when decoding payloads created before event IDs existed.
     const PRE_V41_METADATA: &[u8] = &[34, 6, 108, 101, 103, 97, 99, 121];
+
+    #[test]
+    fn decodes_pre_v23_log_fields() {
+        let decoded = crate::event::LogEvent::from(Log::decode(PRE_V23_LOG_FIELDS).unwrap());
+
+        assert_eq!(
+            decoded.value(),
+            &VrlValue::Object(vrl::btreemap! {
+                "message" => VrlValue::from("hello")
+            })
+        );
+    }
 
     #[test]
     fn decodes_pre_v24_histogram_and_summary_variants() {
@@ -925,6 +921,19 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(values, [Some(String::new()), None]);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn log_encoding_uses_value_instead_of_fields() {
+        let event = crate::event::LogEvent::from(vrl::btreemap! {
+            "message" => VrlValue::from("hello")
+        });
+
+        let encoded = Log::from(event);
+
+        assert!(encoded.fields.is_empty());
+        assert!(encoded.value.is_some());
     }
 
     #[test]

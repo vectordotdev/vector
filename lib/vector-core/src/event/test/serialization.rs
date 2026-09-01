@@ -118,12 +118,12 @@ fn type_serialization() {
 //
 // Encoding paths have different fixed proto-wrapper overhead before the Value tree:
 //
-//   - `Log.fields` and `Trace.fields` can carry 99 Value frames.
+//   - `Trace.fields` can carry 99 Value frames.
 //   - `Log.value` and metadata can carry 96 Value frames.
 //
 // The gate uses the highest common safe limit, MAX_VALUE_NESTING_FRAMES (96), for every
 // arbitrary Value. The boundary tests verify both that common limit and the extra
-// headroom on the wider wire paths.
+// headroom on the wider trace wire path.
 //
 // The saturated-event tests create events with ALL Value-carrying fields at the common
 // max frame cost simultaneously. The proto conversion code populates every
@@ -305,83 +305,8 @@ fn nesting_gate_rejects_above_max_depth() {
     }
 }
 
-/// Verify that the wider `Log.fields` path has one level of headroom over the common
-/// budget while the metadata path is tight, for both object-only and array-only values.
-///
-/// Object-only `Log.fields`:     depth 33 succeeds, 34 fails.
-/// Object-only `metadata_full`:  depth 32 succeeds, 33 fails.
-/// Array-only  `Log.fields`:     depth 49 succeeds, 50 fails.
-/// Array-only  `metadata_full`:  depth 48 succeeds, 49 fails.
-#[test]
-fn per_path_boundaries() {
-    let roundtrip_value = |value: Value| -> bool {
-        let mut event = LogEvent::default();
-        event.insert(event_path!("data"), value);
-        let array = EventArray::Logs(LogArray::from(vec![event]));
-        let proto_array = proto::EventArray::from(array);
-        let mut buf = BytesMut::with_capacity(65536);
-        proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
-    };
-
-    let roundtrip_metadata = |value: Value| -> bool {
-        let mut event = LogEvent::from("flat");
-        *event.metadata_mut().value_mut() = value;
-        let array = EventArray::Logs(LogArray::from(vec![event]));
-        let proto_array = proto::EventArray::from(array);
-        let mut buf = BytesMut::with_capacity(65536);
-        proto_array.encode(&mut buf).unwrap();
-        proto::EventArray::decode(buf.freeze()).is_ok()
-    };
-
-    // `Log.fields` accepts 33 object levels (cost 99), one more than the common limit.
-    // The "data" key contributes the outer object level.
-    assert!(
-        roundtrip_value(create_nested_value(MAX_OBJECT_DEPTH_VALUE)),
-        "Log.fields should succeed one object level above the common budget"
-    );
-    assert!(
-        !roundtrip_value(create_nested_value(MAX_OBJECT_DEPTH_VALUE + 1)),
-        "Log.fields should fail at object depth {}",
-        MAX_OBJECT_DEPTH_VALUE + 2
-    );
-
-    // `metadata_full` is tight at the common limit of 32 object levels (cost 96).
-    assert!(
-        roundtrip_metadata(create_nested_value(MAX_OBJECT_DEPTH_VALUE)),
-        "metadata_full should succeed at the common object-depth limit"
-    );
-    assert!(
-        !roundtrip_metadata(create_nested_value(MAX_OBJECT_DEPTH_VALUE + 1)),
-        "metadata_full should fail at object depth {}",
-        MAX_OBJECT_DEPTH_VALUE + 1
-    );
-
-    // The outer object plus 48 nested arrays costs 99 frames on `Log.fields`.
-    assert!(
-        roundtrip_value(create_nested_array(MAX_ARRAY_DEPTH_VALUE)),
-        "Log.fields should succeed with one array level of headroom"
-    );
-    assert!(
-        !roundtrip_value(create_nested_array(MAX_ARRAY_DEPTH_VALUE + 1)),
-        "Log.fields should fail at array depth {}",
-        MAX_ARRAY_DEPTH_VALUE + 2
-    );
-
-    // `metadata_full` is tight at 48 array levels (cost 96).
-    assert!(
-        roundtrip_metadata(create_nested_array(MAX_ARRAY_DEPTH_VALUE)),
-        "metadata_full should succeed at the common array-depth limit"
-    );
-    assert!(
-        !roundtrip_metadata(create_nested_array(MAX_ARRAY_DEPTH_VALUE + 1)),
-        "metadata_full should fail at array depth {}",
-        MAX_ARRAY_DEPTH_VALUE + 1
-    );
-}
-
-/// Non-object log roots are encoded through `Log.value`, not the legacy `Log.fields`
-/// map. Its lower wire limit establishes the common budget used for every Value.
+/// Logs are encoded through `Log.value`, whose wire limit establishes the common budget used for
+/// every Value.
 #[test]
 fn value_budget_matches_tightest_wire_path() {
     let make_log = |array_depth| LogEvent::from(create_nested_array(array_depth));
@@ -521,8 +446,8 @@ fn nesting_gate_rejects_timestamp_leaf_at_max_object_depth() {
         proto::EventArray::decode(buf.freeze()).is_ok()
     };
 
-    // `Log.fields` can carry 33 object levels (cost 99), but a Timestamp leaf raises
-    // that cost to 100 and fails decode. The gate rejects it under the common limit too.
+    // `Log.value` can carry 32 object levels (cost 96), but a Timestamp leaf raises
+    // that cost to 97 and fails decode. The gate rejects it under the common limit too.
     let event_data_ts = create_nested_value_with_leaf(MAX_OBJECT_DEPTH_VALUE, ts_leaf());
     assert!(
         !roundtrip_log(event_data_ts.clone()),
