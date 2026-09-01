@@ -2435,6 +2435,36 @@ fn decode_v3_rejects_negative_origin_values() {
     assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
 }
 
+#[test]
+fn decode_v3_rejects_timestamp_outside_chrono_range() {
+    let mut data = minimal_v3_metric_data();
+    data.timestamps[0] = i64::MAX;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_interval_millisecond_overflow() {
+    let mut data = minimal_v3_metric_data();
+    data.intervals[0] = u64::from(u32::MAX / 1000 + 1);
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_tagset_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tag_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_tagsets = vec![1, 1];
+    for previous_tagset in 1..=5 {
+        data.dict_tagsets
+            .extend([2, -i64::from(previous_tagset), 0]);
+    }
+    data.tagset_refs[0] = 6;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
 #[tokio::test]
 async fn decode_series_endpoint_v3() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {

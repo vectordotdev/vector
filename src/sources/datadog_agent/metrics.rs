@@ -31,6 +31,8 @@ use crate::{
     sources::util::{extract_tag_key_and_value, http::capped_body},
 };
 
+const MAX_V3_EXPANDED_TAGSET_BYTES: usize = 16 * 1024 * 1024;
+
 #[derive(Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesRequest {
     pub(crate) series: Vec<DatadogSeriesMetric>,
@@ -402,6 +404,9 @@ pub(super) fn decode_v3_metric_data(
             timestamp = timestamp
                 .checked_add(data.timestamps[timestamp_idx])
                 .ok_or("Datadog v3 timestamp overflow")?;
+            if Utc.timestamp_opt(timestamp, 0).single().is_none() {
+                return Err("invalid Datadog v3 timestamp".into());
+            }
             timestamp_idx += 1;
             let value = match value_type {
                 0 => 0.0,
@@ -475,6 +480,11 @@ pub(super) fn decode_v3_metric_data(
                 },
             )
             .collect();
+        let interval =
+            u32::try_from(data.intervals[index]).map_err(|_| "invalid Datadog v3 interval")?;
+        interval
+            .checked_mul(1000)
+            .ok_or("Datadog v3 interval milliseconds overflow")?;
         series.push(super::ddmetric_proto::metric_payload::MetricSeries {
             resources,
             metric: names[name_ref as usize].clone(),
@@ -483,9 +493,7 @@ pub(super) fn decode_v3_metric_data(
             r#type: metric_type as i32,
             unit,
             source_type_name: source_types[source_type_ref as usize].clone(),
-            interval: i64::from(
-                u32::try_from(data.intervals[index]).map_err(|_| "invalid Datadog v3 interval")?,
-            ),
+            interval: i64::from(interval),
             metadata,
         });
     }
@@ -539,7 +547,8 @@ fn decode_v3_tagsets(
     dictionary: &[String],
     metadata: Option<&super::ddmetric_v3_proto::Metadata>,
 ) -> crate::Result<Vec<Vec<String>>> {
-    let mut tagsets = vec![Vec::new()];
+    let mut tagsets: Vec<Vec<String>> = vec![Vec::new()];
+    let mut expanded_bytes: usize = 0;
     let mut offset = 0;
     while offset < packed.len() {
         let size = usize::try_from(packed[offset]).map_err(|_| "invalid Datadog v3 tagset size")?;
@@ -563,20 +572,34 @@ fn decode_v3_tagsets(
                         .ok_or("Datadog v3 tagset reference overflow")?,
                 )
                 .map_err(|_| "invalid Datadog v3 tagset reference")?;
-                tags.extend(
-                    tagsets
-                        .get(index)
-                        .ok_or("invalid Datadog v3 tagset reference")?
-                        .iter()
-                        .cloned(),
-                );
+                let referenced = tagsets
+                    .get(index)
+                    .ok_or("invalid Datadog v3 tagset reference")?;
+                let referenced_bytes = referenced.iter().try_fold(0usize, |total, tag| {
+                    total
+                        .checked_add(std::mem::size_of::<String>())
+                        .and_then(|total| total.checked_add(tag.len()))
+                        .ok_or("Datadog v3 expanded tagset size overflow")
+                })?;
+                expanded_bytes = expanded_bytes
+                    .checked_add(referenced_bytes)
+                    .ok_or("Datadog v3 expanded tagset size overflow")?;
+                if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
+                    return Err("Datadog v3 expanded tagsets exceed size limit".into());
+                }
+                tags.extend(referenced.iter().cloned());
             } else {
-                tags.push(
-                    dictionary
-                        .get(reference as usize)
-                        .ok_or("invalid Datadog v3 tag reference")?
-                        .clone(),
-                );
+                let tag = dictionary
+                    .get(reference as usize)
+                    .ok_or("invalid Datadog v3 tag reference")?;
+                expanded_bytes = expanded_bytes
+                    .checked_add(std::mem::size_of::<String>())
+                    .and_then(|total| total.checked_add(tag.len()))
+                    .ok_or("Datadog v3 expanded tagset size overflow")?;
+                if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
+                    return Err("Datadog v3 expanded tagsets exceed size limit".into());
+                }
+                tags.push(tag.clone());
             }
         }
         tagsets.push(tags);
@@ -586,6 +609,13 @@ fn decode_v3_tagsets(
         for tagset in &mut tagsets {
             for tag in &metadata.tags {
                 if !tagset.contains(tag) {
+                    expanded_bytes = expanded_bytes
+                        .checked_add(std::mem::size_of::<String>())
+                        .and_then(|total| total.checked_add(tag.len()))
+                        .ok_or("Datadog v3 expanded tagset size overflow")?;
+                    if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
+                        return Err("Datadog v3 expanded tagsets exceed size limit".into());
+                    }
                     tagset.push(tag.clone());
                 }
             }
