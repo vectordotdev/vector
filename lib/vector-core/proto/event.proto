@@ -35,6 +35,13 @@ message EventWrapper {
   }
 }
 
+// The stable envelope for the native JSON codec. The extra message layer is an
+// unambiguous discriminator from the legacy native JSON representation, whose
+// top-level object is Vector's in-memory Event enum serialized by serde.
+message NativeJsonEnvelope {
+  EventWrapper event = 1;
+}
+
 message Log {
   // Deprecated, use value instead.
   map<string, Value> fields = 1 [deprecated = true];

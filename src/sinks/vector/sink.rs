@@ -202,10 +202,10 @@ mod tests {
             .expect("PushEventsRequest decode should succeed at the accepted value budget");
     }
 
-    /// An object-root log one step past the common budget cannot decode through `Log.value`,
-    /// so the sink gate must reject it before encoding.
+    /// An object-root log one step past the common budget still fits the wider
+    /// `Log.fields` wire path, but the sink gate applies the same limit to every Value.
     #[test]
-    fn push_events_request_cannot_decode_one_past_common_value_budget() {
+    fn push_events_request_rejects_one_past_common_value_budget() {
         // 32 nested objects under "data" → 33 effective object levels, cost 99.
         let mut log = LogEvent::default();
         log.insert(event_path!("data"), build_nested_value(32));
@@ -222,8 +222,10 @@ mod tests {
         let mut buf = BytesMut::with_capacity(65536);
         request.encode(&mut buf).expect("encode should succeed");
 
-        proto_vector::PushEventsRequest::decode(buf.freeze())
-            .expect_err("the Log.value wire path must reject events above the common budget");
+        proto_vector::PushEventsRequest::decode(buf.freeze()).expect(
+            "the object-root wire path can decode 99 frames even though the common \
+             Value gate rejects it",
+        );
     }
 
     #[test]

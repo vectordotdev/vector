@@ -304,10 +304,35 @@ impl From<super::LogEvent> for WithMetadata<Log> {
     fn from(log_event: super::LogEvent) -> Self {
         let (value, metadata) = log_event.into_parts();
 
+        // Due to the backwards compatibility requirement by the
+        // "event_can_go_from_raw_prost_to_eventarray_encodable" test, "fields" must not
+        // be empty, since that will decode as an empty array. A "dummy" value is placed
+        // in fields instead which is ignored during decoding. To reduce encoding bloat
+        // from a dummy value, it is only used when the root value type is not an object.
+        // Once this backwards compatibility is no longer required, "fields" can
+        // be entirely removed from the Log object.
+        let (fields, value) = if let VrlValue::Object(fields) = value {
+            // Use only "fields" to prevent having to use the dummy value.
+            let fields = fields
+                .into_iter()
+                .map(|(k, v)| (k.into(), encode_value(v)))
+                .collect::<BTreeMap<_, _>>();
+
+            (fields, None)
+        } else {
+            // Must insert at least one field, otherwise the field is omitted entirely on the
+            // Protocol Buffers side. The dummy field value is ultimately ignored in the decoding
+            // step since `value` is provided.
+            let mut dummy_fields = BTreeMap::new();
+            dummy_fields.insert(".".to_owned(), encode_value(VrlValue::Null));
+
+            (dummy_fields, Some(encode_value(value)))
+        };
+
         #[allow(deprecated)]
         let data = Log {
-            fields: BTreeMap::new(),
-            value: Some(encode_value(value)),
+            fields,
+            value,
             metadata: Some(encode_value(metadata.value().clone())),
             metadata_full: Some(metadata.clone().into()),
         };
@@ -496,6 +521,33 @@ impl From<super::Event> for EventWrapper {
 impl From<super::Event> for WithMetadata<EventWrapper> {
     fn from(event: super::Event) -> Self {
         WithMetadata::<Event>::from(event).into()
+    }
+}
+
+impl EventWrapper {
+    /// Converts an event using only the current log value representation.
+    ///
+    /// Binary native encoding continues to use the standard `From` conversion so older
+    /// receivers and its wider object-root nesting boundary remain compatible. Native JSON uses
+    /// this conversion because deprecated fields are omitted from its published representation.
+    pub fn from_event_for_native_json(event: super::Event) -> Self {
+        let event = match event {
+            super::Event::Log(log) => {
+                let (value, metadata) = log.into_parts();
+                #[allow(deprecated)]
+                let log = Log {
+                    fields: BTreeMap::new(),
+                    value: Some(encode_value(value)),
+                    metadata: Some(encode_value(metadata.value().clone())),
+                    metadata_full: Some(metadata.into()),
+                };
+                Event::Log(log)
+            }
+            super::Event::Metric(metric) => Event::Metric(metric.into()),
+            super::Event::Trace(trace) => Event::Trace(trace.into()),
+        };
+
+        Self { event: Some(event) }
     }
 }
 
@@ -925,15 +977,23 @@ mod tests {
 
     #[test]
     #[allow(deprecated)]
-    fn log_encoding_uses_value_instead_of_fields() {
-        let event = crate::event::LogEvent::from(vrl::btreemap! {
+    fn native_json_log_encoding_does_not_change_native_protobuf_encoding() {
+        let event = crate::event::Event::Log(crate::event::LogEvent::from(vrl::btreemap! {
             "message" => VrlValue::from("hello")
-        });
+        }));
 
-        let encoded = Log::from(event);
+        let native = EventWrapper::from(event.clone()).event.unwrap();
+        let native_json = EventWrapper::from_event_for_native_json(event)
+            .event
+            .unwrap();
+        let (Event::Log(native), Event::Log(native_json)) = (native, native_json) else {
+            panic!("event wrappers did not contain logs");
+        };
 
-        assert!(encoded.fields.is_empty());
-        assert!(encoded.value.is_some());
+        assert!(!native.fields.is_empty());
+        assert!(native.value.is_none());
+        assert!(native_json.fields.is_empty());
+        assert!(native_json.value.is_some());
     }
 
     #[test]

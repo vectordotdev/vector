@@ -69,12 +69,14 @@ mod tests {
         serializer.encode(event, &mut bytes).unwrap();
 
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json.as_object().map(serde_json::Map::len), Some(1));
+        assert!(json.get("event").is_some());
         assert_eq!(
-            json.pointer("/log/value/map/fields/foo/rawBytes"),
+            json.pointer("/event/log/value/map/fields/foo/rawBytes"),
             Some(&serde_json::Value::String("YmFy".to_owned()))
         );
-        assert!(json.pointer("/log/fields").is_none());
-        assert!(json.pointer("/log/metadata").is_none());
+        assert!(json.pointer("/event/log/fields").is_none());
+        assert!(json.pointer("/event/log/metadata").is_none());
     }
 
     #[test]
@@ -114,17 +116,17 @@ mod tests {
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(
-            json.pointer("/metric/aggregatedHistogram3/count"),
+            json.pointer("/event/metric/aggregatedHistogram3/count"),
             Some(&serde_json::Value::String("1".to_owned()))
         );
-        assert!(json.pointer("/metric/aggregatedHistogram1").is_none());
-        assert!(json.pointer("/metric/aggregatedHistogram2").is_none());
-        assert!(json.pointer("/metric/tagsV1").is_none());
+        assert!(json.pointer("/event/metric/aggregatedHistogram1").is_none());
+        assert!(json.pointer("/event/metric/aggregatedHistogram2").is_none());
+        assert!(json.pointer("/event/metric/tagsV1").is_none());
         assert_eq!(
-            json.pointer("/metric/tagsV2/service/values/0/value"),
+            json.pointer("/event/metric/tagsV2/service/values/0/value"),
             Some(&serde_json::Value::String("api".to_owned()))
         );
-        assert!(json.pointer("/metric/metadata").is_none());
+        assert!(json.pointer("/event/metric/metadata").is_none());
     }
 
     #[test]
@@ -137,7 +139,7 @@ mod tests {
             .unwrap();
 
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert!(json.pointer("/trace/metadata").is_none());
-        assert!(json.pointer("/trace/metadataFull").is_some());
+        assert!(json.pointer("/event/trace/metadata").is_none());
+        assert!(json.pointer("/event/trace/metadataFull").is_some());
     }
 }
