@@ -2465,6 +2465,59 @@ fn decode_v3_rejects_excessive_tagset_expansion() {
     assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
 }
 
+#[test]
+fn decode_v3_rejects_excessive_series_tag_cloning() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tag_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_tagsets = vec![1, 1];
+    data.types = vec![3 | 0x30; 17];
+    data.name_refs = std::iter::once(1)
+        .chain(std::iter::repeat_n(0, 16))
+        .collect();
+    data.tagset_refs = std::iter::once(1)
+        .chain(std::iter::repeat_n(0, 16))
+        .collect();
+    data.resources_refs = vec![0; 17];
+    data.intervals = vec![0; 17];
+    data.num_points = vec![0; 17];
+    data.source_type_name_refs = vec![0; 17];
+    data.origin_info_refs = vec![0; 17];
+    data.timestamps.clear();
+    data.vals_float64.clear();
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_reference_accumulator_overflow() {
+    let mut data = minimal_v3_metric_data();
+    data.types = vec![3 | 0x30; 2];
+    data.name_refs = vec![1, i64::MAX];
+    data.tagset_refs = vec![0; 2];
+    data.resources_refs = vec![0; 2];
+    data.intervals = vec![0; 2];
+    data.num_points = vec![0; 2];
+    data.source_type_name_refs = vec![0; 2];
+    data.origin_info_refs = vec![0; 2];
+    data.timestamps.clear();
+    data.vals_float64.clear();
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_does_not_expand_unused_global_resources() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_resource_len = vec![0; 100_000];
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: Vec::new(),
+        resources: vec!["container".to_string(), "x".repeat(1024)],
+    };
+
+    let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
+    assert_eq!(series[0].resources.len(), 1);
+}
+
 #[tokio::test]
 async fn decode_series_endpoint_v3() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {

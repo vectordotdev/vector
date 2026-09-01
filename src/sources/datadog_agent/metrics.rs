@@ -32,6 +32,7 @@ use crate::{
 };
 
 const MAX_V3_EXPANDED_TAGSET_BYTES: usize = 16 * 1024 * 1024;
+const MAX_V3_EXPANDED_SERIES_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesRequest {
@@ -313,9 +314,13 @@ pub(super) fn decode_v3_metric_data(
     let tag_strings = decode_v3_strings(&data.dict_tag_str, true)?;
     let units = decode_v3_strings(&data.dict_unit_str, false)?;
     let tagsets = decode_v3_tagsets(&data.dict_tagsets, &tag_strings, metadata)?;
-    let resources = decode_v3_resources(data, metadata)?;
+    let resources = decode_v3_resources(data)?;
     let source_types = decode_v3_strings(&data.dict_source_type_name, false)?;
     let origin_count = data.dict_origin_info.len() / 3 + 1;
+
+    if metadata.is_some_and(|metadata| metadata.resources.len() % 2 != 0) {
+        return Err("Datadog v3 metadata resources must be pairs".into());
+    }
 
     if !data.dict_origin_info.len().is_multiple_of(3)
         || data.name_refs.len() < data.types.len()
@@ -329,26 +334,37 @@ pub(super) fn decode_v3_metric_data(
         return Err("invalid Datadog v3 metric columns".into());
     }
 
-    let mut name_ref = 0;
-    let mut tagset_ref = 0;
-    let mut resources_ref = 0;
-    let mut source_type_ref = 0;
-    let mut origin_ref = 0;
-    let mut unit_ref = 0;
+    let mut name_ref: i64 = 0;
+    let mut tagset_ref: i64 = 0;
+    let mut resources_ref: i64 = 0;
+    let mut source_type_ref: i64 = 0;
+    let mut origin_ref: i64 = 0;
+    let mut unit_ref: i64 = 0;
     let mut unit_idx = 0;
     let mut timestamp: i64 = 0;
     let mut timestamp_idx = 0;
     let mut sint64_idx = 0;
     let mut float32_idx = 0;
     let mut float64_idx = 0;
+    let mut expanded_series_bytes: usize = 0;
     let mut series = Vec::with_capacity(data.types.len());
 
     for index in 0..data.types.len() {
-        name_ref += data.name_refs[index];
-        tagset_ref += data.tagset_refs[index];
-        resources_ref += data.resources_refs[index];
-        source_type_ref += data.source_type_name_refs[index];
-        origin_ref += data.origin_info_refs[index];
+        name_ref = name_ref
+            .checked_add(data.name_refs[index])
+            .ok_or("Datadog v3 name reference overflow")?;
+        tagset_ref = tagset_ref
+            .checked_add(data.tagset_refs[index])
+            .ok_or("Datadog v3 tagset reference overflow")?;
+        resources_ref = resources_ref
+            .checked_add(data.resources_refs[index])
+            .ok_or("Datadog v3 resource reference overflow")?;
+        source_type_ref = source_type_ref
+            .checked_add(data.source_type_name_refs[index])
+            .ok_or("Datadog v3 source type reference overflow")?;
+        origin_ref = origin_ref
+            .checked_add(data.origin_info_refs[index])
+            .ok_or("Datadog v3 origin reference overflow")?;
         if name_ref < 0
             || name_ref as usize >= names.len()
             || tagset_ref < 0
@@ -373,7 +389,9 @@ pub(super) fn decode_v3_metric_data(
             if unit_idx >= data.unit_refs.len() {
                 return Err("invalid Datadog v3 unit column".into());
             }
-            unit_ref += data.unit_refs[unit_idx];
+            unit_ref = unit_ref
+                .checked_add(data.unit_refs[unit_idx])
+                .ok_or("Datadog v3 unit reference overflow")?;
             unit_idx += 1;
             if unit_ref < 0 || unit_ref as usize >= units.len() {
                 return Err("invalid Datadog v3 unit reference".into());
@@ -396,6 +414,48 @@ pub(super) fn decode_v3_metric_data(
         if point_count > remaining_timestamps || point_count > remaining_values {
             return Err("invalid Datadog v3 point count".into());
         }
+
+        let tag_bytes = tagsets[tagset_ref as usize]
+            .iter()
+            .try_fold(0usize, |total, tag| checked_v3_string_bytes(total, tag))?;
+        let resource_bytes = resources[resources_ref as usize].iter().try_fold(
+            0usize,
+            |total, (resource_type, name)| {
+                let total = checked_v3_string_bytes(total, resource_type)?;
+                checked_v3_string_bytes(total, name)
+            },
+        )?;
+        let resource_bytes = metadata
+            .map(|metadata| {
+                metadata
+                    .resources
+                    .chunks_exact(2)
+                    .try_fold(resource_bytes, |total, pair| {
+                        let total = checked_v3_string_bytes(total, &pair[0])?;
+                        checked_v3_string_bytes(total, &pair[1])
+                    })
+            })
+            .transpose()?
+            .unwrap_or(resource_bytes);
+        let series_bytes =
+            std::mem::size_of::<super::ddmetric_proto::metric_payload::MetricSeries>()
+                .checked_add(
+                    point_count
+                        .checked_mul(std::mem::size_of::<
+                            super::ddmetric_proto::metric_payload::MetricPoint,
+                        >())
+                        .ok_or("Datadog v3 expanded series size overflow")?,
+                )
+                .and_then(|total| total.checked_add(tag_bytes))
+                .and_then(|total| total.checked_add(resource_bytes))
+                .ok_or("Datadog v3 expanded series size overflow")?;
+        expanded_series_bytes = expanded_series_bytes
+            .checked_add(series_bytes)
+            .ok_or("Datadog v3 expanded series size overflow")?;
+        if expanded_series_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
+            return Err("Datadog v3 expanded series exceed size limit".into());
+        }
+
         let mut points = Vec::with_capacity(point_count);
         for _ in 0..point_count {
             if timestamp_idx >= data.timestamps.len() {
@@ -446,7 +506,7 @@ pub(super) fn decode_v3_metric_data(
             _ => metric_payload::MetricType::Unspecified,
         };
         let no_index = packed_type & 0x100 != 0;
-        let metadata = if origin_ref == 0 && !no_index {
+        let series_metadata = if origin_ref == 0 && !no_index {
             None
         } else {
             let (origin_product, origin_category, origin_service) = if origin_ref == 0 {
@@ -471,7 +531,8 @@ pub(super) fn decode_v3_metric_data(
                 }),
             })
         };
-        let resources = resources[resources_ref as usize]
+        let mut decoded_resources: Vec<super::ddmetric_proto::metric_payload::Resource> = resources
+            [resources_ref as usize]
             .iter()
             .map(
                 |(resource_type, name)| super::ddmetric_proto::metric_payload::Resource {
@@ -480,13 +541,21 @@ pub(super) fn decode_v3_metric_data(
                 },
             )
             .collect();
+        if let Some(payload_metadata) = metadata {
+            decoded_resources.extend(payload_metadata.resources.chunks_exact(2).map(|pair| {
+                super::ddmetric_proto::metric_payload::Resource {
+                    r#type: pair[0].clone(),
+                    name: pair[1].clone(),
+                }
+            }));
+        }
         let interval =
             u32::try_from(data.intervals[index]).map_err(|_| "invalid Datadog v3 interval")?;
         interval
             .checked_mul(1000)
             .ok_or("Datadog v3 interval milliseconds overflow")?;
         series.push(super::ddmetric_proto::metric_payload::MetricSeries {
-            resources,
+            resources: decoded_resources,
             metric: names[name_ref as usize].clone(),
             tags: tagsets[tagset_ref as usize].clone(),
             points,
@@ -494,7 +563,7 @@ pub(super) fn decode_v3_metric_data(
             unit,
             source_type_name: source_types[source_type_ref as usize].clone(),
             interval: i64::from(interval),
-            metadata,
+            metadata: series_metadata,
         });
     }
     Ok(series)
@@ -626,7 +695,6 @@ fn decode_v3_tagsets(
 
 fn decode_v3_resources(
     data: &super::ddmetric_v3_proto::MetricData,
-    metadata: Option<&super::ddmetric_v3_proto::Metadata>,
 ) -> crate::Result<Vec<Vec<(String, String)>>> {
     let dictionary = decode_v3_strings(&data.dict_resource_str, false)?;
     let mut resources = vec![Vec::new()];
@@ -666,17 +734,14 @@ fn decode_v3_resources(
         resources.push(set);
         entry_offset = end;
     }
-    if let Some(metadata) = metadata {
-        if metadata.resources.len() % 2 != 0 {
-            return Err("Datadog v3 metadata resources must be pairs".into());
-        }
-        for set in &mut resources {
-            for pair in metadata.resources.chunks_exact(2) {
-                set.push((pair[0].clone(), pair[1].clone()));
-            }
-        }
-    }
     Ok(resources)
+}
+
+fn checked_v3_string_bytes(total: usize, value: &str) -> crate::Result<usize> {
+    total
+        .checked_add(std::mem::size_of::<String>())
+        .and_then(|total| total.checked_add(value.len()))
+        .ok_or_else(|| "Datadog v3 expanded string size overflow".into())
 }
 
 /// Builds Vector's `EventMetadata` from the received metadata. Currently this is only
