@@ -77,10 +77,11 @@ times.
 
 If `cargo vdev run <config>` fails, fall back to `cargo run -- --config <config>`.
 
-When a relevant test command explicitly sets `FEATURES`, run
-`make check-clippy-no-default-features` with that exact value. If a representative configuration
-exists, derive its features with `cargo vdev features <config>`. Do not infer features from file
-names; when no authoritative feature set is available, use `make check-clippy`.
+When a relevant test command explicitly sets `FEATURES`, run `make check-clippy` with that exact
+value. A non-empty `FEATURES` value disables the default features; include `default` explicitly when
+they are required. If a representative configuration exists, derive its features with
+`cargo vdev features <config>`. Do not infer features from file names; when no authoritative feature
+set is available, use `make check-clippy` without `FEATURES` for full-feature validation.
 
 #### Running tests
 

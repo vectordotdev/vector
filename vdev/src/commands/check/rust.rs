@@ -13,6 +13,7 @@ pub struct Cli {
     #[arg(long, default_value_t = true)]
     clippy: bool,
 
+    /// Exact feature set to check. Include `default` to enable the default features.
     #[arg(short = 'F', long, value_delimiter = ',', env = "FEATURES")]
     features: Vec<String>,
 
@@ -46,16 +47,14 @@ impl Cli {
             .filter(|f| !f.is_empty())
             .collect();
 
-        let feature_args: Vec<String> = if self.no_default_features || !features.is_empty() {
-            let mut args = Vec::new();
-            if self.no_default_features {
-                args.push("--no-default-features".to_string());
-            }
-            if !features.is_empty() {
-                args.push("--features".to_string());
-                args.push(features.join(","));
-            }
-            args
+        let feature_args: Vec<String> = if !features.is_empty() {
+            vec![
+                "--no-default-features".to_string(),
+                "--features".to_string(),
+                features.join(","),
+            ]
+        } else if self.no_default_features {
+            vec!["--no-default-features".to_string()]
         } else {
             vec!["--all-features".to_string()]
         };
@@ -94,5 +93,71 @@ impl Cli {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(features: &[&str], no_default_features: bool) -> Vec<OsString> {
+        Cli {
+            clippy: true,
+            features: features.iter().map(ToString::to_string).collect(),
+            no_default_features,
+            fix: false,
+        }
+        .build_args(Tool::Clippy)
+    }
+
+    #[test]
+    fn checks_all_features_by_default() {
+        assert_eq!(
+            args(&[], false),
+            ["clippy", "--workspace", "--all-targets", "--all-features"]
+        );
+    }
+
+    #[test]
+    fn treats_features_as_an_exact_set() {
+        assert_eq!(
+            args(&["sources-file"], false),
+            [
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--no-default-features",
+                "--features",
+                "sources-file",
+            ]
+        );
+    }
+
+    #[test]
+    fn allows_default_features_to_be_selected_explicitly() {
+        assert_eq!(
+            args(&["default", "sources-file"], false),
+            [
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--no-default-features",
+                "--features",
+                "default,sources-file",
+            ]
+        );
+    }
+
+    #[test]
+    fn supports_checking_with_no_features() {
+        assert_eq!(
+            args(&[], true),
+            [
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--no-default-features",
+            ]
+        );
     }
 }
