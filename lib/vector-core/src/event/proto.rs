@@ -93,8 +93,8 @@ impl From<Trace> for Event {
 }
 
 impl From<Log> for super::LogEvent {
+    #[allow(deprecated)]
     fn from(log: Log) -> Self {
-        #[allow(deprecated)]
         let metadata = log
             .metadata_full
             .map(Into::into)
@@ -145,6 +145,7 @@ impl From<Trace> for super::TraceEvent {
 }
 
 impl From<MetricValue> for super::MetricValue {
+    #[allow(deprecated)]
     fn from(value: MetricValue) -> Self {
         match value {
             MetricValue::Counter(counter) => Self::Counter {
@@ -205,6 +206,7 @@ impl From<MetricValue> for super::MetricValue {
 }
 
 impl From<Metric> for super::Metric {
+    #[allow(deprecated)]
     fn from(metric: Metric) -> Self {
         let kind = match metric.kind() {
             metric::Kind::Incremental => super::MetricKind::Incremental,
@@ -252,7 +254,6 @@ impl From<Metric> for super::Metric {
 
         let value = super::MetricValue::from(metric.value.unwrap());
 
-        #[allow(deprecated)]
         let metadata = metric
             .metadata_full
             .map(Into::into)
