@@ -110,8 +110,8 @@ Vector through a ClusterIP Service.
 
 ## Prerequisites
 
-- [`kubectl`](https://kubernetes.io/docs/reference/kubectl/) configured against a target cluster
-- [`helm`](https://helm.sh/) version 3.0 or later
+- [`helm`](https://helm.sh/) version 3.0 or later, configured against a target cluster
+- [`kubectl`](https://kubernetes.io/docs/reference/kubectl/) for read-only cluster inspection and port-forwarding
 - At least 9 allocatable CPUs total (8 for Vector at max scale, 0.5 for the consumer, 0.2 for the producer)
 - [`grpcurl`](https://github.com/fullstorydev/grpcurl) for metric collection
 - [Kubernetes Metrics API](https://github.com/kubernetes-sigs/metrics-server) (`metrics-server`) installed (This is required for `kubectl top pods` and HPA CPU targets. K3s bundles `metrics-server` by default. On other clusters, run `kubectl top nodes` to verify that `metrics-server` is available before you start.)
@@ -144,15 +144,13 @@ automates this process.
 
 ## Setup
 
-The following manifests create the namespace and deploy the consumer that drains all data forwarded by Vector:
+The following Helm release creates the namespace and deploys the consumer that drains all data forwarded by Vector:
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/namespace.yaml" dir="true" >}}
-
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/consumer.yaml" dir="true" >}}
+{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/consumer-chart/templates/consumer.yaml" dir="true" >}}
 
 ```bash
-kubectl apply -f manifests/namespace.yaml
-kubectl apply -f manifests/consumer.yaml
+helm upgrade --install consumer manifests/consumer-chart \
+  -n vector-perf --create-namespace --wait --timeout=3m
 
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
@@ -175,17 +173,19 @@ the consumer:
 {{< embed file="content/en/guides/level-up/k8s-autoscaling/values.yaml" dir="true" >}}
 
 ```bash
-helm upgrade --install vector vectordotdev/vector --namespace vector-perf --version 0.56.0 \
-  -f values.yaml --set replicas=1 --wait --timeout=3m
+helm upgrade --install vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
+  -f values.yaml --set replicas=1 --set autoscaling.enabled=false --wait --timeout=3m
 
-kubectl apply -f manifests/ingress.yaml
-kubectl apply -f manifests/producer.yaml
+helm upgrade --install vector-ingress manifests/ingress-chart \
+  -n vector-perf --wait --timeout=3m
+helm upgrade --install producer manifests/producer-chart \
+  -n vector-perf --wait --timeout=3m
 ```
 
 The following Ingress routes HTTP POST requests to the Vector Service at the request level (L7),
 so every pod receives a share of traffic as soon as it's Ready, independent of how or why the replica count changes:
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/ingress.yaml" dir="true" >}}
+{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/ingress-chart/templates/ingress.yaml" dir="true" >}}
 
 Note that `proxy-read-timeout` and `proxy-send-timeout` are left at their
 60s defaults. Under overload, a stalled connection that exceeds those
@@ -195,7 +195,7 @@ that request's events rather than just delaying them.
 The producer is [lading](https://github.com/DataDog/lading), configured to
 generate `apache_common` log lines at 55 MiB/s across 100 parallel connections:
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/producer.yaml" dir="true" >}}
+{{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/producer-chart/templates/producer.yaml" dir="true" >}}
 
 At 55 MiB/s, the workload is expected to overwhelm a single pod's regex-parsing capacity.
 When the pod reaches CPU saturation, Vector applies backpressure, reducing the rate at which lading can send data.
@@ -206,63 +206,63 @@ The resulting throughput and CPU utilization are shown in the following table:
 
 | Metric | Value |
 | ------ | ----- |
-| Throughput | **16.64 MiB/s** |
-| Events/s | **130,863 ev/s** |
+| Throughput | **16.93 MiB/s** |
+| Events/s | **133,098 ev/s** |
 | Pod CPU | **1000m (100%)** |
 | Bottleneck | **Vector CPU** |
 
 <!-- RESULTS-SINGLE-END -->
 
 The pod is pinned at its 1000m CPU limit, and throughput tops out at
-16.64 MiB/s, confirming the expected CPU ceiling. This per-pod throughput is the
+16.93 MiB/s, confirming the expected CPU ceiling. This per-pod throughput is the
 baseline that the next two phases are measured against.
 
 ## Phase 2: 3 pods
 
-The following commands scale the deployment to three replicas:
+The following command scales the deployment to three replicas through its Helm release:
 
 ```bash
-kubectl scale deployment vector -n vector-perf --replicas=3
-kubectl rollout status deployment/vector -n vector-perf
+helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
+  -f values.yaml --set replicas=3 --set autoscaling.enabled=false --wait --timeout=3m
 ```
 
 At 55 MiB/s, the workload still exceeds the combined throughput ceiling of three
-pods (3 × 16.64 MiB/s = 49.92 MiB/s). All three pods remain still fully saturated.
+pods (3 × 16.93 MiB/s = 50.79 MiB/s). All three pods remain CPU-bound.
 
 <!-- RESULTS-LB-START -->
 
 | Metric | Value |
 | ------ | ----- |
-| Throughput | **50.47 MiB/s** |
-| Events/s | **396,846 ev/s** |
-| Pod CPU | **~1000m (100%)** |
-| Scaling vs. Phase 1 | **3.03×** |
+| Throughput | **49.07 MiB/s** |
+| Events/s | **385,840 ev/s** |
+| Pod CPU | **~970m (97%)** |
+| Scaling vs. Phase 1 | **2.90×** |
 | Bottleneck | **Vector CPU** |
 
 <!-- RESULTS-LB-END -->
 
 ## Phase 3: 8 pods
 
-The following commands scale the deployment to eight replicas:
+The following command scales the deployment to eight replicas through its Helm release:
 
 ```bash
-kubectl scale deployment vector -n vector-perf --replicas=8
-kubectl rollout status deployment/vector -n vector-perf
+helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
+  -f values.yaml --set replicas=8 --set autoscaling.enabled=false --wait --timeout=3m
 ```
 
-Eight pods provide a combined throughput ceiling of approximately 133.1 MiB/s (8 × 16.64 MiB/s = 133.1 MiB/s), well above the workload's 55 MiB/s. The bottleneck is
-eliminated. All 55 MiB/s flows through, and the pods have ample CPU headroom.
+Eight pods provide a combined throughput ceiling of approximately 135.4 MiB/s (8 × 16.93 MiB/s = 135.4 MiB/s), well above the workload's 55 MiB/s. The bottleneck is
+eliminated. The full workload flows through, and the pods have ample CPU headroom.
 
 <!-- RESULTS-8W-START -->
 
 | Metric | Value |
 | ------ | ----- |
-| Throughput | **56.80 MiB/s** |
-| Events/s | **446,650 ev/s** |
+| Throughput | **62.52 MiB/s** |
+| Events/s | **491,589 ev/s** |
 | Pod CPU | **~470m (47%)** |
 | Bottleneck | **None, spare capacity** |
 
-Each pod handles approximately 7.1 MiB/s at about 47% CPU utilization,
+Each pod handles approximately 7.8 MiB/s at about 47% CPU utilization,
 leaving over half of each pod's capacity unused. With L7 per-request routing,
 load is distributed evenly across all eight pods.
 
@@ -277,11 +277,11 @@ with Vector pods limited to **1 vCPU and 2 GiB of memory**.
 
 | | Phase 1 (1 pod) | Phase 2 (3 pods) | Phase 3 (8 pods) |
 | - | ----------------- | ------------------ | ------------------ |
-| Throughput | 16.64 MiB/s | 50.47 MiB/s | **56.80 MiB/s** |
-| Events/s | 130,863 | 396,846 | 446,650 |
-| CPU per pod | 1000m (100%) | ~1000m (100%) | ~470m (47%) |
+| Throughput | 16.93 MiB/s | 49.07 MiB/s | **62.52 MiB/s** |
+| Events/s | 133,098 | 385,840 | 491,589 |
+| CPU per pod | 1000m (100%) | ~970m (97%) | ~470m (47%) |
 | Bottleneck | Vector CPU | Vector CPU | **None** |
-| Scaling vs. Phase 1 | 1× | 3.03× | **3.41×** |
+| Scaling vs. Phase 1 | 1× | 2.90× | **3.69×** |
 
 <!-- RESULTS-COMPARE-END -->
 
@@ -292,40 +292,48 @@ properly utilizing each pod's capacity (only 47% average CPU utilization).
 
 Based on the results of Phase 1, we can estimate how many pods we would need
 to spin up to stay under CPU saturation while keeping some headroom. The
-saturation crossover is 55 / 16.64 ≈ **3.3 pods** at 100% CPU. At a 70%
-utilization target, the expected equilibrium is ⌈3.3 / 0.70⌉ = ⌈4.71⌉ = **5 pods**.
+saturation crossover is 55 / 16.93 ≈ **3.25 pods** at 100% CPU. At a 70%
+utilization target, the expected equilibrium is ⌈3.25 / 0.70⌉ = ⌈4.64⌉ = **5 pods**.
 
 We can now configure the HPA to find the minimum pod count that keeps CPU
 utilization around the 70% target.
 
 ```bash
-kubectl scale deployment vector -n vector-perf --replicas=1  # Reset to 1 pod
-kubectl rollout status deployment/vector -n vector-perf --timeout=120s  # Wait for scale-down
+# Reset to 1 pod and keep autoscaling disabled until the scale-down completes.
+helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
+  -f values.yaml --set replicas=1 --set autoscaling.enabled=false --wait --timeout=3m
 
-# Create HPA (70% CPU target, 1–8 replicas)
-kubectl autoscale deployment vector -n vector-perf \
-  --cpu-percent=70 --min=1 --max=8
+# Create HPA (70% CPU target, 1–8 replicas) through the Vector release.
+helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0 \
+  -f values.yaml --set replicas=1 \
+  --set autoscaling.enabled=true \
+  --set autoscaling.minReplicas=1 \
+  --set autoscaling.maxReplicas=8 \
+  --set autoscaling.targetCPUUtilizationPercentage=70 \
+  --set autoscaling.behavior.scaleDown.stabilizationWindowSeconds=60 \
+  --wait --timeout=3m
 ```
 
-The following timeline shows how the HPA scales the deployment from one replica to five replicas
+The following timeline shows how the HPA scales the deployment from one replica to five replicas:
 <!-- RESULTS-HPA-START -->
 
 **Scale-up timeline (no manual intervention):**
 
 | Time | Replicas | Avg CPU | Event |
 | ---- | -------- | ------- | ----- |
-| t=0 s | **1** | 100% | load starts |
+| t=0 s | **1** | — | HPA starts |
 | t=30 s | **2** | 100% | HPA scales 1→2 |
-| t=90 s | **3** | 98% | HPA scales 2→3 |
-| t=136 s | **5** | 100% | HPA scales 3→5 |
-| t=196 s | **5** | **71%** | **Stable, equilibrium** |
+| t=61 s | **3** | 99% | HPA scales 2→3 |
+| t=107 s | **5** | 99% | HPA scales 3→5 |
+| t=138 s | **5** | 71% | — |
+| t=169 s | **5** | **70%** | **Stable, equilibrium** |
 
-Time to equilibrium: **196 seconds (approximately 3 minutes)**, 3 scale events, no manual scaling.
+Time to equilibrium: **169 seconds (approximately 3 minutes)**, 3 scale events, no manual scaling.
 
-**Throughput at equilibrium: 56.56 MiB/s, 444,744 ev/s, 5 pods, 71% average CPU.**
+**Throughput at equilibrium: 60.69 MiB/s, 477,203 ev/s, 5 pods, 70% average CPU.**
 
-The HPA settles at five pods: CPU converges from 97% immediately after the 3→5
-scale-up event to 71%, within the ±10% tolerance band (63–77%) set by the
+The HPA settles at five pods: CPU converges from 99% during the 3→5
+scale-up event to 70%, within the ±10% tolerance band (63–77%) set by the
 [`--horizontal-pod-autoscaler-tolerance`](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/)
 flag's `0.1` default, and holds stable for three consecutive 15-second intervals.
 
@@ -339,12 +347,12 @@ times might yield different results.
 
 | Time | Replicas | Avg CPU | Event |
 | ---- | -------- | ------- | ----- |
-| t=0 s | **1** | 100% | load starts |
+| t=0 s | **1** | 100% | Load starts |
 | t=30 s | **2** | 100% | HPA scales 1→2 |
 | t=61 s | **3** | 98% | HPA scales 2→3 |
 | t=91 s | **4** | 96% | HPA scales 3→4 |
 | t=122 s | **6** | 91% | HPA scales 4→6 |
-| t=137 s | **6** | 67% |       —        |
+| t=137 s | **6** | 67% | — |
 | t=182 s | **6** | **60%** | **Stable, equilibrium** |
 
 But... Why? We are using the 70% CPU threshold and didn't alter the autoscaler's
@@ -367,59 +375,58 @@ even though the CPU load falls squarely out of bounds.
 desired = ⌈ 6 × (60% / 70%) ⌉ = ⌈ 5.1428571429 ⌉ = 6
 ```
 
-Given that past the saturation point the workload is no longer CPU-bound. So
-the *total* CPU demand is fixed and the HPA just spreads it across whatever pods
-exist. Slower pods change this number: a pod that parses 10% slower needs ~10% more CPU
-for the same 55 MiB/s, raising the total; faster pods lower it.
+Past the saturation point, the workload is no longer CPU-bound. The *total* CPU
+demand is fixed, and the HPA spreads it across the available pods. A pod that
+parses 10% slower needs approximately 10% more CPU for the same 55 MiB/s
+workload, increasing the total CPU demand. Faster pods reduce it.
 
-Doing some calculations based on Phase 1's results, we can get the total
-workload demand based on each pod's capacity:
+Based on Phase 1's results, the total workload demand is:
 
 ```text
-total CPU demand = (55 / 16.64) × 100% = 330.5 pod-percent
+total CPU demand = (55 / 16.93) × 100% = 324.9 pod-percent
 ```
 
 Based on the calculated total CPU demand we can calculate theoretical
 stabilization pod counts. The table below sweeps the per-pod speed ±10% (and
 also 15% slower).
 
-(✅ = stable resting point):
+A ✅ marks a stable resting point where the HPA does not scale.
 
 | Per-pod speed vs. benchmark | +10% faster | Benchmark | 10% slower | 15% slower |
 | --------------------------- | ----------- | --------- | ---------- | ---------- |
-| Per-pod throughput (MiB/s)  | 18.3        | 16.64     | 15.0       | 14.1       |
-| Total CPU demand            | 300%        | 330%      | 367%       | 389%       |
-| **4 pods**                  | 75% ✅      | 83%       | 92%        | 97%        |
-| **5 pods**                  | 60% ✅      | 66% ✅    | 73% ✅     | 78%        |
-| **6 pods**                  | 50%         | 55%       | 61% ✅     | 65% ✅     |
-| **7 pods**                  | 43%         | 47%       | 53%        | 56%        |
+| Per-pod throughput (MiB/s)  | 18.62       | 16.93     | 15.24      | 14.39      |
+| Total CPU demand            | 295%        | 325%      | 361%       | 382%       |
+| **4 pods**                  | 74% ✅      | 81%       | 90%        | 96%        |
+| **5 pods**                  | 59% ✅      | 65% ✅    | 72% ✅     | 76% ✅     |
+| **6 pods**                  | 49%         | 54%       | 60% ✅     | 64% ✅     |
+| **7 pods**                  | 42%         | 46%       | 52%        | 55%        |
 
 We can see that these values are theoretical, since they're based on Phase 1's results.
 Even when we stabilized at the expected 5 pods the CPU utilization was around 70%
-instead of the projected 66%. Real world scenarios will likely fall somewhere
+instead of the projected 65%. Real world scenarios will likely fall somewhere
 in between the benchmark and the 10% slower band, which can lead to the results
 we observed.
 
 ```text
-((71% - 66%) / 66%) × 100 = 7.57
+((70% - 64.97%) / 64.97%) × 100 = 7.74%
 ```
 
-In the original Phase 4 run we're about 7.57% slower than the predicted benchmark.
+In the original Phase 4 run we're about 7.74% slower than the predicted benchmark.
 
 ## Results summary
 
 | | Phase 1 (1 pod) | Phase 2 (3 pods) | Phase 3 (8 pods) | Phase 4 (HPA) |
 | - | ----------------- | ------------------ | ------------------ | ------------------ |
-| Throughput | 16.64 MiB/s | 50.47 MiB/s | 56.80 MiB/s | **56.56 MiB/s** |
-| Events/s | 130,863 | 396,846 | 446,650 | **444,744** |
-| CPU per pod | 1000m (100%) | ~1000m (100%) | ~470m (47%) | **~710m (71%)** |
+| Throughput | 16.93 MiB/s | 49.07 MiB/s | 62.52 MiB/s | **60.69 MiB/s** |
+| Events/s | 133,098 | 385,840 | 491,589 | **477,203** |
+| CPU per pod | 1000m (100%) | ~970m (97%) | ~470m (47%) | **~700m (70%)** |
 | Bottleneck | Vector CPU | Vector CPU | None | None |
-| Scaling vs. Phase 1 | 1× | 3.03× | 3.41× | **3.40×** |
+| Scaling vs. Phase 1 | 1× | 2.90× | 3.69× | **3.58×** |
 | Pod count | manual (1) | manual (3) | manual (8) | **auto (5)** |
 
-Phase 4 reaches Phase 3's throughput with three fewer pods and no manual scaling.
+Phase 4 delivers throughput comparable to Phase 3 with three fewer pods and no manual scaling.
 The HPA scales to five pods, matching the prediction
-and keeping CPU near its 70% target instead of
+and keeping CPU at its 70% target instead of
 leaving each pod with roughly 53% of unused CPU capacity.
 
 ## Key takeaways
@@ -446,7 +453,7 @@ connection first, the in-flight request's events are lost along with it.
 
 ## Replicating these results
 
-The manifests, Helm values, and scripts used throughout this guide live in
+The Helm values, charts, and scripts used throughout this guide live in
 [`k8s-autoscaling/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling).
 
 The [`terraform/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling/terraform)
@@ -455,12 +462,20 @@ we used, if you don't already have a cluster to test
 against.
 
 Once the [Setup](#setup) steps are complete and Phase 1's producer and ingress
-are deployed, `run-experiment.sh` runs all four phases end to end: scaling the
-deployment, waiting for each rollout, measuring throughput, and creating the
-HPA for Phase 4. It then prints a single results table.
+are deployed, `run-experiment.sh` can run all four phases or one selected phase.
+It updates the Vector release, waits for the deployment to become ready,
+measures throughput, and manages the chart-provided HPA for Phase 4.
+
+The script first scales Vector to 0 replicas and waits for its pods to
+terminate, so every invocation starts from the same clean state instead of
+measuring a transition from the replica count left by a previous run.
 
 {{< embed file="content/en/guides/level-up/k8s-autoscaling/scripts/run-experiment.sh" open="false" >}}
 
 ```bash
+# Run all phases.
 KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh
+
+# Run one phase (1, 2, 3, or 4).
+KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh 4
 ```

@@ -1,0 +1,4 @@
+apiVersion: v2
+name: producer
+description: Lading load generator that produces apache_common log lines over HTTP
+version: 0.1.0

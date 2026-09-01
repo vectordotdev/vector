@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# run-experiment.sh — run all 4 Vector scaling phases and print a results table.
+# run-experiment.sh — run one or all Vector scaling phases and print results.
 #
 # Usage:
-#   KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh
+#   KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh [all|1|2|3|4]
 #
-# Requirements: kubectl, grpcurl, python3, Bash >= 4
+# Requirements: kubectl, helm, grpcurl, python3, Bash >= 4
 # The script assumes namespace, consumer, ingress-nginx, and ingress are already deployed.
 
 set -euo pipefail
@@ -16,8 +16,25 @@ if (( BASH_VERSINFO[0] < 4 )); then
   exit 1
 fi
 
+PHASE=${1:-all}
+if [[ "$#" -gt 1 ]]; then
+  echo "ERROR: expected at most one phase argument." >&2
+  exit 2
+fi
+case "$PHASE" in
+  all | 1 | 2 | 3 | 4) ;;
+  *)
+    echo "ERROR: phase must be one of: all, 1, 2, 3, 4." >&2
+    exit 2
+    ;;
+esac
+
 NAMESPACE=vector-perf
-PRODUCER_MANIFEST="$(dirname "${BASH_SOURCE[0]}")/../manifests/producer.yaml"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GUIDE_DIR="$(dirname "$SCRIPT_DIR")"
+PRODUCER_CHART="$GUIDE_DIR/manifests/producer-chart"
+VECTOR_VALUES="$GUIDE_DIR/values.yaml"
+VECTOR_CHART_VERSION=0.58.0
 TMPDIR_WORK=/tmp/vec-experiment-$$
 mkdir -p "$TMPDIR_WORK"
 trap 'rm -rf "$TMPDIR_WORK"; pkill -f "kubectl port-forward.*vector-perf.*pod/" 2>/dev/null || true' EXIT
@@ -25,11 +42,17 @@ trap 'rm -rf "$TMPDIR_WORK"; pkill -f "kubectl port-forward.*vector-perf.*pod/" 
 # ── helpers ───────────────────────────────────────────────────────────────────
 log() { echo "==> $*" >&2; }
 
-# K3s kubeconfig uses client-certificate auth — no AWS credentials needed.
+# Helm owns every desired-state change. kubectl is used only to observe the
+# cluster and port-forward to Vector's observability API.
 kube() { kubectl "$@"; }
 
-wait_rollout() {
-  kube rollout status deployment/vector -n "$NAMESPACE" --timeout=120s >&2
+helm_vector() {
+  helm upgrade --install vector vectordotdev/vector \
+    --namespace "$NAMESPACE" \
+    --version "$VECTOR_CHART_VERSION" \
+    -f "$VECTOR_VALUES" \
+    "$@" \
+    --wait --timeout=3m >/dev/null
 }
 
 # Wait until all Vector pods are Ready and have had a stable restart count for
@@ -76,8 +99,15 @@ wait_stable() {
   exit 1
 }
 
-delete_hpa() {
-  kube delete hpa vector -n "$NAMESPACE" 2>/dev/null || true
+# Scale Vector to 0 and wait for its pods to terminate, so every run (including
+# reruns against a cluster left over from a previous Phase 4) starts from the
+# same clean state instead of measuring a transition from whatever replica
+# count the last run ended on.
+reset_vector() {
+  log "Resetting Vector to 0 replicas for a clean run..."
+  helm_vector --set replicas=0 --set autoscaling.enabled=false
+  kube wait --for=delete pod -l app.kubernetes.io/name=vector \
+    -n "$NAMESPACE" --timeout=60s >/dev/null 2>&1 || true
 }
 
 pick_pods() {
@@ -200,9 +230,7 @@ run_static_phase() {
   local phase=$1 replicas=$2 out="$TMPDIR_WORK/phase${1}.txt"
 
   log "Phase $phase: scaling Vector to $replicas pod(s)..."
-  delete_hpa
-  kube scale deployment vector -n "$NAMESPACE" --replicas="$replicas" >/dev/null 2>&1
-  wait_rollout
+  helm_vector --set replicas="$replicas" --set autoscaling.enabled=false
   wait_stable
 
   log "Phase $phase: measuring all $replicas pod(s) (20 s warmup + 30 s window)..."
@@ -227,16 +255,15 @@ run_hpa_phase() {
   local out="$TMPDIR_WORK/phase4.txt"
 
   log "Phase 4: resetting to 1 pod and creating HPA (70% target, max 8)..."
-  delete_hpa
-  kube scale deployment vector -n "$NAMESPACE" --replicas=1 >/dev/null 2>&1
-  wait_rollout
+  helm_vector --set replicas=1 --set autoscaling.enabled=false
   wait_stable
-  kube autoscale deployment vector -n "$NAMESPACE" \
-    --cpu-percent=70 --min=1 --max=8 >/dev/null 2>&1
-  # Shorten scale-down stabilization from the 300s default so an HPA
-  # overshoot doesn't stall the experiment for minutes before correcting.
-  kube patch hpa vector -n "$NAMESPACE" --type merge \
-    -p '{"spec":{"behavior":{"scaleDown":{"stabilizationWindowSeconds":60}}}}' >/dev/null 2>&1
+  helm_vector \
+    --set replicas=1 \
+    --set autoscaling.enabled=true \
+    --set autoscaling.minReplicas=1 \
+    --set autoscaling.maxReplicas=8 \
+    --set autoscaling.targetCPUUtilizationPercentage=70 \
+    --set autoscaling.behavior.scaleDown.stabilizationWindowSeconds=60
 
   local start elapsed
   local last_replicas=1 scale_events=0 stable_count=0 last_stable=0
@@ -323,24 +350,49 @@ if ! kubectl cluster-info --request-timeout=5s >/dev/null 2>&1; then
 fi
 log "Cluster reachable."
 
-log "Applying producer manifest (lading, 55 MiB/s)..."
-kube apply -f "$PRODUCER_MANIFEST" >/dev/null 2>&1
-kube scale deployment producer -n "$NAMESPACE" --replicas=1 >/dev/null 2>&1
-kube rollout restart deployment producer -n "$NAMESPACE" >/dev/null 2>&1
-kube rollout status deployment/producer -n "$NAMESPACE" --timeout=120s >/dev/null 2>&1
+reset_vector
+
+log "Installing producer chart (lading, 55 MiB/s)..."
+helm upgrade --install producer "$PRODUCER_CHART" \
+  -n "$NAMESPACE" \
+  --set-string runId="$(date -u +%Y-%m-%dT%H:%M:%SZ)-$$" \
+  --wait --timeout=3m >/dev/null
 log "Waiting 20 s for lading to initialise..."
 sleep 20
 
-run_static_phase 1 1
-run_static_phase 2 3
-run_static_phase 3 8
-run_hpa_phase
+case "$PHASE" in
+  all)
+    run_static_phase 1 1
+    run_static_phase 2 3
+    run_static_phase 3 8
+    run_hpa_phase
+    ;;
+  1) run_static_phase 1 1 ;;
+  2) run_static_phase 2 3 ;;
+  3) run_static_phase 3 8 ;;
+  4) run_hpa_phase ;;
+esac
 
 # Load all results
 declare -A R
 for f in "$TMPDIR_WORK"/phase*.txt; do
   while IFS='=' read -r k v; do R[$k]=$v; done < "$f"
 done
+
+if [[ "$PHASE" != all ]]; then
+  key="PHASE${PHASE}"
+  echo ""
+  echo "Phase $PHASE results:"
+  echo "  Throughput: ${R[${key}_MIBPS]} MiB/s"
+  echo "  Events/s:   ${R[${key}_EPS]}"
+  echo "  Avg CPU:    ${R[${key}_CPU]}"
+  echo "  Pods:       ${R[${key}_PODS]}"
+  if [[ "$PHASE" == 4 ]]; then
+    echo "  Scale events: ${R[PHASE4_SCALE_EVENTS]}"
+    echo "  Equilibrium:  ${R[PHASE4_ELAPSED]}"
+  fi
+  exit 0
+fi
 
 # ── results table ─────────────────────────────────────────────────────────────
 echo ""
@@ -376,7 +428,7 @@ printf "│ %-12s │ %-12s │ %-12s │ %-12s │ %-11s │\n" \
   "${R[PHASE4_PODS]:-?}"
 printf "│ %-12s │ %-12s │ %-12s │ %-12s │ %-11s │\n" \
   "Bottleneck" \
-  "Vector CPU" "Vector CPU" "None" "— "
+  "Vector CPU" "Vector CPU" "None" "N/A"
 echo "└──────────────┴──────────────┴──────────────┴──────────────┴─────────────┘"
 echo ""
 echo "Phase 4: ${R[PHASE4_SCALE_EVENTS]:-?} scale events," \

@@ -5,7 +5,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: consumer
-  namespace: vector-perf
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -39,7 +39,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: consumer
-  namespace: vector-perf
+  namespace: {{ .Release.Namespace }}
 spec:
   selector:
     app: consumer

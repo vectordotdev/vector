@@ -1,19 +1,11 @@
-# Helm values for Vector, used across all phases of the k8s-autoscaling guide:
+# Helm values for Vector, used across all phases of the k8s-autoscaling guide.
+# Every phase applies this file through `helm upgrade` and overrides only the
+# replica count and autoscaling settings needed for that phase. This keeps Helm
+# as the sole owner of the Deployment and HPA desired state.
 #
-#   helm upgrade --install vector vectordotdev/vector \
-#     --namespace vector-perf \
-#     --version 0.56.0 \
-#     -f values.yaml \
-#     --set replicas=<n>
-#
-# Only the initial install (replicas=1) goes through Helm. After that, every
-# phase scales the Deployment directly via `kubectl scale` / `kubectl
-# autoscale`, so the live replica count drifts from this file — a later
-# `helm upgrade` without --set replicas would scale it back down to 1.
-#
-# Chart 0.56.0 pulls image tag 0.56.0-distroless-libc by default. The
-# throughput/HPA equilibrium numbers in this guide were measured against
-# that image; a different Vector version can shift the saturation point.
+# Chart 0.58.0 pulls image tag 0.58.0-distroless-libc by default. The benchmark
+# results in this guide were measured against that image; a different Vector
+# version can shift the saturation point.
 
 role: Stateless-Aggregator
 

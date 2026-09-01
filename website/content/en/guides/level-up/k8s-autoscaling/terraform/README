@@ -7,6 +7,7 @@ Prerequisites
 - Terraform >= 1.0
 - An AWS account/credentials with permission to create EC2 instances, key
   pairs, and security groups in the default VPC of the target region
+- Helm 3.0 or later, kubectl, and grpcurl installed on the local workstation
 - An SSH key pair to access the instance:
 
     ssh-keygen -t ed25519 -f ~/.ssh/vector_tests -N ""
@@ -29,11 +30,12 @@ Usage
    concurrent reproduction, also pass `-var="cluster_suffix=<your-username>"`
    to avoid name collisions.
 
-3. Use the generated kubeconfig with kubectl/helm and with
-   ../scripts/run-experiment.sh:
+3. Use the generated kubeconfig with Helm and with
+   ../scripts/run-experiment.sh. The script uses kubectl only for cluster
+   inspection and port-forwarding:
 
     export KUBECONFIG=$(terraform output -raw kubeconfig_path)
-    kubectl get nodes
+    helm list --all-namespaces
 
 4. When finished, tear the cluster down (pass the same `-var` flags you
    applied with):

@@ -182,5 +182,5 @@ output "instance_ip" {
 }
 
 output "kubeconfig_path" {
-  value = "${path.module}/kubeconfig"
+  value = abspath("${path.module}/kubeconfig")
 }

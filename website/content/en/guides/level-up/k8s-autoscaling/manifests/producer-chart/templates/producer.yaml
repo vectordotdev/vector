@@ -14,7 +14,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: lading-config
-  namespace: vector-perf
+  namespace: {{ .Release.Namespace }}
 data:
   lading.yaml: |
     generator:
@@ -34,7 +34,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: producer
-  namespace: vector-perf
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -42,6 +42,8 @@ spec:
       app: producer
   template:
     metadata:
+      annotations:
+        vector.dev/experiment-run: {{ .Values.runId | quote }}
       labels:
         app: producer
     spec:

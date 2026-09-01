@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: vector-http
-  namespace: vector-perf
+  namespace: {{ .Release.Namespace }}
   annotations:
     # Allow arbitrarily large POST bodies (100 MiB chunks from producers)
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
