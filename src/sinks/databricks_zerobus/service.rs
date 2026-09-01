@@ -317,8 +317,13 @@ impl ZerobusService {
         proxy: &ProxyConfig,
     ) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
-            .endpoint(&config.ingestion_endpoint)
-            .unity_catalog_url(&config.unity_catalog_endpoint)
+            .endpoint(config.ingestion_endpoint.to_string())
+            .unity_catalog_url(
+                config
+                    .unity_catalog_endpoint
+                    .to_string()
+                    .trim_end_matches('/'),
+            )
             .application_name(config.user_agent_suffix());
         builder = builder.connector_factory(build_connector_factory(proxy)?);
         let sdk = builder.build().map_err(|e| ZerobusSinkError::ConfigError {
@@ -352,7 +357,7 @@ impl ZerobusService {
         let (client_id, client_secret) = config.auth.credentials();
 
         let table_schema = unity_catalog_schema::fetch_table_schema(
-            &config.unity_catalog_endpoint,
+            &config.unity_catalog_endpoint.to_string(),
             &config.table_name,
             client_id,
             client_secret,
@@ -586,8 +591,13 @@ impl ZerobusService {
         config.validate()?;
 
         let sdk = ZerobusSdk::builder()
-            .endpoint(&config.ingestion_endpoint)
-            .unity_catalog_url(&config.unity_catalog_endpoint)
+            .endpoint(config.ingestion_endpoint.to_string())
+            .unity_catalog_url(
+                config
+                    .unity_catalog_endpoint
+                    .to_string()
+                    .trim_end_matches('/'),
+            )
             .build()
             .map_err(|e| ZerobusSinkError::ConfigError {
                 message: format!("Failed to create Zerobus SDK: {}", e),
@@ -703,14 +713,15 @@ mod tests {
     use crate::sinks::databricks_zerobus::config::{
         DatabricksAuthentication, ZerobusStreamOptions,
     };
+    use crate::sinks::util::HttpEndpoint;
     use databricks_zerobus_ingest_sdk::ZerobusError;
     use vector_lib::sensitive_string::SensitiveString;
 
     fn test_config() -> ZerobusSinkConfig {
         ZerobusSinkConfig {
-            ingestion_endpoint: "https://127.0.0.1:1".to_string(),
+            ingestion_endpoint: HttpEndpoint::parse("https://127.0.0.1:1").unwrap(),
             table_name: "test.default.logs".to_string(),
-            unity_catalog_endpoint: "https://127.0.0.1:1".to_string(),
+            unity_catalog_endpoint: HttpEndpoint::parse("https://127.0.0.1:1").unwrap(),
             auth: DatabricksAuthentication::OAuth {
                 client_id: SensitiveString::from("id".to_string()),
                 client_secret: SensitiveString::from("secret".to_string()),
@@ -1043,12 +1054,12 @@ mod tests {
         let resolved = ResolvedSchema::for_test(schema);
 
         let mut e1 = LogEvent::default();
-        e1.insert("id", 1i64);
-        e1.insert("body", "hello");
-        e1.insert("ts", Utc::now());
+        e1.insert(vrl::event_path!("id"), 1i64);
+        e1.insert(vrl::event_path!("body"), "hello");
+        e1.insert(vrl::event_path!("ts"), Utc::now());
 
         let mut e2 = LogEvent::default();
-        e2.insert("id", 2i64);
+        e2.insert(vrl::event_path!("id"), 2i64);
         // `body` and `ts` omitted — both nullable, so they encode as null.
 
         let batch =
@@ -1086,7 +1097,7 @@ mod tests {
         let resolved = ResolvedSchema::for_test(schema);
 
         let mut e = LogEvent::default();
-        e.insert("body", "no id here"); // `id` omitted
+        e.insert(vrl::event_path!("body"), "no id here"); // `id` omitted
 
         let err = ZerobusService::encode_batch(&resolved, &[Event::Log(e)]).unwrap_err();
         assert!(matches!(err, ZerobusSinkError::EncodingError { .. }));

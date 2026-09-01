@@ -13,9 +13,9 @@ name = "generate-avro-fixtures"
 path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
-apache-avro = { version = "0.20.0", default-features = false }
-arrow = { version = "58.2.0", default-features = false, features = ["ipc", "json"], optional = true }
-parquet = { version = "58.2.0", default-features = false, features = [
+apache-avro = { version = "0.22.0", default-features = false }
+arrow = { version = "59.2.0", default-features = false, features = ["ipc", "json"], optional = true }
+parquet = { version = "59.2.0", default-features = false, features = [
     "arrow",
     "snap",
     "zstd",
@@ -25,11 +25,8 @@ parquet = { version = "58.2.0", default-features = false, features = [
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
-chrono-tz.workspace = true
-rust_decimal.workspace = true
 csv-core = { version = "0.1.13", default-features = false }
 derivative.workspace = true
-derive_more = { version = "2.1.1", optional = true, features = ["from", "display"] }
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 futures.workspace = true
@@ -47,7 +44,6 @@ regex.workspace = true
 serde.workspace = true
 serde_with.workspace = true
 serde_json.workspace = true
-serde-aux = { version = "4.5", optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
 strum = { workspace = true, optional = true }
@@ -60,25 +56,36 @@ vector-common = { path = "../vector-common", default-features = false }
 vector-common-macros.workspace = true
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
-vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
+vector-core = { path = "../vector-core", default-features = false }
 vector-vrl-functions.workspace = true
 toml = { version = "0.9.8", optional = true }
 
 [dev-dependencies]
+criterion.workspace = true
 futures.workspace = true
 indoc.workspace = true
+proptest.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
-similar-asserts = "1.7.0"
-vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
+similar-asserts = "2.0.0"
+tempfile.workspace = true
+vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
 rstest = "0.26.1"
 tracing-test = "0.2.6"
 uuid.workspace = true
 vrl.workspace = true
+# `zdict_builder` exposes dictionary training, used only to build test fixtures.
+zstd = { workspace = true, features = ["zdict_builder"] }
 
 [features]
 arrow = ["dep:arrow", "arrow/chrono-tz"]
 parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
-syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:toml"]
 test = []
+
+[[bench]]
+name = "codecs"
+path = "benches/main.rs"
+harness = false
+required-features = ["opentelemetry"]

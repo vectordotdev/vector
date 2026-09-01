@@ -1,0 +1,20 @@
+sinks:
+  my_sink_id:
+    type: gcp_cloud_storage
+    inputs:
+      - my-source-or-transform-id
+    acl: authenticated-read
+    bucket: my-bucket
+    cache_control: no-transform
+    compression: none
+    content_encoding: gzip
+    content_type: text/plain; charset=utf-8
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    endpoint: https://storage.googleapis.com/
+    filename_append_uuid: true
+    filename_time_format: "%s"
+    key_prefix: date=%F/
+    storage_class: ARCHIVE
+    timezone: local

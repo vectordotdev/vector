@@ -1,11 +1,18 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
+)]
+
+use derivative::Derivative;
 use futures::FutureExt;
-use http::{Request, Uri, header::AUTHORIZATION};
+use http::{HeaderValue, Request, header::AUTHORIZATION};
 use hyper::Body;
 use tower::ServiceBuilder;
 use vector_lib::{
     config::{AcknowledgementsConfig, DataType, Input, proxy::ProxyConfig},
     configurable::configurable_component,
     sensitive_string::SensitiveString,
+    stream::BatcherSettings,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -15,12 +22,14 @@ use super::{
 };
 use crate::{
     codecs::Transformer,
+    config::ValidatedSink,
     http::HttpClient,
     sinks::{
-        BuildError, Healthcheck, HealthcheckError, VectorSink,
+        Healthcheck, HealthcheckError, VectorSink,
         prelude::{SinkConfig, SinkContext},
         util::{
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, Compression, HttpEndpoint, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
             http::{HttpStatusRetryLogic, RetryStrategy},
         },
     },
@@ -28,39 +37,35 @@ use crate::{
 
 /// Configuration for the `appsignal` sink.
 #[configurable_component(sink("appsignal", "Deliver log and metric event data to AppSignal."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 pub(super) struct AppsignalConfig {
     /// The URI for the AppSignal API to send data to.
     #[configurable(validation(format = "uri"))]
     #[configurable(metadata(docs::examples = "https://appsignal-endpoint.net"))]
+    #[derivative(Default(value = "default_endpoint()"))]
     #[serde(default = "default_endpoint")]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// A valid app-level AppSignal Push API key.
     #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
     #[configurable(metadata(docs::examples = "${APPSIGNAL_PUSH_API_KEY}"))]
     push_api_key: SensitiveString,
 
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<AppsignalDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -68,13 +73,12 @@ pub(super) struct AppsignalConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     retry_strategy: RetryStrategy,
 }
 
-pub(super) fn default_endpoint() -> String {
-    "https://appsignal-endpoint.net".to_string()
+pub(super) fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://appsignal-endpoint.net").unwrap()
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -87,16 +91,21 @@ impl SinkBatchSettings for AppsignalDefaultBatchSettings {
 }
 
 impl AppsignalConfig {
-    pub(super) fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
-        let client = HttpClient::new(tls, proxy)?;
+    pub(super) fn build_client(
+        &self,
+        proxy: &ProxyConfig,
+        tls: &MaybeTlsSettings,
+    ) -> crate::Result<HttpClient> {
+        let client = HttpClient::new(tls.clone(), proxy)?;
         Ok(client)
     }
 
-    pub(super) fn build_sink(&self, http_client: HttpClient) -> crate::Result<VectorSink> {
-        let batch_settings = self.batch.into_batcher_settings()?;
-
-        let endpoint = endpoint_uri(&self.endpoint, "vector/events")?;
+    pub(super) fn build_sink(
+        &self,
+        http_client: HttpClient,
+        batch_settings: BatcherSettings,
+        endpoint: HttpEndpoint,
+    ) -> crate::Result<VectorSink> {
         let push_api_key = self.push_api_key.clone();
         let compression = self.compression;
         let service = AppsignalService::new(http_client, endpoint, push_api_key, compression);
@@ -129,19 +138,6 @@ impl_generate_config_from_default!(AppsignalConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "appsignal")]
 impl SinkConfig for AppsignalConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(cx.proxy())?;
-        let healthcheck = healthcheck(
-            endpoint_uri(&self.endpoint, "vector/healthcheck")?,
-            self.push_api_key.inner().to_string(),
-            client.clone(),
-        )
-        .boxed();
-        let sink = self.build_sink(client)?;
-
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::new(DataType::Metric | DataType::Log)
     }
@@ -151,8 +147,65 @@ impl SinkConfig for AppsignalConfig {
     }
 }
 
-async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crate::Result<()> {
-    let request = Request::get(uri).header(AUTHORIZATION, format!("Bearer {push_api_key}"));
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub struct ValidatedAppsignal {
+    batch_settings: BatcherSettings,
+    endpoint: HttpEndpoint,
+    healthcheck_endpoint: HttpEndpoint,
+    // Omitted: `authorization` embeds the push API key.
+    #[derivative(Debug = "ignore")]
+    authorization: HeaderValue,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AppsignalConfig {
+    type Validated = ValidatedAppsignal;
+
+    fn validate(&self) -> crate::Result<ValidatedAppsignal> {
+        let batch_settings = self.batch.into_batcher_settings()?;
+        let endpoint = endpoint_uri(&self.endpoint, "vector/events")?;
+        let healthcheck_endpoint = endpoint_uri(&self.endpoint, "vector/healthcheck")?;
+        let authorization = HeaderValue::from_str(&format!("Bearer {}", self.push_api_key.inner()))
+            .map_err(|e| format!("invalid push_api_key: {e}"))?;
+
+        Ok(ValidatedAppsignal {
+            batch_settings,
+            endpoint,
+            healthcheck_endpoint,
+            authorization,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAppsignal,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedAppsignal {
+            batch_settings,
+            endpoint,
+            healthcheck_endpoint,
+            authorization,
+        } = validated.clone();
+
+        // TLS settings may read certificate files from disk, so they are
+        // resolved at build time rather than during pure validation.
+        let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
+        let client = self.build_client(cx.proxy(), &tls)?;
+        let healthcheck = healthcheck(healthcheck_endpoint, authorization, client.clone()).boxed();
+        let sink = self.build_sink(client, batch_settings, endpoint)?;
+
+        Ok((sink, healthcheck))
+    }
+}
+
+async fn healthcheck(
+    uri: HttpEndpoint,
+    authorization: HeaderValue,
+    client: HttpClient,
+) -> crate::Result<()> {
+    let request = Request::get(uri.as_uri()).header(AUTHORIZATION, authorization);
     let response = client.send(request.body(Body::empty()).unwrap()).await?;
 
     match response.status() {
@@ -161,21 +214,13 @@ async fn healthcheck(uri: Uri, push_api_key: String, client: HttpClient) -> crat
     }
 }
 
-pub fn endpoint_uri(endpoint: &str, path: &str) -> crate::Result<Uri> {
-    let uri = if endpoint.ends_with('/') {
-        format!("{endpoint}{path}")
-    } else {
-        format!("{endpoint}/{path}")
-    };
-    match uri.parse::<Uri>() {
-        Ok(u) => Ok(u),
-        Err(e) => Err(Box::new(BuildError::UriParseError { source: e })),
-    }
+pub fn endpoint_uri(endpoint: &HttpEndpoint, path: &str) -> crate::Result<HttpEndpoint> {
+    Ok(endpoint.append_path(path)?)
 }
 
 #[cfg(test)]
 mod test {
-    use super::{AppsignalConfig, endpoint_uri};
+    use super::{AppsignalConfig, HttpEndpoint, endpoint_uri};
 
     #[test]
     fn generate_config() {
@@ -184,7 +229,10 @@ mod test {
 
     #[test]
     fn endpoint_uri_with_path() {
-        let uri = endpoint_uri("https://appsignal-endpoint.net", "vector/events");
+        let uri = endpoint_uri(
+            &HttpEndpoint::parse("https://appsignal-endpoint.net").unwrap(),
+            "vector/events",
+        );
         assert_eq!(
             uri.expect("Not a valid URI").to_string(),
             "https://appsignal-endpoint.net/vector/events"
@@ -193,10 +241,47 @@ mod test {
 
     #[test]
     fn endpoint_uri_with_trailing_slash() {
-        let uri = endpoint_uri("https://appsignal-endpoint.net/", "vector/events");
+        let uri = endpoint_uri(
+            &HttpEndpoint::parse("https://appsignal-endpoint.net/").unwrap(),
+            "vector/events",
+        );
         assert_eq!(
             uri.expect("Not a valid URI").to_string(),
             "https://appsignal-endpoint.net/vector/events"
+        );
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let config = AppsignalConfig {
+            endpoint: HttpEndpoint::parse("https://appsignal-endpoint.net").unwrap(),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.endpoint.to_string(),
+            "https://appsignal-endpoint.net/vector/events"
+        );
+        assert_eq!(
+            validated.healthcheck_endpoint.to_string(),
+            "https://appsignal-endpoint.net/vector/healthcheck"
+        );
+    }
+
+    #[test]
+    fn validate_fails_on_invalid_push_api_key() {
+        use crate::config::ValidatedSink;
+
+        let config = AppsignalConfig {
+            endpoint: HttpEndpoint::parse("https://appsignal-endpoint.net").unwrap(),
+            push_api_key: "key\nwith_newline".to_string().into(),
+            ..Default::default()
+        };
+        assert!(
+            config.validate().is_err(),
+            "an API key with an invalid header byte must fail validation"
         );
     }
 }

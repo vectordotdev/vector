@@ -15,7 +15,7 @@ use crate::{
     event::{Event, Value},
     internal_events::AwsCloudwatchLogsMessageSizeError,
     sinks::{aws_cloudwatch_logs::CloudwatchKey, util::metadata::RequestMetadataBuilder},
-    template::Template,
+    template::{ConfinedTemplate, UnconfinedTemplate},
 };
 
 // Estimated maximum size of InputLogEvent is 50 bytes with an empty message
@@ -51,8 +51,8 @@ impl MetaDescriptive for CloudwatchRequest {
 }
 
 pub struct CloudwatchRequestBuilder {
-    pub group_template: Template,
-    pub stream_template: Template,
+    pub group_template: ConfinedTemplate,
+    pub stream_template: UnconfinedTemplate,
     pub transformer: Transformer,
     pub encoder: Encoder<()>,
 }
@@ -143,12 +143,24 @@ mod tests {
     use vector_lib::{config::log_schema, event::LogEvent};
 
     use super::{CloudwatchRequestBuilder, MAX_MESSAGE_SIZE};
+    use crate::template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate};
+
+    fn confined(src: &str, field: &'static str) -> ConfinedTemplate {
+        Template::try_from(src)
+            .unwrap()
+            .confine(&ConfinementConfig::default(), "aws_cloudwatch_logs", field)
+            .unwrap()
+    }
+
+    fn unconfined(src: &str) -> UnconfinedTemplate {
+        UnconfinedTemplate::try_from(src).unwrap()
+    }
 
     #[test]
     fn test() {
         let mut request_builder = CloudwatchRequestBuilder {
-            group_template: "group".try_into().unwrap(),
-            stream_template: "stream".try_into().unwrap(),
+            group_template: confined("group", "group_name"),
+            stream_template: unconfined("stream"),
             transformer: Default::default(),
             encoder: Default::default(),
         };
@@ -165,8 +177,8 @@ mod tests {
     #[test]
     fn test_rejects_oversized_log_event() {
         let mut request_builder = CloudwatchRequestBuilder {
-            group_template: "group".try_into().unwrap(),
-            stream_template: "stream".try_into().unwrap(),
+            group_template: confined("group", "group_name"),
+            stream_template: unconfined("stream"),
             transformer: Default::default(),
             encoder: Default::default(),
         };

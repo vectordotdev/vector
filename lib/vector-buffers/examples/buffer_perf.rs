@@ -11,7 +11,7 @@ use std::{
 use bytes::{Buf, BufMut};
 use clap::{Arg, Command};
 use hdrhistogram::Histogram;
-use rand::Rng;
+use rand::RngExt;
 use tokio::{select, sync::oneshot, task, time};
 use tracing::{Span, debug, info};
 use tracing_subscriber::EnvFilter;
@@ -27,6 +27,7 @@ use vector_common::{
     byte_size_of::ByteSizeOf,
     finalization::{
         AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+        MergeFinalizable,
     },
 };
 
@@ -69,9 +70,17 @@ impl EventCount for VariableMessage {
     }
 }
 
+impl Bufferable for VariableMessage {}
+
 impl Finalizable for VariableMessage {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
+    }
+}
+
+impl MergeFinalizable for VariableMessage {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.finalizers.merge(finalizers);
     }
 }
 

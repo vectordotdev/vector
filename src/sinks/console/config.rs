@@ -10,7 +10,9 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     sinks::{Healthcheck, VectorSink, console::sink::WriterSink},
 };
 
@@ -41,14 +43,12 @@ pub enum Target {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {
-    #[configurable(derived)]
     #[serde(default = "default_target")]
     pub target: Target,
 
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -62,8 +62,8 @@ const fn default_target() -> Target {
 }
 
 impl GenerateConfig for ConsoleSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             target: Target::Stdout,
             encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
             acknowledgements: Default::default(),
@@ -75,7 +75,28 @@ impl GenerateConfig for ConsoleSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::new(self.encoding.config().1.input_type())
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for ConsoleSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<()> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &(),
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
@@ -83,25 +104,17 @@ impl SinkConfig for ConsoleSinkConfig {
         let sink: VectorSink = match self.target {
             Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
                 output: io::stdout(),
-                transformer,
+                transformer: transformer.clone(),
                 encoder,
             }),
             Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
                 output: io::stderr(),
-                transformer,
+                transformer: transformer.clone(),
                 encoder,
             }),
         };
 
         Ok((sink, future::ok(()).boxed()))
-    }
-
-    fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 

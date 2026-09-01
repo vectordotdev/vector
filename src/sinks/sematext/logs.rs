@@ -1,4 +1,10 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
+)]
+
 use async_trait::async_trait;
+use derivative::Derivative;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
@@ -7,14 +13,16 @@ use vrl::event_path;
 use super::Region;
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::EventArray,
     sinks::{
         Healthcheck, VectorSink,
         elasticsearch::{BulkConfig, ElasticsearchApiVersion, ElasticsearchConfig},
         util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, StreamSink,
-            TowerRequestConfig, http::RequestConfig,
+            BatchConfig, Compression, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
+            StreamSink, TowerRequestConfig, http::RequestConfig,
         },
     },
     template::Template,
@@ -25,7 +33,6 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct SematextLogsConfig {
     #[serde(default = "super::default_region")]
-    #[configurable(derived)]
     region: Region,
 
     /// The endpoint to send data to.
@@ -41,19 +48,15 @@ pub struct SematextLogsConfig {
     #[configurable(metadata(docs::examples = "some-sematext-token"))]
     token: SensitiveString,
 
-    #[configurable(derived)]
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -63,9 +66,9 @@ pub struct SematextLogsConfig {
 }
 
 impl GenerateConfig for SematextLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            token = "${SEMATEXT_TOKEN}"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            token: ${SEMATEXT_TOKEN}
         "#})
         .unwrap()
     }
@@ -78,22 +81,78 @@ const EU_ENDPOINT: &str = "https://logsene-receiver.eu.sematext.com";
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::log()
+    }
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub struct ValidatedSematextLogs {
+    endpoint: String,
+    // Omitted: `index` is built from the write token and would leak it via Debug.
+    #[derivative(Debug = "ignore")]
+    index: Template,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for SematextLogsConfig {
+    type Validated = ValidatedSematextLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedSematextLogs> {
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(endpoint), _) => endpoint.clone(),
             (None, Region::Us) => US_ENDPOINT.to_owned(),
             (None, Region::Eu) => EU_ENDPOINT.to_owned(),
         };
 
-        let (sink, healthcheck) = ElasticsearchConfig {
+        let index = Template::try_from(self.token.inner())
+            .map_err(|error| format!("unable to parse token as Template: {error}"))?;
+
+        // Run the derived Elasticsearch config's full structural validation
+        // (endpoints, batch, versioning, confinement) so a malformed endpoint
+        // or token template is rejected here rather than at startup.
+        self.derived_elasticsearch_config(&endpoint, &index)?
+            .validate()?;
+
+        Ok(ValidatedSematextLogs { endpoint, index })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedSematextLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedSematextLogs { endpoint, index } = validated;
+
+        let es_config = self.derived_elasticsearch_config(endpoint, index)?;
+        let (sink, healthcheck) = SinkConfig::build(&es_config, cx).await?;
+
+        let stream = sink.into_stream();
+        let mapped_stream = MapTimestampStream { inner: stream };
+
+        Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
+    }
+}
+
+impl SematextLogsConfig {
+    /// Build the Elasticsearch config this sink delegates to.
+    fn derived_elasticsearch_config(
+        &self,
+        endpoint: &str,
+        index: &Template,
+    ) -> crate::Result<ElasticsearchConfig> {
+        let endpoint =
+            HttpEndpoint::parse(endpoint).map_err(|e| format!("invalid Sematext endpoint: {e}"))?;
+        Ok(ElasticsearchConfig {
             endpoints: vec![endpoint],
             compression: Compression::None,
-            doc_type: "\
-                logs"
-                .to_string(),
+            doc_type: "logs".to_string(),
             bulk: BulkConfig {
-                index: Template::try_from(self.token.inner())
-                    .expect("unable to parse token as Template"),
+                index: index.clone(),
                 ..Default::default()
             },
             batch: self.batch,
@@ -104,22 +163,7 @@ impl SinkConfig for SematextLogsConfig {
             encoding: self.encoding.clone(),
             api_version: ElasticsearchApiVersion::V6,
             ..Default::default()
-        }
-        .build(cx)
-        .await?;
-
-        let stream = sink.into_stream();
-        let mapped_stream = MapTimestampStream { inner: stream };
-
-        Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
+        })
     }
 }
 
@@ -162,7 +206,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::SinkConfig,
+        config::{SinkConfig, ValidatedSink},
         sinks::util::test::{build_test_server, load_sink},
         test_util::{
             addr::next_addr,
@@ -176,6 +220,117 @@ mod tests {
         crate::test_util::test_generate_config::<SematextLogsConfig>();
     }
 
+    #[test]
+    fn prepares_valid_config() {
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: None,
+            token: "mylogtoken".to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.endpoint, US_ENDPOINT);
+        assert_eq!(validated.index.get_ref(), "mylogtoken");
+    }
+
+    #[test]
+    fn debug_impl_does_not_leak_token() {
+        // `ValidatedSematextLogs`'s `index` field is built from the write token,
+        // so its Debug output must not expose the token value.
+        let token = "mylogtoken";
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: None,
+            token: token.to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        let debug = format!("{validated:?}");
+        assert!(
+            !debug.contains(token),
+            "Debug output must not contain the write token, got: {debug}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_unconfined_token_template() {
+        // A token that is an unconfined routing template (no literal prefix)
+        // passes template parsing but is rejected by the derived Elasticsearch
+        // config's confinement check. Structural validation must catch it here
+        // rather than deferring the error to startup.
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: None,
+            token: "{{ index }}".to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        assert!(
+            config.validate().is_err(),
+            "an unconfined token template should fail validation"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_malformed_token_template() {
+        // A token with invalid template syntax (a dangling `%` is an invalid
+        // strftime item) must surface a validation error rather than panic
+        // during structural validation.
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: None,
+            token: "%".to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let err = config
+            .validate()
+            .expect_err("a malformed token template should fail validation");
+        assert!(
+            err.to_string()
+                .contains("unable to parse token as Template"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        // A custom endpoint that parses as a URI but has no host must be
+        // rejected by the derived Elasticsearch config's structural validation
+        // rather than failing at startup.
+        let config = SematextLogsConfig {
+            region: Region::Us,
+            endpoint: Some("/path".to_string()),
+            token: "mylogtoken".to_string().into(),
+            encoding: Default::default(),
+            request: Default::default(),
+            batch: Default::default(),
+            acknowledgements: Default::default(),
+        };
+
+        let err = config
+            .validate()
+            .expect_err("an endpoint without a host should fail validation");
+        assert!(
+            err.to_string().contains("invalid Sematext endpoint"),
+            "unexpected error: {err}"
+        );
+    }
+
     #[tokio::test]
     async fn smoke() {
         let (mut config, cx) = load_sink::<SematextLogsConfig>(indoc! {r#"
@@ -184,14 +339,14 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        _ = config.build(cx.clone()).await.unwrap();
+        _ = SinkConfig::build(&config, cx.clone()).await.unwrap();
 
         let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         config.endpoint = Some(format!("http://{addr}"));
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);

@@ -9,10 +9,16 @@ use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
 use super::{
-    encoder::StackdriverLogsEncoder, request_builder::StackdriverLogsRequestBuilder,
-    service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
+    encoder::{
+        StackdriverLabelConfig as EncoderLabelConfig, StackdriverLogsEncoder,
+        StackdriverResource as EncoderResource,
+    },
+    request_builder::StackdriverLogsRequestBuilder,
+    service::StackdriverLogsServiceRequestBuilder,
+    sink::StackdriverLogsSink,
 };
 use crate::{
+    config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
@@ -20,11 +26,12 @@ use crate::{
         gcs_common::config::healthcheck_response,
         prelude::*,
         util::{
-            BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
+            BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },
+    template::{ConfinementConfig, UnconfinedTemplate},
 };
 
 #[derive(Debug, Snafu)]
@@ -45,11 +52,13 @@ impl TowerRequestConfigDefaults for StackdriverTowerRequestConfigDefaults {
     "gcp_stackdriver_logs",
     "Deliver logs to GCP's Cloud Operations suite."
 ))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct StackdriverConfig {
+    #[derivative(Default(value = "default_endpoint()"))]
     #[serde(skip, default = "default_endpoint")]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     #[serde(flatten)]
     pub(super) log_name: StackdriverLogName,
@@ -84,22 +93,17 @@ pub(super) struct StackdriverConfig {
     #[serde(flatten)]
     pub(super) auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(super) encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig<StackdriverTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     pub(super) tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -107,13 +111,16 @@ pub(super) struct StackdriverConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
-pub(super) fn default_endpoint() -> String {
-    "https://logging.googleapis.com/v2/entries:write".to_string()
+pub(super) fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://logging.googleapis.com/v2/entries:write")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
@@ -180,13 +187,16 @@ pub(super) struct StackdriverLabelConfig {
     ))]
     #[configurable(metadata(docs::examples = "labels_examples()"))]
     #[serde(default)]
-    pub(super) labels: HashMap<String, Template>,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
 }
 
 fn labels_examples() -> HashMap<String, String> {
     let mut example = HashMap::new();
     example.insert("label_1".to_string(), "value_1".to_string());
-    example.insert("label_2".to_string(), "{{ template_value_2 }}".to_string());
+    example.insert(
+        "label_2".to_string(),
+        "label-{{ template_value_2 }}".to_string(),
+    );
     example
 }
 
@@ -223,13 +233,13 @@ pub(super) struct StackdriverResource {
     #[serde(flatten)]
     #[configurable(metadata(docs::additional_props_description = "A type-specific label."))]
     #[configurable(metadata(docs::examples = "label_examples()"))]
-    pub(super) labels: HashMap<String, Template>,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
 }
 
 fn label_examples() -> HashMap<String, String> {
     let mut example = HashMap::new();
     example.insert("instanceId".to_string(), "Twilight".to_string());
-    example.insert("zone".to_string(), "{{ zone }}".to_string());
+    example.insert("zone".to_string(), "zone-{{ zone }}".to_string());
     example
 }
 
@@ -238,54 +248,8 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let auth = self.auth.build(Scope::LoggingWrite).await?;
-
-        let request_builder = StackdriverLogsRequestBuilder {
-            encoder: StackdriverLogsEncoder::new(
-                self.encoding.clone(),
-                self.log_id.clone(),
-                self.log_name.clone(),
-                self.label_config.clone(),
-                self.resource.clone(),
-                self.severity_key.clone(),
-            ),
-        };
-
-        let batch_settings = self
-            .batch
-            .validate()?
-            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
-            .into_batcher_settings()?;
-
-        let request_limits = self.request.into_settings();
-
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
-
-        let uri: Uri = self.endpoint.parse()?;
-
-        let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
-            uri: uri.clone(),
-            auth: auth.clone(),
-        };
-
-        let service = HttpService::new(client.clone(), stackdriver_logs_service_request_builder);
-
-        let service = ServiceBuilder::new()
-            .settings(
-                request_limits,
-                http_response_retry_logic(self.retry_strategy.clone()),
-            )
-            .service(service);
-
-        let sink = StackdriverLogsSink::new(service, batch_settings, request_builder);
-
-        let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
-
-        auth.spawn_regenerate_token();
-
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -298,6 +262,97 @@ impl SinkConfig for StackdriverConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for StackdriverConfig {
+    type Validated = ValidatedStackdriverLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedStackdriverLogs> {
+        let log_id = self
+            .log_id
+            .clone()
+            .confine(&self.confinement, Self::NAME, "log_id")?;
+
+        let resource = EncoderResource {
+            type_: self.resource.type_.clone(),
+            labels: self.resource.labels.clone(),
+        };
+
+        let label_config = EncoderLabelConfig {
+            labels_key: self.label_config.labels_key.clone(),
+            labels: self.label_config.labels.clone(),
+        };
+
+        let encoder = StackdriverLogsEncoder::new(
+            self.encoding.clone(),
+            log_id,
+            self.log_name.clone(),
+            label_config,
+            resource,
+            self.severity_key.clone(),
+        );
+
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
+            .into_batcher_settings()?;
+
+        Ok(ValidatedStackdriverLogs {
+            encoder,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedStackdriverLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedStackdriverLogs {
+            encoder,
+            batch_settings,
+        } = validated;
+
+        let auth = self.auth.build(Scope::LoggingWrite).await?;
+
+        let request_builder = StackdriverLogsRequestBuilder {
+            encoder: encoder.clone(),
+        };
+
+        let request_limits = self.request.into_settings();
+
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
+
+        let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
+            uri: self.endpoint.as_uri().clone(),
+            auth: auth.clone(),
+        };
+
+        let service = HttpService::new(client.clone(), stackdriver_logs_service_request_builder);
+
+        let service = ServiceBuilder::new()
+            .settings(
+                request_limits,
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
+            .service(service);
+
+        let sink = StackdriverLogsSink::new(service, *batch_settings, request_builder);
+
+        let healthcheck = healthcheck(client, auth.clone(), self.endpoint.as_uri().clone()).boxed();
+
+        auth.spawn_regenerate_token();
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedStackdriverLogs {
+    encoder: StackdriverLogsEncoder,
+    batch_settings: BatcherSettings,
 }
 
 async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> crate::Result<()> {
@@ -318,4 +373,52 @@ async fn healthcheck(client: HttpClient, auth: GcpAuthenticator, uri: Uri) -> cr
     let response = client.send(request).await?;
 
     healthcheck_response(response, HealthcheckError::NotFound.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::ValidatedSink;
+    use crate::template::{ConfinementConfig, Template};
+
+    use super::*;
+
+    #[test]
+    fn confinement_rejects_unconfined_log_id() {
+        let template = Template::try_from("{{ log_id }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_log_id() {
+        let template = Template::try_from("{{ log_id }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_log_id() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "gcp_stackdriver_logs", "log_id");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        let config = StackdriverConfig {
+            log_id: "events-{{ env }}".try_into().unwrap(),
+            endpoint: default_endpoint(),
+            ..Default::default()
+        };
+        config.validate().expect("validation should succeed");
+        assert_eq!(
+            config.endpoint.to_string(),
+            "https://logging.googleapis.com/v2/entries:write"
+        );
+    }
 }

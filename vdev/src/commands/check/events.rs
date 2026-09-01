@@ -692,7 +692,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
         let trait_name = node
             .trait_
             .as_ref()
-            .and_then(|(_, path, _)| path.segments.last())
+            .and_then(|(path, _)| path.segments.last())
             .map(|s| s.ident.to_string());
         let event_name = match &*node.self_ty {
             Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()),

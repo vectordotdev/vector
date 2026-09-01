@@ -34,10 +34,8 @@ pub struct FileDescriptorSourceConfig {
     /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     pub host_key: Option<OptionalValuePath>,
 
-    #[configurable(derived)]
     pub framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
@@ -71,7 +69,7 @@ impl FileDescriptorConfig for FileDescriptorSourceConfig {
 }
 
 impl GenerateConfig for FileDescriptorSourceConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         let fd = null_fd().unwrap();
         toml::from_str(&format!(
             r#"

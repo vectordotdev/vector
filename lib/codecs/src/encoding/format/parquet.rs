@@ -118,12 +118,10 @@ pub struct ParquetSerializerConfig {
 
     /// Compression codec applied per column page inside the Parquet file.
     #[serde(default)]
-    #[configurable(derived)]
     pub compression: ParquetCompression,
 
     /// Controls how events with fields not present in the schema are handled.
     #[serde(default)]
-    #[configurable(derived)]
     pub schema_mode: ParquetSchemaMode,
 }
 
@@ -441,6 +439,7 @@ mod tests {
     use parquet::record::reader::RowIter;
     use tokio_util::codec::Encoder;
     use vector_core::event::LogEvent;
+    use vrl::event_path;
 
     fn create_event<V>(fields: Vec<(&str, V)>) -> Event
     where
@@ -448,7 +447,7 @@ mod tests {
     {
         let mut log = LogEvent::default();
         for (key, value) in fields {
-            log.insert(key, value.into());
+            log.insert(&vrl::path::parse_target_path(key).unwrap(), value.into());
         }
         Event::Log(log)
     }
@@ -490,14 +489,14 @@ mod tests {
     ) -> Event {
         use vector_core::event::Value;
         let mut log = LogEvent::default();
-        log.insert("host", "localhost");
-        log.insert("message", message);
-        log.insert("service", "vector");
-        log.insert("source_type", "demo_logs");
-        log.insert("timestamp", Value::Timestamp(timestamp));
-        log.insert("random_time", Value::Timestamp(timestamp));
-        log.insert("status_code", Value::Integer(status_code));
-        log.insert("response_time_secs", response_time_secs);
+        log.insert(event_path!("host"), "localhost");
+        log.insert(event_path!("message"), message);
+        log.insert(event_path!("service"), "vector");
+        log.insert(event_path!("source_type"), "demo_logs");
+        log.insert(event_path!("timestamp"), Value::Timestamp(timestamp));
+        log.insert(event_path!("random_time"), Value::Timestamp(timestamp));
+        log.insert(event_path!("status_code"), Value::Integer(status_code));
+        log.insert(event_path!("response_time_secs"), response_time_secs);
         Event::Log(log)
     }
 
@@ -764,7 +763,7 @@ mod tests {
             ParquetSerializer::new(config).expect("Should create serializer from schema file");
 
         let mut log = LogEvent::default();
-        log.insert("name", "alice");
+        log.insert(event_path!("name"), "alice");
 
         let mut buffer = BytesMut::new();
         serializer
@@ -865,8 +864,8 @@ mod tests {
         .expect("Failed to create strict serializer");
 
         let mut log = LogEvent::default();
-        log.insert("name", "test");
-        log.insert("level", "info");
+        log.insert(event_path!("name"), "test");
+        log.insert(event_path!("level"), "info");
 
         let mut buffer = BytesMut::new();
         assert!(

@@ -146,7 +146,6 @@ pub struct PubsubConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The maximum number of concurrent stream connections to open at once.
@@ -210,17 +209,14 @@ pub struct PubsubConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
@@ -855,7 +851,7 @@ mod integration_tests {
     use hyper::{Request, StatusCode};
     use serde_json::{Value, json};
     use tokio::time::{Duration, Instant};
-    use vrl::btreemap;
+    use vrl::{btreemap, event_path};
 
     use super::*;
     use crate::{
@@ -1179,16 +1175,36 @@ mod integration_tests {
         assert_eq!(events.len(), lines.len());
         for (message, event) in lines.into_iter().zip(events) {
             let log = event.into_log();
-            assert_eq!(log.get("message"), Some(&message.into()));
-            assert_eq!(log.get("source_type"), Some(&"gcp_pubsub".into()));
-            assert!(log.get("timestamp").unwrap().as_timestamp().unwrap() >= &start);
-            assert!(log.get("timestamp").unwrap().as_timestamp().unwrap() <= &end);
+            assert_eq!(log.get(event_path!("message")), Some(&message.into()));
+            assert_eq!(
+                log.get(event_path!("source_type")),
+                Some(&"gcp_pubsub".into())
+            );
             assert!(
-                message_ids.insert(log.get("message_id").unwrap().clone().to_string()),
+                log.get(event_path!("timestamp"))
+                    .unwrap()
+                    .as_timestamp()
+                    .unwrap()
+                    >= &start
+            );
+            assert!(
+                log.get(event_path!("timestamp"))
+                    .unwrap()
+                    .as_timestamp()
+                    .unwrap()
+                    <= &end
+            );
+            assert!(
+                message_ids.insert(
+                    log.get(event_path!("message_id"))
+                        .unwrap()
+                        .clone()
+                        .to_string()
+                ),
                 "Message contained duplicate message_id"
             );
             let logattr = log
-                .get("attributes")
+                .get(event_path!("attributes"))
                 .expect("missing attributes")
                 .as_object()
                 .unwrap()

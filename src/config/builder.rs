@@ -20,15 +20,12 @@ pub struct ConfigBuilder {
     pub global: GlobalOptions,
 
     #[cfg(feature = "api")]
-    #[configurable(derived)]
     #[serde(default)]
     pub api: api::Options,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub schema: schema::Options,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
 

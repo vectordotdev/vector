@@ -61,11 +61,9 @@ pub struct TransformOuter<T>
 where
     T: Configurable + Serialize + 'static,
 {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 
-    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     /// Enable CPU usage metrics for this transform.
@@ -241,30 +239,32 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
         input_definitions: &[(OutputId, schema::Definition)],
     ) -> Vec<TransformOutput>;
 
-    /// Validates that the configuration of the transform is valid.
     /// Validates structural constraints on the transform configuration that do not require
     /// environment resources: reserved output names, duplicate route names, invalid sample
-    /// rates, and similar config-level checks. Called during config compilation so errors
-    /// are reported on both `vector validate` and normal startup/reload.
+    /// rates, and similar config-level checks.
+    ///
+    /// Called during config compilation so errors are reported on both `vector validate`
+    /// and normal startup/reload. This is the first validation phase, run before any
+    /// context-dependent checks.
     ///
     /// # Errors
     ///
     /// If validation does not succeed, an error variant containing a list of all validation errors
     /// is returned.
-    fn validate(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         Ok(())
     }
 
-    /// Validates the transform configuration against environment resources: compiles VRL
-    /// programs, builds conditions, and resolves enrichment table references. Only called
-    /// from `vector validate` (via `validate_transforms`), not during normal startup because
-    /// `build()` performs equivalent checks with real resources.
+    /// Validates the transform configuration against the schema and enrichment context.
+    /// Compiles VRL programs, builds conditions, and resolves enrichment table references.
+    /// Only called from `vector validate` (via `validate_transforms`), not during normal startup
+    /// because `build()` performs equivalent checks with real resources.
     ///
     /// # Errors
     ///
     /// If validation does not succeed, an error variant containing a list of all validation errors
     /// is returned.
-    fn validate_env(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
+    fn validate_with_context(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
         Ok(())
     }
 

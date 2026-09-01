@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{
     aws::{ClientBuilder, create_client, is_retriable_error},
-    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext, ValidatedSink},
     sinks::{
         Healthcheck, VectorSink,
         prelude::*,
@@ -67,7 +67,6 @@ pub struct KinesisStreamsSinkConfig {
     #[serde(flatten)]
     pub base: KinesisSinkBaseConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
 }
@@ -117,16 +116,42 @@ impl KinesisStreamsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisStreamsSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy).await?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+    fn input(&self) -> Input {
+        self.base.input()
+    }
 
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        self.base.acknowledgements()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedKinesisStreams {
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for KinesisStreamsSinkConfig {
+    type Validated = ValidatedKinesisStreams;
+
+    fn validate(&self) -> crate::Result<ValidatedKinesisStreams> {
         let batch_settings = self
             .batch
             .validate()?
             .limit_max_bytes(MAX_PAYLOAD_SIZE)?
             .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
+
+        Ok(ValidatedKinesisStreams { batch_settings })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedKinesisStreams,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.create_client(&cx.proxy).await?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
         let sink = build_sink::<
             KinesisStreamClient,
@@ -137,7 +162,7 @@ impl SinkConfig for KinesisStreamsSinkConfig {
         >(
             &self.base,
             self.base.partition_key_field.clone(),
-            batch_settings,
+            validated.batch_settings,
             KinesisStreamClient { client },
             KinesisRetryLogic {
                 retry_partial: self.base.request_retry_partial,
@@ -146,23 +171,16 @@ impl SinkConfig for KinesisStreamsSinkConfig {
 
         Ok((sink, healthcheck))
     }
-
-    fn input(&self) -> Input {
-        self.base.input()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        self.base.acknowledgements()
-    }
 }
 
 impl GenerateConfig for KinesisStreamsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"partition_key_field = "foo"
-            stream_name = "my-stream"
-            encoding.codec = "json""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"partition_key_field: foo
+            stream_name: my-stream
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }
@@ -220,10 +238,36 @@ impl RetryLogic for KinesisRetryLogic {
 
 #[cfg(test)]
 mod tests {
-    use super::KinesisStreamsSinkConfig;
+    use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<KinesisStreamsSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_batch_settings() {
+        let config = KinesisStreamsSinkConfig {
+            batch: BatchConfig::<KinesisDefaultBatchSettings>::default(),
+            base: KinesisSinkBaseConfig {
+                stream_name: String::from("test"),
+                region: crate::aws::RegionOrEndpoint::with_both(
+                    "us-east-1",
+                    "http://localhost:4566",
+                ),
+                encoding: vector_lib::codecs::JsonSerializerConfig::default().into(),
+                compression: Compression::None,
+                request: Default::default(),
+                tls: None,
+                auth: Default::default(),
+                request_retry_partial: false,
+                acknowledgements: Default::default(),
+                partition_key_field: None,
+            },
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.batch_settings.item_limit, MAX_PAYLOAD_EVENTS);
+        assert_eq!(validated.batch_settings.size_limit, MAX_PAYLOAD_SIZE);
     }
 }

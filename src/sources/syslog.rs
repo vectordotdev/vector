@@ -1,6 +1,6 @@
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -80,16 +80,12 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
-        #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
 
-        #[configurable(derived)]
         permit_origin: Option<IpAllowlistConfig>,
 
-        #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
 
         /// The size of the receive buffer used for each connection.
@@ -100,11 +96,18 @@ pub enum Mode {
 
         /// The maximum number of TCP connections that are allowed at any given time.
         connection_limit: Option<u32>,
+
+        /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+        ///
+        /// This bounds how long a connection can hold its slot against `connection_limit`
+        /// before the TLS handshake finishes, protecting against clients that open a
+        /// connection but never complete (or never start) a handshake.
+        #[configurable(metadata(docs::type_unit = "seconds"))]
+        tls_handshake_timeout_secs: Option<NonZeroU64>,
     },
 
     /// Listen on UDP.
     Udp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
         /// The size of the receive buffer used for the listening socket.
@@ -155,6 +158,7 @@ impl Default for SyslogConfig {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
             },
             host_key: None,
             max_length: crate::serde::default_max_length(),
@@ -164,8 +168,8 @@ impl Default for SyslogConfig {
 }
 
 impl GenerateConfig for SyslogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(SyslogConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(SyslogConfig::default()).unwrap()
     }
 }
 
@@ -188,6 +192,7 @@ impl SourceConfig for SyslogConfig {
                 tls,
                 receive_buffer_bytes,
                 connection_limit,
+                tls_handshake_timeout_secs,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -206,9 +211,11 @@ impl SourceConfig for SyslogConfig {
                     keepalive,
                     shutdown_secs,
                     tls,
+                    None, // tls_reloader: not wired for this source
                     tls_client_metadata_key,
                     receive_buffer_bytes,
                     None,
+                    tls_handshake_timeout_secs,
                     cx,
                     false.into(),
                     connection_limit,
@@ -467,7 +474,7 @@ mod test {
 
     use chrono::prelude::*;
     use indoc::indoc;
-    use rand::{Rng, rng};
+    use rand::{RngExt, rng};
     use serde::Deserialize;
     use tokio::time::{Duration, Instant, sleep};
     use tokio_util::codec::BytesCodec;
@@ -839,21 +846,21 @@ mod test {
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("host", "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
+            expected.insert(event_path!("host"), "74794bfb6795");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
 
-            expected.insert("meta.sequenceId", "1");
-            expected.insert("meta.sysUpTime", "37");
-            expected.insert("meta.language", "EN");
-            expected.insert("origin.software", "test");
-            expected.insert("origin.ip", "192.168.0.1");
+            expected.insert(event_path!("meta", "sequenceId"), "1");
+            expected.insert(event_path!("meta", "sysUpTime"), "37");
+            expected.insert(event_path!("meta", "language"), "EN");
+            expected.insert(event_path!("origin", "software"), "test");
+            expected.insert(event_path!("origin", "ip"), "192.168.0.1");
 
-            expected.insert("severity", "notice");
-            expected.insert("facility", "user");
-            expected.insert("version", 1);
-            expected.insert("appname", "root");
-            expected.insert("procid", 8449);
-            expected.insert("source_ip", "192.168.0.254");
+            expected.insert(event_path!("severity"), "notice");
+            expected.insert(event_path!("facility"), "user");
+            expected.insert(event_path!("version"), 1);
+            expected.insert(event_path!("appname"), "root");
+            expected.insert(event_path!("procid"), 8449);
+            expected.insert(event_path!("source_ip"), "192.168.0.254");
         }
 
         assert_event_data_eq!(
@@ -886,20 +893,20 @@ mod test {
                     .expect("invalid timestamp"),
             );
             expected.insert(
-                log_schema().host_key().unwrap().to_string().as_str(),
+                (PathPrefix::Event, log_schema().host_key().unwrap()),
                 "74794bfb6795",
             );
-            expected.insert("hostname", "74794bfb6795");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
             expected.insert(
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("severity", "notice");
-            expected.insert("facility", "user");
-            expected.insert("version", 1);
-            expected.insert("appname", "root");
-            expected.insert("procid", 8449);
-            expected.insert("source_ip", "192.168.0.254");
+            expected.insert(event_path!("severity"), "notice");
+            expected.insert(event_path!("facility"), "user");
+            expected.insert(event_path!("version"), 1);
+            expected.insert(event_path!("appname"), "root");
+            expected.insert(event_path!("procid"), 8449);
+            expected.insert(event_path!("source_ip"), "192.168.0.254");
         }
 
         let event = event_from_bytes(
@@ -931,7 +938,7 @@ mod test {
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
-                .get("empty")
+                .get(event_path!("empty"))
                 .expect("empty exists")
                 .is_object()
         }
@@ -996,7 +1003,7 @@ mod test {
         let event =
             event_from_bytes("host", None, raw.to_owned().into(), LogNamespace::Legacy).unwrap();
         assert_eq!(
-            event.as_log().get(r#"origin."foo.bar""#),
+            event.as_log().get(event_path!("origin", "foo.bar")),
             Some(&Value::from("baz"))
         );
     }
@@ -1015,7 +1022,7 @@ mod test {
 
         let mut expected = Event::Log(LogEvent::from(msg));
         {
-            let value = event.as_log().get("timestamp").unwrap();
+            let value = event.as_log().get(event_path!("timestamp")).unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
@@ -1030,19 +1037,19 @@ mod test {
                 expected_date,
             );
             expected.insert(
-                log_schema().host_key().unwrap().to_string().as_str(),
+                (PathPrefix::Event, log_schema().host_key().unwrap()),
                 "74794bfb6795",
             );
             expected.insert(
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert("severity", "notice");
-            expected.insert("facility", "user");
-            expected.insert("appname", "root");
-            expected.insert("procid", 8539);
-            expected.insert("source_ip", "192.168.0.254");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
+            expected.insert(event_path!("severity"), "notice");
+            expected.insert(event_path!("facility"), "user");
+            expected.insert(event_path!("appname"), "root");
+            expected.insert(event_path!("procid"), 8539);
+            expected.insert(event_path!("source_ip"), "192.168.0.254");
         }
 
         assert_event_data_eq!(event, expected);
@@ -1064,7 +1071,7 @@ mod test {
 
         let mut expected = Event::Log(LogEvent::from(msg));
         {
-            let value = event.as_log().get("timestamp").unwrap();
+            let value = event.as_log().get(event_path!("timestamp")).unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
@@ -1081,14 +1088,14 @@ mod test {
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("host", "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert("severity", "info");
-            expected.insert("facility", "local7");
-            expected.insert("appname", "liblogging-stdlog");
-            expected.insert("origin.software", "rsyslogd");
-            expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("source_ip", "192.168.0.254");
+            expected.insert(event_path!("host"), "74794bfb6795");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
+            expected.insert(event_path!("severity"), "info");
+            expected.insert(event_path!("facility"), "local7");
+            expected.insert(event_path!("appname"), "liblogging-stdlog");
+            expected.insert(event_path!("origin", "software"), "rsyslogd");
+            expected.insert(event_path!("origin", "swVersion"), "8.24.0");
+            expected.insert(event_path!("source_ip"), "192.168.0.254");
             expected.insert(event_path!("origin", "x-pid"), "8979");
             expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
@@ -1117,13 +1124,13 @@ mod test {
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("host", "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert("severity", "info");
-            expected.insert("facility", "local7");
-            expected.insert("appname", "liblogging-stdlog");
-            expected.insert("origin.software", "rsyslogd");
-            expected.insert("origin.swVersion", "8.24.0");
+            expected.insert(event_path!("host"), "74794bfb6795");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
+            expected.insert(event_path!("severity"), "info");
+            expected.insert(event_path!("facility"), "local7");
+            expected.insert(event_path!("appname"), "liblogging-stdlog");
+            expected.insert(event_path!("origin", "software"), "rsyslogd");
+            expected.insert(event_path!("origin", "swVersion"), "8.24.0");
             expected.insert(event_path!("origin", "x-pid"), "9043");
             expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
@@ -1148,6 +1155,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
             });
 
             let key = ComponentKey::from("in");
@@ -1191,8 +1199,8 @@ mod test {
             let output_messages: Vec<SyslogMessageRfc5424> = output_events
                 .into_iter()
                 .map(|mut e| {
-                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("hostname")); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("source_ip")); // Vector adds this field which will cause a parse error.
                     e.into()
                 })
                 .collect();
@@ -1257,8 +1265,8 @@ mod test {
             let output_messages: Vec<SyslogMessageRfc5424> = output_events
                 .into_iter()
                 .map(|mut e| {
-                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("hostname")); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("source_ip")); // Vector adds this field which will cause a parse error.
                     e.into()
                 })
                 .collect();
@@ -1335,8 +1343,8 @@ mod test {
             let output_messages: Vec<SyslogMessageRfc5424> = output_events
                 .into_iter()
                 .map(|mut e| {
-                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("hostname")); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("source_ip")); // Vector adds this field which will cause a parse error.
                     e.into()
                 })
                 .collect();
@@ -1359,6 +1367,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
             });
 
             let key = ComponentKey::from("in");
@@ -1413,8 +1422,8 @@ mod test {
             let output_messages: Vec<SyslogMessageRfc5424> = output_events
                 .into_iter()
                 .map(|mut e| {
-                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("hostname")); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("source_ip")); // Vector adds this field which will cause a parse error.
                     e.into()
                 })
                 .collect();

@@ -19,6 +19,7 @@ pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 pub const DDTAGS: &str = "ddtags";
 /// The datadog message event path.
 pub const MESSAGE: &str = "message";
+pub(crate) const DATADOG_METRIC_RESOURCE_TAG_PREFIX: &str = "resource.";
 
 /// Mapping of the semantic meaning of well known Datadog reserved attributes
 /// to the field name that Datadog intake expects.

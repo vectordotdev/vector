@@ -53,7 +53,6 @@ pub enum DataTypeConfig {
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct ListOption {
-    #[configurable(derived)]
     method: Method,
 }
 
@@ -96,7 +95,6 @@ pub struct RedisSourceConfig {
     #[serde(default)]
     data_type: DataTypeConfig,
 
-    #[configurable(derived)]
     list: Option<ListOption>,
 
     /// The Redis URL to connect to.
@@ -117,12 +115,10 @@ pub struct RedisSourceConfig {
     #[configurable(metadata(docs::examples = "redis_key"))]
     redis_key: Option<OptionalValuePath>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
@@ -134,16 +130,17 @@ pub struct RedisSourceConfig {
 }
 
 impl GenerateConfig for RedisSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
             r#"
-            url = "redis://127.0.0.1:6379/0"
-            key = "vector"
-            data_type = "list"
-            list.method = "lpop"
-            redis_key = "redis_key"
+            url: "redis://127.0.0.1:6379/0"
+            key: vector
+            data_type: list
+            list:
+              method: lpop
+            redis_key: redis_key
             "#,
-        )
+        })
         .unwrap()
     }
 }
