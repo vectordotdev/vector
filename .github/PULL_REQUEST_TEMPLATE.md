@@ -23,10 +23,7 @@ Changes to CI, website, playground and similar are generally not considered user
 
 - Please read our [Vector contributor resources](https://github.com/vectordotdev/vector/tree/master/docs#getting-started).
 - Do not hesitate to use `@vectordotdev/vector` to reach out to us regarding this PR.
-- Before pushing, run:
-  - `make fmt`
-  - `make check-clippy` (auto-fix with `make clippy-fix`)
-  - `make test`
+- Before pushing, follow our [pre-push guidance](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md#pre-push).
 - After a review is requested, please avoid force pushes to help us review incrementally.
   - Feel free to push as many commits as you want. They will be squashed into one before merging.
   - For example, you can run `git merge origin master` and `git push`.
