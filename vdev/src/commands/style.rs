@@ -17,9 +17,6 @@ static IGNORED_PATHS: LazyLock<Vec<Pattern>> = LazyLock::new(|| {
         "tests/data*",
         "lib/codecs/tests/data*",
         "lib/vector-core/tests/data*",
-        "tests/helm-snapshots/*/snapshot.yaml",
-        "lib/remap-tests/tests/*.vrl",
-        "lib/datadog/grok/patterns/*.pattern",
     ]
     .into_iter()
     .map(|pattern| Pattern::new(pattern).expect("style ignore pattern should be valid"))
