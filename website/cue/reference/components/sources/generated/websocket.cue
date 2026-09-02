@@ -186,7 +186,7 @@ generated: components: sources: websocket: configuration: {
 		type: uint: {
 			default: 30
 			examples: [
-				10,
+				10
 			]
 			unit: "seconds"
 		}
@@ -744,7 +744,7 @@ generated: components: sources: websocket: configuration: {
 		type: uint: {
 			default: 2
 			examples: [
-				5,
+				5
 			]
 			unit: "seconds"
 		}
@@ -763,7 +763,7 @@ generated: components: sources: websocket: configuration: {
 		required: false
 		type: uint: {
 			examples: [
-				30,
+				30
 			]
 			unit: "seconds"
 		}
@@ -787,7 +787,7 @@ generated: components: sources: websocket: configuration: {
 		required: false
 		type: uint: {
 			examples: [
-				5,
+				5
 			]
 			unit: "seconds"
 		}

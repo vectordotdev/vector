@@ -49,7 +49,7 @@ generated: components: sinks: elasticsearch: configuration: {
 					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
 					"""
 				v6: "Use the Elasticsearch 6.x API."
-				v7: "Use the Elasticsearch 7.x API."
+				v7: "Use the Elasticsearch 7.x-compatible API, including OpenSearch."
 				v8: "Use the Elasticsearch 8.x API."
 			}
 		}

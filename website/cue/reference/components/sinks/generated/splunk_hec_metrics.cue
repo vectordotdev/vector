@@ -186,7 +186,7 @@ generated: components: sinks: splunk_hec_metrics: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ host }}", "custom_index"]
+			examples: ["index-{{ host }}", "custom_index"]
 			syntax: "template"
 		}
 	}
@@ -386,7 +386,7 @@ generated: components: sinks: splunk_hec_metrics: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
+			examples: ["source-{{ file }}", "/var/log/syslog", "UDP:514"]
 			syntax: "template"
 		}
 	}
@@ -398,7 +398,7 @@ generated: components: sinks: splunk_hec_metrics: configuration: {
 			"""
 		required: false
 		type: string: {
-			examples: ["{{ sourcetype }}", "_json"]
+			examples: ["sourcetype-{{ sourcetype }}", "_json"]
 			syntax: "template"
 		}
 	}

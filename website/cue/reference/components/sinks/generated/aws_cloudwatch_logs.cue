@@ -709,7 +709,7 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 			"""
 		required: true
 		type: string: {
-			examples: ["group-name", "{{ file }}"]
+			examples: ["group-name", "group-{{ file }}"]
 			syntax: "template"
 		}
 	}
@@ -957,7 +957,7 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 			"""
 		required: true
 		type: string: {
-			examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
+			examples: ["stream-{{ host }}", "%Y-%m-%d", "stream-name"]
 			syntax: "template"
 		}
 	}

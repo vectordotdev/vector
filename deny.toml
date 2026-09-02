@@ -52,4 +52,6 @@ ignore = [
   { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic-time duplicate attribute check - versions needing upgrade are v0.31 (direct dep) and v0.37.4 (via opendal < 0.58)" },
   { id = "RUSTSEC-2026-0195", reason = "quick-xml unbounded namespace-declaration allocation in NsReader - versions needing upgrade are v0.31 (direct dep) and v0.37.4 (via opendal < 0.58)" },
   { id = "RUSTSEC-2026-0235", reason = "rkyv 0.7 is vulnerable but unmaintained; upgrading vector-buffers to rkyv 0.8 requires a breaking serialization migration" },
+  { id = "RUSTSEC-2026-0253", reason = "Vector uses lru 0.18.2; aws-sdk-s3 and ratatui still require lru ^0.16.3" },
+  { id = "RUSTSEC-2026-0258", reason = "h2 0.3 via aws-smithy-http-client (hyper 0.14) and tonic 0.11 - http 1.0 / AWS SDK upgrade (https://github.com/vectordotdev/vector/issues/19179)" },
 ]

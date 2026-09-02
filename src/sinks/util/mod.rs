@@ -54,7 +54,7 @@ pub use service::{
 };
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
-pub use uri::UriSerde;
+pub use uri::{HttpEndpoint, HttpEndpointError, UriSerde};
 use vector_lib::{TimeZone, json_size::JsonSize};
 
 use crate::event::EventFinalizers;

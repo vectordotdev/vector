@@ -393,21 +393,6 @@ generated: components: sources: http: configuration: {
 			}
 		}
 	}
-	encoding: {
-		deprecated: true
-		description: """
-			The expected encoding of received data.
-
-			For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
-			"""
-		required: false
-		type: string: enum: {
-			binary: "Binary."
-			json:   "JSON."
-			ndjson: "Newline-delimited JSON."
-			text:   "Plaintext."
-		}
-	}
 	framing: {
 		description: """
 			Framing configuration.
@@ -751,7 +736,7 @@ generated: components: sources: http: configuration: {
 		type: uint: {
 			default: 200
 			examples: [
-				202,
+				202
 			]
 		}
 	}
