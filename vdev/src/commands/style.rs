@@ -1,4 +1,4 @@
-use std::{fs, path::Path, sync::LazyLock};
+use std::{fs, sync::LazyLock};
 
 use anyhow::{Context as _, Result, bail};
 use glob::Pattern;
@@ -103,7 +103,8 @@ fn eligible_files(files: Vec<String>) -> Vec<String> {
     files
         .into_iter()
         .filter(|file| {
-            !IGNORED_PATHS.iter().any(|pattern| pattern.matches(file)) && Path::new(file).is_file()
+            !IGNORED_PATHS.iter().any(|pattern| pattern.matches(file))
+                && fs::symlink_metadata(file).is_ok_and(|metadata| metadata.file_type().is_file())
         })
         .collect()
 }
@@ -207,6 +208,24 @@ mod tests {
     fn excludes_binary_content_from_fixes() {
         assert_eq!(fix_text(b"binary\0payload "), None);
         assert_eq!(fix_text(&[0xff, b' ']), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn excludes_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let directory = tempfile::tempdir().unwrap();
+        let target = directory.path().join("target");
+        let link = directory.path().join("link");
+        fs::write(&target, "target").unwrap();
+        symlink(&target, &link).unwrap();
+
+        assert!(
+            eligible_files(vec![link.to_string_lossy().into_owned()]).is_empty(),
+            "symlinks must not be treated as writable files"
+        );
+        assert_eq!(fs::read_to_string(target).unwrap(), "target");
     }
 
     #[test]
