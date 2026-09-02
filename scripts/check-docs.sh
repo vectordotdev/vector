@@ -7,8 +7,8 @@ set -euo pipefail
 #
 #   Checks that the contents of the /website/cue folder are valid. This includes:
 #
-#     1. Ensuring that the .cue files can compile.
-#     2. In CI, ensuring that the .cue files are properly formatted.
+#     1. Ensuring that the .cue files are properly formatted.
+#     2. Ensuring that the .cue files can compile.
 
 ROOT=$(git rev-parse --show-toplevel)
 CUE="${ROOT}/scripts/cue.sh"
@@ -23,20 +23,21 @@ read-all-docs() {
     exit 1
   fi
 
-  if [[ "${CI:-"false"}" != "true" ]]; then
-    echo "Skipping cue files format validation - reserved for CI"
-  else
-    echo "Validating cue files formatting..."
+  echo "Validating cue files formatting..."
 
-    STATE_BEFORE="$(read-all-docs)"
-    "${CUE}" fmt
-    STATE_AFTER="$(read-all-docs)"
+  # Run formatter (modifies files in-place)
+  "${CUE}" fmt
 
-    if [[ "$STATE_BEFORE" != "$STATE_AFTER" ]]; then
-      printf "Incorrectly formatted CUE files\n\n"
-      diff --unified <(echo "$STATE_BEFORE") <(echo "$STATE_AFTER")
-      exit 1
-    fi
+  # Check if any files were modified
+  MODIFIED_FILES=$(git diff --name-only "${ROOT}/website/cue")
+
+  if [[ -n "$MODIFIED_FILES" ]]; then
+    printf "Incorrectly formatted CUE files:\n\n"
+    while IFS= read -r file; do
+      echo "  - $file"
+    done <<< "$MODIFIED_FILES"
+    printf "\nRun './scripts/cue.sh fmt' to fix formatting issues.\n"
+    exit 1
   fi
 
   echo "Validating cue files correctness..."

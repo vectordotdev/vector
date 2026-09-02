@@ -83,6 +83,22 @@ generated: components: sinks: axiom: configuration: {
 			}
 		}
 	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	dataset: {
 		description: "The Axiom dataset to write to."
 		required:    true
@@ -106,7 +122,7 @@ generated: components: sinks: axiom: configuration: {
 			Cannot be used together with `url`.
 			"""
 		required: false
-		type: string: examples: ["${AXIOM_REGION}", "mumbai.axiom.co", "eu-central-1.aws.edge.axiom.co"]
+		type: string: examples: ["mumbai.axiom.co", "${AXIOM_REGION}", "eu-central-1.aws.edge.axiom.co"]
 	}
 	request: {
 		description: "Outbound HTTP request settings."
@@ -305,6 +321,37 @@ generated: components: sinks: axiom: configuration: {
 			}
 		}
 	}
+	retry_strategy: {
+		description: """
+			Configurable retry strategy for `http` based sinks.
+
+			For more information about error responses, see [Client Error Responses][error_responses].
+
+			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+			"""
+		required: false
+		type: object: options: {
+			status_codes: {
+				description:   "Retry on these specific HTTP status codes"
+				relevant_when: "type = \"custom\""
+				required:      true
+				type: array: items: type: uint: {}
+			}
+			type: {
+				description: "The retry strategy enum."
+				required:    false
+				type: string: {
+					default: "default"
+					enum: {
+						all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
+						custom:  "Custom retry strategy"
+						default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
+						none:    "Don't retry any errors, including request timeouts."
+					}
+				}
+			}
+		}
+	}
 	tls: {
 		description: """
 			The TLS settings for the connection.
@@ -417,6 +464,6 @@ generated: components: sinks: axiom: configuration: {
 			This takes precedence over `region` if both are set (but both should not be set).
 			"""
 		required: false
-		type: string: examples: ["https://api.eu.axiom.co", "http://localhost:3400/ingest", "${AXIOM_URL}"]
+		type: string: {}
 	}
 }

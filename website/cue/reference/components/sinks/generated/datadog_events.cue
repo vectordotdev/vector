@@ -47,8 +47,8 @@ generated: components: sinks: datadog_events: configuration: {
 		description: """
 			The endpoint to send observability data to.
 
-			The endpoint must contain an HTTP scheme, and may specify a hostname or IP
-			address and port. The API path should NOT be specified as this is handled by
+			The endpoint must be an absolute HTTP(S) URL. A missing scheme defaults
+			to `https`. The API path should NOT be specified as this is handled by
 			the sink.
 
 			If set, overrides the `site` option.
@@ -238,6 +238,37 @@ generated: components: sinks: datadog_events: configuration: {
 				type: uint: {
 					default: 60
 					unit:    "seconds"
+				}
+			}
+		}
+	}
+	retry_strategy: {
+		description: """
+			Configurable retry strategy for `http` based sinks.
+
+			For more information about error responses, see [Client Error Responses][error_responses].
+
+			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+			"""
+		required: false
+		type: object: options: {
+			status_codes: {
+				description:   "Retry on these specific HTTP status codes"
+				relevant_when: "type = \"custom\""
+				required:      true
+				type: array: items: type: uint: {}
+			}
+			type: {
+				description: "The retry strategy enum."
+				required:    false
+				type: string: {
+					default: "default"
+					enum: {
+						all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
+						custom:  "Custom retry strategy"
+						default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
+						none:    "Don't retry any errors, including request timeouts."
+					}
 				}
 			}
 		}

@@ -9,11 +9,10 @@ use tokio::{
     time::sleep,
 };
 use tokio_stream::wrappers::UnixListenerStream;
-use tokio_util::codec::FramedRead;
 use tracing::{Instrument, field};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::StreamDecodingError,
+    codecs::{DecoderFramedRead, StreamDecodingError},
     internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
 };
 
@@ -47,7 +46,7 @@ pub fn build_unix_stream_source<D, F, E>(
 ) -> crate::Result<Source>
 where
     D: tokio_util::codec::Decoder<Item = (F, usize), Error = E> + Clone + Send + 'static,
-    E: StreamDecodingError + std::fmt::Display + Send,
+    E: StreamDecodingError + std::fmt::Display + Send + From<std::io::Error>,
     F: Into<SmallVec<[Event; 1]>> + Send,
 {
     Ok(Box::pin(async move {
@@ -106,7 +105,7 @@ where
                     bytes_received.emit(ByteSize(byte_size));
                 })
                 .allow_read_until(shutdown.clone().map(|_| ()));
-            let mut stream = FramedRead::new(stream, decoder.clone());
+            let mut stream = DecoderFramedRead::new(stream, decoder.clone());
 
             let connection_open = connection_open.clone();
             let mut out = out.clone();

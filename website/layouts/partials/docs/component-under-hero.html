@@ -8,6 +8,9 @@
 {{ $input := $config.input }}
 {{ $output := $config.output }}
 
+{{ $singularType := strings.TrimSuffix "s" $type }}
+{{ $issuesUrl := printf "https://github.com/vectordotdev/vector/issues?q=sort%%3Aupdated-desc+is%%3Aissue+is%%3Aopen+label%%3A%%22%s%%3A+%s%%22" $singularType $tag }}
+
 <div class="block space-y-1">
   {{ if eq $classes.development "beta" }}
   {{ partial "badge.html" (dict "prefix" "status" "word" "beta" "color" "red" "inline" true) }}
@@ -56,6 +59,7 @@
   {{ end }}
 </div>
 
+{{ if or $input.logs $input.metrics $input.traces }}
 <div class="w-full mt-4">
   {{ if $input.logs }}
   {{ partial "badge.html" (dict "prefix" "input" "word" "logs" "color" "blue" "inline" true) }}
@@ -67,7 +71,9 @@
   {{ partial "badge.html" (dict "prefix" "input" "word" "traces" "color" "blue" "inline" true) }}
   {{ end }}
 </div>
+{{ end }}
 
+{{ if $output }}
 <div class="w-full mt-4">
   {{ range $k, $v := $output }}
   {{ if eq $k "logs" }}
@@ -83,6 +89,7 @@
   {{ end }}
   {{ end }}
 </div>
+{{ end }}
 
 
 {{ if .Params.deprecated }}
@@ -90,3 +97,10 @@
   {{ partial "badge.html" (dict "prefix" "status" "word" "deprecated" "color" "red" "inline" true) }}
 </div>
 {{ end }}
+
+<div class="mt-4 text-sm">
+  <a href="{{ $issuesUrl }}" rel="noopener" target="_blank" class="inline-flex items-center space-x-2 text-primary-dark dark:text-primary hover:underline">
+    <ion-icon name="logo-github" aria-hidden="true"></ion-icon>
+    <span>View open issues for this component on GitHub</span>
+  </a>
+</div>

@@ -256,6 +256,79 @@ generated: components: sinks: aws_s3: configuration: {
 			}
 		}
 	}
+	batch_encoding: {
+		description: """
+			Batch encoding configuration for columnar formats.
+
+			When set, events are encoded together as a batch in a columnar format (Parquet)
+			instead of the standard per-event framing-based encoding. The columnar format handles
+			its own internal compression, so the top-level `compression` setting is bypassed.
+			"""
+		required: false
+		type: object: options: {
+			codec: {
+				description: """
+					Encodes events in [Apache Parquet][apache_parquet] columnar format.
+
+					[apache_parquet]: https://parquet.apache.org/
+					"""
+				required: true
+				type: string: enum: parquet: """
+					Encodes events in [Apache Parquet][apache_parquet] columnar format.
+
+					[apache_parquet]: https://parquet.apache.org/
+					"""
+			}
+			compression: {
+				description: "Compression codec applied per column page inside the Parquet file."
+				required:    false
+				type: object: options: {
+					algorithm: {
+						description: "Compression codec applied per column page inside the Parquet file."
+						required:    false
+						type: string: {
+							default: "snappy"
+							enum: {
+								gzip:   "Gzip compression. Level must be between 1 and 9."
+								lz4:    "LZ4 raw compression"
+								none:   "No compression"
+								snappy: "Snappy compression (no level)."
+								zstd:   "Zstd compression. Level must be between 1 and 21."
+							}
+						}
+					}
+					level: {
+						description:   "Compression level (1–21). This is the range Vector supports; higher values compress more but are slower."
+						relevant_when: "algorithm = \"zstd\" or algorithm = \"gzip\""
+						required:      true
+						type: uint: {}
+					}
+				}
+			}
+			schema_file: {
+				description: """
+					Path to a native Parquet schema file (`.schema`).
+
+					Required unless `schema_mode` is `auto_infer`. The file must contain a valid
+					Parquet message type definition.
+					"""
+				required: false
+				type: string: {}
+			}
+			schema_mode: {
+				description: "Controls how events with fields not present in the schema are handled."
+				required:    false
+				type: string: {
+					default: "relaxed"
+					enum: {
+						auto_infer: "Auto infer schema based on the batch. No schema file needed."
+						relaxed:    "Missing fields become null. Extra fields are silently dropped."
+						strict:     "Missing fields become null. Extra fields cause an error."
+					}
+				}
+			}
+		}
+	}
 	bucket: {
 		description: """
 			The S3 bucket name.
@@ -312,7 +385,7 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"gzip",
+			"gzip"
 		]
 	}
 	content_type: {
@@ -326,6 +399,22 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: examples: ["application/gzip"]
+	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	encoding: {
 		description: """
@@ -389,7 +478,7 @@ generated: components: sinks: aws_s3: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -644,12 +733,18 @@ generated: components: sinks: aws_s3: configuration: {
 
 					When set to `single`, only the last non-bare value of tags are displayed with the
 					metric. When set to `full`, all metric tags are exposed as separate assignments.
+					When set to `auto`, tag values are encoded using their underlying shape.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
+						auto: """
+															Tag values are exposed using their underlying shape: single-value tags as strings,
+															multi-value tags as arrays. A length-1 array round-trips as a scalar; use `Full` to
+															force array shape.
+															"""
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config
@@ -789,7 +884,7 @@ generated: components: sinks: aws_s3: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"json",
+			"json"
 		]
 	}
 	filename_time_format: {

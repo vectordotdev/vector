@@ -126,8 +126,8 @@ enough to not warrant a version split between the old and new code.
 
 - Replace contents of `src/kubernetes` with equivalents from `kube`
   1. `src/kubernetes/client` replaced with `kube-client`
-  1. `src/kubernetes/reflector` and dependencies replaced with `kube-runtime::reflector`
-  1. `src/kubernetes/state` updates to minimize in-house code
+  2. `src/kubernetes/reflector` and dependencies replaced with `kube-runtime::reflector`
+  3. `src/kubernetes/state` updates to minimize in-house code
 - Ensure unit tests and integration tests show matching behavior before and after rewrite
 
 ## Future Improvements

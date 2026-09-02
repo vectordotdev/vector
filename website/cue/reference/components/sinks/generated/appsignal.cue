@@ -128,7 +128,7 @@ generated: components: sinks: appsignal: configuration: {
 		description: "The URI for the AppSignal API to send data to."
 		required:    false
 		type: string: {
-			default: "https://appsignal-endpoint.net"
+			default: "https://appsignal-endpoint.net/"
 			examples: ["https://appsignal-endpoint.net"]
 		}
 	}
@@ -319,6 +319,37 @@ generated: components: sinks: appsignal: configuration: {
 				type: uint: {
 					default: 60
 					unit:    "seconds"
+				}
+			}
+		}
+	}
+	retry_strategy: {
+		description: """
+			Configurable retry strategy for `http` based sinks.
+
+			For more information about error responses, see [Client Error Responses][error_responses].
+
+			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
+			"""
+		required: false
+		type: object: options: {
+			status_codes: {
+				description:   "Retry on these specific HTTP status codes"
+				relevant_when: "type = \"custom\""
+				required:      true
+				type: array: items: type: uint: {}
+			}
+			type: {
+				description: "The retry strategy enum."
+				required:    false
+				type: string: {
+					default: "default"
+					enum: {
+						all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
+						custom:  "Custom retry strategy"
+						default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
+						none:    "Don't retry any errors, including request timeouts."
+					}
 				}
 			}
 		}

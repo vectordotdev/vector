@@ -28,7 +28,6 @@ use smallvec::SmallVec;
 use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
-use tracing::Instrument;
 use vector_lib::{
     codecs::decoding::FramingError,
     config::{LegacyKey, LogNamespace, log_schema},
@@ -167,22 +166,24 @@ pub(super) struct Config {
     #[configurable(metadata(docs::examples = 1))]
     pub(super) max_number_of_messages: u32,
 
-    #[configurable(derived)]
     #[serde(default)]
     #[derivative(Default)]
     pub(super) tls_options: Option<TlsConfig>,
 
     // Client timeout configuration for SQS operations. Take care when configuring these settings
     // to allow enough time for the polling interval configured in `poll_secs`.
-    #[configurable(derived)]
     #[derivative(Default)]
     #[serde(default)]
     #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
 
     /// Configuration for deferring events to another queue based on their age.
-    #[configurable(derived)]
     pub(super) deferred: Option<DeferredConfig>,
+}
+
+pub(super) struct S3Options {
+    pub(super) compression: super::Compression,
+    pub(super) request_payer: Option<super::S3RequestPayer>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -278,10 +279,10 @@ pub struct State {
     region: Region,
 
     s3_client: S3Client,
+    s3_options: S3Options,
     sqs_client: SqsClient,
 
     multiline: Option<line_agg::Config>,
-    compression: super::Compression,
 
     queue_url: String,
     poll_secs: i32,
@@ -305,7 +306,7 @@ impl Ingestor {
         sqs_client: SqsClient,
         s3_client: S3Client,
         config: Config,
-        compression: super::Compression,
+        s3_options: S3Options,
         multiline: Option<line_agg::Config>,
         decoder: Decoder,
     ) -> Result<Ingestor, IngestorNewError> {
@@ -318,9 +319,9 @@ impl Ingestor {
             region,
 
             s3_client,
+            s3_options,
             sqs_client,
 
-            compression,
             multiline,
 
             queue_url: config.queue_url,
@@ -358,7 +359,7 @@ impl Ingestor {
                 acknowledgements,
             );
             let fut = process.run();
-            let handle = tokio::spawn(fut.in_current_span());
+            let handle = crate::spawn_in_current_span(fut);
             handles.push(handle);
         }
 
@@ -678,6 +679,7 @@ impl IngestorProcess {
             .get_object()
             .bucket(s3_event.s3.bucket.name.clone())
             .key(s3_event.s3.object.key.clone())
+            .set_request_payer(self.state.s3_options.request_payer.map(Into::into))
             .send()
             .await
             .context(GetObjectSnafu {
@@ -703,7 +705,7 @@ impl IngestorProcess {
 
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
-            self.state.compression,
+            self.state.s3_options.compression,
             &s3_event.s3.object.key,
             object.content_encoding.as_deref(),
             object.content_type.as_deref(),
@@ -1247,10 +1249,9 @@ fn test_s3_sns_testevent() {
 
 #[test]
 fn parse_sqs_config() {
-    let config: Config = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-        "#,
+    let config: Config = serde_yaml::from_str(
+        r#"queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+"#,
     )
     .unwrap();
     assert_eq!(
@@ -1259,14 +1260,12 @@ fn parse_sqs_config() {
     );
     assert!(config.deferred.is_none());
 
-    let config: Config = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-            [deferred]
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
-            max_age_secs = 3600
-        "#,
-    )
+    let config: Config = serde_yaml::from_str(indoc::indoc! {r#"
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        deferred:
+          queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+          max_age_secs: 3600
+    "#})
     .unwrap();
     assert_eq!(
         config.queue_url,
@@ -1281,21 +1280,17 @@ fn parse_sqs_config() {
     );
     assert_eq!(deferred.max_age_secs, 3600);
 
-    let test: Result<Config, toml::de::Error> = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-            [deferred]
-            max_age_secs = 3600
-        "#,
-    );
+    let test: Result<Config, serde_yaml::Error> = serde_yaml::from_str(indoc::indoc! {r#"
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        deferred:
+          max_age_secs: 3600
+    "#});
     assert!(test.is_err());
 
-    let test: Result<Config, toml::de::Error> = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-            [deferred]
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
-        "#,
-    );
+    let test: Result<Config, serde_yaml::Error> = serde_yaml::from_str(indoc::indoc! {r#"
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        deferred:
+          queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+    "#});
     assert!(test.is_err());
 }

@@ -26,10 +26,10 @@ pub mod aws_s_s;
 pub mod axiom;
 #[cfg(feature = "sinks-azure_blob")]
 pub mod azure_blob;
-#[cfg(feature = "sinks-azure_blob")]
+#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-azure_logs_ingestion",))]
 pub mod azure_common;
-#[cfg(feature = "sinks-azure_monitor_logs")]
-pub mod azure_monitor_logs;
+#[cfg(feature = "sinks-azure_logs_ingestion")]
+pub mod azure_logs_ingestion;
 #[cfg(feature = "sinks-blackhole")]
 pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]
@@ -38,6 +38,8 @@ pub mod clickhouse;
 pub mod console;
 #[cfg(feature = "sinks-databend")]
 pub mod databend;
+#[cfg(feature = "sinks-databricks_zerobus")]
+pub mod databricks_zerobus;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
@@ -114,7 +116,7 @@ pub mod vector;
 pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
 pub mod websocket;
-#[cfg(feature = "sinks-websocket-server")]
+#[cfg(feature = "sinks-websocket_server")]
 pub mod websocket_server;
 
 pub use vector_lib::{config::Input, sink::VectorSink};

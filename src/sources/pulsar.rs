@@ -12,11 +12,10 @@ use pulsar::{
     consumer::Message,
     message::proto::MessageIdData,
 };
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        Decoder, DecodingConfig, StreamDecodingError,
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput},
@@ -76,23 +75,18 @@ pub struct PulsarSourceConfig {
     /// Max count of messages in a batch.
     batch_size: Option<u32>,
 
-    #[configurable(derived)]
     auth: Option<AuthConfig>,
 
-    #[configurable(derived)]
     dead_letter_queue_policy: Option<DeadLetterQueuePolicy>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -101,7 +95,6 @@ pub struct PulsarSourceConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsOptions>,
 }
@@ -131,10 +124,7 @@ enum AuthConfig {
     },
 
     /// OAuth authentication.
-    OAuth {
-        #[configurable(derived)]
-        oauth2: OAuth2Config,
-    },
+    OAuth { oauth2: OAuth2Config },
 }
 
 /// OAuth2-specific authentication configuration.
@@ -389,7 +379,7 @@ async fn parse_message(
     let topic = msg.topic.clone();
     let producer_name = msg.payload.metadata.producer_name.clone();
 
-    let mut stream = FramedRead::new(msg.payload.data.as_ref(), decoder.clone());
+    let mut stream = DecoderFramedRead::new(msg.payload.data.as_ref(), decoder.clone());
     let stream = async_stream::stream! {
         while let Some(next) = stream.next().await {
             match next {

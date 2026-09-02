@@ -1,6 +1,0 @@
-query ComponentByComponentKeyQuery($componentId: String!) {
-    componentByComponentKey(componentId: $componentId) {
-        __typename
-        componentId
-    }
-}

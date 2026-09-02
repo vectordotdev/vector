@@ -2,10 +2,8 @@ package metadata
 
 components: sinks: greptimedb_metrics: {
 	title: "GreptimeDB Metrics"
-	alias: "greptimedb"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -20,7 +18,6 @@ components: sinks: greptimedb_metrics: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   20
 				timeout_secs: 1.0
 			}

@@ -1,6 +1,9 @@
-use std::{cell::RefCell, path::PathBuf, time::Duration};
+#![allow(clippy::let_underscore_must_use)]
+
+use std::{any::Any, cell::RefCell, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
+use derivative::Derivative;
 use dyn_clone::DynClone;
 use serde::Serialize;
 use serde_with::serde_as;
@@ -18,7 +21,9 @@ use vector_lib::{
 };
 use vector_vrl_metrics::MetricsStorage;
 
-use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
+use super::{
+    ComponentKey, DynValidatedSink, ProxyConfig, Resource, dot_graph::GraphConfig, schema,
+};
 use crate::{
     extra_context::ExtraContext,
     sinks::{Healthcheck, util::UriSerde},
@@ -55,16 +60,15 @@ impl<T: SinkConfig + 'static> From<T> for BoxedSink {
 /// Fully resolved sink component.
 #[configurable_component]
 #[configurable(metadata(docs::component_base_type = "sink"))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct SinkOuter<T>
 where
     T: Configurable + Serialize + 'static,
 {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 
-    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     /// The full URI to make HTTP healthcheck requests to.
@@ -74,27 +78,47 @@ where
     #[configurable(deprecated, metadata(docs::hidden), validation(format = "uri"))]
     pub healthcheck_uri: Option<UriSerde>,
 
-    #[configurable(derived, metadata(docs::advanced))]
     #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub healthcheck: SinkHealthcheckOptions,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub buffer: BufferConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]
     pub inner: BoxedSink,
+
+    /// Validated state, filled in during config compilation.
+    ///
+    /// This is the erased state produced by `ValidatedSink::validate`, retained so
+    /// the topology builder can build the sink without re-validating. It is never serialized
+    /// or diffed (see `#[serde(skip)]`), and is shared (via `Arc`) so enrichment-table-derived
+    /// sinks can carry it without cloning the underlying value.
+    #[serde(skip)]
+    #[derivative(Debug = "ignore")]
+    pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl<T> SinkOuter<T>
 where
     T: Configurable + Serialize,
 {
+    /// Builds the sink from the retained validated state.
+    ///
+    /// Every sink participates in the validated lifecycle, so the validated state is
+    /// always present (filled in during config compilation) and the sink is built
+    /// through the `DynValidatedSink` boundary.
+    pub async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let validated = self
+            .validated
+            .as_ref()
+            .expect("validated state missing for migrated sink");
+        let dyn_sink: &dyn DynValidatedSink = self.inner.as_ref();
+        dyn_sink.build_dyn(validated.as_ref(), cx).await
+    }
     pub fn new<I, IS>(inputs: I, inner: IS) -> SinkOuter<T>
     where
         I: IntoIterator<Item = T>,
@@ -108,6 +132,7 @@ where
             inner: inner.into(),
             proxy: Default::default(),
             graph: Default::default(),
+            validated: None,
         }
     }
 
@@ -167,6 +192,7 @@ where
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
             graph: self.graph,
+            validated: self.validated,
         }
     }
 }
@@ -235,17 +261,23 @@ impl From<UriSerde> for SinkHealthcheckOptions {
 /// Generalized interface for describing and building sink components.
 #[async_trait]
 #[typetag::serde(tag = "type")]
-pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync {
+pub trait SinkConfig:
+    DynClone + NamedComponent + core::fmt::Debug + Send + Sync + DynValidatedSink
+{
     /// Builds the sink with the given context.
     ///
-    /// If the sink is built successfully, `Ok(...)` is returned containing the sink and the sink's
-    /// healthcheck.
+    /// This default validates the sink structure on the fly and builds from the
+    /// validated state. The topology normally uses `SinkOuter::build`, which builds
+    /// from the validated state retained during config compilation.
     ///
     /// # Errors
     ///
     /// If an error occurs while building the sink, an error variant explaining the issue is
     /// returned.
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)>;
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let validated = self.validate_dyn()?;
+        self.build_dyn(&*validated, cx).await
+    }
 
     /// Gets the input configuration for this sink.
     fn input(&self) -> Input;
@@ -264,6 +296,15 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
     /// when resources must first be reclaimed before being reassigned, and so on.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
+    }
+
+    /// Returns this sink's template-confinement config, if it supports confinement.
+    ///
+    /// The topology uses this to own the `vector_security_confinement_disabled`
+    /// gauge for the sink's lifetime. `None` (the default) means the sink does
+    /// not participate in template confinement and emits no gauge.
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        None
     }
 
     /// Gets the acknowledgements configuration for this sink.

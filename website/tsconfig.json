@@ -4,16 +4,15 @@
     "module": "es2022",
     "jsx": "react",
     "lib": ["dom", "es2015", "es2017"],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "noImplicitAny": false,
-    "baseUrl": ".",
     "typeRoots": ["./node_modules/@types"]
   },
   "exclude": ["node_modules"],
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "assets/js/search.tsx"]
 }

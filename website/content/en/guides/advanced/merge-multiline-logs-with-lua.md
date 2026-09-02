@@ -43,44 +43,44 @@ in the [guide on parsing CSV logs][guides.parsing-csv-logs-with-lua]. The underl
 
 Such an algorithm can be implemented, for example, with the following transform config:
 
-```toml title="vector.toml"
-[transforms.lua]
-  inputs = []
-  type = "lua"
-  version = "2"
-  source = """
-    csv = require("csv") -- load the `lua-csv` module
-    expected_columns = 23 -- expected number of columns in incoming CSV lines
-    line_separator = "\\r\\n" -- note the double escaping required by the TOML format
-  """
-  hooks.process = """
-    function (event, emit)
-      merged_event = merge(event)
-      if merged_event == nil then -- a global variable containing the merged event
-        merged_event = event -- if it is empty, set it to the current event
-      else -- otherwise, concatenate the line in the stored merged event
-           -- with the next line
-        merged_event.log.message = merged_event.log.message ..
-                                  line_separator .. event.log.message
-      end
+```yaml title="vector.yaml"
+transforms:
+  lua:
+    inputs: []
+    type: "lua"
+    version: "2"
+    source: |
+      csv = require("csv") -- load the `lua-csv` module
+      expected_columns = 23 -- expected number of columns in incoming CSV lines
+      line_separator = "\r\n"
+    hooks:
+      process: |
+        function (event, emit)
+          merged_event = merge(event)
+          if merged_event == nil then -- a global variable containing the merged event
+            merged_event = event -- if it is empty, set it to the current event
+          else -- otherwise, concatenate the line in the stored merged event
+               -- with the next line
+            merged_event.log.message = merged_event.log.message ..
+                                      line_separator .. event.log.message
+          end
 
-      fields = csv.openstring(event.log.message):lines()() -- parse CSV
-      if #fields < expected_columns then
-        return -- not all fields are present in the merged event yet
-      end
+          fields = csv.openstring(event.log.message):lines()() -- parse CSV
+          if #fields < expected_columns then
+            return -- not all fields are present in the merged event yet
+          end
 
-      -- do something with the array of the parsed fields
-      merged_event.log.csv_fields = fields -- for example, just store them in an
-                                           -- array field
+          -- do something with the array of the parsed fields
+          merged_event.log.csv_fields = fields -- for example, just store them in an
+                                               -- array field
 
-      emit(merged_event) -- emit the resulting event
-      merged_event = nil -- clear the merged event
-    end
-  """
+          emit(merged_event) -- emit the resulting event
+          merged_event = nil -- clear the merged event
+        end
 ```
 
-In this code sample, the `source` option defines code that's executed when the transform is created.
-while the `hooks.process` option defines a function that's called for each incoming event.
+In this code sample, the `source` option defines code that is executed when the transform is created,
+while the `hooks.process` option defines a function that is called for each incoming event.
 
 ## How It Works
 

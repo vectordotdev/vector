@@ -35,28 +35,18 @@ NATS [documentation][nats_auth_docs]. For TLS client certificate authentication 
 ))]
 pub enum NatsAuthConfig {
     /// Username/password authentication.
-    UserPassword {
-        #[configurable(derived)]
-        user_password: NatsAuthUserPassword,
-    },
+    UserPassword { user_password: NatsAuthUserPassword },
 
     /// Token authentication.
-    Token {
-        #[configurable(derived)]
-        token: NatsAuthToken,
-    },
+    Token { token: NatsAuthToken },
 
     /// Credentials file authentication. (JWT-based)
     CredentialsFile {
-        #[configurable(derived)]
         credentials_file: NatsAuthCredentialsFile,
     },
 
     /// NKey authentication.
-    Nkey {
-        #[configurable(derived)]
-        nkey: NatsAuthNKey,
-    },
+    Nkey { nkey: NatsAuthNKey },
 }
 
 impl std::fmt::Display for NatsAuthConfig {
@@ -145,6 +135,22 @@ impl NatsAuthConfig {
     }
 }
 
+/// Validate the NATS TLS cert/key pairing without touching the filesystem.
+///
+/// Mirrors the pairing check in `from_tls_auth_config`.
+pub(crate) fn validate_tls_cert_key_pair(
+    tls_config: &TlsEnableableConfig,
+) -> Result<(), NatsConfigError> {
+    if !tls_config.enabled.unwrap_or(false) {
+        return Ok(());
+    }
+    match (&tls_config.options.crt_file, &tls_config.options.key_file) {
+        (Some(_), None) => Err(NatsConfigError::TlsMissingKey),
+        (None, Some(_)) => Err(NatsConfigError::TlsMissingCert),
+        _ => Ok(()),
+    }
+}
+
 pub(crate) fn from_tls_auth_config(
     connection_name: &str,
     auth_config: &Option<NatsAuthConfig>,
@@ -166,6 +172,8 @@ pub(crate) fn from_tls_auth_config(
                 return Ok(nats_options);
             }
 
+            validate_tls_cert_key_pair(tls_config)?;
+
             let nats_options = match &tls_config.options.ca_file {
                 None => nats_options,
                 Some(ca_file) => nats_options.add_root_certificates(ca_file.clone()),
@@ -176,8 +184,9 @@ pub(crate) fn from_tls_auth_config(
                 (Some(crt_file), Some(key_file)) => {
                     nats_options.add_client_certificate(crt_file.clone(), key_file.clone())
                 }
-                (Some(_crt_file), None) => return Err(NatsConfigError::TlsMissingKey),
-                (None, Some(_key_file)) => return Err(NatsConfigError::TlsMissingCert),
+                (Some(_), None) | (None, Some(_)) => {
+                    unreachable!("cert/key pairing validated by validate_tls_cert_key_pair")
+                }
             };
             Ok(nats_options)
         }
@@ -186,145 +195,135 @@ pub(crate) fn from_tls_auth_config(
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+
     use super::*;
 
     fn parse_auth(s: &str) -> Result<async_nats::ConnectOptions, crate::Error> {
-        toml::from_str(s)
+        serde_yaml::from_str(s)
             .map_err(Into::into)
             .and_then(|config: NatsAuthConfig| config.to_nats_options().map_err(Into::into))
     }
 
     #[test]
     fn auth_user_password_ok() {
-        parse_auth(
-            r#"
-            strategy = "user_password"
-            user_password.user = "username"
-            user_password.password = "password"
-        "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: user_password
+            user_password:
+              user: username
+              password: password
+        "#})
         .unwrap();
     }
 
     #[test]
     fn auth_user_password_missing_user() {
-        parse_auth(
-            r#"
-            strategy = "user_password"
-            user_password.password = "password"
-        "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: user_password
+            user_password:
+              password: password
+        "#})
         .unwrap_err();
     }
 
     #[test]
     fn auth_user_password_missing_password() {
-        parse_auth(
-            r#"
-            strategy = "user_password"
-            user_password.user = "username"
-        "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: user_password
+            user_password:
+              user: username
+        "#})
         .unwrap_err();
     }
 
     #[test]
     fn auth_user_password_missing_all() {
-        parse_auth(
-            r#"
-            strategy = "user_password"
-            token.value = "foobar"
-            "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: user_password
+            token:
+              value: foobar
+        "#})
         .unwrap_err();
     }
 
     #[test]
     fn auth_token_ok() {
-        parse_auth(
-            r#"
-            strategy = "token"
-            token.value = "token"
-        "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: token
+            token:
+              value: token
+        "#})
         .unwrap();
     }
 
     #[test]
     fn auth_token_missing() {
-        parse_auth(
-            r#"
-            strategy = "token"
-            user_password.user = "foobar"
-            "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: token
+            user_password:
+              user: foobar
+        "#})
         .unwrap_err();
     }
 
     #[test]
     fn auth_credentials_file_ok() {
-        parse_auth(
-            r#"
-            strategy = "credentials_file"
-            credentials_file.path = "tests/integration/nats/data/nats.creds"
-        "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: credentials_file
+            credentials_file:
+              path: tests/integration/nats/data/nats.creds
+        "#})
         .unwrap();
     }
 
     #[test]
     fn auth_credentials_file_missing() {
-        parse_auth(
-            r#"
-            strategy = "credentials_file"
-            token.value = "foobar"
-            "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: credentials_file
+            token:
+              value: foobar
+        "#})
         .unwrap_err();
     }
 
     #[test]
     fn auth_nkey_ok() {
-        parse_auth(
-            r#"
-            strategy = "nkey"
-            nkey.nkey = "UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5"
-            nkey.seed = "SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA"
-        "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: nkey
+            nkey:
+              nkey: UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5
+              seed: SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA
+        "#})
         .unwrap();
     }
 
     #[test]
     fn auth_nkey_missing_nkey() {
-        parse_auth(
-            r#"
-            strategy = "nkey"
-            nkey.seed = "SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA"
-        "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: nkey
+            nkey:
+              seed: SUAAEZYNLTEA2MDTG7L5X7QODZXYHPOI2LT2KH5I4GD6YVP24SE766EGPA
+        "#})
         .unwrap_err();
     }
 
     #[test]
     fn auth_nkey_missing_seed() {
-        parse_auth(
-            r#"
-            strategy = "nkey"
-            nkey.nkey = "UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5"
-        "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: nkey
+            nkey:
+              nkey: UC435ZYS52HF72E2VMQF4GO6CUJOCHDUUPEBU7XDXW5AQLIC6JZ46PO5
+        "#})
         .unwrap_err();
     }
 
     #[test]
     fn auth_nkey_missing_both() {
-        parse_auth(
-            r#"
-            strategy = "nkey"
-            user_password.user = "foobar"
-            "#,
-        )
+        parse_auth(indoc! {r#"
+            strategy: nkey
+            user_password:
+              user: foobar
+        "#})
         .unwrap_err();
     }
 }

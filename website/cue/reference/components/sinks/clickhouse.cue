@@ -4,7 +4,6 @@ components: sinks: clickhouse: {
 	title: "ClickHouse"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: clickhouse: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -153,7 +151,6 @@ components: sinks: clickhouse: {
 				types are unsupported:
 				- `FIXED_SIZE_BINARY`
 				- `JSON`
-				- `UUID`
 				- `ENUM`
 
 				#### Timezone Handling

@@ -25,8 +25,8 @@ pub struct TraceToLogConfig {
 }
 
 impl GenerateConfig for TraceToLogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             log_namespace: None,
         })
         .unwrap()

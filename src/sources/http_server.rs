@@ -6,11 +6,7 @@ use http::StatusCode;
 use http_serde;
 use tokio_util::codec::Decoder as _;
 use vector_lib::{
-    codecs::{
-        BytesDecoderConfig, BytesDeserializerConfig, JsonDeserializerConfig,
-        NewlineDelimitedDecoderConfig,
-        decoding::{DeserializerConfig, FramingConfig},
-    },
+    codecs::decoding::{DeserializerConfig, FramingConfig},
     config::{DataType, LegacyKey, LogNamespace},
     configurable::configurable_component,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
@@ -22,51 +18,16 @@ use warp::http::HeaderMap;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
-    config::{
-        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
-    },
+    config::{Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     http::KeepaliveConfig,
     serde::{bool_or_struct, default_decoding},
     sources::util::{
-        Encoding, HttpSource,
+        HttpSource,
         http::{HttpMethod, add_headers, add_query_parameters},
     },
     tls::TlsEnableableConfig,
 };
-
-/// Configuration for the `http` source.
-#[configurable_component(source("http", "Host an HTTP endpoint to receive logs."))]
-#[configurable(metadata(deprecated))]
-#[derive(Clone, Debug)]
-pub struct HttpConfig(SimpleHttpConfig);
-
-impl GenerateConfig for HttpConfig {
-    fn generate_config() -> toml::Value {
-        <SimpleHttpConfig as GenerateConfig>::generate_config()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "http")]
-impl SourceConfig for HttpConfig {
-    async fn build(&self, cx: SourceContext) -> vector_lib::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        self.0.outputs(global_log_namespace)
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        self.0.resources()
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        self.0.can_acknowledge()
-    }
-}
 
 /// Configuration for the `http_server` source.
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
@@ -78,13 +39,6 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
     #[configurable(metadata(docs::examples = "localhost:80"))]
     address: SocketAddr,
-
-    /// The expected encoding of received data.
-    ///
-    /// For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
-    #[configurable(deprecated)]
-    #[serde(default)]
-    encoding: Option<Encoding>,
 
     /// A list of HTTP headers to include in the log event.
     ///
@@ -114,7 +68,14 @@ pub struct SimpleHttpConfig {
     #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
-    #[configurable(derived)]
+    /// HTTP authentication configuration.
+    ///
+    /// Use HTTP authentication with HTTPS only. The authentication credentials are passed as an
+    /// HTTP header without any additional encryption beyond what is provided by the transport itself.
+    ///
+    /// When using the `custom` strategy, the VRL program may write `%field = value` to enrich
+    /// authenticated events. These metadata fields are injected into the event body (legacy
+    /// namespace) or under `http_server.<field>` in event metadata (Vector namespace).
     auth: Option<HttpServerAuthConfig>,
 
     /// Whether or not to treat the configured `path` as an absolute path.
@@ -154,16 +115,12 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_response_code")]
     response_code: StatusCode,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     decoding: Option<DeserializerConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -172,7 +129,6 @@ pub struct SimpleHttpConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 }
@@ -217,46 +173,27 @@ impl SimpleHttpConfig {
             )
             .with_standard_vector_source_metadata();
 
-        // for metadata that is added to the events dynamically from config options
+        // For metadata that is added to the events dynamically from config options.
         if log_namespace == LogNamespace::Legacy {
-            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+            // Custom auth programs can inject any VRL value, not just bytes; widen the unknown
+            // field kind accordingly so schema-aware downstream components don't reject events.
+            let unknown_kind = if matches!(self.auth, Some(HttpServerAuthConfig::Custom { .. })) {
+                Kind::any()
+            } else {
+                Kind::bytes()
+            };
+            schema_definition = schema_definition.unknown_fields(unknown_kind);
         }
 
         schema_definition
     }
 
     fn get_decoding_config(&self) -> crate::Result<DecodingConfig> {
-        if self.encoding.is_some() && (self.framing.is_some() || self.decoding.is_some()) {
-            return Err("Using `encoding` is deprecated and does not have any effect when `decoding` or `framing` is provided. Configure `framing` and `decoding` instead.".into());
-        }
-
-        let (framing, decoding) = if let Some(encoding) = self.encoding {
-            match encoding {
-                Encoding::Text => (
-                    NewlineDelimitedDecoderConfig::new().into(),
-                    BytesDeserializerConfig::new().into(),
-                ),
-                Encoding::Json => (
-                    BytesDecoderConfig::new().into(),
-                    JsonDeserializerConfig::default().into(),
-                ),
-                Encoding::Ndjson => (
-                    NewlineDelimitedDecoderConfig::new().into(),
-                    JsonDeserializerConfig::default().into(),
-                ),
-                Encoding::Binary => (
-                    BytesDecoderConfig::new().into(),
-                    BytesDeserializerConfig::new().into(),
-                ),
-            }
-        } else {
-            let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
-            let framing = self
-                .framing
-                .clone()
-                .unwrap_or_else(|| decoding.default_stream_framing());
-            (framing, decoding)
-        };
+        let decoding = self.decoding.clone().unwrap_or_else(default_decoding);
+        let framing = self
+            .framing
+            .clone()
+            .unwrap_or_else(|| decoding.default_stream_framing());
 
         Ok(DecodingConfig::new(
             framing,
@@ -270,7 +207,6 @@ impl Default for SimpleHttpConfig {
     fn default() -> Self {
         Self {
             address: "0.0.0.0:8080".parse().unwrap(),
-            encoding: None,
             headers: Vec::new(),
             query_parameters: Vec::new(),
             tls: None,
@@ -424,6 +360,14 @@ struct SimpleHttpSource {
 }
 
 impl HttpSource for SimpleHttpSource {
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
+    fn name() -> &'static str {
+        SimpleHttpConfig::NAME
+    }
+
     /// Enriches the log events with metadata for the `request_path` and for each of the headers.
     /// Non-log events are skipped.
     fn enrich_events(
@@ -543,11 +487,15 @@ mod tests {
         config::LogNamespace,
         event::LogEvent,
         lookup::{
-            OwnedTargetPath, PathPrefix, event_path, lookup_v2::OptionalValuePath, owned_value_path,
+            OwnedTargetPath, PathPrefix, event_path, lookup_v2::OptionalValuePath,
+            owned_value_path, path,
         },
         schema::Definition,
     };
-    use vrl::value::{Kind, ObjectMap, kind::Collection};
+    use vrl::{
+        path::ValuePath as _,
+        value::{Kind, ObjectMap, kind::Collection},
+    };
 
     use super::{SimpleHttpConfig, remove_duplicates};
     use crate::{
@@ -601,7 +549,6 @@ mod tests {
             SimpleHttpConfig {
                 address,
                 headers,
-                encoding: None,
                 query_parameters,
                 response_code,
                 tls: None,
@@ -1271,6 +1218,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_rejects_gzip_bomb_with_413() {
+        // A modestly-sized gzipped blob of zeros that would expand past the default
+        // 100 MiB cap if decompression were unbounded.
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        let chunk = [0u8; 8 * 1024];
+        for _ in 0..(200 * 1024 * 1024 / chunk.len()) {
+            encoder.write_all(&chunk).unwrap();
+        }
+        let body = encoder.finish().unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert("Content-Encoding", "gzip".parse().unwrap());
+
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            None,
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(413, send_bytes(addr, body, headers).await);
+    }
+
+    #[tokio::test]
     async fn http_path() {
         let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let (rx, addr) = source(
@@ -1723,6 +1705,174 @@ mod tests {
                 list_dedup
             );
         }
+    }
+
+    #[test]
+    fn inject_auth_enrichment_does_not_clobber_vector_namespace_builtin_fields() {
+        use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
+        use vector_lib::codecs::BytesDeserializerConfig;
+        use vrl::value::KeyString;
+
+        let decoder = DecodingConfig::new(
+            BytesDecoderConfig::new().into(),
+            BytesDeserializerConfig::new().into(),
+            LogNamespace::Vector,
+        )
+        .build()
+        .unwrap()
+        .with_log_namespace(LogNamespace::Vector);
+
+        let source = super::SimpleHttpSource {
+            headers: vec![],
+            query_parameters: vec![],
+            path_key: OptionalValuePath::none(),
+            host_key: OptionalValuePath::none(),
+            decoder,
+            log_namespace: LogNamespace::Vector,
+        };
+
+        let mut log = LogEvent::default();
+        // Pre-populate %http_server.path as enrich_events would.
+        log.insert(
+            (
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("path")),
+            ),
+            "/real/path",
+        );
+
+        let mut events = vec![Event::Log(log)];
+        let mut enrichment = ObjectMap::new();
+        // Attempt to clobber the built-in `path` field and inject a new field.
+        enrichment.insert(KeyString::from("path"), Value::from("/clobbered"));
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("t-123"));
+
+        source.inject_auth_enrichment(&mut events, enrichment);
+
+        let Event::Log(log) = &events[0] else {
+            panic!("expected log event");
+        };
+        assert_eq!(
+            log.get((
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("path")),
+            )),
+            Some(&Value::from("/real/path")),
+            "auth enrichment must not overwrite built-in source metadata"
+        );
+        assert_eq!(
+            log.get((
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
+            )),
+            Some(&Value::from("t-123")),
+            "new auth enrichment field must be injected"
+        );
+    }
+
+    #[test]
+    fn inject_auth_enrichment_does_not_overwrite_existing_metadata_in_vector_namespace() {
+        use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
+        use vector_lib::codecs::BytesDeserializerConfig;
+        use vrl::value::KeyString;
+
+        let decoder = DecodingConfig::new(
+            BytesDecoderConfig::new().into(),
+            BytesDeserializerConfig::new().into(),
+            LogNamespace::Vector,
+        )
+        .build()
+        .unwrap()
+        .with_log_namespace(LogNamespace::Vector);
+
+        let source = super::SimpleHttpSource {
+            headers: vec![],
+            query_parameters: vec![],
+            path_key: OptionalValuePath::none(),
+            host_key: OptionalValuePath::none(),
+            decoder,
+            log_namespace: LogNamespace::Vector,
+        };
+
+        let mut log = LogEvent::default();
+        // Pre-populate a key (e.g. already written by enrich_events or the decoded event).
+        log.insert(
+            (
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
+            ),
+            "existing",
+        );
+
+        let mut events = vec![Event::Log(log)];
+        let mut enrichment = ObjectMap::new();
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("auth-value"));
+
+        source.inject_auth_enrichment(&mut events, enrichment);
+
+        let Event::Log(log) = &events[0] else {
+            panic!("expected log event");
+        };
+        assert_eq!(
+            log.get((
+                PathPrefix::Metadata,
+                path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),
+            )),
+            Some(&Value::from("existing")),
+            "auth enrichment must not overwrite already-present metadata keys"
+        );
+    }
+
+    #[test]
+    fn inject_auth_enrichment_applies_to_non_log_events_in_vector_namespace() {
+        use crate::{codecs::DecodingConfig, sources::util::HttpSource as _};
+        use vector_lib::{
+            codecs::BytesDeserializerConfig,
+            event::{Metric, MetricKind, MetricValue},
+        };
+        use vrl::value::KeyString;
+
+        let decoder = DecodingConfig::new(
+            BytesDecoderConfig::new().into(),
+            BytesDeserializerConfig::new().into(),
+            LogNamespace::Vector,
+        )
+        .build()
+        .unwrap()
+        .with_log_namespace(LogNamespace::Vector);
+
+        let source = super::SimpleHttpSource {
+            headers: vec![],
+            query_parameters: vec![],
+            path_key: OptionalValuePath::none(),
+            host_key: OptionalValuePath::none(),
+            decoder,
+            log_namespace: LogNamespace::Vector,
+        };
+
+        let metric = Metric::new(
+            "requests",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let mut events = vec![Event::Metric(metric)];
+
+        let mut enrichment = ObjectMap::new();
+        enrichment.insert(KeyString::from("tenant_id"), Value::from("t-456"));
+
+        source.inject_auth_enrichment(&mut events, enrichment);
+
+        let Event::Metric(metric) = &events[0] else {
+            panic!("expected metric event");
+        };
+        assert_eq!(
+            metric
+                .metadata()
+                .value()
+                .get(path!(SimpleHttpConfig::NAME).concat(path!("tenant_id")),),
+            Some(&Value::from("t-456")),
+            "auth enrichment must be written to non-log event metadata"
+        );
     }
 
     impl ValidatableComponent for SimpleHttpConfig {

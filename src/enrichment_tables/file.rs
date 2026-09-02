@@ -7,7 +7,7 @@ use vector_lib::{
     TimeZone,
     configurable::configurable_component,
     conversion::Conversion,
-    enrichment::{Case, Condition, IndexHandle, Table},
+    enrichment::{Case, Condition, Error, IndexHandle, Table},
 };
 use vrl::value::{ObjectMap, Value};
 
@@ -59,7 +59,6 @@ pub struct FileSettings {
     pub path: PathBuf,
 
     /// File encoding configuration.
-    #[configurable(derived)]
     pub encoding: Encoding,
 }
 
@@ -68,7 +67,6 @@ pub struct FileSettings {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileConfig {
     /// File-specific settings.
-    #[configurable(derived)]
     pub file: FileSettings,
 
     /// Key/value pairs representing mapped log field names and types.
@@ -239,6 +237,7 @@ impl EnrichmentTableConfig for FileConfig {
     async fn build(
         &self,
         globals: &crate::config::GlobalOptions,
+        _prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         Ok(Box::new(File::new(
             self.clone(),
@@ -384,7 +383,7 @@ impl File {
     }
 
     /// Order the fields in the index according to the position they are found in the header.
-    fn normalize_index_fields(&self, index: &[&str]) -> Result<Vec<usize>, String> {
+    fn normalize_index_fields(&self, index: &[&str]) -> Result<Vec<usize>, Error> {
         // Get the positions of the fields we are indexing
         let normalized = self
             .headers
@@ -400,7 +399,7 @@ impl File {
             .collect::<Vec<_>>();
 
         if normalized.len() != index.len() {
-            let missing = index
+            let fields = index
                 .iter()
                 .filter_map(|col| {
                     if self.headers.iter().any(|header| header == *col) {
@@ -409,9 +408,8 @@ impl File {
                         Some(col.to_string())
                     }
                 })
-                .collect::<Vec<_>>()
-                .join(", ");
-            Err(format!("field(s) '{missing}' missing from dataset"))
+                .collect();
+            Err(Error::MissingDatasetFields { fields })
         } else {
             Ok(normalized)
         }
@@ -426,7 +424,7 @@ impl File {
         &self,
         fieldidx: &[usize],
         case: Case,
-    ) -> Result<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, String> {
+    ) -> Result<HashMap<u64, Vec<usize>, hash_hasher::HashBuildHasher>, Error> {
         let mut index = HashMap::with_capacity_and_hasher(
             self.data.len(),
             hash_hasher::HashBuildHasher::default(),
@@ -476,7 +474,7 @@ impl File {
         case: Case,
         condition: &'a [Condition<'a>],
         handle: IndexHandle,
-    ) -> Result<Option<&'a Vec<usize>>, String> {
+    ) -> Result<Option<&'a Vec<usize>>, Error> {
         // The index to use has been passed, we can use this to search the data.
         // We are assuming that the caller has passed an index that represents the fields
         // being passed in the condition.
@@ -502,7 +500,7 @@ impl File {
         wildcard: &'a Value,
         condition: &'a [Condition<'a>],
         handle: IndexHandle,
-    ) -> Result<Option<&'a Vec<usize>>, String> {
+    ) -> Result<Option<&'a Vec<usize>>, Error> {
         if let Some(result) = self.indexed(case, condition, handle)? {
             return Ok(Some(result));
         }
@@ -525,19 +523,21 @@ impl File {
 
 /// Adds the bytes from the given value to the hash.
 /// Each field is terminated by a `0` value to separate the fields
-fn hash_value(hasher: &mut seahash::SeaHasher, case: Case, value: &Value) -> Result<(), String> {
+fn hash_value(hasher: &mut seahash::SeaHasher, case: Case, value: &Value) -> Result<(), Error> {
     match value {
         Value::Bytes(bytes) => match case {
             Case::Sensitive => hasher.write(bytes),
             Case::Insensitive => hasher.write(
                 std::str::from_utf8(bytes)
-                    .map_err(|_| "column contains invalid utf".to_string())?
+                    .map_err(|source| Error::InvalidUtfInColumn { source })?
                     .to_lowercase()
                     .as_bytes(),
             ),
         },
         value => {
-            let bytes: bytes::Bytes = value.encode_as_bytes()?;
+            let bytes: bytes::Bytes = value
+                .encode_as_bytes()
+                .map_err(|details| Error::FailedToEncodeValue { details })?;
             hasher.write(&bytes);
         }
     }
@@ -548,7 +548,7 @@ fn hash_value(hasher: &mut seahash::SeaHasher, case: Case, value: &Value) -> Res
 }
 
 /// Returns an error if the iterator doesn't yield exactly one result.
-fn single_or_err<I, T>(mut iter: T) -> Result<I, String>
+fn single_or_err<I, T>(mut iter: T) -> Result<I, Error>
 where
     T: Iterator<Item = I>,
 {
@@ -556,9 +556,9 @@ where
 
     if iter.next().is_some() {
         // More than one row has been found.
-        Err("more than one row found".to_string())
+        Err(Error::MoreThanOneRowFound)
     } else {
-        result.ok_or_else(|| "no rows found".to_string())
+        result.ok_or(Error::NoRowsFound)
     }
 }
 
@@ -570,7 +570,7 @@ impl Table for File {
         select: Option<&'a [String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, Error> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
@@ -582,7 +582,7 @@ impl Table for File {
                 } else {
                     self.indexed(case, condition, handle)?
                 }
-                .ok_or_else(|| "no rows found in index".to_string())?
+                .ok_or(Error::NoRowsFound)?
                 .iter()
                 .map(|idx| &self.data[*idx]);
 
@@ -599,7 +599,7 @@ impl Table for File {
         select: Option<&'a [String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, Error> {
         match index {
             None => {
                 // No index has been passed so we need to do a Sequential Scan.
@@ -630,7 +630,7 @@ impl Table for File {
         }
     }
 
-    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         let normalized = self.normalize_index_fields(fields)?;
         match self
             .indexes
@@ -951,7 +951,9 @@ mod tests {
 
         let error = file.add_index(Case::Sensitive, &["apples", "field2", "bananas"]);
         assert_eq!(
-            Err("field(s) 'apples, bananas' missing from dataset".to_string()),
+            Err(Error::MissingDatasetFields {
+                fields: vec!["apples".into(), "bananas".into()],
+            }),
             error
         )
     }
@@ -1466,7 +1468,7 @@ mod tests {
         };
 
         assert_eq!(
-            Err("no rows found".to_string()),
+            Err(Error::NoRowsFound),
             file.find_table_row(Case::Sensitive, &[condition], None, None, None)
         );
     }
@@ -1493,7 +1495,7 @@ mod tests {
         };
 
         assert_eq!(
-            Err("no rows found in index".to_string()),
+            Err(Error::NoRowsFound),
             file.find_table_row(Case::Sensitive, &[condition], None, None, Some(handle))
         );
     }
@@ -1521,7 +1523,7 @@ mod tests {
         };
 
         assert_eq!(
-            Err("no rows found in index".to_string()),
+            Err(Error::NoRowsFound),
             file.find_table_row(
                 Case::Sensitive,
                 &[condition],

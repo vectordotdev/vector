@@ -4,7 +4,6 @@ components: sinks: azure_blob: {
 	title: "Azure Blob Storage"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: azure_blob: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       true
 				max_bytes:    10_000_000
 				timeout_secs: 300.0
 			}
@@ -37,6 +35,7 @@ components: sinks: azure_blob: {
 					enum: ["json", "text"]
 				}
 			}
+			proxy: enabled: true
 			request: {
 				enabled:        true
 				rate_limit_num: 250

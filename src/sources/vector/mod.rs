@@ -3,7 +3,8 @@ use std::net::SocketAddr;
 
 use chrono::Utc;
 use futures::TryFutureExt;
-use tonic::{Request, Response, Status};
+use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
+use tonic_health::server::health_reporter;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::NativeDeserializerConfig,
@@ -22,7 +23,13 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
-    sources::{Source, util::grpc::run_grpc_server},
+    sources::{
+        Source,
+        util::{
+            decompression::max_decompressed_size_bytes,
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        },
+    },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -126,13 +133,14 @@ pub struct VectorConfig {
     /// It _must_ include a port.
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
+
+    #[serde(default)]
+    keepalive: GrpcKeepaliveConfig,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
@@ -157,14 +165,15 @@ impl Default for VectorConfig {
             address: "0.0.0.0:6000".parse().unwrap(),
             tls: None,
             acknowledgements: Default::default(),
+            keepalive: Default::default(),
             log_namespace: None,
         }
     }
 }
 
 impl GenerateConfig for VectorConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(VectorConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(VectorConfig::default()).unwrap()
     }
 }
 
@@ -176,19 +185,46 @@ impl SourceConfig for VectorConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let service = proto::Server::new(Service {
+        // Create the custom Vector service (existing).
+        //
+        // Compression negotiation (gzip, zstd) is handled centrally by
+        // `DecompressionAndMetricsLayer` in `sources::util::grpc`, so we
+        // deliberately do not call `.accept_compressed(..)` here.
+        let vector_service = proto::Server::new(Service {
             pipeline: cx.out,
             acknowledgements,
             log_namespace,
         })
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
-        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
-        .max_decoding_message_size(usize::MAX);
+        // Tonic added a default of 4MB in 0.9. Bound this by the global decompressed-size
+        // cap rather than `usize::MAX` so a single oversized message cannot drive unbounded
+        // allocation on this unauthenticated listener.
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
-        let source =
-            run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
-                error!(message = "Source future failed.", %error);
-            });
+        // Create the standard gRPC health service
+        let (mut health_reporter, health_service) = health_reporter();
+
+        // Register the Vector service as serving in the health reporter
+        health_reporter
+            .set_service_status("vector.Vector", tonic_health::ServingStatus::Serving)
+            .await;
+
+        // Combine both services using RoutesBuilder
+        let mut builder = RoutesBuilder::default();
+        builder
+            .add_service(health_service)
+            .add_service(vector_service);
+
+        let source = run_grpc_server_with_routes(
+            self.address,
+            tls_settings,
+            None,
+            builder.routes(),
+            self.keepalive.clone(),
+            cx.shutdown,
+        )
+        .map_err(|error| {
+            error!(message = "Source future failed.", %error);
+        });
 
         Ok(Box::pin(source))
     }
@@ -221,11 +257,76 @@ mod test {
     use vrl::value::{Kind, kind::Collection};
 
     use super::VectorConfig;
-    use crate::config::SourceConfig;
+    use crate::{
+        SourceSender,
+        config::{SourceConfig, SourceContext},
+        test_util,
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::VectorConfig>();
+    }
+
+    #[test]
+    fn config_keepalive() {
+        let config: VectorConfig = toml::from_str(
+            r#"
+                address = "0.0.0.0:6000"
+
+                [keepalive]
+                max_connection_age_secs = 300
+                max_connection_age_grace_secs = 30
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(config.keepalive.max_connection_age_secs, Some(300));
+        assert_eq!(config.keepalive.max_connection_age_grace_secs, Some(30));
+    }
+
+    #[tokio::test]
+    async fn max_connection_age_closes_idle_connection() {
+        use tokio::{
+            io::AsyncReadExt,
+            net::TcpStream,
+            time::{Duration, sleep, timeout},
+        };
+
+        let (_guard, addr) = test_util::addr::next_addr();
+        let source_config = format!(
+            r#"
+                address = "{addr}"
+
+                [keepalive]
+                max_connection_age_secs = 1
+            "#
+        );
+        let source: VectorConfig = toml::from_str(&source_config).unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        sleep(Duration::from_millis(1500)).await;
+
+        let mut buf = [0; 32];
+        let read = timeout(Duration::from_secs(2), async {
+            loop {
+                if stream.read(&mut buf).await.unwrap() == 0 {
+                    break 0;
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(read, 0);
     }
 
     #[test]
@@ -286,9 +387,11 @@ mod tests {
         test_util,
     };
 
-    async fn run_test(vector_source_config_str: &str, addr: SocketAddr) {
-        let config = format!(r#"address = "{addr}""#);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+    async fn run_test(compression: Option<&str>) {
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let source_config = format!("address: \"{addr}\"");
+        let source: VectorConfig = serde_yaml::from_str(&source_config).unwrap();
 
         let (tx, rx) = SourceSender::new_test();
         let server = source
@@ -301,7 +404,14 @@ mod tests {
         // Ideally, this would be a fully custom agent to send the data,
         // but the sink side already does such a test and this is good
         // to ensure interoperability.
-        let sink: SinkConfig = toml::from_str(vector_source_config_str).unwrap();
+        let sink_config = match compression {
+            Some(c) => indoc::formatdoc! {r#"
+                address: "{addr}"
+                compression: "{c}"
+            "#},
+            None => format!("address: \"{addr}\"\n"),
+        };
+        let sink: SinkConfig = serde_yaml::from_str(&sink_config).unwrap();
         let cx = SinkContext::default();
         let (sink, _) = sink.build(cx).await.unwrap();
 
@@ -321,20 +431,176 @@ mod tests {
 
     #[tokio::test]
     async fn receive_message() {
-        let (_guard, addr) = test_util::addr::next_addr();
-
-        let config = format!(r#"address = "{addr}""#);
-        run_test(&config, addr).await;
+        run_test(None).await;
     }
 
     #[tokio::test]
-    async fn receive_compressed_message() {
+    async fn receive_gzip_compressed_message() {
+        run_test(Some("gzip")).await;
+    }
+
+    #[tokio::test]
+    async fn receive_zstd_compressed_message() {
+        run_test(Some("zstd")).await;
+    }
+
+    #[tokio::test]
+    async fn custom_health_check_works() {
+        use tonic::transport::Channel;
+
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let config = format!("address: \"{addr}\"");
+        let source: VectorConfig = serde_yaml::from_str(&config).unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        // Test the custom Vector health check endpoint
+        let endpoint = format!("http://{addr}");
+        let channel = Channel::from_shared(endpoint)
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+
+        let mut client = proto::Client::new(channel);
+        let response = client
+            .health_check(proto::HealthCheckRequest {})
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.into_inner().status,
+            proto::ServingStatus::Serving as i32
+        );
+    }
+
+    #[tokio::test]
+    async fn max_connection_age_allows_client_reconnect() {
+        use tokio::time::{Duration, sleep};
+        use tonic::transport::Channel;
+
+        use crate::sources::util::grpc::test_support::{
+            max_connection_age_connection_observations,
+            reset_max_connection_age_connection_observations,
+        };
+
         let (_guard, addr) = test_util::addr::next_addr();
 
         let config = format!(
-            r#"address = "{addr}"
-            compression=true"#
+            r#"
+                address = "{addr}"
+
+                [keepalive]
+                max_connection_age_secs = 1
+            "#
         );
-        run_test(&config, addr).await;
+        let source: VectorConfig = toml::from_str(&config).unwrap();
+
+        reset_max_connection_age_connection_observations();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        let endpoint = format!("http://{addr}");
+        let channel = Channel::from_shared(endpoint)
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+        let mut client = proto::Client::new(channel);
+
+        let response = client
+            .health_check(proto::HealthCheckRequest {})
+            .await
+            .unwrap();
+        assert_eq!(
+            response.into_inner().status,
+            proto::ServingStatus::Serving as i32
+        );
+        let observations_before_expiry = max_connection_age_connection_observations();
+        assert!(!observations_before_expiry.is_empty());
+
+        sleep(Duration::from_millis(1500)).await;
+
+        let response = client
+            .health_check(proto::HealthCheckRequest {})
+            .await
+            .unwrap();
+        assert_eq!(
+            response.into_inner().status,
+            proto::ServingStatus::Serving as i32
+        );
+        let observations = max_connection_age_connection_observations();
+        assert!(
+            observations.len() > observations_before_expiry.len(),
+            "expected second RPC to reconnect after max connection age elapsed, got observations: {observations:?}",
+        );
+        assert!(observations.iter().any(|peer_addr| {
+            !observations_before_expiry
+                .iter()
+                .any(|observed| observed == peer_addr)
+        }));
+    }
+
+    #[tokio::test]
+    async fn standard_grpc_health_check_works() {
+        use tonic::transport::Channel;
+        use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
+
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let config = format!("address: \"{addr}\"");
+        let source: VectorConfig = serde_yaml::from_str(&config).unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        // Test the standard gRPC health check protocol
+        let endpoint = format!("http://{addr}");
+        let channel = Channel::from_shared(endpoint)
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+
+        let mut client = HealthClient::new(channel);
+
+        // Check aggregate server health (empty service string)
+        let response = client
+            .check(HealthCheckRequest {
+                service: String::new(),
+            })
+            .await
+            .unwrap();
+
+        use tonic_health::pb::health_check_response::ServingStatus;
+        assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
+
+        // Check the named Vector service health
+        let response = client
+            .check(HealthCheckRequest {
+                service: "vector.Vector".to_string(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
     }
 }

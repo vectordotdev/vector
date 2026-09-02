@@ -4,8 +4,7 @@ components: sources: exec: {
 	title: "Exec"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["sidecar"]
 		development:   "stable"
 		egress_method: "stream"
@@ -49,7 +48,6 @@ components: sources: exec: {
 				message:   fields._raw_line
 				timestamp: fields._current_timestamp
 				data_stream: {
-					common:      true
 					description: "The data stream from which the event originated."
 					required:    false
 					type: string: {

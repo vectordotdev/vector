@@ -39,9 +39,9 @@ use crate::{
     sources::{
         http_server::HttpConfigParamKind,
         opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
-        util::{add_headers, decompress_body},
+        util::{add_headers, decompress_body, http::capped_body},
     },
-    tls::MaybeTlsSettings,
+    tls::{MaybeTlsSettings, TlsAcceptorReloader},
 };
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -54,11 +54,15 @@ impl warp::reject::Reject for ApiError {}
 pub(crate) async fn run_http_server(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
 ) -> crate::Result<()> {
-    let listener = tls_settings.bind(&address).await?;
+    let listener = tls_settings
+        .bind_reloadable(&address, tls_reloader)
+        .await?
+        .with_keepalive(keepalive_settings.tcp_keepalive);
     let routes = filters.recover(handle_rejection);
 
     info!(message = "Building HTTP server.", address = %address);
@@ -109,9 +113,11 @@ pub(crate) fn build_warp_filter(
     );
     let metrics_filters = build_warp_metrics_filter(
         acknowledgements,
+        log_namespace,
         out.clone(),
         bytes_received.clone(),
         events_received.clone(),
+        headers.clone(),
         metrics_deserializer,
     );
     let trace_filters = build_warp_trace_filter(
@@ -119,6 +125,7 @@ pub(crate) fn build_warp_filter(
         out.clone(),
         bytes_received,
         events_received,
+        headers.clone(),
         traces_deserializer,
     );
     log_filters
@@ -188,6 +195,8 @@ where
         + 'static
         + Fn(Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
 {
+    let body_filter = capped_body();
+
     warp::post()
         .and(warp::path("v1"))
         .and(warp::path(telemetry_type))
@@ -198,7 +207,7 @@ where
         ))
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::headers_cloned())
-        .and(warp::body::bytes())
+        .and(body_filter)
         .and_then(
             move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
                 let events = make_events(encoding_header, headers, body);
@@ -257,12 +266,14 @@ fn build_warp_log_filter(
 }
 fn build_warp_metrics_filter(
     acknowledgements: bool,
+    log_namespace: LogNamespace,
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    headers_cfg: Vec<HttpConfigParamKind>,
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
-    let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
+    let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
@@ -276,15 +287,14 @@ fn build_warp_metrics_filter(
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
                 if let Some(d) = deserializer.as_ref() {
-                    parse_with_deserializer(
-                        d,
-                        decoded_body,
-                        LogNamespace::default(),
-                        &events_received,
-                    )
+                    parse_with_deserializer(d, decoded_body, log_namespace, &events_received)
                 } else {
                     decode_metrics_body(decoded_body, &events_received)
                 }
+                .map(|mut events| {
+                    enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
+                    events
+                })
             })
     };
 
@@ -301,9 +311,10 @@ fn build_warp_trace_filter(
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    headers_cfg: Vec<HttpConfigParamKind>,
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
-    let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
+    let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
@@ -326,6 +337,10 @@ fn build_warp_trace_filter(
                 } else {
                     decode_trace_body(decoded_body, &events_received)
                 }
+                .map(|mut events| {
+                    enrich_events(&mut events, &headers_cfg, &headers, LogNamespace::default());
+                    events
+                })
             })
     };
 

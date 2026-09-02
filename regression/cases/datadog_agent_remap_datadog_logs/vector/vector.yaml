@@ -9,9 +9,9 @@ sources:
     type: "internal_metrics"
 
   datadog_agent:
-    type:             "datadog_agent"
+    type: "datadog_agent"
     acknowledgements: false
-    address:          "0.0.0.0:8282"
+    address: "0.0.0.0:8282"
 
 ##
 ## Transforms
@@ -19,13 +19,13 @@ sources:
 
 transforms:
   parse_message:
-    type:   "remap"
-    inputs: [ "datadog_agent" ]
+    type: "remap"
+    inputs: ["datadog_agent"]
     source: |
-            pyld, err = parse_json(.message)
-            if err == null {
-              .message = pyld.mineral
-            }
+      pyld, err = parse_json(.message)
+      if err == null {
+        .message = pyld.mineral
+      }
 
 ##
 ## Sinks
@@ -33,18 +33,17 @@ transforms:
 
 sinks:
   prometheus:
-    type:    "prometheus_exporter"
-    inputs: [ "internal_metrics" ]
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
     address: "0.0.0.0:9090"
 
   datadog_logs:
-    type:            "datadog_logs"
-    inputs: [ "parse_message" ]
-    endpoint:        "http://localhost:8080"
+    type: "datadog_logs"
+    inputs: ["parse_message"]
+    endpoint: "http://localhost:8080"
     default_api_key: "DEADBEEF"
-    compression: "gzip"
     healthcheck:
       enabled: false
     buffer:
-      type:       "memory"
-      max_events: 50000  # buffer 50 payloads at a time
+      type: "memory"
+      max_events: 50000 # buffer 50 payloads at a time

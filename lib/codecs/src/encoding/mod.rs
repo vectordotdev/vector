@@ -10,10 +10,13 @@ pub mod serializer;
 mod transformer;
 pub use chunking::{Chunker, Chunking, GelfChunker};
 pub use config::{EncodingConfig, EncodingConfigWithFraming, SinkType};
-pub use encoder::{BatchEncoder, BatchSerializer, Encoder, EncoderKind};
+#[cfg(feature = "arrow")]
+pub use encoder::{BatchEncoder, BatchOutput, BatchSerializer};
+pub use encoder::{Encoder, EncoderKind};
 #[cfg(feature = "arrow")]
 pub use format::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
+    find_null_non_nullable_fields,
 };
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
@@ -26,6 +29,10 @@ pub use format::{
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "parquet")]
+pub use format::{
+    ParquetCompression, ParquetSchemaMode, ParquetSerializer, ParquetSerializerConfig,
+};
 #[cfg(feature = "syslog")]
 pub use format::{SyslogSerializer, SyslogSerializerConfig};
 pub use framing::{

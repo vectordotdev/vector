@@ -98,7 +98,7 @@ Partitioning, or “topics” in Kafka terminology, refers to separating data in
 
 ### Global Aggregation
 
-Because Vector can deployed anywhere in your infrastructure, it offers a unique approach to global aggregation. Aggregation can be tiered, allowing local aggregators to reduce data before forwarding to your global aggregators.
+Because Vector can be deployed anywhere in your infrastructure, it offers a unique approach to global aggregation. Aggregation can be tiered, allowing local aggregators to reduce data before forwarding to your global aggregators.
 
 ![Aggregator](/img/going-to-prod/global-aggregation.png)
 
@@ -111,4 +111,4 @@ This eliminates the need to deploy a single monolith aggregator, creating an unn
 
 ## Support
 
-For easy setup and maintenance of this architecture, consider the Vector’s [discussions](https://discussions.vector.dev) or [chat](https://chat.vector.dev). These are free best effort channels. For enterprise needs, consider Datadog Observability Pipelines, which comes with enterprise-level support. Read more about that product [here](https://www.datadoghq.com/product/observability-pipelines/).
+For easy setup and maintenance of this architecture, consider the Vector’s [discussions](https://discussions.vector.dev) or [chat](https://chat.vector.dev). These are free best effort channels. For enterprise needs, consider Datadog Observability Pipelines, which comes with enterprise-level support. Read more about [Datadog Observability Pipelines](https://www.datadoghq.com/product/observability-pipelines/).

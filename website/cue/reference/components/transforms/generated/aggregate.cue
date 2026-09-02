@@ -22,13 +22,13 @@ generated: components: transforms: aggregate: configuration: {
 			enum: {
 				Auto:   "Default mode. Sums incremental metrics and uses the latest value for absolute metrics."
 				Count:  "Counts metrics for incremental and absolute metrics"
-				Diff:   "Returns difference between latest value for absolute, ignores incremental"
-				Latest: "Returns the latest value for absolute metrics, ignores incremental"
-				Max:    "Max value of absolute metric, ignores incremental"
-				Mean:   "Mean value of absolute metric, ignores incremental"
-				Min:    "Min value of absolute metric, ignores incremental"
-				Stdev:  "Stdev value of absolute metric, ignores incremental"
-				Sum:    "Sums incremental metrics, ignores absolute"
+				Diff:   "Returns difference between latest value for absolute; incremental metrics pass through unchanged."
+				Latest: "Returns the latest value for absolute metrics; incremental metrics pass through unchanged."
+				Max:    "Max value of absolute metric; incremental metrics pass through unchanged."
+				Mean:   "Mean value of absolute metric; incremental metrics pass through unchanged."
+				Min:    "Min value of absolute metric; incremental metrics pass through unchanged."
+				Stdev:  "Stdev value of absolute metric; incremental metrics pass through unchanged."
+				Sum:    "Sums incremental metrics; absolute metrics pass through unchanged."
 			}
 		}
 	}

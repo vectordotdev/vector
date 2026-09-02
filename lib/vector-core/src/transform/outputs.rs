@@ -42,7 +42,7 @@ impl TransformOutputs {
         let mut controls = HashMap::new();
 
         for output in outputs_in {
-            let (fanout, control) = Fanout::new();
+            let (fanout, control) = Fanout::new(component_key.clone());
 
             let log_schema_definitions = output
                 .log_schema_definitions

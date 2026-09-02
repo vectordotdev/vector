@@ -1,0 +1,49 @@
+// Auto-detected by markdownlint-cli2 and editors (Zed, VS Code, JetBrains).
+{
+  "default": true,
+
+  "MD001": false, // Hugo generates the outer heading structure, so heading levels in content files are intentional
+  "MD003": { "style": "atx" },
+  "MD004": true,
+  "MD005": true,
+  "MD007": { "indent": 2 },
+  "MD009": true,
+  "MD010": true,
+  "MD011": true,
+  "MD012": false, // due to the way we generate docs, it is not possible to strictly enforce new lines
+  "MD013": false, // due to the way we generate docs, it is not possible to enforce a line length
+  "MD014": false, // we allow commands without output
+  "MD018": true,
+  "MD019": true,
+  "MD020": true,
+  "MD021": true,
+  "MD022": true,
+  "MD023": true,
+  "MD024": false, // due to the way we generate docs, there are cases where duplicate headings are out of our control
+  "MD025": false, // release templates and other files intentionally use multiple top-level headings
+  "MD026": { "punctuation": ".,;:" },
+  "MD027": true,
+  "MD028": true,
+  "MD029": { "style": "ordered" },
+  "MD031": true,
+  "MD032": true,
+  "MD033": false, // we allow HTML
+  "MD034": false, // we allow full URLs in special cases, such as component attributes
+  "MD035": true,
+  "MD036": true,
+  "MD037": true,
+  "MD038": true,
+  "MD039": true,
+  "MD040": true,
+  "MD041": false, // top-level headings are automatically generated for us
+  "MD042": true,
+  "MD043": true,
+  "MD044": true,
+  "MD046": true,
+  "MD047": true,
+  "MD048": true,
+  "MD049": false, // both *foo* and _foo_ are used intentionally for different semantic purposes
+  "MD051": false, // Hugo assembles sections from partials/shortcodes; fragments exist at render time but not in raw markdown
+  "MD052": false, // Hugo link definitions use shortcodes in URLs, unresolvable by markdownlint
+  "MD053": false  // Hugo uses reference link definitions extensively in README/website content
+}

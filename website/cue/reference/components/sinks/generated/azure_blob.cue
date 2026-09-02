@@ -1,6 +1,20 @@
 package metadata
 
 generated: components: sinks: azure_blob: configuration: {
+	account_name: {
+		description: """
+			The Azure Blob Storage Account name.
+
+			If provided, this will be used instead of the `connection_string`.
+			This is useful for authenticating with an Azure credential.
+
+			Exactly one of `connection_string`, `account_name`, or `blob_endpoint` must be set.
+			"""
+		required: false
+		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
+		required_one_of_group: "azure_blob_credentials"
+		type: string: examples: ["mylogstorage"]
+	}
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
@@ -25,6 +39,123 @@ generated: components: sinks: azure_blob: configuration: {
 				"""
 			required: false
 			type: bool: {}
+		}
+	}
+	auth: {
+		description: "Azure service principal authentication."
+		required:    false
+		type: object: options: {
+			azure_client_id: {
+				description: """
+					The [Azure Client ID][azure_client_id].
+
+					[azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\" or azure_credential_kind = \"client_secret_credential\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_CLIENT_ID:?err}"]
+			}
+			azure_client_secret: {
+				description: """
+					The [Azure Client Secret][azure_client_secret].
+
+					[azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"client_secret_credential\""
+				required:      true
+				type: string: examples: ["00-00~000000-0000000~0000000000000000000", "${AZURE_CLIENT_SECRET:?err}"]
+			}
+			azure_credential_kind: {
+				description: "The kind of Azure credential to use."
+				required:    true
+				type: string: enum: {
+					azure_cli:                         "Use Azure CLI credentials"
+					client_certificate_credential:     "Use certificate credentials"
+					client_secret_credential:          "Use client ID/secret credentials"
+					managed_identity:                  "Use Managed Identity credentials"
+					managed_identity_client_assertion: "Use Managed Identity with Client Assertion credentials"
+					workload_identity:                 "Use Workload Identity credentials"
+				}
+			}
+			azure_tenant_id: {
+				description: """
+					The [Azure Tenant ID][azure_tenant_id].
+
+					[azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\" or azure_credential_kind = \"client_secret_credential\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_TENANT_ID:?err}"]
+			}
+			certificate_password: {
+				description:   "The password for the client certificate, if applicable."
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				required:      false
+				type: string: examples: ["${AZURE_CLIENT_CERTIFICATE_PASSWORD}"]
+			}
+			certificate_path: {
+				description:   "PKCS12 certificate with RSA private key."
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				required:      true
+				type: string: examples: ["path/to/certificate.pfx", "${AZURE_CLIENT_CERTIFICATE_PATH:?err}"]
+			}
+			client_assertion_client_id: {
+				description:   "The target Client ID to use."
+				relevant_when: "azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			client_assertion_tenant_id: {
+				description:   "The target Tenant ID to use."
+				relevant_when: "azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			client_id: {
+				description: """
+					The [Azure Client ID][azure_client_id]. Defaults to the value of the environment variable `AZURE_CLIENT_ID`.
+
+					[azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"workload_identity\""
+				required:      false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_CLIENT_ID}"]
+			}
+			tenant_id: {
+				description: """
+					The [Azure Tenant ID][azure_tenant_id]. Defaults to the value of the environment variable `AZURE_TENANT_ID`.
+
+					[azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"workload_identity\""
+				required:      false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_TENANT_ID}"]
+			}
+			token_file_path: {
+				description:   "Path of a file containing a Kubernetes service account token. Defaults to the value of the environment variable `AZURE_FEDERATED_TOKEN_FILE`."
+				relevant_when: "azure_credential_kind = \"workload_identity\""
+				required:      false
+				type: string: examples: ["/var/run/secrets/azure/tokens/azure-identity-token", "${AZURE_FEDERATED_TOKEN_FILE}"]
+			}
+			user_assigned_managed_identity_id: {
+				description:   "The User Assigned Managed Identity to use."
+				relevant_when: "azure_credential_kind = \"managed_identity\" or azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			user_assigned_managed_identity_id_type: {
+				description: """
+					The type of the User Assigned Managed Identity ID provided (Client ID, Object ID,
+					or Resource ID). Defaults to Client ID.
+					"""
+				relevant_when: "azure_credential_kind = \"managed_identity\" or azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      false
+				type: string: enum: {
+					client_id:   "Client ID"
+					object_id:   "Object ID"
+					resource_id: "Resource ID"
+				}
+			}
 		}
 	}
 	batch: {
@@ -65,14 +196,30 @@ generated: components: sinks: azure_blob: configuration: {
 
 			The UUID is appended to the timestamp portion of the object key, such that if the blob key
 			generated is `date=2022-07-18/1658176486`, setting this field to `true` results
-			in an blob key that looks like
+			in a blob key that looks like
 			`date=2022-07-18/1658176486-30f6652c-71da-4f9f-800d-a1189c47c547`.
 
-			This ensures there are no name collisions, and can be useful in high-volume workloads where
-			blob keys must be unique.
+			The default value depends on `blob_type`:
+			- `block`: `true` — guarantees unique blob names across concurrent writers.
+			- `append`: `false` — multiple batches must share the same blob name to append to it.
+			  Set to `true` only if you intentionally want each flush to target a distinct append blob.
 			"""
 		required: false
 		type: bool: {}
+	}
+	blob_endpoint: {
+		description: """
+			The Azure Blob Storage endpoint.
+
+			If provided, this will be used instead of the `connection_string`.
+			This is useful for authenticating with an Azure credential.
+
+			Exactly one of `connection_string`, `account_name`, or `blob_endpoint` must be set.
+			"""
+		required: false
+		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
+		required_one_of_group: "azure_blob_credentials"
+		type: string: examples: ["https://mylogstorage.blob.core.windows.net/"]
 	}
 	blob_prefix: {
 		description: """
@@ -93,23 +240,88 @@ generated: components: sinks: azure_blob: configuration: {
 		description: """
 			The timestamp format for the time component of the blob key.
 
-			By default, blob keys are appended with a timestamp that reflects when the blob are sent to
-			Azure Blob Storage, such that the resulting blob key is functionally equivalent to joining
+			Blob keys are appended with a timestamp that reflects when the blob is sent to
+			Azure Blob Storage. The resulting blob key is functionally equivalent to joining
 			the blob prefix with the formatted timestamp, such as `date=2022-07-18/1658176486`.
 
 			This would represent a `blob_prefix` set to `date=%F/` and the timestamp of Mon Jul 18 2022
-			20:34:44 GMT+0000, with the `filename_time_format` being set to `%s`, which renders
-			timestamps in seconds since the Unix epoch.
+			20:34:44 GMT+0000, with the `blob_time_format` set to `%s`, which renders timestamps in
+			seconds since the Unix epoch.
 
 			Supports the common [`strftime`][chrono_strftime_specifiers] specifiers found in most
 			languages.
 
 			When set to an empty string, no timestamp is appended to the blob prefix.
 
+			The default value depends on `blob_type`:
+			- `block`: `%s` (Unix epoch seconds) — each batch gets a unique timestamp.
+			- `append`: `%Y-%m-%dT%H` (ISO 8601 date and hour) — batches within the same hour share
+			  the same blob.
+
 			[chrono_strftime_specifiers]: https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers
 			"""
 		required: false
 		type: string: syntax: "strftime"
+	}
+	blob_type: {
+		description: """
+			The type of blob to use when writing to Azure Blob Storage.
+
+			- `block` (default): each batch creates a new uniquely-named blob.
+			  `blob_append_uuid` defaults to `true`; `blob_time_format` defaults to `%s`.
+			- `append`: each batch appends to the same blob, keyed off `blob_prefix` and
+			  `blob_time_format`. `blob_append_uuid` defaults to `false`; `blob_time_format`
+			  defaults to `%Y-%m-%dT%H` (hourly rotation).
+
+			Azure limits each `append_block` call to 4 MiB (4,194,304 bytes), so `batch.max_bytes`
+			defaults to that limit in `append` mode and any explicit value above it is rejected at
+			startup. `batch.max_bytes` measures the pre-encoding event size, while Azure enforces the
+			limit on the encoded (and, if enabled, compressed) request body — with the default `gzip`
+			compression the encoded body is smaller than the batched events, so 4 MiB leaves
+			headroom. If you disable compression, encoding overhead (for example JSON escaping) can
+			push a near-limit batch over the limit and Azure rejects the request; lower
+			`batch.max_bytes` to leave headroom in that case.
+
+			Azure caps an append blob at 50,000 blocks and each flush consumes one, so
+			`blob_time_format` must rotate to a new blob before that cap is hit. The hourly default
+			allows 50,000 flushes per hour, or about 56 MiB/s at the 4 MiB batch limit; daily rotation
+			would cap the same partition near 2.3 MiB/s, after which Azure rejects appends with
+			`BlockCountExceedsLimit` until the name rolls over.
+
+			Appended blocks are persisted in the order Azure receives the requests, so `append` mode
+			defaults `request.concurrency` to `1` to keep flushes to the same blob in order. As with
+			all Vector sinks, delivery is at-least-once: a flush retried after Azure already committed
+			the block is appended twice. Setting `request.retry_attempts` to `0` disables sink-level
+			retries, but it does not give at-most-once delivery — upstream retries and resending
+			sources can still produce duplicates.
+			"""
+		required: false
+		type: string: {
+			default: "block"
+			enum: {
+				append: """
+					Stores data as append blobs.
+
+					Each flush appends to a stable-named blob instead of creating a new one, which suits
+					continuous log streaming: one growing file per time window.
+
+					Batches land verbatim, one after the other, so `compression` must be concatenation-safe
+					(`gzip`, `zstd`, or `none`; read such a blob with a multi-stream decompressor like `gunzip`)
+					and `framing` must terminate every record — `codec = "json"` therefore defaults to
+					newline-delimited JSON rather than the one array per blob that `block` emits. Settings that
+					cannot be appended safely are rejected at startup.
+
+					Changing `encoding` mixes formats inside a blob whose `Content-Type` is already set. Change
+					`blob_prefix` or `blob_time_format`, or wait for the next time window, to start a new blob.
+					"""
+				block: """
+					Stores data as block blobs.
+
+					Each batch creates a new uniquely-named blob. Recommended for high-throughput
+					scenarios where blobs are written once and read many times.
+					"""
+			}
+		}
 	}
 	compression: {
 		description: """
@@ -164,14 +376,44 @@ generated: components: sinks: azure_blob: configuration: {
 			| Allowed services       | Blob               |
 			| Allowed resource types | Container & Object |
 			| Allowed permissions    | Read & Create      |
+
+			If you also configure the `tags` option, the SAS must include the
+			`Tags` permission. Azure applies the *Set Blob Tags* authorization requirement to
+			the `Put Blob` request that carries the `x-ms-tags` header, so without it tagged
+			uploads fail with an authorization error even when the health check still passes.
+
+			When `blob_type` is `append`, the SAS token additionally needs the `Add` (or `Write`)
+			permission. `Read & Create` is sufficient to pass the health check and create the blob,
+			but every `Append Block` call fails with `403 Forbidden` without `Add`/`Write`.
+
+			Exactly one of `connection_string`, `account_name`, or `blob_endpoint` must be set.
 			"""
-		required: true
-		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"]
+		required: false
+		required_one_of: ["connection_string", "account_name", "blob_endpoint"]
+		required_one_of_group: "azure_blob_credentials"
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
+		warnings: ["Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep connection strings secure and not expose them in logs, error messages, or version control systems."]
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."
 		required:    true
 		type: string: examples: ["my-logs"]
+	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	encoding: {
 		description: """
@@ -235,7 +477,7 @@ generated: components: sinks: azure_blob: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -490,12 +732,18 @@ generated: components: sinks: azure_blob: configuration: {
 
 					When set to `single`, only the last non-bare value of tags are displayed with the
 					metric. When set to `full`, all metric tags are exposed as separate assignments.
+					When set to `auto`, tag values are encoded using their underlying shape.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
+						auto: """
+															Tag values are exposed using their underlying shape: single-value tags as strings,
+															multi-value tags as arrays. A length-1 array round-trips as a scalar; use `Full` to
+															force array shape.
+															"""
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config
@@ -674,6 +922,25 @@ generated: components: sinks: azure_blob: configuration: {
 						"""
 				}
 			}
+		}
+	}
+	metadata: {
+		description: """
+			The set of [custom metadata][blob_metadata] `key:value` pairs to apply to created blobs.
+
+			Each entry becomes an `x-ms-meta-{key}` header. Azure limits the total size of all
+			metadata and restricts key names to ASCII alphanumeric characters and underscores,
+			starting with a letter. Non-ASCII values must be Base64-encoded before being set.
+			The service rejects invalid configurations. See the [Azure documentation][blob_metadata]
+			for current limits.
+
+			[blob_metadata]: https://learn.microsoft.com/rest/api/storageservices/set-blob-metadata
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "A key/value pair."
+			required:    true
+			type: string: {}
 		}
 	}
 	request: {
@@ -860,6 +1127,54 @@ generated: components: sinks: azure_blob: configuration: {
 					unit:    "seconds"
 				}
 			}
+		}
+	}
+	tags: {
+		description: """
+			The set of [blob index tags][blob_index_tags] to apply to created blobs.
+
+			Each entry becomes a tag in the `x-ms-tags` header. Azure limits blobs to 10 tags,
+			with restricted character sets for keys and values; the service rejects invalid
+			configurations.
+
+			When authenticating with a shared access signature (SAS), the token must include the
+			`Tags` permission in addition to `Read` and `Create`. Azure applies the *Set Blob Tags*
+			authorization requirement to the `Put Blob` request that carries these tags, so without
+			it tagged uploads fail with an authorization error even when the health check still passes.
+
+			When authenticating with an Azure credential (managed identity, workload identity, and so
+			on), the identity needs the
+			`Microsoft.Storage/storageAccounts/blobServices/containers/blobs/tags/write` RBAC action.
+			The least-privileged built-in role that grants it is *Storage Blob Data Owner*; the
+			*Storage Blob Data Contributor* role commonly sufficient for uploads does not include it.
+
+			[blob_index_tags]: https://learn.microsoft.com/azure/storage/blobs/storage-blob-index-how-to
+			"""
+		required: false
+		type: object: {
+			examples: [{
+				Classification: "confidential"
+				PHI:            "True"
+				Project:        "Blue"
+			}]
+			options: "*": {
+				description: "A single tag."
+				required:    true
+				type: string: {}
+			}
+		}
+	}
+	tls: {
+		description: "TLS configuration."
+		required:    false
+		type: object: options: ca_file: {
+			description: """
+				Absolute path to an additional CA certificate file.
+
+				The certificate must be in PEM (X.509) format.
+				"""
+			required: false
+			type: string: examples: ["/path/to/certificate_authority.crt"]
 		}
 	}
 }

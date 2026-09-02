@@ -204,7 +204,6 @@ pub struct JournaldConfig {
     #[serde(default)]
     pub journal_namespace: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -519,7 +518,7 @@ impl JournaldSource {
         let events_received = register!(EventsReceived);
 
         // Spawn stderr handler task
-        let stderr_handler = tokio::spawn(Self::handle_stderr(stderr_stream));
+        let stderr_handler = crate::spawn_in_current_span(Self::handle_stderr(stderr_stream));
 
         let batch_size = self.batch_size;
         let result = loop {
@@ -842,7 +841,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         LogNamespace::Vector => {
             if let Some(host) = log
                 .get(metadata_path!(JournaldConfig::NAME, "metadata"))
-                .and_then(|meta| meta.get(HOSTNAME))
+                .and_then(|meta| meta.get(path!(HOSTNAME)))
             {
                 log.insert(metadata_path!(JournaldConfig::NAME, "host"), host.clone());
             }
@@ -865,8 +864,8 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         LogNamespace::Vector => log
             .get(metadata_path!(JournaldConfig::NAME, "metadata"))
             .and_then(|meta| {
-                meta.get(SOURCE_TIMESTAMP)
-                    .or_else(|| meta.get(RECEIVED_TIMESTAMP))
+                meta.get(path!(SOURCE_TIMESTAMP))
+                    .or_else(|| meta.get(path!(RECEIVED_TIMESTAMP)))
             }),
         LogNamespace::Legacy => log
             .get(event_path!(SOURCE_TIMESTAMP))
@@ -1056,7 +1055,7 @@ impl Finalizer {
     ) -> Self {
         if acknowledgements {
             let (finalizer, mut ack_stream) = OrderedFinalizer::new(Some(shutdown));
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 while let Some((status, cursor)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         checkpointer.lock().await.set(cursor).await;
@@ -1110,10 +1109,7 @@ impl Checkpointer {
             0 => Ok(None),
             _ => {
                 let text = String::from_utf8_lossy(&buf);
-                match text.find('\n') {
-                    Some(nl) => Ok(Some(String::from(&text[..nl]))),
-                    None => Ok(None), // Maybe return an error?
-                }
+                Ok(text.split_once('\n').map(|(line, _)| line.to_string()))
             }
         }
     }
@@ -1809,7 +1805,9 @@ mod tests {
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
         let mut event = Event::from(LogEvent::from(vrl::value::Value::from(json)));
 
-        event.as_mut_log().insert("timestamp", chrono::Utc::now());
+        event
+            .as_mut_log()
+            .insert(event_path!("timestamp"), chrono::Utc::now());
 
         let definitions = config.outputs(namespace).remove(0).schema_definition(true);
 

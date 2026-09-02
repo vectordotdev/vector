@@ -1,3 +1,6 @@
+// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
+#![allow(clippy::let_underscore_must_use)]
+
 use std::sync::Arc;
 
 use futures::{Sink, Stream, stream};
@@ -15,6 +18,7 @@ use crate::{
     conditions::Condition,
     config::{
         AcknowledgementsConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
+        ValidatedSink,
     },
     sinks::Healthcheck,
     sources,
@@ -117,7 +121,10 @@ impl SourceConfig for UnitTestStreamSourceConfig {
 #[derive(Clone, Default)]
 pub enum UnitTestSinkCheck {
     /// Check all events that are received against the list of conditions.
-    Checks(Vec<Vec<Condition>>),
+    Checks {
+        conditions: Vec<Vec<Condition>>,
+        expected_event_count: Option<usize>,
+    },
 
     /// Check that no events were received.
     NoOutputs,
@@ -159,7 +166,28 @@ impl_generate_config_from_default!(UnitTestSinkConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "unit_test")]
 impl SinkConfig for UnitTestSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for UnitTestSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = self.result_tx.lock().await.take();
         let sink = UnitTestSink {
             test_name: self.test_name.clone(),
@@ -170,14 +198,6 @@ impl SinkConfig for UnitTestSinkConfig {
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::all()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &AcknowledgementsConfig::DEFAULT
     }
 }
 
@@ -203,8 +223,21 @@ impl StreamSink<Event> for UnitTestSink {
         }
 
         match self.check {
-            UnitTestSinkCheck::Checks(checks) => {
-                if output_events.is_empty() {
+            UnitTestSinkCheck::Checks {
+                conditions: checks,
+                expected_event_count,
+            } => {
+                if let Some(expected) = expected_event_count {
+                    let actual = output_events.len();
+                    if actual != expected {
+                        result.test_errors.push(format!(
+                            "expected {} events from transforms {:?}, but received {}",
+                            expected, self.transform_ids, actual
+                        ));
+                    }
+                }
+
+                if output_events.is_empty() && expected_event_count != Some(0) {
                     result
                         .test_errors
                         .push(format!("checks for transforms {:?} failed: no events received. Topology may be disconnected or transform is missing inputs.", self.transform_ids));
@@ -298,20 +331,33 @@ impl std::fmt::Debug for UnitTestStreamSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "unit_test_stream")]
 impl SinkConfig for UnitTestStreamSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = self.sink.lock().await.take().unwrap();
-        let healthcheck = future::ok(()).boxed();
-
-        #[allow(deprecated)]
-        Ok((VectorSink::from_event_sink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::all()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for UnitTestStreamSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = self.sink.lock().await.take().unwrap();
+        let healthcheck = future::ok(()).boxed();
+
+        #[allow(deprecated)]
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 }
 

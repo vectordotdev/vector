@@ -121,6 +121,17 @@ cli: {
 			description: env_vars.VECTOR_ALLOW_EMPTY_CONFIG.description
 			env_var:     "VECTOR_ALLOW_EMPTY_CONFIG"
 		}
+		"dangerously-allow-env-var-interpolation": {
+			description: env_vars.VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION.description
+			env_var:     "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION"
+		}
+	}
+
+	_core_flags: {
+		"dangerously-allow-env-var-interpolation": {
+			description: env_vars.VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION.description
+			env_var:     "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION"
+		}
 	}
 
 	_core_config_options: {
@@ -192,12 +203,29 @@ cli: {
 			type:        "integer"
 			env_var:     "VECTOR_THREADS"
 		}
+		"chunk-size-events": {
+			description: env_vars.VECTOR_CHUNK_SIZE_EVENTS.description
+			default:     env_vars.VECTOR_CHUNK_SIZE_EVENTS.type.uint.default
+			type:        "integer"
+			env_var:     "VECTOR_CHUNK_SIZE_EVENTS"
+		}
 		"internal-log-rate-limit": {
 			_short:      "i"
 			description: env_vars.VECTOR_INTERNAL_LOG_RATE_LIMIT.description
 			default:     env_vars.VECTOR_INTERNAL_LOG_RATE_LIMIT.type.uint.default
 			type:        "integer"
 			env_var:     "VECTOR_INTERNAL_LOG_RATE_LIMIT"
+		}
+		"internal-logs-source-rate-limit": {
+			description: env_vars.VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT.description
+			type:        "integer"
+			env_var:     "VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT"
+		}
+		"max-decompressed-size-bytes": {
+			description: env_vars.VECTOR_MAX_DECOMPRESSED_SIZE_BYTES.description
+			default:     env_vars.VECTOR_MAX_DECOMPRESSED_SIZE_BYTES.type.uint.default
+			type:        "integer"
+			env_var:     "VECTOR_MAX_DECOMPRESSED_SIZE_BYTES"
 		}
 	}
 
@@ -214,6 +242,7 @@ cli: {
 
 			example: "vector graph --config /etc/vector/vector.yaml | dot -Tsvg > graph.svg"
 
+			flags:   _default_flags & _core_flags
 			options: _core_options
 		}
 		"generate": {
@@ -271,6 +300,7 @@ cli: {
 				out the [unit testing documentation](\(urls.vector_unit_tests)).
 				"""
 
+			flags: _default_flags & _core_flags
 			options: {
 				"config-toml": {
 					description: env_vars.VECTOR_CONFIG_TOML.description
@@ -334,7 +364,7 @@ cli: {
 				}
 				"url": {
 					_short:      "u"
-					description: "Vector GraphQL API server endpoint"
+					description: "Vector gRPC API server endpoint"
 					type:        "string"
 				}
 				"limit": {
@@ -414,7 +444,7 @@ cli: {
 				}
 				"url": {
 					_short:      "u"
-					description: "Vector GraphQL API server endpoint"
+					description: "Vector gRPC API server endpoint"
 					type:        "string"
 				}
 			}
@@ -441,7 +471,7 @@ cli: {
 					_short:      "d"
 					description: "Fail validation on warnings"
 				}
-			}
+			} & _core_flags
 
 			options: {
 				"config-yaml": {
@@ -654,6 +684,15 @@ cli: {
 				unit:    null
 			}
 		}
+		VECTOR_CHUNK_SIZE_EVENTS: {
+			description: """
+				The number of events batched per source send and used as the base for source output buffer sizing.
+				"""
+			type: uint: {
+				default: 1000
+				unit:    "events"
+			}
+		}
 		VECTOR_WATCH_CONFIG: {
 			description: "Watch for changes in the configuration file and reload accordingly"
 			type: bool: default: false
@@ -678,10 +717,29 @@ cli: {
 			}
 		}
 		VECTOR_INTERNAL_LOG_RATE_LIMIT: {
-			description: "Set the internal log rate limit. This limits Vector from emitting identical logs more than once over the given number of seconds."
+			description: """
+				Set the internal log rate limit in seconds. Within each time window, the first occurrence of a
+				log is emitted, the second shows a suppression warning, and subsequent occurrences are silent
+				until the window expires. When the window expires and the log fires again, a summary of the
+				suppressed count is emitted followed by the log itself.
+				"""
 			type: uint: {
 				default: 10
 				unit:    null
+			}
+		}
+		VECTOR_INTERNAL_LOGS_SOURCE_RATE_LIMIT: {
+			description: """
+				Apply a rate limit (in seconds) to the broadcast channel that feeds all `internal_logs` sources.
+				When set, the first occurrence of a repeated log is emitted, the second shows a suppression
+				warning, and subsequent occurrences are silent until the window expires. When the window expires
+				and the log fires again, a summary of the suppressed count is emitted followed by the log itself.
+				Unset by default so that `internal_logs` consumers receive every log event. This limit is
+				independent of `VECTOR_INTERNAL_LOG_RATE_LIMIT`, which only applies to stdout/stderr output.
+				"""
+			type: uint: {
+				default: null
+				unit:    "seconds"
 			}
 		}
 		VECTOR_GRACEFUL_SHUTDOWN_LIMIT_SECS: {
@@ -709,6 +767,13 @@ cli: {
 				"""
 			type: bool: default: false
 		}
+		VECTOR_MAX_DECOMPRESSED_SIZE_BYTES: {
+			description: "Maximum number of bytes allowed after decompressing a payload. Sources that decompress incoming payloads enforce this cap to prevent a compressed \"bomb\" from exhausting memory. Defaults to 104857600 (100 MiB)."
+			type: uint: {
+				default: 104857600
+				unit:    "bytes"
+			}
+		}
 		VECTOR_STRICT_ENV_VARS: {
 			description: """
 				Turn on strict mode for environment variable interpolation. When set, interpolation of a missing
@@ -718,6 +783,14 @@ cli: {
 				warnings.
 				"""
 			type: bool: default: true
+		}
+		VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION: {
+			description: """
+				Allow interpolation of environment variables in configuration files. Environment variable
+				interpolation is disabled by default. Enabling this may expose environment secrets into your
+				Vector configuration.
+				"""
+			type: bool: default: false
 		}
 	}
 

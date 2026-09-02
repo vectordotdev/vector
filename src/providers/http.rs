@@ -21,6 +21,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct RequestConfig {
     /// HTTP headers to add to the request.
+    #[configurable(metadata(docs::additional_props_description = "An HTTP header."))]
     #[serde(default)]
     pub headers: IndexMap<String, String>,
 }
@@ -41,7 +42,6 @@ pub struct HttpConfig {
     /// URL for the HTTP provider.
     url: Option<Url>,
 
-    #[configurable(derived)]
     request: RequestConfig,
 
     /// How often to poll the provider, in seconds.
@@ -50,12 +50,10 @@ pub struct HttpConfig {
     #[serde(flatten)]
     tls_options: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 
     /// Which config format expected to be loaded
-    #[configurable(derived)]
     config_format: Format,
 
     /// Enable environment variable interpolation

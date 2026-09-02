@@ -8,7 +8,6 @@ components: transforms: aws_ec2_metadata: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
@@ -79,7 +78,6 @@ components: transforms: aws_ec2_metadata: {
 			"account-id": {
 				description: "The `account-id` that launched the EC2 instance."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["123456789"]

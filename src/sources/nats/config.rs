@@ -87,7 +87,6 @@ pub struct JetStreamConfig {
     pub consumer: String,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub batch_config: BatchConfig,
 }
 
@@ -136,18 +135,14 @@ pub struct NatsSourceConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     pub auth: Option<NatsAuthConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
@@ -168,7 +163,6 @@ pub struct NatsSourceConfig {
     #[derivative(Default(value = "default_subscription_capacity()"))]
     pub subscriber_capacity: usize,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub jetstream: Option<JetStreamConfig>,
 }
@@ -182,13 +176,13 @@ pub const fn default_subscription_capacity() -> usize {
 }
 
 impl GenerateConfig for NatsSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
             r#"
-            connection_name = "vector"
-            subject = "from.vector"
-            url = "nats://127.0.0.1:4222""#,
-        )
+            connection_name: vector
+            subject: from.vector
+            url: "nats://127.0.0.1:4222""#,
+        })
         .unwrap()
     }
 }
