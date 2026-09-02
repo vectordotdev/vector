@@ -5,7 +5,8 @@ specifies the bidirectional mapping between the typed `TraceEvent` defined in th
 and the Datadog agent-to-backend trace protobuf. It establishes the Datadog ingress and
 egress paths, the effective-equivalence round-trip guarantee for
 `Datadog -> Vector -> Datadog`, the multi-service chunk split/coalesce rules, the reserved
-`_dd.*` sub-objects that carry agent-payload, tracer-payload, and `meta_struct` state, and
+Datadog event and span contexts that carry agent-payload, tracer-payload, chunk, and
+`meta_struct` state, and
 the cross-format conformance rule for `OTLP -> Vector -> datadog_traces`.
 
 ## Context
@@ -57,11 +58,9 @@ Trace Context, and other informational entries are defined in the
 
 - APM stats aggregation in the `datadog_traces` sink, today reading magic keys from
   `TraceEvent`, will read typed fields after this RFC and its parent land.
-- The OTLP-side reservation of `datadog.*` span-attribute keys (`datadog.chunk.priority`,
-  `datadog.chunk.origin`, `datadog.chunk.dropped`, `datadog.chunk.tags`,
-  `datadog.span.resource`, `datadog.span.type`) for synthesis of typed-only Datadog
-  state on OTLP egress is the OTLP mapping sub-RFC's concern; this sub-RFC owns the
-  contents those keys carry on cross-format relay.
+- The OTLP-side reservation of `datadog.*` resource and span attributes for synthesis
+  of Datadog-native context on OTLP egress is the OTLP mapping sub-RFC's concern; this
+  sub-RFC owns the context values those keys carry on cross-format relay.
 
 ## Scope
 
@@ -76,23 +75,20 @@ Trace Context, and other informational entries are defined in the
   span order within a chunk, specific chunk grouping when the producer-side grouping was
   non-conforming) may differ.
 - The three Datadog span-attribute partitions (`meta`, `metrics`, `meta_struct`) and how
-  they map to the typed `Span.attributes`. The single reserved key
-  `Span.attributes."_dd.meta_struct"` carries the bytes-typed partition; the two scalar
-  partitions merge by `AttrValue` variant.
-- The two resource-scoped reserved keys (`Resource.attributes."_dd.payload"` and
-  `Resource.attributes."_dd.tracer"`) carrying the agent-payload envelope and
-  tracer-payload tags.
-- The chunk-scoped typed state in `TraceEvent.chunk = Some(...)` (`priority`, `origin`,
-  `dropped`, `tags`).
+  the two scalar partitions map into `Span.attributes` by `AttrValue` variant while
+  `meta_struct` is preserved in `Span.datadog.meta_struct`.
+- The agent-payload envelope and tracer-payload tags in
+  `TraceEvent.datadog.{agent,tracer}`.
+- The chunk-scoped typed state in `TraceEvent.datadog.chunk = Some(...)`
+  (`priority`, `origin`, `dropped`, `tags`).
 - The multi-service chunk split rule on ingress and the corresponding re-coalescence rule
   on egress, including the cross-grouping invariant for non-conforming multi-trace chunks.
-- The envelope reconstruction policy for `AgentPayload` and `TracerPayload` on egress, both
-  during the migration (`vector.trace_legacy_layout`-keyed) and post-migration
-  (`EventMetadata.source_type`-keyed).
+- The authoritative reconstruction policy for explicitly present Datadog namespace
+  state and the common-field fallback when that state is absent.
 - The cross-format conformance rule for `OTLP -> Vector -> datadog_traces`: a
-  non-`datadog_agent`-sourced event reaching the `datadog_traces` sink follows the
-  enumerated Datadog-Agent derivations below and is backend-effectively equivalent under
-  Vector's typed mapping. It need not reproduce the Agent converter's exact wire shape.
+  trace whose Datadog namespace is absent/default follows the enumerated Datadog-Agent
+  derivations below and is backend-effectively equivalent under Vector's typed mapping.
+  It need not reproduce the Agent converter's exact wire shape.
 
 ### Out of scope
 
@@ -127,18 +123,6 @@ Rationale section below.
   source resolves the collision deterministically (`metrics` wins),
   saturating-increments `Span.dropped_attributes_count`, and reports the dropped scalar,
   which is not recoverable on egress.
-- **Producer `meta` or `metrics` key `_dd.meta_struct`** collides with the reserved
-  sub-object for the `meta_struct` partition; the `meta_struct` content wins on both
-  ingress and egress, and the scalar is dropped and reported.
-  Ingress saturating-increments `Span.dropped_attributes_count`; Datadog egress has no
-  wire field for that count.
-- **Multi-hop topologies that relay traces through intermediate `vector` source/sink
-  hops** may lose Datadog agent-envelope state (`_dd.payload` / `_dd.tracer`)
-  post-migration: `vector` hops reset `EventMetadata.source_type` to `"vector"`, so the
-  default envelope-reconstruction policy treats the relayed event as non-Datadog-
-  originated and synthesizes a defaults-only envelope on egress. Operators can restore
-  envelope passthrough via sink configuration; see "Envelope reconstruction policy"
-  below.
 - **Unknown `AttributeAnyValue` or array-element type discriminators** drop the
   containing span-event attribute, saturating-increment
   `SpanEvent.dropped_attributes_count`, and are reported.
@@ -167,22 +151,21 @@ normalization also apply.
 
 The Datadog wire mapping is invisible to VRL: programs read and write the typed
 `TraceEvent` surface defined in the parent RFC. The Datadog-specific surface a VRL author
-sees is `TraceEvent.chunk` (sampling priority, origin, dropped flag, chunk tags),
-`Span.resource_name`, `Span.span_type`, and the two reserved keys
-`Resource.attributes."_dd.payload"` / `Resource.attributes."_dd.tracer"` plus
-`Span.attributes."_dd.meta_struct"`. All of these are typed-surface entries the parent
-RFC defines; this sub-RFC specifies how they map to and from the Datadog wire format.
+sees is the `TraceEvent.datadog` and `Span.datadog` namespaces. The
+event namespace carries the optional agent envelope, tracer tags, and optional chunk;
+the span namespace carries `resource_name`, `span_type`, and `meta_struct`. This sub-RFC
+specifies how those typed paths map to and from the Datadog wire format.
 
 ```coffee
 # Read a Datadog chunk-scoped tag.
-decision_maker = .chunk.tags."_dd.p.dm"
+decision_maker = .datadog.chunk.tags."_dd.p.dm"
 
-# Read agent-payload envelope state on a Datadog-sourced trace.
-agent_apm_mode = .resource.attributes."_dd.payload"."tags"."_dd.apm_mode"
-tracer_apm_mode = .resource.attributes."_dd.tracer"."_dd.apm_mode"
+# Read agent- and tracer-payload state.
+agent_apm_mode = .datadog.agent.tags."_dd.apm_mode"
+tracer_apm_mode = .datadog.tracer.tags."_dd.apm_mode"
 
 # Inspect a meta_struct sub-entry (msgpack-encoded; Vector exposes it as bytes).
-meta_struct_event = .spans[0].attributes."_dd.meta_struct"."dd.event_payload"
+meta_struct_event = .spans[0].datadog.meta_struct."dd.event_payload"
 ```
 
 ### Implementation
@@ -198,7 +181,7 @@ that cannot succeed on the same Vector version.
 After indexed entries are handled as above, a standard `AgentPayload` whose
 `tracerPayloads` repeated field is empty, or a `TracerPayload` whose `chunks` repeated
 field is empty, produces zero `TraceEvent`s: there is no
-`TraceChunk` from which to populate `TraceEvent.chunk` and no `Resource` envelope is
+`TraceChunk` from which to populate `TraceEvent.datadog.chunk` and no event grouping is
 well-defined in isolation, so the wire input has no `TraceEvent` representation. The
 standard-empty case is lossless because it carries no span data the Datadog backend
 would observe.
@@ -224,11 +207,12 @@ The grouping rules are:
   `Span.service` populates `Resource.service`.
 - The enclosing `AgentPayload`'s envelope (`hostName`, `env`, `agentVersion`, `targetTPS`,
   `errorTPS`, `rareSamplerEnabled`, and `tags`) populates
-  `Resource.attributes."_dd.payload"` as a structured sub-object;
-  `TracerPayload.tags` populates `Resource.attributes."_dd.tracer"` (see "Datadog
-  resource-scoped state" below).
+  `TraceEvent.datadog.agent = Some(...)`;
+  `TracerPayload.tags` populates `TraceEvent.datadog.tracer.tags` (see "Datadog
+  event-scoped state" below).
 - `TraceChunk.{priority, origin, droppedTrace, tags}` populate
-  `TraceEvent.chunk = Some(ChunkContext { ... })`, including when every field is default.
+  `TraceEvent.datadog.chunk = Some(DatadogChunkContext { ... })`, including when every
+  field is default.
   Every decoded `priority` value is present internally: `0` maps to
   `Some(SamplingPriority::AutoReject)` and every other `i32` maps through the parent
   RFC's canonical constructor.
@@ -239,21 +223,21 @@ The grouping rules are:
 | `TracerPayload.hostname`                                      | `Resource.host`                                       |
 | `TracerPayload.env`                                           | `Resource.environment`                                |
 | `Span.service` (per span)                                     | `Resource.service` of the event holding the span      |
-| `AgentPayload` envelope (whole message; see below)            | `Resource.attributes."_dd.payload"`                   |
-| `TracerPayload.tags`                                          | `Resource.attributes."_dd.tracer"`                    |
-| `TraceChunk.{priority, origin, droppedTrace, tags}`           | `TraceEvent.chunk = Some(...)`                        |
+| `AgentPayload` envelope (whole message; see below)            | `TraceEvent.datadog.agent = Some(...)`                |
+| `TracerPayload.tags`                                          | `TraceEvent.datadog.tracer.tags`                      |
+| `TraceChunk.{priority, origin, droppedTrace, tags}`           | `TraceEvent.datadog.chunk = Some(...)`                |
 | `TracerPayload` non-host/env scalar fields (see below)        | `Resource.attributes` under defined keys              |
 | `Span.traceID` (u64)                                          | `Span.trace_id.low_u64`                               |
 | `Span.meta["_dd.p.tid"]` (hex u64) if present (see below)     | `Span.trace_id.high_u64`                              |
 | `Span.spanID`, `Span.parentID`                                | `Span.span_id`, `Span.parent_span_id`                 |
 | `Span.name`                                                   | `Span.name`                                           |
-| `Span.resource`                                               | `Span.resource_name`                                  |
-| `Span.type`                                                   | `Span.span_type`                                      |
+| `Span.resource`                                               | `Span.datadog.resource_name`                          |
+| `Span.type`                                                   | `Span.datadog.span_type`                              |
 | `Span.start`, `Span.duration`                                 | `Span.start_time`, `Span.duration` (ns-exact)         |
 | `Span.error` and `Span.meta["error.message"]`                 | `Span.status` (see below)                             |
 | `Span.meta`                                                   | `Span.attributes` (`AttrValue::String`, see below)    |
 | `Span.metrics`                                                | `Span.attributes` (`AttrValue::Double`)               |
-| `Span.meta_struct`                                            | `Span.attributes."_dd.meta_struct"` (`Map<Bytes>`)    |
+| `Span.meta_struct`                                            | `Span.datadog.meta_struct` (`Map<Bytes>`)             |
 | `Span.spanEvents[*].{time_unix_nano, name}`                   | `SpanEvent.{time, name}`                              |
 | `Span.spanEvents[*].attributes` (`AttributeAnyValue`)         | `SpanEvent.attributes` (typed `AttrValue` per variant)|
 | `Span.spanLinks[*].traceID` (u64)                             | `SpanLink.trace_id.low_u64` in `Span.links`           |
@@ -263,8 +247,8 @@ The grouping rules are:
 | `Span.spanLinks[*].flags` (u32)                               | `SpanLink.flags` (full u32 verbatim)                  |
 | `Span.spanLinks[*].attributes`                                | `SpanLink.attributes` (`AttrValue::String`)           |
 
-The cross-format derivation rules later in this section (`span_type` from
-`Span.kind` / `Span.attributes`, `resource_name` from `Span.attributes` / `Span.name`, the
+The cross-format derivation rules later in this section (`datadog.span_type` from
+`Span.kind` / `Span.attributes`, `datadog.resource_name` from `Span.attributes` / `Span.name`, the
 `TracerPayload` semantic-convention key set, and the flattening of unmapped
 `Resource.attributes` into per-span `meta`) are projections of the Datadog Agent OTLP
 ingest reference in the Glossary. The precise key sets and lookup orders track current
@@ -289,9 +273,9 @@ Vector consumer and is dropped on ingest (see "Out of scope").
 Datadog's string scalars do not expose proto3 presence, so decode cannot distinguish an
 omitted field from one explicitly encoded as empty. The mapping nevertheless preserves
 the decoded empty value as `Some("")` for `Resource.{service,environment,host}`,
-`Span.{resource_name,span_type}`, and `ChunkContext.origin`; `None` means no source value
-was available. Datadog egress therefore reproduces the empty value, and the
-`resource_name` / `span_type` fallback applies only to `None`.
+`Span.datadog.{resource_name,span_type}`, and `DatadogChunkContext.origin`; `None` means
+no source value was available. Datadog egress therefore reproduces the empty value, and
+the `resource_name` / `span_type` fallback applies only to `None`.
 
 #### `Span.duration` wire-domain handling
 
@@ -434,13 +418,12 @@ Datadog spans carry attributes in three independent wire-level maps:
 - `metrics`: keys to IEEE-754 doubles.
 - `meta_struct`: keys to opaque bytes (msgpack-encoded structured payloads).
 
-Datadog ingress maps each partition into `Span.attributes`:
+Datadog ingress maps the partitions into the common and Datadog span surfaces:
 
 - `meta` entries become top-level entries with `AttrValue::String`.
 - `metrics` entries become top-level entries with `AttrValue::Double`.
-- `meta_struct` entries are placed under the reserved key
-  `Span.attributes."_dd.meta_struct"`, whose value is an `AttrValue::Map` mapping each
-  `meta_struct` key to an `AttrValue::Bytes` payload.
+- `meta_struct` entries populate `Span.datadog.meta_struct`, which maps each key
+  directly to its opaque `Bytes` payload.
 
 The protobuf decoder rejects invalid UTF-8 in `map<string, string>` keys or values at
 the payload boundary, before this attribute mapping runs; no raw-string fallback decoder
@@ -449,29 +432,13 @@ is introduced.
 If a producer emits the same key in both `meta` and `metrics`, the Datadog source
 resolves the collision deterministically (`metrics` wins), saturating-increments
 `Span.dropped_attributes_count`, and reports the drop. A key emitted in `meta_struct`
-and either `meta` or `metrics`
-normally retains both values (the `meta_struct` entry under
-`attributes."_dd.meta_struct"`, the scalar entry as a top-level attribute) because the
-two surfaces target different keys: the `meta_struct` sub-object lives at the reserved
-key `_dd.meta_struct`, and any other producer-supplied `meta` or `metrics` key is
-necessarily distinct from that reserved name.
-
-The single exception is a producer that emits the literal key `_dd.meta_struct` in `meta` or
-`metrics`: the scalar entry and the `meta_struct` sub-object both target
-`Span.attributes."_dd.meta_struct"`. In this collision `meta_struct` wins on both ingress and
-egress: on ingress the sub-object is placed after the scalar merge, overwriting any scalar at that
-key; on egress step 1 drains the sub-object first, and step 2 skips the key because it has already
-been consumed, so the `meta` scalar at `_dd.meta_struct` is dropped.
-The drop is reported in either direction; ingress additionally saturating-increments
-`Span.dropped_attributes_count`. This case is declared as an explicit round-trip
-exclusion above.
+and either scalar map retains both values because `Span.datadog.meta_struct` and
+`Span.attributes` are structurally separate. This includes the literal scalar key
+`_dd.meta_struct`; it does not collide with the structured partition.
 
 Datadog egress, in order:
 
-1. Drain `Span.attributes."_dd.meta_struct"` into the wire `meta_struct` map (each
-   sub-entry's `AttrValue::Bytes` payload becomes one `meta_struct` entry). A
-   non-`Map` value at the reserved key, or a non-`Bytes` sub-entry within it, is
-   dropped and reported.
+1. Copy `Span.datadog.meta_struct` into the wire `meta_struct` map.
 2. Partition the remaining attributes by `AttrValue` variant: `String` and `Bytes` to
    `meta` (the latter as a UTF-8-lossy string), `Double` and `Int` (coerced to `f64`)
    to `metrics`. `Null` is dropped (the wire has no representation for "key present,
@@ -490,41 +457,32 @@ keys, lossy UTF-8 for bytes, the same quoted strings for non-finite doubles, and
 map has no representation for "key present, value absent," and are reported. These rules
 are total and do not depend on a JSON library's non-finite-number behavior.
 
-#### Datadog resource-scoped state
+#### Datadog event-scoped state
 
-Datadog's agent-payload and tracer-payload envelopes carry resource-scoped metadata that
-is preserved as two reserved top-level entries in `Resource.attributes`:
+The `AgentPayload` envelope populates `TraceEvent.datadog.agent`; `None` means that no
+agent envelope is present. Its typed scalar fields are `host_name`, `env`,
+`agent_version`, `target_tps`, `error_tps`, and `rare_sampler_enabled`, and its `tags`
+field carries the wire-level `AgentPayload.tags` map. The double fields preserve NaN
+payloads unchanged.
 
-| Wire scope                       | `Resource.attributes` key | Value shape       |
-| -------------------------------- | ------------------------- | ----------------- |
-| `AgentPayload` (whole message)   | `_dd.payload`             | `AttrValue::Map`  |
-| `TracerPayload.tags`             | `_dd.tracer`              | `AttrValue::Map`  |
-
-`_dd.payload` mirrors the wire `AgentPayload` envelope under sub-keys: `host_name`,
-`env`, `agent_version`, `target_tps`, `error_tps`, `rare_sampler_enabled` (the scalar
-fields), and `tags` -- a nested `AttrValue::Map` of the wire-level `AgentPayload.tags`
-map. The double-typed `target_tps` and `error_tps` slots use `AttrValue::Double` and
-round-trip NaN unchanged. `_dd.tracer` carries only the wire-level `TracerPayload.tags`
-map; `TracerPayload.hostname` and `TracerPayload.env` map to the typed
-`Resource.host` / `Resource.environment` fields directly.
+`TracerPayload.tags` populates `TraceEvent.datadog.tracer.tags`.
+`TracerPayload.hostname` and `TracerPayload.env` map to the common
+`Resource.host` / `Resource.environment` fields directly. The tracer context is
+always present because protobuf cannot distinguish an omitted map from an empty map.
 
 VRL access:
 
 ```coffee
-.agent_host      = .resource.attributes."_dd.payload"."host_name"
-.agent_apm_mode  = .resource.attributes."_dd.payload"."tags"."_dd.apm_mode"
-.tracer_apm_mode = .resource.attributes."_dd.tracer"."_dd.apm_mode"
+.agent_host      = .datadog.agent.host_name
+.agent_apm_mode  = .datadog.agent.tags."_dd.apm_mode"
+.tracer_apm_mode = .datadog.tracer.tags."_dd.apm_mode"
 ```
-
-The two keys live under the `_dd.*` namespace alongside other Datadog-internal keys
-(`_dd.apm_mode`, `_dd.tags.container`, `_dd.tags.process`, `_dd.p.dm`, `_dd.p.tid`,
-`_dd.error_tracking_*`, `_dd.otel.gateway`).
 
 #### Datadog chunk context
 
 Datadog `TraceChunk.priority`, `origin`, `droppedTrace`, and `tags` apply uniformly to
 every span in the chunk. Every Datadog-sourced `TraceEvent` corresponds to exactly one
-chunk by construction and therefore carries `TraceEvent.chunk = Some(...)`, including
+chunk by construction and therefore carries `TraceEvent.datadog.chunk = Some(...)`, including
 for an explicitly all-default chunk. An OTLP-sourced event with no recovered Datadog
 chunk state carries `None`.
 
@@ -537,15 +495,15 @@ Datadog chunk state. On Datadog egress, `None` emits the wire default zero.
 VRL access:
 
 ```coffee
-.priority       = .chunk.priority
-.origin         = .chunk.origin
-.dropped        = .chunk.dropped
-.decision_maker = .chunk.tags."_dd.p.dm"
+.priority       = .datadog.chunk.priority
+.origin         = .datadog.chunk.origin
+.dropped        = .datadog.chunk.dropped
+.decision_maker = .datadog.chunk.tags."_dd.p.dm"
 ```
 
 #### Datadog egress derivation rules
 
-When `Span.span_type` is `None` on Datadog egress (the normal case for OTLP-sourced
+When `Span.datadog.span_type` is `None` on Datadog egress (the normal case for OTLP-sourced
 spans), the sink derives the wire `Span.type` from `Span.kind` and `Span.attributes`,
 following the Datadog Agent's
 [`SpanKind2Type`](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/transform/otelutil.go)
@@ -558,15 +516,15 @@ logic:
 - All other kinds (`Internal`, `Producer`, `Consumer`, `Unspecified`, `Other`) ->
   `"custom"`.
 
-If `Span.span_type` is `Some(v)`, the value is emitted as-is (Datadog-sourced spans
+If `Span.datadog.span_type` is `Some(v)`, the value is emitted as-is (Datadog-sourced spans
 carry it directly). Because Datadog has no span-kind wire field, `Span.kind` is always
 `Unspecified` for Datadog-sourced events on ingress; the `SpanKind2Type` derivation
 therefore never fires on a pure `Datadog -> Vector -> Datadog` round trip.
 
-When `Span.resource_name` is `None` on Datadog egress (the normal case for OTLP-sourced
+When `Span.datadog.resource_name` is `None` on Datadog egress (the normal case for OTLP-sourced
 spans), the sink derives the wire `Span.resource` from `Span.attributes` following the
 Datadog Agent's OTLP ingest reference implementation, falling back to `Span.name` when
-no matching attribute is present. If `Span.resource_name` is `Some(v)`, the value is
+no matching attribute is present. If `Span.datadog.resource_name` is `Some(v)`, the value is
 emitted as-is.
 
 On Datadog egress, the sink:
@@ -579,20 +537,18 @@ On Datadog egress, the sink:
 - Flattens unmapped `Resource.attributes` entries into each span's wire `meta` under
   the attribute key.
   - Scope: applies to keys other than the typed-slot promotions (`service.name`,
-    `deployment.environment.name`, `host.name`), the reserved cross-format envelope
-    sub-objects (`_dd.payload`, `_dd.tracer`), and the TracerPayload-mapped semantic-
+    `deployment.environment.name`, `host.name`) and the TracerPayload-mapped semantic-
     convention keys per "`TracerPayload` semantic-convention key mapping" above.
   - Tie-breaker: a per-span `Span.attributes` entry at the same key wins over a
     `Resource.attributes` entry; the wire format has no resource-attribute scope, so
     the per-span duplication is the wire shape's nature, not Vector's choice. Each
     discarded resource-scoped value is reported; Datadog has no wire dropped-attribute
     count to update.
-  - For Datadog-sourced events these unmapped keys are empty by construction (Datadog
-    ingest places non-promoted resource state in `_dd.payload` / `_dd.tracer`), so the
-    round-trip is unaffected.
-- Drains `Span.attributes."_dd.meta_struct"` into the wire `meta_struct` map and
-  re-partitions the remaining attributes into `meta` / `metrics` by `AttrValue` variant
-  per "Datadog attribute partitions" above.
+  - For Datadog-sourced events these unmapped keys are empty by construction; native
+    agent/tracer state lives in `TraceEvent.datadog`, so the round-trip is unaffected.
+- Copies `Span.datadog.meta_struct` into the wire `meta_struct` map and partitions
+  `Span.attributes` into `meta` / `metrics` by `AttrValue` variant per "Datadog
+  attribute partitions" above.
 - Reconstructs each `SpanEvent.attributes` entry as an `AttributeAnyValue` from the
   `AttrValue` variant per "`SpanEvent.attributes` typed value mapping" above, not the
   `meta` / `metrics` partitioning rule.
@@ -627,16 +583,11 @@ updated in-band count on that wire.
 
 #### Envelope reconstruction and chunk re-coalescence
 
-Before grouping, Datadog egress normalizes the reserved envelope values into their wire
-shapes. A non-`Map` `_dd.payload` or `_dd.tracer` is ignored; Datadog-originated events
-then use the same typed-slot-and-defaults fallback as an absent envelope. Within a map,
-string, numeric, and boolean wire fields accept only their matching `AttrValue` variant
-(`Bytes` is accepted for strings via lossy UTF-8); a mismatched field uses its proto3
-default. A non-`Map` `tags` value becomes an empty map, while tag entries use
-`dd_value_to_string` and omit top-level `Null`. Every ignored, defaulted, or coerced
-value is reported. Grouping keys and wire serialization both use this normalized result,
-so malformed transform-authored state cannot produce inconsistent grouping or a sink
-failure.
+Before grouping, Datadog egress normalizes namespace state into its wire shape.
+Agent-envelope scalar fields are already typed. Entries in agent, tracer, and chunk tag
+maps use `dd_value_to_string` and omit top-level `Null`; every coercion or omission is
+reported. Grouping keys and wire serialization both use this normalized result, so
+transform-authored state cannot produce inconsistent grouping or a sink failure.
 
 All equality used by the nested Datadog grouping steps is structural. Double values are
 compared by their IEEE-754 `to_bits()` representation, so a NaN equals the same preserved
@@ -646,29 +597,24 @@ envelope doubles and doubles nested in resource or chunk attributes.
 Datadog egress groups events into wire `AgentPayload` / `TracerPayload` / `TraceChunk`
 structures by nested grouping keys:
 
-**`AgentPayload` grouping.** Groups events by their envelope and emits one
-`AgentPayload` per group. The envelope used as the grouping key is origin-dependent,
-matching the envelope-reconstruction policy below: for Datadog-originated events it is
-the normalized `Resource.attributes."_dd.payload"`; for all other events it is the
-synthesized envelope from typed `Resource` slots and proto3 defaults (per the Fallback
-sub-bullet below). A
-`_dd.payload` attribute on a non-Datadog-originated event (e.g. set by a transform) does
-not contribute to the grouping key, consistent with the reconstruction policy ignoring
-it. This is the outermost grouping step, so every downstream `TracerPayload` and
-`TraceChunk` is by construction confined to a single `AgentPayload`.
+**`AgentPayload` grouping.** Groups events by their effective envelope and emits one
+`AgentPayload` per group. `TraceEvent.datadog.agent = Some(...)` is authoritative
+regardless of which source or transform populated it. When it is `None`, the effective
+envelope is synthesized from common `Resource` slots and proto3 defaults. This is the
+outermost grouping step, so every downstream `TracerPayload` and `TraceChunk` is by
+construction confined to a single `AgentPayload`.
 
 - Scalar reconstruction: each `AgentPayload`'s `hostName`, `env`, `agentVersion`,
   `targetTPS`, `errorTPS`, `rareSamplerEnabled`, and `tags` are read from the matching
-  `_dd.payload` sub-keys; `tags` entries are coerced to the wire `map<string, string>`
-  via `dd_value_to_string`.
-- Fallback for non-Datadog-originated events: events with no `_dd.payload` envelope
-  (e.g. OTLP-sourced or transform-synthesized) derive what they can from the typed
+  fields in a present `datadog.agent`; tags use the normalization above.
+- Fallback for an absent agent envelope: events with `datadog.agent = None`
+  derive what they can from the typed
   `Resource` slots and default the rest. Specifically: `AgentPayload.hostName` is
   taken from `Resource.host`, `AgentPayload.env` from `Resource.environment`, and the
   agent-internal-only fields (`agentVersion`, `targetTPS`, `errorTPS`,
   `rareSamplerEnabled`, agent-level `tags`) are emitted as their proto3 defaults
   (empty string, `0.0`, `false`, empty map). No `datadog_traces` sink configuration
-  governs these fields. Two non-Datadog-originated events with equal `Resource.host`
+  governs these fields. Two such events with equal `Resource.host`
   and `Resource.environment` therefore share the same synthesized envelope and land in
   the same `AgentPayload`.
 - Grouping on the full envelope preserves the partitioning Vector applies today, so
@@ -676,54 +622,42 @@ it. This is the outermost grouping step, so every downstream `TracerPayload` and
   into the same `AgentPayload` and relayed traffic stays attributed to its originating
   agent.
 
-**Envelope reconstruction policy.** The Datadog sink consults `_dd.payload` and
-`_dd.tracer` for `AgentPayload` / `TracerPayload` envelope reconstruction only for
-events identified as Datadog-originated; all other events use the typed-slot-and-
-defaults derivation specified in the Fallback sub-bullet above for `_dd.payload`, and
-emit an empty `TracerPayload.tags` for `_dd.tracer`.
-
-During the coexistence and deprecated-proto window the `datadog_agent` source writes
-`vector.trace_legacy_layout` on both `TraceEventCompat::Legacy` and
-`TraceEventCompat::Typed` events, and the sink reads it to identify
-Datadog-originated events. Because the hint is preserved across `vector` source/sink
-hops, relay pipelines continue to forward the original agent envelope without
-operator intervention while either representation can be present. After that window,
-typed sources stop emitting the migration hint and the sink reads
-`EventMetadata.source_type` (set by the topology source pump on every emission and reset
-to `"vector"` at each hop); operators who want to relay Datadog envelope state across
-`vector` hops must enable that explicitly in the sink configuration.
-
-That post-migration opt-in treats a `source_type == "vector"` event as
-Datadog-originated for the sole purpose of consulting its normalized `_dd.payload` and
-`_dd.tracer` envelopes. Direct events from any other non-Datadog source continue to
-ignore those reserved keys even when passthrough is enabled. The eventual configuration
-key is an implementation detail; this trust rule is its required behavior.
+**Namespace authority.** Datadog egress does not inspect
+`EventMetadata.source_type` or `vector.trace_legacy_layout` when reconstructing typed
+events. A source, OTLP bridge, or transform that explicitly populates `.datadog`
+expresses an intent to control Datadog-native egress state. Ordinary resource and span
+attributes never acquire that authority merely because their keys resemble Datadog
+internals. Typed namespace state therefore survives disk buffers and intermediate
+`vector` source/sink hops without an origin-specific passthrough option. The migration
+hint remains solely the temporary legacy-shim selector defined by the parent RFC.
 
 **`TracerPayload` grouping.** Within each `AgentPayload`, gather events with a
 TracerPayload-envelope-equivalent `Resource` into one `TracerPayload`, with each span's
 `Span.service` reconstructed from its event's `Resource.service`.
 
-- Equivalence: two `Resource`s are TracerPayload-envelope-equivalent when every field
-  that maps to a `TracerPayload` wire field in the ingest table above is equal.
+- Equivalence: two events are TracerPayload-envelope-equivalent when their normalized
+  `datadog.tracer.tags` are equal and every `Resource` field that maps to a
+  `TracerPayload` wire field in the ingest table above is equal.
   `Resource.schema_url`, `Resource.dropped_attributes_count`, and any
   `Resource.attributes` key not mapped to a `TracerPayload` field do not contribute to
-  the grouping key. `Resource.attributes."_dd.payload"` is already pinned by the
-  enclosing `AgentPayload` step, so it is by construction equal across every event in
-  the group and is not part of this key either.
+  the grouping key. The effective agent envelope is already pinned by the enclosing
+  `AgentPayload` step.
 - Scalar reconstruction: the wire `TracerPayload`'s scalar fields are reconstructed by
   inverting the ingress mapping. `Resource.host` populates `TracerPayload.hostname`,
   `Resource.environment` populates `TracerPayload.env`, and the semantic-convention
   attributes per "`TracerPayload` semantic-convention key mapping" populate the
   corresponding `TracerPayload` scalars.
 - Tags: `TracerPayload.tags` is reconstructed from
-  `Resource.attributes."_dd.tracer"` per the envelope-reconstruction policy above;
-  entries are coerced to the wire `map<string, string>` via `dd_value_to_string`.
+  `TraceEvent.datadog.tracer.tags`; entries use the normalization above. The default
+  tracer context therefore emits an empty map.
 
-**`TraceChunk` grouping and re-coalescence.** Before grouping, map `chunk = None` to
-`ChunkContext::default()`; this synthesizes the Datadog wire's required chunk envelope
+**`TraceChunk` grouping and re-coalescence.** Before grouping, map
+`datadog.chunk = None` to `DatadogChunkContext::default()`; this synthesizes the
+Datadog wire's required chunk envelope
 without claiming that one existed on the input. Within each `TracerPayload`, group spans
-across events by the effective `ChunkContext` plus `trace_id`, and emit one `TraceChunk`
-per group. `None` and `Some(ChunkContext::default())` therefore share an egress group.
+across events by the effective `DatadogChunkContext` plus `trace_id`, and emit one
+`TraceChunk` per group. `None` and `Some(DatadogChunkContext::default())` therefore
+share an egress group.
 
 - Empty events: an event whose `spans` vector is empty contributes no spans to any
   group; it emits one additional `TraceChunk` whose `priority`, `origin`, `tags`, and
@@ -732,15 +666,15 @@ per group. `None` and `Some(ChunkContext::default())` therefore share an egress 
   such events (see "Ingress and egress mapping"), so they reach this step only from an
   OTLP-sourced relay or from a transform that filtered every span out.
 - Tags comparison and serialization: the `tags` comparison is canonical structural
-  equality with deterministic key ordering. `ChunkContext.tags` entries are serialized to
+  equality with deterministic key ordering. `DatadogChunkContext.tags` entries are serialized to
   the wire `TraceChunk.tags` (`map<string, string>`) via `dd_value_to_string`. For
   Datadog-sourced events, chunk tags are always `AttrValue::String` on ingress so this
   stringification is lossless on round-trip.
 - Cross-grouping invariant: chunk grouping is nested inside `TracerPayload` grouping
   which is nested inside `AgentPayload` grouping, so events in the same chunk group
   are by construction in the same `TracerPayload` and `AgentPayload`. A transform that
-  mutates `_dd.payload` on a subset of spans from the same original chunk causes those
-  spans to land in a different `AgentPayload` at the outermost step, and therefore a
+  mutates `.datadog.agent` on a subset of events split from the same original chunk
+  causes those spans to land in a different `AgentPayload` at the outermost step, and therefore a
   different `TracerPayload` and `TraceChunk` as well, which is correct (the mutated
   envelope should not be coalesced with the original).
 - Round-trip shapes: a multi-service wire chunk that was split into multiple events on
@@ -750,8 +684,9 @@ per group. `None` and `Some(ChunkContext::default())` therefore share an egress 
 
 #### Cross-format conformance: `OTLP -> Vector -> datadog_traces`
 
-A non-`datadog_agent`-sourced event reaching the `datadog_traces` sink follows the
-enumerated Agent-aligned derivations below. Conformance means backend-effective
+An event whose Datadog-native slots are absent or default follows the enumerated
+Agent-aligned derivations below. Explicit Datadog state lifted from reserved OTLP bridge
+attributes is authoritative instead. Conformance means backend-effective
 equivalence under Vector's typed mapping, not exact reproduction of every field the
 Datadog Agent OTLP converter would place on the wire. Current Agent `main`, as linked in
 the Glossary, is the reference for these derivations:
@@ -760,8 +695,8 @@ the Glossary, is the reference for these derivations:
   (attribute-key lookup with `Span.name` fallback) follow the upstream Agent code.
 - The `TracerPayload` semantic-convention key set defining which `Resource.attributes`
   keys populate which `TracerPayload` scalar fields is similarly upstream-tracking.
-- The `_dd.payload` envelope synthesis for OTLP-sourced events uses the typed-slot-
-  and-defaults rule above; it produces no agent-internal fields (`agentVersion`,
+- Agent-envelope synthesis when `.datadog.agent` is absent uses the common-field-and-
+  defaults rule above; it produces no agent-internal fields (`agentVersion`,
   `targetTPS`, `errorTPS`, `rareSamplerEnabled`, agent-level `tags`) because the OTLP
   input has none, matching the Datadog Agent's own behaviour when serving as an OTLP
   receiver.
@@ -775,14 +710,11 @@ field. Those wire-shape differences are permitted only where the Datadog backend
 observes equivalent trace data.
 
 `datadog_agent -> Vector -> OTLP` is the inverse of the forward mapping for fields the
-reference covers. Datadog-only concepts that the Datadog Agent does not produce on its
-OTLP output have no inverse: chunk-scoped state and `Span.resource_name` /
-`Span.span_type` are emitted under the reserved `datadog.*` OTLP span-attribute keys
-defined by the OTLP mapping sub-RFC; the `_dd.payload` / `_dd.tracer` resource-scoped
-envelopes and the `_dd.meta_struct` span sub-object flow through as `Resource.attributes`
-and `Span.attributes` entries under their model-level keys via the generic `AttrValue` ->
-`AnyValue` mapping. This entire path is best-effort and is explicitly out of the
-zero-loss round-trip guarantee.
+reference covers. The OTLP mapping sub-RFC defines reserved `datadog.*` resource and
+span bridge attributes for the agent envelope, tracer tags, chunk state, span resource
+name and type, and `meta_struct`. OTLP egress synthesizes those attributes from the
+typed Datadog namespaces and OTLP ingress lifts them back. This entire path is
+best-effort and is explicitly out of the zero-loss round-trip guarantee.
 
 No upstream reference implementation for the reverse direction (Datadog wire -> OTLP) is
 cited as normative; the OpenTelemetry Collector's
@@ -808,16 +740,14 @@ not authoritative.
   normalized form is what every Datadog backend documents; the typed `SpanStatus` enum
   has no carrier for non-bivalent values, and preserving the raw integer would require
   an `Option<i32>` shadow field that no consumer would read.
-- The `meta_struct` partition is preserved as a reserved sub-object
-  (`Span.attributes."_dd.meta_struct"`) rather than merged into the flat attribute map.
-  `AttrValue` distinguishes `String` from `Bytes` structurally so the wire types
-  themselves would not collide, but the three partitions are semantically distinct
-  (`meta_struct` payloads are msgpack-encoded structured records, not opaque scalars)
-  and the reserved-key form documents that distinction at the typed surface. The
-  encoding parallels the resource-level treatment of `AgentPayload.tags` and
-  `TracerPayload.tags`.
-- Agent-payload- and tracer-payload-scoped state are kept as separate sub-objects
-  inside `Resource.attributes` rather than merged because the two scopes collide on
+- The `meta_struct` partition is preserved in `Span.datadog.meta_struct` rather than
+  merged into the common attribute map. `AttrValue` distinguishes `String` from `Bytes`
+  structurally, but the partitions are semantically distinct: `meta_struct` payloads
+  are msgpack-encoded structured records, not opaque scalars. A dedicated bytes map
+  also prevents a producer scalar named `_dd.meta_struct` from colliding with the wire
+  partition.
+- Agent-payload- and tracer-payload-scoped state are kept as separate typed contexts
+  rather than merged because the two scopes collide on
   known keys at both the tag-map level and the scalar level. The Datadog Agent's trace
   writer
   ([`pkg/trace/writer/trace.go`](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/writer/trace.go))
@@ -830,21 +760,13 @@ not authoritative.
   `AgentPayload.hostName` / `env` describe the collector and routinely differ from
   `TracerPayload.hostname` / `env` (which describe the application), and Vector's
   existing egress sink already partitions on the agent-level values to keep the two
-  attribution domains distinct. The `_dd.payload` sub-object is structured to hold the
-  full `AgentPayload` envelope (scalars plus `tags`) so egress can reconstruct that
-  partitioning exactly; `_dd.tracer` carries only the tracer-tags map because the
-  other tracer-payload fields have typed `Resource` slots.
-- The envelope reconstruction policy is a default-behaviour choice, not a security
-  boundary: a transform can freely overwrite `_dd.payload` values on a Datadog-
-  originated event and those writes are honoured at egress. The policy's purpose is
-  narrower -- ensuring that non-Datadog-sourced events do not accidentally use Datadog
-  envelope fields from a `_dd.payload` attribute present for unrelated reasons (e.g.
-  an OTLP producer that happens to use the `_dd.*` namespace, or a cross-format
-  pipeline where the same `datadog_traces` sink receives both Datadog and OTLP input).
-  The migration-period and post-migration mechanisms differ by design: the hint is
-  preserved across hops so relay pipelines work without operator intervention; the
-  post-migration `source_type` reset at hops tightens the default for new deployments
-  at the cost of requiring operator opt-in for multi-hop Datadog relay.
+  attribution domains distinct. `DatadogAgentEnvelope` holds the full agent envelope
+  while `DatadogTracerContext` carries only tags because the other tracer-payload
+  fields have common `Resource` slots.
+- Namespace authority is an intent boundary, not a security boundary. Ordinary
+  attributes cannot accidentally become an agent envelope, while a transform that
+  explicitly writes `.datadog` is asking to control Datadog-native egress state. This
+  removes source-type heuristics and preserves the state across `vector` hops.
 - The Datadog egress rule for the `Span.status` / `error.message` typed-slot/attribute
   pair preserves the pure round-trip property by construction. A Datadog-sourced span
   with `error = 1` and no `meta["error.message"]` ingests as `Error("")` with no
@@ -856,7 +778,7 @@ not authoritative.
   two without the other; in that case the typed value is selected and the divergence is
   observable, matching the precedent set on the other Datadog typed slot/attribute pairs
   (`Resource.{service,environment,host}` and `Span.trace_id.high_u64`).
-- The Datadog egress chunk-grouping rule `(effective ChunkContext, trace_id)` relies on a
+- The Datadog egress chunk-grouping rule `(effective DatadogChunkContext, trace_id)` relies on a
   producer-side convention parallel to the `meta` / `metrics` story: the `TraceChunk`
   proto describes a chunk as "a list of spans with the same trace ID", and Datadog
   producers honor this by construction. For the conforming case, multi-service chunks
@@ -864,7 +786,7 @@ not authoritative.
   through unchanged; for a non-conforming multi-trace chunk, egress emits one chunk
   per `trace_id`. Both shapes are effectively equivalent at the Datadog backend,
   since chunk grouping is an ingestion-time transport detail rather than a semantic
-  primitive. All four `ChunkContext` fields contribute to the grouping key; `dropped`
+  primitive. All four `DatadogChunkContext` fields contribute to the grouping key; `dropped`
   (`droppedTrace` on the wire) is chunk-scoped sampler state, not a per-group
   attribute: two chunks that share the same `(priority, origin, tags, trace_id)` but
   differ on `droppedTrace` must remain distinct egress chunks, otherwise the relay
@@ -882,11 +804,7 @@ not authoritative.
 - The Datadog round-trip guarantee depends on a producer-side keyset-disjointness
   convention between `meta` and `metrics`. The Alternatives below describe contained
   fallbacks if this convention ever ceases to hold.
-- The `_dd.payload` / `_dd.tracer` reserved-key approach overloads `Resource.attributes`
-  with what is semantically wire-protocol state. A purely-typed alternative would add
-  more fields to `Resource` for each envelope component; the reserved-key form keeps
-  the typed surface minimal and parallels the `_dd.meta_struct` treatment.
-- Non-Datadog-originated events reaching the `datadog_traces` sink synthesize empty
+- Events without an explicit Datadog agent envelope reaching the `datadog_traces` sink synthesize empty
   agent-internal envelope fields (no `agentVersion`, default TPS values, etc.). This is
   the same behaviour the Datadog Agent's own OTLP receiver exhibits, but operators who
   expected the relay to forge agent-version-style fields will be surprised.
@@ -927,7 +845,7 @@ examined Datadog SDK or agent emits. Listed as the contained mechanical fallback
 producer-side disjointness convention ever ceases to hold for production traffic; the
 change is local to `Span`, the Datadog source, the Datadog sink, and a unified read
 helper, with no impact on the OTLP side. The `meta_struct` partition is already
-preserved exactly under `Span.attributes."_dd.meta_struct"` in the proposal and does not
+preserved exactly under `Span.datadog.meta_struct` in the proposal and does not
 motivate this alternative.
 
 ### Namespace-prefixed unified map for span partitions
@@ -938,35 +856,23 @@ prefixing each key with its partition name (`dd.meta.<k>`, `dd.metrics.<k>`), wi
 prefixes leak Datadog-specific encoding into every transform regardless of source: an
 OTLP-only pipeline has to know about the namespace to avoid colliding with it, and an
 OTLP-sourced attribute that happens to use a `dd.meta.*` key is silently misclassified
-on egress. The `AttrValue`-variant routing for `meta` / `metrics` and the reserved-
-sub-object form for `meta_struct` achieve the same egress mapping without imposing any
+on egress. The `AttrValue`-variant routing for `meta` / `metrics` and the typed
+`Span.datadog.meta_struct` map achieve the same egress mapping without imposing any
 naming constraint on the flat attribute namespace.
 
-### Bare top-level resource scope keys
+### Reserved resource-attribute envelope objects
 
-Use `payload` and `tracer` as the two reserved top-level keys in `Resource.attributes`
-instead of the namespaced `_dd.payload` / `_dd.tracer` adopted in the proposal. The
-contents are identical in both forms. Rejected because the bare names are plausible
-attribute keys that legitimate OTLP-sourced or transform-generated resource attributes
-can already use: OpenTelemetry semantic conventions are uniformly dotted, but user-set
-resource attributes (via `OTEL_RESOURCE_ATTRIBUTES=payload=...`), transform-generated
-attributes (`.resource.attributes.payload = ...`), and future OpenTelemetry additions
-are not bound by that convention. A collision under the bare-keys design is silent on
-Datadog egress: the sink would either misclassify a legitimate user attribute as
-Datadog wire data, or drop it as ill-typed. The namespaced form reduces the collision
-class: no stable OpenTelemetry semantic-convention attribute uses a `_dd.*`-prefixed
-key, so convention-defined attributes cannot collide. However, OTLP permits any custom
-key, so a producer or transform may legitimately set
-`Resource.attributes["_dd.payload"]` or `Resource.attributes["_dd.tracer"]`. When that
-occurs on a non-Datadog-originated event, the default origin filter ignores it for
-envelope reconstruction; on OTLP egress the key flows through under its model-level name
-via the generic attribute mapping. An operator who explicitly enables `vector`
-passthrough opts into trusting such state after a hop. The bare-keys design would produce
-the same collision class for far more ordinary `payload` or `tracer` attributes. The
-`_dd.*` namespace limits the reserved surface to two names that signal
-Datadog-internal intent.
+Encode `DatadogEventContext.agent` and `.tracer` under
+`Resource.attributes."_dd.payload"` / `"_dd.tracer"` and use event provenance to decide
+whether Datadog egress should honor them. Rejected primarily because provenance signals
+are rewritten at intermediate `vector` hops, losing envelope authority unless operators
+configure a separate passthrough rule. Custom OTLP resource attributes may also
+legitimately use those keys, requiring a dynamic origin check to distinguish common
+attributes from Datadog wire state. The explicit `.datadog` namespace makes authoring
+intent structural, survives internal serialization, and leaves ordinary `_dd.*`
+resource attributes untouched.
 
-### `ChunkContext.priority` as a raw `i32`
+### `DatadogChunkContext.priority` as a raw `i32`
 
 Datadog's wire representation is a signed integer with four well-known values
 (`UserReject = -1`, `AutoReject = 0`, `AutoKeep = 1`, `UserKeep = 2`). Storing the raw

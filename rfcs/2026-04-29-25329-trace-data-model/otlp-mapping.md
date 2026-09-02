@@ -42,11 +42,12 @@ parent RFC's `AttrValue`.
 - The 1:1 mapping between `AttrValue` variants and OTLP's `string_value` / `bytes_value` /
   `int_value` / `bool_value` / `double_value` / `array_value` / `kvlist_value` (with unset
   oneof representing `AttrValue::Null`).
-- Synthesis on OTLP egress (and lift on OTLP ingress) of typed-only Datadog state into
-  reserved span-attribute keys (`datadog.chunk.priority`, `datadog.chunk.origin`,
+- Synthesis on OTLP egress (and lift on OTLP ingress) of Datadog-native contexts into
+  reserved resource attributes (`datadog.agent`, `datadog.tracer.tags`) and span
+  attributes (`datadog.chunk.priority`, `datadog.chunk.origin`,
   `datadog.chunk.dropped`, `datadog.chunk.tags`, `datadog.span.resource`,
-  `datadog.span.type`) for best-effort cross-format relay; the keys are defined here and
-  their contents are specified by the Datadog sub-RFC.
+  `datadog.span.type`, `datadog.span.meta_struct`) for best-effort cross-format relay;
+  the keys are defined here and their contents are specified by the Datadog sub-RFC.
 - The OTLP mapping targets fields at the OpenTelemetry
   [`Stable`](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/)
   stability tier or higher.
@@ -69,13 +70,13 @@ below.
   `deployment.environment.name` on OTLP egress. If both keys are present on ingress, the
   deprecated value is dropped (the stable key wins). See the deprecated-environment
   paragraph under Implementation.
-- **Reserved cross-format OTLP span-attribute keys** (`datadog.chunk.priority`,
-  `datadog.chunk.origin`, `datadog.chunk.dropped`, `datadog.chunk.tags`,
-  `datadog.span.resource`, `datadog.span.type`): lifted from `Span.attributes` into
-  typed `TraceEvent.chunk` / `Span.resource_name` / `Span.span_type` slots on OTLP
-  ingress and stripped; synthesized into `Span.attributes` from the typed slots on OTLP
-  egress, removing or replacing any existing attribute at the same key. The Datadog sub-RFC
-  specifies the contents these keys carry; this sub-RFC reserves the keys.
+- **Reserved cross-format OTLP attributes** (`datadog.agent`,
+  `datadog.tracer.tags`, `datadog.chunk.*`, `datadog.span.resource`,
+  `datadog.span.type`, `datadog.span.meta_struct`): lifted into typed
+  `TraceEvent.datadog` / `Span.datadog` slots on OTLP ingress and stripped;
+  synthesized from those slots on OTLP egress, removing or replacing any existing
+  common attribute at the same key. The Datadog sub-RFC specifies the contents these
+  keys carry; this sub-RFC reserves them.
 - **OTLP fields at `Development` or `Alpha` stability tier** are dropped on OTLP ingress.
 - **`Span.end_time_unix_nano < start_time_unix_nano`** is clamped to zero duration on
   ingress and reported. The egress reconstruction emits
@@ -119,8 +120,9 @@ decoders.
 
 Each OTLP `ScopeSpans` is one `TraceEvent`. The containing `ResourceSpans.resource`
 populates `TraceEvent.resource`; the `ScopeSpans.scope` populates `TraceEvent.scope`; the
-spans inside populate `TraceEvent.spans`; `TraceEvent.chunk` is `None` unless reserved
-`datadog.chunk.*` attributes are lifted as specified below. A
+spans inside populate `TraceEvent.spans`. `TraceEvent.datadog` and each
+`Span.datadog` start at their defaults and are populated only by valid reserved
+`datadog.*` bridge attributes as specified below. A
 `ScopeSpans` with an empty `spans` repeated field produces a `TraceEvent` with
 `spans = []`, forwarded per the parent RFC's empty-spans guideline; on OTLP egress an
 empty-spans `TraceEvent` becomes one `ScopeSpans { spans: [] }`.
@@ -147,16 +149,21 @@ empty-spans `TraceEvent` becomes one `ScopeSpans { spans: [] }`.
 | `Span.status.{code,message}` (see status)                          | `Span.status.{code,message}`                  |
 | `Span.dropped_*_count`                                             | `Span.dropped_*_count`                        |
 
-On OTLP egress, `TraceEvent`s sharing a `Resource` (including `Resource.schema_url`) are
-gathered into one `ResourceSpans`; each event becomes one `ScopeSpans`. Two events with
-identical `Resource` content but different `schema_url` values produce separate
-`ResourceSpans` messages; the grouping key includes `schema_url`. The `_dd.*` reserved
-keys in `Resource.attributes` (`_dd.payload`, `_dd.tracer`) and `Span.attributes`
-(`_dd.meta_struct`) egress through the generic `AttrValue` -> `AnyValue` mapping under
-their model-level keys. Typed-only Datadog state (`TraceEvent.chunk`,
-`Span.resource_name`, `Span.span_type`) has no attribute-map representation; the OTLP
-sink synthesizes it into `Span.attributes` under reserved keys (see "Reserved OTLP-egress
-keys" below) for best-effort cross-format relay.
+Reserved bridge attributes are exceptions to the generic attribute rows:
+resource-level `datadog.agent` / `datadog.tracer.tags` lift into
+`TraceEvent.datadog`, while span-level `datadog.chunk.*` / `datadog.span.*` lift
+into `TraceEvent.datadog.chunk` or `Span.datadog`. The bridge section below defines
+the exact paths and types.
+
+On OTLP egress, `TraceEvent`s sharing a `Resource` (including `Resource.schema_url`) and
+the same resource-level Datadog bridge projection are gathered into one
+`ResourceSpans`; each event becomes one `ScopeSpans`. Two events with identical common
+`Resource` content but different agent envelopes or tracer tags therefore produce
+separate `ResourceSpans` messages. Datadog-native context has no common attribute-map
+representation; the OTLP sink synthesizes it under reserved resource and span keys (see
+"Reserved OTLP bridge keys" below) for best-effort cross-format relay. Ordinary `_dd.*`
+keys have no special meaning and flow through the generic `AttrValue` -> `AnyValue`
+mapping.
 
 #### Zero-ID detection
 
@@ -206,7 +213,7 @@ non-promotion rule above applies). The other typed slot/attribute-map pairs from
 parent RFC do not apply on OTLP egress: `Span.trace_id` is a single 16-byte wire field
 (no `_dd.p.tid` duplication), `Span.status` egresses through OTLP's `Status.message` field with any `error.message`
 attribute left in place as a regular attribute, and the chunk-state pair is the cross-format
-synthesis covered under "Reserved OTLP-egress keys for typed-only Datadog state" below.
+synthesis covered under "Reserved OTLP bridge keys for Datadog-native state" below.
 
 #### Deprecated `deployment.environment` handling
 
@@ -306,58 +313,74 @@ bytes differ:
   `SpanKind::Other(n)` and egresses as the same integer, so unknown kind values introduced
   by future OpenTelemetry versions round-trip unchanged.
 
-#### Reserved OTLP-egress keys for typed-only Datadog state
+#### Reserved OTLP bridge keys for Datadog-native state
 
-`TraceEvent.chunk`, `Span.resource_name`, and `Span.span_type` are typed-only fields
-with no attribute-map representation, so the generic `AttrValue` -> `AnyValue` mapping
-does not carry them through OTLP. The OTLP sink synthesizes them into `Span.attributes`
-under the following reserved keys, and OTLP ingress lifts the same keys back into the
-typed slots and strips them from `Span.attributes`. The Datadog sub-RFC specifies the
-contents these keys carry; this sub-RFC reserves the keys at OTLP-wire-level:
+The generic `AttrValue` -> `AnyValue` mapping does not carry the separate Datadog
+contexts through OTLP. The OTLP sink therefore synthesizes them under reserved
+`datadog.*` keys, and OTLP ingress lifts the same keys into typed contexts and strips
+them from the common attribute maps.
 
-- `Span.attributes."datadog.chunk.priority"` -- carries `TraceEvent.chunk.priority` as
-  `int_value` (the integer-form `SamplingPriority` wire value).
-- `Span.attributes."datadog.chunk.origin"` -- carries `TraceEvent.chunk.origin` as
-  `string_value`.
-- `Span.attributes."datadog.chunk.dropped"` -- carries `TraceEvent.chunk.dropped` as
-  `bool_value`; omitted when `false`.
-- `Span.attributes."datadog.chunk.tags"` -- carries `TraceEvent.chunk.tags` as a
-  `kvlist_value`; omitted when empty.
-- `Span.attributes."datadog.span.resource"` -- carries `Span.resource_name` as
-  `string_value`.
-- `Span.attributes."datadog.span.type"` -- carries `Span.span_type` as `string_value`.
+Resource-level keys:
 
-On ingress, a reserved key is lifted only when its `AnyValue` uses the exact variant
-listed above. `datadog.chunk.priority` additionally requires its `int_value` to fit the
-internal sampling-priority discriminator domain. A wrong-typed or out-of-range reserved
-value is stripped from `Span.attributes`, saturating-increments
-`Span.dropped_attributes_count`, does not update the typed slot, and is reported. Valid
-reserved keys on the same span are still lifted; no coercion or whole-span rejection
-occurs.
+- `Resource.attributes."datadog.agent"` -- carries
+  `TraceEvent.datadog.agent` as a `kvlist_value`. A present envelope emits the outer
+  object even when all members are default-valued, preserving `Some(Default)` versus
+  `None`. Members are `host_name`, `env`, `agent_version` (`string_value`);
+  `target_tps`, `error_tps` (`double_value`); `rare_sampler_enabled` (`bool_value`);
+  and `tags` (`kvlist_value`).
+- `Resource.attributes."datadog.tracer.tags"` -- carries
+  `TraceEvent.datadog.tracer.tags` as a `kvlist_value`; omitted when empty.
 
-Chunk keys are synthesized only when `TraceEvent.chunk` is `Some`; optional or
+Span-level keys:
+
+- `Span.attributes."datadog.chunk.priority"` -- carries
+  `TraceEvent.datadog.chunk.priority` as `int_value` (the integer-form
+  `SamplingPriority` wire value).
+- `Span.attributes."datadog.chunk.origin"` -- carries
+  `TraceEvent.datadog.chunk.origin` as `string_value`.
+- `Span.attributes."datadog.chunk.dropped"` -- carries
+  `TraceEvent.datadog.chunk.dropped` as `bool_value`; omitted when `false`.
+- `Span.attributes."datadog.chunk.tags"` -- carries
+  `TraceEvent.datadog.chunk.tags` as a `kvlist_value`; omitted when empty.
+- `Span.attributes."datadog.span.resource"` -- carries
+  `Span.datadog.resource_name` as `string_value`.
+- `Span.attributes."datadog.span.type"` -- carries
+  `Span.datadog.span_type` as `string_value`.
+- `Span.attributes."datadog.span.meta_struct"` -- carries
+  `Span.datadog.meta_struct` as a `kvlist_value` whose entries are `bytes_value`;
+  omitted when empty.
+
+On ingress, a reserved key is lifted only when its `AnyValue` uses the exact outer
+variant listed above. Within `datadog.agent`, recognized members of the wrong type use
+their typed defaults and are reported; unknown members are ignored and reported, while
+valid siblings are retained. Within `datadog.span.meta_struct`, a non-`bytes_value`
+entry is dropped and reported. `datadog.chunk.priority` additionally requires its
+`int_value` to fit the internal sampling-priority discriminator domain. A malformed
+resource-level key saturating-increments `Resource.dropped_attributes_count`; a
+malformed span-level key or nested member saturating-increments
+`Span.dropped_attributes_count`. The reserved attribute is stripped in every case, and
+valid sibling keys continue to lift.
+
+Chunk keys are synthesized only when `TraceEvent.datadog.chunk` is `Some`; optional or
 default-valued fields within that context are omitted. An all-default `Some` therefore
 emits no chunk keys and re-ingests as `None`; preserving Datadog chunk presence through
 an OTLP hop is part of the explicitly best-effort cross-format path, not the OTLP
-round-trip guarantee. `Span.resource_name` and `Span.span_type` keys are omitted when
-their typed slot is `None`.
+round-trip guarantee. Optional span fields are likewise omitted when `None`.
 
-Reserved-key semantics: on OTLP egress the typed slot is the single source of truth, so
-any existing attribute at a reserved key is removed and replaced only when the typed
-value requires emission. Removing an existing conflicting value saturating-increments
-the emitted `Span.dropped_attributes_count` and is reported. On OTLP ingress, the keys
-are lifted into their typed slots and stripped from `Span.attributes` so OTLP egress
-through the same Vector emits them once under the typed path, not twice. Cross-format
-recovery via these keys is best-effort and is explicitly outside the OTLP round-trip
-guarantee (see "Out of scope" above).
+On OTLP egress, the typed namespace is the single source of truth for every reserved
+key. Any common attribute at the same key is removed and replaced only when the typed
+value requires emission. Removing a conflicting resource or span attribute
+saturating-increments the corresponding emitted dropped count and is reported. On
+ingress, lifting and stripping ensures that OTLP egress through the same Vector emits
+each value once. Cross-format recovery via these keys is best-effort and is explicitly
+outside the OTLP round-trip guarantee.
 
-For per-span chunk-context recovery on OTLP ingress: spans within the same `ScopeSpans` typically
-share chunk-context values (the wire shape mirrors the original `TraceChunk` on the Datadog side of
-the relay), but in the degenerate case where spans within a `ScopeSpans` carry conflicting values
-for the same `datadog.chunk.*` key, the wire-order-first value wins and the conflict is
-reported. Any successfully lifted chunk key materializes
-`Some(ChunkContext::default())` before applying its value; if all chunk keys are absent
-or malformed, `TraceEvent.chunk` is `None`.
+For per-span chunk-context recovery on OTLP ingress, spans within the same `ScopeSpans`
+typically share chunk-context values. If they carry conflicting values for the same
+`datadog.chunk.*` key, the wire-order-first value wins and the conflict is reported.
+Any successfully lifted chunk key materializes
+`Some(DatadogChunkContext::default())` before applying its value; if all chunk keys are
+absent or malformed, `TraceEvent.datadog.chunk` is `None`.
 
 ## Rationale
 
@@ -376,22 +399,21 @@ or malformed, `TraceEvent.chunk` is `None`.
   structurally because the parent RFC's `AttrValue` carries `String` and `Bytes` as
   distinct variants. OTLP egress is a 1:1 variant routing with no payload inspection,
   so the round trip is bit-exact for pure-relay pipelines.
-- The `datadog.*` namespace at the OTLP wire boundary carries typed-only Datadog state
-  that has no attribute-map representation in the typed model (chunk-scoped state and the
-  Datadog-native `Span` slots). The namespace prefix limits the collision class with
-  user-set OTLP attributes to a small, declared set rather than relying on bare key names
-  that could plausibly appear in unrelated user data. Items already in the typed attribute
-  maps (`_dd.payload`, `_dd.tracer`, `_dd.meta_struct`) egress through the generic
-  `AttrValue` -> `AnyValue` mapping under their model-level keys and need no separate
-  wire-level reservation.
+- The `datadog.*` namespace at the OTLP wire boundary carries Datadog-native state that
+  has no common attribute-map representation in the typed model. The explicit prefix
+  declares authoring intent and limits collisions with user-set OTLP attributes to a
+  small reserved set. Ordinary `_dd.*` resource and span attributes remain common
+  attributes and never acquire Datadog egress authority merely from their spelling.
+- Always-present logical Datadog contexts let VRL and typed consumers use stable paths
+  without first testing the source format. Default contexts synthesize no OTLP bridge
+  attributes, so purely OTLP-native traffic pays no wire-size cost.
 
 ## Drawbacks
 
-- Best-effort recovery of Datadog state from reserved OTLP span-attribute keys
-  (`datadog.chunk.*`, `datadog.span.resource`, `datadog.span.type`) on cross-format relay
+- Best-effort recovery of Datadog state from reserved OTLP resource and span attributes
   is not guaranteed: a transform that drops or rewrites one of these attributes on
-  OTLP-stage traffic silently loses the corresponding Datadog state. Operators are
-  advised not to set these reserved keys outside cross-format pipelines.
+  OTLP-stage traffic loses the corresponding Datadog state. Operators should not use
+  the reserved keys for unrelated custom attributes.
 - Additional parent-RFC-level drawbacks (VRL-config breakage on typed-path migration,
   per-span operations requiring `.spans` iteration, etc.) apply to OTLP-sourced and
   OTLP-bound events as well.
@@ -400,7 +422,8 @@ or malformed, `TraceEvent.chunk` is `None`.
 
 - [OTLP traces protocol](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto)
   -- the primary shape this RFC adopts. The container `TraceEvent` is structurally one
-  `ScopeSpans` plus its `Resource` and an optional Datadog-only `ChunkContext`.
+  `ScopeSpans` plus its `Resource`, with explicit Datadog contexts projected through
+  reserved OTLP bridge attributes when present.
 - The OpenTelemetry [Collector OTLP receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
   is the reference implementation of the OTLP ingress semantics; Vector's OTLP source
   follows the same wire decoding.
@@ -423,7 +446,7 @@ then proceeds through these obligations:
 
 1. Implement `LegacyTraceEvent -> TraceEvent` conversion and unique detection of
    historical pre-hint OTLP layouts.
-2. Implement `TraceEvent -> OTLP` encoding satisfying the mapping and reserved-key
+2. Implement `TraceEvent -> OTLP` encoding satisfying the mapping and bridge-key
    contracts above.
 3. Establish the `OTLP -> Vector -> OTLP` effective-equivalence guarantee and validate
    every declared exclusion.
@@ -431,7 +454,7 @@ then proceeds through these obligations:
    source. Typed input must pass end-to-end through OTLP export before the source emits
    typed events; typed source events retain the migration hint for the window specified
    by the parent RFC.
-5. Publish the OTLP field mapping and reserved-key conventions in the user migration
+5. Publish the OTLP field mapping and bridge-key conventions in the user migration
    guide.
 
 ## Future Improvements
