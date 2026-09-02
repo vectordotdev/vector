@@ -112,7 +112,6 @@ pub struct CuckooMemoryConfig {
     #[serde(default = "default_cuckoo_counter_bits")]
     pub counter_bits: NonZeroUsize,
     /// Field in the incoming value used as the counter increment override.
-    #[configurable(derived)]
     #[serde(default)]
     pub counter_field: OptionalValuePath,
     /// The amount to increment the counter by on every insertion. Negative values are allowed.
@@ -126,7 +125,6 @@ pub struct CuckooMemoryConfig {
     ///
     /// If table `reload_behavior` is set to `clear-state` and this is set, the persisted state will
     /// still be read after reload.
-    #[configurable(derived)]
     #[serde(default)]
     pub persistence_path: Option<PathBuf>,
     /// The interval used for exporting data.

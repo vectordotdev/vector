@@ -204,7 +204,6 @@ pub struct JournaldConfig {
     #[serde(default)]
     pub journal_namespace: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 

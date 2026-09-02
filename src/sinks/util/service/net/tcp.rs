@@ -15,10 +15,8 @@ use crate::dns;
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConnectorConfig {
-    #[configurable(derived)]
     address: HostAndPort,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
     /// The size of the socket's send buffer.
@@ -28,7 +26,6 @@ pub struct TcpConnectorConfig {
     #[configurable(metadata(docs::examples = 65536))]
     send_buffer_size: Option<usize>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 }
 

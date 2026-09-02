@@ -38,7 +38,7 @@ impl AvroDeserializerConfig {
                 schema,
                 strip_schema_id_prefix,
                 encoding: AvroEncoding::Datum,
-                schema_source: AvroSchemaSource::Provided,
+                schema_source: Some(AvroSchemaSource::Provided),
                 max_ocf_records: DEFAULT_MAX_OCF_RECORDS,
             },
         }
@@ -56,7 +56,7 @@ impl AvroDeserializerConfig {
                 schema,
                 strip_schema_id_prefix,
                 encoding,
-                schema_source,
+                schema_source: Some(schema_source),
                 max_ocf_records: DEFAULT_MAX_OCF_RECORDS,
             },
         }
@@ -85,8 +85,16 @@ impl AvroDeserializerConfig {
             ));
         }
 
+        let schema_source =
+            self.avro_options
+                .schema_source
+                .unwrap_or(match self.avro_options.encoding {
+                    AvroEncoding::Datum => AvroSchemaSource::Provided,
+                    AvroEncoding::ObjectContainerFile => AvroSchemaSource::Embedded,
+                });
+
         let schema = if self.avro_options.encoding == AvroEncoding::ObjectContainerFile
-            && self.avro_options.schema_source == AvroSchemaSource::Embedded
+            && schema_source == AvroSchemaSource::Embedded
         {
             // For OCF with embedded schema, we don't need to pre-parse the schema
             None
@@ -101,7 +109,7 @@ impl AvroDeserializerConfig {
             schema,
             strip_schema_id_prefix: self.avro_options.strip_schema_id_prefix,
             encoding: self.avro_options.encoding,
-            schema_source: self.avro_options.schema_source,
+            schema_source,
             max_ocf_bytes: max_decompressed_size_bytes(),
             max_ocf_records: self.avro_options.max_ocf_records,
         })
@@ -170,11 +178,12 @@ pub struct AvroDeserializerOptions {
     #[serde(default)]
     pub encoding: AvroEncoding,
 
-    /// How to handle the Avro schema for Object Container File decoding.
+    /// How to handle the Avro schema for decoding.
     ///
-    /// Defaults to `provided` for backward compatibility.
+    /// Defaults to `provided` for `datum` encoding and `embedded` for
+    /// `object_container_file` encoding.
     #[serde(default)]
-    pub schema_source: AvroSchemaSource,
+    pub schema_source: Option<AvroSchemaSource>,
 
     /// Maximum number of records decoded from a single Avro Object Container File.
     ///
@@ -251,7 +260,9 @@ impl AvroDeserializer {
             .schema
             .as_ref()
             .ok_or_else(|| vector_common::Error::from("Schema required for datum decoding"))?;
-        let value = apache_avro::from_avro_datum(schema, &mut bytes.reader(), None)?;
+        let value = apache_avro::reader::datum::GenericDatumReader::builder(schema)
+            .build()?
+            .read_value(&mut bytes.reader())?;
 
         let apache_avro::types::Value::Record(fields) = value else {
             return Err(vector_common::Error::from("Expected an avro Record"));
@@ -468,15 +479,23 @@ mod tests {
 
     fn ocf_bytes(records: &[Log]) -> Bytes {
         let schema = get_schema();
-        let mut writer = apache_avro::Writer::new(&schema, Vec::new());
+        let mut writer = apache_avro::Writer::new(&schema, Vec::new()).unwrap();
 
         for record in records {
             writer
-                .append(apache_avro::to_value(record.clone()).unwrap())
+                .append_value(apache_avro::to_value(record.clone()).unwrap())
                 .unwrap();
         }
 
         Bytes::from(writer.into_inner().unwrap())
+    }
+
+    fn datum_bytes(schema: &Schema, value: AvroValue) -> Vec<u8> {
+        apache_avro::writer::datum::GenericDatumWriter::builder(schema)
+            .build()
+            .unwrap()
+            .write_value_to_vec(value)
+            .unwrap()
     }
 
     fn ocf_deserializer(max_ocf_bytes: usize, max_ocf_records: usize) -> AvroDeserializer {
@@ -491,6 +510,53 @@ mod tests {
     }
 
     #[test]
+    fn schema_source_defaults_by_encoding() {
+        let datum = AvroDeserializerConfig::new(get_schema().canonical_form(), false)
+            .build()
+            .expect("datum configuration should build");
+        assert_eq!(datum.schema_source, AvroSchemaSource::Provided);
+        assert!(datum.schema.is_some());
+
+        let ocf = AvroDeserializerConfig {
+            avro_options: AvroDeserializerOptions {
+                schema: "not valid Avro schema".to_owned(),
+                strip_schema_id_prefix: false,
+                encoding: AvroEncoding::ObjectContainerFile,
+                schema_source: None,
+                max_ocf_records: DEFAULT_MAX_OCF_RECORDS,
+            },
+        }
+        .build()
+        .expect("OCF configuration should use its embedded schema by default");
+        assert_eq!(ocf.schema_source, AvroSchemaSource::Embedded);
+        assert!(ocf.schema.is_none());
+    }
+
+    #[test]
+    fn provided_ocf_schema_must_match_embedded_schema() {
+        let config = AvroDeserializerConfig::new_with_options(
+            r#"{"type":"record","name":"log","fields":[{"name":"different","type":"string"}]}"#
+                .to_owned(),
+            false,
+            AvroEncoding::ObjectContainerFile,
+            AvroSchemaSource::Provided,
+        );
+        let deserializer = config
+            .build()
+            .expect("provided schema should parse during configuration build");
+
+        let error = deserializer
+            .parse(
+                ocf_bytes(&[Log {
+                    message: "hello".to_owned(),
+                }]),
+                LogNamespace::Vector,
+            )
+            .expect_err("mismatched provided schema must be rejected");
+        assert!(error.to_string().contains("fingerprint"));
+    }
+
+    #[test]
     fn deserialize_avro() {
         let schema = get_schema();
 
@@ -498,7 +564,7 @@ mod tests {
             message: "hello from avro".to_owned(),
         };
         let record_value = apache_avro::to_value(event).unwrap();
-        let record_datum = apache_avro::to_avro_datum(&schema, record_value).unwrap();
+        let record_datum = datum_bytes(&schema, record_value);
         let record_bytes = Bytes::from(record_datum);
 
         let deserializer = AvroDeserializer::new(
@@ -526,7 +592,7 @@ mod tests {
             message: "hello from avro".to_owned(),
         };
         let record_value = apache_avro::to_value(event).unwrap();
-        let record_datum = apache_avro::to_avro_datum(&schema, record_value).unwrap();
+        let record_datum = datum_bytes(&schema, record_value);
 
         let mut bytes = BytesMut::new();
         bytes.extend([0, 0, 0, 0, 0]); // 0 prefix + 4 byte schema id
@@ -559,7 +625,7 @@ mod tests {
         };
         let value = apache_avro::to_value(event).unwrap();
         // let value = value.resolve(&schema).unwrap();
-        let datum = apache_avro::to_avro_datum(&schema, value).unwrap();
+        let datum = datum_bytes(&schema, value);
 
         let mut bytes = BytesMut::new();
         bytes.extend([0, 0, 0, 0, 0]); // 0 prefix + 4 byte schema id
@@ -603,11 +669,11 @@ mod tests {
 
         // Write OCF file using apache_avro library
         let mut ocf_file = NamedTempFile::new().unwrap();
-        let mut writer = apache_avro::Writer::new(&schema, Vec::new());
+        let mut writer = apache_avro::Writer::new(&schema, Vec::new()).unwrap();
 
         for record in &records {
             let record_value = apache_avro::to_value(record.clone()).unwrap();
-            writer.append(record_value).unwrap();
+            writer.append_value(record_value).unwrap();
         }
 
         let ocf_data = writer.into_inner().unwrap();

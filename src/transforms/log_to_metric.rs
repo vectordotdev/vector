@@ -84,7 +84,6 @@ pub struct CounterConfig {
     #[serde(default = "default_increment_by_value")]
     pub increment_by_value: bool,
 
-    #[configurable(derived)]
     #[serde(default = "default_kind")]
     pub kind: MetricKind,
 }
@@ -116,7 +115,6 @@ pub struct MetricConfig {
     #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
     pub tags: Option<IndexMap<UnconfinedTemplate, TagConfig>>,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub metric: MetricTypeConfig,
 }
@@ -158,7 +156,7 @@ pub enum MetricTypeConfig {
 }
 
 impl MetricConfig {
-    fn field(&self) -> &str {
+    const fn field(&self) -> &str {
         self.field.get_ref()
     }
 }

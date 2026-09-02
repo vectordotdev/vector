@@ -214,4 +214,16 @@ generated: components: sources: syslog: configuration: {
 			}
 		}
 	}
+	tls_handshake_timeout_secs: {
+		description: """
+			The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+
+			This bounds how long a connection can hold its slot against `connection_limit`
+			before the TLS handshake finishes, protecting against clients that open a
+			connection but never complete (or never start) a handshake.
+			"""
+		relevant_when: "mode = \"tcp\""
+		required:      false
+		type: uint: unit: "seconds"
+	}
 }

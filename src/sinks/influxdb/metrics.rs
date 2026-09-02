@@ -1,6 +1,12 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
+)]
+
 use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
+use derivative::Derivative;
 use futures::{SinkExt, future::BoxFuture, stream};
 use indoc::indoc;
 use tower::Service;
@@ -12,7 +18,9 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::{
         Event, KeyString,
         metric::{Metric, MetricValue, Sample, StatisticKind},
@@ -27,7 +35,8 @@ use crate::{
             influxdb_settings,
         },
         util::{
-            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, EncodedEvent, HttpEndpoint, SinkBatchSettings,
+            TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
@@ -70,7 +79,7 @@ pub struct InfluxDbConfig {
     ///
     /// This should be a full HTTP URI, including the scheme, host, and port.
     #[configurable(metadata(docs::examples = "http://localhost:8086/"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The InfluxDB API version to use.
     ///
@@ -146,11 +155,9 @@ pub struct InfluxDbConfig {
     #[configurable(metadata(docs::minimal = true))]
     pub token: Option<SensitiveString>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
@@ -159,14 +166,12 @@ pub struct InfluxDbConfig {
     #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<HashMap<String, String>>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The list of quantiles to calculate when sending distribution metrics.
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -283,15 +288,6 @@ impl InfluxDbConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDbConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
-        let healthcheck = healthcheck(self.clone().endpoint, self.settings()?, client.clone())?;
-        validate_quantiles(&self.quantiles)?;
-        let sink = InfluxDbSvc::new(self.clone(), client)?;
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -301,24 +297,82 @@ impl SinkConfig for InfluxDbConfig {
     }
 }
 
-impl InfluxDbSvc {
-    pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
-        let settings = influxdb_settings(config.settings()?);
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub struct ValidatedInfluxDbMetrics {
+    // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
+    #[derivative(Debug = "ignore")]
+    uri: http::Uri,
+    token: SensitiveString,
+    protocol_version: ProtocolVersion,
+    #[derivative(Debug = "ignore")]
+    batch: BatchSettings<MetricsBuffer>,
+}
 
-        let endpoint = config.endpoint.clone();
+#[async_trait::async_trait]
+impl ValidatedSink for InfluxDbConfig {
+    type Validated = ValidatedInfluxDbMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedInfluxDbMetrics> {
+        validate_quantiles(&self.quantiles)?;
+
+        let settings = influxdb_settings(self.settings()?);
+
+        let uri = settings.write_uri(self.endpoint.clone())?;
+
         let token = settings.token();
         let protocol_version = settings.protocol_version();
 
-        let batch = config.batch.into_batch_settings()?;
+        let batch = self.batch.into_batch_settings()?;
+
+        Ok(ValidatedInfluxDbMetrics {
+            uri,
+            token,
+            protocol_version,
+            batch,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedInfluxDbMetrics,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let healthcheck = healthcheck(self.clone().endpoint, self.settings()?, client.clone())?;
+        let sink = InfluxDbSvc::from_validated(self.clone(), validated, client)?;
+        Ok((sink, healthcheck))
+    }
+}
+
+impl InfluxDbSvc {
+    #[cfg(all(test, feature = "influxdb-integration-tests"))]
+    pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
+        let validated = config.validate()?;
+        Self::from_validated(config, &validated, client)
+    }
+
+    fn from_validated(
+        config: InfluxDbConfig,
+        validated: &ValidatedInfluxDbMetrics,
+        client: HttpClient,
+    ) -> crate::Result<VectorSink> {
+        let ValidatedInfluxDbMetrics {
+            uri,
+            token,
+            protocol_version,
+            batch,
+        } = validated;
+
         let request = config.request.into_settings();
 
-        let uri = settings.write_uri(endpoint)?;
-
-        let http_service = HttpBatchService::new(client, create_build_request(uri, token.inner()));
+        let http_service =
+            HttpBatchService::new(client, create_build_request(uri.clone(), token.inner()));
 
         let influxdb_http_service = InfluxDbSvc {
             config,
-            protocol_version,
+            protocol_version: *protocol_version,
             inner: http_service,
         };
         let mut normalizer = MetricNormalizer::<InfluxMetricNormalize>::default();
@@ -595,6 +649,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::ValidatedSink,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
         sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts},
     };
@@ -621,56 +676,33 @@ mod tests {
     }
 
     #[test]
-    fn test_settings_explicit_v2_rejects_v1_settings() {
-        let config = indoc! {r#"
-            endpoint: "http://localhost:9999"
-            version: "2"
-            bucket: "my-bucket"
-            org: "my-org"
-            token: "my-token"
-            database: "stale-v1-database"
-            username: "stale-v1-user"
-        "#};
-        let config: InfluxDbConfig = serde_yaml::from_str(config).unwrap();
-        assert!(config.settings().is_err());
-    }
+    fn prepares_valid_config() {
+        let config = InfluxDbConfig {
+            endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
+            org: Some("my-org".to_string()),
+            bucket: Some("my-bucket".to_string()),
+            token: Some("my-token".to_string().into()),
+            default_namespace: None,
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            batch: Default::default(),
+            request: Default::default(),
+            tags: None,
+            tls: None,
+            quantiles: default_summary_quantiles(),
+            acknowledgements: Default::default(),
+        };
 
-    #[test]
-    fn test_settings_explicit_v1_rejects_v2_settings() {
-        let config = indoc! {r#"
-            endpoint: "http://localhost:9999"
-            version: "1"
-            database: "my-database"
-            org: "stale-v2-org"
-            bucket: "stale-v2-bucket"
-            token: "stale-v2-token"
-        "#};
-        let config: InfluxDbConfig = serde_yaml::from_str(config).unwrap();
-        assert!(config.settings().is_err());
-    }
-
-    #[test]
-    fn test_settings_explicit_v2_accepts_only_v2_settings() {
-        let config = indoc! {r#"
-            endpoint: "http://localhost:9999"
-            version: "2"
-            bucket: "my-bucket"
-            org: "my-org"
-            token: "my-token"
-        "#};
-        let config: InfluxDbConfig = serde_yaml::from_str(config).unwrap();
-        assert!(config.settings().is_ok());
-    }
-
-    #[test]
-    fn test_settings_explicit_v1_accepts_only_v1_settings() {
-        let config = indoc! {r#"
-            endpoint: "http://localhost:9999"
-            version: "1"
-            database: "my-database"
-        "#};
-        let config: InfluxDbConfig = serde_yaml::from_str(config).unwrap();
-        assert!(config.settings().is_ok());
+        let validated = config.validate().expect("preparation should succeed");
+        assert!(matches!(validated.protocol_version, ProtocolVersion::V2));
+        assert_eq!(
+            validated.uri.to_string(),
+            "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns"
+        );
     }
 
     #[test]
@@ -1190,6 +1222,7 @@ mod integration_tests {
                 onboarding_v1, onboarding_v2, query_v1,
             },
         },
+        sinks::util::HttpEndpoint,
         test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         tls::{self, TlsConfig},
     };
@@ -1218,7 +1251,7 @@ mod integration_tests {
         let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
-            endpoint: url.to_string(),
+            endpoint: HttpEndpoint::parse(url).unwrap(),
             version: Some(InfluxDbVersion::V1),
             database: Some(database.clone()),
             consistency: None,
@@ -1313,7 +1346,7 @@ mod integration_tests {
         let cx = SinkContext::default();
 
         let config = InfluxDbConfig {
-            endpoint,
+            endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
             version: Some(InfluxDbVersion::V2),
             database: None,
             consistency: None,

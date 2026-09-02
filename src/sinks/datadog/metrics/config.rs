@@ -1,5 +1,3 @@
-use http::Uri;
-use snafu::ResultExt;
 use tower::ServiceBuilder;
 use vector_lib::{
     config::proxy::ProxyConfig, configurable::configurable_component, stream::BatcherSettings,
@@ -12,12 +10,15 @@ use super::{
 };
 use crate::{
     common::datadog,
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
-        Healthcheck, UriParseSnafu, VectorSink,
+        Healthcheck, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig, batch::BatchConfig},
+        util::{
+            HttpEndpoint, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            batch::BatchConfig,
+        },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -137,13 +138,13 @@ impl DatadogMetricsCompression {
 
 /// Maps Datadog metric endpoints to their actual URI.
 pub struct DatadogMetricsEndpointConfiguration {
-    series_endpoint: Uri,
-    sketches_endpoint: Uri,
+    series_endpoint: HttpEndpoint,
+    sketches_endpoint: HttpEndpoint,
 }
 
 impl DatadogMetricsEndpointConfiguration {
     /// Creates a new `DatadogMEtricsEndpointConfiguration`.
-    pub const fn new(series_endpoint: Uri, sketches_endpoint: Uri) -> Self {
+    pub const fn new(series_endpoint: HttpEndpoint, sketches_endpoint: HttpEndpoint) -> Self {
         Self {
             series_endpoint,
             sketches_endpoint,
@@ -151,7 +152,7 @@ impl DatadogMetricsEndpointConfiguration {
     }
 
     /// Gets the URI for the given Datadog metrics endpoint.
-    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> Uri {
+    pub fn get_uri_for_endpoint(&self, endpoint: DatadogMetricsEndpoint) -> HttpEndpoint {
         match endpoint {
             DatadogMetricsEndpoint::Series { .. } => self.series_endpoint.clone(),
             DatadogMetricsEndpoint::Sketches => self.sketches_endpoint.clone(),
@@ -182,11 +183,9 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub series_api_version: SeriesApiVersion,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -196,22 +195,60 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogMetricsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.build_client(&cx.proxy)?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.local_dd_common.with_globals(global)?;
-        let healthcheck = dd_common.build_healthcheck(client.clone())?;
-        let sink = self.build_sink(&dd_common, client)?;
-
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.local_dd_common.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedMetrics {
+    batcher_settings: BatcherSettings,
+    sketches_batcher_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DatadogMetricsConfig {
+    type Validated = ValidatedMetrics;
+
+    fn validate(&self) -> crate::Result<ValidatedMetrics> {
+        let (batcher_settings, sketches_batcher_settings) =
+            resolve_endpoint_batch_settings(self.batch, self.series_api_version)?;
+
+        let site = self
+            .local_dd_common
+            .site
+            .clone()
+            .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
+        let base = Self::metrics_base_endpoint(self.local_dd_common.endpoint.as_deref(), &site);
+        HttpEndpoint::parse(&base)?;
+
+        Ok(ValidatedMetrics {
+            batcher_settings,
+            sketches_batcher_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedMetrics,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.build_client(&cx.proxy)?;
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
+        let dd_common = self.local_dd_common.with_globals(global)?;
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
+        let sink = self.build_sink(
+            &dd_common,
+            client,
+            validated.batcher_settings,
+            validated.sketches_batcher_settings,
+        )?;
+
+        Ok((sink, healthcheck))
     }
 }
 
@@ -224,15 +261,14 @@ impl DatadogMetricsConfig {
     /// doing something wrong, for understanding issues from the API side.
     ///
     /// The `endpoint` configuration field will be used here if it is present.
-    fn get_base_agent_endpoint(&self, dd_common: &DatadogCommonConfig) -> String {
-        dd_common.endpoint.clone().unwrap_or_else(|| {
-            let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
-            format!(
-                "https://{}-vector.agent.{}",
-                version,
-                dd_common.site.as_str()
-            )
-        })
+    fn metrics_base_endpoint(endpoint: Option<&str>, site: &str) -> String {
+        endpoint.map_or_else(
+            || {
+                let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
+                format!("https://{version}-vector.agent.{site}")
+            },
+            |endpoint| endpoint.to_string(),
+        )
     }
 
     /// Generates the `DatadogMetricsEndpointConfiguration`, used for mapping endpoints to their URI.
@@ -240,7 +276,7 @@ impl DatadogMetricsConfig {
         &self,
         dd_common: &DatadogCommonConfig,
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
-        let base_uri = self.get_base_agent_endpoint(dd_common);
+        let base_uri = Self::metrics_base_endpoint(dd_common.endpoint.as_deref(), &dd_common.site);
 
         let series_endpoint = build_uri(&base_uri, self.series_api_version.get_path())?;
         let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
@@ -272,10 +308,9 @@ impl DatadogMetricsConfig {
         &self,
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
+        batcher_settings: BatcherSettings,
+        sketches_batcher_settings: BatcherSettings,
     ) -> crate::Result<VectorSink> {
-        let (batcher_settings, sketches_batcher_settings) =
-            resolve_endpoint_batch_settings(self.batch, self.series_api_version)?;
-
         // TODO: revisit our concurrency and batching defaults
         let request_limits = self.request.into_settings();
 
@@ -293,7 +328,12 @@ impl DatadogMetricsConfig {
             self.series_api_version,
         );
 
-        let protocol = self.get_protocol(dd_common);
+        let protocol = HttpEndpoint::parse(&Self::metrics_base_endpoint(
+            dd_common.endpoint.as_deref(),
+            &dd_common.site,
+        ))?
+        .protocol()
+        .to_string();
         let sink = DatadogMetricsSink::new(
             service,
             request_builder,
@@ -304,15 +344,6 @@ impl DatadogMetricsConfig {
         );
 
         Ok(VectorSink::from_event_streamsink(sink))
-    }
-
-    fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
-        self.get_base_agent_endpoint(dd_common)
-            .parse::<Uri>()
-            .unwrap()
-            .scheme_str()
-            .unwrap_or("http")
-            .to_string()
     }
 }
 
@@ -338,20 +369,52 @@ fn resolve_endpoint_batch_settings(
     Ok((series, sketches))
 }
 
-fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
-    let result = format!("{host}{endpoint}")
-        .parse::<Uri>()
-        .context(UriParseSnafu)?;
-    Ok(result)
+fn build_uri(host: &str, endpoint: &str) -> crate::Result<HttpEndpoint> {
+    Ok(HttpEndpoint::parse(host)?.append_path(endpoint)?)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ValidatedSink;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogMetricsConfig>();
+    }
+
+    #[test]
+    fn validate_produces_endpoint_specific_batch_settings() {
+        let config = DatadogMetricsConfig::default();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.batcher_settings.size_limit, 5_242_880); // 5 MiB — Series v2 limit
+        assert_eq!(validated.sketches_batcher_settings.size_limit, 62_914_560); // 60 MiB — Sketches limit
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = DatadogMetricsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("not a uri".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_non_http_scheme() {
+        let config = DatadogMetricsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("ftp://localhost:8080".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
     }
 
     // When max_bytes is unset, each endpoint gets its own API payload limit.

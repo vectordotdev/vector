@@ -390,6 +390,12 @@ check-component-features: ## Check that all component features are setup properl
 check-clippy: ## Check code with Clippy
 	$(VDEV) check rust
 
+.PHONY: check-clippy-no-default-features
+check-clippy-no-default-features: ## Check code with Clippy using only FEATURES
+	@test -n "$(strip $(FEATURES))" || \
+		{ echo "FEATURES is required" >&2; exit 2; }
+	$(VDEV) check rust --no-default-features
+
 .PHONY: check-docs
 check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
 	$(VDEV) check docs

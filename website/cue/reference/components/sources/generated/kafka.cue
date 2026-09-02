@@ -426,6 +426,51 @@ generated: components: sources: kafka: configuration: {
 			}
 		}
 	}
+	decompression: {
+		description: """
+			Configuration for decompressing message payloads that were compressed by the producer.
+
+			This applies to application-level compression, where the producer compressed each message
+			payload before sending it. Compression negotiated at the Kafka protocol level is handled
+			transparently by the underlying client library and does not require this option.
+
+			Payloads are decompressed before `framing` and `decoding` are applied.
+			"""
+		required: false
+		type: object: options: {
+			algorithm: {
+				description: "The decompression algorithm."
+				required:    true
+				type: string: enum: {
+					gzip: """
+						[Gzip][gzip] decompression.
+
+						[gzip]: https://www.gzip.org/
+						"""
+					zlib: """
+						[Zlib][zlib] decompression.
+
+						[zlib]: https://zlib.net/
+						"""
+					zstd: """
+						[Zstandard][zstd] decompression.
+
+						[zstd]: https://facebook.github.io/zstd/
+						"""
+				}
+			}
+			dictionary_path: {
+				description: """
+					The path to a compression dictionary to use when decompressing payloads.
+
+					The dictionary must be the same as the one used by the producer when compressing the
+					payloads. Only supported with the `zstd` algorithm.
+					"""
+				required: false
+				type: string: examples: ["/etc/vector/compression.dict"]
+			}
+		}
+	}
 	drain_timeout_ms: {
 		description: """
 			Timeout to drain pending acknowledgements during shutdown or a Kafka

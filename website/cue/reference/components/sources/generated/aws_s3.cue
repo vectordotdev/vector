@@ -862,6 +862,24 @@ generated: components: sources: aws_s3: configuration: {
 		required: false
 		type: string: examples: ["us-east-1"]
 	}
+	request_payer: {
+		description: """
+			Enables retrieving objects from [S3 Requester Pays buckets][requester_pays].
+
+			Set this to `requester` to acknowledge that the AWS account associated with Vector's
+			configured credentials accepts the request and data transfer charges.
+
+			When unset, Vector does not specify a request payer.
+
+			[requester_pays]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/RequesterPaysBuckets.html
+			"""
+		required: false
+		type: string: enum: requester: """
+			Enables retrieving objects from [S3 Requester Pays buckets][requester_pays].
+
+			The requester accepts the S3 request and data transfer charges.
+			"""
+	}
 	sqs: {
 		description: "Configuration options for SQS."
 		required:    false

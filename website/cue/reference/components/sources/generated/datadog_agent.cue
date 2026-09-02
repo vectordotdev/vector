@@ -402,6 +402,11 @@ generated: components: sources: datadog_agent: configuration: {
 			}
 		}
 	}
+	disable_llmobs: {
+		description: "If this is set to `true`, LLM Observability events are not accepted by the component."
+		required:    false
+		type: bool: default: false
+	}
 	disable_logs: {
 		description: "If this is set to `true`, logs are not accepted by the component."
 		required:    false
@@ -681,6 +686,22 @@ generated: components: sources: datadog_agent: configuration: {
 					default: 300
 					examples: [600]
 					unit: "seconds"
+				}
+			}
+			tcp_keepalive: {
+				description: """
+					TCP keepalive settings for accepted connections.
+
+					Configures OS-level TCP keepalive probes on accepted connections. When set, the OS
+					will send keepalive probes after the specified idle time has elapsed, detecting and
+					closing connections where the remote peer has disappeared without sending a FIN or
+					RST packet (for example, due to an abrupt machine failure or network partition).
+					"""
+				required: false
+				type: object: options: time_secs: {
+					description: "The time to wait before starting to send TCP keepalive probes on an idle connection."
+					required:    false
+					type: uint: unit: "seconds"
 				}
 			}
 		}

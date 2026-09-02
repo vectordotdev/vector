@@ -133,7 +133,6 @@ pub struct Ec2Metadata {
     #[derivative(Default(value = "default_refresh_timeout_secs()"))]
     refresh_timeout_secs: Duration,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 

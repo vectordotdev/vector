@@ -30,7 +30,10 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+use vector_lib::{
+    configurable::configurable_component, sensitive_string::SensitiveString,
+    tcp::TcpKeepaliveConfig,
+};
 
 #[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
@@ -564,6 +567,15 @@ pub struct KeepaliveConfig {
     #[serde(default = "default_max_connection_age_jitter_factor")]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub max_connection_age_jitter_factor: f64,
+
+    /// TCP keepalive settings for accepted connections.
+    ///
+    /// Configures OS-level TCP keepalive probes on accepted connections. When set, the OS
+    /// will send keepalive probes after the specified idle time has elapsed, detecting and
+    /// closing connections where the remote peer has disappeared without sending a FIN or
+    /// RST packet (for example, due to an abrupt machine failure or network partition).
+    #[serde(default)]
+    pub tcp_keepalive: Option<TcpKeepaliveConfig>,
 }
 
 const fn default_max_connection_age() -> Option<u64> {
@@ -579,6 +591,7 @@ impl Default for KeepaliveConfig {
         Self {
             max_connection_age_secs: default_max_connection_age(),
             max_connection_age_jitter_factor: default_max_connection_age_jitter_factor(),
+            tcp_keepalive: None,
         }
     }
 }
@@ -754,11 +767,9 @@ impl ParameterValue {
     }
 
     /// Returns the raw string value of the parameter.
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn value(&self) -> &str {
+    pub const fn value(&self) -> &str {
         match self {
-            ParameterValue::String(s) => s,
-            ParameterValue::Typed { value, .. } => value,
+            ParameterValue::String(value) | ParameterValue::Typed { value, .. } => value.as_str(),
         }
     }
 
@@ -812,6 +823,8 @@ impl IntoIterator for QueryParameterValue {
 }
 
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
+
+mod client_v1;
 
 #[cfg(test)]
 mod transport_tests;

@@ -18,10 +18,7 @@ use warp::http::HeaderMap;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
-    config::{
-        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
-    },
+    config::{Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     http::KeepaliveConfig,
     serde::{bool_or_struct, default_decoding},
@@ -31,38 +28,6 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
-
-/// Configuration for the `http` source.
-#[configurable_component(source("http", "Host an HTTP endpoint to receive logs."))]
-#[configurable(metadata(deprecated))]
-#[derive(Clone, Debug)]
-pub struct HttpConfig(SimpleHttpConfig);
-
-impl GenerateConfig for HttpConfig {
-    fn generate_config() -> serde_json::Value {
-        <SimpleHttpConfig as GenerateConfig>::generate_config()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "http")]
-impl SourceConfig for HttpConfig {
-    async fn build(&self, cx: SourceContext) -> vector_lib::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        self.0.outputs(global_log_namespace)
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        self.0.resources()
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        self.0.can_acknowledge()
-    }
-}
 
 /// Configuration for the `http_server` source.
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
@@ -111,7 +76,6 @@ pub struct SimpleHttpConfig {
     /// When using the `custom` strategy, the VRL program may write `%field = value` to enrich
     /// authenticated events. These metadata fields are injected into the event body (legacy
     /// namespace) or under `http_server.<field>` in event metadata (Vector namespace).
-    #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
     /// Whether or not to treat the configured `path` as an absolute path.
@@ -151,16 +115,12 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_response_code")]
     response_code: StatusCode,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     decoding: Option<DeserializerConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -169,7 +129,6 @@ pub struct SimpleHttpConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 }

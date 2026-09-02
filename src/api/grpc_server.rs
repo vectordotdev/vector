@@ -152,8 +152,8 @@ impl GrpcServer {
 ///
 /// Returns `200 {"ok":true}` while the server is serving and
 /// `503 {"ok":false}` once [`GrpcServer::set_not_serving`] has been called.
-/// Matches the response shape of the pre-gRPC GraphQL-era endpoint so
-/// existing HTTP health probes (Kubernetes, load balancers) keep working.
+/// Preserves the response shape expected by existing HTTP health probes such as
+/// Kubernetes and load balancers.
 fn http_router(state: ServingState) -> Router {
     Router::new()
         .route("/health", get(health_handler).head(health_handler))

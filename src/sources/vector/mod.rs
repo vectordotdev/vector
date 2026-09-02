@@ -133,15 +133,12 @@ pub struct VectorConfig {
     /// It _must_ include a port.
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: GrpcKeepaliveConfig,
 

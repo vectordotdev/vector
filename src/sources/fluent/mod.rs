@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, io, net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Buf, Bytes, BytesMut};
@@ -164,17 +164,14 @@ mod deser {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FluentTcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
     /// The size of the receive buffer used for each connection.
@@ -184,10 +181,16 @@ pub struct FluentTcpConfig {
     #[configurable(metadata(docs::examples = 65536))]
     receive_buffer_bytes: Option<usize>,
 
-    #[configurable(derived)]
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
+
     tls: Option<TlsSourceConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 }
@@ -216,6 +219,7 @@ impl FluentTcpConfig {
             tls_client_metadata_key,
             self.receive_buffer_bytes,
             None,
+            self.tls_handshake_timeout_secs,
             cx,
             self.acknowledgements,
             self.connection_limit,
@@ -277,6 +281,7 @@ impl GenerateConfig for FluentConfig {
                 permit_origin: None,
                 tls: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: Default::default(),
                 connection_limit: Some(2),
             }),
@@ -1167,6 +1172,7 @@ mod tests {
                 keepalive: None,
                 permit_origin: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: true.into(),
                 connection_limit: None,
             }),
@@ -1240,6 +1246,7 @@ mod tests {
                 keepalive: None,
                 permit_origin: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
             }),
@@ -1298,6 +1305,7 @@ mod tests {
                 keepalive: None,
                 permit_origin: None,
                 receive_buffer_bytes: None,
+                tls_handshake_timeout_secs: None,
                 acknowledgements: false.into(),
                 connection_limit: None,
             }),
@@ -1527,6 +1535,7 @@ mod integration_tests {
                     keepalive: None,
                     permit_origin: None,
                     receive_buffer_bytes: None,
+                    tls_handshake_timeout_secs: None,
                     acknowledgements: false.into(),
                     connection_limit: None,
                 }),
