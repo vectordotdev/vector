@@ -18,7 +18,6 @@ static IGNORED_PATHS: LazyLock<Vec<Pattern>> = LazyLock::new(|| {
         "*avsc",
         "*avro",
         "*pb",
-        "lib/vector-core/tests/data*",
     ]
     .into_iter()
     .map(|pattern| Pattern::new(pattern).expect("style ignore pattern should be valid"))
@@ -240,7 +239,6 @@ mod tests {
             "schema.avsc",
             "events.avro",
             "message.pb",
-            "lib/vector-core/tests/data/example.txt",
         ] {
             assert!(
                 IGNORED_PATHS.iter().any(|pattern| pattern.matches(path)),
