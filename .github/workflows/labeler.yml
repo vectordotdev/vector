@@ -1,6 +1,6 @@
 name: "Pull Request Labeler"
 on:
-  pull_request_target:
+  pull_request:
 
 concurrency:
   group: pr-labels-${{ github.event.pull_request.number }}
