@@ -12,11 +12,6 @@ This should help the reviewers give feedback faster and with higher quality. -->
 ## How did you test this PR?
 <!-- Please describe how you tested your changes. Also include any information about your setup. -->
 
-## Is this a breaking change?
-
-- [ ] Yes
-- [ ] No
-
 ## Does this PR include user facing changes?
 <!-- If this PR alters Vector behavior in any way, for example, it adds a new config field or changes internal metrics it is considered a user facing change.
 Changes to CI, website, playground and similar are generally not considered user facing -->
