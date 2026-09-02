@@ -227,14 +227,20 @@ mod tests {
     }
 
     #[test]
-    fn preserves_existing_ignore_patterns() {
+    fn ignores_configured_paths() {
         for path in [
             "image.png",
+            "image.svg",
+            "image.gif",
+            "image.ico",
+            "artifact.sig",
+            "page.html",
+            "schema.desc",
             "tests/data/example.txt",
-            "distribution/kubernetes/vector/vector.yaml",
-            "tests/helm-snapshots/vector/snapshot.yaml",
-            "lib/remap-tests/tests/example.vrl",
-            "lib/datadog/grok/patterns/example.pattern",
+            "schema.avsc",
+            "events.avro",
+            "message.pb",
+            "lib/vector-core/tests/data/example.txt",
         ] {
             assert!(
                 IGNORED_PATHS.iter().any(|pattern| pattern.matches(path)),
