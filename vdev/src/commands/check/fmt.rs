@@ -13,6 +13,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        app::set_repo_dir()?;
         style::check_all()?;
 
         info!("Checking Rust formatting...");
