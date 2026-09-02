@@ -111,53 +111,37 @@ mod tests {
     }
 
     #[test]
-    fn checks_all_features_by_default() {
-        assert_eq!(
-            args(&[], false),
-            ["clippy", "--workspace", "--all-targets", "--all-features"]
-        );
-    }
+    fn builds_feature_args() {
+        let cases: &[(&[&str], bool, &[&str])] = &[
+            (&[], false, &["--all-features"]),
+            (&[], true, &["--no-default-features"]),
+            (
+                &["sources-file"],
+                false,
+                &["--no-default-features", "--features", "sources-file"],
+            ),
+            (
+                &["default", "sources-file"],
+                false,
+                &[
+                    "--no-default-features",
+                    "--features",
+                    "default,sources-file",
+                ],
+            ),
+        ];
 
-    #[test]
-    fn treats_features_as_an_exact_set() {
-        assert_eq!(
-            args(&["sources-file"], false),
-            [
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--no-default-features",
-                "--features",
-                "sources-file",
-            ]
-        );
-    }
-
-    #[test]
-    fn allows_default_features_to_be_selected_explicitly() {
-        assert_eq!(
-            args(&["default", "sources-file"], false),
-            [
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--no-default-features",
-                "--features",
-                "default,sources-file",
-            ]
-        );
-    }
-
-    #[test]
-    fn supports_checking_with_no_features() {
-        assert_eq!(
-            args(&[], true),
-            [
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--no-default-features",
-            ]
-        );
+        for (features, no_default_features, feature_args) in cases {
+            let expected = ["clippy", "--workspace", "--all-targets"]
+                .into_iter()
+                .chain(feature_args.iter().copied())
+                .map(OsString::from)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                args(features, *no_default_features),
+                expected,
+                "features={features:?}, no_default_features={no_default_features}"
+            );
+        }
     }
 }
