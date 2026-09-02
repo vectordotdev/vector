@@ -797,8 +797,9 @@ A present but unrecognized hint returns the same error without attempting detect
 - Typed field accessors exist only on `TraceEvent`. `TraceEventCompat` does not expose
   typed accessors, so typed code cannot accidentally access an unconverted legacy event
   or enter a migration-only panic state.
-- A typed-aware sink or transform consumes `TraceEventCompat` at every trace-event
-  intake path and invokes a fallible `try_into_typed()` conversion that yields zero or
+- A converting consumer (a sink, `remap` in typed mode, or `trace_to_log`) consumes
+  `TraceEventCompat` at every trace-event intake path and invokes a fallible
+  `try_into_typed()` conversion that yields zero or
   more `TraceEvent`s. The `Typed` arm returns a one-element sequence containing its
   `TraceEvent` without migration work. The `Legacy` arm selects a source-specific
   shim from the hint or, for a hintless record, the unique format-shape detector
@@ -810,8 +811,17 @@ A present but unrecognized hint returns the same error without attempting detect
   typed event per `ScopeSpans`. A conversion error retains the original
   `LegacyTraceEvent`, including metadata and finalizers, so the caller can report and
   drop it according to normal acknowledgement semantics. There is no reverse
-  conversion. A transform that emits converted events wraps each as
+  conversion. A converting transform that emits traces wraps each result as
   `TraceEventCompat::Typed`.
+- Pass-through transforms that emit traces (`sample`, `delay`, and similar) are
+  representation-preserving: they dispatch on `TraceEventCompat` and emit the same
+  variant they received. They do not convert `Legacy` to `Typed`. Converting at
+  `sample` would send `Typed` into a downstream `remap` that still defaults to
+  `legacy` and rejects typed input, so a common `source -> sample -> remap` pipeline
+  would enter the mapping-error path as soon as `sample` migrated. On `Legacy` they
+  keep using the existing path API; on `Typed` they use typed accessors. `sample`'s
+  unit is one decision per received event, so a multi-service Datadog chunk becomes
+  one decision per `(TraceChunk, Span.service)` only when that event is already typed.
 - Successful conversion clones the original `EventMetadata` onto every resulting
   `TraceEvent`, sharing secrets, `datadog_api_key`, source identity, the
   `vector.trace_legacy_layout` hint, and `EventFinalizers`. Acknowledgements therefore
@@ -998,10 +1008,12 @@ conversion routines and detectors deleted.
   Alternatives for why a single atomic replacement was rejected.
 - Per-component shims convert `LegacyTraceEvent -> TraceEvent` only, never the reverse:
   neither the migration hint nor the typed model can reconstruct a source-specific
-  legacy layout after arbitrary transforms. Built-in consumers therefore migrate before
-  producers; removing the untyped forwarders makes omissions compile errors. User VRL
-  migrates through the explicit `remap` mode, available for an announced interval before
-  producers flip.
+  legacy layout after arbitrary transforms. Converting consumers (sinks, typed `remap`,
+  `trace_to_log`) therefore migrate before producers; pass-through transforms accept
+  both variants without converting so a `source -> sample -> remap` pipeline keeps
+  working while `remap` still defaults to `legacy`. Removing the untyped forwarders
+  makes omissions compile errors. User VRL migrates through the explicit `remap` mode,
+  available for an announced interval before producers flip.
 - Shim selection is keyed on a reserved sub-key `vector.trace_legacy_layout` in
   `EventMetadata.value` set by the producing trace source. The `vector` metadata
   namespace is read-only to VRL, so transforms between source and sink cannot
@@ -1321,9 +1333,10 @@ this RFC. Per-format shims, encoders, and source and sink flips are sequenced in
 [Datadog mapping](2026-04-29-25329-trace-data-model/datadog-mapping.md) sub-RFCs.
 Format-agnostic prerequisites land first; per-format shims may then land in either
 order; this RFC's consumer and VRL work and the compile-time gate follow; source flips
-are independent after that gate; cleanup is last. Consumers must accept
+are independent after that gate; cleanup is last. Converting consumers must accept
 `TraceEventCompat` and fallibly convert it to `TraceEvent` before any source emits
-typed events, because shims are unidirectional.
+typed events, because shims are unidirectional. Pass-through transforms must accept both
+variants without converting.
 
 The format-agnostic work is organized into six stages. A stage may span multiple PRs;
 its exit criteria, rather than a prescribed internal implementation, gate the next
@@ -1352,12 +1365,13 @@ stage.
    trace constructors, and the trace-only
    `remap.trace_representation = "typed"` mode. The transform converts legacy input
    before constructing `VrlTarget` and runs once per resulting typed event; paths never
-   convert. Then migrate `sample` and `trace_to_log`. Each typed built-in consumer
-   converts at intake and uses only `TraceEvent`.
+   convert. Then migrate `sample` and `trace_to_log`. Sinks and `trace_to_log` convert
+   at intake and use only `TraceEvent`. Pass-through transforms accept both variants
+   without converting `Legacy` to `Typed`.
    `sample` remains per-event,
    so a multi-service Datadog chunk changes from incidental whole-chunk atomicity to one
-   decision per `(TraceChunk, Span.service)` event even when the input is still a
-   pre-flip legacy chunk; `trace_to_log` emits a uniform source-independent layout.
+   decision per `(TraceChunk, Span.service)` only when the event is already typed;
+   `trace_to_log` emits a uniform source-independent layout.
    Before the next stage, every migrated consumer must accept
    both legacy and typed input and all typed VRL and round-trip contracts must hold.
 5. **Use the compile-time gate, publish migration guidance, and flip producers.** Remove
