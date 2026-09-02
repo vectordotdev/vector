@@ -93,12 +93,30 @@ fn validate_event_wrapper(wrapper: &proto::EventWrapper) -> Result<(), &'static 
                 validate_timestamp(timestamp.seconds, timestamp.nanos)?;
             }
             let value = metric.value.as_ref().ok_or("metric is missing value")?;
-            if let proto::metric::Value::Sketch(sketch) = value {
-                let sketch = sketch.sketch.as_ref().ok_or("sketch is missing value")?;
-                let proto::sketch::Sketch::AgentDdSketch(sketch) = sketch;
-                if sketch.k.len() != sketch.n.len() {
-                    return Err("sketch bin keys and counts have different lengths");
+            match value {
+                proto::metric::Value::Distribution1(distribution)
+                    if distribution.values.len() != distribution.sample_rates.len() =>
+                {
+                    return Err("distribution values and sample rates have different lengths");
                 }
+                proto::metric::Value::AggregatedHistogram1(histogram)
+                    if histogram.buckets.len() != histogram.counts.len() =>
+                {
+                    return Err("histogram buckets and counts have different lengths");
+                }
+                proto::metric::Value::AggregatedSummary1(summary)
+                    if summary.quantiles.len() != summary.values.len() =>
+                {
+                    return Err("summary quantiles and values have different lengths");
+                }
+                proto::metric::Value::Sketch(sketch) => {
+                    let sketch = sketch.sketch.as_ref().ok_or("sketch is missing value")?;
+                    let proto::sketch::Sketch::AgentDdSketch(sketch) = sketch;
+                    if sketch.k.len() != sketch.n.len() {
+                        return Err("sketch bin keys and counts have different lengths");
+                    }
+                }
+                _ => {}
             }
             validate_optional_value(metric.metadata.as_ref())?;
             validate_metadata(metric.metadata_full.as_ref())
