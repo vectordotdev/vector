@@ -49,7 +49,9 @@ pub(crate) fn fix_changed() -> Result<()> {
 
     for file in files {
         let contents = fs::read(&file).with_context(|| format!("Could not read {file}"))?;
-        let fixed = fix(&contents);
+        let Some(fixed) = fix_text(&contents) else {
+            continue;
+        };
         if contents != fixed {
             fs::write(&file, fixed).with_context(|| format!("Could not update {file}"))?;
         }
@@ -65,6 +67,9 @@ fn check(files: Vec<String>) -> Result<()> {
     let mut failed = false;
     for file in files {
         let contents = fs::read(&file).with_context(|| format!("Could not read {file}"))?;
+        if is_binary(&contents) {
+            continue;
+        }
         let issues = inspect(&contents);
 
         if issues.missing_newline {
@@ -124,6 +129,14 @@ fn inspect(contents: &[u8]) -> Issues {
     }
 
     issues
+}
+
+fn is_binary(contents: &[u8]) -> bool {
+    contents.contains(&b'\0') || std::str::from_utf8(contents).is_err()
+}
+
+fn fix_text(contents: &[u8]) -> Option<Vec<u8>> {
+    (!is_binary(contents)).then(|| fix(contents))
 }
 
 fn fix(contents: &[u8]) -> Vec<u8> {
@@ -188,6 +201,12 @@ mod tests {
         assert_eq!(fix(b"clean\n"), b"clean\n");
         assert_eq!(fix(b"   "), b"\n");
         assert_eq!(inspect(b"clean\n"), Issues::default());
+    }
+
+    #[test]
+    fn excludes_binary_content_from_fixes() {
+        assert_eq!(fix_text(b"binary\0payload "), None);
+        assert_eq!(fix_text(&[0xff, b' ']), None);
     }
 
     #[test]
