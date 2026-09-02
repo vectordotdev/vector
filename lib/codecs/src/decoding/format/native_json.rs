@@ -190,6 +190,30 @@ mod test {
             json!({"event": {"log": {}}}),
             json!({"event": {"log": {"value": {}}}}),
             json!({"event": {"metric": {"name": "missing-value"}}}),
+            json!({
+                "event": {
+                    "metric": {
+                        "name": "mismatched-distribution",
+                        "distribution1": {"values": [1.0, 2.0], "sampleRates": [1]}
+                    }
+                }
+            }),
+            json!({
+                "event": {
+                    "metric": {
+                        "name": "mismatched-histogram",
+                        "aggregatedHistogram1": {"buckets": [1.0, 2.0], "counts": [1]}
+                    }
+                }
+            }),
+            json!({
+                "event": {
+                    "metric": {
+                        "name": "mismatched-summary",
+                        "aggregatedSummary1": {"quantiles": [0.5, 0.9], "values": [1.0]}
+                    }
+                }
+            }),
             json!({"event": {"metric": {"name": "missing-sketch", "sketch": {}}}}),
             json!({
                 "event": {

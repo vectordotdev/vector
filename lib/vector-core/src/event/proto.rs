@@ -218,7 +218,9 @@ impl From<Metric> for super::Metric {
 
         let name = metric.name;
 
-        let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
+        let namespace = metric
+            .namespace_v2
+            .or_else(|| (!metric.namespace.is_empty()).then_some(metric.namespace));
 
         // Sign can never be lost as ts.nanos is always non negative (per proto spec)
         #[allow(clippy::cast_sign_loss)]
@@ -482,6 +484,7 @@ impl From<super::Metric> for WithMetadata<Metric> {
         let data = Metric {
             name,
             namespace,
+            namespace_v2: None,
             timestamp,
             tags_v1,
             tags_v2,
@@ -543,7 +546,14 @@ impl EventWrapper {
                 };
                 Event::Log(log)
             }
-            super::Event::Metric(metric) => Event::Metric(metric.into()),
+            super::Event::Metric(metric) => {
+                let has_namespace = metric.namespace().is_some();
+                let mut metric: Metric = metric.into();
+                if has_namespace {
+                    metric.namespace_v2 = Some(std::mem::take(&mut metric.namespace));
+                }
+                Event::Metric(metric)
+            }
             super::Event::Trace(trace) => Event::Trace(trace.into()),
         };
 
@@ -994,6 +1004,31 @@ mod tests {
         assert!(native.value.is_none());
         assert!(native_json.fields.is_empty());
         assert!(native_json.value.is_some());
+    }
+
+    #[test]
+    fn native_json_metric_encoding_preserves_empty_namespace_presence() {
+        let event = crate::event::Event::Metric(
+            crate::event::Metric::new(
+                "requests",
+                crate::event::MetricKind::Absolute,
+                EventMetricValue::Counter { value: 1.0 },
+            )
+            .with_namespace(Some(String::new())),
+        );
+
+        let native = EventWrapper::from(event.clone()).event.unwrap();
+        let native_json = EventWrapper::from_event_for_native_json(event)
+            .event
+            .unwrap();
+        let (Event::Metric(native), Event::Metric(native_json)) = (native, native_json) else {
+            panic!("event wrappers did not contain metrics");
+        };
+
+        assert!(native.namespace.is_empty());
+        assert_eq!(native.namespace_v2, None);
+        assert!(native_json.namespace.is_empty());
+        assert_eq!(native_json.namespace_v2, Some(String::new()));
     }
 
     #[test]

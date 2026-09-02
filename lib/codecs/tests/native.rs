@@ -325,6 +325,35 @@ fn native_proto_preserves_legacy_object_nesting_headroom() {
 }
 
 #[test]
+fn native_json_preserves_explicit_empty_metric_namespace() {
+    let expected = Event::Metric(
+        Metric::new(
+            "requests",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_namespace(Some(String::new())),
+    );
+    let mut encoded = BytesMut::new();
+    NativeJsonSerializerConfig
+        .build()
+        .encode(expected.clone(), &mut encoded)
+        .unwrap();
+
+    let json: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+    assert_eq!(
+        json.pointer("/event/metric/namespaceV2"),
+        Some(&serde_json::Value::String(String::new()))
+    );
+
+    let mut decoded = NativeJsonDeserializerConfig::default()
+        .build()
+        .parse(encoded.freeze(), LogNamespace::Legacy)
+        .unwrap();
+    assert_eq!(decoded.pop(), Some(expected));
+}
+
+#[test]
 fn native_json_decodes_legacy_u32_metric_counts() {
     let input = Bytes::from_static(
         br#"{"metric":{"name":"requests","kind":"absolute","aggregated_histogram":{"buckets":[{"upper_limit":1.0,"count":4294967295}],"count":4294967295,"sum":2.0}}}"#,
