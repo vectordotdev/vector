@@ -17,7 +17,7 @@ VECTOR_VERSION="${VECTOR_VERSION#v}"
 
 # If PACKAGE_ROOT is unset or empty, use the public COSE release bucket.
 # PACKAGE_ROOT remains an override for package mirrors.
-PACKAGE_ROOT="${PACKAGE_ROOT:-"https://dd-cose-releases.s3.amazonaws.com/vector"}"
+PACKAGE_ROOT="${PACKAGE_ROOT:-"https://install.datadoghq.com/vector"}"
 PACKAGE_URL="${PACKAGE_ROOT}/${VECTOR_VERSION}"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"

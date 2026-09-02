@@ -33,9 +33,9 @@ allocator which is a sensible default otherwise. As we have a better understandi
 likely we will revisit this decision.
 
 [0_14]: /releases/0.14.0
-[0_14_musl_aarch64]: https://dd-cose-releases.s3.amazonaws.com/vector/0.14.0/vector-0.14.0-aarch64-unknown-linux-musl.tar.gz
-[0_14_musl_armv7]: https://dd-cose-releases.s3.amazonaws.com/vector/0.14.0/vector-0.14.0-armv7-unknown-linux-musleabihf.tar.gz
-[0_14_musl_x86_64]: https://dd-cose-releases.s3.amazonaws.com/vector/0.14.0/vector-0.14.0-x86_64-unknown-linux-musl.tar.gz
+[0_14_musl_aarch64]: https://install.datadoghq.com/vector/0.14.0/vector-0.14.0-aarch64-unknown-linux-musl.tar.gz
+[0_14_musl_armv7]: https://install.datadoghq.com/vector/0.14.0/vector-0.14.0-armv7-unknown-linux-musleabihf.tar.gz
+[0_14_musl_x86_64]: https://install.datadoghq.com/vector/0.14.0/vector-0.14.0-x86_64-unknown-linux-musl.tar.gz
 [gnu_allocator]: https://www.gnu.org/software/libc/manual/html_node/The-GNU-Allocator.html
 [jemalloc]: https://github.com/jemalloc/jemalloc
 [musl_allocator]: https://musl.libc.org/releases.html

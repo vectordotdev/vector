@@ -607,7 +607,7 @@ urls: {
 	vector_msi_source_files:                    "\(vector_repo)/tree/master/distribution/msi"
 	vector_new_relic_sink:                      "/docs/reference/configuration/sinks/new_relic/"
 	vector_nix_package:                         "\(github)/NixOS/nixpkgs/blob/master/pkgs/tools/misc/vector/default.nix"
-	vector_packages_root:                       "https://dd-cose-releases.s3.amazonaws.com"
+	vector_packages_root:                       "https://install.datadoghq.com"
 	vector_performance:                         "\(vector_repo)/#performance"
 	vector_privacy_policy:                      "\(vector_repo)/blob/master/PRIVACY.md"
 	vector_pull_requests:                       "\(vector_repo)/pulls"
