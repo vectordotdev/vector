@@ -17,7 +17,6 @@ static IGNORED_PATHS: LazyLock<Vec<Pattern>> = LazyLock::new(|| {
         "tests/data*",
         "lib/codecs/tests/data*",
         "lib/vector-core/tests/data*",
-        "distribution/kubernetes/*/*.yaml",
         "tests/helm-snapshots/*/snapshot.yaml",
         "lib/remap-tests/tests/*.vrl",
         "lib/datadog/grok/patterns/*.pattern",
