@@ -13,6 +13,7 @@ use chrono::{
     FixedOffset, Utc,
     format::{Item, strftime::StrftimeItems},
 };
+use derive_more::Display;
 use http::Uri;
 use regex::Regex;
 
@@ -110,7 +111,8 @@ pub fn confined_preview(rendered: &str) -> String {
 /// event that is used as the input data when rendering the template.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
-#[derive(Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Default, Display, PartialEq, Eq, Hash)]
+#[display("{src}")]
 #[serde(try_from = "String", into = "String")]
 pub struct UnconfinedTemplate {
     src: String,
@@ -137,7 +139,8 @@ pub struct UnconfinedTemplate {
 ///
 /// Both fields are private to this module, so a `ConfinedTemplate` can
 /// never be constructed (or deserialized) without going through confinement.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Display, PartialEq, Eq, Hash)]
+#[display("{inner}")]
 pub struct ConfinedTemplate {
     inner: UnconfinedTemplate,
     checker: Option<ConfinementChecker>,
@@ -163,7 +166,7 @@ pub use confined::ConfinedUriTemplate;
 /// confinement boundary, should store [`UnconfinedTemplate`] directly instead.
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, Display, PartialEq, Eq, Hash)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
     inner: UnconfinedTemplate,
@@ -179,7 +182,7 @@ pub struct Template {
 /// There is deliberately no conversion from `Template`: a `UriTemplate` originates only from
 /// string parsing, `Default`, or deserialization, so the URI-ness of a field is fixed by its
 /// declared config type.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, Display, PartialEq, Eq, Hash)]
 #[configurable_component]
 #[configurable(metadata(docs::templateable))]
 pub struct UriTemplate(Template);

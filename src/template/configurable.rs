@@ -70,12 +70,6 @@ impl Template {
     }
 }
 
-impl fmt::Display for Template {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
-    }
-}
-
 impl From<UnconfinedTemplate> for Template {
     fn from(inner: UnconfinedTemplate) -> Self {
         Template { inner }
@@ -155,12 +149,6 @@ impl UriTemplate {
                 })
             })
             .map_err(Into::into)
-    }
-}
-
-impl fmt::Display for UriTemplate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
     }
 }
 

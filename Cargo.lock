@@ -13373,6 +13373,7 @@ dependencies = [
  "databricks-zerobus-ingest-sdk",
  "deadpool 0.13.0",
  "derivative",
+ "derive_more",
  "dirs-next",
  "dnsmsg-parser",
  "dnstap-parser",

@@ -1,3 +1,5 @@
+use derivative::Derivative;
+
 use super::*;
 
 impl fmt::Debug for ConfinedTemplate {
@@ -6,12 +8,6 @@ impl fmt::Debug for ConfinedTemplate {
             .field("inner", &self.inner)
             .field("confinement", &self.checker.as_ref().map(|_| "<fn>"))
             .finish()
-    }
-}
-
-impl fmt::Display for ConfinedTemplate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
     }
 }
 
@@ -78,24 +74,13 @@ impl ConfinedTemplate {
 /// [`ConfinedTemplate`] can never be wired into a URI field. Rendering forwards
 /// to the inner [`ConfinedTemplate`], whose checker enforces URI-specific
 /// confinement at render time.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Derivative, Clone, Display, PartialEq, Eq, Hash)]
+#[derivative(Debug = "transparent")]
 pub struct ConfinedUriTemplate(ConfinedTemplate);
 
 impl ConfinedUriTemplate {
     pub(super) const fn new(inner: ConfinedTemplate) -> Self {
         Self(inner)
-    }
-}
-
-impl fmt::Debug for ConfinedUriTemplate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl fmt::Display for ConfinedUriTemplate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
     }
 }
 
