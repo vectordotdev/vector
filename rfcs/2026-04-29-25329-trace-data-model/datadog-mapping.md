@@ -501,7 +501,11 @@ Because proto3 provides no scalar presence for `TraceChunk.priority`, every deco
 wire value maps to `Some(SamplingPriority)`: zero is `Some(AutoReject)`, known non-zero
 values use their canonical variants, and other `i32` values use `Other`. `None` is
 reserved for events with no source priority, such as an OTLP event without recovered
-Datadog chunk state. On Datadog egress, `None` emits the wire default zero.
+Datadog chunk state. On Datadog egress, that `None` emits `AutoKeep` (wire 1), matching
+today's `datadog_traces` sink and the Datadog Agent OTLP ingest at its default sampling
+rate. Wire `0` is reserved for an explicit `AutoReject`. Emitting the proto3 default
+zero for a missing priority would mark ordinary OTLP traces as `AutoReject` and can
+cause the Datadog backend to discard them.
 
 VRL access:
 
@@ -663,12 +667,14 @@ TracerPayload-envelope-equivalent `Resource` into one `TracerPayload`, with each
   tracer context therefore emits an empty map.
 
 **`TraceChunk` grouping and re-coalescence.** Before grouping, map
-`datadog.chunk = None` to `DatadogChunkContext::default()`; this synthesizes the
-Datadog wire's required chunk envelope
-without claiming that one existed on the input. Within each `TracerPayload`, group spans
-across events by the effective `DatadogChunkContext` plus `trace_id`, and emit one
-`TraceChunk` per group. `None` and `Some(DatadogChunkContext::default())` therefore
-share an egress group.
+`datadog.chunk = None` to a synthesized `DatadogChunkContext` whose other fields are
+default and whose missing `priority` is treated as the egress value `AutoKeep`.
+Grouping keys use that same effective priority, so `None` and
+`Some(DatadogChunkContext::default())` share an egress group as `AutoKeep`. Within each
+`TracerPayload`, group spans across events by the effective `DatadogChunkContext` plus
+`trace_id`, and emit one `TraceChunk` per group. An explicit `Some(AutoReject)`,
+including a Datadog-decoded all-default chunk whose wire priority was `0`, does not share
+that group.
 
 - Empty events: an event whose `spans` vector is empty contributes no spans to any
   group; it emits one additional `TraceChunk` whose `priority`, `origin`, `tags`, and
@@ -711,6 +717,10 @@ the Glossary, is the reference for these derivations:
   `targetTPS`, `errorTPS`, `rareSamplerEnabled`, agent-level `tags`) because the OTLP
   input has none, matching the Datadog Agent's own behaviour when serving as an OTLP
   receiver.
+- Chunk priority when `.datadog.chunk` is absent or `.datadog.chunk.priority` is `None`
+  emits `AutoKeep` (wire 1). Vector does not implement the Agent's probabilistic OTLP
+  sampler; this matches today's `datadog_traces` sink and the Agent converter at its
+  default sampling rate.
 
 The rest follows this RFC's explicit typed mapping. In particular, Vector emits
 `SpanEvent` and `SpanLink` through their native Datadog protobuf fields and preserves a

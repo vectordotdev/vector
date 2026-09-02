@@ -368,9 +368,13 @@ malformed span-level key or nested member saturating-increments
 `Span.dropped_attributes_count`. The reserved attribute is stripped in every case, and
 valid sibling keys continue to lift.
 
-Chunk keys are synthesized only when `TraceEvent.datadog.chunk` is `Some`; optional or
-default-valued fields within that context are omitted. An all-default `Some` therefore
-emits no chunk keys and re-ingests as `None`; preserving Datadog chunk presence through
+Chunk keys are synthesized only when `TraceEvent.datadog.chunk` is `Some`. Optional or
+default-valued fields within that context are omitted, except `datadog.chunk.priority`:
+that key is emitted whenever `priority` is `Some`, including `AutoReject` (wire `0`).
+Omitting `0` as a proto3 default would make an explicit reject indistinguishable from a
+missing priority after an OTLP hop, and Datadog egress of a missing priority is
+`AutoKeep`. An all-default `Some` with `priority = None` therefore still emits no chunk
+keys and re-ingests as `None`; preserving Datadog chunk presence through
 an OTLP hop is part of the explicitly best-effort cross-format path, not the OTLP
 round-trip guarantee. Optional span fields are likewise omitted when `None`.
 
