@@ -1,0 +1,120 @@
+name: Tag approved release
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "Cargo.toml"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: release-autotag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Validate merge and create release tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Create Vector bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Checkout pushed commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Validate release transition
+        id: validation
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          current=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
+          previous=$(git show "$BEFORE_SHA":Cargo.toml | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -1)
+
+          if [[ "$current" == *-dev ]]; then
+            echo "Development transition $previous -> $current; no release tag required."
+            echo "tag_required=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ ! "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$previous" != "${current}-dev" ]]; then
+            echo "Invalid release transition $previous -> $current" >&2
+            exit 1
+          fi
+
+          while IFS= read -r file; do
+            case "$file" in
+              .github/release-metadata.json | \
+              Cargo.lock | \
+              Cargo.toml | \
+              distribution/docker/alpine/Dockerfile | \
+              distribution/docker/debian/Dockerfile | \
+              distribution/install.sh | \
+              website/cue/reference/administration/interfaces/kubectl.cue | \
+              website/cue/reference/versions.cue | \
+              changelog.d/*.md | \
+              website/content/en/highlights/*.md | \
+              website/content/en/releases/*.md | \
+              website/cue/reference/releases/*.cue)
+                ;;
+              *)
+                echo "Unexpected release merge file: $file" >&2
+                exit 1
+                ;;
+            esac
+          done < <(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")
+
+          jq -e \
+            --arg version "$current" \
+            --arg prepared_from "$BEFORE_SHA" \
+            '.schema_version == 1 and
+             .status == "prepared" and
+             .version == $version and
+             .prepared_from == $prepared_from' \
+            .github/release-metadata.json >/dev/null
+
+          pr_count=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+            --jq "[.[] | select(.merged_at != null and .base.ref == \"master\" and .head.ref == \"release/prepare-v${current}\" and .head.repo.full_name == \"${GITHUB_REPOSITORY}\" and .merge_commit_sha == \"${GITHUB_SHA}\")] | length")
+          if [[ "$pr_count" != "1" ]]; then
+            echo "Expected one merged preparation PR for $GITHUB_SHA, found $pr_count" >&2
+            exit 1
+          fi
+
+          tag="v${current}"
+          existing=$(git rev-parse --verify --quiet "refs/tags/${tag}" || true)
+          if [[ -n "$existing" && "$existing" != "$GITHUB_SHA" ]]; then
+            echo "Tag $tag already points to $existing" >&2
+            exit 1
+          fi
+
+          echo "tag_required=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag with Vector bot token
+        if: steps.validation.outputs.tag_required == 'true'
+        env:
+          TAG: ${{ steps.validation.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify --quiet "refs/tags/${TAG}"; then
+            echo "$TAG already points at $GITHUB_SHA"
+            exit 0
+          fi
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"

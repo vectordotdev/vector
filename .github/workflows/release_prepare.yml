@@ -1,0 +1,182 @@
+name: Prepare release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable Vector version to prepare, for example 0.59.0
+        required: true
+        type: string
+      next_version:
+        description: Development version for housekeeping, for example 0.60.0-dev
+        required: true
+        type: string
+      vrl_version:
+        description: Released VRL version to pin, for example 0.28.0
+        required: true
+        type: string
+      alpine_version:
+        description: Optional Alpine base image version
+        required: false
+        type: string
+      debian_version:
+        description: Optional Debian base image version
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-prepare
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Open release preparation PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Create Vector bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Checkout master
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Validate requested release
+        id: preflight
+        env:
+          BOT_APP: ${{ steps.app-token.outputs.app-slug }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ inputs.version }}
+          NEXT_VERSION: ${{ inputs.next_version }}
+          VRL_VERSION: ${{ inputs.vrl_version }}
+        run: |
+          set -euo pipefail
+
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$NEXT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev$ ]]
+          [[ "$VRL_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+
+          current=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
+          if [[ "$current" != "${VERSION}-dev" ]]; then
+            echo "Expected Cargo.toml version ${VERSION}-dev, found $current" >&2
+            exit 1
+          fi
+
+          jq -e --arg version "$current" \
+            '.schema_version == 1 and .status == "development" and .version == $version' \
+            .github/release-metadata.json >/dev/null
+
+          if git rev-parse --verify --quiet "refs/tags/v${VERSION}"; then
+            echo "Tag v${VERSION} already exists" >&2
+            exit 1
+          fi
+
+          branch="release/prepare-v${VERSION}"
+          existing=$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --head "$branch" \
+            --base master \
+            --app "$BOT_APP" \
+            --state open \
+            --json isCrossRepository,url \
+            --jq '[.[] | select(.isCrossRepository == false)][0].url // empty')
+          if [[ -n "$existing" ]]; then
+            echo "Preparation PR already exists: $existing"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Existing preparation PR: $existing" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "Branch $branch exists without an open PR" >&2
+            exit 1
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Set up release tooling
+        if: steps.preflight.outputs.skip != 'true'
+        uses: ./.github/actions/setup
+        with:
+          cue: true
+          vdev: true
+
+      - name: Configure Git
+        if: steps.preflight.outputs.skip != 'true'
+        run: |
+          git config user.name "vectordotdev-bot[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+
+      - name: Generate release changes
+        if: steps.preflight.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ inputs.version }}
+          NEXT_VERSION: ${{ inputs.next_version }}
+          VRL_VERSION: ${{ inputs.vrl_version }}
+          ALPINE_VERSION: ${{ inputs.alpine_version }}
+          DEBIAN_VERSION: ${{ inputs.debian_version }}
+        run: |
+          set -euo pipefail
+
+          args=(
+            release prepare
+            --version "$VERSION"
+            --next-version "$NEXT_VERSION"
+            --vrl-version "$VRL_VERSION"
+            --dry-run
+          )
+          if [[ -n "$ALPINE_VERSION" ]]; then
+            args+=(--alpine-version "$ALPINE_VERSION")
+          fi
+          if [[ -n "$DEBIAN_VERSION" ]]; then
+            args+=(--debian-version "$DEBIAN_VERSION")
+          fi
+
+          cargo vdev "${args[@]}"
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Push preparation branch
+        if: steps.preflight.outputs.skip != 'true'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: git push --set-upstream origin "HEAD:release/prepare-v${VERSION}"
+
+      - name: Open preparation PR
+        if: steps.preflight.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ inputs.version }}
+          NEXT_VERSION: ${{ inputs.next_version }}
+          VRL_VERSION: ${{ inputs.vrl_version }}
+        run: |
+          set -euo pipefail
+
+          url=$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base master \
+            --head "release/prepare-v${VERSION}" \
+            --title "chore(releasing): prepare v${VERSION}" \
+            --label no-changelog \
+            --body "Automated preparation for Vector v${VERSION}.
+
+          - Changes \`${VERSION}-dev\` to \`${VERSION}\`.
+          - Pins VRL to \`${VRL_VERSION}\` and generates the release files.
+          - Records \`${NEXT_VERSION}\` for post-release housekeeping.
+          - Must be squash-merged into \`master\`.
+
+          After merge, the autotag workflow will create \`v${VERSION}\` at the approved squash commit.")
+
+          echo "Opened $url" >> "$GITHUB_STEP_SUMMARY"

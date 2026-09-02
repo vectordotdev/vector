@@ -1,0 +1,111 @@
+name: Validate release PR
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - ".github/release-metadata.json"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "changelog.d/**"
+      - "distribution/docker/**"
+      - "distribution/install.sh"
+      - "website/content/en/highlights/**"
+      - "website/content/en/releases/**"
+      - "website/cue/reference/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release state transition
+    if: >-
+      startsWith(github.event.pull_request.head.ref, 'release/prepare-v') ||
+      startsWith(github.event.pull_request.head.ref, 'release/housekeeping-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate files, metadata, and versions
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          base_version=$(git show "$BASE_SHA":Cargo.toml | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -1)
+          head_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
+
+          if [[ "$HEAD_REF" == release/prepare-v* ]]; then
+            version=${HEAD_REF#release/prepare-v}
+            [[ "$base_version" == "${version}-dev" ]]
+            [[ "$head_version" == "$version" ]]
+
+            while IFS= read -r file; do
+              case "$file" in
+                .github/release-metadata.json | \
+                Cargo.lock | \
+                Cargo.toml | \
+                distribution/docker/alpine/Dockerfile | \
+                distribution/docker/debian/Dockerfile | \
+                distribution/install.sh | \
+                website/cue/reference/administration/interfaces/kubectl.cue | \
+                website/cue/reference/versions.cue | \
+                changelog.d/*.md | \
+                website/content/en/highlights/*.md | \
+                website/content/en/releases/*.md | \
+                website/cue/reference/releases/*.cue)
+                  ;;
+                *)
+                  echo "Unexpected release preparation file: $file" >&2
+                  exit 1
+                  ;;
+              esac
+            done < <(git diff --name-only "$BASE_SHA" HEAD)
+
+            jq -e \
+              --arg version "$version" \
+              --arg prepared_from "$BASE_SHA" \
+              '.schema_version == 1 and
+               .status == "prepared" and
+               .version == $version and
+               .prepared_from == $prepared_from and
+               (.next_version | test("^[0-9]+\\.[0-9]+\\.[0-9]+-dev$")) and
+               (.vrl_version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and
+               (.release_date | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))' \
+              .github/release-metadata.json >/dev/null
+            test -f "website/cue/reference/releases/${version}.cue"
+          else
+            version=${HEAD_REF#release/housekeeping-v}
+            next_version=$(git show "$BASE_SHA":.github/release-metadata.json | jq -r '.next_version')
+            [[ "$base_version" == "$version" ]]
+            [[ "$head_version" == "$next_version" ]]
+
+            actual=$(git diff --name-only "$BASE_SHA" HEAD | sort)
+            expected=$'.github/release-metadata.json\nCargo.lock\nCargo.toml'
+            if [[ "$actual" != "$expected" ]]; then
+              echo "Unexpected housekeeping files:" >&2
+              printf '%s\n' "$actual" >&2
+              exit 1
+            fi
+
+            jq -e \
+              --arg next_version "$next_version" \
+              --arg version "$version" \
+              '.schema_version == 1 and
+               .status == "development" and
+               .version == $next_version and
+               .last_release.version == $version and
+               .last_release.tag == ("v" + $version) and
+               (.last_release.commit | test("^[0-9a-f]{40}$"))' \
+              .github/release-metadata.json >/dev/null
+          fi
+
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
