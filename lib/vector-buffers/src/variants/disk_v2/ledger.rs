@@ -236,13 +236,13 @@ where
     config: DiskBufferConfig<FS>,
     // Advisory lock for this buffer directory.
     #[allow(dead_code)]
-    lock: LockFile,
+    lock: Arc<LockFile>,
     // Ledger state.
     state: BackedArchive<FS::MutableMemoryMap, LedgerState>,
     // The total size, in bytes, of all unread records in the buffer.
     total_buffer_size: AtomicU64,
     // Notifier for reader-related progress.
-    reader_notify: Notify,
+    reader_notify: Arc<Notify>,
     // Notifier for writer-related progress.
     writer_notify: Notify,
     // Tracks when writer has fully shutdown.
@@ -500,6 +500,10 @@ where
         self.reader_notify.notified().await;
     }
 
+    pub fn reader_notifier(&self) -> Arc<Notify> {
+        Arc::clone(&self.reader_notify)
+    }
+
     /// Waits for a signal from the writer that progress has been made.
     ///
     /// This will occur when a record is written, or when a new data file is created.
@@ -534,18 +538,8 @@ where
         next_record_id
     }
 
-    /// Tracks events that arrived at the buffer but were rejected before being
-    /// persisted (e.g. `Bufferable::filter_unencodable` dropping over-budget
-    /// sub-items). Bumps both `received` and the unintentional-`dropped` counter
-    /// on the usage handle so `buffer_size = received - sent - dropped` stays
-    /// consistent and operators can see the rejection in buffer-usage metrics.
-    /// `total_buffer_size` is intentionally left alone — these events never
-    /// reached disk.
-    pub fn track_dropped(&self, event_count: u64, byte_size: u64) {
-        self.usage_handle
-            .increment_received_event_count_and_byte_size(event_count, byte_size);
-        self.usage_handle
-            .increment_dropped_event_count_and_byte_size(event_count, byte_size, false);
+    pub fn usage_handle(&self) -> BufferUsageHandle {
+        self.usage_handle.clone()
     }
 
     /// Tracks the statistics of multiple successful reads.
@@ -731,7 +725,7 @@ where
     /// operations, an error variant will be returned describing the error.
     #[cfg_attr(test, instrument(skip_all, level = "trace"))]
     pub(super) async fn load_or_create(
-        config: DiskBufferConfig<FS>,
+        mut config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
     ) -> Result<Ledger<FS>, LedgerLoadCreateError> {
         // Create our containing directory if it doesn't already exist.
@@ -751,6 +745,12 @@ where
         if !lock.try_lock().context(IoSnafu)? {
             return Err(LedgerLoadCreateError::LedgerLockAlreadyHeld);
         }
+        let lock = Arc::new(lock);
+        // Production blocking writes take a lease on this lock before leaving the async runtime.
+        let session_guard: Arc<dyn Send + Sync> = lock.clone();
+        config
+            .filesystem
+            .bind_buffer_session(Arc::downgrade(&session_guard));
 
         // Open the ledger file, which may involve creating it if it doesn't yet exist.
         let ledger_path = config.data_dir.join("buffer.db");
@@ -816,7 +816,7 @@ where
             lock,
             state: ledger_state,
             total_buffer_size: AtomicU64::new(0),
-            reader_notify: Notify::new(),
+            reader_notify: Arc::new(Notify::new()),
             writer_notify: Notify::new(),
             writer_done: AtomicBool::new(false),
             pending_acks: AtomicU64::new(0),

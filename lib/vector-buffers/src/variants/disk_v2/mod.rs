@@ -193,9 +193,12 @@ mod ser;
 mod writer;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
+#[cfg(test)]
+pub(crate) use self::io::{StalledWrites, TestWriteGate};
 
 use self::ledger::Ledger;
+pub(crate) use self::writer::CapacityProgress;
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
     io::{Filesystem, ProductionFilesystem},

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{path::Path, time::Duration};
 
 use metrics::Histogram;
 use vector_common::NamedInternalEvent;
@@ -7,6 +7,49 @@ use vector_common::{
     internal_event::{CounterName, GaugeName, HistogramName, InternalEvent, error_type},
     registered_event,
 };
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct DiskBufferBackpressure<'a> {
+    pub operation: &'static str,
+    pub error: &'a std::io::Error,
+    pub retry_delay: Duration,
+    pub buffer_path: &'a Path,
+}
+
+impl InternalEvent for DiskBufferBackpressure<'_> {
+    fn emit(self) {
+        warn!(
+            message = "Disk buffer is waiting for filesystem capacity.",
+            operation = self.operation,
+            error = %self.error,
+            error_kind = ?self.error.kind(),
+            retry_delay_ms = self.retry_delay.as_millis(),
+            buffer_path = %self.buffer_path.display(),
+            internal_log_rate_limit = false,
+        );
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct DiskBufferBackpressureRecovered<'a> {
+    pub operation: &'static str,
+    pub retries: u64,
+    pub duration: Duration,
+    pub buffer_path: &'a Path,
+}
+
+impl InternalEvent for DiskBufferBackpressureRecovered<'_> {
+    fn emit(self) {
+        info!(
+            message = "Disk buffer filesystem capacity recovered.",
+            operation = self.operation,
+            retries = self.retries,
+            duration_ms = self.duration.as_millis(),
+            buffer_path = %self.buffer_path.display(),
+            internal_log_rate_limit = false,
+        );
+    }
+}
 
 #[derive(NamedInternalEvent)]
 pub struct BufferCreated {

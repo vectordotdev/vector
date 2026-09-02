@@ -2,11 +2,13 @@ use std::{
     cmp::Ordering,
     convert::Infallible as StdInfallible,
     fmt,
+    future::Future,
     io::{self, ErrorKind},
     marker::PhantomData,
     num::NonZeroUsize,
     path::Path,
     sync::Arc,
+    time::Instant,
 };
 
 use bytes::BufMut;
@@ -22,25 +24,33 @@ use rkyv::{
     },
 };
 use snafu::{ResultExt, Snafu};
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use tokio::time::{Duration, sleep};
 
 use super::{
     common::{DiskBufferConfig, create_crc32c_hasher},
-    io::Filesystem,
+    io::{Filesystem, is_filesystem_full},
     ledger::Ledger,
     record::{Record, RecordStatus, validate_record_archive},
 };
 
 use crate::{
     Bufferable,
+    buffer_usage_data::BufferUsageHandle,
     encoding::{AsMetadata, Encodable},
+    internal_events::{DiskBufferBackpressure, DiskBufferBackpressureRecovered},
     variants::disk_v2::{
         io::AsyncFile,
         reader::{ReadToken, ReaderError, RecordReader, decode_record_payload},
         record::{RECORD_HEADER_LEN, try_as_record_archive},
     },
 };
-use vector_common::finalization::{EventFinalizerGroups, EventStatus};
+use vector_common::{
+    finalization::{EventFinalizerGroups, EventStatus},
+    internal_event::emit,
+};
+
+const FILESYSTEM_FULL_RETRY_INITIAL: Duration = Duration::from_millis(100);
+const FILESYSTEM_FULL_RETRY_MAX: Duration = Duration::from_secs(5);
 
 /// Error that occurred during calls to [`BufferWriter`].
 #[derive(Debug, Snafu)]
@@ -245,6 +255,9 @@ pub enum TryWriteOutcome<T> {
     Written,
     /// The buffer is currently full; the record is returned for retry or discard.
     Full(T),
+    /// The record is owned by the writer because some of its bytes may already have been written.
+    /// The caller must not retry or route another copy of it.
+    Pending,
     /// The record permanently exceeded the maximum record size and was dropped.
     ///
     /// Its finalizers have already been resolved as [`EventStatus::Dropped`] (equivalent to
@@ -258,17 +271,12 @@ pub enum TryWriteOutcome<T> {
 ///
 /// Used in `try_write_record_inner` so that every `?` exit automatically notifies acking sources
 /// to nack / withhold checkpoints for any record that did not reach durable storage.
-struct FinalizerGuard {
-    finalizers: EventFinalizerGroups,
-    error_on_drop: bool,
-}
+#[derive(Debug)]
+struct FinalizerGuard(Option<EventFinalizerGroups>);
 
 impl FinalizerGuard {
     fn new(finalizers: EventFinalizerGroups) -> Self {
-        Self {
-            finalizers,
-            error_on_drop: true,
-        }
+        Self(Some(finalizers))
     }
 
     /// Releases the guard without marking finalizers as errored.
@@ -276,28 +284,94 @@ impl FinalizerGuard {
     /// Call when the record was intentionally dropped (unwritable) or successfully flushed to
     /// disk — both cases where the upstream source should ack rather than retry.
     fn disarm(mut self) {
-        self.error_on_drop = false;
+        self.0.take();
     }
 
     /// Returns the finalizers for reattachment to the recovered record on buffer-full retry.
     fn into_inner(mut self) -> EventFinalizerGroups {
-        self.error_on_drop = false;
-        std::mem::take(&mut self.finalizers)
+        self.0.take().expect("finalizers must exist")
     }
 }
 
 impl Drop for FinalizerGuard {
     fn drop(&mut self) {
-        if self.error_on_drop {
-            self.finalizers.update_status(EventStatus::Errored);
+        if let Some(finalizers) = self.0.as_mut() {
+            finalizers.update_status(EventStatus::Errored);
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct WriteToken {
     event_count: usize,
     serialized_len: usize,
+}
+
+#[derive(Debug)]
+struct PendingRecordWrite {
+    token: WriteToken,
+    finalizers: FinalizerGuard,
+}
+
+enum PendingWriteOutcome {
+    None,
+    Complete(usize),
+    CapacityBlocked,
+}
+
+enum WriteAttempt<T> {
+    Written(usize),
+    Full(T),
+    Pending,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CapacityProgress {
+    Ready,
+    Blocked,
+    WaitingForReader,
+}
+
+#[derive(Debug)]
+struct CapacityBackpressure {
+    operation: CapacityOperation,
+    retries: u64,
+    started: Instant,
+}
+
+struct CapacityRetry {
+    delay: Duration,
+    reader_wakeup_used: bool,
+}
+
+impl Default for CapacityRetry {
+    fn default() -> Self {
+        Self {
+            delay: FILESYSTEM_FULL_RETRY_INITIAL,
+            reader_wakeup_used: false,
+        }
+    }
+}
+
+enum EnsureReady {
+    Ready,
+    RetryCapacity(CapacityOperation, io::Error),
+    WaitingForReader,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CapacityOperation {
+    DataWrite,
+    OpenDataFile,
+}
+
+impl CapacityOperation {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::DataWrite => "write data",
+            Self::OpenDataFile => "open data file",
+        }
+    }
 }
 
 impl WriteToken {
@@ -329,17 +403,45 @@ pub(super) struct FlushResult {
 struct TrackingBufWriter<W> {
     inner: W,
     buf: Vec<u8>,
+    capacity: usize,
+    flush_offset: usize,
+    direct_write_offset: usize,
+    completed_flush: Option<FlushResult>,
     unflushed_events: usize,
 }
 
-impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
+impl<W: AsyncFile> TrackingBufWriter<W> {
     /// Creates a new `TrackingBufWriter` with the specified buffer capacity.
     fn with_capacity(cap: usize, inner: W) -> Self {
         Self {
             inner,
             buf: Vec::with_capacity(cap),
+            capacity: cap,
+            flush_offset: 0,
+            direct_write_offset: 0,
+            completed_flush: None,
             unflushed_events: 0,
         }
+    }
+
+    fn take_completed_flush(&mut self) -> Option<FlushResult> {
+        self.completed_flush.take()
+    }
+
+    fn current_record_may_be_committed(&self) -> bool {
+        self.direct_write_offset > 0 || self.inner.has_pending_write()
+    }
+
+    async fn write_all_resumable(inner: &mut W, buf: &[u8], offset: &mut usize) -> io::Result<()> {
+        while *offset < buf.len() {
+            match inner.write_resumable(&buf[*offset..]).await {
+                Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
+                Ok(written) => *offset += written,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(())
     }
 
     /// Writes the given buffer.
@@ -347,8 +449,8 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
     /// If enough internal buffer capacity is available, then this write will be buffered internally
     /// until [`flush`] is called.  If there's not enough remaining internal buffer capacity, then
     /// the internal buffer will be flushed to the inner writer first.  If the given buffer is
-    /// larger than the internal buffer capacity, then it will be written directly to the inner
-    /// writer.
+    /// larger than the internal buffer capacity, it is written directly from the caller's retained
+    /// serialization buffer.
     ///
     /// Internally, a counter is kept of how many buffered events are waiting to be flushed. This
     /// count is incremented every time `write` can fully buffer the record without having to flush
@@ -364,27 +466,29 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
     /// If a write to the inner writer occurs, and that write encounters an error, an error variant
     /// will be returned describing the error.
     async fn write(&mut self, event_count: usize, buf: &[u8]) -> io::Result<Option<FlushResult>> {
-        let mut flush_result = None;
-
         // If this write would cause us to exceed our internal buffer capacity, flush whatever we
         // have buffered already.
-        if self.buf.len() + buf.len() > self.buf.capacity() {
-            flush_result = self.flush().await?;
+        if self.buf.len() + buf.len() > self.capacity
+            && let Some(flush_result) = self.flush().await?
+        {
+            let completed = self.completed_flush.get_or_insert(FlushResult::default());
+            completed.events_flushed += flush_result.events_flushed;
+            completed.bytes_flushed += flush_result.bytes_flushed;
         }
 
-        // If the given buffer is too large to be buffered at all, then bypass the internal buffer.
-        if buf.len() >= self.buf.capacity() {
-            self.inner.write_all(buf).await?;
+        if buf.len() >= self.capacity {
+            Self::write_all_resumable(&mut self.inner, buf, &mut self.direct_write_offset).await?;
 
-            let flush_result = flush_result.get_or_insert(FlushResult::default());
-            flush_result.events_flushed += event_count as u64;
-            flush_result.bytes_flushed += buf.len() as u64;
+            self.direct_write_offset = 0;
+            let completed = self.completed_flush.get_or_insert(FlushResult::default());
+            completed.events_flushed += event_count as u64;
+            completed.bytes_flushed += buf.len() as u64;
         } else {
             self.buf.extend_from_slice(buf);
             self.unflushed_events += event_count;
         }
 
-        Ok(flush_result)
+        Ok(self.completed_flush.take())
     }
 
     /// Flushes the internal buffer to the underlying writer.
@@ -408,16 +512,16 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         let events_flushed = self.unflushed_events as u64;
         let bytes_flushed = self.buf.len() as u64;
 
-        let result = self.inner.write_all(&self.buf[..]).await;
+        Self::write_all_resumable(&mut self.inner, &self.buf, &mut self.flush_offset).await?;
+
+        self.flush_offset = 0;
         self.unflushed_events = 0;
         self.buf.clear();
 
-        result.map(|()| {
-            Some(FlushResult {
-                events_flushed,
-                bytes_flushed,
-            })
-        })
+        Ok(Some(FlushResult {
+            events_flushed,
+            bytes_flushed,
+        }))
     }
 
     /// Gets a reference to the underlying writer.
@@ -438,9 +542,12 @@ impl<W: fmt::Debug> fmt::Debug for TrackingBufWriter<W> {
             .field("writer", &self.inner)
             .field(
                 "buffer",
-                &format_args!("{}/{}", self.buf.len(), self.buf.capacity()),
+                &format_args!("{}/{}", self.buf.len(), self.capacity),
             )
             .field("unflushed_events", &self.unflushed_events)
+            .field("flush_offset", &self.flush_offset)
+            .field("direct_write_offset", &self.direct_write_offset)
+            .field("completed_flush", &self.completed_flush)
             .finish()
     }
 }
@@ -514,6 +621,10 @@ where
     #[cfg(test)]
     pub fn get_ref(&self) -> &W {
         self.writer.get_ref()
+    }
+
+    fn current_record_may_be_committed(&self) -> bool {
+        self.writer.current_record_may_be_committed()
     }
 
     /// Whether or not `amount` bytes could be written while obeying the data file size limit.
@@ -680,7 +791,7 @@ where
         record: T,
     ) -> Result<(usize, Option<FlushResult>), WriterError<T>> {
         let token = self.archive_record(id, record)?;
-        self.flush_record(token).await
+        self.flush_record(&token).await
     }
 
     /// Flushes the previously-archived record.
@@ -699,7 +810,7 @@ where
     #[instrument(skip(self), level = "trace")]
     pub async fn flush_record(
         &mut self,
-        token: WriteToken,
+        token: &WriteToken,
     ) -> Result<(usize, Option<FlushResult>), WriterError<T>> {
         // Make sure the write token we've been given matches whatever the last call to `archive_record` generated.
         let event_count = token.event_count();
@@ -740,6 +851,10 @@ where
         }
 
         Ok((serialized_len, flush_result))
+    }
+
+    fn take_completed_flush(&mut self) -> Option<FlushResult> {
+        self.writer.take_completed_flush()
     }
 
     /// Recovers an archived record that has not yet been flushed.
@@ -870,6 +985,7 @@ enum WriterCheckpointScanAction {
 
 /// Writes records to the buffer.
 #[derive(Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct BufferWriter<T, FS>
 where
     FS: Filesystem,
@@ -885,6 +1001,9 @@ where
     data_file_full: bool,
     skip_to_next: bool,
     ready_to_write: bool,
+    pending_record_write: Option<PendingRecordWrite>,
+    capacity_backpressure: Option<CapacityBackpressure>,
+    capacity_sync_pending: bool,
     _t: PhantomData<T>,
 }
 
@@ -907,6 +1026,9 @@ where
             unflushed_bytes: 0,
             skip_to_next: false,
             ready_to_write: false,
+            pending_record_write: None,
+            capacity_backpressure: None,
+            capacity_sync_pending: false,
             next_record_id,
             unflushed_events: 0,
             _t: PhantomData,
@@ -942,6 +1064,123 @@ where
 
     fn can_write(&self) -> bool {
         !self.data_file_full && self.data_file_size < self.config.max_data_file_size
+    }
+
+    async fn wait_for_capacity(&self, retry: &mut CapacityRetry) {
+        if retry.reader_wakeup_used {
+            sleep(retry.delay).await;
+            retry.reader_wakeup_used = false;
+        } else {
+            tokio::select! {
+                () = self.ledger.wait_for_reader() => retry.reader_wakeup_used = true,
+                () = sleep(retry.delay) => {}
+            }
+        }
+        retry.delay = retry.delay.saturating_mul(2).min(FILESYSTEM_FULL_RETRY_MAX);
+    }
+
+    fn record_capacity_error(
+        &mut self,
+        operation: CapacityOperation,
+        error: &io::Error,
+        retry_delay: Duration,
+    ) {
+        if let Some(backpressure) = self.capacity_backpressure.as_mut() {
+            debug_assert_eq!(backpressure.operation, operation);
+            backpressure.retries += 1;
+            return;
+        }
+
+        emit(DiskBufferBackpressure {
+            operation: operation.as_str(),
+            error,
+            retry_delay,
+            buffer_path: &self.config.data_dir,
+        });
+        self.capacity_backpressure = Some(CapacityBackpressure {
+            operation,
+            retries: 1,
+            started: Instant::now(),
+        });
+    }
+
+    fn record_capacity_recovered(&mut self, operation: CapacityOperation) {
+        let Some(backpressure) = self
+            .capacity_backpressure
+            .take_if(|backpressure| backpressure.operation == operation)
+        else {
+            return;
+        };
+        emit(DiskBufferBackpressureRecovered {
+            operation: backpressure.operation.as_str(),
+            retries: backpressure.retries,
+            duration: backpressure.started.elapsed(),
+            buffer_path: &self.config.data_dir,
+        });
+    }
+
+    async fn finish_pending_record_write(&mut self) -> Result<PendingWriteOutcome, WriterError<T>> {
+        let Some(token) = self
+            .pending_record_write
+            .as_ref()
+            .map(|pending| pending.token)
+        else {
+            return Ok(PendingWriteOutcome::None);
+        };
+
+        let (result, completed_flush) = {
+            let writer = self
+                .writer
+                .as_mut()
+                .expect("pending record write must have an open writer");
+            let result = writer.flush_record(&token).await;
+            (result, writer.take_completed_flush())
+        };
+        if let Some(flush_result) = completed_flush {
+            self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
+        }
+
+        let (bytes_written, flush_result) = match result {
+            Ok(result) => result,
+            Err(WriterError::Io { source })
+                if self.ready_to_write && is_filesystem_full(&source) =>
+            {
+                self.record_capacity_error(
+                    CapacityOperation::DataWrite,
+                    &source,
+                    FILESYSTEM_FULL_RETRY_INITIAL,
+                );
+                return Ok(PendingWriteOutcome::CapacityBlocked);
+            }
+            Err(error) => return Err(error),
+        };
+        self.record_capacity_recovered(CapacityOperation::DataWrite);
+
+        self.track_write(token.event_count(), bytes_written as u64);
+        if let Some(flush_result) = flush_result {
+            self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
+        }
+
+        self.pending_record_write
+            .take()
+            .expect("pending record write must exist")
+            .finalizers
+            .disarm();
+        Ok(PendingWriteOutcome::Complete(bytes_written))
+    }
+
+    fn recover_pending_record(&mut self) -> Result<T, WriterError<T>> {
+        let pending = self
+            .pending_record_write
+            .take()
+            .expect("pending record write must exist");
+        let writer = self
+            .writer
+            .as_mut()
+            .expect("pending record write must have an open writer");
+        let mut record = writer.recover_archived_record(&pending.token)?;
+        record.merge_finalizer_groups(pending.finalizers.into_inner());
+        Ok(record)
     }
 
     fn can_write_record(&self, amount: usize) -> bool {
@@ -1050,7 +1289,7 @@ where
         let previous_writer_file_id = self.ledger.get_current_writer_file_id();
         self.reset();
         self.ledger.state().increment_writer_file_id();
-        self.ensure_ready_for_write().await.context(IoSnafu)?;
+        self.ensure_ready_for_write_fatal().await.context(IoSnafu)?;
         self.reconcile_current_data_file_with_checkpoint().await?;
         self.ledger.flush().context(IoSnafu)?;
 
@@ -1279,7 +1518,7 @@ where
             current_writer_data_file = ?self.ledger.get_current_writer_data_file_path(),
             "Validating last written record in current data file."
         );
-        self.ensure_ready_for_write().await.context(IoSnafu)?;
+        self.ensure_ready_for_write_fatal().await.context(IoSnafu)?;
 
         // If our current file is empty, there's no sense doing this check.
         if self.data_file_size == 0 {
@@ -1443,7 +1682,7 @@ where
 
         self.reset();
         self.mark_for_skip();
-        self.ensure_ready_for_write().await.context(IoSnafu)?;
+        self.ensure_ready_for_write_fatal().await.context(IoSnafu)?;
         self.ledger.flush().context(IoSnafu)?;
 
         debug!(
@@ -1461,14 +1700,13 @@ where
         total_buffer_size >= max_buffer_size
     }
 
-    /// Records sub-items that arrived at the buffer but were dropped before
-    /// reaching disk (e.g. `Bufferable::filter_unencodable` rejecting events
-    /// the protobuf decoder cannot handle). Delegates to the ledger's usage
-    /// handle so the rejection shows up under the disk-v2 stage's
-    /// `received` / `dropped` metrics in production, where the
-    /// `BufferSender` does not carry its own usage instrumentation.
-    pub(crate) fn track_dropped(&self, event_count: u64, byte_size: u64) {
-        self.ledger.track_dropped(event_count, byte_size);
+    pub(crate) fn usage_handle(&self) -> BufferUsageHandle {
+        self.ledger.usage_handle()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn next_writer_data_file_path(&self) -> std::path::PathBuf {
+        self.ledger.get_next_writer_data_file_path()
     }
 
     /// Ensures this writer is ready to attempt writer the next record.
@@ -1476,7 +1714,7 @@ where
     // The inline antithesis assertion block pushes this over the line limit. Its
     // source lines count even when the feature is off, so the allow is unconditional.
     #[allow(clippy::too_many_lines)]
-    async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
+    async fn ensure_ready_for_write(&mut self, wait_for_reader: bool) -> io::Result<EnsureReady> {
         // Check the overall size of the buffer and figure out if we can write.
         loop {
             // If we haven't yet exceeded the maximum buffer size, then we can proceed. Likewise, if
@@ -1509,6 +1747,9 @@ where
                 );
             }
 
+            if !wait_for_reader {
+                return Ok(EnsureReady::WaitingForReader);
+            }
             self.ledger.wait_for_reader().await;
         }
 
@@ -1520,7 +1761,7 @@ where
         let mut should_open_next = self.should_skip();
         if self.writer.is_some() {
             if self.can_write() {
-                return Ok(());
+                return Ok(EnsureReady::Ready);
             }
 
             // Our current data file is full, so we need to open a new one.  Signal to the loop
@@ -1531,7 +1772,12 @@ where
             //
             // We still flush ourselves to disk, etc, to make sure all of the data is there.
             should_open_next = true;
-            self.flush_inner(true).await?;
+            if matches!(self.try_flush_inner(true).await?, CapacityProgress::Blocked) {
+                return Ok(EnsureReady::RetryCapacity(
+                    CapacityOperation::DataWrite,
+                    io::ErrorKind::StorageFull.into(),
+                ));
+            }
 
             self.reset();
         }
@@ -1573,8 +1819,8 @@ where
                 Ok(data_file) => Some((data_file, 0)),
                 // We got back an error trying to open the file: might be that it already exists,
                 // might be something else.
-                Err(e) => match e.kind() {
-                    ErrorKind::AlreadyExists => {
+                Err(e) => {
+                    if e.kind() == ErrorKind::AlreadyExists {
                         // We open the file again, without the atomic "create new" behavior.  If we
                         // can do that successfully, we check its length.  There's three main
                         // situations we encounter:
@@ -1584,11 +1830,18 @@ where
                         //   it, or waiting for acknowledgements to be able to delete it
                         // - it may not be full, which could be because it's the data file the
                         //   writer left off on last time
-                        let data_file = self
+                        let data_file = match self
                             .ledger
                             .filesystem()
                             .open_file_writable(&data_file_path)
-                            .await?;
+                            .await
+                        {
+                            Ok(data_file) => data_file,
+                            Err(error) => {
+                                drop(cleanup_guard);
+                                return self.handle_open_error(error, should_open_next);
+                            }
+                        };
                         let metadata = data_file.metadata().await?;
                         let file_len = metadata.len();
                         if file_len == 0 || !should_open_next {
@@ -1604,10 +1857,14 @@ where
                             // before we can proceed.
                             None
                         }
+                    } else {
+                        // Legitimate I/O error with the operation, bubble this up. Preserve a
+                        // pending rotation so a retry targets the same next file instead of
+                        // reopening the current full file first.
+                        drop(cleanup_guard);
+                        return self.handle_open_error(e, should_open_next);
                     }
-                    // Legitimate I/O error with the operation, bubble this up.
-                    _ => return Err(e),
-                },
+                }
             };
 
             if let Some((data_file, data_file_size)) = file {
@@ -1619,7 +1876,10 @@ where
                 );
 
                 // Make sure the file is flushed to disk, especially if we just created it.
-                data_file.sync_all().await?;
+                if let Err(error) = data_file.sync_all().await {
+                    drop(cleanup_guard);
+                    return self.handle_open_error(error, should_open_next);
+                }
 
                 self.writer = Some(RecordWriter::new(
                     data_file,
@@ -1656,7 +1916,7 @@ where
                     );
                 }
 
-                return Ok(());
+                return Ok(EnsureReady::Ready);
             }
 
             // The file is still present and waiting for a reader to finish reading it in order
@@ -1666,7 +1926,39 @@ where
 
             // Wait until the reader signals progress and try again.
             debug!("Target data file is still present and not yet processed. Waiting for reader.");
+            if !wait_for_reader {
+                if should_open_next {
+                    self.mark_for_skip();
+                }
+                return Ok(EnsureReady::WaitingForReader);
+            }
             self.ledger.wait_for_reader().await;
+        }
+    }
+
+    async fn ensure_ready_for_write_fatal(&mut self) -> io::Result<()> {
+        match self.ensure_ready_for_write(true).await? {
+            EnsureReady::Ready => Ok(()),
+            EnsureReady::RetryCapacity(_, error) => Err(error),
+            EnsureReady::WaitingForReader => unreachable!("blocking readiness must wait"),
+        }
+    }
+
+    fn handle_open_error(
+        &mut self,
+        error: io::Error,
+        preserve_rotation: bool,
+    ) -> io::Result<EnsureReady> {
+        if self.ready_to_write && is_filesystem_full(&error) {
+            if preserve_rotation {
+                self.mark_for_skip();
+            }
+            Ok(EnsureReady::RetryCapacity(
+                CapacityOperation::OpenDataFile,
+                error,
+            ))
+        } else {
+            Err(error)
         }
     }
 
@@ -1688,20 +1980,53 @@ where
             .await
             .map(|inner| match inner {
                 // A zero-byte write is the sentinel for a silently dropped oversized record.
-                Ok(0) => TryWriteOutcome::Dropped,
-                Ok(_) => TryWriteOutcome::Written,
-                Err(record) => TryWriteOutcome::Full(record),
+                WriteAttempt::Written(0) => TryWriteOutcome::Dropped,
+                WriteAttempt::Written(_) => TryWriteOutcome::Written,
+                WriteAttempt::Full(record) => TryWriteOutcome::Full(record),
+                WriteAttempt::Pending => TryWriteOutcome::Pending,
             })
     }
 
     #[instrument(skip_all, level = "debug")]
+    #[allow(clippy::too_many_lines)]
     async fn try_write_record_inner(
         &mut self,
         mut record: T,
-    ) -> Result<Result<usize, T>, WriterError<T>> {
+    ) -> Result<WriteAttempt<T>, WriterError<T>> {
+        // Own the finalizers before the first await so cancellation always nacks an unowned record.
+        // Once physical writing starts, this guard moves into `pending_record_write` instead.
+        let record_finalizers = FinalizerGuard::new(record.take_finalizer_groups());
+
+        // Cancellation can leave a direct write in progress. Finish it before archiving a new
+        // record so its saved byte offset and finalizers cannot be applied to different data.
+        match self.finish_pending_record_write().await? {
+            PendingWriteOutcome::None | PendingWriteOutcome::Complete(_) => {}
+            PendingWriteOutcome::CapacityBlocked => {
+                record.merge_finalizer_groups(record_finalizers.into_inner());
+                return Ok(WriteAttempt::Full(record));
+            }
+        }
+
+        // A cancelled explicit flush can leave buffered bytes and an active physical-capacity
+        // episode without a pending record token. Resolve that underlying data write before a new
+        // record is allowed to fit in memory and appear accepted.
+        if self
+            .capacity_backpressure
+            .as_ref()
+            .is_some_and(|backpressure| backpressure.operation == CapacityOperation::DataWrite)
+            && matches!(
+                self.try_flush_inner(false).await?,
+                CapacityProgress::Blocked
+            )
+        {
+            record.merge_finalizer_groups(record_finalizers.into_inner());
+            return Ok(WriteAttempt::Full(record));
+        }
+
         // If the buffer is already full, we definitely can't complete this write.
         if self.is_buffer_full() {
-            return Ok(Err(record));
+            record.merge_finalizer_groups(record_finalizers.into_inner());
+            return Ok(WriteAttempt::Full(record));
         }
 
         let record_events: NonZeroUsize = record
@@ -1709,21 +2034,29 @@ where
             .try_into()
             .map_err(|_| WriterError::EmptyRecord)?;
 
-        // Extract the finalizers before `archive_record` consumes the record. The encoder
-        // unconditionally consumes the record (even on failure), so we must take what we need here
-        // to handle the case where encoding fails because the record is too large to ever write.
-        // The guard automatically resolves the finalizers as Errored if this function exits via
-        // `?`; call `disarm()` or `into_inner()` on the non-error paths.
-        let record_finalizers = FinalizerGuard::new(record.take_finalizer_groups());
-
         // Grab the next record ID and attempt to write the record.
         let record_id = self.get_next_record_id();
-
         let token = loop {
             // Make sure we have an open data file to write to, which might also be us opening the
             // next data file because our first attempt at writing had to finalize a data file that
             // was already full.
-            self.ensure_ready_for_write().await.context(IoSnafu)?;
+            match self.ensure_ready_for_write(false).await {
+                Ok(EnsureReady::Ready) => {
+                    self.record_capacity_recovered(CapacityOperation::OpenDataFile);
+                }
+                Ok(EnsureReady::RetryCapacity(operation, source)) => {
+                    self.record_capacity_error(operation, &source, FILESYSTEM_FULL_RETRY_INITIAL);
+                    let mut record = record;
+                    record.merge_finalizer_groups(record_finalizers.into_inner());
+                    return Ok(WriteAttempt::Full(record));
+                }
+                Ok(EnsureReady::WaitingForReader) => {
+                    let mut record = record;
+                    record.merge_finalizer_groups(record_finalizers.into_inner());
+                    return Ok(WriteAttempt::Full(record));
+                }
+                Err(source) => return Err(WriterError::Io { source }),
+            }
 
             let writer = self
                 .writer
@@ -1788,7 +2121,7 @@ where
                             record_events.get() as u64,
                             encoded_len as u64,
                         );
-                        return Ok(Ok(0));
+                        return Ok(WriteAttempt::Written(0));
                     }
                     e => return Err(e),
                 },
@@ -1801,19 +2134,27 @@ where
         //
         // Otherwise, we proceed with flushing like we normally would.
         let can_write_record = self.can_write_record(token.serialized_len());
-        let writer = self
-            .writer
-            .as_mut()
-            .expect("writer should exist after `ensure_ready_for_write`");
-
-        let (bytes_written, flush_result) = if can_write_record {
-            // We always return errors here because flushing the record won't return a recoverable
-            // error like `DataFileFull`, as that gets checked during archiving. The guard fires
-            // Errored automatically on `?` exit.
-            let result = writer.flush_record(token).await?;
-            // Record is durable on disk; disarm so finalizers resolve as Delivered.
-            record_finalizers.disarm();
-            result
+        let bytes_written = if can_write_record {
+            self.pending_record_write = Some(PendingRecordWrite {
+                token,
+                finalizers: record_finalizers,
+            });
+            match self.finish_pending_record_write().await? {
+                PendingWriteOutcome::Complete(bytes_written) => bytes_written,
+                PendingWriteOutcome::CapacityBlocked => {
+                    let current_may_be_committed = self
+                        .writer
+                        .as_ref()
+                        .is_some_and(RecordWriter::current_record_may_be_committed);
+                    if current_may_be_committed {
+                        return Ok(WriteAttempt::Pending);
+                    }
+                    return self.recover_pending_record().map(WriteAttempt::Full);
+                }
+                PendingWriteOutcome::None => {
+                    unreachable!("record write was just marked pending")
+                }
+            }
         } else {
             // The record would not fit given the current size of the buffer, so we need to recover it from the
             // writer and hand it back. This looks a little weird because we want to surface deserialize/decoding
@@ -1824,29 +2165,17 @@ where
             // record path, but this record is being returned for retry (block mode) or overflow.
             // `into_inner` extracts from the guard without resolving status; the finalizers will
             // be resolved only when the returned record is eventually written or dropped.
+            let writer = self
+                .writer
+                .as_mut()
+                .expect("writer should exist after `ensure_ready_for_write`");
             let mut record = writer.recover_archived_record(&token)?;
             record.merge_finalizer_groups(record_finalizers.into_inner());
-            return Ok(Err(record));
+            return Ok(WriteAttempt::Full(record));
         };
 
-        // Track our write since things appear to have succeeded. This only updates our internal
-        // state as we have not yet authoritatively flushed the write to the data file. This tracks
-        // not only how many bytes we have buffered, but also how many events, which in turn drives
-        // record ID generation.  We do this after the write appears to succeed to avoid issues with
-        // setting the ledger state to a record ID that we may never have actually written, which
-        // could lead to record ID gaps.
-        self.track_write(record_events.get(), bytes_written as u64);
-
-        // If we did flush some buffered writes during this write, however, we now compensate for
-        // that after updating our internal state. Publishing the flushed state also notifies the
-        // reader, after all shared state reflects the readable bytes.
-        if let Some(flush_result) = flush_result {
-            self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
-        }
-
-        // A record at or above the write-buffer size forces the buffered writer to
-        // flush mid-record, exercising the large-record path that splits a single
-        // record across multiple underlying writes.
+        // A record at or above the write-buffer size exercises the owned large-record path. The
+        // subsequent flush may split the record across multiple underlying writes.
         #[cfg(feature = "antithesis-disk-asserts")]
         {
             #![allow(clippy::disallowed_types)] // once_cell::Lazy
@@ -1868,7 +2197,7 @@ where
             "Wrote record."
         );
 
-        Ok(Ok(bytes_written))
+        Ok(WriteAttempt::Written(bytes_written))
     }
 
     /// Writes a record.
@@ -1882,13 +2211,28 @@ where
     /// the error.
     #[instrument(skip_all, level = "debug")]
     pub async fn write_record(&mut self, mut record: T) -> Result<usize, WriterError<T>> {
+        let mut retry = CapacityRetry::default();
         loop {
             match self.try_write_record_inner(record).await? {
-                Ok(bytes_written) => return Ok(bytes_written),
-                Err(old_record) => {
+                WriteAttempt::Written(bytes_written) => return Ok(bytes_written),
+                WriteAttempt::Full(old_record) => {
                     record = old_record;
-                    self.ledger.wait_for_reader().await;
+                    if self.capacity_backpressure.is_some() {
+                        self.wait_for_capacity(&mut retry).await;
+                    } else {
+                        self.ledger.wait_for_reader().await;
+                    }
                 }
+                WriteAttempt::Pending => loop {
+                    self.wait_for_capacity(&mut retry).await;
+                    match self.finish_pending_record_write().await? {
+                        PendingWriteOutcome::Complete(bytes_written) => return Ok(bytes_written),
+                        PendingWriteOutcome::CapacityBlocked => {}
+                        PendingWriteOutcome::None => {
+                            unreachable!("pending write disappeared before completion")
+                        }
+                    }
+                },
             }
         }
     }
@@ -1911,7 +2255,7 @@ where
     }
 
     #[instrument(skip(self), level = "debug")]
-    async fn flush_inner(&mut self, force_full_flush: bool) -> io::Result<()> {
+    async fn try_flush_inner(&mut self, force_full_flush: bool) -> io::Result<CapacityProgress> {
         // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
         // flush the ledger.  This is enough for readers on Linux since the file ends up in the page
         // cache, as we don't do any O_DIRECT fanciness, and the new contents can be immediately
@@ -1919,26 +2263,131 @@ where
         //
         // TODO: Windows has a page cache as well, and macOS _should_, but we should verify this
         // behavior works on those platforms as well.
-        let flush_result = if let Some(writer) = self.writer.as_mut() {
-            writer.flush().await?
-        } else {
-            None
+        let result = match self.writer.as_mut() {
+            Some(writer) => writer.flush().await,
+            None => Ok(None),
         };
-
+        let flush_result = match result {
+            Ok(result) => result,
+            Err(error) if self.ready_to_write && is_filesystem_full(&error) => {
+                self.record_capacity_error(
+                    CapacityOperation::DataWrite,
+                    &error,
+                    FILESYSTEM_FULL_RETRY_INITIAL,
+                );
+                return Ok(CapacityProgress::Blocked);
+            }
+            Err(error) => return Err(error),
+        };
         if let Some(flush_result) = flush_result {
             // Publish the readable bytes before waking the reader.
             self.publish_flushed_progress(flush_result.events_flushed, flush_result.bytes_flushed);
         }
 
-        if self.ledger.should_flush() || force_full_flush {
-            if let Some(writer) = self.writer.as_mut() {
-                writer.sync_all().await?;
+        if self.capacity_sync_pending || self.ledger.should_flush() || force_full_flush {
+            if let Some(writer) = self.writer.as_mut()
+                && let Err(error) = writer.sync_all().await
+            {
+                if self.ready_to_write && is_filesystem_full(&error) {
+                    self.capacity_sync_pending = true;
+                    self.record_capacity_error(
+                        CapacityOperation::DataWrite,
+                        &error,
+                        FILESYSTEM_FULL_RETRY_INITIAL,
+                    );
+                    return Ok(CapacityProgress::Blocked);
+                }
+                return Err(error);
             }
 
-            self.ledger.flush()
+            if let Err(error) = self.ledger.flush() {
+                if self.ready_to_write && is_filesystem_full(&error) {
+                    self.capacity_sync_pending = true;
+                    self.record_capacity_error(
+                        CapacityOperation::DataWrite,
+                        &error,
+                        FILESYSTEM_FULL_RETRY_INITIAL,
+                    );
+                    return Ok(CapacityProgress::Blocked);
+                }
+                return Err(error);
+            }
+            self.capacity_sync_pending = false;
+            self.record_capacity_recovered(CapacityOperation::DataWrite);
+            Ok(CapacityProgress::Ready)
         } else {
-            Ok(())
+            self.record_capacity_recovered(CapacityOperation::DataWrite);
+            Ok(CapacityProgress::Ready)
         }
+    }
+
+    pub(crate) async fn try_flush(&mut self) -> io::Result<CapacityProgress> {
+        match self
+            .finish_pending_record_write()
+            .await
+            .map_err(|error| match error {
+                WriterError::Io { source } => source,
+                error => io::Error::other(error.to_string()),
+            })? {
+            PendingWriteOutcome::CapacityBlocked => return Ok(CapacityProgress::Blocked),
+            PendingWriteOutcome::None | PendingWriteOutcome::Complete(_) => {}
+        }
+        self.try_flush_inner(false).await
+    }
+
+    pub(crate) async fn retry_capacity(&mut self) -> io::Result<CapacityProgress> {
+        // Cancellation can occur while a production `spawn_blocking` write is still in flight,
+        // before its result records a capacity episode. Probe writer-owned work first so the
+        // shared retry driver can finish that syscall and publish the record.
+        if self.pending_record_write.is_some()
+            || self
+                .writer
+                .as_ref()
+                .is_some_and(RecordWriter::current_record_may_be_committed)
+        {
+            return self.try_flush().await;
+        }
+
+        match self
+            .capacity_backpressure
+            .as_ref()
+            .map(|state| state.operation)
+        {
+            Some(CapacityOperation::DataWrite) => self.try_flush().await,
+            Some(CapacityOperation::OpenDataFile) => {
+                match self.ensure_ready_for_write(false).await? {
+                    EnsureReady::Ready => {
+                        self.record_capacity_recovered(CapacityOperation::OpenDataFile);
+                        Ok(CapacityProgress::Ready)
+                    }
+                    EnsureReady::RetryCapacity(operation, error) => {
+                        self.record_capacity_error(
+                            operation,
+                            &error,
+                            FILESYSTEM_FULL_RETRY_INITIAL,
+                        );
+                        Ok(CapacityProgress::Blocked)
+                    }
+                    EnsureReady::WaitingForReader => Ok(CapacityProgress::WaitingForReader),
+                }
+            }
+            None => Ok(CapacityProgress::Ready),
+        }
+    }
+
+    pub(crate) fn is_capacity_blocked(&self) -> bool {
+        self.capacity_backpressure.is_some()
+    }
+
+    pub(crate) fn fail_pending_write(&mut self) {
+        self.pending_record_write.take();
+    }
+
+    pub(crate) fn reader_progress_waiter(
+        &self,
+    ) -> impl Future<Output = ()> + Send + use<T, FS> + 'static {
+        let notify = self.ledger.reader_notifier();
+        async move { notify.notified().await }
     }
 
     /// Flushes the writer.
@@ -1955,8 +2404,14 @@ where
     /// variant will be returned describing the error.
     #[instrument(skip(self), level = "trace")]
     pub async fn flush(&mut self) -> io::Result<()> {
-        self.flush_inner(false).await?;
-        Ok(())
+        let mut retry = CapacityRetry::default();
+        loop {
+            match self.try_flush().await? {
+                CapacityProgress::Ready => return Ok(()),
+                CapacityProgress::Blocked => self.wait_for_capacity(&mut retry).await,
+                CapacityProgress::WaitingForReader => self.ledger.wait_for_reader().await,
+            }
+        }
     }
 }
 
@@ -1990,5 +2445,142 @@ where
 {
     fn drop(&mut self) {
         self.close();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        io,
+        pin::Pin,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        task::{Context, Poll},
+        time::Duration,
+    };
+
+    use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+    use super::TrackingBufWriter;
+    use crate::variants::disk_v2::io::{AsyncFile, Metadata};
+
+    #[derive(Debug)]
+    struct PendingAfterPrefixWriter {
+        bytes: Vec<u8>,
+        pause: Arc<AtomicBool>,
+        wrote_prefix: bool,
+    }
+
+    impl AsyncWrite for PendingAfterPrefixWriter {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            if self.wrote_prefix && self.pause.load(Ordering::Acquire) {
+                return Poll::Pending;
+            }
+
+            let amount = if self.wrote_prefix {
+                buf.len()
+            } else {
+                buf.len().min(4)
+            };
+            self.bytes.extend_from_slice(&buf[..amount]);
+            self.wrote_prefix = true;
+            Poll::Ready(Ok(amount))
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl AsyncRead for PendingAfterPrefixWriter {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl AsyncFile for PendingAfterPrefixWriter {
+        async fn metadata(&self) -> io::Result<Metadata> {
+            Ok(Metadata {
+                len: self.bytes.len() as u64,
+            })
+        }
+
+        async fn truncate(&self, _size: u64) -> io::Result<()> {
+            Ok(())
+        }
+
+        async fn sync_all(&self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    enum CancelledWritePath {
+        Flush,
+        Direct,
+    }
+
+    async fn assert_cancelled_write_resumes(path: CancelledWritePath) {
+        let pause = Arc::new(AtomicBool::new(true));
+        let inner = PendingAfterPrefixWriter {
+            bytes: Vec::new(),
+            pause: Arc::clone(&pause),
+            wrote_prefix: false,
+        };
+        let capacity = match path {
+            CancelledWritePath::Flush => 16,
+            CancelledWritePath::Direct => 4,
+        };
+        let mut writer = TrackingBufWriter::with_capacity(capacity, inner);
+        let expected = b"abcdefghij";
+        if matches!(path, CancelledWritePath::Flush) {
+            assert_eq!(writer.write(1, expected).await.unwrap(), None);
+        }
+
+        let timed_out = match path {
+            CancelledWritePath::Flush => {
+                tokio::time::timeout(Duration::from_millis(10), writer.flush()).await
+            }
+            CancelledWritePath::Direct => {
+                tokio::time::timeout(Duration::from_millis(10), writer.write(1, expected)).await
+            }
+        };
+        assert!(timed_out.is_err());
+        assert_eq!(writer.get_ref().bytes, b"abcd");
+
+        pause.store(false, Ordering::Release);
+        let result = match path {
+            CancelledWritePath::Flush => writer.flush().await,
+            CancelledWritePath::Direct => writer.write(1, expected).await,
+        }
+        .unwrap()
+        .unwrap();
+        assert_eq!(result.events_flushed, 1);
+        assert_eq!(result.bytes_flushed, expected.len() as u64);
+        assert_eq!(writer.get_ref().bytes, expected);
+    }
+
+    #[tokio::test]
+    async fn cancelled_flush_resumes_after_committed_prefix() {
+        assert_cancelled_write_resumes(CancelledWritePath::Flush).await;
+    }
+
+    #[tokio::test]
+    async fn cancelled_direct_write_resumes_after_committed_prefix() {
+        assert_cancelled_write_resumes(CancelledWritePath::Direct).await;
     }
 }
