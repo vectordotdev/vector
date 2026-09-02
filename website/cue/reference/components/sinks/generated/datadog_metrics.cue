@@ -85,51 +85,6 @@ generated: components: sinks: datadog_metrics: configuration: {
 		required: false
 		type: string: examples: ["myservice"]
 	}
-	dual_write: {
-		description: """
-			V3 shadow dual-write configuration.
-
-			By default, a sampled fraction of legacy series flushes is mirrored as V3 payloads to
-			a separate intake endpoint, both stamped with a shared `X-Metrics-Request-ID` — but
-			only when submitting directly to Datadog. If `endpoint` is set to a custom Agent,
-			relay, or test collector, dual-write defaults to disabled instead, since the shadow
-			route isn't guaranteed to exist there. Set `dual_write.enabled` explicitly to override
-			either default in either direction.
-
-			Sketches are never dual-written, regardless of this setting.
-			"""
-		required: false
-		type: object: options: {
-			enabled: {
-				description: """
-					Whether to enable V3 shadow dual-write.
-
-					When unset, this defaults to `true` when submitting directly to Datadog (no custom
-					`endpoint` set), and to `false` when a custom `endpoint` is configured (for example, a
-					Datadog Agent, relay, or test collector). The shadow route
-					(`/api/intake/metrics/v3beta/series`) is only guaranteed to exist on Datadog's own
-					intake; hitting it on a custom endpoint that doesn't implement it 404s, which is
-					treated as a retriable error, so every sampled flush would add a request that retries
-					forever. Set this explicitly to `true` to opt in to shadow traffic against a custom
-					endpoint anyway, or to `false` to disable it even when submitting directly to Datadog.
-
-					This only ever affects series. Sketches are never dual-written.
-					"""
-				required: false
-				type: bool: {}
-			}
-			shadow_every: {
-				description: """
-					Send a V3 shadow payload once per this many legacy (V1/V2) series flushes.
-
-					Set to `1` to shadow every series flush (full dual-write). Must be greater than zero.
-					Defaults to `1000`. Sketches flushes are never counted or shadowed.
-					"""
-				required: false
-				type: uint: default: 1000
-			}
-		}
-	}
 	endpoint: {
 		description: """
 			The endpoint to send observability data to.
@@ -333,8 +288,9 @@ generated: components: sinks: datadog_metrics: configuration: {
 		description: """
 			Controls which Datadog series API endpoint is used to submit metrics.
 
-			Defaults to `v2` (`/api/v2/series`). Set to `v1` (`/api/v1/series`) only if you need to
-			fall back to the legacy endpoint.
+			Defaults to `v2` (`/api/v2/series`). Set to `v3` (`/api/intake/metrics/v3/series`) to use
+			the columnar protobuf format, or to `v1` (`/api/v1/series`) only if you need to fall back
+			to the legacy endpoint.
 			"""
 		required: false
 		type: string: {

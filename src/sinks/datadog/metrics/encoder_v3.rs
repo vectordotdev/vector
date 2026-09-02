@@ -341,8 +341,7 @@ fn encode_metric_to_v3(
 /// Resolved once via direct lookup, independent of `MetricTags`' key-iteration order --
 /// `resource.device` sorts after `device` alphabetically, so an order-dependent overwrite
 /// inside the tag-iteration loop would silently prefer the wrong one whenever a metric
-/// carries both, producing a different device resource than V2 for the same metric and
-/// mismatching the paired V2/V3 shadow payloads for the same flush.
+/// carries both, producing a different device resource than V2 for the same metric.
 fn resolve_device_resource(tags: &MetricTags) -> Option<&str> {
     tags.get("device").or_else(|| tags.get("resource.device"))
 }
@@ -355,8 +354,7 @@ fn resolve_device_resource(tags: &MetricTags) -> Option<&str> {
 /// explicit "skip if empty" filter applied *per visited value*, which instead kept whichever
 /// non-empty value it saw and ignored a later, chronologically-last empty one. That divergence
 /// meant a metric whose host tag's last-inserted value happened to be empty produced a
-/// non-empty host resource in V3 but an empty one in V2 for the same metric, mismatching the
-/// paired V2/V3 shadow payloads for the same flush.
+/// non-empty host resource in V3 but an empty one in V2 for the same metric.
 ///
 /// An absent, empty, or empty-after-resolution host tag all come out `None` here; the caller
 /// fills in an empty host resource once a host key is configured at all, matching V2's
@@ -497,8 +495,8 @@ mod tests {
     // `resource.device` via `tags.remove("device").or(tags.remove("resource.device"))`. V3 used
     // to resolve this inside its tag-iteration loop, where `MetricTags`' key-ordered iteration
     // visits `device` before `resource.device` (alphabetically) and unconditionally overwrote
-    // whichever was seen last -- silently preferring `resource.device` instead, and mismatching
-    // the paired V2/V3 shadow payloads for the same flush whenever a metric carried both.
+    // whichever was seen last -- silently preferring `resource.device` instead, and diverging
+    // from V2 whenever a metric carried both.
     #[test]
     fn v3_device_resource_prefers_device_over_resource_device() {
         // Only `device` present.

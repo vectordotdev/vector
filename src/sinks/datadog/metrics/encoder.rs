@@ -327,8 +327,8 @@ impl DatadogMetricsEncoder {
                     });
                 }
             },
-            // V3/V3Beta metrics must be routed to DatadogMetricsV3Encoder.
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3 | SeriesApiVersion::V3Beta) => {
+            // V3 metrics must be routed to DatadogMetricsV3Encoder.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3) => {
                 return Err(EncoderError::InvalidMetric {
                     expected: "v1 or v2 series",
                     metric_value: "v3",

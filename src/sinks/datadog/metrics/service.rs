@@ -48,13 +48,6 @@ pub struct DatadogMetricsRequest {
     pub content_encoding: &'static str,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
-    /// Shared transaction ID linking a V2 and V3 shadow payload from the same flush.
-    /// When set, `X-Metrics-Request-ID/Seq/Len` headers are included on the request.
-    pub batch_id: Option<Arc<str>>,
-    /// 0-based index of this request within the current flush (for split payloads).
-    pub batch_seq: usize,
-    /// Total number of requests produced by the current flush (for split payloads).
-    pub batch_len: usize,
 }
 
 impl DatadogMetricsRequest {
@@ -73,7 +66,7 @@ impl DatadogMetricsRequest {
             },
         );
 
-        let mut builder = Request::post(self.uri)
+        Request::post(self.uri)
             .header("DD-API-KEY", api_key)
             // TODO: The Datadog Agent sends this header to indicate the version of the Go library
             // it uses which contains the Protocol Buffers definitions used for the Sketches API.
@@ -87,16 +80,8 @@ impl DatadogMetricsRequest {
             // this header.
             .header("DD-Agent-Payload", "4.87.0")
             .header(CONTENT_TYPE, self.content_type)
-            .header(CONTENT_ENCODING, self.content_encoding);
-
-        if let Some(id) = &self.batch_id {
-            builder = builder
-                .header("X-Metrics-Request-ID", id.as_ref())
-                .header("X-Metrics-Request-Seq", self.batch_seq.to_string())
-                .header("X-Metrics-Request-Len", self.batch_len.to_string());
-        }
-
-        builder.body(Body::from(self.payload))
+            .header(CONTENT_ENCODING, self.content_encoding)
+            .body(Body::from(self.payload))
     }
 }
 
@@ -180,11 +165,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
 
         Box::pin(async move {
             let request_metadata = std::mem::take(request.metadata_mut());
-            let batch_id = request.batch_id.clone();
             let uri = request.uri.clone();
-            let batch_seq = request.batch_seq;
-            let batch_len = request.batch_len;
-            let start = std::time::Instant::now();
 
             let call_result: Result<_, DatadogApiError> = async {
                 let http_request = request
@@ -200,31 +181,51 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             let result = call_result.inspect_err(|error| {
                 emit!(DatadogMetricsRequestFailed {
                     error: &error.to_string(),
-                    batch_id: batch_id.as_deref(),
                     uri: &uri,
                 });
             })?;
-
-            // Only batch_id-tagged requests are logged on success (dual-write shadow flushes,
-            // which are rare — sampled once per `shadow_every`), so this stays low-volume and
-            // gives visibility into dispatch timing for both the V2 and V3 twins of a flush.
-            if let Some(id) = batch_id.as_deref() {
-                info!(
-                    message = "Sent Datadog metrics request.",
-                    batch_id = id,
-                    %uri,
-                    batch_seq,
-                    batch_len,
-                    status = %result.status(),
-                    elapsed_ms = start.elapsed().as_millis() as u64,
-                    internal_log_rate_limit = false,
-                );
-            }
 
             Ok(DatadogMetricsResponse {
                 status_code: result.status(),
                 request_metadata,
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The `X-Metrics-Request-*` correlation headers only ever existed to pair a legacy
+    /// payload with its V3 shadow twin so the intake could compare them. With shadow
+    /// dual-write gone there is nothing to correlate, so requests must not carry them.
+    #[test]
+    fn requests_carry_no_correlation_headers() {
+        let request = DatadogMetricsRequest {
+            api_key: None,
+            payload: Bytes::from_static(b"payload"),
+            uri: "https://example.com/api/v2/series".parse().unwrap(),
+            content_type: "application/x-protobuf",
+            content_encoding: "zstd",
+            finalizers: EventFinalizers::default(),
+            metadata: RequestMetadata::new(0, 0, 0, 0, GroupedCountByteSize::new_untagged()),
+        };
+
+        let http_request = request
+            .into_http_request(HeaderValue::from_static("atoken"))
+            .expect("request should build");
+
+        let unexpected: Vec<&str> = http_request
+            .headers()
+            .keys()
+            .map(http::HeaderName::as_str)
+            .filter(|name| name.starts_with("x-metrics-request"))
+            .collect();
+
+        assert!(
+            unexpected.is_empty(),
+            "unexpected shadow correlation headers: {unexpected:?}"
+        );
     }
 }

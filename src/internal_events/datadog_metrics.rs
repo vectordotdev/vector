@@ -37,9 +37,8 @@ impl InternalEvent for DatadogMetricsEncodingError<'_> {
 }
 
 /// Fired on every failed attempt to send a Datadog metrics request (including ones that
-/// will be retried), tagged with the request's `batch_id` and target `uri` so a specific
-/// failure can be correlated with a Datadog-side error such as
-/// `[<batch_id>] MISMATCH (timeout): incomplete payloads` from V3 shadow-write validation.
+/// will be retried), tagged with the target `uri` so a specific failure can be correlated
+/// with the endpoint it was sent to.
 ///
 /// This is diagnostic logging only — it does not increment `component_errors_total`, since
 /// the generic request driver already counts the final, post-retry failure via `CallError`.
@@ -50,7 +49,6 @@ impl InternalEvent for DatadogMetricsEncodingError<'_> {
 #[derive(Debug, NamedInternalEvent)]
 pub struct DatadogMetricsRequestFailed<'a> {
     pub error: &'a str,
-    pub batch_id: Option<&'a str>,
     pub uri: &'a http::Uri,
 }
 
@@ -61,7 +59,6 @@ impl InternalEvent for DatadogMetricsRequestFailed<'_> {
             error = self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
-            batch_id = self.batch_id.unwrap_or("none"),
             uri = %self.uri,
             internal_log_rate_limit = true,
         );
