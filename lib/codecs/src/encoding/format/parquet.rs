@@ -118,12 +118,10 @@ pub struct ParquetSerializerConfig {
 
     /// Compression codec applied per column page inside the Parquet file.
     #[serde(default)]
-    #[configurable(derived)]
     pub compression: ParquetCompression,
 
     /// Controls how events with fields not present in the schema are handled.
     #[serde(default)]
-    #[configurable(derived)]
     pub schema_mode: ParquetSchemaMode,
 }
 

@@ -14,10 +14,7 @@ use vrl::value::Kind;
 
 use crate::{
     codecs::Transformer,
-    config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, Input, SinkConfig, SinkContext,
-        ValidatedSink,
-    },
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext, ValidatedSink},
     event::{EventRef, LogEvent, Value},
     http::{HttpClient, QueryParameters},
     internal_events::TemplateRenderingError,
@@ -114,7 +111,6 @@ pub struct ElasticsearchConfig {
     ///
     /// Amazon OpenSearch Serverless requires this option to be set to `auto` (the default).
     #[serde(default)]
-    #[configurable(derived)]
     pub api_version: ElasticsearchApiVersion,
 
     /// Whether or not to send the `type` field to Elasticsearch.
@@ -152,26 +148,20 @@ pub struct ElasticsearchConfig {
     pub pipeline: Option<String>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub mode: ElasticsearchMode,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub compression: Compression,
 
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
-    #[configurable(derived)]
     pub encoding: Transformer,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub request: RequestConfig,
 
-    #[configurable(derived)]
     pub auth: Option<ElasticsearchAuthConfig>,
 
     /// Custom parameters to add to the query string for each HTTP request sent to Elasticsearch.
@@ -181,7 +171,6 @@ pub struct ElasticsearchConfig {
     pub query: Option<QueryParameters>,
 
     #[serde(default)]
-    #[configurable(derived)]
     #[cfg(feature = "aws-core")]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
@@ -190,11 +179,9 @@ pub struct ElasticsearchConfig {
     pub opensearch_service_type: OpenSearchServiceType,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     #[serde(default)]
-    #[configurable(derived)]
     #[serde(rename = "distribution")]
     pub endpoint_health: Option<HealthConfig>,
 
@@ -203,15 +190,12 @@ pub struct ElasticsearchConfig {
     // `DataStreamConfig` into the `mode` enum variants. Doing so would remove them from the root
     // of the config here and thus any post serde config parsing manual error prone logic.
     #[serde(alias = "normal", default)]
-    #[configurable(derived)]
     pub bulk: BulkConfig,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub data_stream: Option<DataStreamConfig>,
 
     #[serde(default)]
-    #[configurable(derived)]
     pub metrics: Option<MetricToLogConfig>,
 
     #[serde(
@@ -219,10 +203,8 @@ pub struct ElasticsearchConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
-    #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -740,10 +722,6 @@ impl SinkConfig for ElasticsearchConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

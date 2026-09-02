@@ -30,7 +30,9 @@ use vector_lib::{
 
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{
@@ -58,7 +60,7 @@ pub struct FileSinkConfig {
     /// File path to write events to.
     ///
     /// Compression format extension must be explicit.
-    #[configurable(metadata(docs::examples = "/tmp/vector-%Y-%m-%d.log"))]
+    #[configurable(metadata(docs::examples = "/var/log/vector/vector-%Y-%m-%d.log"))]
     #[configurable(metadata(
         docs::examples = "/tmp/application-{{ application_id }}-%Y-%m-%d.log"
     ))]
@@ -96,11 +98,9 @@ pub struct FileSinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -108,15 +108,12 @@ pub struct FileSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: FileInternalMetricsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub truncate: FileTruncateConfig,
 }
@@ -243,17 +240,6 @@ impl OutFile {
 #[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self, cx)?;
-        Ok((
-            super::VectorSink::from_event_streamsink(sink),
-            future::ok(()).boxed(),
-        ))
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -264,6 +250,56 @@ impl SinkConfig for FileSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedFileSink {
+    transformer: Transformer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for FileSinkConfig {
+    type Validated = ValidatedFileSink;
+
+    fn validate(&self) -> crate::Result<ValidatedFileSink> {
+        let transformer = self.encoding.transformer();
+
+        // Pure path-confinement checks. `PathConfinement` itself is not
+        // retained (it is not `Clone`), so `build` reconstructs it from the
+        // same inputs; running the checks here lets `vector validate
+        // --no-environment` catch invalid routing paths and relative
+        // `base_dir`s.
+        if let Some(base) = self.base_dir.as_ref()
+            && base.is_relative()
+        {
+            return Err(Box::new(
+                crate::sinks::util::path_confinement::BuildError::BaseNotAbsolute {
+                    path: base.clone(),
+                },
+            ));
+        }
+        if !self
+            .confinement
+            .dangerously_allow_unconfined_template_resolution
+        {
+            PathConfinement::for_template(&self.path, self.base_dir.as_deref())
+                .map_err(Box::new)?;
+        }
+
+        Ok(ValidatedFileSink { transformer })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedFileSink,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let sink = FileSink::from_validated(self, validated, cx)?;
+        Ok((
+            super::VectorSink::from_event_streamsink(sink),
+            future::ok(()).boxed(),
+        ))
     }
 }
 
@@ -282,10 +318,18 @@ pub struct FileSink {
 
 impl FileSink {
     pub fn new(config: &FileSinkConfig, cx: SinkContext) -> crate::Result<Self> {
-        let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+        let validated = config.validate()?;
+        Self::from_validated(config, &validated, cx)
+    }
 
+    /// Constructs the sink from the validated state, performing only the
+    /// environment-dependent (non-`validate`) work: timezone offset resolution
+    /// and path confinement construction.
+    fn from_validated(
+        config: &FileSinkConfig,
+        validated: &ValidatedFileSink,
+        cx: SinkContext,
+    ) -> crate::Result<Self> {
         let offset = config
             .timezone
             .or(cx.globals.timezone)
@@ -314,9 +358,12 @@ impl FileSink {
                 .map_err(Box::new)?
         };
 
+        let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),
-            transformer,
+            transformer: validated.transformer.clone(),
             encoder,
             idle_timeout: config.idle_timeout,
             files: ExpiringHashMap::default(),
@@ -746,7 +793,7 @@ mod tests {
     use futures::{SinkExt, stream};
     use similar_asserts::assert_eq;
     use vector_lib::{
-        codecs::JsonSerializerConfig,
+        codecs::{JsonSerializerConfig, encoding::SerializerConfig},
         event::{LogEvent, TraceEvent},
         sink::VectorSink,
     };
@@ -766,6 +813,18 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<FileSinkConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_state() {
+        let config = base_config("/tmp/vector-test.log");
+        let _validated = config.validate().expect("validation should succeed");
+        // Serializer construction is deferred to `build`; validation retains the
+        // transformer so `build` can construct the encoder.
+        assert!(matches!(
+            config.encoding.config().1,
+            SerializerConfig::Text(_)
+        ));
     }
 
     #[tokio::test]
