@@ -893,11 +893,16 @@ Single-event encoding via `EventWrapper` is 1:1:
 1:1-or-N: during coexistence, in-memory `TraceArray` (a
 `Vec<TraceEventCompat>`) can hold a mix of variants when a source that emits typed
 events natively and one that still emits legacy events fan in to the same downstream
-component, but the wire `EventArray.events` oneof must select one variant. The encoder
-must therefore emit one or more homogeneous arrays while preserving the original event
-order and per-event finalizer and acknowledgement behavior. Decoders see only
+component, but the wire `EventArray.events` oneof must select one variant. That split
+cannot live in `Encodable::encode`: the disk writer calls it once per record and it
+returns one byte buffer. Mixed arrays are therefore split into maximal contiguous
+homogeneous `EventArray`s *before* any one-record encoder, preserving original event
+order and per-event finalizer and acknowledgement behavior. Each run is then encoded
+and written as its own record. Decoders see only
 homogeneous wire arrays; mixing reappears at fan-in points downstream without changing
-the order observed by stateful components.
+the order observed by stateful components. The `vector` sink already encodes
+`EventWrapper` 1:1, so this split applies to the disk-buffer `EventArray` path and any
+other caller that encodes an `EventArray` as a single record.
 
 Retiring the `TraceEventCompat` enum does not immediately retire the proto:
 `LegacyTrace`,

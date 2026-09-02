@@ -101,6 +101,11 @@ Trace Context, and other informational entries are defined in the
   tracer-payload form). Until support lands, standard `tracerPayloads` entries are
   processed while indexed entries are discarded and reported; see "Ingress and egress
   mapping."
+- Typed decoding of the pre-`tracerPayloads` `/api/v0.2/traces` shape
+  (`traces` / `transactions` with empty `tracerPayloads`). Today's source routes that
+  payload to `handle_dd_trace_payload_v0`. The typed mapping discards those spans and
+  reports the drop; see "Ingress and egress mapping." Removing that decode path, and the
+  local proto fields that carry it, may land independently of the typed migration.
 - Exact wire parity with the Datadog Agent's complete OTLP converter, including its
   legacy metadata encodings and configuration-dependent synthetic tags.
 
@@ -178,13 +183,24 @@ Until indexed decoding is implemented, the source discards every non-empty
 produces zero events and is acknowledged after the discard is reported, avoiding retries
 that cannot succeed on the same Vector version.
 
-After indexed entries are handled as above, a standard `AgentPayload` whose
-`tracerPayloads` repeated field is empty, or a `TracerPayload` whose `chunks` repeated
+After indexed entries are handled as above, a modern `AgentPayload` whose
+`tracerPayloads` repeated field is empty and whose historical `traces` and
+`transactions` fields are also empty, or a `TracerPayload` whose `chunks` repeated
 field is empty, produces zero `TraceEvent`s: there is no
 `TraceChunk` from which to populate `TraceEvent.datadog.chunk` and no event grouping is
-well-defined in isolation, so the wire input has no `TraceEvent` representation. The
+well-defined in isolation, so the wire input has no `TraceEvent` representation. That
 standard-empty case is lossless because it carries no span data the Datadog backend
 would observe.
+
+A payload whose `tracerPayloads` is empty but whose `traces` or `transactions` fields
+carry spans is the pre-`tracerPayloads` shape. Today's source routes it to
+`handle_dd_trace_payload_v0`, which emits one event per `APITrace` and one event per
+`transactions` span. The typed mapping does not ingest that shape: those spans are
+discarded and reported, and the request is acknowledged so it is not retried. This is
+not a lossless empty payload. Adopting the upstream `AgentPayload` proto, which does not
+declare fields 3 and 4, makes the same spans undecodable unknown fields; the independent
+removal of that path must still report an empty-`tracerPayloads` payload so an operator
+on an Agent old enough to emit it gets a diagnosable signal.
 
 An `AgentPayload` with at least one `TracerPayload` carrying at least one `TraceChunk`
 with at least one span expands into one `TraceEvent` per
@@ -503,9 +519,7 @@ values use their canonical variants, and other `i32` values use `Other`. `None` 
 reserved for events with no source priority, such as an OTLP event without recovered
 Datadog chunk state. On Datadog egress, that `None` emits `AutoKeep` (wire 1), matching
 today's `datadog_traces` sink and the Datadog Agent OTLP ingest at its default sampling
-rate. Wire `0` is reserved for an explicit `AutoReject`. Emitting the proto3 default
-zero for a missing priority would mark ordinary OTLP traces as `AutoReject` and can
-cause the Datadog backend to discard them.
+rate. Wire `0` is reserved for an explicit `AutoReject`.
 
 VRL access:
 
@@ -910,7 +924,9 @@ range value.
 ## Plan Of Attack
 
 Removing the obsolete `tracerPayloads`-empty ingest branch and adopting the upstream
-Datadog protos may land independently.
+Datadog protos may land independently. That removal must report a payload whose
+`tracerPayloads` is empty, including one that still carries `traces` / `transactions`
+spans, rather than treating it as a lossless empty modern payload.
 
 The remaining work starts after the format-agnostic prerequisites (fallible proto decode
 boundary, temporary `TraceEventCompat` enum, legacy-layout hint precursor, and internal
