@@ -1032,8 +1032,13 @@ generated: configuration: {
 									}
 									default: "block"
 								}
-								description: "Event handling behavior when a buffer is full."
-								required:    false
+								description: """
+																		Controls what happens when a buffer reaches its configured size limit.
+
+																		If the disk fills, Vector follows this setting for new events. An event already being written
+																		finishes when space becomes available. Initialization and other I/O errors remain fatal.
+																		"""
+								required: false
 							}
 							max_events: {
 								type: uint: default: 500
