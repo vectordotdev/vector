@@ -127,6 +127,13 @@ spans inside populate `TraceEvent.spans`. `TraceEvent.datadog` and each
 `spans = []`, forwarded per the parent RFC's empty-spans guideline; on OTLP egress an
 empty-spans `TraceEvent` becomes one `ScopeSpans { spans: [] }`.
 
+The OTLP legacy shim applies the same grouping. A pre-flip per-span OTLP event converts
+one-to-one into a typed event whose `spans` holds that span. A legacy event that
+already carries more than one `ScopeSpans` grouping (for example `use_otlp_decoding`
+batch encoding) fans out to one typed event per `ScopeSpans`. Metadata, finalizers, and
+acknowledgements on the resulting sequence follow the parent RFC's conversion
+contract.
+
 | OTLP                                                               | Internal                                      |
 | ------------------------------------------------------------------ | --------------------------------------------- |
 | `ResourceSpans.resource.attributes["service.name"]`                | `Resource.service`                            |
@@ -445,7 +452,8 @@ extension) are owned by the parent RFC's Plan of Attack and must land first. OTL
 then proceeds through these obligations:
 
 1. Implement `LegacyTraceEvent -> TraceEvent` conversion and unique detection of
-   historical pre-hint OTLP layouts.
+   historical pre-hint OTLP layouts. The converter must fan out a legacy event that
+   carries more than one `ScopeSpans` grouping.
 2. Implement `TraceEvent -> OTLP` encoding satisfying the mapping and bridge-key
    contracts above.
 3. Establish the `OTLP -> Vector -> OTLP` effective-equivalence guarantee and validate

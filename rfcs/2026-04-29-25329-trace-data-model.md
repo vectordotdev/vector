@@ -187,9 +187,11 @@ transforms:
 ```
 
 `trace_representation` initially defaults to `legacy`. Typed mode accepts only trace input and
-converts before running VRL; path access never converts. VRL conditions do not convert,
-so typed conditions require an upstream typed `remap`. Because conversion is one-way,
-legacy mode rejects typed input with a representation-mismatch mapping error.
+converts before running VRL; path access never converts. A Datadog legacy event that holds a
+multi-service chunk becomes one typed event per distinct `Span.service`, and the program then
+runs independently on each result. VRL conditions do not convert, so typed conditions require an
+upstream typed `remap`. Because conversion is one-way, legacy mode rejects typed input with a
+representation-mismatch mapping error.
 
 In `typed` mode, a `TraceEvent` exposes its `Resource`, `Scope`, Datadog-native context,
 and `Vec<Span>` directly:
@@ -796,19 +798,36 @@ A present but unrecognized hint returns the same error without attempting detect
   typed accessors, so typed code cannot accidentally access an unconverted legacy event
   or enter a migration-only panic state.
 - A typed-aware sink or transform consumes `TraceEventCompat` at every trace-event
-  intake path and invokes a fallible `try_into_typed()` conversion. The `Typed` arm
-  returns its `TraceEvent` without migration work; the `Legacy` arm selects a
-  source-specific shim from the hint or, for a hintless record, the unique
-  format-shape detector match. A conversion error retains the original
+  intake path and invokes a fallible `try_into_typed()` conversion that yields zero or
+  more `TraceEvent`s. The `Typed` arm returns a one-element sequence containing its
+  `TraceEvent` without migration work. The `Legacy` arm selects a source-specific
+  shim from the hint or, for a hintless record, the unique format-shape detector
+  match. A Datadog legacy event is one `TraceChunk` and therefore becomes one typed
+  event per distinct `Span.service`; a singular conversion cannot satisfy that mapping
+  because each typed event has only one `Resource.service`, so it would drop spans or
+  assign some the wrong service. An OTLP legacy event that already carries more than
+  one `ScopeSpans` grouping (for example a `use_otlp_decoding` batch) becomes one
+  typed event per `ScopeSpans`. A conversion error retains the original
   `LegacyTraceEvent`, including metadata and finalizers, so the caller can report and
   drop it according to normal acknowledgement semantics. There is no reverse
-  conversion. A transform that emits the converted event wraps it as
+  conversion. A transform that emits converted events wraps each as
   `TraceEventCompat::Typed`.
+- Successful conversion clones the original `EventMetadata` onto every resulting
+  `TraceEvent`, sharing secrets, `datadog_api_key`, source identity, the
+  `vector.trace_legacy_layout` hint, and `EventFinalizers`. Acknowledgements therefore
+  wait for every resulting event, matching Vector's existing fan-out behavior (for
+  example remap assigning an array to `.`). A successful conversion that yields no
+  events consumes the original; its finalizers fire on drop. The default unused-event
+  status (`EventStatus::Dropped`) does not fail the batch. Per-span drops that the
+  selected mapping reports while converting a well-formed layout are not
+  conversion-API failures: remaining spans still produce typed events.
 - `remap.trace_representation` selects the VRL representation before program execution.
-  Typed mode calls `try_into_typed()` before constructing `VrlTarget`; legacy mode
-  accepts only `Legacy`. Pre-execution failures use the normal mapping-error,
-  `drop_on_error`, and `reroute_dropped` behavior. Once converted, an event remains typed
-  even when later VRL failure forwards it unmodified.
+  Typed mode calls `try_into_typed()` before constructing `VrlTarget` and then runs the
+  program once per resulting typed event; legacy mode accepts only `Legacy`.
+  Pre-execution conversion failure uses the normal mapping-error, `drop_on_error`,
+  and `reroute_dropped` behavior against the original event. A successful conversion
+  that yields no events is not a mapping error: remap emits nothing. Once converted,
+  each event remains typed even when later VRL failure forwards it unmodified.
 
 Per-component shims are unidirectional (`LegacyTraceEvent -> TraceEvent` only). The
 `datadog_agent` source ships with a shim and format-shape detector that know the
@@ -990,7 +1009,7 @@ conversion routines and detectors deleted.
   every event record and passes through fan-in, disk buffers, and `vector` source/sink
   hops unchanged (unlike `EventMetadata.source_type`, which the topology rewrites on
   every emission and so cannot serve as the selector across a serialised hop).
-  Conversion is explicit outside VRL; only the resulting `TraceEvent` exposes typed
+  Conversion is explicit outside VRL; only a resulting `TraceEvent` exposes typed
   accessors. Hintless records written before the precursor use format-shape detectors
   and convert only on exactly one match; this fallback does not rely on
   `EventMetadata.source_type`. The convention lives only for the duration of the
@@ -1332,13 +1351,14 @@ stage.
 4. **Establish typed VRL and migrate consumers.** Implement the typed paths, fallible
    trace constructors, and the trace-only
    `remap.trace_representation = "typed"` mode. The transform converts legacy input
-   before constructing `VrlTarget`; paths never convert. Then migrate `sample` and
-   `trace_to_log`. Each typed built-in consumer converts at intake and uses only
-   `TraceEvent`.
+   before constructing `VrlTarget` and runs once per resulting typed event; paths never
+   convert. Then migrate `sample` and `trace_to_log`. Each typed built-in consumer
+   converts at intake and uses only `TraceEvent`.
    `sample` remains per-event,
    so a multi-service Datadog chunk changes from incidental whole-chunk atomicity to one
-   decision per `(TraceChunk, Span.service)` event; `trace_to_log` emits a uniform
-   source-independent layout. Before the next stage, every migrated consumer must accept
+   decision per `(TraceChunk, Span.service)` event even when the input is still a
+   pre-flip legacy chunk; `trace_to_log` emits a uniform source-independent layout.
+   Before the next stage, every migrated consumer must accept
    both legacy and typed input and all typed VRL and round-trip contracts must hold.
 5. **Use the compile-time gate, publish migration guidance, and flip producers.** Remove
    untyped forwarding methods from `TraceEventCompat` and migrate every resulting Rust

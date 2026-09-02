@@ -193,15 +193,16 @@ with at least one span expands into one `TraceEvent` per
 The grouping rules are:
 
 - Each `TraceChunk` carrying at least one span becomes one `TraceEvent`. A chunk whose
-  spans use more than one `Span.service` is split into one event per distinct service;
-  egress re-coalesces such events back into a single chunk (see below). A `TraceChunk`
-  whose `spans` repeated field is empty produces zero `TraceEvent`s and the discard is
-  reported, extending the empty-`tracerPayloads` and empty-`chunks` rule above one level
-  down: no `Span.service` is available to populate `Resource.service`, and a chunk
-  envelope with no spans carries nothing the Datadog backend would observe. Datadog
-  ingress therefore never synthesizes an event that exists only to satisfy the parent
-  RFC's empty-spans rule; that rule still governs Datadog egress, which receives empty
-  events from OTLP-sourced relays and from transforms that filter every span out.
+  spans use more than one `Span.service` is split into one event per distinct service,
+  in first-seen `Span.service` order; egress re-coalesces such events back into a single
+  chunk (see below). A `TraceChunk` whose `spans` repeated field is empty produces zero
+  `TraceEvent`s and the discard is reported, extending the empty-`tracerPayloads` and
+  empty-`chunks` rule above one level down: no `Span.service` is available to populate
+  `Resource.service`, and a chunk envelope with no spans carries nothing the Datadog
+  backend would observe. Datadog ingress therefore never synthesizes an event that
+  exists only to satisfy the parent RFC's empty-spans rule; that rule still governs
+  Datadog egress, which receives empty events from OTLP-sourced relays and from
+  transforms that filter every span out.
 - The enclosing `TracerPayload`'s metadata (`hostname`, `env`, `containerID`,
   `languageName`, `tracerVersion`, etc.) populates the event's `Resource`. Per-span
   `Span.service` populates `Resource.service`.
@@ -217,6 +218,16 @@ The grouping rules are:
   `Some(SamplingPriority::AutoReject)` and every other `i32` maps through the parent
   RFC's canonical constructor.
 - `Scope` is left default; Datadog has no scope concept.
+
+The `datadog_agent` legacy shim applies the same grouping. Today's
+`convert_dd_tracer_payload` emits one `LegacyTraceEvent` per `TraceChunk`, including
+when that chunk contains more than one `Span.service`. Pre-flip source output keeps
+that one-event-per-chunk shape so existing legacy VRL is unchanged. The shim splits
+the chunk's successfully converted spans by distinct `Span.service` into the same
+typed events native ingest would have produced, in first-seen service order.
+Metadata, finalizers, and acknowledgements on the resulting sequence follow the
+parent RFC's conversion contract. An empty-spans
+legacy chunk converts to zero typed events and is reported, matching native ingest.
 
 | Datadog                                                       | Internal                                              |
 | ------------------------------------------------------------- | ----------------------------------------------------- |
@@ -896,7 +907,9 @@ boundary, temporary `TraceEventCompat` enum, legacy-layout hint precursor, and i
 `TypedTrace` proto extension) in the parent RFC:
 
 1. Implement `LegacyTraceEvent -> TraceEvent` conversion and unique detection of
-   historical pre-hint Datadog layouts.
+   historical pre-hint Datadog layouts. The converter must split a multi-service
+   chunk and apply the parent RFC's metadata and acknowledgement contract to the
+   resulting sequence.
 2. Implement `TraceEvent -> Datadog` encoding satisfying the mapping and egress contracts
    above.
 3. Establish the `Datadog -> Vector -> Datadog` effective-equivalence guarantee,
