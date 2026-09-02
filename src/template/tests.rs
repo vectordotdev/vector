@@ -847,6 +847,96 @@ fn static_uri_with_fragment_allowed() {
 }
 
 #[test]
+fn prefix_template_with_leading_strftime_needs_no_confinement() {
+    // A non-URI template whose first component is strftime (e.g. S3
+    // `key_prefix: "%Y/%m/"`, Kafka topic `%Y-%m`) has no literal prefix but
+    // also no event-field references. Its rendered value is operator-authored
+    // (time-derived), so prefix confinement must not be required.
+    for template_str in &["%Y/%m/", "%Y-%m", "logs-%Y/%m/%d.log"] {
+        let tpl = Template::try_from(*template_str).unwrap();
+        assert!(
+            ConfinementChecker::for_prefix_template(&tpl)
+                .unwrap()
+                .is_none(),
+            "expected no prefix confinement for {template_str}"
+        );
+    }
+}
+
+#[test]
+fn prefix_template_with_strftime_and_fields_still_confined() {
+    // When the template also references event fields, confinement still
+    // applies to the literal prefix.
+    let tpl = Template::try_from("logs-%Y/{{ tenant }}/").unwrap();
+    let checker = ConfinementChecker::for_prefix_template(&tpl)
+        .unwrap()
+        .unwrap();
+    assert!(checker.confine("logs-2001/tenant-a/").is_ok());
+    assert!(checker.confine("other/tenant-a/").is_err());
+}
+
+#[test]
+fn uri_template_with_strftime_query_builds_and_renders() {
+    // A URI with a strftime directive in an operator-authored query but no
+    // event-field references (e.g. `?date=%Y-%m-%d`) must build and render,
+    // not require the global opt-out. The query structure is fixed by the
+    // template; only the time-derived values change.
+    let ts = Utc
+        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+        .single()
+        .expect("invalid timestamp");
+    let mut event = Event::Log(LogEvent::from("x"));
+    event
+        .as_mut_log()
+        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
+
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://logs.example.com/ingest?date=%Y-%m-%d").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://logs.example.com/ingest?date=2001-02-03"
+    );
+    // Runtime confinement still applies to the authority.
+    assert!(
+        confined
+            .check_confinement("https://other.example.com/ingest?date=2001-02-03")
+            .is_err()
+    );
+}
+
+#[test]
+fn uri_template_with_strftime_fragment_builds_and_renders() {
+    // Same as the query case, but for an operator-authored fragment. The
+    // fragment structure is fixed by the template; only the time-derived
+    // values change.
+    let ts = Utc
+        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+        .single()
+        .expect("invalid timestamp");
+    let mut event = Event::Log(LogEvent::from("x"));
+    event
+        .as_mut_log()
+        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
+
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://logs.example.com/ingest#%Y-%m-%d").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://logs.example.com/ingest#2001-02-03"
+    );
+    // Runtime confinement still applies to the authority.
+    assert!(
+        confined
+            .check_confinement("https://other.example.com/ingest#2001-02-03")
+            .is_err()
+    );
+}
+
+#[test]
 fn no_static_uri_authority_rejected() {
     // `https://{{ host }}/ingest` has prefix `https://` — any host can be
     // rendered, so the confinement is meaningless. Must be rejected at build.
