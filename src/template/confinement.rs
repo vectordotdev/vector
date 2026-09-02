@@ -623,9 +623,11 @@ impl UriChecker {
         //    tenant value `ok?tenant=evil` renders
         //    `.../ingest/ok?tenant=evil`: same authority and path prefix but
         //    an attacker-controlled query. With an operator-authored query
-        //    (template has no field references), the rendered query must stay
-        //    within the operator-authored prefix; the remainder is
-        //    time-derived, never event-controlled.
+        //    (template has no field references), the rendered query must
+        //    start with the operator-authored verbatim prefix. The portion
+        //    beyond it is operator-authored literals plus time-derived
+        //    text — never event-controlled — so it is not further
+        //    restricted.
         let query_ok = match &self.query_prefix {
             None => uri.query().is_none(),
             Some(prefix) => uri.query().is_some_and(|q| q.starts_with(prefix.as_str())),
@@ -639,8 +641,10 @@ impl UriChecker {
 
         // 7. Fragment check. Only reached when the operator authored a
         //    fragment (otherwise step 1 rejected any raw `#`): the rendered
-        //    fragment must stay within the operator-authored prefix; the
-        //    remainder is time-derived. `http::Uri` strips fragments at parse,
+        //    fragment must start with the operator-authored verbatim
+        //    prefix. The portion beyond it is operator-authored literals
+        //    plus time-derived text — never event-controlled — so it is
+        //    not further restricted. `http::Uri` strips fragments at parse,
         //    so extract from the raw string.
         if let Some(fragment_prefix) = &self.fragment_prefix {
             let fragment = rendered.split_once('#').map(|(_, f)| f).unwrap_or_default();

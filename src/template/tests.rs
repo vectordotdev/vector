@@ -937,6 +937,83 @@ fn uri_template_with_strftime_fragment_builds_and_renders() {
 }
 
 #[test]
+fn uri_template_with_strftime_query_and_fragment_builds_and_renders() {
+    // Combined case: operator-authored query AND fragment, both with
+    // strftime directives and no field references. Both must be recorded
+    // as prefixes and enforced at render.
+    let ts = Utc
+        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+        .single()
+        .expect("invalid timestamp");
+    let mut event = Event::Log(LogEvent::from("x"));
+    event
+        .as_mut_log()
+        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
+
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://logs.example.com/ingest?date=%Y-%m-%d#%H").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://logs.example.com/ingest?date=2001-02-03#04"
+    );
+}
+
+#[test]
+fn uri_template_with_strftime_query_rejects_query_escape() {
+    // Negative case: the rendered query must stay within the operator-
+    // authored prefix. A query that escaped the prefix (e.g. a template
+    // bug or a mis-recorded prefix) is rejected at render.
+    let tpl = Template::try_from("https://logs.example.com/ingest?date=%Y-%m-%d").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
+
+    // Within the operator-authored prefix: fine.
+    assert!(
+        c.confine("https://logs.example.com/ingest?date=2001-02-03")
+            .is_ok()
+    );
+    // Different query structure: rejected.
+    assert!(
+        c.confine("https://logs.example.com/ingest?other=2001-02-03")
+            .is_err()
+    );
+    // No query at all: rejected.
+    assert!(c.confine("https://logs.example.com/ingest").is_err());
+}
+
+#[test]
+fn uri_template_with_strftime_fragment_rejects_fragment_escape() {
+    // Negative case: the rendered fragment must stay within the operator-
+    // authored prefix.
+    let tpl = Template::try_from("https://logs.example.com/ingest#date-%Y-%m-%d").unwrap();
+    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
+
+    // Within the operator-authored prefix: fine.
+    assert!(
+        c.confine("https://logs.example.com/ingest#date-2001-02-03")
+            .is_ok()
+    );
+    // Different fragment structure: rejected.
+    assert!(c.confine("https://logs.example.com/ingest#other").is_err());
+    // Missing fragment: rejected.
+    assert!(c.confine("https://logs.example.com/ingest").is_err());
+}
+
+#[test]
+fn prefix_template_with_leading_strftime_and_fields_rejected() {
+    // A template whose FIRST component is strftime AND that references
+    // event fields has no literal prefix to confine to, and does contain
+    // event-controlled content — it must still be rejected (NoDerivableBase)
+    // without the opt-out.
+    let tpl = Template::try_from("%Y/{{ tenant }}/").unwrap();
+    assert!(matches!(
+        ConfinementChecker::for_prefix_template(&tpl).unwrap_err(),
+        BuildError::NoDerivableBase { .. }
+    ));
+}
+
+#[test]
 fn no_static_uri_authority_rejected() {
     // `https://{{ host }}/ingest` has prefix `https://` — any host can be
     // rendered, so the confinement is meaningless. Must be rejected at build.
