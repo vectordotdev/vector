@@ -133,6 +133,9 @@ message Metric {
     AggregatedSummary3 aggregated_summary3 = 17;
   }
   string namespace = 11;
+  // Presence-aware namespace used by native JSON. Binary native retains the
+  // original namespace field so its wire representation remains unchanged.
+  optional string namespace_v2 = 22;
   uint32 interval_ms = 18;
   Value metadata = 19 [deprecated = true];
   Metadata metadata_full = 21;
