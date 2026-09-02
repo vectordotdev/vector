@@ -8,7 +8,6 @@ use std::{
 };
 
 use super::S3SinkConfig;
-#[cfg(feature = "codecs-parquet")]
 use super::config::S3BatchEncoding;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client},
@@ -492,6 +491,81 @@ async fn s3_flush_on_exhaustion() {
     assert_eq!(lines, response_lines); // if all events are received, and lines.len() < batch size, then a flush was performed.
 }
 
+#[tokio::test]
+async fn s3_avro_ocf_insert_message() {
+    use vector_lib::codecs::encoding::format::{AvroOcfSerializerConfig, AvroSerializerOptions};
+    use vrl::event_path;
+
+    let cx = SinkContext::default();
+    let bucket = uuid::Uuid::new_v4().to_string();
+    create_bucket(&bucket, false).await;
+
+    let config = S3SinkConfig {
+        batch_encoding: Some(S3BatchEncoding::AvroOcf(AvroOcfSerializerConfig::new(
+            AvroSerializerOptions {
+                schema: r#"{
+                    "type": "record",
+                    "name": "Log",
+                    "fields": [{"name": "message", "type": "string"}]
+                }"#
+                .to_owned(),
+            },
+        ))),
+        ..config(&bucket, 100, 5.0)
+    };
+
+    let prefix = config.key_prefix.clone();
+    let service = config.create_service(&cx.globals.proxy).await.unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
+
+    let (batch_notifier, receiver) = BatchNotifier::new_with_receiver();
+    let events: Vec<Event> = (0..10)
+        .map(|i| {
+            let mut log = LogEvent::from(format!("message_{i}"));
+            log.insert(event_path!("message"), format!("message_{i}"));
+            Event::from(log).with_batch_notifier(&batch_notifier)
+        })
+        .collect();
+
+    drop(batch_notifier);
+    run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+
+    let keys = get_keys(&bucket, prefix).await;
+    assert_eq!(keys.len(), 1);
+    assert!(
+        keys[0].ends_with(".avro"),
+        "expected .avro extension: {}",
+        keys[0]
+    );
+
+    let object = get_object(&bucket, keys[0].clone()).await;
+    assert_eq!(object.content_encoding, None);
+    assert_eq!(
+        object.content_type.as_deref(),
+        Some("application/octet-stream")
+    );
+
+    let body = object.body.collect().await.unwrap().into_bytes();
+    assert!(body.starts_with(b"Obj\x01"), "missing Avro OCF magic bytes");
+
+    let records = apache_avro::Reader::new(body.as_ref())
+        .expect("S3 object must be a valid Avro OCF file")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("Avro OCF records must decode");
+    assert_eq!(records.len(), 10);
+
+    for (index, record) in records.into_iter().enumerate() {
+        let apache_avro::types::Value::Record(fields) = record else {
+            panic!("expected Avro record");
+        };
+        assert!(fields.into_iter().any(|(name, value)| {
+            name == "message"
+                && value == apache_avro::types::Value::String(format!("message_{index}"))
+        }));
+    }
+}
+
 #[cfg(feature = "codecs-parquet")]
 #[tokio::test]
 async fn s3_parquet_insert_message() {
@@ -735,7 +809,6 @@ fn config(bucket: &str, batch_size: usize, timeout_secs: f64) -> S3SinkConfig {
         options: S3Options::default(),
         region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
-        #[cfg(feature = "codecs-parquet")]
         batch_encoding: None,
         compression: Compression::None,
         batch,

@@ -511,6 +511,7 @@ tonic-build = { workspace = true, optional = true }
 openssl-src = { version = "300", default-features = false, features = ["force-engine", "legacy"] }
 
 [dev-dependencies]
+apache-avro = { version = "0.21.0", default-features = false }
 approx = "0.5.1"
 strum.workspace = true
 assert_cmd = { version = "2.0.17", default-features = false }

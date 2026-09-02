@@ -27,6 +27,8 @@ use vector_common::internal_event::{
     ComponentEventsDropped, Count, InternalEventHandle, Registered, UNINTENTIONAL, emit, register,
 };
 use vector_config::configurable_component;
+
+use super::super::serializer::BatchSerializerCompression;
 use vector_core::event::Event;
 
 use super::arrow::{ArrowEncodingError, build_record_batch};
@@ -35,39 +37,10 @@ use crate::internal_events::{ArrowWriterError, JsonSerializationError, SchemaGen
 
 type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 
-/// Compression algorithm and optional level for archive objects.
-#[configurable_component]
-#[derive(Default, Copy, Clone, Debug, PartialEq)]
-#[configurable(metadata(
-    docs::enum_tag_description = "Compression codec applied per column page inside the Parquet file."
-))]
-#[serde(tag = "algorithm", rename_all = "snake_case")]
-pub enum ParquetCompression {
-    /// Zstd compression. Level must be between 1 and 21.
-    Zstd {
-        /// Compression level (1–21). This is the range Vector supports; higher values compress more but are slower.
-        #[configurable(validation(range(min = 1, max = 21)))]
-        level: u8,
-    },
-    /// Gzip compression. Level must be between 1 and 9.
-    Gzip {
-        /// Compression level (1–9). This is the range Vector supports; higher values compress more but are slower.
-        #[configurable(validation(range(min = 1, max = 9)))]
-        level: u8,
-    },
+/// Compatibility alias for the shared batch-file compression configuration.
+pub type ParquetCompression = BatchSerializerCompression;
 
-    /// Snappy compression (no level).
-    #[default]
-    Snappy,
-
-    /// LZ4 raw compression
-    Lz4,
-
-    /// No compression
-    None,
-}
-
-impl TryFrom<ParquetCompression> for ParquetCodecCompression {
+impl TryFrom<BatchSerializerCompression> for ParquetCodecCompression {
     type Error = parquet::errors::ParquetError;
     fn try_from(
         value: ParquetCompression,
@@ -75,6 +48,9 @@ impl TryFrom<ParquetCompression> for ParquetCodecCompression {
         match value {
             ParquetCompression::None => Ok(ParquetCodecCompression::UNCOMPRESSED),
             ParquetCompression::Snappy => Ok(ParquetCodecCompression::SNAPPY),
+            ParquetCompression::Deflate => Err(parquet::errors::ParquetError::General(
+                "Parquet does not support deflate compression; use gzip or zstd instead".to_owned(),
+            )),
             ParquetCompression::Zstd { level } => Ok(ParquetCodecCompression::ZSTD(
                 ZstdLevel::try_new(level.into())?,
             )),
@@ -641,6 +617,18 @@ mod tests {
             .expect("Empty events should succeed");
 
         assert!(buffer.is_empty(), "Buffer should be empty for empty events");
+    }
+
+    #[test]
+    fn test_parquet_rejects_deflate_compression() {
+        let result = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_mode: ParquetSchemaMode::AutoInfer,
+            compression: BatchSerializerCompression::Deflate,
+            ..Default::default()
+        });
+
+        let error = result.expect_err("Parquet must reject Deflate compression");
+        assert!(error.to_string().contains("does not support deflate"));
     }
 
     #[test]

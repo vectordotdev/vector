@@ -7,29 +7,30 @@ use vector_core::event::Event;
 use crate::encoding::ArrowStreamSerializer;
 #[cfg(feature = "parquet")]
 use crate::encoding::ParquetSerializer;
+use crate::encoding::format::AvroOcfSerializer;
 use crate::{
     encoding::{Error, Framer, Serializer},
     internal_events::{EncoderFramingError, EncoderSerializeError},
 };
 
 /// The output of a batch encoding operation.
-///
-/// Only available when the `arrow` feature is enabled.
-#[cfg(feature = "arrow")]
 #[derive(Debug)]
 pub enum BatchOutput {
     /// An Arrow RecordBatch containing all events encoded as columnar data.
+    #[cfg(feature = "arrow")]
     Arrow(arrow::record_batch::RecordBatch),
 }
 
 /// Serializers that support batch encoding (encoding all events at once).
-///
-/// Only available when the `arrow` feature is enabled (the `parquet` feature
-/// implies `arrow`).
-#[cfg(feature = "arrow")]
 #[derive(Debug, Clone)]
 pub enum BatchSerializer {
+    /// Avro Object Container File (OCF) format serializer.
+    ///
+    /// Encodes a batch of events as a single, self-contained OCF file with an embedded schema and
+    /// randomly generated sync marker.
+    AvroOcf(AvroOcfSerializer),
     /// Arrow IPC stream format serializer.
+    #[cfg(feature = "arrow")]
     Arrow(ArrowStreamSerializer),
     /// Parquet format serializer.
     #[cfg(feature = "parquet")]
@@ -37,13 +38,11 @@ pub enum BatchSerializer {
 }
 
 /// An encoder that encodes batches of events.
-#[cfg(feature = "arrow")]
 #[derive(Debug, Clone)]
 pub struct BatchEncoder {
     serializer: BatchSerializer,
 }
 
-#[cfg(feature = "arrow")]
 impl BatchEncoder {
     /// Creates a new `BatchEncoder` with the specified batch serializer.
     pub const fn new(serializer: BatchSerializer) -> Self {
@@ -58,6 +57,8 @@ impl BatchEncoder {
     /// Get the HTTP content type.
     pub const fn content_type(&self) -> Option<&'static str> {
         match &self.serializer {
+            BatchSerializer::AvroOcf(_) => Some("application/octet-stream"),
+            #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(_) => Some("application/vnd.apache.arrow.stream"),
             #[cfg(feature = "parquet")]
             BatchSerializer::Parquet(_) => Some("application/vnd.apache.parquet"),
@@ -65,10 +66,14 @@ impl BatchEncoder {
     }
 
     /// Encode a batch of events into a `BatchOutput`.
-    pub fn encode_batch(&self, events: &[Event]) -> Result<BatchOutput, Error> {
+    pub fn encode_batch(&self, _events: &[Event]) -> Result<BatchOutput, Error> {
         match &self.serializer {
+            BatchSerializer::AvroOcf(_) => Err(Error::SerializingError(Box::from(
+                "AvroOcf serializer does not support encode_batch; use the tokio Encoder interface instead",
+            ))),
+            #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
-                let record_batch = serializer.encode_to_record_batch(events).map_err(|err| {
+                let record_batch = serializer.encode_to_record_batch(_events).map_err(|err| {
                     use crate::encoding::ArrowEncodingError;
                     match err {
                         ArrowEncodingError::NullConstraint { .. } => {
@@ -87,12 +92,16 @@ impl BatchEncoder {
     }
 }
 
-#[cfg(feature = "arrow")]
 impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
     type Error = Error;
 
+    #[allow(unused_variables)]
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match &mut self.serializer {
+            BatchSerializer::AvroOcf(serializer) => serializer
+                .encode(events, buffer)
+                .map_err(Error::SerializingError),
+            #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
                 serializer.encode(events, buffer).map_err(|err| {
                     use crate::encoding::ArrowEncodingError;
@@ -118,7 +127,6 @@ pub enum EncoderKind {
     /// Uses framing to encode individual events
     Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
-    #[cfg(feature = "arrow")]
     Batch(BatchEncoder),
 }
 
