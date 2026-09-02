@@ -146,15 +146,25 @@ enum State {
     },
 }
 
+/// The stage of the decompression pipeline an `io::Error` originated from, used to give the
+/// returned `internal` status a stage-specific prefix so failures stay diagnosable.
+#[derive(strum::Display)]
+#[strum(serialize_all = "lowercase")]
+enum DecompressStage {
+    Initialize,
+    Write,
+    Finalize,
+}
+
 /// Maps a decompressor `io::Error` to a gRPC [`Status`]: an oversized payload becomes
 /// `out_of_range` (a client fault, matching the existing >4GB handling) while anything else falls
-/// back to `internal` with `internal_msg` and the underlying error appended, so failures such as
-/// a corrupt or truncated payload stay diagnosable from the returned status.
-fn decompressor_error_to_status(error: &io::Error, internal_msg: &'static str) -> Status {
+/// back to `internal` with the stage the error came from and the underlying error appended, so
+/// failures such as a corrupt or truncated payload stay diagnosable from the returned status.
+fn decompressor_error_to_status(error: &io::Error, stage: DecompressStage) -> Status {
     if is_decompressed_size_limit_error(error) {
         Status::out_of_range("decompressed message exceeds the maximum allowed size")
     } else {
-        Status::internal(format!("{internal_msg}: {error}"))
+        Status::internal(format!("failed to {stage} decompressor: {error}"))
     }
 }
 
@@ -395,16 +405,17 @@ async fn drive_body_decompression(
                                         "compressed frames without a negotiated scheme are rejected earlier",
                                     );
                                     slot.insert(Decompressor::new(scheme).map_err(|error| {
-                                        Status::internal(format!(
-                                            "failed to initialize decompressor: {error}"
-                                        ))
+                                        decompressor_error_to_status(
+                                            &error,
+                                            DecompressStage::Initialize,
+                                        )
                                     })?)
                                 }
                             };
                             if let Err(error) = d.write_all(&buf[..to_take]) {
                                 return Err(decompressor_error_to_status(
                                     &error,
-                                    "failed to write to decompressor",
+                                    DecompressStage::Write,
                                 ));
                             }
 
@@ -430,7 +441,7 @@ async fn drive_body_decompression(
                         // or truncated message, surfaced as an internal error with the underlying
                         // cause attached so the failure is diagnosable.
                         let mut buf = result.map_err(|error| {
-                            decompressor_error_to_status(&error, "failed to finalize decompressor")
+                            decompressor_error_to_status(&error, DecompressStage::Finalize)
                         })?;
                         bytes_received += buf.len();
 
