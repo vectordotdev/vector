@@ -166,6 +166,8 @@ impl<T: Bufferable> TopologyBuilder<T> {
             if !provides_instrumentation {
                 sender.with_usage_instrumentation(usage_handle.clone());
                 receiver.with_usage_instrumentation(usage_handle);
+            } else if stage.when_full == WhenFull::DropNewest {
+                sender.with_drop_newest_usage_instrumentation(usage_handle);
             }
 
             current_stage = Some((sender, receiver));

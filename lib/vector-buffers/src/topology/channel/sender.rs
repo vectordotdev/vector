@@ -222,6 +222,7 @@ pub struct BufferSender<T: Bufferable> {
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
     usage_instrumentation: Option<BufferUsageHandle>,
+    drop_newest_usage_instrumentation: Option<BufferUsageHandle>,
     #[derivative(Debug = "ignore")]
     send_duration: Option<Registered<BufferSendDuration>>,
     #[derivative(Debug = "ignore")]
@@ -236,6 +237,7 @@ impl<T: Bufferable> BufferSender<T> {
             overflow: None,
             when_full,
             usage_instrumentation: None,
+            drop_newest_usage_instrumentation: None,
             send_duration: None,
             custom_instrumentation: None,
         }
@@ -248,6 +250,7 @@ impl<T: Bufferable> BufferSender<T> {
             overflow: Some(Box::new(overflow)),
             when_full: WhenFull::Overflow,
             usage_instrumentation: None,
+            drop_newest_usage_instrumentation: None,
             send_duration: None,
             custom_instrumentation: None,
         }
@@ -266,6 +269,10 @@ impl<T: Bufferable> BufferSender<T> {
     /// Configures this sender to instrument the items passing through it.
     pub fn with_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
         self.usage_instrumentation = Some(handle);
+    }
+
+    pub(crate) fn with_drop_newest_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
+        self.drop_newest_usage_instrumentation = Some(handle);
     }
 
     /// Configures this sender to instrument the send duration.
@@ -303,6 +310,7 @@ impl<T: Bufferable> BufferSender<T> {
         let item_sizing = self
             .usage_instrumentation
             .as_ref()
+            .or(self.drop_newest_usage_instrumentation.as_ref())
             .map(|_| (item.event_count(), item.size_of()));
 
         let accounting = match self.when_full {
@@ -352,15 +360,14 @@ impl<T: Bufferable> BufferSender<T> {
             }
         };
 
-        // Backend filter drops are accounted directly through the backend's own
-        // usage handle (e.g. disk-v2's ledger), so they show up in the buffer
-        // stage's `received` / `dropped` metrics even when the `BufferSender`
-        // does not carry instrumentation. This block only reports fullness-driven
-        // drops captured via `was_dropped`.
-        if let Some(instrumentation) = self.usage_instrumentation.as_ref()
-            && let Some((item_count, item_size)) = item_sizing
-        {
-            accounting.record(instrumentation, item_count, item_size);
+        if let Some((item_count, item_size)) = item_sizing {
+            if let Some(instrumentation) = self.usage_instrumentation.as_ref() {
+                accounting.record(instrumentation, item_count, item_size);
+            } else if matches!(&accounting, UsageAccounting::DroppedNewest)
+                && let Some(instrumentation) = self.drop_newest_usage_instrumentation.as_ref()
+            {
+                accounting.record(instrumentation, item_count, item_size);
+            }
         }
         if let Some(send_duration) = self.send_duration.as_ref()
             && let Some(send_reference) = send_reference

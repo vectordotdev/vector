@@ -5,15 +5,18 @@ use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 
 use super::{
-    create_buffer_v2_with_data_file_count_limit, create_buffer_v2_with_max_data_file_size,
-    create_buffer_v2_with_max_record_size_and_usage, read_next, read_next_some,
+    create_buffer_v2_with_data_file_count_limit,
+    create_buffer_v2_with_data_file_count_limit_and_usage,
+    create_buffer_v2_with_max_data_file_size, create_buffer_v2_with_max_record_size_and_usage,
+    read_next, read_next_some,
 };
 use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus};
 
 use crate::{
-    assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
-    assert_reader_writer_v2_file_positions,
+    WhenFull, assert_buffer_is_empty, assert_buffer_records, assert_buffer_size,
+    assert_enough_bytes_written, assert_reader_writer_v2_file_positions,
     test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
+    topology::channel::{BufferSender, SenderAdapter},
     variants::disk_v2::{
         TryWriteOutcome,
         common::align16,
@@ -465,6 +468,42 @@ async fn writer_try_write_returns_when_buffer_is_full() {
                 .await
                 .expect("write should not fail");
             assert!(matches!(second_write_result, TryWriteOutcome::Full(_)));
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn buffer_sender_drop_newest_tracks_intentional_drop() {
+    let _a = install_tracing_helpers();
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let record = SizedRecord::new(96);
+            let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
+            let (writer, _, _, usage) = create_buffer_v2_with_data_file_count_limit_and_usage(
+                data_dir,
+                max_data_file_size,
+                2,
+            )
+            .await;
+            let mut sender = BufferSender::new(SenderAdapter::from(writer), WhenFull::DropNewest);
+            sender.with_drop_newest_usage_instrumentation(usage.clone());
+
+            sender
+                .send(record.clone(), None)
+                .await
+                .expect("send should not fail");
+            sender.flush().await.expect("flush should not fail");
+            sender
+                .send(record, None)
+                .await
+                .expect("send should not fail");
+
+            let snapshot = usage.snapshot();
+            assert_eq!(snapshot.received_event_count, 2);
+            assert_eq!(snapshot.dropped_event_count_intentional, 1);
         }
     })
     .await;
