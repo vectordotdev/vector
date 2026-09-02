@@ -774,6 +774,7 @@ sources-opentelemetry = [
   "vector-lib/opentelemetry",
   "dep:prost",
   "dep:prost-types",
+  "dep:tonic-health",
   "sources-http_server",
   "sources-utils-http",
   "sources-utils-http-headers",

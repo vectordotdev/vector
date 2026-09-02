@@ -22,7 +22,8 @@ use crate::{
 };
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
-use tonic::transport::server::RoutesBuilder;
+use tonic::{server::NamedService, transport::server::RoutesBuilder};
+use tonic_health::server::health_reporter;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
     codecs::decoding::{OtlpDeserializer, OtlpSignalType},
@@ -320,8 +321,28 @@ impl OpentelemetryConfig {
         })
         .max_decoding_message_size(max_decompressed_size_bytes());
 
+        // Serve the standard `grpc.health.v1.Health` service, as the `vector` source does, so a
+        // health check on this port gets a real gRPC status instead of the bare HTTP 404 that an
+        // unrouted method returns. The reporter already reports the aggregate (empty) service name
+        // as serving, and that is the name a probe sends unless it is told otherwise.
+        let (mut health_reporter, health_service) = health_reporter();
+
+        // Report each OTLP service by name as well, so a probe can target a single signal. The
+        // names come from the generated `NamedService` implementations because a hand-written
+        // string could drift from the routes registered below.
+        for service_name in [
+            <LogsServiceServer<Service> as NamedService>::NAME,
+            <MetricsServiceServer<Service> as NamedService>::NAME,
+            <TraceServiceServer<Service> as NamedService>::NAME,
+        ] {
+            health_reporter
+                .set_service_status(service_name, tonic_health::ServingStatus::Serving)
+                .await;
+        }
+
         let mut builder = RoutesBuilder::default();
         builder
+            .add_service(health_service)
             .add_service(log_service)
             .add_service(metrics_service)
             .add_service(trace_service);
