@@ -14,7 +14,7 @@ pub struct Cli {
     clippy: bool,
 
     /// Exact feature set to check. Include `default` to enable the default features.
-    #[arg(short = 'F', long, value_delimiter = ',', env = "FEATURES")]
+    #[arg(short = 'F', long, value_delimiter = ',')]
     features: Vec<String>,
 
     #[arg(long)]
