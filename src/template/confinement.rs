@@ -243,7 +243,7 @@ impl ConfinementChecker {
     /// - `DynamicUriQueryOrFragment`: `?` or `#` with field references
     /// - `EncodedSeparatorInUriPrefix`: `%2F`, `%5C`, or backslash in prefix
     /// - `UnsupportedUriScheme`: non-HTTP(S) scheme like ftp://
-    pub(crate) fn for_uri_template(tpl: &UriTemplate) -> Result<Option<Self>, BuildError> {
+    pub(crate) fn for_uri_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
         match Self::validate_common(&tpl.inner)? {
             Some(prefix) => {
                 // Reject URI templates that have field references AND `?` or `#`.
@@ -279,7 +279,7 @@ impl ConfinementChecker {
     ///
     /// This prevents `UriTemplate::confine` from accepting `ftp://`, relative `/path`,
     /// or schemeless `//host` URIs even when static.
-    fn validate_static_uri(tpl: &UriTemplate) -> Result<(), BuildError> {
+    fn validate_static_uri(tpl: &Template) -> Result<(), BuildError> {
         // Static templates don't need a runtime checker, but we still enforce
         // HTTP/HTTPS scheme and a non-empty authority (host) uniformly.
         UriChecker::parse_http_uri(tpl.get_ref()).map(|_| ())

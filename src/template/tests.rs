@@ -1,6 +1,5 @@
 use chrono::{Offset, TimeZone, Utc};
 use chrono_tz::Tz;
-use vector_config::schema::generate_root_schema;
 use vector_lib::{
     config::LogNamespace,
     lookup::{PathPrefix, metadata_path},
@@ -10,85 +9,6 @@ use vrl::event_path;
 
 use super::*;
 use crate::event::{Event, LogEvent, MetricKind, MetricValue};
-
-// =============================================================================
-// UriTemplate serde and schema tests
-// =============================================================================
-
-#[test]
-fn template_marker_is_ignored_by_configurable() {
-    // `Template` and `UriTemplate` are concrete newtypes over `UnconfinedTemplate` that
-    // must report the same referenceable name (so the generator emits a single shared
-    // schema definition) and generate an identical schema.
-    assert_eq!(
-        <Template as Configurable>::referenceable_name(),
-        <UriTemplate as Configurable>::referenceable_name(),
-    );
-    assert_eq!(
-        <Template as Configurable>::referenceable_name(),
-        Some("vector::template::Template"),
-    );
-
-    let prefix_schema = serde_json::to_value(generate_root_schema::<Template>().unwrap()).unwrap();
-    let uri_schema = serde_json::to_value(generate_root_schema::<UriTemplate>().unwrap()).unwrap();
-    assert_eq!(prefix_schema, uri_schema);
-}
-
-#[test]
-fn template_schema_is_templateable() {
-    // Documentation generation keys off the `docs::templateable` metadata flag, so it must
-    // survive the hand-written `Configurable` impl for both markers.
-    for schema in [
-        generate_root_schema::<Template>().unwrap(),
-        generate_root_schema::<UriTemplate>().unwrap(),
-    ] {
-        let metadata = serde_json::to_value(&schema.schema).unwrap();
-        assert_eq!(
-            metadata.pointer("/_metadata/docs::templateable"),
-            Some(&serde_json::json!(true)),
-            "schema must carry the docs::templateable flag: {metadata}"
-        );
-    }
-}
-
-#[test]
-fn uri_template_schema_is_string() {
-    // UriTemplate must generate a plain string schema (same as Template).
-    let root_schema = generate_root_schema::<UriTemplate>().unwrap();
-    let schema_value = serde_json::to_value(&root_schema.schema).unwrap();
-
-    // The schema must have type: "string" and no object/array/oneOf/anyOf
-    let schema_obj = schema_value.as_object().expect("schema must be an object");
-    assert_eq!(
-        schema_obj.get("type"),
-        Some(&serde_json::json!("string")),
-        "UriTemplate schema must have type: string"
-    );
-    assert!(
-        !schema_obj.contains_key("properties"),
-        "UriTemplate must not have properties (not an object)"
-    );
-    assert!(
-        !schema_obj.contains_key("additionalProperties"),
-        "UriTemplate must not have additionalProperties"
-    );
-    assert!(
-        !schema_obj.contains_key("items"),
-        "UriTemplate must not have items (not an array)"
-    );
-    assert!(
-        !schema_obj.contains_key("oneOf"),
-        "UriTemplate must not be a oneOf"
-    );
-    assert!(
-        !schema_obj.contains_key("anyOf"),
-        "UriTemplate must not be an anyOf"
-    );
-    assert!(
-        !schema_obj.contains_key("allOf"),
-        "UriTemplate must not be an allOf"
-    );
-}
 
 #[test]
 fn uri_template_serde_roundtrip_string() {
@@ -651,7 +571,7 @@ fn uri_path_traversal_rejected() {
     // `https://api.internal/ingest/{{ tenant }}` with `../../admin` passes the
     // authority check (same host) but must be caught by the path-prefix +
     // `..` checks.
-    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
 
     assert!(c.confine("https://api.internal/ingest/acme").is_ok());
@@ -672,7 +592,7 @@ fn uri_percent_encoded_dotdot_rejected() {
     // Servers that decode percent-encoding before path resolution can be
     // tricked by `%2e%2e` instead of `..`.  All encoded variants must be
     // rejected alongside the literal `..`.
-    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
 
     assert!(c.confine("https://api.internal/ingest/legit").is_ok());
@@ -706,7 +626,7 @@ fn uri_encoded_slash_traversal_rejected() {
     // alone would miss it. Many HTTP servers decode `%2f` before resolving the
     // path, turning the single segment into `../admin` and escaping the prefix.
     // We must also reject `%5c` (encoded backslash) for Windows-backed services.
-    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
 
     assert!(matches!(
@@ -733,7 +653,7 @@ fn uri_encoded_slash_traversal_rejected() {
 
 #[test]
 fn uri_authority_mismatch_rejected() {
-    let tpl = UriTemplate::try_from("https://trusted.example.com/{{ path }}").unwrap();
+    let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
 
     // Normal path extension is fine.
@@ -774,7 +694,7 @@ fn uri_path_field_cannot_smuggle_backslash() {
     // Raw `\` is accepted by `http::Uri` but Windows/IIS servers treat it
     // as a path separator — `/ingest/..\admin` escapes the prefix on those
     // hosts. Reject at render time.
-    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
     assert!(matches!(
         c.confine("https://api.internal/ingest/..\\admin")
@@ -793,7 +713,7 @@ fn uri_path_field_cannot_smuggle_double_encoded_traversal() {
     // `%25` is the encoded form of `%`. A proxy that decodes once turns
     // `%252e%252e%252fadmin` into `%2e%2e%2fadmin`; a second decoder
     // resolves it to `../admin`. Reject at render time.
-    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
     assert!(matches!(
         c.confine("https://api.internal/ingest/%252e%252e%252fadmin")
@@ -807,7 +727,7 @@ fn uri_path_field_cannot_smuggle_query() {
     // Templates with no `?` build successfully. A field value that smuggles
     // `?...` into the path (e.g. tenant=`ok?tenant=evil`) is caught at
     // render time via the query-rejection check.
-    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
     assert!(matches!(
         c.confine("https://api.internal/ingest/ok?tenant=evil")
@@ -851,7 +771,7 @@ fn uri_path_field_cannot_smuggle_fragment() {
     // Dynamic URI templates cannot have field-injected fragments.
     // Although `http::Uri` strips fragments server-side, the raw `#` can
     // affect client-side routing/logging and must be rejected.
-    let tpl = UriTemplate::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
+    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
 
     // Check that we detect fragments before parsing strips them
@@ -889,7 +809,7 @@ fn uri_template_with_query_or_fragment_rejected_at_build() {
         "https://api.internal/base/{{ tenant }}/ingest#frag",
         "https://api.internal/base/{{ tenant }}#frag",
     ] {
-        let tpl = UriTemplate::try_from(*template_str).unwrap();
+        let tpl = Template::try_from(*template_str).unwrap();
         assert!(
             matches!(
                 ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
@@ -905,7 +825,7 @@ fn static_uri_with_query_allowed() {
     // A fully static URI (no `{{ }}`) with a query string is safe: the
     // rendered value is fixed and cannot be influenced by event data.
     // No checker is installed; `Ok(None)` is the expected result.
-    let tpl = UriTemplate::try_from("https://api.internal/ingest?source=vector").unwrap();
+    let tpl = Template::try_from("https://api.internal/ingest?source=vector").unwrap();
     assert!(
         ConfinementChecker::for_uri_template(&tpl)
             .unwrap()
@@ -918,7 +838,7 @@ fn static_uri_with_fragment_allowed() {
     // A fully static URI (no `{{ }}`) with a fragment is safe: the
     // rendered value is fixed and cannot be influenced by event data.
     // No checker is installed; `Ok(None)` is the expected result.
-    let tpl = UriTemplate::try_from("https://api.internal/ingest#section").unwrap();
+    let tpl = Template::try_from("https://api.internal/ingest#section").unwrap();
     assert!(
         ConfinementChecker::for_uri_template(&tpl)
             .unwrap()
@@ -931,7 +851,7 @@ fn no_static_uri_authority_rejected() {
     // `https://{{ host }}/ingest` has prefix `https://` — any host can be
     // rendered, so the confinement is meaningless. Must be rejected at build.
     for template_str in &["https://{{ host }}/ingest", "http://{{ host }}/path"] {
-        let tpl = UriTemplate::try_from(*template_str).unwrap();
+        let tpl = Template::try_from(*template_str).unwrap();
         assert!(
             matches!(
                 ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
@@ -941,7 +861,7 @@ fn no_static_uri_authority_rejected() {
         );
     }
     // A template with a static host followed by a `/` is accepted.
-    let tpl = UriTemplate::try_from("https://trusted.example.com/{{ path }}").unwrap();
+    let tpl = Template::try_from("https://trusted.example.com/{{ path }}").unwrap();
     assert!(
         ConfinementChecker::for_uri_template(&tpl)
             .unwrap()
@@ -956,7 +876,7 @@ fn partial_uri_authority_rejected() {
         "https://tenant.{{ env }}.example.com/",
         "https://api.internal{{ path }}",
     ] {
-        let tpl = UriTemplate::try_from(*template_str).unwrap();
+        let tpl = Template::try_from(*template_str).unwrap();
         assert!(
             matches!(
                 ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
