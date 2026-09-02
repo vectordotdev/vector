@@ -2224,7 +2224,7 @@ dependencies = [
  "bitflags 2.10.0",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "regex",
@@ -7177,7 +7177,7 @@ dependencies = [
  "itoa",
  "lockfree-object-pool",
  "metrics",
- "metrics-util",
+ "metrics-util 0.18.0",
  "once_cell",
  "tracing 0.1.44",
  "tracing-core 0.1.36",
@@ -7199,6 +7199,24 @@ dependencies = [
  "ordered-float 4.6.0",
  "quanta",
  "radix_trie",
+ "sketches-ddsketch",
+]
+
+[[package]]
+name = "metrics-util"
+version = "0.20.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96f8722f8562635f92f8ed992f26df0532266eb03d5202607c20c0d7e9745e13"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+ "hashbrown 0.16.0",
+ "indexmap 2.12.0",
+ "metrics",
+ "ordered-float 5.3.0",
+ "rand 0.9.4",
+ "rand_xoshiro",
+ "rapidhash",
  "sketches-ddsketch",
 ]
 
@@ -9052,7 +9070,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -9072,7 +9090,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "343d3bd7056eda839b03204e68deff7d1b13aba7af2b2fd16890697274262ee7"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "petgraph 0.8.3",
@@ -9106,7 +9124,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "syn 2.0.119",
@@ -9119,7 +9137,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "proc-macro2 1.0.106",
  "quote 1.0.45",
  "syn 2.0.119",
@@ -9634,6 +9652,15 @@ name = "rand_xorshift"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
+dependencies = [
+ "rand_core 0.9.0",
+]
+
+[[package]]
+name = "rand_xoshiro"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
 dependencies = [
  "rand_core 0.9.0",
 ]
@@ -13510,7 +13537,7 @@ dependencies = [
  "memmap2",
  "metrics",
  "metrics-tracing-context",
- "metrics-util",
+ "metrics-util 0.20.4",
  "num-traits",
  "proptest",
  "quickcheck",
@@ -13655,7 +13682,7 @@ dependencies = [
  "ipnet",
  "metrics",
  "metrics-tracing-context",
- "metrics-util",
+ "metrics-util 0.20.4",
  "mlua",
  "ndarray",
  "ndarray-stats",
