@@ -15,7 +15,9 @@ static IGNORED_PATHS: LazyLock<Vec<Pattern>> = LazyLock::new(|| {
         "*html",
         "*desc",
         "tests/data*",
-        "lib/codecs/tests/data*",
+        "*avsc",
+        "*avro",
+        "*pb",
         "lib/vector-core/tests/data*",
     ]
     .into_iter()
