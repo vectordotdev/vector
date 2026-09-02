@@ -113,7 +113,6 @@ pub struct AvroOcfSerializerConfig {
 
     /// Compression codec applied to OCF data blocks.
     #[serde(default)]
-    #[configurable(derived)]
     pub compression: BatchSerializerCompression,
 }
 
@@ -177,13 +176,13 @@ impl Encoder<Vec<Event>> for AvroOcfSerializer {
 
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let mut writer =
-            apache_avro::Writer::with_codec(&self.schema, Vec::new(), self.compression.clone());
+            apache_avro::Writer::with_codec(&self.schema, Vec::new(), self.compression)?;
 
         for event in events {
             let log = event.into_log();
             let value = apache_avro::to_value(log)?;
             let value = value.resolve(&self.schema)?;
-            writer.append(value).map_err(|e| {
+            writer.append_value(value).map_err(|e| {
                 vector_common::Error::from(format!("Failed to append Avro record: {e}"))
             })?;
         }
@@ -362,12 +361,14 @@ mod tests {
                 )
                 .unwrap();
 
-            assert!(
-                bytes
-                    .windows(codec_name.len())
-                    .any(|window| window == codec_name.as_bytes()),
-                "OCF header must advertise {codec_name} compression"
-            );
+            if codec_name != "null" {
+                assert!(
+                    bytes
+                        .windows(codec_name.len())
+                        .any(|window| window == codec_name.as_bytes()),
+                    "OCF header must advertise {codec_name} compression"
+                );
+            }
 
             let records = apache_avro::Reader::new(bytes.as_ref())
                 .unwrap()

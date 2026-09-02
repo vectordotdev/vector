@@ -491,8 +491,8 @@ fn generate_test_case_ocf_from_value(schema: &str, value: Value, filename: &str)
     // - The schema is embedded in the header using the full JSON (not PCF/canonical form),
     //   preserving doc strings, aliases, defaults, etc.
     // - Records are batched into blocks with correct count/size encoding
-    let mut writer = apache_avro::Writer::new(&schema, Vec::new());
-    writer.append(value)?;
+    let mut writer = apache_avro::Writer::new(&schema, Vec::new())?;
+    writer.append_value(value)?;
     let buf = writer.into_inner()?;
 
     // Create OCF file with .ocf.avro extension (schema is shared via .avsc)
