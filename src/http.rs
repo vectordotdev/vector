@@ -9,11 +9,13 @@ use std::{
 
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
+#[cfg(any(feature = "sinks-clickhouse", test))]
 use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
 use http::{
     HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
     uri::InvalidUri,
 };
+#[cfg(any(feature = "sinks-clickhouse", test))]
 use http_1::Request as RequestV1;
 use hyper::{
     body::{Body, HttpBody},
@@ -464,6 +466,7 @@ impl Auth {
         builder
     }
 
+    #[cfg(any(feature = "sinks-clickhouse", test))]
     pub(crate) fn apply_v1<B>(&self, request: &mut RequestV1<B>) {
         self.apply_headers_map_v1(request.headers_mut())
     }
@@ -495,6 +498,7 @@ impl Auth {
         }
     }
 
+    #[cfg(any(feature = "sinks-clickhouse", test))]
     fn apply_headers_map_v1(&self, map: &mut http_1::HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
