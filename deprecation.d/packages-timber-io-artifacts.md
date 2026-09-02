@@ -1,13 +1,13 @@
 ---
 what: "Stable Vector artifacts hosted at `packages.timber.io`"
-deprecated_since: "0.58.0"
+deprecated_since: "0.59.0"
 ---
 
 Stable Vector release archives and packages are now hosted in the public COSE
 release bucket. The `packages.timber.io/vector` URLs are deprecated and users should
 switch to `install.datadoghq.com/vector` instead.
 
-Starting with Vector `0.58.0`, the Vector installer and the download
+Starting with Vector `0.59.0`, the Vector installer and the download
 instructions on [vector.dev](https://vector.dev/download/) point to artifacts
 in the COSE bucket. Existing `packages.timber.io` URLs continue to work during
 the deprecation period.
