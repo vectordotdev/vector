@@ -338,6 +338,12 @@ impl RunningTopology {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
 
+        resolve_draining_disk_buffer_sinks(
+            &mut self.draining_disk_buffer_sinks,
+            required_disk_buffer_paths(&new_config, &diff),
+        )
+        .await;
+
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
@@ -376,6 +382,11 @@ impl RunningTopology {
         warn!("Failed to completely load new configuration. Restoring old configuration.");
 
         let diff = diff.flip();
+        resolve_draining_disk_buffer_sinks(
+            &mut self.draining_disk_buffer_sinks,
+            required_disk_buffer_paths(&self.config, &diff),
+        )
+        .await;
         if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&self.config, &diff)
             .with_buffers(buffers)
             .with_extra_context(extra_context.clone())
@@ -1605,6 +1616,38 @@ fn active_draining_disk_buffer_paths(drains: &mut Vec<DrainingDiskBufferSink>) -
         .collect()
 }
 
+fn required_disk_buffer_paths(config: &Config, diff: &ConfigDiff) -> HashSet<PathBuf> {
+    diff.sinks
+        .to_add
+        .iter()
+        .chain(&diff.sinks.to_change)
+        .chain(&diff.enrichment_tables.sinks.to_add)
+        .chain(&diff.enrichment_tables.sinks.to_change)
+        .flat_map(|key| disk_buffer_directories(config, key))
+        .collect()
+}
+
+async fn resolve_draining_disk_buffer_sinks(
+    drains: &mut Vec<DrainingDiskBufferSink>,
+    required_paths: HashSet<PathBuf>,
+) {
+    let mut remaining = Vec::with_capacity(drains.len());
+    for drain in drains.drain(..) {
+        let conflicts = drain
+            .buffer_paths
+            .iter()
+            .any(|path| required_paths.contains(path));
+        if drain.task.is_finished() || conflicts {
+            if let Err(error) = drain.task.await {
+                error!(%error, "Failed to join background disk buffer drain task.");
+            }
+        } else {
+            remaining.push(drain);
+        }
+    }
+    *drains = remaining;
+}
+
 fn register_draining_disk_buffer_sink(
     drains: &mut Vec<DrainingDiskBufferSink>,
     task: TaskHandle,
@@ -1660,17 +1703,32 @@ fn enrichment_table_sink_buffer(
 
 #[cfg(test)]
 mod disk_buffer_drain_tests {
-    use std::{collections::HashSet, num::NonZeroU64, path::PathBuf};
+    use std::{
+        collections::HashSet,
+        num::NonZeroU64,
+        path::PathBuf,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+    };
 
     use tokio::sync::oneshot;
-    use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
+    use vector_lib::{
+        buffers::{BufferConfig, BufferType, WhenFull},
+        gauge,
+        internal_event::GaugeName,
+    };
 
     use super::{
-        TaskOutput, active_draining_disk_buffer_paths, register_draining_disk_buffer_sink,
+        DrainingDiskBufferSink, TaskOutput, active_draining_disk_buffer_paths,
+        register_draining_disk_buffer_sink, resolve_draining_disk_buffer_sinks,
     };
     use crate::{
         config::{ComponentKey, Config, unit_test::UnitTestSourceConfig},
+        event::EventArray,
         test_util::mock::basic_sink,
+        utilization::{Utilization, UtilizationEmitter},
     };
 
     #[tokio::test]
@@ -1712,5 +1770,107 @@ mod disk_buffer_drain_tests {
         }
         assert!(active_draining_disk_buffer_paths(&mut drains).is_empty());
         assert!(drains.is_empty());
+    }
+
+    #[tokio::test]
+    async fn rebuild_waits_only_for_conflicting_drains() {
+        let conflicting_path = PathBuf::from("data/buffer/v2/readded");
+        let unrelated_path = PathBuf::from("data/buffer/v2/unrelated");
+        let (conflicting_tx, conflicting_rx) = oneshot::channel();
+        let (unrelated_tx, unrelated_rx) = oneshot::channel();
+        let unrelated_finished = Arc::new(AtomicBool::new(false));
+        let unrelated_finished_task = Arc::clone(&unrelated_finished);
+        let conflicting = tokio::spawn(async move {
+            _ = conflicting_rx.await;
+            Ok(TaskOutput::Healthcheck)
+        });
+        let unrelated = tokio::spawn(async move {
+            _ = unrelated_rx.await;
+            unrelated_finished_task.store(true, Ordering::SeqCst);
+            Ok(TaskOutput::Healthcheck)
+        });
+        tokio::task::yield_now().await;
+        let mut drains = vec![
+            DrainingDiskBufferSink {
+                task: conflicting,
+                buffer_paths: vec![conflicting_path.clone()],
+            },
+            DrainingDiskBufferSink {
+                task: unrelated,
+                buffer_paths: vec![unrelated_path.clone()],
+            },
+        ];
+
+        {
+            let resolve =
+                resolve_draining_disk_buffer_sinks(&mut drains, HashSet::from([conflicting_path]));
+            tokio::pin!(resolve);
+            assert!(futures::poll!(&mut resolve).is_pending());
+            conflicting_tx.send(()).unwrap();
+            resolve.await;
+        }
+
+        assert_eq!(drains.len(), 1);
+        assert_eq!(drains[0].buffer_paths, vec![unrelated_path]);
+        assert!(!unrelated_finished.load(Ordering::SeqCst));
+        unrelated_tx.send(()).unwrap();
+        drains.pop().unwrap().task.await.unwrap().unwrap();
+        assert!(unrelated_finished.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn completed_sink_is_reaped_before_reopening_its_disk_buffer() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let data_dir = data_dir.path().to_path_buf();
+        let sink_key = ComponentKey::from("readded");
+        let buffer = BufferConfig::Single(BufferType::DiskV2 {
+            max_size: NonZeroU64::new(268_435_488).unwrap(),
+            when_full: WhenFull::Block,
+        });
+        let (tx, rx) = buffer
+            .build::<EventArray>(
+                Some(data_dir.clone()),
+                sink_key.to_string(),
+                tracing::Span::none(),
+            )
+            .await
+            .unwrap();
+        drop(tx);
+        let (_, registry) = UtilizationEmitter::new();
+        let utilization_sender =
+            registry.add_component(sink_key.clone(), gauge!(GaugeName::Utilization));
+        let completed = tokio::spawn(async move {
+            Ok(TaskOutput::Sink(Utilization::new(
+                utilization_sender,
+                sink_key,
+                rx.into_stream(),
+            )))
+        });
+        while !completed.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        let buffer_path = data_dir.join("buffer/v2/readded");
+        let mut drains = vec![DrainingDiskBufferSink {
+            task: completed,
+            buffer_paths: vec![buffer_path],
+        }];
+
+        assert!(
+            buffer
+                .build::<EventArray>(
+                    Some(data_dir.clone()),
+                    "readded".into(),
+                    tracing::Span::none(),
+                )
+                .await
+                .is_err()
+        );
+        resolve_draining_disk_buffer_sinks(&mut drains, HashSet::new()).await;
+        assert!(drains.is_empty());
+
+        let reopened = buffer
+            .build::<EventArray>(Some(data_dir), "readded".into(), tracing::Span::none())
+            .await;
+        assert!(reopened.is_ok());
     }
 }

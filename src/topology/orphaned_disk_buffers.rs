@@ -2,9 +2,10 @@ use std::{
     collections::HashSet,
     fs, io,
     path::{Path, PathBuf},
-    sync::Arc,
+    thread,
 };
 
+use futures::executor;
 use tokio::sync::watch;
 use vector_lib::{buffers::BufferConfig, config::ComponentKey};
 
@@ -30,11 +31,16 @@ impl OrphanedDiskBufferScanner {
 
     fn spawn<S, R>(scan: S, report: R) -> Self
     where
-        S: Fn(&ScanRequest) -> io::Result<Vec<PathBuf>> + Send + Sync + 'static,
-        R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>) + Send + Sync + 'static,
+        S: Fn(&ScanRequest) -> io::Result<Vec<PathBuf>> + Send + 'static,
+        R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>) + Send + 'static,
     {
         let (sender, receiver) = watch::channel(None);
-        tokio::spawn(run_scanner(receiver, Arc::new(scan), Arc::new(report)));
+        if let Err(error) = thread::Builder::new()
+            .name("orphaned-disk-buffer-scanner".into())
+            .spawn(move || run_scanner(receiver, scan, report))
+        {
+            warn!(%error, message = "Failed to start unreferenced disk buffer scanner thread.");
+        }
         Self { sender }
     }
 
@@ -63,34 +69,26 @@ impl OrphanedDiskBufferScanner {
     }
 }
 
-async fn run_scanner<S, R>(
-    mut receiver: watch::Receiver<Option<ScanRequest>>,
-    scan: Arc<S>,
-    report: Arc<R>,
-) where
-    S: Fn(&ScanRequest) -> io::Result<Vec<PathBuf>> + Send + Sync + 'static,
-    R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>) + Send + Sync + 'static,
+fn run_scanner<S, R>(mut receiver: watch::Receiver<Option<ScanRequest>>, scan: S, report: R)
+where
+    S: Fn(&ScanRequest) -> io::Result<Vec<PathBuf>>,
+    R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>),
 {
-    while receiver.changed().await.is_ok() {
+    while executor::block_on(receiver.changed()).is_ok() {
         let Some(request) = receiver.borrow_and_update().clone() else {
             continue;
         };
-        let scan_request = request.clone();
-        let scan = Arc::clone(&scan);
-        let result = tokio::task::spawn_blocking(move || scan(&scan_request)).await;
+        if receiver.has_changed().is_err() {
+            break;
+        }
+        let result = scan(&request);
         let is_latest = receiver.has_changed().is_ok()
             && receiver
                 .borrow()
                 .as_ref()
                 .is_some_and(|latest| latest.generation == request.generation);
-        match result {
-            Ok(result) if is_latest => report(&request, result),
-            Err(error) if is_latest => warn!(
-                data_dir = request.data_dir.to_string_lossy().as_ref(),
-                %error,
-                message = "Failed to join unreferenced disk buffer scan task.",
-            ),
-            Ok(_) | Err(_) => {}
+        if is_latest {
+            report(&request, result);
         }
     }
 }
@@ -325,8 +323,8 @@ mod tests {
         receiver.recv_timeout(Duration::from_secs(2)).unwrap()
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn scanner_coalesces_requests_and_suppresses_stale_results() {
+    #[test]
+    fn scanner_coalesces_requests_and_suppresses_stale_results() {
         let (started_tx, started_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let release_rx = Arc::new(Mutex::new(release_rx));
@@ -353,8 +351,8 @@ mod tests {
         assert!(started_rx.try_recv().is_err());
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn scanner_schedule_and_drop_are_nonblocking_and_worker_terminates() {
+    #[test]
+    fn scanner_schedule_and_drop_are_nonblocking_and_worker_terminates() {
         let (release_tx, release_rx) = mpsc::channel();
         let release_rx = Arc::new(Mutex::new(release_rx));
         let (started_tx, started_rx) = mpsc::channel();
@@ -373,12 +371,42 @@ mod tests {
         scanner.schedule("latest".into(), HashSet::new());
         drop(scanner);
         release_tx.send(()).unwrap();
-        release_tx.send(()).unwrap();
 
         assert!(matches!(
             worker_rx.recv_timeout(Duration::from_secs(2)),
             Err(mpsc::RecvTimeoutError::Disconnected)
         ));
+        assert!(started_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn runtime_shutdown_does_not_wait_for_scan() {
+        let (release_tx, release_rx) = mpsc::channel();
+        let (started_tx, started_rx) = mpsc::channel();
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+
+        runtime.block_on(async {
+            let scanner = OrphanedDiskBufferScanner::spawn(
+                move |_| {
+                    started_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                    Ok(Vec::new())
+                },
+                |_, _| {},
+            );
+            scanner.schedule("scan".into(), HashSet::new());
+            recv(&started_rx);
+            drop(scanner);
+        });
+
+        let started = std::time::Instant::now();
+        drop(runtime);
+        assert!(started.elapsed() < Duration::from_millis(250));
+        release_tx.send(()).unwrap();
     }
 
     #[test]
