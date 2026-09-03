@@ -778,3 +778,63 @@ fn check_value_nesting_cost_with_mixed_variants() {
     assert!(check_value_nesting_cost(&value, 0, 7).is_ok());
     assert!(check_value_nesting_cost(&value, 0, 6).is_err());
 }
+
+#[test]
+fn truncated_protobuf_is_invalid_payload() {
+    let array = EventArray::Logs(vec![LogEvent::from("hello")]);
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(array, &mut buffer);
+    assert!(buffer.len() > 1);
+    buffer.truncate(buffer.len() - 1);
+
+    let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            crate::event::ser::DecodeError::InvalidProtobufPayload { .. }
+        ),
+        "truncated protobuf should be InvalidProtobufPayload, got {error:?}"
+    );
+    let message = error.to_string();
+    assert!(
+        message.contains("EventArray") && message.contains("EventWrapper"),
+        "invalid payload should report both decode attempts, got {message}"
+    );
+}
+
+#[test]
+fn unknown_event_array_variant_is_not_invalid_protobuf() {
+    // Field 4 is not a member of `EventArray.events`. Prost keeps it as an unknown
+    // field and leaves the oneof unset, which must not be reported as corrupt protobuf.
+    let buffer = bytes::Bytes::from_static(&[34, 0]);
+    let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            crate::event::ser::DecodeError::UnrecognizedEventVariant
+        ),
+        "unknown oneof tag should be UnrecognizedEventVariant, got {error:?}"
+    );
+}
+
+#[test]
+fn nan_float_is_rejected_by_encodable_decode() {
+    let proto_array = proto::EventArray {
+        events: Some(proto::event_array::Events::Logs(proto::LogArray {
+            logs: vec![proto::Log {
+                value: Some(proto::Value {
+                    kind: Some(proto::value::Kind::Float(f64::NAN)),
+                }),
+                ..proto::Log::default()
+            }],
+        })),
+    };
+    let mut buffer = BytesMut::with_capacity(64);
+    proto_array.encode(&mut buffer).unwrap();
+
+    let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
+    assert!(
+        matches!(error, crate::event::ser::DecodeError::NanFloat),
+        "NaN float should be NanFloat, got {error:?}"
+    );
+}

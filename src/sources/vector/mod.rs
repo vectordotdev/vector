@@ -11,7 +11,9 @@ use vector_lib::{
     config::LogNamespace,
     configurable::configurable_component,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    internal_event::{CountByteSize, InternalEventHandle as _},
+    internal_event::{
+        ComponentEventsDropped, CountByteSize, InternalEventHandle as _, UNINTENTIONAL,
+    },
 };
 
 use crate::{
@@ -20,7 +22,9 @@ use crate::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
     },
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{
+        EVENT_PROTO_DECODE_REASON, EventsReceived, GrpcEventDecodeError, StreamClosedError,
+    },
     proto::vector as proto,
     serde::bool_or_struct,
     sources::{
@@ -55,12 +59,27 @@ impl proto::Service for Service {
         &self,
         request: Request<proto::PushEventsRequest>,
     ) -> Result<Response<proto::PushEventsResponse>, Status> {
-        let mut events: Vec<Event> = request
-            .into_inner()
-            .events
-            .into_iter()
-            .map(Event::from)
-            .collect();
+        let request = request.into_inner();
+        let mut events = Vec::with_capacity(request.events.len());
+        let mut dropped = 0;
+        for wrapper in request.events {
+            match Event::try_from(wrapper) {
+                Ok(event) => events.push(event),
+                Err(error) => {
+                    dropped += 1;
+                    emit!(GrpcEventDecodeError { error });
+                }
+            }
+        }
+        if dropped > 0 {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: dropped,
+                reason: EVENT_PROTO_DECODE_REASON,
+            });
+        }
+        if events.is_empty() {
+            return Ok(Response::new(proto::PushEventsResponse {}));
+        }
 
         let now = Utc::now();
         for event in &mut events {

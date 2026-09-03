@@ -263,10 +263,11 @@ impl<'a> TapRunner<'a> {
 
         let core_event_wrapper =
             vector_core::event::proto::EventWrapper::decode(Bytes::from(bytes))
-                .map_err(|e| format!("Failed to decode event: {}", e))?;
+                .map_err(|error| format!("Failed to decode event: {error}"))?;
 
         // Convert to vector-core Event (which has Serialize)
-        let event: Event = core_event_wrapper.into();
+        let event = Event::try_from(core_event_wrapper)
+            .map_err(|error| format!("Failed to convert event: {error}"))?;
 
         // Serialize based on format
         match format {
