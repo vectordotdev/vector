@@ -147,9 +147,9 @@ markdown headings inside the body.
 ### Breaking
 
 Breaking fragments start with an H1 title (optionally with a Hugo-style `{#anchor}` for a stable
-backlink) followed by `## Summary` and `## Migration` sections. Only the `## Summary` content
-lands in the changelog list; the title, anchor, and `## Migration` body feed the
-auto-generated upgrade guide.
+backlink) followed by `## Summary` and `## Migration` sections. The `## Summary` content lands in
+the changelog list; the title and anchor are also rendered on the release page as links into the
+auto-generated upgrade guide, which uses the title, anchor, and `## Migration` body.
 
     $ cat changelog.d/env_var_interpolation.breaking.md
     # Environment variable interpolation disabled by default {#env-var-interpolation}

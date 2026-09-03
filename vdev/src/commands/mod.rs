@@ -83,6 +83,7 @@ mod package;
 mod release;
 mod run;
 mod status;
+mod style;
 mod test;
 mod test_vrl;
 mod version;

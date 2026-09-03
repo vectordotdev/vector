@@ -28,10 +28,8 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
     /// The timeout before a connection is forcefully closed during shutdown.
@@ -50,10 +48,8 @@ pub struct TcpConfig {
     #[serde(default = "default_port_key")]
     pub port_key: OptionalValuePath,
 
-    #[configurable(derived)]
     permit_origin: Option<IpAllowlistConfig>,
 
-    #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
     /// The size of the receive buffer used for each connection.

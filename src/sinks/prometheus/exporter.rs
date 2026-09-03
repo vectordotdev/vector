@@ -33,7 +33,10 @@ use vector_lib::{
 
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
-    config::{AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     event::{
         Event, EventStatus, Finalizable,
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
@@ -76,10 +79,8 @@ pub struct PrometheusExporterConfig {
     #[configurable(metadata(docs::examples = "192.160.0.10:9598"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
@@ -129,7 +130,6 @@ pub struct PrometheusExporterConfig {
     #[serde(default)]
     pub suppress_timestamp: bool,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -180,23 +180,6 @@ impl GenerateConfig for PrometheusExporterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        if self.flush_period_secs.is_zero() {
-            warn!(
-                "Disabling `flush_period_secs` (setting it to `0`) disables metric expiration, \
-                 which can result in unbounded memory growth if metric series cardinality is \
-                 unbounded."
-            );
-        }
-
-        validate_quantiles(&self.quantiles)?;
-
-        let sink = PrometheusExporter::new(self.clone());
-        let healthcheck = future::ok(()).boxed();
-
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         Input::metric()
     }
@@ -207,6 +190,36 @@ impl SinkConfig for PrometheusExporterConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for PrometheusExporterConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<()> {
+        validate_quantiles(&self.quantiles)?;
+
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &(),
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        if self.flush_period_secs.is_zero() {
+            warn!(
+                "Disabling `flush_period_secs` (setting it to `0`) disables metric expiration, \
+                 which can result in unbounded memory growth if metric series cardinality is \
+                 unbounded."
+            );
+        }
+
+        let sink = PrometheusExporter::new(self.clone());
+        let healthcheck = future::ok(()).boxed();
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 }
 
@@ -628,6 +641,23 @@ mod tests {
         crate::test_util::test_generate_config::<PrometheusExporterConfig>();
     }
 
+    #[test]
+    fn validate_accepts_zero_flush_period() {
+        // A zero flush period disables metric expiration and is valid.
+        let config = PrometheusExporterConfig {
+            flush_period_secs: std::time::Duration::from_secs(0),
+            ..Default::default()
+        };
+        config
+            .validate()
+            .expect("zero flush period should validate");
+
+        // The default config validates cleanly.
+        PrometheusExporterConfig::default()
+            .validate()
+            .expect("default config should validate");
+    }
+
     #[tokio::test]
     async fn prometheus_notls() {
         export_and_fetch_simple(None).await;
@@ -908,7 +938,9 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -997,7 +1029,9 @@ mod tests {
         let mut receiver = BatchNotifier::apply_to(&mut events[..]);
         assert_eq!(receiver.try_recv(), Err(TryRecvError::Empty));
 
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (_, delayed_event) = create_metric_gauge(Some("delayed".to_string()), 123.4);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(
             sink,
@@ -1475,7 +1509,11 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(config.build(SinkContext::default()).await.is_ok());
+        assert!(
+            SinkConfig::build(&config, SinkContext::default())
+                .await
+                .is_ok()
+        );
     }
 }
 
@@ -1569,7 +1607,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(2),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         let (_, delayed_event) = tests::create_metric_gauge(Some("delayed".to_string()), 123.4);
 
@@ -1607,7 +1647,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 
@@ -1664,7 +1706,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(3),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 
@@ -1711,7 +1755,9 @@ mod integration_tests {
             flush_period_secs: Duration::from_secs(0),
             ..Default::default()
         };
-        let (sink, _) = config.build(SinkContext::default()).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, SinkContext::default())
+            .await
+            .unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
 

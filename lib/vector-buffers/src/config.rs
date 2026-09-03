@@ -227,7 +227,6 @@ pub enum BufferType {
         #[serde(flatten)]
         size: MemoryBufferSize,
 
-        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },
@@ -250,7 +249,6 @@ pub enum BufferType {
         )]
         max_size: NonZeroU64,
 
-        #[configurable(derived)]
         #[serde(default)]
         when_full: WhenFull,
     },

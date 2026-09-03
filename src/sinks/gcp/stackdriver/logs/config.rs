@@ -10,14 +10,15 @@ use vrl::value::Kind;
 
 use super::{
     encoder::{
-        ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder,
+        StackdriverLabelConfig as EncoderLabelConfig, StackdriverLogsEncoder,
+        StackdriverResource as EncoderResource,
     },
     request_builder::StackdriverLogsRequestBuilder,
     service::StackdriverLogsServiceRequestBuilder,
     sink::StackdriverLogsSink,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
@@ -30,7 +31,7 @@ use crate::{
             service::TowerRequestConfigDefaults,
         },
     },
-    template::ConfinementConfig,
+    template::{ConfinementConfig, UnconfinedTemplate},
 };
 
 #[derive(Debug, Snafu)]
@@ -92,22 +93,17 @@ pub(super) struct StackdriverConfig {
     #[serde(flatten)]
     pub(super) auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(super) encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig<StackdriverTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     pub(super) tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -115,11 +111,9 @@ pub(super) struct StackdriverConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -193,7 +187,7 @@ pub(super) struct StackdriverLabelConfig {
     ))]
     #[configurable(metadata(docs::examples = "labels_examples()"))]
     #[serde(default)]
-    pub(super) labels: HashMap<String, Template>,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
 }
 
 fn labels_examples() -> HashMap<String, String> {
@@ -239,7 +233,7 @@ pub(super) struct StackdriverResource {
     #[serde(flatten)]
     #[configurable(metadata(docs::additional_props_description = "A type-specific label."))]
     #[configurable(metadata(docs::examples = "label_examples()"))]
-    pub(super) labels: HashMap<String, Template>,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
 }
 
 fn label_examples() -> HashMap<String, String> {
@@ -268,10 +262,6 @@ impl SinkConfig for StackdriverConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[async_trait::async_trait]
@@ -284,37 +274,14 @@ impl ValidatedSink for StackdriverConfig {
             .clone()
             .confine(&self.confinement, Self::NAME, "log_id")?;
 
-        // Confine every label value template. Stackdriver identifies
-        // destinations by `resource.type + resource.labels`, so an event-
-        // controlled label like `resource.labels.zone: "{{ zone }}"` is as
-        // steerable as `log_id` unless we confine it too. Same for arbitrary
-        // log-entry labels in `label_config.labels`.
-        let resource = ConfinedStackdriverResource {
+        let resource = EncoderResource {
             type_: self.resource.type_.clone(),
-            labels: self
-                .resource
-                .labels
-                .clone()
-                .into_iter()
-                .map(|(k, v)| {
-                    v.confine(&self.confinement, Self::NAME, "resource.labels")
-                        .map(|v| (k, v))
-                })
-                .collect::<crate::Result<_>>()?,
+            labels: self.resource.labels.clone(),
         };
 
-        let label_config = ConfinedStackdriverLabelConfig {
+        let label_config = EncoderLabelConfig {
             labels_key: self.label_config.labels_key.clone(),
-            labels: self
-                .label_config
-                .labels
-                .clone()
-                .into_iter()
-                .map(|(k, v)| {
-                    v.confine(&self.confinement, Self::NAME, "label_config.labels")
-                        .map(|v| (k, v))
-                })
-                .collect::<crate::Result<_>>()?,
+            labels: self.label_config.labels.clone(),
         };
 
         let encoder = StackdriverLogsEncoder::new(

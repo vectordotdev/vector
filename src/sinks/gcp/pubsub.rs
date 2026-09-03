@@ -12,8 +12,7 @@ use vector_lib::configurable::configurable_component;
 use crate::{
     codecs::{Encoder, EncodingConfig, Transformer},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, PUBSUB_URL, Scope},
@@ -78,22 +77,17 @@ pub struct PubsubConfig {
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<PubsubDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -127,10 +121,6 @@ impl SinkConfig for PubsubConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

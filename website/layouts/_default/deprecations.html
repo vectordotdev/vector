@@ -17,7 +17,7 @@
       {{ partial "hero.html" . }}
     </div>
 
-    <div id="page-content" class="mt-10">
+    <div id="page-content" data-pagefind-body class="mt-10">
       {{ if gt (len $pending) 0 }}
       <div>
         <div class="prose dark:prose-invert max-w-none">

@@ -5,5 +5,5 @@ sinks:
       - my-source-or-transform-id
     encoding:
       codec: json
-    subject: "{{ host }}"
+    subject: events-{{ host }}
     url: nats://demo.nats.io
