@@ -811,7 +811,9 @@ fn unknown_event_array_variant_is_not_invalid_protobuf() {
     assert!(
         matches!(
             error,
-            crate::event::ser::DecodeError::UnrecognizedEventVariant
+            crate::event::ser::DecodeError::InvalidEvent {
+                source: proto::EventProtoError::UnrecognizedEventVariant,
+            }
         ),
         "unknown oneof tag should be UnrecognizedEventVariant, got {error:?}"
     );
@@ -834,7 +836,12 @@ fn nan_float_is_rejected_by_encodable_decode() {
 
     let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
     assert!(
-        matches!(error, crate::event::ser::DecodeError::NanFloat),
+        matches!(
+            error,
+            crate::event::ser::DecodeError::InvalidEvent {
+                source: proto::EventProtoError::NanFloat,
+            }
+        ),
         "NaN float should be NanFloat, got {error:?}"
     );
 }

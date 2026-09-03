@@ -166,27 +166,10 @@ pub enum DecodeError {
     },
     #[snafu(display("unsupported encoding metadata for this context"))]
     UnsupportedEncodingMetadata,
-    #[snafu(display(
-        "event protobuf was structurally valid but an event or metric variant was absent or unrecognized; this often indicates a version mismatch"
-    ))]
-    UnrecognizedEventVariant,
-    #[snafu(display(
-        "event protobuf contained a NaN float, which cannot be represented in Vector's event model"
-    ))]
-    NanFloat,
-    #[snafu(display("event protobuf contained an invalid timestamp"))]
-    InvalidTimestamp,
+    #[snafu(transparent)]
+    InvalidEvent { source: proto::EventProtoError },
 }
 
-impl From<proto::EventProtoError> for DecodeError {
-    fn from(error: proto::EventProtoError) -> Self {
-        match error {
-            proto::EventProtoError::UnrecognizedEventVariant => Self::UnrecognizedEventVariant,
-            proto::EventProtoError::NanFloat => Self::NanFloat,
-            proto::EventProtoError::InvalidTimestamp => Self::InvalidTimestamp,
-        }
-    }
-}
 /// Flags for describing the encoding scheme used by our primary event types that flow through buffers.
 ///
 /// # Stability
