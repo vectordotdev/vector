@@ -31,7 +31,7 @@ mod common;
 use self::common::{Progress, arb_buffer_config};
 
 mod filesystem;
-use self::filesystem::TestFilesystem;
+pub(super) use self::filesystem::TestFilesystem;
 
 mod record;
 use self::record::Record;
