@@ -38,7 +38,35 @@ const CAPACITY_RETRY_MAX: Duration = Duration::from_secs(5);
 enum CapacityState {
     Ready,
     Retrying,
-    Failed(String),
+    Failed(TerminalError),
+}
+
+#[derive(Clone, Debug)]
+struct TerminalError {
+    kind: io::ErrorKind,
+    raw_os_error: Option<i32>,
+    message: String,
+}
+
+impl From<&io::Error> for TerminalError {
+    fn from(error: &io::Error) -> Self {
+        Self {
+            kind: error.kind(),
+            raw_os_error: error.raw_os_error(),
+            message: error.to_string(),
+        }
+    }
+}
+
+impl TerminalError {
+    fn to_io_error(&self) -> io::Error {
+        // io::Error can preserve either a raw OS error or a custom message, but not both.
+        // Prefer the raw error when present so callers retain its platform classification.
+        match self.raw_os_error {
+            Some(raw_os_error) => io::Error::from_raw_os_error(raw_os_error),
+            None => io::Error::new(self.kind, self.message.clone()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -197,13 +225,6 @@ where
         }
     }
 
-    fn check_terminal_error(&self) -> crate::Result<()> {
-        if let CapacityState::Failed(error) = &*self.capacity_state.lock().expect("poisoned") {
-            return Err(io::Error::other(error.clone()).into());
-        }
-        Ok(())
-    }
-
     fn is_capacity_blocked(&self) -> bool {
         matches!(
             *self.capacity_state.lock().expect("poisoned"),
@@ -284,7 +305,7 @@ where
                 error!(%error, "Disk buffer capacity retry failed.");
                 let mut capacity_state = self.capacity_state.lock().expect("poisoned");
                 if matches!(*capacity_state, CapacityState::Retrying) {
-                    *capacity_state = CapacityState::Failed(error.to_string());
+                    *capacity_state = CapacityState::Failed(TerminalError::from(error));
                     self.capacity_notify.notify_waiters();
                 }
             }
@@ -354,7 +375,7 @@ where
             match &*self.capacity_state.lock().expect("poisoned") {
                 CapacityState::Ready => return Ok(()),
                 CapacityState::Failed(error) => {
-                    return Err(io::Error::other(error.clone()).into());
+                    return Err(error.to_io_error().into());
                 }
                 CapacityState::Retrying => {}
             }
@@ -364,7 +385,13 @@ where
     }
 
     async fn try_send_record(self: &Arc<Self>, item: T) -> crate::Result<TryWriteOutcome<T>> {
-        self.check_terminal_error()?;
+        let mut item = item;
+        let finalizers = UnownedFinalizers::take(&mut item);
+        if let CapacityState::Failed(error) = &*self.capacity_state.lock().expect("poisoned") {
+            return Err(error.to_io_error().into());
+        }
+        finalizers.restore(&mut item);
+
         let pre_count = item.event_count() as u64;
         let pre_size = item.size_of() as u64;
         let Some(mut item) = item.filter_unencodable() else {
@@ -398,7 +425,7 @@ where
                     return Ok(TryWriteOutcome::Full(item));
                 }
                 CapacityState::Failed(error) => {
-                    return Err(io::Error::other(error.clone()).into());
+                    return Err(error.to_io_error().into());
                 }
             }
 
@@ -416,7 +443,7 @@ where
                             return Ok(TryWriteOutcome::Full(item));
                         }
                         CapacityState::Failed(error) => {
-                            return Err(io::Error::other(error.clone()).into());
+                            return Err(error.to_io_error().into());
                         }
                     }
                 }
@@ -482,7 +509,7 @@ where
                     CapacityState::Ready => false,
                     CapacityState::Retrying => true,
                     CapacityState::Failed(error) => {
-                        return Err(io::Error::other(error.clone()).into());
+                        return Err(error.to_io_error().into());
                     }
                 }
             };
@@ -500,7 +527,7 @@ where
                     CapacityState::Ready => false,
                     CapacityState::Retrying => true,
                     CapacityState::Failed(error) => {
-                        return Err(io::Error::other(error.clone()).into());
+                        return Err(error.to_io_error().into());
                     }
                 }
             };

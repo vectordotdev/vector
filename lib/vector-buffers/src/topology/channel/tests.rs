@@ -33,6 +33,15 @@ impl Drop for WriteGateCleanup {
     }
 }
 
+fn assert_terminal_permission_denied(error: vector_common::Error) {
+    let error = error
+        .downcast::<io::Error>()
+        .expect("terminal error should retain its I/O classification");
+    assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+    #[cfg(unix)]
+    assert_eq!(error.raw_os_error(), Some(libc::EACCES));
+}
+
 async fn assert_send_ok_with_capacities<T>(
     sender: &mut BufferSender<T>,
     value: impl Into<T>,
@@ -671,17 +680,39 @@ async fn terminal_capacity_retry_wakes_waiters_and_stays_failed() {
     let waiting = tokio::spawn(async move { blocker.send(Record::new(113, 64, 1), None).await });
     sleep(Duration::from_millis(20)).await;
     assert!(!waiting.is_finished(), "block send should await capacity");
+    #[cfg(unix)]
+    filesystem.fail_data_writes_after_raw_os_error(0, libc::EACCES);
+    #[cfg(not(unix))]
     filesystem.fail_data_writes_after(0, io::ErrorKind::PermissionDenied);
-    assert!(
+    assert_terminal_permission_denied(
         timeout(Duration::from_secs(1), waiting)
             .await
             .expect("terminal retry must wake the waiter")
             .unwrap()
-            .is_err()
+            .expect_err("terminal retry must fail the waiter"),
     );
-    assert!(
-        owner.send(Record::new(114, 64, 1), None).await.is_err(),
-        "terminal retry state must reject subsequent sends"
+
+    let mut rejected = Record::new(114, 64, 1);
+    let (batch, finalizer) = BatchNotifier::new_with_receiver();
+    rejected.add_batch_notifier(batch);
+    assert_terminal_permission_denied(
+        owner
+            .send(rejected, None)
+            .await
+            .expect_err("terminal retry state must reject subsequent sends"),
+    );
+    assert_eq!(
+        timeout(Duration::from_secs(1), finalizer)
+            .await
+            .expect("terminal send finalizer should resolve"),
+        BatchStatus::Errored,
+        "terminal sends must nack finalizers for source redelivery"
+    );
+    assert_terminal_permission_denied(
+        owner
+            .flush()
+            .await
+            .expect_err("terminal retry state must reject flushes"),
     );
     drop(owner);
     drop(reader);

@@ -35,7 +35,7 @@ struct FileInner {
 
 #[derive(Debug, Default)]
 struct FaultState {
-    data_write_error: Option<io::ErrorKind>,
+    data_write_error: Option<FaultError>,
     data_write_attempts: usize,
     bytes_until_error: Option<usize>,
     max_write_size: Option<usize>,
@@ -65,7 +65,6 @@ impl OpenFault {
 
 #[derive(Clone, Copy, Debug)]
 enum FaultError {
-    #[cfg(not(unix))]
     Kind(io::ErrorKind),
     #[cfg(unix)]
     RawOs(i32),
@@ -74,7 +73,6 @@ enum FaultError {
 impl FaultError {
     fn into_error(self) -> io::Error {
         match self {
-            #[cfg(not(unix))]
             Self::Kind(kind) => kind.into(),
             #[cfg(unix)]
             Self::RawOs(raw) => io::Error::from_raw_os_error(raw),
@@ -240,11 +238,10 @@ impl AsyncWrite for TestFile {
             let mut faults = self.faults.lock().expect("poisoned");
             faults.data_write_attempts += 1;
             if faults.bytes_until_error == Some(0) {
-                return Err(io::Error::from(
-                    faults
-                        .data_write_error
-                        .unwrap_or(io::ErrorKind::StorageFull),
-                ))
+                return Err(faults
+                    .data_write_error
+                    .unwrap_or(FaultError::Kind(io::ErrorKind::StorageFull))
+                    .into_error())
                 .into();
             }
 
@@ -429,7 +426,15 @@ impl TestFilesystem {
 
     pub(crate) fn fail_data_writes_after(&self, bytes: usize, kind: io::ErrorKind) {
         self.with_faults(|faults| {
-            faults.data_write_error = Some(kind);
+            faults.data_write_error = Some(FaultError::Kind(kind));
+            faults.bytes_until_error = Some(bytes);
+        });
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn fail_data_writes_after_raw_os_error(&self, bytes: usize, raw_os_error: i32) {
+        self.with_faults(|faults| {
+            faults.data_write_error = Some(FaultError::RawOs(raw_os_error));
             faults.bytes_until_error = Some(bytes);
         });
     }
