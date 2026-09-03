@@ -12,15 +12,8 @@ labels: "domain: releasing"
 
 # Prepare the release
 
-- [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml) workflow with:
-  - `version`: the stable Vector version, for example `0.59.0`.
-  - `vrl_version`: the exact released VRL version.
-- [ ] Review the bot-authored `release/prepare-v*` PR.
-  - [ ] Confirm its release-state validation check passes.
-  - [ ] Review the generated changelog entries and remove reverted or housekeeping entries.
-  - [ ] Review breaking changes, deprecations, and upgrade guidance.
-  - [ ] Confirm the release date and pinned VRL version.
-  - [ ] Run `cargo vdev deprecation show --version "<version>"`.
+- [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml) workflow with the Vector and released VRL versions.
+- [ ] Review the generated release notes in the bot-authored PR, including changelog entries, breaking changes, deprecations, and upgrade guidance.
 - [ ] Squash-merge the preparation PR into `master`.
 
 The merge is the release approval. The autotag workflow validates the merged diff and creates the
