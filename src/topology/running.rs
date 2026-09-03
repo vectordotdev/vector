@@ -1,6 +1,8 @@
 use std::{
     collections::{HashMap, HashSet},
+    pin::Pin,
     sync::{Arc, Mutex},
+    task::{Context, Poll},
 };
 
 use futures::{Future, FutureExt, future};
@@ -52,13 +54,19 @@ pub enum ReloadError {
     FailedToRestore,
 }
 
-struct AbortTasksOnDrop(Vec<tokio::task::AbortHandle>);
+struct AbortOnDropTask<T>(tokio::task::JoinHandle<T>);
 
-impl Drop for AbortTasksOnDrop {
+impl<T> Future for AbortOnDropTask<T> {
+    type Output = Result<T, tokio::task::JoinError>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.0).poll(cx)
+    }
+}
+
+impl<T> Drop for AbortOnDropTask<T> {
     fn drop(&mut self) {
-        for handle in &self.0 {
-            handle.abort();
-        }
+        self.0.abort();
     }
 }
 
@@ -167,7 +175,6 @@ impl RunningTopology {
         // Create handy handles collections of all tasks for the subsequent
         // operations.
         let mut wait_handles = Vec::new();
-        let mut abort_handles = Vec::new();
         // We need a Vec here since source components have two tasks. One for
         // pump in self.tasks, and the other for source in self.source_tasks.
         let mut check_handles = HashMap::<ComponentKey, Vec<_>>::new();
@@ -183,21 +190,18 @@ impl RunningTopology {
             .chain(self.source_tasks)
             .chain(self.retired_disk_sink_tasks)
         {
-            abort_handles.push(task.abort_handle());
-            let task = task.map(map_closure).shared();
+            let task = AbortOnDropTask(task).map(map_closure).shared();
 
             wait_handles.push(task.clone());
             check_handles.entry(key).or_default().push(task);
         }
 
         if let Some(utilization_task) = self.utilization_task {
-            abort_handles.push(utilization_task.abort_handle());
-            wait_handles.push(utilization_task.map(map_closure).shared());
+            wait_handles.push(AbortOnDropTask(utilization_task).map(map_closure).shared());
         }
 
         if let Some(metrics_task) = self.metrics_task {
-            abort_handles.push(metrics_task.abort_handle());
-            wait_handles.push(metrics_task.map(map_closure).shared());
+            wait_handles.push(AbortOnDropTask(metrics_task).map(map_closure).shared());
         }
 
         // If we reach this, we will forcefully abort all tracked component and auxiliary tasks. If
@@ -278,18 +282,18 @@ impl RunningTopology {
         };
 
         // Finishes once all tasks have shutdown.
-        let success =
-            futures::future::join_all(wait_handles).map(|results| results.into_iter().all(|ok| ok));
+        let retired_disk_sink_task_failed = self.retired_disk_sink_task_failed;
+        let success = futures::future::join_all(wait_handles)
+            .map(move |results| !retired_disk_sink_task_failed && results.into_iter().all(|ok| ok));
 
         // Aggregate future that ends once anything detects that all tasks have shutdown.
         // Resolves to `true` only if the winning branch got there without forcing anything.
-        let retired_disk_sink_task_failed = self.retired_disk_sink_task_failed;
         let shutdown_complete_future = future::select_all(vec![
             Box::pin(timeout) as future::BoxFuture<'static, bool>,
             Box::pin(reporter) as future::BoxFuture<'static, bool>,
             Box::pin(success) as future::BoxFuture<'static, bool>,
         ])
-        .map(move |(graceful, _index, _remaining)| graceful && !retired_disk_sink_task_failed);
+        .map(|(graceful, _index, _remaining)| graceful);
 
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
@@ -300,13 +304,8 @@ impl RunningTopology {
             trigger.cancel();
         }
 
-        let abort_tasks = AbortTasksOnDrop(abort_handles);
-        async move {
-            let _abort_tasks = abort_tasks;
-            let (_, graceful) =
-                futures::future::join(source_shutdown_complete, shutdown_complete_future).await;
-            graceful
-        }
+        futures::future::join(source_shutdown_complete, shutdown_complete_future)
+            .map(|(_, graceful)| graceful)
     }
 
     /// Attempts to load a new configuration and update this running topology.
@@ -1585,4 +1584,46 @@ fn enrichment_table_sink_buffer(
         .filter_map(|(table_key, table)| table.as_sink(table_key))
         .find(|(key, _)| key == sink_key)
         .map(|(_, sink)| sink.buffer)
+}
+
+#[cfg(test)]
+mod abort_on_drop_task_tests {
+    use futures::future;
+    use tokio::{sync::oneshot, time::Duration};
+
+    use super::AbortOnDropTask;
+
+    struct NotifyOnDrop(Option<oneshot::Sender<()>>);
+
+    impl Drop for NotifyOnDrop {
+        fn drop(&mut self) {
+            self.0.take().unwrap().send(()).unwrap_or(());
+        }
+    }
+
+    #[tokio::test]
+    async fn returns_completed_task_output() {
+        let task = AbortOnDropTask(tokio::spawn(async { 42 }));
+
+        assert_eq!(task.await.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn aborts_unfinished_task_on_drop() {
+        let (started_tx, started_rx) = oneshot::channel();
+        let (dropped_tx, dropped_rx) = oneshot::channel();
+        let task = AbortOnDropTask(tokio::spawn(async move {
+            let _notify = NotifyOnDrop(Some(dropped_tx));
+            started_tx.send(()).unwrap();
+            future::pending::<()>().await;
+        }));
+        started_rx.await.unwrap();
+
+        drop(task);
+
+        tokio::time::timeout(Duration::from_secs(5), dropped_rx)
+            .await
+            .expect("aborted task was not dropped")
+            .unwrap();
+    }
 }
