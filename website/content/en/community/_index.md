@@ -26,10 +26,6 @@ The Discord server is meant for connecting with other Vector users and fostering
 
 The Vector team does not actively monitor the Discord channels. The best way to reach out to the Vector team directly is through GitHub.
 
-## X
-
-Find us on [X][vector_x].
-
 ## FAQ
 
 ### How do I contribute to Vector?
@@ -59,8 +55,6 @@ Vector has adopted the Rust community model and practices for engaging with peop
 1. [Rust Language Organization][rust_lang]
 
 2. [Rust community standards][rust_community]
-
-[vector_x]: https://x.com/vectordotdev
 
 [discord]: https://chat.vector.dev
 
