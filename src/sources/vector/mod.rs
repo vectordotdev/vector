@@ -11,9 +11,7 @@ use vector_lib::{
     config::LogNamespace,
     configurable::configurable_component,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    internal_event::{
-        ComponentEventsDropped, CountByteSize, InternalEventHandle as _, UNINTENTIONAL,
-    },
+    internal_event::{CountByteSize, InternalEventHandle as _},
 };
 
 use crate::{
@@ -22,9 +20,7 @@ use crate::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
     },
-    internal_events::{
-        EVENT_PROTO_DECODE_REASON, EventsReceived, GrpcEventDecodeError, StreamClosedError,
-    },
+    internal_events::{EventsReceived, GrpcEventDecodeError, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
     sources::{
@@ -61,21 +57,11 @@ impl proto::Service for Service {
     ) -> Result<Response<proto::PushEventsResponse>, Status> {
         let request = request.into_inner();
         let mut events = Vec::with_capacity(request.events.len());
-        let mut dropped = 0;
         for wrapper in request.events {
             match Event::try_from(wrapper) {
                 Ok(event) => events.push(event),
-                Err(error) => {
-                    dropped += 1;
-                    emit!(GrpcEventDecodeError { error });
-                }
+                Err(error) => emit!(GrpcEventDecodeError { error }),
             }
-        }
-        if dropped > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: dropped,
-                reason: EVENT_PROTO_DECODE_REASON,
-            });
         }
         if events.is_empty() {
             return Ok(Response::new(proto::PushEventsResponse {}));

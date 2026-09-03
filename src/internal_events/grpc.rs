@@ -68,7 +68,7 @@ pub struct GrpcError<E> {
 }
 
 #[cfg(feature = "sources-vector")]
-pub(crate) const EVENT_PROTO_DECODE_REASON: &str = "Failed to decode Vector protobuf event.";
+const EVENT_PROTO_DECODE_REASON: &str = "Failed to decode Vector protobuf event.";
 
 /// A structurally valid gRPC event protobuf could not be converted into a Vector event.
 #[cfg(feature = "sources-vector")]
