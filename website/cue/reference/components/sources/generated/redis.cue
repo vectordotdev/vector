@@ -413,14 +413,19 @@ generated: components: sources: redis: configuration: {
 					max_length: {
 						description: """
 																The maximum length of a single GELF message, in bytes. Messages longer than this length are
-																dropped. If this option is not set, the decoder does not limit the length of messages and
-																the per-message memory is unbounded.
+																dropped.
 
 																**Note**: A message can be composed of multiple chunks, and this limit applies to the whole
 																message, not to individual chunks.
 
 																This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
 																The message payload is the concatenation of all chunk payloads.
+
+																**Note**: The decoder also caps the payload buffered across *all* incomplete messages
+																at 128 MiB, so no chunked message can exceed that whatever this is set to.
+
+																An unchunked message is never buffered, so neither limit applies to it; its size is
+																bounded by whatever the source accepts as one frame.
 																"""
 						required: false
 						type: uint: {}
