@@ -9,14 +9,12 @@ labels: "domain: releasing"
 
 - [ ] Cut a new [VRL release](https://github.com/vectordotdev/vrl/blob/main/release/README.md) if needed.
 - [ ] Choose the Vector release version and the released VRL version.
-- [ ] Decide whether the Alpine or Debian release image needs an explicit base-image update.
 
 # Prepare the release
 
 - [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml) workflow with:
   - `version`: the stable Vector version, for example `0.59.0`.
   - `vrl_version`: the exact released VRL version.
-  - Optional Alpine and Debian versions when those base images need updating.
 - [ ] Review the bot-authored `release/prepare-v*` PR.
   - [ ] Confirm its release-state validation check passes.
   - [ ] Review the generated changelog entries and remove reverted or housekeeping entries.
