@@ -169,6 +169,7 @@ impl ValidatedSink for AmqpSinkConfig {
             .connection_string
             .parse::<AMQPUri>()
             .map_err(|e| format!("Invalid connection string: {e}"))?;
+        self.encoding.validate()?;
         let exchange = self
             .exchange
             .clone()

@@ -346,6 +346,8 @@ impl ValidatedSink for KafkaSinkConfig {
             .topic
             .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
+        self.encoding.validate()?;
+
         Ok(ValidatedKafkaSink { topic })
     }
 

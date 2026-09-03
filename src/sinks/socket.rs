@@ -189,6 +189,7 @@ impl ValidatedSink for SocketSinkConfig {
                 // Mirror the pure host/port check from `UdpSinkConfig::build`
                 // so malformed addresses are rejected here instead.
                 config.parse_address()?;
+                encoding.validate()?;
                 let transformer = encoding.transformer();
                 Ok(ValidatedSocket::Udp { transformer })
             }

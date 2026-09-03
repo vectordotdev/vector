@@ -101,6 +101,7 @@ impl ValidatedSink for SqsSinkConfig {
         )?;
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
+        self.base_config.encoding.validate()?;
 
         Ok(ValidatedSqsSink {
             message_group_id,
