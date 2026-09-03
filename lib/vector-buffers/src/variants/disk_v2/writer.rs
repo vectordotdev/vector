@@ -337,6 +337,10 @@ struct CapacityBackpressure {
     operation: CapacityOperation,
     retries: u64,
     started: Instant,
+    #[cfg(test)]
+    error_kind: io::ErrorKind,
+    #[cfg(test)]
+    raw_os_error: Option<i32>,
 }
 
 struct CapacityRetry {
@@ -355,6 +359,7 @@ impl Default for CapacityRetry {
 
 enum EnsureReady {
     Ready,
+    CapacityBlocked,
     RetryCapacity(CapacityOperation, io::Error),
     WaitingForReader,
 }
@@ -368,7 +373,7 @@ enum CapacityOperation {
 impl CapacityOperation {
     const fn as_str(self) -> &'static str {
         match self {
-            Self::DataWrite => "write data",
+            Self::DataWrite => "persist data",
             Self::OpenDataFile => "open data file",
         }
     }
@@ -1101,7 +1106,25 @@ where
             operation,
             retries: 1,
             started: Instant::now(),
+            #[cfg(test)]
+            error_kind: error.kind(),
+            #[cfg(test)]
+            raw_os_error: error.raw_os_error(),
         });
+    }
+
+    #[cfg(test)]
+    pub(crate) fn capacity_backpressure_details(
+        &self,
+    ) -> Option<(&'static str, u64, io::ErrorKind, Option<i32>)> {
+        self.capacity_backpressure.as_ref().map(|backpressure| {
+            (
+                backpressure.operation.as_str(),
+                backpressure.retries,
+                backpressure.error_kind,
+                backpressure.raw_os_error,
+            )
+        })
     }
 
     fn record_capacity_recovered(&mut self, operation: CapacityOperation) {
@@ -1773,10 +1796,7 @@ where
             // We still flush ourselves to disk, etc, to make sure all of the data is there.
             should_open_next = true;
             if matches!(self.try_flush_inner(true).await?, CapacityProgress::Blocked) {
-                return Ok(EnsureReady::RetryCapacity(
-                    CapacityOperation::DataWrite,
-                    io::ErrorKind::StorageFull.into(),
-                ));
+                return Ok(EnsureReady::CapacityBlocked);
             }
 
             self.reset();
@@ -1939,6 +1959,9 @@ where
     async fn ensure_ready_for_write_fatal(&mut self) -> io::Result<()> {
         match self.ensure_ready_for_write(true).await? {
             EnsureReady::Ready => Ok(()),
+            EnsureReady::CapacityBlocked => {
+                unreachable!("blocking readiness cannot retry an already-recorded capacity error")
+            }
             EnsureReady::RetryCapacity(_, error) => Err(error),
             EnsureReady::WaitingForReader => unreachable!("blocking readiness must wait"),
         }
@@ -2050,7 +2073,7 @@ where
                     record.merge_finalizer_groups(record_finalizers.into_inner());
                     return Ok(WriteAttempt::Full(record));
                 }
-                Ok(EnsureReady::WaitingForReader) => {
+                Ok(EnsureReady::CapacityBlocked | EnsureReady::WaitingForReader) => {
                     let mut record = record;
                     record.merge_finalizer_groups(record_finalizers.into_inner());
                     return Ok(WriteAttempt::Full(record));
@@ -2360,6 +2383,7 @@ where
                         self.record_capacity_recovered(CapacityOperation::OpenDataFile);
                         Ok(CapacityProgress::Ready)
                     }
+                    EnsureReady::CapacityBlocked => Ok(CapacityProgress::Blocked),
                     EnsureReady::RetryCapacity(operation, error) => {
                         self.record_capacity_error(
                             operation,

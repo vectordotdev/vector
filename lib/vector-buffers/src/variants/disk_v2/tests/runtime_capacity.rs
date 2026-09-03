@@ -586,27 +586,83 @@ async fn runtime_rotation_sync_capacity_retries_without_losing_current_record() 
     assert_written(&mut writer, current).await;
 }
 
-#[tokio::test]
-async fn rotation_flush_capacity_error_retains_data_write_operation() {
+#[tokio::test(start_paused = true)]
+async fn rotation_flush_capacity_error_is_recorded_once_with_scheduled_retries() {
+    vector_common::event_test_util::clear_recorded_events();
     let filesystem = TestFilesystem::default();
     let CapacityBuffer { mut writer, .. } = build_rotating_buffer(filesystem.clone()).await;
     fill_for_rotation(&mut writer, 80).await;
     assert_written(&mut writer, Record::new(82, 64, 1)).await;
     assert_written(&mut writer, Record::new(83, 64, 1)).await;
+    let write_attempts_before_fault = filesystem.data_write_attempts();
 
+    #[cfg(unix)]
+    filesystem.fail_data_writes_after_raw_os_error(0, libc::ENOSPC);
+    #[cfg(not(unix))]
     filesystem.fail_data_writes_after(0, io::ErrorKind::StorageFull);
     let record = Record::new(84, 64, 1);
     assert_eq!(
         writer.try_write_record(record.clone()).await.unwrap(),
         TryWriteOutcome::Full(record.clone())
     );
+    assert_eq!(
+        filesystem.data_write_attempts() - write_attempts_before_fault,
+        1
+    );
+    #[cfg(unix)]
+    assert_eq!(
+        writer.capacity_backpressure_details(),
+        Some((
+            "persist data",
+            1,
+            io::ErrorKind::StorageFull,
+            Some(libc::ENOSPC)
+        ))
+    );
+    #[cfg(not(unix))]
+    assert_eq!(
+        writer.capacity_backpressure_details(),
+        Some(("persist data", 1, io::ErrorKind::StorageFull, None))
+    );
+    vector_common::event_test_util::contains_name_once("DiskBufferBackpressure").unwrap();
+
+    let mut write = Box::pin(writer.write_record(record.clone()));
+    tokio::select! {
+        biased;
+        result = &mut write => panic!("capacity-blocked rotation unexpectedly completed: {result:?}"),
+        () = tokio::task::yield_now() => {}
+    }
+    assert_eq!(
+        filesystem.data_write_attempts() - write_attempts_before_fault,
+        2
+    );
+
+    tokio::time::advance(Duration::from_millis(100)).await;
+    tokio::select! {
+        biased;
+        result = &mut write => panic!("capacity-blocked rotation unexpectedly completed: {result:?}"),
+        () = tokio::task::yield_now() => {}
+    }
+    assert_eq!(
+        filesystem.data_write_attempts() - write_attempts_before_fault,
+        3
+    );
+
+    tokio::time::advance(Duration::from_millis(100)).await;
+    tokio::select! {
+        biased;
+        result = &mut write => panic!("capacity-blocked rotation unexpectedly completed: {result:?}"),
+        () = tokio::task::yield_now() => {}
+    }
+    assert_eq!(
+        filesystem.data_write_attempts() - write_attempts_before_fault,
+        3
+    );
 
     filesystem.restore_data_writes();
-    assert_eq!(
-        writer.retry_capacity().await.unwrap(),
-        CapacityProgress::Ready
-    );
-    assert_written(&mut writer, record).await;
+    tokio::time::advance(Duration::from_millis(100)).await;
+    write.await.unwrap();
+    vector_common::event_test_util::contains_name_once("DiskBufferBackpressureRecovered").unwrap();
 }
 
 #[tokio::test(start_paused = true)]
