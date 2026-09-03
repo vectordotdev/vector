@@ -464,8 +464,11 @@ generated: components: sources: amqp: configuration: {
 						description: """
 																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
 																dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
-																If this option is not set, the decoder does not limit the number of pending messages and the memory usage
-																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
+
+																Chunks belonging to messages that are already pending are still accepted once the limit is
+																reached, so in-flight messages can complete.
+
+																**Note**: The decoder caps this at 4096 internally. Higher values do not raise it.
 																"""
 						required: false
 						type: uint: {}
