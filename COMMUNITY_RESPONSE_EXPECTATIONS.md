@@ -24,8 +24,9 @@ More complex changes will generally require more discussion and review. Large
 changes, new components, and breaking changes should therefore be discussed in
 an issue before substantial implementation begins.
 
-If a pull request has received no maintainer activity for some time, a polite
-ping to `@vectordotdev/vector` is welcome.
+If a pull request has received no maintainer activity for some time, leave a
+comment on the pull request. Maintainers can take a look as they work through
+the backlog.
 
 ## Issues
 
