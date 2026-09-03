@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use futures::stream;
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
-use sqlx::{Connection, FromRow, PgConnection};
+use sqlx::{Connection, FromRow, PgConnection, Row};
 use vector_lib::event::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
     MetricValue,
@@ -34,14 +34,18 @@ fn timestamp() -> DateTime<Utc> {
     DateTime::from_timestamp_micros(timestamp.timestamp_micros()).unwrap()
 }
 
-fn create_event(id: i64) -> Event {
+fn create_event_with_host(id: i64, host: &str) -> Event {
     let mut event = LogEvent::from("raw log line");
     event.insert(event_path!("id"), id);
-    event.insert(event_path!("host"), "example.com");
+    event.insert(event_path!("host"), host);
     let event_payload = event.clone().into_parts().0;
     event.insert(event_path!("payload"), event_payload);
     event.insert(event_path!("timestamp"), timestamp());
     event.into()
+}
+
+fn create_event(id: i64) -> Event {
+    create_event_with_host(id, "example.com")
 }
 
 fn create_event_with_notifier(id: i64) -> (Event, BatchStatusReceiver) {
@@ -167,6 +171,34 @@ async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
     (config, table, connection)
 }
 
+async fn prepare_upsert_config(
+    primary_keys: Vec<&str>,
+    update_columns: Vec<&str>,
+    max_events: usize,
+) -> (PostgresConfig, String, PgConnection) {
+    let table = random_table_name();
+    let endpoint = pg_url();
+    let config_str = format!(
+        r#"
+            endpoint = "{endpoint}"
+            table = "{table}"
+            batch.max_events = {max_events}
+
+            action = "upsert"
+            upsert.primary_keys = {primary_keys:?}
+            upsert.update_columns = {update_columns:?}
+        "#,
+    );
+
+    let (config, _) = load_sink::<PostgresConfig>(&config_str).unwrap();
+
+    let connection = PgConnection::connect(endpoint.as_str())
+        .await
+        .expect("Failed to connect to Postgres");
+
+    (config, table, connection)
+}
+
 #[tokio::test]
 async fn healthcheck_passes() {
     trace_init();
@@ -255,6 +287,45 @@ async fn insert_single_event() {
 }
 
 #[tokio::test]
+async fn upsert_single_event_without_conflict() {
+    trace_init();
+
+    let (config, table, mut connection) = prepare_upsert_config(
+        vec!["id"],
+        vec!["host", "timestamp", "message", "payload"],
+        1,
+    )
+    .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (input_event, mut receiver) = create_event_with_notifier(0);
+    let input_log_event = input_event.clone().into_log();
+    let expected_value = serde_json::to_value(&input_log_event).unwrap();
+
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event)), &POSTGRES_SINK_TAGS)
+        .await;
+    // We drop the event to notify the receiver that the batch was delivered.
+    std::mem::drop(input_log_event);
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_all_sql = format!("SELECT * FROM {table}");
+    let actual_event: TestEvent = sqlx::query_as(&select_all_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+    let actual_value = serde_json::to_value(actual_event).unwrap();
+    assert_eq!(expected_value, actual_value);
+}
+
+#[tokio::test]
 async fn insert_multiple_events() {
     trace_init();
 
@@ -262,6 +333,53 @@ async fn insert_multiple_events() {
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
     let create_table_sql = format!(
         "CREATE TABLE {table} (id BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (input_events, mut receiver) = create_events(100);
+    let input_log_events = input_events
+        .clone()
+        .into_iter()
+        .map(Event::into_log)
+        .collect::<Vec<_>>();
+    let expected_values = input_log_events
+        .iter()
+        .map(|event| serde_json::to_value(event).unwrap())
+        .collect::<Vec<_>>();
+    run_and_assert_sink_compliance(sink, stream::iter(input_events), &POSTGRES_SINK_TAGS).await;
+    // We drop the event to notify the receiver that the batch was delivered.
+    std::mem::drop(input_log_events);
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_all_sql = format!("SELECT * FROM {table} ORDER BY id");
+    let actual_events: Vec<TestEvent> = sqlx::query_as(&select_all_sql)
+        .fetch_all(&mut connection)
+        .await
+        .unwrap();
+    let actual_values = actual_events
+        .iter()
+        .map(|event| serde_json::to_value(event).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(expected_values, actual_values);
+}
+
+#[tokio::test]
+async fn upsert_multiple_events_without_conflict() {
+    trace_init();
+
+    let (config, table, mut connection) = prepare_upsert_config(
+        vec!["id"],
+        vec!["host", "timestamp", "message", "payload"],
+        1,
+    )
+    .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
     );
     sqlx::query(&create_table_sql)
         .execute(&mut connection)
@@ -513,4 +631,177 @@ async fn insertion_fails_primary_key_violation() {
         &COMPONENT_ERROR_TAGS,
     )
     .await;
+}
+
+#[tokio::test]
+async fn upsert_two_events_with_primary_key_violation_succeeds() {
+    trace_init();
+
+    let (config, table, mut connection) = prepare_upsert_config(
+        vec!["id"],
+        vec!["host", "timestamp", "message", "payload"],
+        1,
+    )
+    .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (accept_event, mut accept_receiver) = create_event_with_notifier(0);
+    let (replace_event, mut replace_receiver) = create_event_with_notifier(0);
+
+    let input_events = vec![accept_event, replace_event];
+
+    let input_log_events = input_events
+        .clone()
+        .into_iter()
+        .map(Event::into_log)
+        .collect::<Vec<_>>();
+
+    let expected_value = serde_json::to_value(&input_log_events[1]).unwrap();
+
+    run_and_assert_sink_compliance(sink, stream::iter(input_events), &POSTGRES_SINK_TAGS).await;
+
+    // We drop the event to notify the receivers that the batch was delivered.
+    std::mem::drop(input_log_events);
+    assert_eq!(accept_receiver.try_recv(), Ok(BatchStatus::Delivered));
+    assert_eq!(replace_receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_all_sql = format!("SELECT * FROM {table}");
+    let actual_event: TestEvent = sqlx::query_as(&select_all_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+    let actual_value = serde_json::to_value(actual_event).unwrap();
+    assert_eq!(expected_value, actual_value);
+}
+
+#[tokio::test]
+async fn upsert_two_events_with_primary_key_violation_within_same_batch() {
+    trace_init();
+
+    let (config, table, mut connection) = prepare_upsert_config(
+        vec!["id"],
+        vec!["host", "timestamp", "message", "payload"],
+        2,
+    )
+    .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB)"
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let mut input_events = vec![
+        create_event_with_host(0, "host-stored.com"),
+        create_event_with_host(0, "host-ignored.com"),
+    ];
+    let mut receiver = BatchNotifier::apply_to(&mut input_events);
+
+    let input_log_events = input_events
+        .clone()
+        .into_iter()
+        .map(Event::into_log)
+        .collect::<Vec<_>>();
+
+    let expected_value = serde_json::to_value(&input_log_events[0]).unwrap();
+
+    run_and_assert_sink_compliance(sink, stream::iter(input_events), &POSTGRES_SINK_TAGS).await;
+
+    // We drop the event to notify the receiver that the batch was delivered.
+    std::mem::drop(input_log_events);
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_all_sql = format!("SELECT * FROM {table}");
+    let actual_event: TestEvent = sqlx::query_as(&select_all_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+    let actual_value = serde_json::to_value(actual_event).unwrap();
+    assert_eq!(expected_value, actual_value);
+}
+
+#[tokio::test]
+async fn upsert_fails_on_unquoted_field() {
+    trace_init();
+
+    let (config, table, mut connection) =
+        prepare_upsert_config(vec!["id"], vec!["column with spaces"], 1).await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        r#"CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB, "column with spaces" TEXT NOT NULL)"#
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (mut fail_event, mut fail_receiver) = create_event_with_notifier(0);
+    fail_event
+        .as_mut_log()
+        .insert(event_path!("column with spaces"), "bad");
+
+    let fail_log = fail_event.clone().into_log();
+
+    run_and_assert_sink_error(sink, stream::once(ready(fail_event)), &COMPONENT_ERROR_TAGS).await;
+
+    // We drop the event to notify the receivers that the batch was delivered.
+    std::mem::drop(fail_log);
+
+    assert_eq!(fail_receiver.try_recv(), Ok(BatchStatus::Rejected));
+}
+
+#[tokio::test]
+async fn upsert_success_on_quoted_field() {
+    trace_init();
+
+    let (config, table, mut connection) =
+        prepare_upsert_config(vec!["id"], vec![r#""column with spaces""#], 1).await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        r#"CREATE TABLE {table} (id BIGINT PRIMARY KEY, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB, "column with spaces" TEXT NOT NULL)"#
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (mut accept_event, mut accept_receiver) = create_event_with_notifier(0);
+    accept_event
+        .as_mut_log()
+        .insert(event_path!("column with spaces"), "good");
+
+    let accept_log = accept_event.clone().into_log();
+
+    run_and_assert_sink_compliance(sink, stream::once(ready(accept_event)), &POSTGRES_SINK_TAGS)
+        .await;
+
+    // We drop the event to notify the receivers that the batch was delivered.
+    std::mem::drop(accept_log);
+
+    assert_eq!(accept_receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_all_sql = format!("SELECT * FROM {table}");
+    let actual_event = sqlx::query(&select_all_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+
+    let column_with_spaces_value: String = actual_event
+        .try_get("column with spaces")
+        .expect("column does exist");
+
+    assert_eq!(column_with_spaces_value, "good");
 }
