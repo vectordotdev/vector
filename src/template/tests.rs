@@ -747,22 +747,26 @@ fn uri_template_with_query_or_fragment_rejected_at_build() {
     }
 }
 
+#[rstest]
+// A non-URI template whose first component is strftime (e.g. S3
+// `key_prefix: "%Y/%m/"`, Kafka topic `%Y-%m`) has no literal prefix but
+// also no event-field references. Its rendered value is operator-authored
+// (time-derived), so prefix confinement must not be required.
+#[case::s3_key_prefix("%Y/%m/")]
+#[case::kafka_topic("%Y-%m")]
+#[case::log_file_pattern("logs-%Y/%m/%d.log")]
+fn strftime_only_prefix_template_needs_no_confinement(#[case] template_str: &str) {
+    let tpl = Template::try_from(template_str).unwrap();
+    assert!(
+        ConfinementChecker::for_prefix_template(&tpl)
+            .unwrap()
+            .is_none(),
+        "expected no prefix confinement for {template_str}"
+    );
+}
+
 #[test]
 fn prefix_template_with_strftime_confinement() {
-    // A non-URI template whose first component is strftime (e.g. S3
-    // `key_prefix: "%Y/%m/"`, Kafka topic `%Y-%m`) has no literal prefix but
-    // also no event-field references. Its rendered value is operator-authored
-    // (time-derived), so prefix confinement must not be required.
-    for template_str in &["%Y/%m/", "%Y-%m", "logs-%Y/%m/%d.log"] {
-        let tpl = Template::try_from(*template_str).unwrap();
-        assert!(
-            ConfinementChecker::for_prefix_template(&tpl)
-                .unwrap()
-                .is_none(),
-            "expected no prefix confinement for {template_str}"
-        );
-    }
-
     // When the template also references event fields, confinement still
     // applies to the literal prefix.
     let tpl = Template::try_from("logs-%Y/{{ tenant }}/").unwrap();
