@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
     paths:
-      - ".github/release-metadata.json"
+      - ".github/release-state.json"
       - "Cargo.lock"
       - "Cargo.toml"
       - "changelog.d/**"
@@ -40,7 +40,7 @@ jobs:
           rust: true
           vdev: false
 
-      - name: Validate files, metadata, and versions
+      - name: Validate files, state, and versions
         run: >-
           cargo vdev release workflow pr-check
           --base-sha "${{ github.event.pull_request.base.sha }}"

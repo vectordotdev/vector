@@ -112,7 +112,7 @@ jobs:
 
           - Changes \`${VERSION}-dev\` to \`${VERSION}\`.
           - Pins VRL to \`${VRL_VERSION}\` and generates the release files.
-          - Records \`${NEXT_VERSION}\` for post-release housekeeping.
+          - Post-release housekeeping will move \`master\` to \`${NEXT_VERSION}\`.
           - Must be squash-merged into \`master\`.
 
           After merge, the autotag workflow will create \`v${VERSION}\` at the approved squash commit.")

@@ -18,8 +18,8 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      version: ${{ steps.metadata.outputs.version }}
-      next_version: ${{ steps.metadata.outputs.next_version }}
+      version: ${{ steps.state.outputs.version }}
+      next_version: ${{ steps.state.outputs.next_version }}
     steps:
       - name: Checkout release tag
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -34,8 +34,8 @@ jobs:
           rust: true
           vdev: false
 
-      - name: Validate release metadata
-        id: metadata
+      - name: Validate release state
+        id: state
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
@@ -114,7 +114,7 @@ jobs:
         run: |
           git config user.name "vectordotdev-bot[bot]"
           git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
-          git add Cargo.toml Cargo.lock .github/release-metadata.json
+          git add Cargo.toml Cargo.lock .github/release-state.json
           git commit -m "chore(releasing): begin ${NEXT_VERSION}"
 
       - name: Push housekeeping branch

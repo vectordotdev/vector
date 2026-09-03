@@ -4,8 +4,7 @@
 use crate::utils::{command::run_command, git, paths};
 use crate::{app::CommandExt as _, commands::release::generate_cue};
 use anyhow::{Context, Result, anyhow, bail};
-use chrono::Utc;
-use semver::{Prerelease, Version};
+use semver::Version;
 use std::{
     env, fs,
     path::{Path, PathBuf},
@@ -19,7 +18,7 @@ const DEBIAN_PREFIX: &str = "FROM docker.io/debian:";
 const DEBIAN_DOCKERFILE: &str = "distribution/docker/debian/Dockerfile";
 const KUBECLT_CUE_FILE: &str = "website/cue/reference/administration/interfaces/kubectl.cue";
 const INSTALL_SCRIPT: &str = "distribution/install.sh";
-const RELEASE_METADATA_FILE: &str = ".github/release-metadata.json";
+const RELEASE_STATE_FILE: &str = ".github/release-state.json";
 
 /// Release preparations CLI options.
 #[derive(clap::Args, Debug)]
@@ -47,7 +46,6 @@ pub struct Cli {
 
 struct Prepare {
     new_vector_version: Version,
-    next_vector_version: Version,
     vrl_version: Version,
     alpine_version: Option<String>,
     debian_version: Option<String>,
@@ -66,14 +64,11 @@ impl Cli {
         if !self.vrl_version.pre.is_empty() || !self.vrl_version.build.is_empty() {
             bail!("VRL version must be a stable semantic version");
         }
-        let next_vector_version = next_minor_development_version(&self.version)?;
-
         let repo_root = paths::find_repo_root()?;
         env::set_current_dir(&repo_root)?;
 
         let prepare = Prepare {
             new_vector_version: self.version.clone(),
-            next_vector_version,
             vrl_version: self.vrl_version,
             alpine_version: self.alpine_version.filter(|version| !version.is_empty()),
             debian_version: self.debian_version.filter(|version| !version.is_empty()),
@@ -180,20 +175,17 @@ impl Prepare {
 
         run_command("cargo update -p vector");
 
-        let metadata = serde_json::json!({
+        let state = serde_json::json!({
             "schema_version": 1,
             "status": "prepared",
             "version": release_version,
-            "next_version": self.next_vector_version.to_string(),
             "prepared_from": prepared_from,
-            "release_date": Utc::now().date_naive().to_string(),
-            "vrl_version": self.vrl_version.to_string(),
         });
         fs::write(
-            self.repo_root.join(RELEASE_METADATA_FILE),
-            format!("{}\n", serde_json::to_string_pretty(&metadata)?),
+            self.repo_root.join(RELEASE_STATE_FILE),
+            format!("{}\n", serde_json::to_string_pretty(&state)?),
         )
-        .context("Failed to write release metadata")?;
+        .context("Failed to write release state")?;
 
         git::add_files_in_current_dir()?;
         git::commit(&format!(
@@ -419,16 +411,6 @@ pub(super) fn update_vector_package_version(
     Ok(doc.to_string())
 }
 
-pub(super) fn next_minor_development_version(version: &Version) -> Result<Version> {
-    let minor = version
-        .minor
-        .checked_add(1)
-        .context("minor version overflow")?;
-    let mut next = Version::new(version.major, minor, 0);
-    next.pre = Prerelease::new("dev")?;
-    Ok(next)
-}
-
 fn format_vrl_changelog_block(changelog: &str) -> String {
     let double_tab = "\t\t";
     let body = changelog
@@ -518,8 +500,8 @@ fn get_vrl_changelog(version: &Version) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use crate::commands::release::prepare::{
-        format_vrl_changelog_block, insert_block_after_changelog, next_minor_development_version,
-        update_vector_package_version, update_vrl_to_version,
+        format_vrl_changelog_block, insert_block_after_changelog, update_vector_package_version,
+        update_vrl_to_version,
     };
     use indoc::indoc;
 
@@ -565,15 +547,6 @@ mod tests {
             error
                 .to_string()
                 .contains("expected package version 0.58.0-dev")
-        );
-    }
-
-    #[test]
-    fn test_next_minor_development_version() {
-        let release = "0.59.3".parse().expect("valid version");
-        assert_eq!(
-            next_minor_development_version(&release).expect("next version"),
-            "0.60.0-dev".parse().expect("valid version")
         );
     }
 

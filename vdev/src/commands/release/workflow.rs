@@ -2,11 +2,10 @@
 
 use crate::{
     app::CommandExt as _,
-    commands::release::prepare::{next_minor_development_version, update_vector_package_version},
+    commands::release::prepare::update_vector_package_version,
     utils::{git, paths},
 };
 use anyhow::{Context, Result, bail, ensure};
-use chrono::NaiveDate;
 use semver::{Prerelease, Version};
 use serde::Deserialize;
 use std::{
@@ -18,7 +17,7 @@ use std::{
 };
 use toml_edit::DocumentMut;
 
-const METADATA_PATH: &str = ".github/release-metadata.json";
+const STATE_PATH: &str = ".github/release-state.json";
 const MASTER_BRANCH: &str = "master";
 const VRL_GIT_URL: &str = "https://github.com/vectordotdev/vrl.git";
 
@@ -111,13 +110,7 @@ struct ReleaseMetadata {
     status: String,
     version: String,
     #[serde(default)]
-    next_version: Option<String>,
-    #[serde(default)]
     prepared_from: Option<String>,
-    #[serde(default)]
-    release_date: Option<String>,
-    #[serde(default)]
-    vrl_version: Option<String>,
     #[serde(default)]
     last_release: Option<LastRelease>,
 }
@@ -188,7 +181,7 @@ impl PrepareCheck {
             "expected Cargo.toml version {expected_current}, found {current}"
         );
 
-        let metadata = read_metadata(Path::new(METADATA_PATH))?;
+        let metadata = read_metadata(Path::new(STATE_PATH))?;
         validate_development_metadata(&metadata, &expected_current)?;
 
         let tag = format!("v{}", self.version);
@@ -239,7 +232,7 @@ impl PrCheck {
 
             let base_metadata = metadata_at(&self.base_sha)?;
             validate_development_metadata(&base_metadata, &expected_base)?;
-            let metadata = read_metadata(Path::new(METADATA_PATH))?;
+            let metadata = read_metadata(Path::new(STATE_PATH))?;
             validate_prepared_metadata(&metadata, &version, &self.base_sha)?;
 
             let release_file = format!("website/cue/reference/releases/{version}.cue");
@@ -267,7 +260,7 @@ impl PrCheck {
             );
             validate_housekeeping_files(&changed_files)?;
 
-            let metadata = read_metadata(Path::new(METADATA_PATH))?;
+            let metadata = read_metadata(Path::new(STATE_PATH))?;
             validate_housekeeping_metadata(&metadata, &next, &version, None)?;
         } else {
             bail!("unsupported release branch {}", self.head_ref);
@@ -301,7 +294,7 @@ impl AutotagCheck {
             &changed_files(&self.before_sha, &self.sha)?,
             "release merge",
         )?;
-        let metadata = read_metadata(Path::new(METADATA_PATH))?;
+        let metadata = read_metadata(Path::new(STATE_PATH))?;
         validate_prepared_metadata(&metadata, &current, &self.before_sha)?;
         validate_associated_preparation_pr(&self.repository, &self.sha, &current)?;
 
@@ -332,11 +325,11 @@ impl PublicationCheck {
             self.tag
         );
 
-        let metadata = read_metadata(Path::new(METADATA_PATH))?;
+        let metadata = read_metadata(Path::new(STATE_PATH))?;
         let prepared_from = metadata
             .prepared_from
             .as_deref()
-            .context("prepared metadata is missing prepared_from")?;
+            .context("prepared release state is missing prepared_from")?;
         validate_prepared_metadata(&metadata, &version, prepared_from)?;
         ensure!(
             is_ancestor(&self.sha, "origin/master")?,
@@ -359,7 +352,7 @@ impl HousekeepingCheck {
         ensure_sha(&self.release_commit, "release commit")?;
         let next = next_minor_development_version(&self.version)?;
         let current = current_cargo_version()?;
-        let metadata = read_metadata(Path::new(METADATA_PATH))?;
+        let metadata = read_metadata(Path::new(STATE_PATH))?;
 
         if current == next {
             validate_housekeeping_metadata(
@@ -378,7 +371,7 @@ impl HousekeepingCheck {
             let last_release = metadata
                 .last_release
                 .as_ref()
-                .context("development metadata is missing last_release")?;
+                .context("development release state is missing last_release")?;
             let last_version = parse_stable_version(&last_release.version, "last release version")?;
             if last_version > self.version {
                 println!(
@@ -393,7 +386,7 @@ impl HousekeepingCheck {
             let prepared_from = metadata
                 .prepared_from
                 .as_deref()
-                .context("prepared metadata is missing prepared_from")?;
+                .context("prepared release state is missing prepared_from")?;
             validate_prepared_metadata(&metadata, &current, prepared_from)?;
             println!(
                 "Master is preparing a release after v{}; housekeeping is no longer needed.",
@@ -411,7 +404,7 @@ impl HousekeepingCheck {
         let prepared_from = metadata
             .prepared_from
             .as_deref()
-            .context("prepared metadata is missing prepared_from")?;
+            .context("prepared release state is missing prepared_from")?;
         validate_prepared_metadata(&metadata, &self.version, prepared_from)?;
 
         let branch = format!("release/housekeeping-v{}", self.version);
@@ -438,11 +431,11 @@ impl HousekeepingPrepare {
         ensure_sha(&self.release_commit, "release commit")?;
         let next = next_minor_development_version(&self.version)?;
 
-        let metadata = read_metadata(Path::new(METADATA_PATH))?;
+        let metadata = read_metadata(Path::new(STATE_PATH))?;
         let prepared_from = metadata
             .prepared_from
             .as_deref()
-            .context("prepared metadata is missing prepared_from")?;
+            .context("prepared release state is missing prepared_from")?;
         validate_prepared_metadata(&metadata, &self.version, prepared_from)?;
 
         let cargo_toml = fs::read_to_string("Cargo.toml").context("failed to read Cargo.toml")?;
@@ -472,10 +465,10 @@ impl HousekeepingPrepare {
             }
         });
         fs::write(
-            METADATA_PATH,
+            STATE_PATH,
             format!("{}\n", serde_json::to_string_pretty(&metadata)?),
         )
-        .context("failed to write release metadata")?;
+        .context("failed to write release state")?;
 
         cargo_metadata()
     }
@@ -500,6 +493,17 @@ fn development_version(version: &Version) -> Result<Version> {
     let mut development = version.clone();
     development.pre = Prerelease::new("dev")?;
     Ok(development)
+}
+
+fn next_minor_development_version(version: &Version) -> Result<Version> {
+    ensure_stable(version, "release version")?;
+    let minor = version
+        .minor
+        .checked_add(1)
+        .context("minor version overflow")?;
+    let mut next = Version::new(version.major, minor, 0);
+    next.pre = Prerelease::new("dev")?;
+    Ok(next)
 }
 
 fn current_cargo_version() -> Result<Version> {
@@ -527,27 +531,27 @@ fn read_metadata(path: &Path) -> Result<ReleaseMetadata> {
 }
 
 fn metadata_at(revision: &str) -> Result<ReleaseMetadata> {
-    parse_metadata(&file_at(revision, METADATA_PATH)?)
+    parse_metadata(&file_at(revision, STATE_PATH)?)
 }
 
 fn parse_metadata(contents: &str) -> Result<ReleaseMetadata> {
-    serde_json::from_str(contents).context("invalid release metadata")
+    serde_json::from_str(contents).context("invalid release state")
 }
 
 fn validate_development_metadata(metadata: &ReleaseMetadata, version: &Version) -> Result<()> {
     ensure!(
         metadata.schema_version == 1,
-        "unsupported release metadata schema {}",
+        "unsupported release state schema {}",
         metadata.schema_version
     );
     ensure!(
         metadata.status == "development",
-        "expected development metadata, found {}",
+        "expected development release state, found {}",
         metadata.status
     );
     ensure!(
         metadata.version == version.to_string(),
-        "metadata version {} does not match {version}",
+        "release state version {} does not match {version}",
         metadata.version
     );
     Ok(())
@@ -560,41 +564,25 @@ fn validate_prepared_metadata(
 ) -> Result<()> {
     ensure!(
         metadata.schema_version == 1,
-        "unsupported release metadata schema {}",
+        "unsupported release state schema {}",
         metadata.schema_version
     );
     ensure!(
         metadata.status == "prepared",
-        "expected prepared metadata, found {}",
+        "expected prepared release state, found {}",
         metadata.status
     );
     ensure!(
         metadata.version == version.to_string(),
-        "metadata version {} does not match {version}",
+        "release state version {} does not match {version}",
         metadata.version
     );
     ensure_sha(prepared_from, "prepared_from")?;
     ensure!(
         metadata.prepared_from.as_deref() == Some(prepared_from),
-        "metadata prepared_from does not match {prepared_from}"
+        "release state prepared_from does not match {prepared_from}"
     );
 
-    let expected_next = next_minor_development_version(version)?;
-    let expected_next_string = expected_next.to_string();
-    ensure!(
-        metadata.next_version.as_deref() == Some(expected_next_string.as_str()),
-        "metadata next_version does not match {expected_next}"
-    );
-    let vrl_version = metadata
-        .vrl_version
-        .as_deref()
-        .context("prepared metadata is missing vrl_version")?;
-    parse_stable_version(vrl_version, "metadata VRL version")?;
-    let release_date = metadata
-        .release_date
-        .as_deref()
-        .context("prepared metadata is missing release_date")?;
-    NaiveDate::parse_from_str(release_date, "%Y-%m-%d").context("invalid metadata release_date")?;
     Ok(())
 }
 
@@ -608,7 +596,7 @@ fn validate_housekeeping_metadata(
     let last = metadata
         .last_release
         .as_ref()
-        .context("development metadata is missing last_release")?;
+        .context("development release state is missing last_release")?;
     ensure!(
         last.version == release.to_string(),
         "last release version {} does not match {release}",
@@ -640,7 +628,7 @@ fn validate_release_files(files: &[String], transition: &str) -> Result<()> {
 fn release_file_allowed(file: &str) -> bool {
     matches!(
         file,
-        ".github/release-metadata.json"
+        ".github/release-state.json"
             | "Cargo.lock"
             | "Cargo.toml"
             | "distribution/docker/alpine/Dockerfile"
@@ -663,7 +651,7 @@ fn validate_housekeeping_files(files: &[String]) -> Result<()> {
     let mut actual = files.to_vec();
     actual.sort();
     let expected = vec![
-        METADATA_PATH.to_string(),
+        STATE_PATH.to_string(),
         "Cargo.lock".to_string(),
         "Cargo.toml".to_string(),
     ];
@@ -846,8 +834,8 @@ fn update_vrl_to_main(cargo_toml_contents: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_cargo_version, parse_metadata, release_file_allowed, update_vrl_to_main,
-        validate_housekeeping_files, validate_prepared_metadata,
+        next_minor_development_version, parse_cargo_version, parse_metadata, release_file_allowed,
+        update_vrl_to_main, validate_housekeeping_files, validate_prepared_metadata,
     };
     use indoc::indoc;
 
@@ -876,7 +864,16 @@ mod tests {
     }
 
     #[test]
-    fn prepared_metadata_requires_the_next_minor_development_version() {
+    fn derives_next_minor_development_version() {
+        let release = "0.59.3".parse().expect("valid version");
+        assert_eq!(
+            next_minor_development_version(&release).expect("next version"),
+            "0.60.0-dev".parse().expect("valid version")
+        );
+    }
+
+    #[test]
+    fn prepared_state_requires_the_exact_base() {
         let release = "0.59.0".parse().expect("valid version");
         let prepared_from = "0123456789abcdef0123456789abcdef01234567";
         let valid = format!(
@@ -884,18 +881,14 @@ mod tests {
                 "schema_version": 1,
                 "status": "prepared",
                 "version": "0.59.0",
-                "next_version": "0.60.0-dev",
-                "prepared_from": "{prepared_from}",
-                "release_date": "2026-09-03",
-                "vrl_version": "0.28.0"
+                "prepared_from": "{prepared_from}"
             }}"#
         );
         let metadata = parse_metadata(&valid).expect("valid metadata");
         assert!(validate_prepared_metadata(&metadata, &release, prepared_from).is_ok());
 
-        let wrong_next = valid.replace("0.60.0-dev", "0.59.1-dev");
-        let metadata = parse_metadata(&wrong_next).expect("valid metadata shape");
-        assert!(validate_prepared_metadata(&metadata, &release, prepared_from).is_err());
+        let other_base = "1123456789abcdef0123456789abcdef01234567";
+        assert!(validate_prepared_metadata(&metadata, &release, other_base).is_err());
     }
 
     #[test]
@@ -903,7 +896,7 @@ mod tests {
         assert!(
             validate_housekeeping_files(&[
                 "Cargo.toml".to_owned(),
-                ".github/release-metadata.json".to_owned(),
+                ".github/release-state.json".to_owned(),
                 "Cargo.lock".to_owned(),
             ])
             .is_ok()
