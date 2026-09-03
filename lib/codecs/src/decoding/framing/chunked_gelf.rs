@@ -430,9 +430,19 @@ impl ChunkedGelfDecoder {
 
         let chunk_len = chunk.len();
 
-        // A lone chunk is already a complete message. Avoid pending state, a timeout task, a
-        // payload copy, and reassembly; only the effective per-message limit applies.
+        // A lone chunk is already complete, but it cannot reuse the ID of a pending message.
         if total_chunks == 1 {
+            let pending = self.state.lock().expect("poisoned lock");
+            if let Some(message_state) = pending.messages.get(&message_id) {
+                return Err(ChunkedGelfDecoderError::TotalChunksMismatch {
+                    message_id,
+                    sequence_number,
+                    original_total_chunks: message_state.total_chunks,
+                    received_total_chunks: total_chunks,
+                });
+            }
+            drop(pending);
+
             if chunk_len > self.max_length {
                 return Err(ChunkedGelfDecoderError::MaxLengthExceed {
                     message_id,
@@ -441,7 +451,7 @@ impl ChunkedGelfDecoder {
                     max_length: self.max_length,
                 });
             }
-            return Ok(Some(chunk));
+            return Ok(Some(Bytes::copy_from_slice(&chunk)));
         }
 
         let mut pending = self.state.lock().expect("poisoned lock");
@@ -1156,6 +1166,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_lone_chunk_does_not_retain_the_source_buffer() {
+        let mut chunk = create_chunk(1u64, 0u8, 1u8, &"foo");
+        let source_range = chunk.as_ptr_range();
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        let frame = decoder
+            .decode_eof(&mut chunk)
+            .unwrap()
+            .expect("the lone chunk must complete");
+
+        assert!(
+            !source_range.contains(&frame.as_ptr()),
+            "the returned frame must not alias the decoder's input buffer"
+        );
+    }
+
+    #[tokio::test]
     async fn chunk_exceeding_the_payload_limit_is_rejected_without_leaking() {
         // Cannot observe *when* the check runs relative to the copy; both orderings give this
         // same outcome. Statement order in `decode_chunk` is what enforces that.
@@ -1516,6 +1543,34 @@ mod tests {
                 received_total_chunks: 3,
             }
         ));
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn a_lone_chunk_cannot_reuse_a_pending_message_id(
+        two_chunks_message: ([BytesMut; 2], String),
+    ) {
+        let (mut chunks, expected) = two_chunks_message;
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        assert!(decoder.decode_eof(&mut chunks[0]).unwrap().is_none());
+
+        let mut lone_chunk = create_chunk(1u64, 0u8, 1u8, &"other");
+        let error = decoder
+            .decode_eof(&mut lone_chunk)
+            .expect_err("a pending message already owns this ID");
+        assert!(matches!(
+            downcast_framing_error(&error),
+            ChunkedGelfDecoderError::TotalChunksMismatch {
+                message_id: 1,
+                sequence_number: 0,
+                original_total_chunks: 2,
+                received_total_chunks: 1,
+            }
+        ));
+
+        let frame = decoder.decode_eof(&mut chunks[1]).unwrap();
+        assert_eq!(frame, Some(Bytes::from(expected)));
     }
 
     #[rstest]
