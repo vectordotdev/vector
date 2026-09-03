@@ -70,6 +70,27 @@ fn back_and_forth_through_bytes() {
 }
 
 #[test]
+fn disk_buffer_preserves_trace_layout_metadata() {
+    let mut trace = TraceEvent::default();
+    trace
+        .metadata_mut()
+        .set_trace_layout(crate::event::TRACE_LAYOUT_DATADOG);
+    let expected = EventArray::from(Event::Trace(trace));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Traces(traces) = actual else {
+        panic!("expected a traces array");
+    };
+    assert_eq!(
+        traces[0].metadata().trace_layout(),
+        Some(crate::event::TRACE_LAYOUT_DATADOG)
+    );
+}
+
+#[test]
 fn serialization() {
     let mut event = LogEvent::from("raw log line");
     event.insert(event_path!("foo"), "bar");

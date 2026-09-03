@@ -1,10 +1,11 @@
 use vector_lib::config::clone_input_definitions;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::metadata_path;
 
 use crate::config::OutputId;
 use crate::{
     config::{DataType, GenerateConfig, Input, TransformConfig, TransformContext, TransformOutput},
-    event::{Event, LogEvent},
+    event::{Event, LogEvent, TRACE_LAYOUT_KEY},
     schema::Definition,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
@@ -66,7 +67,12 @@ pub struct TraceToLog;
 impl FunctionTransform for TraceToLog {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if let Event::Trace(trace) = event {
-            output.push(Event::Log(LogEvent::from(trace)));
+            let mut log = LogEvent::from(trace);
+            // The layout marker is only meaningful to components that consume
+            // traces as traces. Drop it so a converted log is not classified
+            // as Vector-namespaced solely because of `%vector.trace_layout`.
+            log.remove_prune(metadata_path!("vector", TRACE_LAYOUT_KEY), true);
+            output.push(Event::Log(log));
         }
     }
 }
@@ -78,7 +84,10 @@ mod tests {
     use crate::transforms::test::create_topology;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::event::TraceEvent;
+    use vector_lib::{
+        config::LogNamespace,
+        event::{TRACE_LAYOUT_DATADOG, TraceEvent},
+    };
 
     #[test]
     fn generate_config() {
@@ -129,6 +138,25 @@ mod tests {
         assert_eq!(
             actual_map, expected_map,
             "Trace data fields should be preserved"
+        );
+    }
+
+    #[tokio::test]
+    async fn drops_trace_layout_marker() {
+        use vrl::btreemap;
+
+        let mut trace = TraceEvent::from(btreemap! {
+            "host" => "a_hostname",
+            "span_id" => "abc123",
+        });
+        trace.metadata_mut().set_trace_layout(TRACE_LAYOUT_DATADOG);
+
+        let log = do_transform(trace).await.unwrap();
+        assert_eq!(log.namespace(), LogNamespace::Legacy);
+        assert_eq!(log.metadata().trace_layout(), None);
+        assert_eq!(
+            log.get(vrl::event_path!("host")),
+            Some(&"a_hostname".into())
         );
     }
 }

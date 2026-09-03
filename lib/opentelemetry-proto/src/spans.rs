@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, TimeZone, Utc};
-use vector_core::event::{Event, TraceEvent};
+use vector_core::event::{Event, TRACE_LAYOUT_OPENTELEMETRY, TraceEvent};
 use vrl::{
     event_path,
     value::{KeyString, Value},
@@ -52,6 +52,9 @@ struct ResourceSpan {
 impl ResourceSpan {
     fn into_event(self, now: DateTime<Utc>) -> Event {
         let mut trace = TraceEvent::default();
+        trace
+            .metadata_mut()
+            .set_trace_layout(TRACE_LAYOUT_OPENTELEMETRY);
         let span = self.span;
         trace.insert(
             event_path!(TRACE_ID_KEY),
