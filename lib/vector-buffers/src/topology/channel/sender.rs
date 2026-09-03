@@ -179,27 +179,22 @@ struct UsageInstrumentation {
 }
 
 impl UsageAccounting {
-    fn record(self, instrumentation: &UsageInstrumentation, item_count: usize, item_size: usize) {
+    fn record(self, handle: &BufferUsageHandle, item_count: usize, item_size: usize) {
         match self {
-            Self::Accepted if !instrumentation.provides_instrumentation => instrumentation
-                .handle
+            Self::Accepted => handle
                 .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64),
             Self::DroppedNewest => {
-                instrumentation
-                    .handle
-                    .increment_received_event_count_and_byte_size(
-                        item_count as u64,
-                        item_size as u64,
-                    );
-                instrumentation
-                    .handle
-                    .increment_dropped_event_count_and_byte_size(
-                        item_count as u64,
-                        item_size as u64,
-                        true,
-                    );
+                handle.increment_received_event_count_and_byte_size(
+                    item_count as u64,
+                    item_size as u64,
+                );
+                handle.increment_dropped_event_count_and_byte_size(
+                    item_count as u64,
+                    item_size as u64,
+                    true,
+                );
             }
-            _ => {}
+            Self::NotAccepted => {}
         }
     }
 }
@@ -379,8 +374,10 @@ impl<T: Bufferable> BufferSender<T> {
 
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
+            && (!instrumentation.provides_instrumentation
+                || matches!(&accounting, UsageAccounting::DroppedNewest))
         {
-            accounting.record(instrumentation, item_count, item_size);
+            accounting.record(&instrumentation.handle, item_count, item_size);
         }
         if let Some(send_duration) = self.send_duration.as_ref()
             && let Some(send_reference) = send_reference
