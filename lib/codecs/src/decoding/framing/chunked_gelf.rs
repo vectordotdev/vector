@@ -318,7 +318,7 @@ pub enum ChunkedGelfDecoderError {
         max_length: usize,
     },
     #[snafu(display(
-        "Buffered payload limit of {limit} bytes reached while processing chunk with message id {message_id} and sequence number {sequence_number}. Discarding the chunk."
+        "Buffered payload limit of {limit} bytes reached while processing chunk with message id {message_id} and sequence number {sequence_number}. Discarding all buffered chunks of that message."
     ))]
     BufferedPayloadLimitReached {
         message_id: u64,
@@ -552,9 +552,10 @@ impl ChunkedGelfDecoder {
             return Ok(Some(message_state.finish(sequence_number, chunk)));
         }
 
-        // Refuse the chunk but keep the message: a full budget is not its fault, and
-        // discarding would let a sender parking the budget pick off everything in flight.
+        // A message that cannot advance would otherwise hold its budget until timeout and keep
+        // other pending messages from advancing. Discard only this message and refund its bytes.
         if pending.buffered_payload.saturating_add(chunk_len) > MAX_BUFFERED_PAYLOAD {
+            pending.discard(message_id);
             return Err(ChunkedGelfDecoderError::BufferedPayloadLimitReached {
                 message_id,
                 sequence_number,
@@ -1216,16 +1217,16 @@ mod tests {
 
     #[rstest]
     #[tokio::test]
-    async fn a_full_budget_turns_away_the_chunk_not_the_message(
+    async fn a_full_budget_discards_only_the_blocked_message(
         three_chunks_message: ([BytesMut; 3], String),
     ) {
         // Three chunks so the refused one is not the last; finishing chunks are exempt.
-        let (mut chunks, expected) = three_chunks_message;
+        let (mut chunks, _) = three_chunks_message;
         let mut decoder = ChunkedGelfDecoder::default();
 
         assert!(decoder.decode_eof(&mut chunks[0]).unwrap().is_none());
-        let held = decoder.state.lock().unwrap().buffered_payload;
-        assert_eq!(held, 3);
+        let mut unrelated = create_chunk(3u64, 0u8, 3u8, &"bar");
+        assert!(decoder.decode_eof(&mut unrelated).unwrap().is_none());
 
         // Saturate the budget from elsewhere, then deliver a chunk that does not finish it.
         decoder.state.lock().unwrap().buffered_payload = MAX_BUFFERED_PAYLOAD;
@@ -1237,17 +1238,20 @@ mod tests {
             downcast_framing_error(&error),
             ChunkedGelfDecoderError::BufferedPayloadLimitReached { .. }
         ));
-        assert_eq!(
-            decoder.state.lock().unwrap().messages.len(),
-            1,
-            "the message must survive a full budget"
+        let pending = decoder.state.lock().unwrap();
+        assert!(
+            !pending.messages.contains_key(&2),
+            "the blocked message must be discarded"
         );
-
-        // Budget frees, and nothing was lost.
-        decoder.state.lock().unwrap().buffered_payload = held;
-        assert!(decoder.decode_eof(&mut chunks[1]).unwrap().is_none());
-        let frame = decoder.decode_eof(&mut chunks[2]).unwrap();
-        assert_eq!(frame, Some(Bytes::from(expected)));
+        assert!(
+            pending.messages.contains_key(&3),
+            "unrelated state must survive"
+        );
+        assert_eq!(
+            pending.buffered_payload,
+            MAX_BUFFERED_PAYLOAD - 3,
+            "discarding must refund the blocked message's buffered bytes"
+        );
     }
 
     #[tokio::test]
