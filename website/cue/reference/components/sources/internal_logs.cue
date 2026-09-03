@@ -27,7 +27,6 @@ components: sources: internal_logs: {
 	}
 
 	support: {
-		notices: []
 		requirements: []
 		warnings: []
 	}

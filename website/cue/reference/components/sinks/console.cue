@@ -37,7 +37,6 @@ components: sinks: console: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.console.configuration

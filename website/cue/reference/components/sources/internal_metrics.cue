@@ -26,7 +26,6 @@ components: sources: internal_metrics: {
 	}
 
 	support: {
-		notices: []
 		requirements: []
 		warnings: []
 	}

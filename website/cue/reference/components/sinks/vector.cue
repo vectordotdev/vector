@@ -58,7 +58,6 @@ components: sinks: vector: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	input: {
