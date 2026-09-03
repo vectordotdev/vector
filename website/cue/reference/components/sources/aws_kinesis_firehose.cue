@@ -50,7 +50,6 @@ components: sources: aws_kinesis_firehose: {
 		]
 
 		warnings: []
-		notices: []
 	}
 
 	installation: {

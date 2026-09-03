@@ -67,7 +67,6 @@ components: sinks: aws_s3: components._aws & {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

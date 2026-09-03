@@ -43,7 +43,6 @@ components: sources: mongodb_metrics: {
 		]
 
 		warnings: []
-		notices: []
 	}
 
 	installation: {
