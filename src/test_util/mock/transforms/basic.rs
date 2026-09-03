@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, path::PathBuf};
 
 use async_trait::async_trait;
 use vector_lib::{
@@ -24,13 +24,26 @@ pub struct BasicTransformConfig {
 
     /// Amount to increase any metric by.
     increase: f64,
+
+    /// Test helper: external files that force transform reload.
+    #[serde(skip)]
+    files: Vec<PathBuf>,
 }
 
 impl_generate_config_from_default!(BasicTransformConfig);
 
 impl BasicTransformConfig {
     pub const fn new(suffix: String, increase: f64) -> Self {
-        Self { suffix, increase }
+        Self {
+            suffix,
+            increase,
+            files: Vec::new(),
+        }
+    }
+
+    pub fn with_files_to_watch(mut self, files: Vec<PathBuf>) -> Self {
+        self.files = files;
+        self
     }
 }
 
@@ -60,6 +73,10 @@ impl TransformConfig for BasicTransformConfig {
                 .map(|(output, definition)| (output.clone(), definition.clone()))
                 .collect(),
         )]
+    }
+
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        self.files.iter().collect()
     }
 }
 
