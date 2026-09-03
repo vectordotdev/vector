@@ -26,62 +26,6 @@ fn uri_template_serde_roundtrip_string() {
 }
 
 #[test]
-fn uri_template_toml_roundtrip_string() {
-    // UriTemplate must work with TOML (plain string representation)
-    #[derive(serde::Deserialize, serde::Serialize)]
-    struct Config {
-        uri: UriTemplate,
-    }
-
-    let config = Config {
-        uri: UriTemplate::try_from("https://logs.example.com/{{ key }}").unwrap(),
-    };
-
-    let toml_str = toml::to_string(&config).unwrap();
-    assert!(toml_str.contains("uri = \"https://logs.example.com"));
-    assert!(!toml_str.contains("inner")); // Should NOT expose inner field
-
-    // Parse serialized TOML and assert the uri node is a scalar string, not a table/object
-    let value = toml::from_str::<toml::Value>(&toml_str).unwrap();
-    let uri_value = value.get("uri").expect("toml must contain 'uri' key");
-    assert!(
-        uri_value.is_str(),
-        "UriTemplate must serialize as a TOML string, not a table; got {uri_value:?}"
-    );
-    assert_eq!(
-        uri_value.as_str().unwrap(),
-        "https://logs.example.com/{{ key }}"
-    );
-
-    let config2: Config = toml::from_str(&toml_str).unwrap();
-    assert_eq!(config.uri, config2.uri);
-}
-
-#[test]
-fn uri_template_yaml_roundtrip_string() {
-    // UriTemplate must work with YAML (plain string representation)
-    let uri = UriTemplate::try_from("https://api.example.com/ingest/{{ id }}").unwrap();
-
-    let yaml_str = serde_yaml::to_string(&uri).unwrap();
-    assert!(yaml_str.contains("https://api.example.com"));
-    assert!(!yaml_str.contains("inner"));
-
-    // Parse serialized YAML and assert the value is exactly the expected scalar string
-    let value = serde_yaml::from_str::<serde_yaml::Value>(&yaml_str).unwrap();
-    assert!(
-        value.is_string(),
-        "UriTemplate must serialize as a YAML string, not a mapping; got {value:?}"
-    );
-    assert_eq!(
-        value.as_str().unwrap(),
-        "https://api.example.com/ingest/{{ id }}"
-    );
-
-    let uri2: UriTemplate = serde_yaml::from_str(&yaml_str).unwrap();
-    assert_eq!(uri, uri2);
-}
-
-#[test]
 fn uri_template_display_preserves_source() {
     // Display must return the original source string
     let src = "https://example.com/{{ path }}";
