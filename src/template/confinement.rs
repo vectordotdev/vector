@@ -1,4 +1,5 @@
-#[derive(Debug, Snafu)]
+use super::parsing::verbatim_text;
+
 #[snafu(module(build_error))]
 pub(crate) enum BuildError {
     /// Template has dynamic content but no literal prefix to confine it to.
@@ -182,10 +183,11 @@ pub(crate) enum ConfinementChecker {
 }
 
 /// The verbatim-rendering portion of an operator-authored URI query or
-/// fragment: everything before the first `%` strftime specifier. The rest of
-/// the query/fragment expands to time-derived text at render time.
+/// fragment: everything before the first elided dynamic unit (`\0`) in the
+/// elided verbatim text. Dynamic units after it expand to time-derived text
+/// at render time.
 fn static_uri_suffix_prefix(s: &str) -> &str {
-    s.split('%').next().unwrap_or(s)
+    s.split('\0').next().unwrap_or(s)
 }
 
 impl ConfinementChecker {
@@ -290,21 +292,24 @@ impl ConfinementChecker {
                 //     sees the path, silently dropping any operator-authored
                 //     suffix like `/ingest`.
                 let src = tpl.get_ref();
-                if has_fields && (src.contains('?') || src.contains('#')) {
+                // Locate `?`/`#` on the elided verbatim rendering — each
+                // strftime directive and `{{ field }}` reference collapsed
+                // to a single `\0` — never on the raw source: chrono parses
+                // directive forms like `%#z` as one unit whose rendering
+                // contains no `#`, but the raw source would split at that
+                // `#` and misrecord a fragment. This branch has no field
+                // references (rejected above), so elisions are directives.
+                let verbatim = verbatim_text(&tpl.inner.parts);
+                if has_fields && (verbatim.contains('?') || verbatim.contains('#')) {
                     return Err(BuildError::DynamicUriQueryOrFragment {
                         template: src.to_string(),
                     });
                 }
-                // Operator-authored query/fragment: everything before the first
-                // `%` strftime specifier renders verbatim; the rest is
-                // time-derived. `literal_prefix()` stops at the first `%`
-                // anywhere, so a query after a path-strftime never reaches the
-                // prefix — extract from the full source instead.
-                let (before_fragment, fragment_prefix) = match src.split_once('#') {
+                let (before_fragment, fragment_prefix) = match verbatim.split_once('#') {
                     Some((before, fragment)) => {
                         (before, Some(static_uri_suffix_prefix(fragment).to_string()))
                     }
-                    None => (src, None),
+                    None => (verbatim.as_str(), None),
                 };
                 let query_prefix = before_fragment
                     .split_once('?')
@@ -431,14 +436,15 @@ pub(crate) struct UriChecker {
     /// Static path portion from the template prefix, e.g. `"/ingest/"`.
     path_prefix: String,
     /// Operator-authored query prefix (template has no field references), up
-    /// to the first `%` strftime specifier. The rendered query must start with
-    /// this; the remainder is time-derived. `None` when the template has no
-    /// `?` — any rendered query is then field-smuggled and rejected.
+    /// to the first elided strftime directive in the elided verbatim text.
+    /// The rendered query must start with this; the remainder is
+    /// time-derived. `None` when the template has no `?` — any rendered query
+    /// is then field-smuggled and rejected.
     query_prefix: Option<String>,
     /// Operator-authored fragment prefix (template has no field references),
-    /// up to the first `%` strftime specifier. `None` when the template has no
-    /// `#` — any raw `#` in the rendered value is then field-smuggled and
-    /// rejected before parsing.
+    /// up to the first elided strftime directive in the elided verbatim
+    /// text. `None` when the template has no `#` — any raw `#` in the
+    /// rendered value is then field-smuggled and rejected before parsing.
     fragment_prefix: Option<String>,
 }
 

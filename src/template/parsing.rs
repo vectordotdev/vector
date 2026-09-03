@@ -81,6 +81,42 @@ pub(super) fn parse_literal(src: &str) -> Result<Part, TemplateParseError> {
     })
 }
 
+/// The text a template renders verbatim, in rendered order, with each
+/// dynamic unit — a strftime directive or a `{{ field }}` reference —
+/// elided as a single `\0`.
+///
+/// Chrono tokenizes directive forms like `%#z` into a single item, so a
+/// separator character written inside a directive never survives into
+/// verbatim text: directive output is time-derived (digits, names,
+/// offsets) and can never contain a URI separator. A literal `\0` in
+/// operator text cannot be confused with an elided unit in practice: any
+/// rendered value containing NUL is rejected outright at render time.
+pub(super) fn verbatim_text(parts: &[Part]) -> String {
+    let mut out = String::new();
+    for part in parts {
+        match part {
+            Part::Literal(text) => out.push_str(text),
+            // Field references render event-controlled text, which never
+            // forms the operator-authored structure under scrutiny.
+            Part::Reference(_) => out.push('\0'),
+            Part::Strftime(parsed) => {
+                for item in parsed.as_items() {
+                    match item {
+                        Item::Literal(text) => out.push_str(text),
+                        Item::OwnedLiteral(text) => out.push_str(text),
+                        Item::Space(text) => out.push_str(text),
+                        Item::OwnedSpace(text) => out.push_str(text),
+                        Item::Numeric(..) | Item::Fixed(_) => out.push('\0'),
+                        // Rejected at parse time; treat defensively as dynamic.
+                        Item::Error => out.push('\0'),
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 // Pre-parse the template string into a series of parts to be filled in at render time.
 pub(super) fn parse_template(src: &str) -> Result<Vec<Part>, TemplateParseError> {
     let mut last_end = 0;
