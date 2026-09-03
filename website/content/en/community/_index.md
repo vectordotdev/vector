@@ -34,13 +34,7 @@ Find us on [X][vector_x].
 
 ### How do I contribute to Vector?
 
-Vector is [open source][oss] and welcomes contributions. A few guidelines to help you get started:
-
-1. Read our [contribution guide][contribution].
-
-2. Start with [good first issues][first_issues].
-
-3. Use [GitHub Discussions][vector_discussions] if you have any questions. We are happy to help!
+Vector is [open source][oss] and welcomes contributions. See our [contribution guide][contribution] or explore [good first issues][first_issues] to get started.
 
 ### What is Vector's governance model?
 
