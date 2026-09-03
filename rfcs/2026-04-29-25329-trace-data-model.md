@@ -142,10 +142,9 @@ declared in the corresponding sub-RFC's Scope section.
   reported. Derived timestamps follow the same rule. The mapping sub-RFCs identify
   format-specific consequences.
 
-When these RFCs say a failure, drop, or normalization is "reported", the implementation
-uses Vector's standard component error or data-loss telemetry. Exact category names,
-metric labels, log fields, and emission mechanics are implementation details governed
-by Vector's instrumentation specification.
+Every failure, drop, and normalization these documents describe is reported as described by the
+[instrumentation specification](../docs/specs/instrumentation.md). These documents
+note reporting only where the disposition itself is not the default one.
 
 Numeric boundary behavior follows one policy throughout the model and mappings:
 

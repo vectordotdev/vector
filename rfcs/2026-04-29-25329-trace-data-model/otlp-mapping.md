@@ -12,7 +12,10 @@ parent RFC's `AttrValue`.
 
 - The parent RFC defines the typed data model, migration mechanics, and internal wire
   serialization. This sub-RFC assumes those definitions and the parent's Glossary, In/Out
-  scope clauses, and User Experience as background.
+  scope clauses, and User Experience as background. In particular, every failure, drop,
+  and normalization below is reported per the parent's global reporting rule and the
+  [instrumentation specification](../../docs/specs/instrumentation.md) it cites, whether
+  or not the rule here restates it.
 - [RFC 11851 -- OpenTelemetry traces source](../2022-03-15-11851-ingest-opentelemetry-traces.md)
   was accepted on the condition that an internal trace model be established before the work was
   completed. This sub-RFC, together with the parent and the Datadog mapping sub-RFC, satisfies
@@ -74,13 +77,13 @@ below.
   common attribute at the same key.
 - **OTLP fields at `Development` or `Alpha` stability tier** are dropped on OTLP ingress.
 - **`Span.end_time_unix_nano < start_time_unix_nano`** is clamped to zero duration on
-  ingress and reported. The egress reconstruction emits
+  ingress. The egress reconstruction emits
   `end_time_unix_nano = start_time_unix_nano`, byte-different from the original input.
-- **`Status.message` paired with `UNSET` or `OK`** is dropped and reported on ingress;
+- **`Status.message` paired with `UNSET` or `OK`** is dropped on ingress;
   OpenTelemetry permits a description only for `ERROR`.
 - **Duplicate keys in an OTLP attribute list or nested `KeyValueList`** use wire-order
   last-wins normalization. Each overwritten value saturating-increments the nearest
-  enclosing item's `dropped_attributes_count` and is reported.
+  enclosing item's `dropped_attributes_count`.
 
 The OTLP-side consequences of the parent RFC's zero-ID rejection and wire-domain
 normalization also apply. The derived end-timestamp case is documented under "Span
@@ -205,8 +208,8 @@ and the promotion rule above left it in place.
 
 On OTLP egress specifically, the typed slot wins for the three pairs above: the canonical key is
 emitted once with the typed value and any duplicate at the same key in `Resource.attributes` is
-discarded and reported; the emitted `Resource.dropped_attributes_count` is
-saturating-incremented. This is required for spec conformance: OTLP
+discarded, saturating-incrementing the emitted
+`Resource.dropped_attributes_count`. This is required for spec conformance: OTLP
 `Resource.attributes` mandates that "attribute keys MUST be unique." If the typed slot
 is `None` and the attribute key is present, the attribute value is emitted unchanged (the
 non-promotion rule above applies). The other typed slot/attribute-map pairs from the
@@ -225,7 +228,7 @@ the attribute as `deployment.environment.name` in semantic conventions
 `deployment.environment` listed as "Replaced by `deployment.environment.name`."
 
 The stable key wins when both are present; dropping the deprecated value
-saturating-increments `Resource.dropped_attributes_count` and is reported. The selected
+saturating-increments `Resource.dropped_attributes_count`. The selected
 key is then subject to the promotion rule above: a non-empty string promotes, while an
 empty or non-string value remains under its original key. On OTLP egress, a promoted
 `Resource.environment` uses
@@ -244,8 +247,7 @@ nanoseconds in memory and on the wire; the round trip is bit-exact for any span 
 `end_time_unix_nano >= start_time_unix_nano`.
 
 A span with reversed timestamps (`end_time_unix_nano < start_time_unix_nano`) is clamped to zero
-duration and reported on ingress; this is one of the OTLP-side zero-loss exclusions
-listed above.
+duration on ingress; this is one of the OTLP-side zero-loss exclusions listed above.
 
 Egress clamping of `Span.start_time`, `SpanEvent.time`, and the reconstructed
 `Span.end_time_unix_nano` follows the parent RFC's numeric boundary policy against the
@@ -266,7 +268,7 @@ round-trip unchanged.
 UNSET` or `OK` the message is dropped on ingest because the OpenTelemetry [Set
 Status](https://opentelemetry.io/docs/specs/otel/trace/api/#set-status) rule restricts `Description`
 to the `Error` code. A wire `Status.message` paired with `code = UNSET` or `OK` is non-conformant
-and is dropped and reported on ingest. See the Rationale subsection below for the
+and is dropped on ingest. See the Rationale subsection below for the
 closed-enum-with-escape-hatch choice that makes future status codes round-trip unchanged.
 
 #### Attribute encoding: `AttrValue` <-> `AnyValue`
@@ -283,7 +285,7 @@ OTLP attribute fields and nested `KeyValueList` values are repeated key-value se
 while the typed model requires unique map keys. Ingest processes each sequence in wire
 order before promotion or reserved-key lifting; when a key repeats, the last value wins.
 Each overwritten earlier value saturating-increments the nearest enclosing resource,
-scope, span, event, or link's `dropped_attributes_count` and is reported. OTLP egress is
+scope, span, event, or link's `dropped_attributes_count`. OTLP egress is
 unique-keyed by construction.
 
 #### Default-valued / absent equivalence
@@ -326,14 +328,13 @@ use `Span.attributes`.
 The contract is:
 
 - The typed namespace is the single source of truth on egress. A common attribute at a
-  reserved key is removed and replaced when the typed value requires emission; the
-  removal saturating-increments the corresponding emitted dropped count and is
-  reported. Ingress lifting and stripping ensures OTLP egress through the same Vector
-  emits each value once.
+  reserved key is removed and replaced when the typed value requires emission,
+  saturating-incrementing the corresponding emitted dropped count. Ingress lifting and
+  stripping ensures OTLP egress through the same Vector emits each value once.
 - A reserved key or nested member that is malformed -- wrong `AnyValue` variant,
   unrecognized member, or out-of-domain value -- is stripped without populating the
-  typed slot, saturating-increments the enclosing item's `dropped_attributes_count`,
-  and is reported. Valid siblings continue to lift.
+  typed slot and saturating-increments the enclosing item's
+  `dropped_attributes_count`. Valid siblings continue to lift.
 - Ordinary `_dd.*` resource and span attributes are not reserved, carry no
   Datadog-native meaning, and never acquire Datadog egress authority from their
   spelling.
