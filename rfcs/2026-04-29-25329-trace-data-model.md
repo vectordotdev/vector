@@ -797,7 +797,7 @@ A present but unrecognized hint returns the same error without attempting detect
 - Typed field accessors exist only on `TraceEvent`. `TraceEventCompat` does not expose
   typed accessors, so typed code cannot accidentally access an unconverted legacy event
   or enter a migration-only panic state.
-- A converting consumer (a sink, `remap` in typed mode, or `trace_to_log`) consumes
+- A converting consumer (a protocol sink, `remap` in typed mode, or `trace_to_log`) consumes
   `TraceEventCompat` at every trace-event intake path and invokes a fallible
   `try_into_typed()` conversion that yields zero or
   more `TraceEvent`s. The `Typed` arm returns a one-element sequence containing its
@@ -934,6 +934,22 @@ Legacy wire support may retire only after all of the following hold:
 Only then are the proto messages removed, field tag 3 reserved in both oneofs, and the
 conversion routines and detectors deleted.
 
+#### JSON encoding
+
+The `json` and `native_json` codecs serialize `TraceEventCompat` untagged: `Legacy` is
+today's inner map and `Typed` is the canonical `{resource, scope, datadog, spans}`
+object, with the same nested values that typed VRL and `trace_to_log` expose.
+`EventMetadata` is omitted. `native_json` still wraps the payload as `{"trace": ...}`.
+These codecs emit the representation they received and do not convert.
+
+JSON input does not carry `EventMetadata`, so the layout hint is unavailable. Decode
+autodetects with a typed-shape detector alongside the Datadog and OTLP detectors, using
+the same uniqueness rule: exactly one match selects `Typed` or `Legacy`; zero or
+multiple matches are a reported error. Do not derive the default externally tagged
+enum: that would wrap legacy payloads in `{"legacy": ...}` as soon as the
+compatibility enum exists, and `Serialize` would still compile after the
+untyped-forwarder gate.
+
 ## Rationale
 
 ### Architectural choices
@@ -1013,7 +1029,7 @@ conversion routines and detectors deleted.
   Alternatives for why a single atomic replacement was rejected.
 - Per-component shims convert `LegacyTraceEvent -> TraceEvent` only, never the reverse:
   neither the migration hint nor the typed model can reconstruct a source-specific
-  legacy layout after arbitrary transforms. Converting consumers (sinks, typed `remap`,
+  legacy layout after arbitrary transforms. Converting consumers (protocol sinks, typed `remap`,
   `trace_to_log`) therefore migrate before producers; pass-through transforms accept
   both variants without converting so a `source -> sample -> remap` pipeline keeps
   working while `remap` still defaults to `legacy`. Removing the untyped forwarders
@@ -1040,6 +1056,10 @@ conversion routines and detectors deleted.
   preserve legacy programs after typed-only producers ship.
 - The `trace_to_log` transform's output also changes; downstream VRL programs against
   its output must update.
+- Pipelines that encode traces with `json` or `native_json` (for example `file` and
+  `kafka`) also change when the payload becomes typed. During coexistence those codecs
+  remain untagged, so legacy output is unchanged until a source flips or a typed
+  `remap` sits upstream. Downstream readers of that JSON must update.
 - Topology granularity is coarser than per-span: each event carries up to a chunk's
   worth of spans (typically tens to hundreds, larger in deep call trees). Buffer-size
   limits expressed in events bound span counts less directly than the previous
@@ -1360,18 +1380,21 @@ stage.
    `TraceArray` while all components continue to use `Legacy`. Adapt existing producers
    mechanically to wrap their unchanged output, then add the typed internal-wire
    variant. Before any source emits typed events, legacy behavior must remain
-   unchanged, both compatibility variants must survive disk-buffer and `vector`
+   unchanged, including untagged `json` / `native_json` encoding of `Legacy` as today's
+   inner map. Both compatibility variants must survive disk-buffer and `vector`
    source/sink boundaries, and optional-value and Datadog child-presence distinctions must
    survive those boundaries.
 3. **Land both format mappings.** Implement and register both format shims and
-   format-shape detectors, then implement both typed encoders per the sub-RFCs. Do not
+   format-shape detectors, including a typed-shape detector for JSON / `native_json`
+   input, then implement both typed encoders per the sub-RFCs. Do not
    expose the typed `remap` mode until both legacy layouts can be converted explicitly.
 4. **Establish typed VRL and migrate consumers.** Implement the typed paths, fallible
    trace constructors, and the trace-only
    `remap.trace_representation = "typed"` mode. The transform converts legacy input
    before constructing `VrlTarget` and runs once per resulting typed event; paths never
-   convert. Then migrate `sample` and `trace_to_log`. Sinks and `trace_to_log` convert
-   at intake and use only `TraceEvent`. Pass-through transforms accept both variants
+   convert. Then migrate `sample` and `trace_to_log`. Protocol sinks and `trace_to_log`
+   convert at intake and use only `TraceEvent`. `json` and `native_json` encoding remain
+   untagged and representation-preserving. Pass-through transforms accept both variants
    without converting `Legacy` to `Typed`.
    `sample` remains per-event,
    so a multi-service Datadog chunk changes from incidental whole-chunk atomicity to one
