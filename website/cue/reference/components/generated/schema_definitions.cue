@@ -1,6 +1,6 @@
 package metadata
 
-#SchemaDefinitions: chunked_gelf_decoder_options: object: options: {
+_schemaDefinitions: chunked_gelf_decoder_options: object: options: {
 	decompression: {
 		description: "Decompression configuration for GELF messages."
 		required:    false

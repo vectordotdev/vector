@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const CUE_DEFINITIONS_FIELD: &str = "#SchemaDefinitions";
+const CUE_DEFINITIONS_FIELD: &str = "_schemaDefinitions";
 const CUE_DEFINITIONS_PLACEHOLDER_FIELD: &str = "vector_internal_schema_definitions";
 const CUE_REFERENCE_MARKER_PREFIX: &str = "__VECTOR_CUE_REFERENCE__";
 
@@ -499,13 +499,13 @@ fn render_and_import_cue_definitions(
     )?;
 
     let cue_output = fs::read_to_string(&cue_output_file)?;
-    let cue_output = mark_cue_definitions_field(&cue_output)?;
+    let cue_output = hide_cue_definitions_field(&cue_output)?;
     fs::write(&cue_output_file, cue_output)?;
 
     Ok(())
 }
 
-fn mark_cue_definitions_field(cue_output: &str) -> Result<String> {
+fn hide_cue_definitions_field(cue_output: &str) -> Result<String> {
     let placeholder = format!("{CUE_DEFINITIONS_PLACEHOLDER_FIELD}:");
     if cue_output.matches(&placeholder).count() != 1 {
         bail!("Generated CUE definitions must contain exactly one placeholder field");
@@ -554,17 +554,17 @@ mod tests {
 
         definitions.rewrite_reference_markers(&mut cue).unwrap();
 
-        assert_eq!(cue, "type: #SchemaDefinitions[\"shared_options\"]\n");
+        assert_eq!(cue, "type: _schemaDefinitions[\"shared_options\"]\n");
     }
 
     #[test]
-    fn marks_imported_definition_storage_as_a_definition() {
+    fn hides_imported_definition_storage() {
         let cue =
             format!("package metadata\n\n{CUE_DEFINITIONS_PLACEHOLDER_FIELD}: shared: {{}}\n");
 
         assert_eq!(
-            mark_cue_definitions_field(&cue).unwrap(),
-            "package metadata\n\n#SchemaDefinitions: shared: {}\n"
+            hide_cue_definitions_field(&cue).unwrap(),
+            "package metadata\n\n_schemaDefinitions: shared: {}\n"
         );
     }
 }

@@ -396,7 +396,7 @@ generated: components: sources: redis: configuration: {
 				description:   "Options for the chunked GELF decoder."
 				relevant_when: "method = \"chunked_gelf\""
 				required:      false
-				type:          #SchemaDefinitions["chunked_gelf_decoder_options"]
+				type:          _schemaDefinitions["chunked_gelf_decoder_options"]
 			}
 			length_delimited: {
 				description:   "Options for the length delimited decoder."
