@@ -49,6 +49,7 @@ impl ChunkedGelfDecoderConfig {
 
 /// Options for building a `ChunkedGelfDecoder`.
 #[configurable_component]
+#[configurable(metadata(docs::cue_definition = "chunked_gelf_decoder_options"))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct ChunkedGelfDecoderOptions {
