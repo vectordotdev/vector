@@ -699,7 +699,7 @@ mod tests {
     use crate::{
         config::{ConfigBuilder, build_unit_tests},
         event::{
-            LogEvent, Metric, Value,
+            LogEvent, Metric, TRACE_LAYOUT_DATADOG, TRACE_LAYOUT_KEY, Value,
             metric::{MetricKind, MetricValue},
         },
         metrics::Controller,
@@ -745,6 +745,51 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<RemapConfig>();
+    }
+
+    #[test]
+    fn remap_cannot_overwrite_trace_layout() {
+        let config = RemapConfig {
+            source: Some(format!("%vector.{TRACE_LAYOUT_KEY} = \"forged\"")),
+            ..Default::default()
+        };
+        let err = remap(config).unwrap_err().to_string();
+        assert!(
+            err.contains("mutation of read-only value"),
+            "unexpected compile error: {err}"
+        );
+    }
+
+    #[test]
+    fn remap_cannot_delete_trace_layout() {
+        let config = RemapConfig {
+            source: Some(format!("del(%vector.{TRACE_LAYOUT_KEY})")),
+            ..Default::default()
+        };
+        let err = remap(config).unwrap_err().to_string();
+        assert!(err.contains("read-only"), "unexpected compile error: {err}");
+    }
+
+    #[test]
+    fn remap_can_read_trace_layout() {
+        let event = {
+            let mut event = LogEvent::from("input");
+            event.metadata_mut().set_trace_layout(TRACE_LAYOUT_DATADOG);
+            Event::from(event)
+        };
+        let conf = RemapConfig {
+            source: Some(format!(".layout = %vector.{TRACE_LAYOUT_KEY}")),
+            drop_on_error: true,
+            drop_on_abort: false,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+        let result = transform_one(&mut tform, event).unwrap();
+        assert_eq!(get_field_string(&result, "layout"), TRACE_LAYOUT_DATADOG);
+        assert_eq!(
+            result.as_log().metadata().trace_layout(),
+            Some(TRACE_LAYOUT_DATADOG)
+        );
     }
 
     #[test]

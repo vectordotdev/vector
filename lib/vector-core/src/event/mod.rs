@@ -7,7 +7,10 @@ pub use finalization::{
     EventFinalizers, EventStatus, Finalizable, GroupedFinalizable, MergeFinalizable,
 };
 pub use log_event::LogEvent;
-pub use metadata::{DatadogMetricOriginMetadata, EventMetadata, Secrets, WithMetadata};
+pub use metadata::{
+    DatadogMetricOriginMetadata, EventMetadata, Secrets, TRACE_LAYOUT_DATADOG, TRACE_LAYOUT_KEY,
+    TRACE_LAYOUT_OPENTELEMETRY, TRACE_LAYOUT_OTLP, WithMetadata,
+};
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
 pub use ser::{MAX_VALUE_NESTING_FRAMES, event_exceeds_max_nesting_cost};
