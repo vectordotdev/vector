@@ -776,7 +776,7 @@ fn prefix_template_with_strftime_confinement() {
     assert!(checker.confine("logs-2001/tenant-a/").is_ok());
     assert!(checker.confine("other/tenant-a/").is_err());
 
-    // But a template whose FIRST component is strftime AND that references
+    // A template whose FIRST component is strftime AND that references
     // event fields has no literal prefix to confine to while still carrying
     // event-controlled content — rejected (NoDerivableBase) without the
     // opt-out.
@@ -785,85 +785,6 @@ fn prefix_template_with_strftime_confinement() {
         ConfinementChecker::for_prefix_template(&tpl).unwrap_err(),
         BuildError::NoDerivableBase { .. }
     ));
-}
-
-#[rstest]
-// Operator-authored strftime directives in a URI query or fragment, with no
-// event-field references (e.g. `?date=%Y-%m-%d`), must build and render
-// without the global opt-out: the query/fragment structure is fixed by the
-// template; only the time-derived values change. `?` and `#` also terminate
-// the static authority on pathless URIs.
-#[case::query(
-    "https://logs.example.com/ingest?date=%Y-%m-%d",
-    "https://logs.example.com/ingest?date=2001-02-03"
-)]
-#[case::fragment(
-    "https://logs.example.com/ingest#%Y-%m-%d",
-    "https://logs.example.com/ingest#2001-02-03"
-)]
-#[case::query_and_fragment(
-    "https://logs.example.com/ingest?date=%Y-%m-%d#%H",
-    "https://logs.example.com/ingest?date=2001-02-03#04"
-)]
-#[case::query_on_pathless_uri(
-    "https://logs.example.com?date=%Y-%m-%d",
-    "https://logs.example.com?date=2001-02-03"
-)]
-#[case::fragment_on_pathless_uri(
-    "https://logs.example.com#date-%Y-%m-%d",
-    "https://logs.example.com#date-2001-02-03"
-)]
-fn uri_template_with_strftime_query_or_fragment_builds_and_renders(
-    #[case] template: &str,
-    #[case] expected: &str,
-) {
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-    let mut event = Event::Log(LogEvent::from("x"));
-    event
-        .as_mut_log()
-        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
-
-    let config = ConfinementConfig::default();
-    let confined = UriTemplate::try_from(template)
-        .unwrap()
-        .confine(&config, "http", "uri")
-        .unwrap();
-
-    assert_eq!(confined.render_string(&event).unwrap(), expected);
-
-    // Runtime confinement still applies to the authority.
-    let other_authority = expected.replacen("logs.example.com", "other.example.com", 1);
-    assert!(confined.check_confinement(&other_authority).is_err());
-}
-
-#[test]
-fn uri_template_with_strftime_query_or_fragment_rejects_escape() {
-    // Negative case: the rendered query/fragment must stay within the
-    // operator-authored prefix. A different structure — or a missing
-    // query/fragment entirely — is rejected.
-    for (template, accepted, rejected, missing) in [
-        (
-            "https://logs.example.com/ingest?date=%Y-%m-%d",
-            "https://logs.example.com/ingest?date=2001-02-03",
-            "https://logs.example.com/ingest?other=2001-02-03",
-            "https://logs.example.com/ingest",
-        ),
-        (
-            "https://logs.example.com/ingest#date-%Y-%m-%d",
-            "https://logs.example.com/ingest#date-2001-02-03",
-            "https://logs.example.com/ingest#other",
-            "https://logs.example.com/ingest",
-        ),
-    ] {
-        let tpl = Template::try_from(template).unwrap();
-        let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
-        assert!(c.confine(accepted).is_ok());
-        assert!(c.confine(rejected).is_err());
-        assert!(c.confine(missing).is_err());
-    }
 }
 
 #[test]
@@ -1081,6 +1002,11 @@ fn uri_template_confine_accepts_http_and_https_schemes() {
 
 #[test]
 fn uri_template_confine_accepts_strftime_only_path() {
+    // A URI with only strftime directives and no `{{ }}` references renders
+    // operator-authored, time-derived text — nothing is event-controlled, so
+    // no runtime checker is built (matching master). It must still build and
+    // render; in particular `http::Uri` must not be fed the raw `%Y`/`%m`
+    // directives as percent escapes.
     let ts = Utc
         .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
         .single()
@@ -1098,11 +1024,19 @@ fn uri_template_confine_accepts_strftime_only_path() {
         confined.render_string(&event).unwrap(),
         "https://logs.example.com/2001/02"
     );
-    assert!(
-        confined
-            .check_confinement("https://other.example.com/2001/02")
-            .is_err()
-    );
+}
+
+#[test]
+fn uri_template_strftime_directive_hash_not_fragment() {
+    // `%#z` is one chrono directive (alternate timezone offset form), not a
+    // `%` followed by a URI fragment. Field-free strftime templates build
+    // with no runtime checker (nothing event-controlled to confine), so the
+    // directive is never treated as a fragment delimiter. Note chrono 0.4
+    // supports `%#z` for parsing only — rendering it panics — so this test
+    // pins build behavior only, exactly like the `%Y/%m` case above.
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://logs.example.com/%#z").unwrap();
+    assert!(tpl.confine(&config, "http", "uri").is_ok());
 }
 
 #[rstest]

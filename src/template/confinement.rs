@@ -3,7 +3,7 @@
 pub(crate) enum BuildError {
     /// Template has dynamic content but no literal prefix to confine it to.
     #[snafu(display(
-        "template has dynamic content (event fields: {fields:?}) but no \
+        "template has dynamic content (event fields: {fields:?}) but has no \
          literal string prefix to derive a confinement base from. Add a static \
          prefix to your template, or set \
          `dangerously_allow_unconfined_template_resolution: true` to opt out."
@@ -69,8 +69,8 @@ pub(crate) enum BuildError {
 
     #[snafu(display(
         "HTTP/HTTPS template {prefix:?} has a `{{{{ field }}}}` reference inside \
-         the authority (host) component: the static prefix has no `/`, `?`, or \
-         `#` after the host, so the rendered host is partly event-controlled. \
+         the authority (host) component: the static prefix has no `/` after \
+         the host, so the rendered host is partly event-controlled. \
          Add a `/` after the static host in your URI template, or set \
          `dangerously_allow_unconfined_template_resolution: true` to opt out."
     ))]
@@ -181,40 +181,20 @@ pub(crate) enum ConfinementChecker {
     Uri(Box<UriChecker>),
 }
 
-/// The verbatim-rendering portion of an operator-authored URI query or
-/// fragment: everything before the first `%` strftime specifier. The rest of
-/// the query/fragment expands to time-derived text at render time.
-fn static_uri_suffix_prefix(s: &str) -> &str {
-    s.split('%').next().unwrap_or(s)
-}
-
 impl ConfinementChecker {
-    /// Validate constraints common to prefix and URI confinement.
+    /// Validate common constraints for both prefix and URI confinement.
     ///
-    /// Returns the literal prefix to confine to, or `Ok(None)` when the
-    /// template needs no confinement.
-    ///
-    /// A template with no `{{ field }}` references has no event-controlled
-    /// content: its rendered value is fully operator-authored (strftime
-    /// specifiers expand to time-derived text, not log-producer input). Such
-    /// templates are confined only when `confine_strftime` is set — URI fields
-    /// use this to keep time-formatted URIs within the operator-authored
-    /// scheme/authority/path; non-URI fields do not, so templates like
-    /// `key_prefix: "%Y/%m/"` build without confinement.
-    fn validate_common(
-        tpl: &UnconfinedTemplate,
-        confine_strftime: bool,
-    ) -> Result<Option<String>, BuildError> {
-        let fields = tpl.get_fields();
-        let needs_confinement = fields.is_some() || (confine_strftime && tpl.is_dynamic());
-        if !needs_confinement {
-            return Ok(None);
-        }
+    /// Returns the literal prefix if the template is dynamic and requires
+    /// confinement. Returns `Ok(None)` if the template is static and needs no
+    /// confinement.
+    fn validate_common(tpl: &UnconfinedTemplate) -> Result<Option<String>, BuildError> {
+        let fields = match tpl.get_fields() {
+            Some(f) => f,
+            None => return Ok(None),
+        };
         let prefix = tpl.literal_prefix();
         if prefix.is_empty() {
-            return Err(BuildError::NoDerivableBase {
-                fields: fields.unwrap_or_default(),
-            });
+            return Err(BuildError::NoDerivableBase { fields });
         }
         Ok(Some(prefix.to_string()))
     }
@@ -226,16 +206,13 @@ impl ConfinementChecker {
     /// starting with `http://` or `https://` is treated as a non-URI string
     /// prefix (e.g., object-store key `"http://logs-{{ region }}/"`).
     ///
-    /// Returns `Ok(None)` for templates with no event-field references (fully
-    /// static, or time-formatted only like `key_prefix: "%Y/%m/"`): their
-    /// rendered value is operator-authored, so there is no event-controlled
-    /// content to confine.
+    /// Returns `Ok(None)` for static templates that need no confinement.
     ///
     /// Errors:
     /// - `NoDerivableBase`: template has field references but no literal prefix
     /// - `DerivedBaseIsRoot`: prefix is exactly `"/"` (trivial confinement)
     pub(crate) fn for_prefix_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
-        match Self::validate_common(&tpl.inner, false)? {
+        match Self::validate_common(&tpl.inner)? {
             Some(prefix) => {
                 // Reject root-only prefix to avoid trivial confinement.
                 if prefix == "/" {
@@ -258,65 +235,51 @@ impl ConfinementChecker {
     /// - HTTP/HTTPS scheme (rejects ftp://, relative paths, schemeless URIs)
     /// - Valid URI structure and non-empty authority
     ///
-    /// **Static URI templates** (no `{{ }}` field references and no strftime)
-    /// return `Ok(None)` because they have no event-controlled content to
-    /// confine at runtime.
+    /// **Static URI templates** (no `{{ }}` field references) return `Ok(None)`
+    /// because they have no event-controlled content to confine at runtime.
     ///
-    /// **Dynamic URI templates** return `Ok(Some(checker))` for runtime
-    /// confinement. For templates with no field references, an operator-authored
-    /// `?query`/`#fragment` is recorded on the checker and enforced at render
-    /// time; only field references combined with `?`/`#` are rejected outright.
+    /// **Dynamic URI templates** return `Ok(Some(checker))` for runtime confinement.
     ///
     /// Errors:
-    /// - `NoDerivableBase`: template has dynamic content but no literal prefix
+    /// - `NoDerivableBase`: template has field references but no literal prefix
     /// - `NoStaticUriAuthority`: URI is malformed, relative, schemeless, or lacks a static host
     /// - `PartialUriAuthority`: field reference inside the authority component
     /// - `DynamicUriQueryOrFragment`: `?` or `#` with field references
     /// - `EncodedSeparatorInUriPrefix`: `%2F`, `%5C`, or backslash in prefix
     /// - `UnsupportedUriScheme`: non-HTTP(S) scheme like ftp://
     pub(crate) fn for_uri_template(tpl: &Template) -> Result<Option<Self>, BuildError> {
-        let has_fields = tpl.inner.get_fields().is_some();
-        match Self::validate_common(&tpl.inner, true)? {
+        match Self::validate_common(&tpl.inner)? {
             Some(prefix) => {
                 // Reject URI templates that have field references AND `?` or `#`.
-                // A query/fragment in a template with no field references is
-                // operator-authored: its structure is fixed by the template, and
-                // any strftime remainder expands to time-derived text, never
-                // log-producer input. It is recorded on the checker and enforced
-                // at render time. But once a `{{ field }}` is present, the
+                // A static query/fragment is safe (fixed value, not
+                // event-controlled). But once a `{{ field }}` is present, the
                 // rendered path segment can smuggle either:
                 //   - a `?extra=...` query string, or
                 //   - a `#frag` that `http::Uri` truncates before our checker
                 //     sees the path, silently dropping any operator-authored
                 //     suffix like `/ingest`.
                 let src = tpl.get_ref();
-                if has_fields && (src.contains('?') || src.contains('#')) {
+                if src.contains('?') || src.contains('#') {
                     return Err(BuildError::DynamicUriQueryOrFragment {
                         template: src.to_string(),
                     });
                 }
-                // Operator-authored query/fragment: everything before the first
-                // `%` strftime specifier renders verbatim; the rest is
-                // time-derived. `literal_prefix()` stops at the first `%`
-                // anywhere, so a query after a path-strftime never reaches the
-                // prefix — extract from the full source instead.
-                let (before_fragment, fragment_prefix) = match src.split_once('#') {
-                    Some((before, fragment)) => {
-                        (before, Some(static_uri_suffix_prefix(fragment).to_string()))
-                    }
-                    None => (src, None),
-                };
-                let query_prefix = before_fragment
-                    .split_once('?')
-                    .map(|(_, query)| static_uri_suffix_prefix(query).to_string());
-                UriChecker::from_prefix(&prefix, query_prefix, fragment_prefix)
-                    .map(|c| Some(Self::Uri(Box::new(c))))
+                UriChecker::from_prefix(&prefix).map(|c| Some(Self::Uri(Box::new(c))))
             }
             None => {
-                // Static template (no field references). Validate URI structure
-                // even though no runtime checker is needed, to enforce the
-                // HTTP/HTTPS + authority requirement uniformly.
-                Self::validate_static_uri(tpl).map(|()| None)
+                // Template with no event-field references. Fully static ones
+                // (no strftime either) are validated for URI structure to
+                // enforce the HTTP/HTTPS + authority requirement uniformly.
+                // Strftime-only templates (e.g. `https://logs.example.com/%Y/%m`)
+                // are not: their source is not a literal URI — the strftime
+                // directives render to time-derived text, never event input —
+                // and `http::Uri` would reject the raw `%` directives as
+                // invalid percent escapes.
+                if !tpl.inner.is_dynamic() {
+                    Self::validate_static_uri(tpl).map(|()| None)
+                } else {
+                    Ok(None)
+                }
             }
         }
     }
@@ -400,9 +363,7 @@ impl PrefixChecker {
 /// Render-time checks:
 ///
 /// 1. **Fragment rejection** — rejects raw `#` before parsing to prevent
-///    `http::Uri` truncation from hiding operator-authored suffixes, unless
-///    the operator authored a fragment (template has no field references),
-///    in which case the fragment is prefix-checked in step 7.
+///    `http::Uri` truncation from hiding operator-authored suffixes.
 ///
 /// 2. **Authority check** — scheme and authority must match the operator-authored
 ///    values (case-insensitive). Catches `@`-userinfo injection and host-extension.
@@ -416,12 +377,7 @@ impl PrefixChecker {
 /// 5. **Encoded separator check** — rejects `%2f`, `%5c`, `%25`, and raw `\`
 ///    in the path (double-decoding and Windows path separator vectors).
 ///
-/// 6. **Query check** — without an operator-authored query, rejects any
-///    rendered query string (field-smuggled `?`); with one, the rendered
-///    query must start with the operator-authored prefix.
-///
-/// 7. **Fragment prefix check** — when the operator authored a fragment, the
-///    rendered fragment must start with the operator-authored prefix.
+/// 6. **Query rejection** — rejects any rendered query string (field-smuggled `?`).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct UriChecker {
     /// Lowercased scheme, e.g. `"https"`.
@@ -430,16 +386,6 @@ pub(crate) struct UriChecker {
     authority: String,
     /// Static path portion from the template prefix, e.g. `"/ingest/"`.
     path_prefix: String,
-    /// Operator-authored query prefix (template has no field references), up
-    /// to the first `%` strftime specifier. The rendered query must start with
-    /// this; the remainder is time-derived. `None` when the template has no
-    /// `?` — any rendered query is then field-smuggled and rejected.
-    query_prefix: Option<String>,
-    /// Operator-authored fragment prefix (template has no field references),
-    /// up to the first `%` strftime specifier. `None` when the template has no
-    /// `#` — any raw `#` in the rendered value is then field-smuggled and
-    /// rejected before parsing.
-    fragment_prefix: Option<String>,
 }
 
 impl UriChecker {
@@ -484,11 +430,7 @@ impl UriChecker {
         Ok((uri, scheme, authority))
     }
 
-    pub(crate) fn from_prefix(
-        prefix: &str,
-        query_prefix: Option<String>,
-        fragment_prefix: Option<String>,
-    ) -> Result<Self, BuildError> {
+    pub(crate) fn from_prefix(prefix: &str) -> Result<Self, BuildError> {
         let (uri, scheme, authority) = Self::parse_http_uri(prefix)?;
         let path = uri.path().to_ascii_lowercase();
         // Reject encoded path separators, encoded percents, and raw
@@ -505,20 +447,16 @@ impl UriChecker {
             });
         }
         // `http::Uri` normalises a missing path to `"/"`, so `uri.path()` can't
-        // tell us whether the prefix actually had a `/` closing off the host.
-        // Check the raw prefix instead: none of `/`, `?`, or `#` after `://`
-        // means the authority runs to the end of the static prefix, so a
-        // `{{ field }}` reference (or a strftime directive) sits inside (or
-        // extends) the authority we just parsed. `?` and `#` terminate the
-        // authority just as `/` does (RFC 3986), so pathless URIs like
-        // `https://logs.example.com?date=%Y-%m-%d` carry a static authority.
+        // tell us whether the prefix actually had a `/` closing off the host. Check
+        // the raw prefix instead: no `/` after `://` means the `{{ field }}`
+        // reference sits inside (or extends) the authority we just parsed.
         let after_scheme = prefix
             .split_once("://")
             .map(|(_, rest)| rest)
             .ok_or_else(|| BuildError::NoStaticUriAuthority {
                 prefix: prefix.to_string(),
             })?;
-        if !after_scheme.contains(['/', '?', '#']) {
+        if !after_scheme.contains('/') {
             return Err(BuildError::PartialUriAuthority {
                 prefix: prefix.to_string(),
             });
@@ -527,15 +465,11 @@ impl UriChecker {
             scheme,
             authority,
             path_prefix: uri.path().to_string(),
-            query_prefix,
-            fragment_prefix,
         })
     }
 
     pub(crate) fn confine(&self, rendered: &str) -> Result<(), ConfineError> {
-        // 1. Reject raw fragment injection BEFORE parsing, unless the operator
-        //    authored a fragment (template has no field references, so no
-        //    event-controlled content can smuggle one).
+        // 1. Reject raw fragment injection BEFORE parsing.
         //    `http::Uri` strips fragments server-side, which would hide the
         //    operator-authored suffix in templates like:
         //      `https://api.internal/base/{{ tenant }}/ingest`
@@ -543,7 +477,7 @@ impl UriChecker {
         //      `https://api.internal/base/ok#evil`
         //    and the parser discards `/ingest` (never checked).
         //    Checking the raw string catches this before truncation.
-        if self.fragment_prefix.is_none() && rendered.contains('#') {
+        if rendered.contains('#') {
             return Err(ConfineError::OutsideBase {
                 rendered: rendered.to_string(),
                 base: format!("{}://{}{}", self.scheme, self.authority, self.path_prefix),
@@ -621,43 +555,16 @@ impl UriChecker {
             });
         }
 
-        // 6. Query check. Without an operator-authored query, URI templates
-        //    containing `?` are rejected at build time, so a query at render
-        //    time means a field value smuggled `?...` into the path — e.g.
-        //    tenant value `ok?tenant=evil` renders
-        //    `.../ingest/ok?tenant=evil`: same authority and path prefix but
-        //    an attacker-controlled query. With an operator-authored query
-        //    (template has no field references), the rendered query must
-        //    start with the operator-authored verbatim prefix. The portion
-        //    beyond it is operator-authored literals plus time-derived
-        //    text — never event-controlled — so it is not further
-        //    restricted.
-        let query_ok = match &self.query_prefix {
-            None => uri.query().is_none(),
-            Some(prefix) => uri.query().is_some_and(|q| q.starts_with(prefix.as_str())),
-        };
-        if !query_ok {
+        // 6. Reject any rendered query. URI templates containing `?` are
+        //    rejected at build time, so a query at render time means a field
+        //    value smuggled `?...` into the path — e.g. tenant value
+        //    `ok?tenant=evil` renders `.../ingest/ok?tenant=evil`: same
+        //    authority and path prefix but an attacker-controlled query.
+        if uri.query().is_some() {
             return Err(ConfineError::OutsideBase {
                 rendered: rendered.to_string(),
                 base: format!("{}://{}{}", self.scheme, self.authority, self.path_prefix),
             });
-        }
-
-        // 7. Fragment check. Only reached when the operator authored a
-        //    fragment (otherwise step 1 rejected any raw `#`): the rendered
-        //    fragment must start with the operator-authored verbatim
-        //    prefix. The portion beyond it is operator-authored literals
-        //    plus time-derived text — never event-controlled — so it is
-        //    not further restricted. `http::Uri` strips fragments at parse,
-        //    so extract from the raw string.
-        if let Some(fragment_prefix) = &self.fragment_prefix {
-            let fragment = rendered.split_once('#').map(|(_, f)| f).unwrap_or_default();
-            if !fragment.starts_with(fragment_prefix.as_str()) {
-                return Err(ConfineError::OutsideBase {
-                    rendered: rendered.to_string(),
-                    base: format!("{}://{}{}", self.scheme, self.authority, self.path_prefix),
-                });
-            }
         }
 
         Ok(())
