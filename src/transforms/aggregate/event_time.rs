@@ -81,7 +81,7 @@ impl Aggregate {
 
         let bucket_key = self.bucket_key(ts);
 
-        if self.is_too_late(bucket_key) {
+        if self.was_bucket_flushed(bucket_key) {
             emit!(AggregateEventDropped {
                 reason: "Event timestamp is too late; bucket already flushed."
             });
@@ -129,7 +129,7 @@ impl Aggregate {
     /// record into. `allowed_lateness_ms` is honoured at flush time (it
     /// delays closing the bucket); once a window has been emitted it is
     /// closed unconditionally and late events for it are dropped.
-    const fn is_too_late(&self, bucket_key: BucketKey) -> bool {
+    const fn was_bucket_flushed(&self, bucket_key: BucketKey) -> bool {
         if let Some(watermark) = self.watermark {
             bucket_key < watermark
         } else {
@@ -393,10 +393,15 @@ impl Aggregate {
         // near `i64::MAX` and every subsequent normal event is rejected as
         // late. Saturating addition keeps far-future buckets parked at
         // `i64::MAX` (never eligible until `force`) instead.
+        //
+        // `event_time_buckets` is a `BTreeMap` ordered by `bucket_key`. A
+        // bucket is eligible when `now_ms >= bucket_key + interval + grace`,
+        // so eligible keys form a prefix. Stop at the first ineligible key
+        // instead of scanning remaining (typically future) windows.
         let buckets_to_flush: Vec<BucketKey> = self
             .event_time_buckets
             .keys()
-            .filter(|&&bucket_key| {
+            .take_while(|&&bucket_key| {
                 force
                     || now_ms
                         >= bucket_key
@@ -505,7 +510,7 @@ impl Aggregate {
 
             // Advance the watermark to the *exclusive end* of the highest
             // flushed bucket so subsequent events for that window (or any
-            // earlier one) are rejected by `is_too_late`.
+            // earlier one) are rejected by `was_bucket_flushed`.
             let bucket_end = bucket_key.saturating_add(interval_ms);
             if self.watermark.is_none_or(|w| bucket_end > w) {
                 self.watermark = Some(bucket_end);

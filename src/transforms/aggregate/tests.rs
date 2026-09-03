@@ -1324,11 +1324,10 @@ fn event_time_future_skew_gating_and_boundary() {
     assert!(out.is_empty(), "far-future event must be dropped");
 
     // Boundary config must not panic in `now + max_future_ms` (saturating millis).
-    let mut boundary =
-        Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
-            et.max_future_ms = i64::MAX as u64;
-        }))
-        .unwrap();
+    let mut boundary = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.max_future_ms = i64::MAX as u64;
+    }))
+    .unwrap();
     boundary.record(make_metric_with_timestamp(
         "counter_now",
         MetricKind::Incremental,
@@ -1361,7 +1360,10 @@ fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
 
     let mut out = vec![];
     agg.flush_event_time_buckets(&mut out, false);
-    assert!(out.is_empty(), "saturated cutoff must stay ineligible until force");
+    assert!(
+        out.is_empty(),
+        "saturated cutoff must stay ineligible until force"
+    );
     assert_eq!(agg.event_time_buckets.len(), 1);
     assert!(
         agg.watermark.is_none(),
@@ -1369,7 +1371,11 @@ fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
     );
 
     agg.flush_event_time_buckets(&mut out, true);
-    assert_eq!(out.len(), 1, "shutdown/force flush must still drain the bucket");
+    assert_eq!(
+        out.len(),
+        1,
+        "shutdown/force flush must still drain the bucket"
+    );
 }
 
 /// Missing-timestamp drop vs use_system_time, plus same-instant cutoff reuse.
