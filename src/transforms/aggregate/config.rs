@@ -32,7 +32,6 @@ pub struct AggregateConfig {
     /// When present, metrics are grouped into buckets based on their timestamps rather than when
     /// they are processed. Omit this block to keep the default system-time behavior.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[configurable(derived)]
     pub event_time: Option<EventTimeConfig>,
 }
 
@@ -62,7 +61,6 @@ pub struct EventTimeConfig {
     /// - `drop` (default) discards the event and increments `component_discarded_events_total`
     /// - `use_system_time` synthesizes a timestamp from the current system clock
     #[serde(default)]
-    #[configurable(derived)]
     pub missing_timestamp: MissingTimestamp,
 
     /// Maximum allowed time drift for future events, in milliseconds.
