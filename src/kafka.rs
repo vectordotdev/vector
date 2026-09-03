@@ -108,6 +108,12 @@ impl KafkaAuthConfig {
         if tls_enabled {
             let tls = self.tls.as_ref().unwrap();
 
+            // librdkafka owns the TLS handshake and exposes no minimum/maximum protocol version
+            // property, so the configured bounds cannot be forwarded.
+            if tls.options.has_protocol_version_bounds() {
+                vector_lib::tls::warn_unenforceable_protocol_versions("librdkafka");
+            }
+
             if let Some(verify_certificate) = &tls.options.verify_certificate {
                 client.set(
                     "enable.ssl.certificate.verification",

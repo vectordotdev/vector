@@ -283,6 +283,9 @@ impl SourceConfig for PubsubConfig {
         auth.apply_uri(&mut uri);
 
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        if tls.has_protocol_version_bounds() {
+            vector_lib::tls::warn_unenforceable_protocol_versions("tonic");
+        }
         let host = uri.host().unwrap_or("pubsub.googleapis.com");
         let mut tls_config = ClientTlsConfig::new().domain_name(host);
         if let Some((cert, key)) = tls.identity_pem() {
