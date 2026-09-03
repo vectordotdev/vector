@@ -1,18 +1,11 @@
 # Support
 
-Vector is an open source project supported by its maintainers and community on
-a best-effort basis. See our [community response expectations][response] for
-information about how pull requests, issues, and discussions are prioritized.
+For questions and troubleshooting, start a [GitHub Discussion][discussions].
+For reproducible bugs, open a [bug report][bug-report].
 
-## Where to ask
-
-- For questions, troubleshooting, and general proposals, start a
-  [GitHub Discussion][discussions].
-- For a reproducible bug, open a [bug report][bug-report].
-- For a feature proposal, open a [feature request][feature-request].
-- For contribution guidance, see [CONTRIBUTING.md][contributing].
-- For community conversation, join [Discord][discord]. The maintainers do not
-  actively monitor Discord for support requests.
+See the [Vector community page][community] for other community and support
+channels. See our [community response expectations][response] for information
+about how pull requests, issues, and discussions are prioritized.
 
 If you are unsure whether you have found a bug, start a discussion. It can be
 continued in an issue if an actionable problem is identified.
@@ -37,9 +30,7 @@ Use fenced code blocks for configurations and logs, and review all content for
 sensitive information before posting it publicly.
 
 [bug-report]: https://github.com/vectordotdev/vector/issues/new?template=bug.yml
-[contributing]: ../CONTRIBUTING.md
+[community]: https://vector.dev/community/
 [discussions]: https://github.com/vectordotdev/vector/discussions/new?category=q-a
-[discord]: https://chat.vector.dev
 [documentation]: https://vector.dev/docs/
-[feature-request]: https://github.com/vectordotdev/vector/issues/new?template=feature.yml
 [response]: ../COMMUNITY_RESPONSE_EXPECTATIONS.md

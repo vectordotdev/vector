@@ -11,7 +11,7 @@ description: >
 * For questions and help: [Create a Vector GitHub Discussions][vector_discussions]
 
 * For bug reports: [Create a Vector GitHub issue][vector_bug_report]
-* For feedback on pull requests, ping the Vector team directly on GitHub with `@vectordotdev/vector`
+* For information about how pull requests are prioritized, see [Community response expectations][response_expectations]
 
 ### VRL
 
@@ -83,6 +83,8 @@ Vector has adopted the Rust community model and practices for engaging with peop
 [linux]: https://www.kernel.org
 
 [oss]: https://github.com/vectordotdev/vector
+
+[response_expectations]: https://github.com/vectordotdev/vector/blob/master/COMMUNITY_RESPONSE_EXPECTATIONS.md
 
 [rust_community]: https://www.rust-lang.org/community
 
