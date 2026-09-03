@@ -167,6 +167,18 @@ impl EncodingConfigWithFraming {
         let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
         Ok((self.transformer(), encoder))
     }
+
+    /// Validate that the configured serializer can be built.
+    ///
+    /// Delegates to [`EncodingConfig::validate`]: the serializer is built and
+    /// discarded to surface unbuildable codecs during pure config validation,
+    /// with the disk-bound protobuf codec assumed valid so validation stays
+    /// filesystem-free (it runs under `vector validate --no-environment`).
+    /// Building the framer is infallible, so there is nothing to validate on
+    /// the framing side.
+    pub fn validate(&self) -> vector_common::Result<()> {
+        self.encoding.validate()
+    }
 }
 
 /// The way a sink processes outgoing events.
@@ -333,6 +345,44 @@ mod test {
     fn validate_accepts_buildable_encoding() {
         let encoding = EncodingConfig::new(
             SerializerConfig::Json(JsonSerializerConfig::default()),
+            Default::default(),
+        );
+
+        assert!(encoding.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_with_framing_rejects_unbuildable_encoding() {
+        let encoding = EncodingConfigWithFraming::new(
+            Some(FramingConfig::NewlineDelimited),
+            SerializerConfig::Avro {
+                avro: AvroSerializerOptions {
+                    schema: "not a valid avro schema".into(),
+                },
+            },
+            Default::default(),
+        );
+
+        let error = encoding.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn validate_with_framing_skips_protobuf_encoding_that_reads_disk() {
+        let encoding = EncodingConfigWithFraming::new(
+            None,
+            SerializerConfig::Protobuf(ProtobufSerializerConfig {
+                protobuf: ProtobufSerializerOptions {
+                    desc_file: "/nonexistent/protobuf.desc".into(),
+                    message_type: "package.Message".into(),
+                    use_json_names: false,
+                },
+            }),
             Default::default(),
         );
 

@@ -178,6 +178,7 @@ impl ValidatedSink for SocketSinkConfig {
         match &self.mode {
             Mode::Tcp(TcpMode { config, encoding }) => {
                 let (host, port) = config.parse_address()?;
+                encoding.validate()?;
                 let transformer = encoding.transformer();
                 Ok(ValidatedSocket::Tcp {
                     host,
@@ -195,6 +196,7 @@ impl ValidatedSink for SocketSinkConfig {
             }
             #[cfg(unix)]
             Mode::UnixStream(UnixMode { encoding, .. }) => {
+                encoding.validate()?;
                 let transformer = encoding.transformer();
                 Ok(ValidatedSocket::UnixStream { transformer })
             }
@@ -203,6 +205,7 @@ impl ValidatedSink for SocketSinkConfig {
             Mode::UnixDatagram(UnixMode { encoding, .. }) => {
                 cfg_if! {
                     if #[cfg(not(target_os = "macos"))] {
+                        encoding.validate()?;
                         let transformer = encoding.transformer();
                         Ok(ValidatedSocket::UnixDatagram { transformer })
                     }

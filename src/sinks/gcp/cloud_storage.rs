@@ -278,6 +278,7 @@ impl ValidatedSink for GcsSinkConfig {
     type Validated = ValidatedGcsSink;
 
     fn validate(&self) -> crate::Result<ValidatedGcsSink> {
+        self.encoding.validate()?;
         let base_url = self.endpoint.append_path(&format!("{}/", self.bucket))?;
         let batch_settings = self.batch.into_batcher_settings()?;
         let key_prefix_template = self.key_prefix_template()?;

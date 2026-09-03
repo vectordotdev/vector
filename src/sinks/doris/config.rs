@@ -173,6 +173,7 @@ impl ValidatedSink for DorisConfig {
     type Validated = ValidatedDoris;
 
     fn validate(&self) -> crate::Result<ValidatedDoris> {
+        self.encoding.validate()?;
         if self.endpoints.is_empty() {
             return Err("No endpoints configured.'.".into());
         }

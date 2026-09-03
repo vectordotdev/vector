@@ -406,6 +406,7 @@ impl ValidatedSink for AzureBlobSinkConfig {
     type Validated = ValidatedAzureBlob;
 
     fn validate(&self) -> crate::Result<ValidatedAzureBlob> {
+        self.encoding.validate()?;
         if self.blob_type == AzureBlobType::Append && !supports_append(self.compression) {
             // An error rather than a warning because of zlib: standard zlib decoders return only
             // the first block and report success, so the loss is invisible to the consumer.
