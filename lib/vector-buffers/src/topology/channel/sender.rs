@@ -14,7 +14,7 @@ use crate::{
     BufferInstrumentation, Bufferable, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     internal_events::BufferSendDuration,
-    variants::disk_v2::{self, DiskBufferUsageHandle, ProductionFilesystem, TryWriteOutcome},
+    variants::disk_v2::{self, DiskBufferUsageSnapshot, ProductionFilesystem, TryWriteOutcome},
 };
 
 /// Adapter for papering over various sender backends.
@@ -24,10 +24,7 @@ pub enum SenderAdapter<T: Bufferable> {
     InMemory(LimitedSender<T>),
 
     /// The disk v2 buffer.
-    DiskV2 {
-        writer: Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>,
-        usage: DiskBufferUsageHandle,
-    },
+    DiskV2(Arc<Mutex<disk_v2::BufferWriter<T, ProductionFilesystem>>>),
 }
 
 impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
@@ -38,11 +35,7 @@ impl<T: Bufferable> From<LimitedSender<T>> for SenderAdapter<T> {
 
 impl<T: Bufferable> From<disk_v2::BufferWriter<T, ProductionFilesystem>> for SenderAdapter<T> {
     fn from(v: disk_v2::BufferWriter<T, ProductionFilesystem>) -> Self {
-        let usage = v.usage_handle();
-        Self::DiskV2 {
-            writer: Arc::new(Mutex::new(v)),
-            usage,
-        }
+        Self::DiskV2(Arc::new(Mutex::new(v)))
     }
 }
 
@@ -62,7 +55,7 @@ where
     pub(crate) fn requires_encodable_items(&self) -> bool {
         match self {
             Self::InMemory(_) => false,
-            Self::DiskV2 { .. } => true,
+            Self::DiskV2(_) => true,
         }
     }
 
@@ -73,7 +66,7 @@ where
                 .await
                 .map(|()| TryWriteOutcome::Written)
                 .map_err(Into::into),
-            Self::DiskV2 { writer, .. } => {
+            Self::DiskV2(writer) => {
                 let pre_count = item.event_count() as u64;
                 let pre_size = item.size_of() as u64;
                 let mut writer = writer.lock().await;
@@ -113,7 +106,7 @@ where
                 .try_send(item)
                 .map(|()| TryWriteOutcome::Written)
                 .or_else(|e| Ok(TryWriteOutcome::Full(e.into_inner()))),
-            Self::DiskV2 { writer, .. } => {
+            Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
                 // Filtering here is unconditional and independent of current occupancy.
@@ -153,7 +146,7 @@ where
     pub(crate) async fn flush(&mut self) -> crate::Result<()> {
         match self {
             Self::InMemory(_) => Ok(()),
-            Self::DiskV2 { writer, .. } => {
+            Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
                 writer.flush().await.map_err(|e| {
                     // Errors on the I/O path, which is all that flushing touches, are never recoverable.
@@ -168,14 +161,17 @@ where
     pub fn capacity(&self) -> Option<usize> {
         match self {
             Self::InMemory(tx) => Some(tx.available_capacity()),
-            Self::DiskV2 { .. } => None,
+            Self::DiskV2(_) => None,
         }
     }
 
-    fn disk_usage_handle(&self) -> Option<DiskBufferUsageHandle> {
+    fn usage_snapshot(&self) -> Option<DiskBufferUsageSnapshot> {
         match self {
-            Self::InMemory(_) => None,
-            Self::DiskV2 { usage, .. } => Some(usage.clone()),
+            Self::InMemory(_) => Some(DiskBufferUsageSnapshot {
+                event_count: 0,
+                byte_size: 0,
+            }),
+            Self::DiskV2(writer) => writer.try_lock().ok().map(|writer| writer.usage_snapshot()),
         }
     }
 }
@@ -293,17 +289,17 @@ impl<T: Bufferable> BufferSender<T> {
         self.custom_instrumentation = Some(Arc::new(instrumentation));
     }
 
-    /// Returns read-only usage handles for all disk stages in this buffer topology.
-    pub fn disk_usage_handles(&self) -> Vec<DiskBufferUsageHandle> {
-        let mut handles = self
-            .base
-            .disk_usage_handle()
-            .into_iter()
-            .collect::<Vec<_>>();
+    /// Returns the aggregate approximate usage of all disk stages in this buffer topology.
+    ///
+    /// Returns `None` rather than waiting if any disk writer is currently busy.
+    pub fn disk_usage_snapshot(&self) -> Option<DiskBufferUsageSnapshot> {
+        let mut usage = self.base.usage_snapshot()?;
         if let Some(overflow) = self.overflow.as_ref() {
-            handles.extend(overflow.disk_usage_handles());
+            let overflow_usage = overflow.disk_usage_snapshot()?;
+            usage.event_count = usage.event_count.saturating_add(overflow_usage.event_count);
+            usage.byte_size = usage.byte_size.saturating_add(overflow_usage.byte_size);
         }
-        handles
+        Some(usage)
     }
 }
 
@@ -406,5 +402,47 @@ impl<T: Bufferable> BufferSender<T> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod usage_snapshot_tests {
+    use std::num::{NonZeroU64, NonZeroUsize};
+
+    use temp_dir::TempDir;
+    use tracing::Span;
+
+    use super::SenderAdapter;
+    use crate::{BufferConfig, BufferType, MemoryBufferSize, WhenFull, test::SizedRecord};
+
+    #[tokio::test]
+    async fn busy_disk_stage_makes_diagnostic_snapshot_unavailable() {
+        let config = BufferConfig::Chained(vec![
+            BufferType::Memory {
+                size: MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()),
+                when_full: WhenFull::Overflow,
+            },
+            BufferType::DiskV2 {
+                max_size: NonZeroU64::new(268_435_488).unwrap(),
+                when_full: WhenFull::Block,
+            },
+        ]);
+        let data_dir = TempDir::new().unwrap();
+        let (sender, _receiver) = config
+            .build::<SizedRecord>(
+                Some(data_dir.path().to_path_buf()),
+                "busy".into(),
+                Span::none(),
+            )
+            .await
+            .unwrap();
+        let overflow = sender.overflow.as_ref().unwrap();
+        let writer = match &overflow.base {
+            SenderAdapter::DiskV2(writer) => writer,
+            SenderAdapter::InMemory(_) => unreachable!(),
+        };
+        let _guard = writer.lock().await;
+
+        assert_eq!(sender.disk_usage_snapshot(), None);
     }
 }

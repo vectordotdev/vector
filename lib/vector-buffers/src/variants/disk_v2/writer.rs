@@ -913,8 +913,16 @@ where
         }
     }
 
-    pub(crate) fn usage_handle(&self) -> super::DiskBufferUsageHandle {
-        self.ledger.disk_usage_handle()
+    /// Gets the current published usage of the buffer.
+    ///
+    /// Writes are included after they are flushed and reads after they are acknowledged, matching
+    /// the ledger's existing published-data semantics. The two counters are sampled separately, so
+    /// the result is approximate when reads and writes are being published concurrently.
+    pub fn usage_snapshot(&self) -> super::DiskBufferUsageSnapshot {
+        super::DiskBufferUsageSnapshot {
+            event_count: self.ledger.get_total_records(),
+            byte_size: self.ledger.get_total_buffer_size(),
+        }
     }
 
     fn get_next_record_id(&mut self) -> u64 {

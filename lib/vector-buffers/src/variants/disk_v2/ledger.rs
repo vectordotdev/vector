@@ -23,7 +23,7 @@ use tokio::{
 use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
-    DiskBufferUsageHandle, Filesystem,
+    Filesystem,
     backed_archive::BackedArchive,
     common::{
         DEFAULT_DATA_FILE_CLEANUP_INTERVAL, DiskBufferConfig, MAX_FILE_ID, align16,
@@ -257,7 +257,6 @@ where
     last_flush: AtomicCell<Instant>,
     // Tracks usage data about the buffer.
     usage_handle: BufferUsageHandle,
-    disk_usage_handle: DiskBufferUsageHandle,
 }
 
 impl<FS> Ledger<FS>
@@ -316,10 +315,6 @@ where
     /// deleted in full.
     pub fn get_total_buffer_size(&self) -> u64 {
         self.total_buffer_size.load(Ordering::Acquire)
-    }
-
-    pub fn disk_usage_handle(&self) -> DiskBufferUsageHandle {
-        self.disk_usage_handle.clone()
     }
 
     /// Increments the total number of bytes for all unread records in the buffer.
@@ -535,7 +530,6 @@ where
         self.increment_total_buffer_size(record_size);
         self.usage_handle
             .increment_received_event_count_and_byte_size(event_count, record_size);
-        self.disk_usage_handle.increment(event_count, record_size);
         self.notify_writer_waiters();
         next_record_id
     }
@@ -559,8 +553,6 @@ where
         self.decrement_total_buffer_size(total_record_size);
         self.usage_handle
             .increment_sent_event_count_and_byte_size(event_count, total_record_size);
-        self.disk_usage_handle
-            .decrement(event_count, total_record_size);
     }
 
     /// Tracks the known byte size of a record that the reader consumed but could not decode.
@@ -570,13 +562,11 @@ where
         // provides the exact byte span that has left the buffer.
         self.usage_handle
             .increment_dropped_event_count_and_byte_size(0, total_record_size, false);
-        self.disk_usage_handle.decrement(0, total_record_size);
     }
 
     /// Removes an unread data file tail that could not be interpreted as a record.
     pub fn track_abandoned_tail_bytes(&self, total_size: u64) {
         self.decrement_total_buffer_size(total_size);
-        self.disk_usage_handle.decrement(0, total_size);
     }
 
     /// Marks the writer as finished.
@@ -704,8 +694,6 @@ where
                 initial_buffer_events,
                 initial_buffer_size,
             );
-        self.disk_usage_handle
-            .set(initial_buffer_events, initial_buffer_size);
     }
 
     pub fn track_dropped_events(&self, count: u64) {
@@ -719,7 +707,6 @@ where
         // TODO: Can we do better here?
         self.usage_handle
             .increment_dropped_event_count_and_byte_size(count, 0, false);
-        self.disk_usage_handle.decrement(count, 0);
     }
 
     /// Records that a record was dropped because it could never be written to the buffer (e.g. it
@@ -842,7 +829,6 @@ where
             data_file_cleanup: DataFileCleanupState::new(cleanup_reader_file_id),
             last_flush: AtomicCell::new(Instant::now()),
             usage_handle,
-            disk_usage_handle: DiskBufferUsageHandle::new(),
         };
 
         // NOTE: We deliberately do not seed `total_buffer_size` here. Historically, the ledger

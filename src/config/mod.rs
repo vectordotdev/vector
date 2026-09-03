@@ -67,7 +67,6 @@ pub use transform::{
 };
 pub use unit_test::{UnitTestResult, build_unit_tests, build_unit_tests_main};
 pub use validation::warnings;
-pub(crate) use validation::{OrphanedDiskBufferScanner, referenced_disk_buffer_directories};
 pub use vars::{ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX, interpolate};
 pub use vector_lib::{
     config::{

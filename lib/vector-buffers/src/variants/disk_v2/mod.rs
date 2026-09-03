@@ -174,10 +174,7 @@ use std::{
     marker::PhantomData,
     num::NonZeroU64,
     path::{Path, PathBuf},
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::Arc,
 };
 
 use async_trait::async_trait;
@@ -222,53 +219,6 @@ pub struct DiskBufferUsageSnapshot {
     pub event_count: u64,
     /// Encoded size of unread records in the buffer.
     pub byte_size: u64,
-}
-
-/// Read-only access to the current unread usage of a disk buffer.
-#[derive(Clone, Debug)]
-pub struct DiskBufferUsageHandle {
-    event_count: Arc<AtomicU64>,
-    byte_size: Arc<AtomicU64>,
-}
-
-impl DiskBufferUsageHandle {
-    fn new() -> Self {
-        Self {
-            event_count: Arc::new(AtomicU64::new(0)),
-            byte_size: Arc::new(AtomicU64::new(0)),
-        }
-    }
-
-    /// Gets the approximate current number and encoded size of unread records.
-    pub fn snapshot(&self) -> DiskBufferUsageSnapshot {
-        DiskBufferUsageSnapshot {
-            event_count: self.event_count.load(Ordering::Relaxed),
-            byte_size: self.byte_size.load(Ordering::Relaxed),
-        }
-    }
-
-    fn set(&self, event_count: u64, byte_size: u64) {
-        self.event_count.store(event_count, Ordering::Relaxed);
-        self.byte_size.store(byte_size, Ordering::Relaxed);
-    }
-
-    fn increment(&self, event_count: u64, byte_size: u64) {
-        self.event_count.fetch_add(event_count, Ordering::Relaxed);
-        self.byte_size.fetch_add(byte_size, Ordering::Relaxed);
-    }
-
-    fn decrement(&self, event_count: u64, byte_size: u64) {
-        _ = self
-            .event_count
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
-                Some(current.saturating_sub(event_count))
-            });
-        _ = self
-            .byte_size
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
-                Some(current.saturating_sub(byte_size))
-            });
-    }
 }
 
 /// Error that occurred when creating/loading a disk buffer.
@@ -475,14 +425,14 @@ where
     let (writer, reader) = Buffer::from_config(config, usage_handle)
         .await
         .map_err(Box::<dyn Error + Send + Sync>::from)?;
-    let existing_usage = writer.usage_handle().snapshot();
-    if existing_usage.event_count > 0 || existing_usage.byte_size > 0 {
+    let usage = writer.usage_snapshot();
+    if usage.event_count > 0 || usage.byte_size > 0 {
         info!(
             buffer_id = id,
             buffer_dir = buffer_path.to_string_lossy().as_ref(),
-            unread_events = existing_usage.event_count,
-            unread_bytes = existing_usage.byte_size,
-            message = "Opened disk buffer with unread data; resuming delivery.",
+            accounted_events = usage.event_count,
+            accounted_bytes = usage.byte_size,
+            message = "Opened disk buffer with remaining accounted data; resuming processing.",
         );
     }
 

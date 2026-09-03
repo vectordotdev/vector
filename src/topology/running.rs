@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 
@@ -13,10 +14,7 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_lib::{
-    buffers::{
-        BufferConfig, DiskBufferUsageHandle, DiskBufferUsageSnapshot,
-        topology::channel::BufferSender,
-    },
+    buffers::{BufferConfig, topology::channel::BufferSender},
     gauge,
     internal_event::GaugeName,
     shutdown::ShutdownSignal,
@@ -28,14 +26,13 @@ use super::{
     BuiltBuffer, TaskHandle, TaskResult,
     builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
-    handle_errors, retain, take_healthchecks,
+    handle_errors,
+    orphaned_disk_buffers::OrphanedDiskBufferScanner,
+    retain, take_healthchecks,
     task::{Task, TaskOutput},
 };
 use crate::{
-    config::{
-        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OrphanedDiskBufferScanner,
-        OutputId, Resource,
-    },
+    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
@@ -56,6 +53,11 @@ pub enum ReloadError {
     TopologyBuildFailed,
     #[snafu(display("failed to restore previous config"))]
     FailedToRestore,
+}
+
+struct DrainingDiskBufferSink {
+    task: TaskHandle,
+    buffer_paths: Vec<PathBuf>,
 }
 
 #[allow(dead_code)]
@@ -81,6 +83,7 @@ pub struct RunningTopology {
     pending_reload: Option<HashSet<ComponentKey>>,
     sink_confinement_gauges: HashMap<ComponentKey, Gauge>,
     orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner,
+    draining_disk_buffer_sinks: Vec<DrainingDiskBufferSink>,
 }
 
 impl RunningTopology {
@@ -107,6 +110,7 @@ impl RunningTopology {
             pending_reload: None,
             sink_confinement_gauges: HashMap::new(),
             orphaned_disk_buffer_scanner: OrphanedDiskBufferScanner::new(),
+            draining_disk_buffer_sinks: Vec::new(),
         }
     }
 
@@ -353,10 +357,10 @@ impl RunningTopology {
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
-                let previous_disk_buffer_directories =
-                    crate::config::referenced_disk_buffer_directories(&self.config);
+                let draining_disk_buffer_paths =
+                    active_draining_disk_buffer_paths(&mut self.draining_disk_buffer_sinks);
                 self.orphaned_disk_buffer_scanner
-                    .scan(&new_config, previous_disk_buffer_directories);
+                    .scan(&new_config, draining_disk_buffer_paths);
                 self.config = new_config;
                 self.refresh_confinement_gauges();
 
@@ -661,22 +665,28 @@ impl RunningTopology {
             debug!(component_id = %key, "Removing sink.");
 
             if sink_buffer(&self.config, key).is_some_and(|buffer| buffer.has_disk_stage()) {
-                let usage_handles = self
+                let usage = self
                     .inputs
                     .get(*key)
                     .expect("removed sink input must exist")
-                    .disk_usage_handles();
-                let usage = disk_buffer_usage(&usage_handles);
+                    .disk_usage_snapshot();
                 let buffer_dirs = disk_buffer_directories(&self.config, key);
                 let drain_in_background = !wait_for_sinks.contains(*key);
-                if usage.event_count > 0 || usage.byte_size > 0 {
+                if let Some(usage) = usage
+                    && (usage.event_count > 0 || usage.byte_size > 0)
+                {
+                    let message = if drain_in_background {
+                        "Removing disk-buffered sink with remaining accounted data; its current instance will continue processing in the background before shutdown."
+                    } else {
+                        "Removing disk-buffered sink with remaining accounted data; reload will wait while its current instance finishes processing."
+                    };
                     warn!(
                         component_id = %key,
                         ?buffer_dirs,
-                        unread_events = usage.event_count,
-                        unread_bytes = usage.byte_size,
+                        accounted_events = usage.event_count,
+                        accounted_bytes = usage.byte_size,
                         drain_in_background,
-                        message = "Removing sink with unread disk-buffered data; its current instance will continue draining before shutdown.",
+                        message,
                     );
                 }
             }
@@ -706,42 +716,28 @@ impl RunningTopology {
                 .as_ref()
                 .is_some_and(BufferConfig::has_disk_stage)
             {
-                let usage_handles = self
+                let usage = self
                     .inputs
                     .get(*key)
                     .expect("changed sink input must exist")
-                    .disk_usage_handles();
-                let usage = disk_buffer_usage(&usage_handles);
+                    .disk_usage_snapshot();
                 let buffer_dirs = disk_buffer_directories(&self.config, key);
                 let new_buffer_dirs = disk_buffer_directories(new_config, key);
 
-                if reuse_buffers.contains(key) {
-                    info!(
-                        component_id = %key,
-                        ?buffer_dirs,
-                        unread_events = usage.event_count,
-                        unread_bytes = usage.byte_size,
-                        message = "Reusing existing disk buffer for replacement sink; unread data will remain available after reload.",
-                    );
-                } else if buffer_dirs
-                    .iter()
-                    .any(|path| new_buffer_dirs.contains(path))
+                if !reuse_buffers.contains(key)
+                    && !buffer_dirs
+                        .iter()
+                        .any(|path| new_buffer_dirs.contains(path))
+                    && let Some(usage) = usage
+                    && (usage.event_count > 0 || usage.byte_size > 0)
                 {
-                    info!(
-                        component_id = %key,
-                        ?buffer_dirs,
-                        unread_events = usage.event_count,
-                        unread_bytes = usage.byte_size,
-                        message = "Replacement sink will reopen the existing disk buffer after the previous sink shuts down.",
-                    );
-                } else if usage.event_count > 0 || usage.byte_size > 0 {
                     warn!(
                         component_id = %key,
                         ?buffer_dirs,
                         ?new_buffer_dirs,
-                        unread_events = usage.event_count,
-                        unread_bytes = usage.byte_size,
-                        message = "Replacement sink will not use the existing disk buffer; reload will wait for the previous sink to drain unread data before continuing.",
+                        accounted_events = usage.event_count,
+                        accounted_bytes = usage.byte_size,
+                        message = "Replacement sink uses a different disk buffer; reload will wait while the previous sink finishes processing remaining accounted data.",
                     );
                 }
             }
@@ -782,7 +778,14 @@ impl RunningTopology {
                 debug!(message = "Waiting for sink to shutdown.", component_id = %key);
                 previous.await.unwrap().unwrap();
             } else {
-                drop(previous); // detach and forget
+                if let Err(previous) = register_draining_disk_buffer_sink(
+                    &mut self.draining_disk_buffer_sinks,
+                    previous,
+                    &self.config,
+                    key,
+                ) {
+                    drop(previous); // detach and forget
+                }
             }
         }
 
@@ -1594,20 +1597,28 @@ fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<O
         .collect()
 }
 
-fn disk_buffer_usage(usage_handles: &[DiskBufferUsageHandle]) -> DiskBufferUsageSnapshot {
-    usage_handles
+fn active_draining_disk_buffer_paths(drains: &mut Vec<DrainingDiskBufferSink>) -> HashSet<PathBuf> {
+    drains.retain(|drain| !drain.task.is_finished());
+    drains
         .iter()
-        .map(DiskBufferUsageHandle::snapshot)
-        .fold(
-            DiskBufferUsageSnapshot {
-                event_count: 0,
-                byte_size: 0,
-            },
-            |total, snapshot| DiskBufferUsageSnapshot {
-                event_count: total.event_count.saturating_add(snapshot.event_count),
-                byte_size: total.byte_size.saturating_add(snapshot.byte_size),
-            },
-        )
+        .flat_map(|drain| drain.buffer_paths.iter().cloned())
+        .collect()
+}
+
+fn register_draining_disk_buffer_sink(
+    drains: &mut Vec<DrainingDiskBufferSink>,
+    task: TaskHandle,
+    config: &Config,
+    sink_key: &ComponentKey,
+) -> Result<(), TaskHandle> {
+    if !sink_buffer(config, sink_key).is_some_and(|buffer| buffer.has_disk_stage()) {
+        return Err(task);
+    }
+    drains.push(DrainingDiskBufferSink {
+        task,
+        buffer_paths: disk_buffer_directories(config, sink_key),
+    });
+    Ok(())
 }
 
 fn sink_buffer(config: &Config, sink_key: &ComponentKey) -> Option<BufferConfig> {
@@ -1617,13 +1628,13 @@ fn sink_buffer(config: &Config, sink_key: &ComponentKey) -> Option<BufferConfig>
         .or_else(|| enrichment_table_sink_buffer(config, sink_key))
 }
 
-fn disk_buffer_directories(config: &Config, sink_key: &ComponentKey) -> Vec<String> {
+fn disk_buffer_directories(config: &Config, sink_key: &ComponentKey) -> Vec<PathBuf> {
     let global_data_dir = config.global.data_dir.clone();
     sink_buffer(config, sink_key)
         .into_iter()
         .flat_map(|buffer| buffer.stages().to_vec())
         .filter_map(|stage| stage.disk_usage(global_data_dir.clone(), sink_key))
-        .map(|usage| usage.data_dir().to_string_lossy().into_owned())
+        .map(|usage| usage.data_dir().to_path_buf())
         .collect()
 }
 
@@ -1645,4 +1656,61 @@ fn enrichment_table_sink_buffer(
         .filter_map(|(table_key, table)| table.as_sink(table_key))
         .find(|(key, _)| key == sink_key)
         .map(|(_, sink)| sink.buffer)
+}
+
+#[cfg(test)]
+mod disk_buffer_drain_tests {
+    use std::{collections::HashSet, num::NonZeroU64, path::PathBuf};
+
+    use tokio::sync::oneshot;
+    use vector_lib::buffers::{BufferConfig, BufferType, WhenFull};
+
+    use super::{
+        TaskOutput, active_draining_disk_buffer_paths, register_draining_disk_buffer_sink,
+    };
+    use crate::{
+        config::{ComponentKey, Config, unit_test::UnitTestSourceConfig},
+        test_util::mock::basic_sink,
+    };
+
+    #[tokio::test]
+    async fn active_drain_paths_survive_multiple_scans_and_finished_drains_are_pruned() {
+        let (finish_tx, finish_rx) = oneshot::channel();
+        let data_dir = PathBuf::from("data");
+        let sink_key = ComponentKey::from("removed");
+        let expected_path = data_dir.join("buffer/v2/removed");
+        let mut config = Config::builder();
+        config.global.data_dir = Some(data_dir);
+        config.add_source("in", UnitTestSourceConfig::default());
+        config.add_sink("removed", &["in"], basic_sink(1).1);
+        config.sinks[&sink_key].buffer = BufferConfig::Single(BufferType::DiskV2 {
+            max_size: NonZeroU64::new(268_435_488).unwrap(),
+            when_full: WhenFull::Block,
+        });
+        let config = config.build().unwrap();
+        let active = tokio::spawn(async move {
+            _ = finish_rx.await;
+            Ok(TaskOutput::Healthcheck)
+        });
+        let finished = tokio::spawn(async { Ok(TaskOutput::Healthcheck) });
+        tokio::task::yield_now().await;
+        let mut drains = Vec::new();
+        assert!(
+            register_draining_disk_buffer_sink(&mut drains, active, &config, &sink_key).is_ok()
+        );
+        assert!(
+            register_draining_disk_buffer_sink(&mut drains, finished, &config, &sink_key).is_ok()
+        );
+
+        let expected = HashSet::from([expected_path]);
+        assert_eq!(active_draining_disk_buffer_paths(&mut drains), expected);
+        assert_eq!(active_draining_disk_buffer_paths(&mut drains), expected);
+
+        finish_tx.send(()).unwrap();
+        while !drains[0].task.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        assert!(active_draining_disk_buffer_paths(&mut drains).is_empty());
+        assert!(drains.is_empty());
+    }
 }
