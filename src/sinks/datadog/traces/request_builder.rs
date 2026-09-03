@@ -22,6 +22,7 @@ use super::{
     sink::PartitionKey,
 };
 use crate::{
+    common::datadog::decode_u64_id,
     event::{Event, ObjectMap, TraceEvent, Value},
     sinks::util::{
         Compression, Compressor, IncrementalRequestBuilder, metadata::RequestMetadataBuilder,
@@ -252,18 +253,18 @@ fn encode_traces(
     results
 }
 
-fn build_empty_payload(key: &PartitionKey) -> dd_proto::TracePayload {
-    dd_proto::TracePayload {
+fn build_empty_payload(key: &PartitionKey) -> dd_proto::AgentPayload {
+    dd_proto::AgentPayload {
         host_name: key.hostname.clone().unwrap_or_default(),
         env: key.env.clone().unwrap_or_default(),
-        traces: vec![],       // Field reserved for the older trace payloads
-        transactions: vec![], // Field reserved for the older trace payloads
         tracer_payloads: vec![],
         // We only send tags at the Trace level
         tags: BTreeMap::new(),
         agent_version: key.agent_version.clone().unwrap_or_default(),
         target_tps: key.target_tps.map(|tps| tps as f64).unwrap_or_default(),
         error_tps: key.error_tps.map(|tps| tps as f64).unwrap_or_default(),
+        rare_sampler_enabled: false,
+        idx_tracer_payloads: vec![],
     }
 }
 
@@ -342,6 +343,7 @@ fn encode_trace(trace: &TraceEvent) -> dd_proto::TracerPayload {
             .get(event_path!("app_version"))
             .map(|v| v.to_string_lossy().into_owned())
             .unwrap_or_default(),
+        container_debug: None,
     }
 }
 
@@ -433,6 +435,160 @@ fn convert_span(span: &ObjectMap) -> dd_proto::Span {
         meta,
         metrics,
         meta_struct,
+        span_links: span
+            .get("span_links")
+            .and_then(Value::as_array)
+            .map(convert_span_links)
+            .unwrap_or_default(),
+        span_events: span
+            .get("span_events")
+            .and_then(Value::as_array)
+            .map(convert_span_events)
+            .unwrap_or_default(),
+    }
+}
+
+fn convert_span_links(links: &[Value]) -> Vec<dd_proto::SpanLink> {
+    links
+        .iter()
+        .filter_map(|link| link.as_object().map(convert_span_link))
+        .collect()
+}
+
+fn convert_span_events(events: &[Value]) -> Vec<dd_proto::SpanEvent> {
+    events
+        .iter()
+        .filter_map(|event| event.as_object().map(convert_span_event))
+        .collect()
+}
+
+fn convert_span_link(link: &ObjectMap) -> dd_proto::SpanLink {
+    dd_proto::SpanLink {
+        trace_id: u64_id_field(link, "trace_id"),
+        trace_id_high: u64_id_field(link, "trace_id_high"),
+        span_id: u64_id_field(link, "span_id"),
+        attributes: string_map_field(link, "attributes"),
+        tracestate: string_field(link, "tracestate"),
+        flags: integer_field(link, "flags") as u32,
+    }
+}
+
+fn convert_span_event(event: &ObjectMap) -> dd_proto::SpanEvent {
+    dd_proto::SpanEvent {
+        time_unix_nano: match event.get("time_unix_nano") {
+            Some(Value::Timestamp(val)) => val.timestamp_nanos_opt().unwrap_or_default() as u64,
+            Some(Value::Integer(val)) => *val as u64,
+            _ => 0,
+        },
+        name: string_field(event, "name"),
+        attributes: event
+            .get("attributes")
+            .and_then(Value::as_object)
+            .map(encode_span_event_attributes)
+            .unwrap_or_default(),
+    }
+}
+
+fn encode_span_event_attributes(
+    attrs: &ObjectMap,
+) -> BTreeMap<String, dd_proto::AttributeAnyValue> {
+    attrs
+        .iter()
+        .map(|(k, v)| (k.to_string(), encode_attribute_any_value(v)))
+        .collect()
+}
+
+fn integer_field(object: &ObjectMap, key: &str) -> i64 {
+    match object.get(key) {
+        Some(Value::Integer(val)) => *val,
+        _ => 0,
+    }
+}
+
+fn u64_id_field(object: &ObjectMap, key: &str) -> u64 {
+    object.get(key).map(decode_u64_id).unwrap_or(0)
+}
+
+fn string_field(object: &ObjectMap, key: &str) -> String {
+    object
+        .get(key)
+        .map(|v| v.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+fn string_map_field(object: &ObjectMap, key: &str) -> BTreeMap<String, String> {
+    object
+        .get(key)
+        .and_then(Value::as_object)
+        .map(object_to_string_map)
+        .unwrap_or_default()
+}
+
+fn object_to_string_map(object: &ObjectMap) -> BTreeMap<String, String> {
+    object
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string_lossy().into_owned()))
+        .collect()
+}
+
+fn encode_attribute_any_value(value: &Value) -> dd_proto::AttributeAnyValue {
+    use dd_proto::attribute_any_value::AttributeAnyValueType;
+
+    match value {
+        Value::Boolean(v) => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::BoolValue as i32,
+            bool_value: *v,
+            ..Default::default()
+        },
+        Value::Integer(v) => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::IntValue as i32,
+            int_value: *v,
+            ..Default::default()
+        },
+        Value::Float(v) => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::DoubleValue as i32,
+            double_value: v.into_inner(),
+            ..Default::default()
+        },
+        Value::Array(values) => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::ArrayValue as i32,
+            array_value: Some(dd_proto::AttributeArray {
+                values: values.iter().map(encode_attribute_array_value).collect(),
+            }),
+            ..Default::default()
+        },
+        other => dd_proto::AttributeAnyValue {
+            r#type: AttributeAnyValueType::StringValue as i32,
+            string_value: other.to_string_lossy().into_owned(),
+            ..Default::default()
+        },
+    }
+}
+
+fn encode_attribute_array_value(value: &Value) -> dd_proto::AttributeArrayValue {
+    use dd_proto::attribute_array_value::AttributeArrayValueType;
+
+    match value {
+        Value::Boolean(v) => dd_proto::AttributeArrayValue {
+            r#type: AttributeArrayValueType::BoolValue as i32,
+            bool_value: *v,
+            ..Default::default()
+        },
+        Value::Integer(v) => dd_proto::AttributeArrayValue {
+            r#type: AttributeArrayValueType::IntValue as i32,
+            int_value: *v,
+            ..Default::default()
+        },
+        Value::Float(v) => dd_proto::AttributeArrayValue {
+            r#type: AttributeArrayValueType::DoubleValue as i32,
+            double_value: v.into_inner(),
+            ..Default::default()
+        },
+        other => dd_proto::AttributeArrayValue {
+            r#type: AttributeArrayValueType::StringValue as i32,
+            string_value: other.to_string_lossy().into_owned(),
+            ..Default::default()
+        },
     }
 }
 
@@ -441,8 +597,8 @@ mod test {
     use proptest::prelude::*;
     use vrl::event_path;
 
-    use super::{PartitionKey, encode_traces};
-    use crate::event::{LogEvent, TraceEvent};
+    use super::{PartitionKey, convert_span_link, encode_traces};
+    use crate::event::{LogEvent, ObjectMap, TraceEvent, Value};
 
     proptest! {
         #[test]
@@ -535,5 +691,18 @@ mod test {
                     .collect::<Vec<_>>()
             ),
         }
+    }
+
+    #[test]
+    fn encodes_span_link_hex_ids_above_i64_max() {
+        let link = ObjectMap::from([
+            ("trace_id".into(), Value::from("ffffffffffffffff")),
+            ("trace_id_high".into(), Value::from("8000000000000000")),
+            ("span_id".into(), Value::from("deadbeefcafebabe")),
+        ]);
+        let encoded = convert_span_link(&link);
+        assert_eq!(encoded.trace_id, u64::MAX);
+        assert_eq!(encoded.trace_id_high, 1u64 << 63);
+        assert_eq!(encoded.span_id, 0xdead_beef_cafe_babe);
     }
 }
