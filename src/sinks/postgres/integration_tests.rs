@@ -805,3 +805,71 @@ async fn upsert_success_on_quoted_field() {
 
     assert_eq!(column_with_spaces_value, "good");
 }
+
+#[tokio::test]
+async fn upsert_with_multi_column_primary_key_succeeds() {
+    fn custom_create_event_with_notifier(
+        id1: i64,
+        id2: i64,
+        host: &str,
+    ) -> (Event, BatchStatusReceiver) {
+        let mut event = LogEvent::from("raw log line");
+        event.insert(event_path!("id1"), id1);
+        event.insert(event_path!("id2"), id2);
+        event.insert(event_path!("host"), host);
+        let event_payload = event.clone().into_parts().0;
+        event.insert(event_path!("payload"), event_payload);
+        event.insert(event_path!("timestamp"), timestamp());
+
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let event = Into::<Event>::into(event).with_batch_notifier(&batch);
+        (event, receiver)
+    }
+
+    trace_init();
+
+    let (config, table, mut connection) = prepare_upsert_config(
+        vec!["id1", "id2"],
+        vec!["host", "timestamp", "message", "payload"],
+        1,
+    )
+    .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let create_table_sql = format!(
+        "CREATE TABLE {table} (id1 BIGINT, id2 BIGINT, host TEXT, timestamp TIMESTAMPTZ, message TEXT, payload JSONB, PRIMARY KEY (id1, id2))"
+    );
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (accept_event, mut accept_receiver) = custom_create_event_with_notifier(0, 1, "original");
+    let (replace_event, mut replace_receiver) =
+        custom_create_event_with_notifier(0, 1, "replacement");
+
+    let input_events = vec![accept_event, replace_event];
+
+    let input_log_events = input_events
+        .clone()
+        .into_iter()
+        .map(Event::into_log)
+        .collect::<Vec<_>>();
+
+    run_and_assert_sink_compliance(sink, stream::iter(input_events), &POSTGRES_SINK_TAGS).await;
+
+    // We drop the event to notify the receivers that the batch was delivered.
+    std::mem::drop(input_log_events);
+    assert_eq!(accept_receiver.try_recv(), Ok(BatchStatus::Delivered));
+    assert_eq!(replace_receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_all_sql = format!("SELECT * FROM {table}");
+    let actual_event = sqlx::query(&select_all_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+
+    let host: String = actual_event.try_get("host").expect("column does exist");
+
+    assert_eq!(host, "replacement");
+}
