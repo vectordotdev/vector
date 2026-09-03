@@ -140,28 +140,30 @@ impl MessageState {
         self.chunks[sequence_number as usize] = Bytes::copy_from_slice(&chunk);
     }
 
-    fn is_complete(&self) -> bool {
-        self.chunks_bitmap.count_ones() == self.total_chunks as u32
+    /// Callers must have ruled out a duplicate, which would not raise the count.
+    fn is_final_missing_chunk(&self) -> bool {
+        self.chunks_bitmap.count_ones() + 1 == self.total_chunks as u32
     }
 
     fn current_length(&self) -> usize {
         self.current_length
     }
 
-    /// Peak is ~2x the message: a contiguous destination coexists with the chunks it copies
-    /// from. Reserving exactly keeps a growing buffer from adding slack on top of that.
-    fn retrieve_message(&mut self) -> Option<Bytes> {
-        if !self.is_complete() {
-            return None;
-        }
-
+    fn finish(mut self: Box<Self>, sequence_number: u8, final_chunk: Bytes) -> Bytes {
         self.timeout_task.abort();
-        let mut message = BytesMut::with_capacity(self.current_length);
-        for chunk in &mut self.chunks[0..self.total_chunks as usize] {
-            message.extend_from_slice(chunk);
-            *chunk = Bytes::new();
+        let mut message = BytesMut::with_capacity(self.current_length + final_chunk.len());
+        for (index, chunk) in self.chunks[0..self.total_chunks as usize]
+            .iter_mut()
+            .enumerate()
+        {
+            if index == sequence_number as usize {
+                message.extend_from_slice(&final_chunk);
+            } else {
+                message.extend_from_slice(chunk);
+                *chunk = Bytes::new();
+            }
         }
-        Some(message.freeze())
+        message.freeze()
     }
 }
 
@@ -423,6 +425,29 @@ impl ChunkedGelfDecoder {
             return Ok(None);
         }
 
+        // Remove a complete message before assembling it. The final chunk goes straight into
+        // the output, so it needs neither an intermediate copy nor shared state during assembly.
+        if message_state.is_final_missing_chunk() {
+            let length = message_state.current_length().saturating_add(chunk.len());
+            if let Some(max_length) = self.max_length
+                && length > max_length
+            {
+                if let Some(dropped) = state_lock.remove(&message_id) {
+                    dropped.timeout_task.abort();
+                }
+                return Err(ChunkedGelfDecoderError::MaxLengthExceed {
+                    message_id,
+                    sequence_number,
+                    length,
+                    max_length,
+                });
+            }
+
+            let message_state = state_lock.remove(&message_id).expect("entry must exist");
+            drop(state_lock);
+            return Ok(Some(message_state.finish(sequence_number, chunk)));
+        }
+
         message_state.add_chunk(sequence_number, chunk);
 
         if let Some(max_length) = self.max_length {
@@ -442,12 +467,7 @@ impl ChunkedGelfDecoder {
             }
         }
 
-        if let Some(message) = message_state.retrieve_message() {
-            state_lock.remove(&message_id);
-            Ok(Some(message))
-        } else {
-            Ok(None)
-        }
+        Ok(None)
     }
 
     /// Decode a GELF message that may be chunked or not. The source bytes are expected to be
@@ -1025,22 +1045,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn retrieve_message_releases_chunks_while_assembling() {
-        // Does not lower the 2x peak, just shortens how long the source side is held.
-        let mut state = MessageState::new(2, tokio::spawn(async {}));
+    async fn finish_assembles_the_final_chunk_in_sequence() {
+        let mut state = Box::new(MessageState::new(3, tokio::spawn(async {})));
         state.add_chunk(0, Bytes::from_static(b"foo"));
-        state.add_chunk(1, Bytes::from_static(b"bar"));
+        state.add_chunk(2, Bytes::from_static(b"baz"));
 
-        let message = state
-            .retrieve_message()
-            .expect("message should be complete");
+        let message = state.finish(1, Bytes::from_static(b"bar"));
 
-        assert_eq!(message, Bytes::from_static(b"foobar"));
-        assert!(
-            state.chunks[..2].iter().all(Bytes::is_empty),
-            "each chunk must be released as it is copied"
-        );
-        assert_eq!(state.current_length(), 6);
+        assert_eq!(message, Bytes::from_static(b"foobarbaz"));
     }
 
     #[rstest]
