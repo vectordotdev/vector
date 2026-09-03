@@ -164,7 +164,6 @@ impl MessageState {
     }
 
     fn finish(mut self: Box<Self>, sequence_number: u8, final_chunk: Bytes) -> Bytes {
-        self.timeout_task.abort();
         let mut message = BytesMut::with_capacity(self.current_length + final_chunk.len());
         for (index, chunk) in self.chunks[0..self.total_chunks as usize]
             .iter_mut()
@@ -539,6 +538,10 @@ impl ChunkedGelfDecoder {
         // buffered chunks, and the final chunk goes straight into the output.
         if message_state.is_final_missing_chunk() {
             let message_state = pending.remove(message_id).expect("entry must exist");
+            // Abort while the message ID is still protected. Otherwise another decoder clone
+            // can reuse the ID before the old timeout is canceled, and that callback can remove
+            // the new message.
+            message_state.timeout_task.abort();
             drop(pending);
             return Ok(Some(message_state.finish(sequence_number, chunk)));
         }
