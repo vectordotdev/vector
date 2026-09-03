@@ -403,6 +403,7 @@ that link or event; and an invalid required span field drops the span. The corre
 in-band dropped count is saturating-incremented when the receiving or destination
 representation carries one, and the drop is reported. Sibling items continue through
 the mapping.
+If every span in a candidate event is rejected, the event itself is dropped and reported.
 
 Zero `TraceId` and `SpanId` values are unrepresentable in a well-formed event by the
 `NonZero` types above. Every construction site rejects and reports zero inputs.
@@ -411,18 +412,6 @@ The internal `TypedTrace` proto decode applies the same rule
 buffered or wire-transported event whose `trace_id` or `span_id` decodes to zero is treated as
 corruption. A `trace_id` whose decoded byte length is not exactly 16 is treated identically to a
 zero `trace_id`: the same per-link or per-span disposition and reporting apply.
-
-Drop granularity is structural and uniform across sources: a zero `SpanLink.span_id` or
-`SpanLink.trace_id` drops only the affected link and saturating-increments
-`Span.dropped_links_count`; a zero `Span.trace_id` or `Span.span_id` drops the enclosing
-span. Every rejected span is reported. If every span in a candidate `TraceEvent` is
-rejected, the event is dropped and reported.
-
-Any future relay-side drop of a `SpanEvent` or attribute follows the same convention: the
-corresponding `dropped_events_count` / `dropped_attributes_count` field on the enclosing
-item is saturating-incremented and the drop is reported. All in-band dropped counts use
-saturating addition while every additional drop is still reported out of band. The relay
-never silently shrinks an in-band count relative to what was received.
 
 A `TraceEvent` whose `spans` vector is otherwise empty -- whether produced by a source or
 by a transform filtering every span out -- passes through unchanged. Sinks emit the
@@ -492,10 +481,7 @@ pub enum SamplingPriority {
 `SpanKind`, `SpanStatus`, and `SamplingPriority` share a single invariant: a value
 matching a known variant's wire number is always carried as that variant, never as
 `Other(n)`. Every construction site must normalize raw values through a shared validated
-constructor. As a consequence, for example,
-`SpanKind::Other(3)`, `SpanStatus::Other(2, _)`, and `SamplingPriority::Other(1)` are
-unrepresentable in any well-formed `TraceEvent`, and pattern matches on the canonical
-variants are exhaustive for the known-value space.
+constructor.
 
 ##### VRL surface for the closed-with-escape-hatch enums
 
@@ -705,31 +691,25 @@ The rules below mirror the existing `Metric` VRL surface. VRL's `del()` operator
 its parent; on the typed `TraceEvent` structure the result depends on what the path
 resolves to:
 
-- **`Option`-wrapped typed slot** (`Span.parent_span_id`, `Resource.service` /
-  `environment` / `host` / `schema_url`, `Scope.name` / `version` / `schema_url`,
-  `Span.datadog.resource_name`, `Span.datadog.span_type`,
-  `TraceEvent.datadog.agent`, `TraceEvent.datadog.chunk`, and
-  `DatadogChunkContext.priority` / `origin`): `del()` clears the slot to `None`.
-  Writing `""` to an `Option<String>` slot sets `Some("")`; it is distinct from `del()`. The
-  analogous rule for `Span.parent_span_id` is documented under "VRL surface for
-  `TraceId` and `SpanId`".
-- **Map entry** in `Attributes` or `Span.datadog.meta_struct` (e.g.
-  `.spans[i].attributes."foo"`, `.spans[i].datadog.meta_struct."payload"`,
-  `.resource.attributes."bar"`, `.scope.attributes.*`, `.datadog.chunk.tags.*`,
-  `.datadog.agent.tags.*`, `.datadog.tracer.tags.*`,
-  `.spans[i].events[j].attributes.*`, `.spans[i].links[j].attributes.*`): `del()` removes
+- **`Option`-wrapped typed slot**: `del()` clears the slot to `None`. Writing `""` to an
+  `Option<String>` slot sets `Some("")` and is distinct from `del()`.
+- **Map entry** in an `Attributes` map or in `Span.datadog.meta_struct`: `del()` removes
   the entry from its map.
-- **`Vec` element** (`.spans[i]`, `.spans[i].events[j]`, `.spans[i].links[j]`): `del()`
-  removes the i-th / j-th element; the vector shrinks and subsequent indices renumber.
+- **`Vec` element**: `del()` removes that element; the vector shrinks and subsequent
+  indices renumber.
 - **Semantically unset required slot** (`Span.status`): `del()` atomically writes
-  `SpanStatus::Unset` and returns the previous status.
-- **Required Datadog context** (`TraceEvent.datadog`,
-  `TraceEvent.datadog.tracer`, or `Span.datadog`): `del()` atomically resets the context
-  to its default value and returns the previous object.
+  `SpanStatus::Unset` and returns the previous status. This is the only required field
+  with such a slot, because `Unset` is the domain's semantic absence rather than merely
+  a default.
+- **Required Datadog context** (`TraceEvent.datadog`, `TraceEvent.datadog.tracer`, or
+  `Span.datadog`): `del()` atomically resets the context to its default value and
+  returns the previous object.
 - **Required typed field or container**: `del()` raises a VRL runtime error, whether or
   not the field has a representable default. Write the replacement explicitly (for
-  example, `.spans[i].duration = 0`, `.datadog.chunk.tags = {}`, or `.spans = []`).
+  example, `.spans[i].duration = 0` or `.spans = []`).
 - **Root path (`del(.)`)**: raises a VRL runtime error.
+
+Which paths fall into each category follows from the type definitions above.
 
 Writing beneath `.datadog.agent` or `.datadog.chunk` while that child is `null`
 validates the complete operation against a temporary default context and materializes

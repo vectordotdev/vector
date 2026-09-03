@@ -168,12 +168,11 @@ mapping.
 
 #### Zero-ID detection
 
-OTLP wire IDs are raw byte arrays interpreted in big-endian order. A trace ID must be
-exactly 16 bytes and a span ID exactly 8 bytes. An ID with the wrong length or an
-all-zero value is malformed: for `Span.trace_id` / `Span.span_id` the source rejects the
-span, and for `Link.trace_id` / `Link.span_id` it rejects only the link and increments
-`Span.dropped_links_count`. Each rejection applies the parent RFC's identifier
-disposition and reporting requirements.
+OTLP wire IDs are raw byte arrays interpreted in big-endian order. Because they are
+length-delimited rather than fixed-width, this mapping adds a structural requirement the
+parent RFC's rule does not imply: a trace ID must be exactly 16 bytes and a span ID
+exactly 8 bytes, and a wrong-length ID is malformed in the same way an all-zero ID is.
+Rejection granularity and reporting then follow the parent RFC's identifier rule.
 
 `Span.parent_span_id` has one explicit normalization because the model represents root
 spans with `None`: an empty sequence or exactly eight zero bytes maps to `None`, and
@@ -248,9 +247,9 @@ A span with reversed timestamps (`end_time_unix_nano < start_time_unix_nano`) is
 duration and reported on ingress; this is one of the OTLP-side zero-loss exclusions
 listed above.
 
-On egress, `Span.start_time` and `SpanEvent.time` are clamped to the OTLP timestamp
-domain and reported. A reconstructed `Span.end_time_unix_nano` outside that domain is
-likewise clamped and reported.
+Egress clamping of `Span.start_time`, `SpanEvent.time`, and the reconstructed
+`Span.end_time_unix_nano` follows the parent RFC's numeric boundary policy against the
+OTLP timestamp domain.
 
 #### `Span.flags` / `Link.flags` layout
 

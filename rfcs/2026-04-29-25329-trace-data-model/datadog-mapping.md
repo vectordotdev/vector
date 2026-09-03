@@ -304,33 +304,23 @@ the decoded empty value as `Some("")` for `Resource.{service,environment,host}`,
 no source value was available. Datadog egress therefore reproduces the empty value, and
 the `resource_name` / `span_type` fallback applies only to `None`.
 
-#### `Span.duration` wire-domain handling
+#### Signed timing fields on ingress
 
-`Span.duration` on the wire is `int64` nanoseconds. Two corner cases sit outside the
-wire field's representable range:
+Datadog's `Span.duration` and `Span.start` wire fields are `int64` and can therefore
+carry negative values, which no documented Datadog tracing SDK produces. The two
+disagree on ingress disposition, so neither follows from the parent RFC's numeric
+boundary policy:
 
-- A negative wire value on ingress is clamped to zero and reported.
-- A typed duration outside the Datadog `int64` field's domain is clamped on egress and
-  reported. This destination is narrower than the corresponding OTLP and internal
-  `TypedTrace` fields.
+- A negative `Span.duration` is clamped to zero and reported, because
+  `std::time::Duration` cannot represent it.
+- A negative `Span.start` is preserved as a pre-epoch timestamp, which the typed model
+  can represent. It remains subject to the parent RFC's pre-epoch clamp if it later
+  crosses a disk buffer or `vector` hop, so a round trip preserves it only within a
+  single instance.
 
-Both cases are declared as Datadog-side round-trip exclusions above.
-
-#### `Span.start` and `SpanEvent.time` wire bounds
-
-Datadog's `Span.start` and `SpanEvent.time_unix_nano` wire fields are `int64` and
-`uint64` respectively; a negative wire `Span.start` is technically representable on the
-wire but is not produced by any documented Datadog tracing SDK. On Datadog ingress, a
-negative `Span.start` is preserved as a pre-epoch `DateTime<Utc>` in the typed model
-(matching the wire's representable range); the value is then subject to the parent
-RFC's pre-epoch internal-proto clamp on any subsequent disk-buffer or `vector`
-source/sink hop.
-
-On Datadog egress, `Span.start_time` and `SpanEvent.time` are clamped to their respective
-wire domains and reported. This matches the parent RFC and OTLP-side policy. A
-`Datadog -> Vector -> Datadog` round trip through a pipeline that does not cross a disk
-buffer or `vector` hop can preserve a negative wire `Span.start` in memory, but Datadog
-egress applies the documented clamp.
+Egress clamping for these fields and for `SpanEvent.time` follows the parent RFC's
+policy against the concrete wire domains. The negative-duration clamp is declared as a
+Datadog-side round-trip exclusion above.
 
 #### `Span.error` and `Span.status`
 
@@ -382,14 +372,12 @@ than the enclosing span, and the wire field is the canonical carrier.
 
 #### Zero-ID detection
 
-Datadog ingress applies the parent RFC's zero-ID drop rule against the *combined* 128-bit
-trace IDs, not the individual wire fields. A `Span` is dropped when `Span.traceID == 0`
-and `meta["_dd.p.tid"]` is absent or parses to zero, since the resulting `TraceId` would
-be all-zero; a `Span.traceID == 0` paired with a non-zero `_dd.p.tid` high half is valid
-and is not rejected. A `Span` is also dropped when `Span.spanID == 0`. `SpanLink` is
-dropped when `(spanLinks[*].traceID == 0 && spanLinks[*].traceID_high == 0)` or when
-`spanLinks[*].spanID == 0`. All drops use the disposition, count updates, and reporting
-requirements defined by the parent RFC's Identifiers section.
+Datadog ingress applies the parent RFC's zero-ID drop rule, including its drop
+granularity and reporting, with one format-specific qualification: because Datadog
+splits a 128-bit trace ID across two wire fields, the rule is evaluated against the
+*combined* ID rather than either field alone. A `Span.traceID` of zero paired with a
+non-zero `_dd.p.tid` high half is a valid ID and is not rejected; the same applies to a
+`SpanLink` whose `traceID` is zero but whose `traceID_high` is not.
 
 Datadog `Span.parentID == 0` is a "no parent" sentinel and is not a zero-ID failure: it
 maps to `Span.parent_span_id = None` rather than to a zero `SpanId`. On egress, a `None`
