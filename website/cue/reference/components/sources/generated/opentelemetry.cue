@@ -29,8 +29,9 @@ generated: components: sources: opentelemetry: configuration: {
 			examples: [{
 				address: "0.0.0.0:4317"
 				keepalive: {
-					max_connection_age_grace_secs: null
-					max_connection_age_secs:       null
+					max_connection_age_grace_secs:    null
+					max_connection_age_jitter_factor: 0.0
+					max_connection_age_secs:          null
 				}
 			}]
 			options: {
@@ -58,6 +59,16 @@ generated: components: sources: opentelemetry: configuration: {
 								examples: [30]
 								unit: "seconds"
 							}
+						}
+						max_connection_age_jitter_factor: {
+							description: """
+																The factor by which to jitter `max_connection_age_secs` for each connection.
+
+																A value of 0.1 gives each connection an age between 90% and 110% of the configured
+																maximum. The default of zero preserves the configured age exactly.
+																"""
+							required: false
+							type: float: default: 0.0
 						}
 						max_connection_age_secs: {
 							description: """

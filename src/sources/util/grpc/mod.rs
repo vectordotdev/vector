@@ -14,6 +14,7 @@ use futures::{FutureExt, StreamExt, future::BoxFuture};
 use http::{HeaderMap, Request, Response};
 use hyper::{Body, body::HttpBody};
 use pin_project::pin_project;
+use rand::Rng;
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::TcpStream,
@@ -68,7 +69,7 @@ pub(crate) mod test_support {
 
 /// Configuration of gRPC server keepalive parameters.
 #[configurable_component]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct GrpcKeepaliveConfig {
     /// The maximum amount of time a connection may exist before the server closes it.
@@ -79,6 +80,14 @@ pub struct GrpcKeepaliveConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Maximum Connection Age"))]
     pub max_connection_age_secs: Option<u64>,
+
+    /// The factor by which to jitter `max_connection_age_secs` for each connection.
+    ///
+    /// A value of 0.1 gives each connection an age between 90% and 110% of the configured
+    /// maximum. The default of zero preserves the configured age exactly.
+    #[serde(default)]
+    #[configurable(validation(range(min = 0.0, max = 1.0)))]
+    pub max_connection_age_jitter_factor: f64,
 
     /// The grace period added to `max_connection_age_secs` before the server closes the connection.
     ///
@@ -93,7 +102,11 @@ pub struct GrpcKeepaliveConfig {
 impl GrpcKeepaliveConfig {
     fn max_connection_lifetime(&self) -> Option<Duration> {
         self.max_connection_age_secs.map(|max_connection_age_secs| {
-            let age = Duration::from_secs(max_connection_age_secs);
+            let age = jittered_duration(
+                Duration::from_secs(max_connection_age_secs),
+                self.max_connection_age_jitter_factor,
+                rand::rng().random_range(-1.0..=1.0),
+            );
             let grace = self
                 .max_connection_age_grace_secs
                 .map(Duration::from_secs)
@@ -102,6 +115,14 @@ impl GrpcKeepaliveConfig {
             age.checked_add(grace).unwrap_or(Duration::MAX)
         })
     }
+}
+
+fn jittered_duration(duration: Duration, jitter_factor: f64, jitter: f64) -> Duration {
+    let multiplier = 1.0 + jitter_factor.clamp(0.0, 1.0) * jitter.clamp(-1.0, 1.0);
+
+    Duration::try_from_secs_f64(duration.as_secs_f64() * multiplier)
+        .unwrap_or(Duration::MAX)
+        .max(Duration::from_secs(1))
 }
 
 struct MaxConnectionAgeIo {
@@ -372,10 +393,9 @@ where
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
     let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
-    let max_connection_lifetime = keepalive.max_connection_lifetime();
-    let stream = listener
-        .accept_stream()
-        .map(move |stream| stream.map(|io| MaxConnectionAgeIo::new(io, max_connection_lifetime)));
+    let stream = listener.accept_stream().map(move |stream| {
+        stream.map(|io| MaxConnectionAgeIo::new(io, keepalive.max_connection_lifetime()))
+    });
 
     info!(%address, "Building gRPC server.");
 
@@ -414,10 +434,9 @@ pub async fn run_grpc_server_with_routes(
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
     let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
-    let max_connection_lifetime = keepalive.max_connection_lifetime();
-    let stream = listener
-        .accept_stream()
-        .map(move |stream| stream.map(|io| MaxConnectionAgeIo::new(io, max_connection_lifetime)));
+    let stream = listener.accept_stream().map(move |stream| {
+        stream.map(|io| MaxConnectionAgeIo::new(io, keepalive.max_connection_lifetime()))
+    });
 
     info!(%address, "Building gRPC server.");
 
@@ -497,6 +516,41 @@ mod tests {
         fn call(&mut self, _req: Request<Body>) -> Self::Future {
             ready(Ok(Response::new(Body::empty())))
         }
+    }
+
+    #[test]
+    fn connection_age_jitter_is_bounded() {
+        let duration = Duration::from_secs(100);
+
+        assert_eq!(jittered_duration(duration, 0.0, 1.0), duration);
+        assert_eq!(
+            jittered_duration(duration, 0.2, -1.0),
+            Duration::from_secs(80)
+        );
+        assert_eq!(
+            jittered_duration(duration, 0.2, 1.0),
+            Duration::from_secs(120)
+        );
+    }
+
+    #[test]
+    fn connection_age_jitter_saturates_on_overflow() {
+        assert_eq!(
+            jittered_duration(Duration::from_secs(u64::MAX), 1.0, 1.0),
+            Duration::MAX
+        );
+    }
+
+    #[test]
+    fn connection_age_jitter_has_one_second_minimum() {
+        assert_eq!(
+            jittered_duration(Duration::from_secs(1), 1.0, -1.0),
+            Duration::from_secs(1)
+        );
+        assert_eq!(
+            jittered_duration(Duration::ZERO, 0.0, 0.0),
+            Duration::from_secs(1)
+        );
     }
 
     #[tokio::test]
