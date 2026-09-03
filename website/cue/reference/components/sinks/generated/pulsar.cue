@@ -331,11 +331,13 @@ generated: components: sinks: pulsar: configuration: {
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					native_json: """
-						Encodes an event in the [native JSON format][vector_native_json].
+						Encodes an event using the [ProtoJSON mapping][protojson] of Vector's
+						[native event schema][vector_native_protobuf]. Deprecated schema fields are omitted.
 
 						This codec is **[experimental][experimental]**.
 
-						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
+						[vector_native_protobuf]: https://github.com/vectordotdev/vector/blob/master/lib/vector-core/proto/event.proto
+						[protojson]: https://protobuf.dev/programming-guides/json/
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
 					otlp: """

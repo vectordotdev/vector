@@ -251,9 +251,10 @@ fn event_strategy(value: BoxedStrategy<Value>) -> BoxedStrategy<Event> {
     prop_oneof![log, metric, trace].boxed()
 }
 
-fn without_metadata(mut event: Event) -> Event {
-    *event.metadata_mut() = EventMetadata::default();
-    event
+fn nested_object(depth: usize) -> Value {
+    (0..depth).fold(Value::from("leaf"), |value, _| {
+        Value::Object(ObjectMap::from_iter([("nested".into(), value)]))
+    })
 }
 
 proptest! {
@@ -286,7 +287,7 @@ proptest! {
 
     #[test]
     fn native_json_is_canonical_for_arbitrary_events(event in event_strategy(json_safe_value())) {
-        let expected = without_metadata(event.clone());
+        let expected = event.clone();
         let serializer = &mut NativeJsonSerializerConfig.build();
         let mut encoded = BytesMut::new();
         serializer.encode(event, &mut encoded).unwrap();
@@ -304,6 +305,52 @@ proptest! {
 
         prop_assert_eq!(encoded, reencoded);
     }
+}
+
+#[test]
+fn native_proto_preserves_legacy_object_nesting_headroom() {
+    let mut log = LogEvent::default();
+    log.insert(event_path!("data"), nested_object(32));
+    let expected = Event::Log(log);
+    let mut serializer = NativeSerializerConfig.build();
+    let mut encoded = BytesMut::new();
+
+    serializer.encode(expected.clone(), &mut encoded).unwrap();
+    let mut decoded = NativeDeserializerConfig
+        .build()
+        .parse(encoded.freeze(), LogNamespace::Legacy)
+        .unwrap();
+
+    assert_eq!(decoded.pop(), Some(expected));
+}
+
+#[test]
+fn native_json_preserves_explicit_empty_metric_namespace() {
+    let expected = Event::Metric(
+        Metric::new(
+            "requests",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_namespace(Some(String::new())),
+    );
+    let mut encoded = BytesMut::new();
+    NativeJsonSerializerConfig
+        .build()
+        .encode(expected.clone(), &mut encoded)
+        .unwrap();
+
+    let json: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
+    assert_eq!(
+        json.pointer("/event/metric/namespaceV2"),
+        Some(&serde_json::Value::String(String::new()))
+    );
+
+    let mut decoded = NativeJsonDeserializerConfig::default()
+        .build()
+        .parse(encoded.freeze(), LogNamespace::Legacy)
+        .unwrap();
+    assert_eq!(decoded.pop(), Some(expected));
 }
 
 #[test]
