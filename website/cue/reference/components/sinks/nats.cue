@@ -49,7 +49,6 @@ components: sinks: nats: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.nats.configuration

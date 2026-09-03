@@ -12,13 +12,16 @@ use vrl::{
 
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::Event,
     http::{Auth, HttpClient},
     schema,
     sinks::util::{
-        BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
-        RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, BoxedRawValue, HttpEndpoint, JsonArrayBuffer, PartitionBuffer,
+        PartitionInnerBuffer, RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig,
+        TowerRequestSettings,
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
     },
     template::{TemplateRenderingError, UnconfinedTemplate},
@@ -42,7 +45,7 @@ pub struct MezmoConfig {
     #[serde(default = "default_endpoint")]
     #[configurable(metadata(docs::examples = "http://127.0.0.1"))]
     #[configurable(metadata(docs::examples = "http://example.com"))]
-    endpoint: UriSerde,
+    endpoint: HttpEndpoint,
 
     /// The hostname that is attached to each batch of events.
     #[configurable(metadata(docs::examples = "${HOSTNAME}"))]
@@ -64,7 +67,6 @@ pub struct MezmoConfig {
     #[configurable(metadata(docs::examples = "tag2"))]
     tags: Option<Vec<UnconfinedTemplate>>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
@@ -78,15 +80,12 @@ pub struct MezmoConfig {
     #[configurable(metadata(docs::examples = "staging"))]
     default_env: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -95,11 +94,8 @@ pub struct MezmoConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
-fn default_endpoint() -> UriSerde {
-    UriSerde {
-        uri: Uri::from_static("https://logs.mezmo.com"),
-        auth: None,
-    }
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://logs.mezmo.com").unwrap()
 }
 
 fn default_app() -> String {
@@ -123,29 +119,6 @@ impl GenerateConfig for MezmoConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "mezmo")]
 impl SinkConfig for MezmoConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let request_settings = self.request.into_settings();
-        let batch_settings = self.batch.into_batch_settings()?;
-        let client = HttpClient::new(None, cx.proxy())?;
-
-        let sink = PartitionHttpSink::new(
-            self.clone(),
-            PartitionBuffer::new(JsonArrayBuffer::new(batch_settings.size)),
-            request_settings,
-            batch_settings.timeout,
-            client.clone(),
-        )
-        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error, internal_log_rate_limit = false));
-
-        let healthcheck = healthcheck(self.clone(), client).boxed();
-
-        #[allow(deprecated)]
-        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
             .optional_meaning("timestamp", Kind::timestamp())
@@ -156,6 +129,53 @@ impl SinkConfig for MezmoConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedMezmo {
+    request_settings: TowerRequestSettings,
+    batch_settings: BatchSettings<JsonArrayBuffer>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for MezmoConfig {
+    type Validated = ValidatedMezmo;
+
+    fn validate(&self) -> crate::Result<ValidatedMezmo> {
+        let request_settings = self.request.into_settings();
+        let batch_settings = self.batch.into_batch_settings()?;
+        Ok(ValidatedMezmo {
+            request_settings,
+            batch_settings,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedMezmo,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let ValidatedMezmo {
+            request_settings,
+            batch_settings,
+        } = validated;
+
+        let client = HttpClient::new(None, cx.proxy())?;
+
+        let sink = PartitionHttpSink::new(
+            self.clone(),
+            PartitionBuffer::new(JsonArrayBuffer::new(batch_settings.size)),
+            request_settings.clone(),
+            batch_settings.timeout,
+            client.clone(),
+        )
+        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error, internal_log_rate_limit = false));
+
+        let healthcheck = healthcheck(self.clone(), client).boxed();
+
+        #[allow(deprecated)]
+        Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 }
 
@@ -332,7 +352,7 @@ impl HttpSink for MezmoConfig {
 
 impl MezmoConfig {
     fn build_uri(&self, query: &str) -> Uri {
-        let host = &self.endpoint.uri;
+        let host = self.endpoint.as_uri();
 
         let uri = format!("{host}{PATH}?{query}");
 
@@ -424,6 +444,38 @@ mod tests {
         assert_eq!(event4_out.get("env").unwrap(), &json!("staging"));
     }
 
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+
+        let (config, _cx) = load_sink::<MezmoConfig>(
+            r#"
+            api_key = "mylogtoken"
+            hostname = "vector"
+        "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        // Realtime size-based defaults: 10 MB batches, 1s timeout.
+        assert_eq!(validated.batch_settings.size.bytes, 10_000_000);
+        assert_eq!(
+            validated.batch_settings.timeout,
+            std::time::Duration::from_secs(1)
+        );
+    }
+
+    #[test]
+    fn rejects_non_http_endpoint() {
+        let config = serde_yaml::from_str::<MezmoConfig>(
+            r#"
+            api_key: "mylogtoken"
+            hostname: "vector"
+            endpoint: "ftp://logs.example.com"
+        "#,
+        );
+        assert!(config.is_err());
+    }
+
     async fn smoke_start(
         status_code: StatusCode,
         batch_status: BatchStatus,
@@ -444,18 +496,14 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        _ = config.build(cx.clone()).await.unwrap();
+        _ = SinkConfig::build(&config, cx.clone()).await.unwrap();
 
         let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let endpoint = UriSerde {
-            uri: format!("http://{addr}").parse::<http::Uri>().unwrap(),
-            auth: None,
-        };
-        config.endpoint = endpoint;
+        config.endpoint = HttpEndpoint::parse(&format!("http://{addr}")).unwrap();
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (rx, _trigger, server) = build_test_server_status(addr, status_code);
         tokio::spawn(server);

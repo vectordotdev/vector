@@ -16,24 +16,20 @@ pub struct MqttCommonConfig {
     pub host: String,
 
     /// TCP port of the MQTT server to connect to.
-    #[configurable(derived)]
     #[serde(default = "default_port")]
     #[derivative(Default(value = "default_port()"))]
     pub port: u16,
 
     /// MQTT username.
     #[serde(default)]
-    #[configurable(derived)]
     pub user: Option<String>,
 
     /// MQTT password.
     #[serde(default)]
-    #[configurable(derived)]
     pub password: Option<String>,
 
     /// MQTT client ID.
     #[serde(default)]
-    #[configurable(derived)]
     pub client_id: Option<String>,
 
     /// Connection keep-alive interval.
@@ -47,7 +43,6 @@ pub struct MqttCommonConfig {
     pub max_packet_size: usize,
 
     /// TLS configuration.
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 }
 

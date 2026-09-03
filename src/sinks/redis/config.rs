@@ -9,7 +9,7 @@ use super::{
     sink::{RedisConnection, RedisSink},
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     serde::OneOrMany,
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
@@ -122,18 +122,14 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
-    #[configurable(derived)]
     pub(super) encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) data_type: DataTypeConfig,
 
-    #[configurable(derived)]
     #[serde(alias = "list")]
     pub(super) list_option: Option<ListOption>,
 
-    #[configurable(derived)]
     #[serde(alias = "sorted_set")]
     pub(super) sorted_set_option: Option<SortedSetOption>,
 
@@ -152,7 +148,6 @@ pub struct RedisSinkConfig {
     #[configurable]
     pub(super) sentinel_service: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) sentinel_connect: Option<SentinelConnectionSettings>,
 
@@ -161,15 +156,12 @@ pub struct RedisSinkConfig {
     #[configurable(metadata(docs::examples = "syslog:{{ app }}", docs::examples = "vector"))]
     pub(super) key: Template,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) batch: BatchConfig<RedisDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig<RedisTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -177,7 +169,6 @@ pub struct RedisSinkConfig {
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -214,10 +205,6 @@ impl SinkConfig for RedisSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 
@@ -314,11 +301,9 @@ impl RedisSinkConfig {
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct SentinelConnectionSettings {
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: MaybeTlsMode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub connections: Option<RedisConnectionSettings>,
 }

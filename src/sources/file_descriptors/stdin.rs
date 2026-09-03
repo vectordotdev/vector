@@ -33,10 +33,8 @@ pub struct StdinConfig {
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     pub host_key: Option<OptionalValuePath>,
 
-    #[configurable(derived)]
     pub framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 

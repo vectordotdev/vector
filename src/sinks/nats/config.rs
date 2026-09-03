@@ -6,7 +6,7 @@ use vector_lib::{codecs::JsonSerializerConfig, tls::TlsEnableableConfig};
 
 use super::{ConfigSnafu, ConnectSnafu, NatsError, sink::NatsSink};
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     nats::{NatsAuthConfig, NatsConfigError, from_tls_auth_config, validate_tls_cert_key_pair},
     sinks::{prelude::*, util::service::TowerRequestConfigDefaults},
     template::ConfinementConfig,
@@ -55,7 +55,6 @@ impl NatsHeaderConfig {
 #[serde(deny_unknown_fields)]
 pub struct JetStreamConfig {
     /// Whether to enable Jetstream.
-    #[configurable(derived)]
     #[serde(default)]
     pub enabled: bool,
 
@@ -82,10 +81,8 @@ impl From<bool> for JetStreamConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
-    #[configurable(derived)]
     pub(super) encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -127,13 +124,10 @@ pub struct NatsSinkConfig {
     ))]
     pub(super) url: String,
 
-    #[configurable(derived)]
     pub(super) tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     pub(super) auth: Option<NatsAuthConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig<NatsTowerRequestConfigDefaults>,
 
@@ -142,7 +136,6 @@ pub struct NatsSinkConfig {
     /// If set, the `subject` must belong to an existing JetStream stream.
     ///
     /// [jetstream]: https://docs.nats.io/nats-concepts/jetstream
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -150,7 +143,6 @@ pub struct NatsSinkConfig {
     )]
     pub(super) jetstream: JetStreamConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -195,10 +187,6 @@ impl SinkConfig for NatsSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

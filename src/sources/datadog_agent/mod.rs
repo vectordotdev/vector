@@ -140,22 +140,17 @@ pub struct DatadogAgentConfig {
     #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -222,7 +217,10 @@ impl SourceConfig for DatadogAgentConfig {
             self.parse_ddtags,
             self.split_metric_namespace,
         );
-        let listener = tls.bind(&self.address).await?;
+        let listener = tls
+            .bind(&self.address)
+            .await?
+            .with_keepalive(self.keepalive.tcp_keepalive);
         let handler = RequestHandler {
             acknowledgements: cx.do_acknowledgements(self.acknowledgements),
             multiple_outputs: self.multiple_outputs,

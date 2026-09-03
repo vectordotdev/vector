@@ -64,7 +64,6 @@ components: sinks: loki: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.loki.configuration

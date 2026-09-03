@@ -7,10 +7,7 @@ use vector_lib::{
 
 use super::{channel::AmqpSinkChannels, service::AmqpError, sink::AmqpSink};
 use crate::{
-    amqp::AmqpConfig,
-    config::{DynValidatedSink, ValidatedSink},
-    sinks::prelude::*,
-    template::ConfinementConfig,
+    amqp::AmqpConfig, config::ValidatedSink, sinks::prelude::*, template::ConfinementConfig,
 };
 
 /// AMQP properties configuration.
@@ -84,10 +81,8 @@ pub struct AmqpSinkConfig {
     #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
 
-    #[configurable(derived)]
     pub(crate) encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -99,7 +94,6 @@ pub struct AmqpSinkConfig {
     #[serde(default = "default_max_channels")]
     pub(crate) max_channels: u32,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -150,10 +144,6 @@ impl SinkConfig for AmqpSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

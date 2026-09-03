@@ -8,7 +8,7 @@ use super::{
     sink::{LokiSink, confine_template_keys},
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     http::{Auth, HttpClient, MaybeAuth},
     schema,
     sinks::{
@@ -41,7 +41,6 @@ pub struct LokiConfig {
     #[serde(default = "default_loki_path")]
     pub path: String,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
     /// The [tenant ID][tenant_id] to specify in requests to Loki.
@@ -104,25 +103,19 @@ pub struct LokiConfig {
     #[serde(default = "default_compression")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
 
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<LokiDefaultBatchSettings>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -130,7 +123,6 @@ pub struct LokiConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -238,10 +230,6 @@ impl SinkConfig for LokiConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

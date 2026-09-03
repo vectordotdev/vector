@@ -146,14 +146,25 @@ enum State {
     },
 }
 
+/// The stage of the decompression pipeline an `io::Error` originated from, used to give the
+/// returned `internal` status a stage-specific prefix so failures stay diagnosable.
+#[derive(strum::Display)]
+#[strum(serialize_all = "lowercase")]
+enum DecompressStage {
+    Initialize,
+    Write,
+    Finalize,
+}
+
 /// Maps a decompressor `io::Error` to a gRPC [`Status`]: an oversized payload becomes
 /// `out_of_range` (a client fault, matching the existing >4GB handling) while anything else falls
-/// back to `internal` with `internal_msg`.
-fn decompressor_error_to_status(error: &io::Error, internal_msg: &'static str) -> Status {
+/// back to `internal` with the stage the error came from and the underlying error appended, so
+/// failures such as a corrupt or truncated payload stay diagnosable from the returned status.
+fn decompressor_error_to_status(error: &io::Error, stage: DecompressStage) -> Status {
     if is_decompressed_size_limit_error(error) {
         Status::out_of_range("decompressed message exceeds the maximum allowed size")
     } else {
-        Status::internal(internal_msg)
+        Status::internal(format!("failed to {stage} decompressor: {error}"))
     }
 }
 
@@ -393,15 +404,18 @@ async fn drive_body_decompression(
                                     let scheme = scheme.as_ref().expect(
                                         "compressed frames without a negotiated scheme are rejected earlier",
                                     );
-                                    slot.insert(Decompressor::new(scheme).map_err(|_| {
-                                        Status::internal("failed to initialize decompressor")
+                                    slot.insert(Decompressor::new(scheme).map_err(|error| {
+                                        decompressor_error_to_status(
+                                            &error,
+                                            DecompressStage::Initialize,
+                                        )
                                     })?)
                                 }
                             };
                             if let Err(error) = d.write_all(&buf[..to_take]) {
                                 return Err(decompressor_error_to_status(
                                     &error,
-                                    "failed to write to decompressor",
+                                    DecompressStage::Write,
                                 ));
                             }
 
@@ -418,15 +432,16 @@ async fn drive_body_decompression(
                             .expect("consumed decompressor when no decompressor was present")
                             .finish();
 
-                        // Decompression can fail here either because the payload exceeded the size
-                        // cap (an oversized-request client fault) or, for malformed input, during
-                        // finalization; map the former to `out_of_range` and treat anything else as
-                        // an internal error.
+                        // Decompression can fail here because the payload exceeded the size cap
+                        // (an oversized-request client fault, mapped to `out_of_range`) or because
+                        // finalization is where the decompressor validates the integrity of the
+                        // payload (for gzip, the deflate stream must be complete and the
+                        // CRC32/length trailer must match; for zstd, the frame must decode
+                        // cleanly). Anything besides the size cap means the client sent a corrupt
+                        // or truncated message, surfaced as an internal error with the underlying
+                        // cause attached so the failure is diagnosable.
                         let mut buf = result.map_err(|error| {
-                            decompressor_error_to_status(
-                                &error,
-                                "reached impossible error during decompressor finalization",
-                            )
+                            decompressor_error_to_status(&error, DecompressStage::Finalize)
                         })?;
                         bytes_received += buf.len();
 
@@ -629,5 +644,181 @@ impl<S> Layer<S> for DecompressionAndMetricsLayer {
             inner,
             bytes_received: register!(BytesReceived::from(Protocol::from("grpc"))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{convert::Infallible, io::Read as _};
+
+    use flate2::{Compression, read::GzEncoder};
+
+    use super::*;
+
+    fn grpc_frame(compressed: bool, payload: &[u8]) -> Vec<u8> {
+        let mut frame = Vec::with_capacity(GRPC_MESSAGE_HEADER_LEN + payload.len());
+        frame.push(u8::from(compressed));
+        frame.extend_from_slice(
+            &u32::try_from(payload.len())
+                .expect("test payloads must fit in a gRPC length prefix")
+                .to_be_bytes(),
+        );
+        frame.extend_from_slice(payload);
+        frame
+    }
+
+    // Mirrors the sender path: `tonic` compresses each message with
+    // `flate2::read::GzEncoder` at compression level 6.
+    fn gzip_compress(payload: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzEncoder::new(payload, Compression::new(6))
+            .read_to_end(&mut out)
+            .expect("gzip compression cannot fail");
+        out
+    }
+
+    async fn decompress_body(
+        scheme: Option<CompressionScheme>,
+        body: Body,
+    ) -> Result<Vec<u8>, Status> {
+        let (destination, mut decompressed) = Body::channel();
+
+        let read_all = async {
+            let mut out = Vec::new();
+            while let Some(Ok(chunk)) = decompressed.data().await {
+                out.extend_from_slice(&chunk);
+            }
+            out
+        };
+
+        let (result, out) = tokio::join!(
+            drive_body_decompression(body, destination, scheme),
+            read_all
+        );
+
+        result.map(|_| out)
+    }
+
+    #[tokio::test]
+    async fn forwards_uncompressed_frame() {
+        let payload = b"an uncompressed gRPC message payload".repeat(100);
+        let frame = grpc_frame(false, &payload);
+
+        let out = decompress_body(None, Body::from(frame.clone()))
+            .await
+            .expect("passthrough must succeed");
+
+        assert_eq!(out, frame);
+    }
+
+    #[tokio::test]
+    async fn decompresses_gzip_frame() {
+        let payload = b"a gzip-compressed gRPC message payload".repeat(100);
+        let frame = grpc_frame(true, &gzip_compress(&payload));
+
+        let out = decompress_body(Some(CompressionScheme::Gzip), Body::from(frame))
+            .await
+            .expect("decompression must succeed");
+
+        assert_eq!(out, grpc_frame(false, &payload));
+    }
+
+    #[tokio::test]
+    async fn decompresses_gzip_frame_across_chunk_boundaries() {
+        let payload = b"a gzip-compressed gRPC message payload".repeat(100);
+        let frame = grpc_frame(true, &gzip_compress(&payload));
+
+        // Deliver the frame in small chunks to exercise the incremental paths of the
+        // state machine, including chunk boundaries inside the gRPC message header
+        // and inside the gzip header/trailer.
+        let chunks = frame
+            .chunks(3)
+            .map(|chunk| Ok::<_, Infallible>(chunk.to_vec()))
+            .collect::<Vec<_>>();
+        let body = Body::wrap_stream(futures::stream::iter(chunks));
+
+        let out = decompress_body(Some(CompressionScheme::Gzip), body)
+            .await
+            .expect("decompression must succeed");
+
+        assert_eq!(out, grpc_frame(false, &payload));
+    }
+
+    #[tokio::test]
+    async fn decompresses_zstd_frame() {
+        let payload = b"a zstd-compressed gRPC message payload".repeat(100);
+        let compressed = zstd::encode_all(&payload[..], 0).expect("zstd compression cannot fail");
+        let frame = grpc_frame(true, &compressed);
+
+        let out = decompress_body(Some(CompressionScheme::Zstd), Body::from(frame))
+            .await
+            .expect("decompression must succeed");
+
+        assert_eq!(out, grpc_frame(false, &payload));
+    }
+
+    #[tokio::test]
+    async fn surfaces_underlying_error_for_corrupt_gzip_trailer() {
+        let payload = b"payload whose gzip CRC32 trailer gets corrupted".repeat(100);
+        let mut compressed = gzip_compress(&payload);
+        // The last eight bytes of a gzip stream are the CRC32 and length trailer;
+        // corruption there is only detectable when the decompressor is finalized.
+        let crc_offset = compressed.len() - 8;
+        compressed[crc_offset] ^= 0xff;
+
+        let status = decompress_body(
+            Some(CompressionScheme::Gzip),
+            Body::from(grpc_frame(true, &compressed)),
+        )
+        .await
+        .expect_err("corrupt payload must be rejected");
+
+        assert!(
+            status
+                .message()
+                .starts_with("failed to finalize decompressor: "),
+            "expected the underlying decompression error to be surfaced, got: {}",
+            status.message()
+        );
+    }
+
+    #[tokio::test]
+    async fn surfaces_underlying_error_for_corrupt_zstd_frame() {
+        let payload = b"payload whose zstd magic gets corrupted".repeat(100);
+        let mut compressed =
+            zstd::encode_all(&payload[..], 0).expect("zstd compression cannot fail");
+        compressed[0] ^= 0xff;
+
+        let status = decompress_body(
+            Some(CompressionScheme::Zstd),
+            Body::from(grpc_frame(true, &compressed)),
+        )
+        .await
+        .expect_err("corrupt payload must be rejected");
+
+        assert!(
+            status
+                .message()
+                .starts_with("failed to finalize decompressor: "),
+            "expected the underlying decompression error to be surfaced, got: {}",
+            status.message()
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_compressed_frame_without_negotiated_scheme() {
+        let frame = grpc_frame(true, &gzip_compress(b"data"));
+
+        let status = decompress_body(None, Body::from(frame))
+            .await
+            .expect_err("compressed frame without a negotiated scheme must be rejected");
+
+        assert!(
+            status
+                .message()
+                .contains("no compression scheme was negotiated"),
+            "unexpected error message: {}",
+            status.message()
+        );
     }
 }

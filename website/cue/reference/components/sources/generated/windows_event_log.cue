@@ -16,11 +16,7 @@ generated: components: sources: windows_event_log: configuration: {
 			delivered to sinks.
 			"""
 		required: false
-		type: object: options: enabled: {
-			description: "Whether or not end-to-end acknowledgements are enabled for this source."
-			required:    false
-			type: bool: {}
-		}
+		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	batch_size: {
 		description: """

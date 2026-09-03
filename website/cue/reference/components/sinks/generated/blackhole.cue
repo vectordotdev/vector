@@ -10,22 +10,7 @@ generated: components: sinks: blackhole: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: options: enabled: {
-			description: """
-				Controls whether or not end-to-end acknowledgements are enabled.
-
-				When enabled for a sink, any source that supports end-to-end
-				acknowledgements that is connected to that sink waits for events
-				to be acknowledged by **all connected sinks** before acknowledging them at the source.
-
-				Enabling or disabling acknowledgements at the sink level takes precedence over any global
-				[`acknowledgements`][global_acks] configuration.
-
-				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-				"""
-			required: false
-			type: bool: {}
-		}
+		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
 	}
 	print_interval_secs: {
 		description: """

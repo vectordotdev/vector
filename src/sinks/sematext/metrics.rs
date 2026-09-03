@@ -21,8 +21,7 @@ use super::Region;
 use crate::{
     Result,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{
         Event, KeyString,
@@ -70,7 +69,6 @@ pub struct SematextMetricsConfig {
     pub default_namespace: String,
 
     #[serde(default = "super::default_region")]
-    #[configurable(derived)]
     pub region: Region,
 
     /// The endpoint to send data to.
@@ -85,15 +83,12 @@ pub struct SematextMetricsConfig {
     #[configurable(metadata(docs::examples = "some-sematext-token"))]
     pub token: SensitiveString,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -142,10 +137,6 @@ impl SinkConfig for SematextMetricsConfig {
     }
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 
