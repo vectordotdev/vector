@@ -2,6 +2,7 @@ use super::schema::SchemaContext;
 use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
 use serde_json::{Value, json};
+use std::collections::{HashMap, hash_map::Entry};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -10,51 +11,49 @@ const CUE_DEFINITIONS_FIELD: &str = "_schemaDefinitions";
 const CUE_DEFINITIONS_PLACEHOLDER_FIELD: &str = "vector_internal_schema_definitions";
 const CUE_REFERENCE_MARKER_PREFIX: &str = "__VECTOR_CUE_REFERENCE__";
 
-// Component schemas are resolved independently before being imported from JSON into CUE. Types
-// marked with `docs::cue_definition` are interned here so repeated resolved values can instead
-// point at one CUE definition. The marker is necessary because JSON cannot represent a CUE
-// reference; it is replaced with a CUE expression immediately after `cue import`.
+// Component schemas are resolved independently before being imported from JSON into CUE. Reused
+// JSON Schema definitions are interned here so repeated resolved values can instead point at one
+// shared CUE value. The marker is necessary because JSON cannot represent a CUE reference; it is
+// replaced with a CUE expression immediately after `cue import`.
 struct CueDefinitions {
     values: IndexMap<String, Value>,
     usage_counts: IndexMap<String, usize>,
+    names_by_value: HashMap<String, String>,
 }
 
 impl CueDefinitions {
     fn from_schema(context: &mut SchemaContext) -> Result<Self> {
-        let definitions = context
+        let mut schema_names = context
             .root_schema
             .get("definitions")
             .and_then(Value::as_object)
             .into_iter()
-            .flatten();
-        let mut named_schemas = Vec::new();
-        for (schema_name, definition) in definitions {
-            if let Some(cue_name) =
-                super::schema::get_schema_metadata(definition, "docs::cue_definition")
-            {
-                let cue_name = cue_name.as_str().ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "CUE definition name for schema '{schema_name}' must be a string"
-                    )
-                })?;
-                named_schemas.push((cue_name.to_string(), schema_name.clone()));
-            }
-        }
-        named_schemas.sort();
+            .flatten()
+            .map(|(name, _)| name.clone())
+            .collect::<Vec<_>>();
+        schema_names.sort();
 
         let mut values = IndexMap::new();
-        for (cue_name, schema_name) in named_schemas {
-            let resolved = context.resolve_schema_by_name(&schema_name)?;
-            let resolved_type = resolved.get("type").and_then(Value::as_object).ok_or_else(
-                || {
-                    anyhow::anyhow!(
-                        "CUE definition schema '{schema_name}' did not resolve to a documented type"
-                    )
-                },
-            )?;
+        let mut names_by_value = HashMap::new();
+        for schema_name in schema_names {
+            let resolved = match context.resolve_schema_by_name(&schema_name) {
+                Ok(resolved) => resolved,
+                Err(error) => {
+                    debug!("Skipping schema definition '{schema_name}': {error:#}");
+                    continue;
+                }
+            };
+            let Some(resolved_type) = resolved.get("type").and_then(Value::as_object) else {
+                continue;
+            };
+            if resolved_type.get("object").is_none() {
+                continue;
+            }
             let resolved_type = Value::Object(SchemaContext::sort_hash_nested(resolved_type));
-            if values.insert(cue_name.clone(), resolved_type).is_some() {
-                bail!("Duplicate CUE definition name '{cue_name}'");
+            let serialized = canonical_value(&resolved_type);
+            if let Entry::Vacant(entry) = names_by_value.entry(serialized) {
+                entry.insert(schema_name.clone());
+                values.insert(schema_name, resolved_type);
             }
         }
 
@@ -62,19 +61,67 @@ impl CueDefinitions {
         Ok(Self {
             values,
             usage_counts,
+            names_by_value,
         })
     }
 
-    fn replace_references(&mut self, value: &mut Value) {
-        for (cue_name, definition) in &self.values {
-            if value == definition {
-                *value = Value::String(format!("{CUE_REFERENCE_MARKER_PREFIX}{cue_name}"));
-                *self
-                    .usage_counts
-                    .get_mut(cue_name)
-                    .expect("usage count exists for every CUE definition") += 1;
-                return;
+    fn count_references(&mut self, value: &Value) {
+        if let Some(cue_name) = self.definition_name(value) {
+            *self
+                .usage_counts
+                .get_mut(&cue_name)
+                .expect("usage count exists for every CUE definition") += 1;
+        }
+
+        match value {
+            Value::Array(values) => {
+                for value in values {
+                    self.count_references(value);
+                }
             }
+            Value::Object(values) => {
+                for value in values.values() {
+                    self.count_references(value);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn retain_reused(&mut self) {
+        self.retain_with_minimum_usage(2);
+    }
+
+    fn retain_used(&mut self) {
+        self.retain_with_minimum_usage(1);
+    }
+
+    fn retain_with_minimum_usage(&mut self, minimum: usize) {
+        self.values.retain(|name, _| {
+            self.usage_counts
+                .get(name)
+                .is_some_and(|count| *count >= minimum)
+        });
+        self.usage_counts
+            .retain(|name, _| self.values.contains_key(name));
+        self.names_by_value
+            .retain(|_, name| self.values.contains_key(name));
+    }
+
+    fn reset_usage_counts(&mut self) {
+        for count in self.usage_counts.values_mut() {
+            *count = 0;
+        }
+    }
+
+    fn replace_references(&mut self, value: &mut Value) {
+        if let Some(cue_name) = self.definition_name(value) {
+            *value = Value::String(format!("{CUE_REFERENCE_MARKER_PREFIX}{cue_name}"));
+            *self
+                .usage_counts
+                .get_mut(&cue_name)
+                .expect("usage count exists for every CUE definition") += 1;
+            return;
         }
 
         match value {
@@ -92,6 +139,11 @@ impl CueDefinitions {
         }
     }
 
+    fn definition_name(&self, value: &Value) -> Option<String> {
+        value.get("object")?;
+        self.names_by_value.get(&canonical_value(value)).cloned()
+    }
+
     fn rewrite_reference_markers(&self, content: &mut String) -> Result<()> {
         for cue_name in self.values.keys() {
             let marker =
@@ -104,21 +156,21 @@ impl CueDefinitions {
         }
         Ok(())
     }
+}
 
-    fn ensure_all_reused(&self) -> Result<()> {
-        let not_reused = self
-            .usage_counts
-            .iter()
-            .filter_map(|(name, count)| (*count < 2).then_some(name.as_str()))
-            .collect::<Vec<_>>();
-        if !not_reused.is_empty() {
-            bail!(
-                "CUE definitions must each replace at least two generated values: {}",
-                not_reused.join(", ")
-            );
-        }
-        Ok(())
-    }
+fn canonical_value(value: &Value) -> String {
+    let object = value
+        .as_object()
+        .expect("only resolved object types are canonicalized");
+    serde_json::to_string(&Value::Object(SchemaContext::sort_hash_nested(object)))
+        .expect("serializing a JSON value cannot fail")
+}
+
+struct CueDocument {
+    data: Value,
+    friendly_name: String,
+    prefix: String,
+    output_file: PathBuf,
 }
 
 pub fn run(schema_path: &Path) -> Result<()> {
@@ -130,6 +182,7 @@ pub fn run(schema_path: &Path) -> Result<()> {
 
     let mut context = SchemaContext::new(root_schema.clone())?;
     let mut cue_definitions = CueDefinitions::from_schema(&mut context)?;
+    let mut documents = Vec::new();
 
     let component_types = ["source", "transform", "sink"];
 
@@ -149,12 +202,11 @@ pub fn run(schema_path: &Path) -> Result<()> {
     component_bases.sort_keys();
 
     for (comp_type, schema_name) in &component_bases {
-        render_and_import_generated_component_schema(
+        documents.push(render_generated_component_schema(
             &mut context,
-            &mut cue_definitions,
             schema_name,
             comp_type,
-        )?;
+        )?);
     }
 
     // 2. Process All Components (sorted by component type and name for deterministic output)
@@ -183,25 +235,44 @@ pub fn run(schema_path: &Path) -> Result<()> {
 
     for (comp_type, components) in &all_components {
         for (comp_name, schema_name) in components {
-            render_and_import_component_schema(
+            documents.push(render_component_schema(
                 &mut context,
-                &mut cue_definitions,
                 schema_name,
                 comp_type,
                 comp_name,
-            )?;
+            )?);
         }
     }
 
     // 3. Process top-level configuration fields (formerly "global options").
     // The standalone API schema (`generated/api.cue`) was retired in #24858; api
     // is now rendered as a top-level field with `group: "api"`.
-    render_and_import_generated_top_level_config_schema(
+    documents.push(render_generated_top_level_config_schema(
         &mut context,
-        &mut cue_definitions,
         &root_schema,
-    )?;
-    cue_definitions.ensure_all_reused()?;
+    )?);
+
+    for document in &documents {
+        cue_definitions.count_references(&document.data);
+    }
+    cue_definitions.retain_reused();
+
+    cue_definitions.reset_usage_counts();
+    for document in &mut documents {
+        cue_definitions.replace_references(&mut document.data);
+    }
+    cue_definitions.retain_used();
+
+    for document in documents {
+        import_json_as_cue(
+            &context,
+            Some(&cue_definitions),
+            &document.data,
+            &document.friendly_name,
+            &document.prefix,
+            &document.output_file,
+        )?;
+    }
     render_and_import_cue_definitions(&context, &cue_definitions)?;
 
     Ok(())
@@ -272,14 +343,12 @@ fn import_json_as_cue(
     Ok(())
 }
 
-fn render_and_import_schema(
-    context: &mut SchemaContext,
-    cue_definitions: &mut CueDefinitions,
+fn render_schema(
     unwrapped_resolved_schema: Value,
     friendly_name: &str,
     config_map_path: &[&str],
     cue_relative_path: &str,
-) -> Result<()> {
+) -> CueDocument {
     let mut data = serde_json::Map::new();
     // Simplified nesting since serde doesn't make building deeply nested objects inline easy
     // In practice, this needs to build a nested path of objects and put `configuration` at the end
@@ -298,55 +367,42 @@ fn render_and_import_schema(
     }
     current_obj.insert("configuration".to_string(), unwrapped_resolved_schema);
 
-    let mut data = Value::Object(data);
-    cue_definitions.replace_references(&mut data);
-
-    let prefix = format!("config-schema-base-{}-", config_map_path.join("-"));
-    let cue_output_file = PathBuf::from("website/cue/reference").join(cue_relative_path);
-    import_json_as_cue(
-        context,
-        Some(cue_definitions),
-        &data,
-        friendly_name,
-        &prefix,
-        &cue_output_file,
-    )
+    CueDocument {
+        data: Value::Object(data),
+        friendly_name: friendly_name.to_string(),
+        prefix: format!("config-schema-base-{}-", config_map_path.join("-")),
+        output_file: PathBuf::from("website/cue/reference").join(cue_relative_path),
+    }
 }
 
-fn render_and_import_generated_component_schema(
+fn render_generated_component_schema(
     context: &mut SchemaContext,
-    cue_definitions: &mut CueDefinitions,
     schema_name: &str,
     component_type: &str,
-) -> Result<()> {
+) -> Result<CueDocument> {
     let friendly_name = format!("generated {component_type} configuration");
     let unwrapped = context.unwrap_resolved_schema(schema_name, &friendly_name)?;
     let cue_path = format!("components/generated/{component_type}s.cue");
 
-    render_and_import_schema(
-        context,
-        cue_definitions,
+    Ok(render_schema(
         Value::Object(unwrapped),
         &friendly_name,
         &["generated", "components", &format!("{component_type}s")],
         &cue_path,
-    )
+    ))
 }
 
-fn render_and_import_component_schema(
+fn render_component_schema(
     context: &mut SchemaContext,
-    cue_definitions: &mut CueDefinitions,
     schema_name: &str,
     component_type: &str,
     component_name: &str,
-) -> Result<()> {
+) -> Result<CueDocument> {
     let friendly_name = format!("'{component_name}' {component_type} configuration");
     let unwrapped = context.unwrap_resolved_schema(schema_name, &friendly_name)?;
     let cue_path = format!("components/{component_type}s/generated/{component_name}.cue");
 
-    render_and_import_schema(
-        context,
-        cue_definitions,
+    Ok(render_schema(
         Value::Object(unwrapped),
         &friendly_name,
         &[
@@ -356,7 +412,7 @@ fn render_and_import_component_schema(
             component_name,
         ],
         &cue_path,
-    )
+    ))
 }
 
 // Field-to-group mapping. Fields not listed default to "global_options".
@@ -451,33 +507,25 @@ fn resolve_top_level_config_fields(
     Ok(resolved_fields)
 }
 
-fn render_and_import_generated_top_level_config_schema(
+fn render_generated_top_level_config_schema(
     context: &mut SchemaContext,
-    cue_definitions: &mut CueDefinitions,
     root_schema: &Value,
-) -> Result<()> {
+) -> Result<CueDocument> {
     let resolved_fields = resolve_top_level_config_fields(context, root_schema)?;
 
-    let mut data = json!({
-        "generated": {
-            "configuration": {
-                "configuration": Value::Object(resolved_fields),
-                "groups": top_level_group_metadata(),
+    Ok(CueDocument {
+        data: json!({
+            "generated": {
+                "configuration": {
+                    "configuration": Value::Object(resolved_fields),
+                    "groups": top_level_group_metadata(),
+                }
             }
-        }
-    });
-    cue_definitions.replace_references(&mut data);
-
-    let cue_output_file =
-        PathBuf::from("website/cue/reference").join("generated/configuration.cue");
-    import_json_as_cue(
-        context,
-        Some(cue_definitions),
-        &data,
-        "configuration",
-        "config-schema-base-generated-configuration-",
-        &cue_output_file,
-    )
+        }),
+        friendly_name: "configuration".to_string(),
+        prefix: "config-schema-base-generated-configuration-".to_string(),
+        output_file: PathBuf::from("website/cue/reference").join("generated/configuration.cue"),
+    })
 }
 
 fn render_and_import_cue_definitions(
@@ -519,27 +567,47 @@ mod tests {
 
     #[test]
     fn replaces_repeated_values_with_cue_references() {
-        let cue_name = "shared_options".to_string();
-        let definition = json!({"object": {"options": {"limit": {"type": {"uint": {}}}}}});
+        let shared_name = "shared_options".to_string();
+        let shared = json!({"object": {"options": {"limit": {"type": {"uint": {}}}}}});
+        let unique_name = "unique_options".to_string();
+        let unique = json!({"object": {"options": {"path": {"type": {"string": {}}}}}});
         let mut values = IndexMap::new();
-        values.insert(cue_name.clone(), definition.clone());
+        values.insert(shared_name.clone(), shared.clone());
+        values.insert(unique_name.clone(), unique.clone());
         let mut usage_counts = IndexMap::new();
-        usage_counts.insert(cue_name, 0);
+        usage_counts.insert(shared_name.clone(), 0);
+        usage_counts.insert(unique_name.clone(), 0);
+        let names_by_value = [
+            (canonical_value(&shared), shared_name.clone()),
+            (canonical_value(&unique), unique_name),
+        ]
+        .into_iter()
+        .collect();
         let mut definitions = CueDefinitions {
             values,
             usage_counts,
+            names_by_value,
         };
         let mut generated = json!({
-            "first": {"type": definition.clone()},
-            "second": {"type": definition},
+            "first": {"type": shared.clone()},
+            "second": {"type": shared},
+            "only": {"type": unique.clone()},
         });
 
+        definitions.count_references(&generated);
+        definitions.retain_reused();
+        definitions.reset_usage_counts();
         definitions.replace_references(&mut generated);
-        definitions.ensure_all_reused().unwrap();
+        definitions.retain_used();
 
         let marker = Value::String(format!("{CUE_REFERENCE_MARKER_PREFIX}shared_options"));
         assert_eq!(generated.pointer("/first/type"), Some(&marker));
         assert_eq!(generated.pointer("/second/type"), Some(&marker));
+        assert_eq!(generated.pointer("/only/type"), Some(&unique));
+        assert_eq!(
+            definitions.values.keys().collect::<Vec<_>>(),
+            vec![&shared_name]
+        );
     }
 
     #[test]
@@ -549,6 +617,7 @@ mod tests {
         let definitions = CueDefinitions {
             values,
             usage_counts: IndexMap::new(),
+            names_by_value: HashMap::new(),
         };
         let mut cue = format!("type: \"{CUE_REFERENCE_MARKER_PREFIX}shared_options\"\n");
 
