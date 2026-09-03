@@ -59,7 +59,6 @@ components: sinks: new_relic: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.new_relic.configuration

@@ -14,7 +14,6 @@ components: sinks: _humio: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	features: {
