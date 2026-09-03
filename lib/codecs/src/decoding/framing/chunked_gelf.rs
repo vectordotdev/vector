@@ -486,8 +486,13 @@ impl ChunkedGelfDecoder {
             let timeout = self.timeout;
             let timeout_handle = tokio::spawn(async move {
                 tokio::time::sleep(timeout).await;
+                let timeout_task_id = tokio::task::id();
                 let mut pending = state.lock().expect("poisoned lock");
-                if pending.remove(message_id).is_some() {
+                let owns_message = pending
+                    .messages
+                    .get(&message_id)
+                    .is_some_and(|message| message.timeout_task.id() == timeout_task_id);
+                if owns_message && pending.remove(message_id).is_some() {
                     warn!(
                         message_id = message_id,
                         timeout_secs = timeout.as_secs_f64(),
