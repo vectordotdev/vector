@@ -20,11 +20,7 @@ description: >
 
 ## Discord
 
-Join our [Discord server][discord].
-
-The Discord server is meant for connecting with other Vector users and fostering community conversations.
-
-The Vector team does not actively monitor the Discord channels. The best way to reach out to the Vector team directly is through GitHub.
+Join our [Discord server][discord] for peer-to-peer conversations with other Vector users. Discord is not an official support channel and is not actively monitored by the Vector team. For questions and help, use [GitHub Discussions][vector_discussions].
 
 ## FAQ
 
