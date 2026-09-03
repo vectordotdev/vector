@@ -34,10 +34,13 @@ parent RFC's `AttrValue`.
 
 - The bidirectional mapping between `TraceEvent` and OTLP `ResourceSpans` / `ScopeSpans` /
   `Span` messages.
+- The stable partition of each `ScopeSpans` by its wire spans' `trace_id`, producing one
+  `TraceEvent` per distinct ID with that ID stored at `TraceEvent.trace_id`.
 - The parent RFC's effective-equivalence round-trip guarantee, applied to
   `OTLP -> Vector -> OTLP`. Attribute iteration order within `Span.attributes`, when the
-  producer-side ordering was non-canonical, is one detail an OTLP backend does not
-  observe and so may differ.
+  producer-side ordering was non-canonical, and the partition of spans among otherwise
+  equivalent `ScopeSpans` messages are details an OTLP backend does not observe and so
+  may differ.
 - The promotion rule for the three semantic-convention attributes (`service.name`,
   `deployment.environment.name`, `host.name`) into typed `Resource` slots, including the
   legacy-key acceptance for `deployment.environment`.
@@ -83,6 +86,9 @@ below.
 - **Duplicate keys in an OTLP attribute list or nested `KeyValueList`** use wire-order
   last-wins normalization. Each overwritten value saturating-increments the nearest
   enclosing item's `dropped_attributes_count`.
+- **Empty `ScopeSpans`** produce no event because the wire grouping supplies no trace ID
+  for required `TraceEvent.trace_id`. Resource and scope state carried only by empty
+  groupings is therefore not relayed.
 
 The OTLP-side consequences of the parent RFC's zero-ID rejection and wire-domain
 normalization also apply. The derived end-timestamp case is documented under "Span
@@ -115,21 +121,34 @@ decoders.
 
 #### Ingress and egress mapping
 
-Each OTLP `ScopeSpans` is one `TraceEvent`. The containing `ResourceSpans.resource`
-populates `TraceEvent.resource`; the `ScopeSpans.scope` populates `TraceEvent.scope`; the
-spans inside populate `TraceEvent.spans`. `TraceEvent.datadog` and each
-`Span.datadog` start at their defaults and are populated only by valid reserved
-`datadog.*` bridge attributes as specified below. A
-`ScopeSpans` with an empty `spans` repeated field produces a `TraceEvent` with
-`spans = []`, forwarded per the parent RFC's empty-spans guideline; on OTLP egress an
-empty-spans `TraceEvent` becomes one `ScopeSpans { spans: [] }`.
+Each OTLP `ScopeSpans` is partitioned by the wire `Span.trace_id`. The grouping
+algorithm is stable and deterministic:
 
-The OTLP legacy shim applies the same grouping. A pre-flip per-span OTLP event converts
-one-to-one into a typed event whose `spans` holds that span. A legacy event that
-already carries more than one `ScopeSpans` grouping (for example `use_otlp_decoding`
-batch encoding) fans out to one typed event per `ScopeSpans`. Metadata, finalizers, and
-acknowledgements on the resulting sequence follow the parent RFC's conversion
-contract.
+1. Scan its successfully decoded spans in wire order.
+2. On the first span for a `trace_id`, create that ID's group at the end of the group
+   sequence.
+3. Append every later span with that ID to the existing group, preserving span order
+   within the group.
+4. Emit one `TraceEvent` per group in first-seen `trace_id` order.
+
+For example, spans ordered `[A1, B1, A2, C1, B2]` produce events
+`A: [A1, A2]`, `B: [B1, B2]`, then `C: [C1]`.
+
+Every resulting event receives the containing `ResourceSpans.resource` as
+`TraceEvent.resource` and the `ScopeSpans.scope` as `TraceEvent.scope`.
+`TraceEvent.datadog` and each `Span.datadog` start at their defaults and are populated
+only by valid reserved `datadog.*` bridge attributes as specified below.
+An empty `ScopeSpans` produces no event because it supplies no trace ID. A non-empty
+`ScopeSpans` whose spans are all rejected likewise produces no event under the parent
+RFC's all-spans-rejected rule. A typed event made empty by a transform remains
+representable because it retains `TraceEvent.trace_id`.
+
+The OTLP legacy shim applies the same partitioning to every `ScopeSpans` it recovers. A
+pre-flip per-span OTLP event converts one-to-one into a typed event whose `spans` holds
+that span. A legacy event carrying several `ScopeSpans` groupings (for example
+`use_otlp_decoding` batch encoding) may fan out further by the distinct trace IDs in
+each grouping. Metadata, finalizers, and acknowledgements on the resulting sequence
+follow the parent RFC's conversion contract.
 
 | OTLP                                                               | Internal                                      |
 | ------------------------------------------------------------------ | --------------------------------------------- |
@@ -143,9 +162,11 @@ contract.
 | `ScopeSpans.scope.{name, version, attributes}`                     | `Scope.{name, version, attributes}`           |
 | `ScopeSpans.scope.dropped_attributes_count`                        | `Scope.dropped_attributes_count`              |
 | `ScopeSpans.schema_url`                                            | `Scope.schema_url`                            |
-| `Span.trace_id`, `Span.span_id`, `Span.parent_span_id`             | same (zero-ID handling: see below)            |
+| `Span.trace_id`                                                    | `TraceEvent.trace_id`                         |
+| `Span.span_id`, `Span.parent_span_id`                              | same (zero-ID handling: see below)            |
 | `Span.trace_state`                                                 | `Span.trace_state` (verbatim)                 |
 | `Span.flags`, `Link.flags` (see flags layout)                      | `Span.flags`, `SpanLink.flags` (full u32)     |
+| `Link.trace_id` (see zero-ID handling)                             | `SpanLink.trace_id` (link target)             |
 | `Span.name`, `Span.kind`                                           | `Span.name`, `Span.kind`                      |
 | `Span.start_time_unix_nano`, `end_time_unix_nano` (see timing)     | `Span.start_time`, `Span.duration` (ns-exact) |
 | `Span.attributes`                                                  | `Span.attributes`                             |
@@ -158,15 +179,30 @@ rows: resource-level keys lift into `TraceEvent.datadog`, while span-level keys 
 into `TraceEvent.datadog.chunk` or `Span.datadog`. The bridge section below defines
 that reservation.
 
+`SpanLink.trace_id` identifies the link target and may differ from the enclosing
+`TraceEvent.trace_id`.
+
 On OTLP egress, `TraceEvent`s sharing a `Resource` (including `Resource.schema_url`) and
 the same resource-level Datadog bridge projection are gathered into one
-`ResourceSpans`; each event becomes one `ScopeSpans`. Two events with identical common
-`Resource` content but different agent envelopes or tracer tags therefore produce
-separate `ResourceSpans` messages. Datadog-native context has no common attribute-map
-representation; the OTLP sink synthesizes it under reserved resource and span keys (see
-"Reserved OTLP bridge keys" below) for best-effort cross-format relay. Ordinary `_dd.*`
-keys have no special meaning and flow through the generic `AttrValue` -> `AnyValue`
-mapping.
+`ResourceSpans`. Within it, non-empty events sharing the same `Scope` and event-level
+`TraceEvent.datadog` bridge projection are re-coalesced into one `ScopeSpans`; spans retain event
+order and their order within each event. Re-coalescence prevents partitioning from
+multiplying scope-level state such as `Scope.dropped_attributes_count`. The emitted wire
+grouping may again contain several trace IDs; the single-ID invariant applies to
+Vector's internal `TraceEvent`, not to OTLP.
+
+Every emitted OTLP `Span.trace_id` is copied from the enclosing
+`TraceEvent.trace_id`; internal spans have no independent trace ID.
+
+An empty event is not coalesced and becomes one `ScopeSpans { spans: [] }`; OTLP has no
+field in that shape to carry its `TraceEvent.trace_id`. Such events arise only after
+typed construction or transformation, outside the pure-relay guarantee. Two events
+with identical common `Resource` content but different agent envelopes or tracer tags
+therefore produce separate `ResourceSpans` messages. Datadog-native context has no
+common attribute-map representation; the OTLP sink synthesizes it under reserved
+resource and span keys (see "Reserved OTLP bridge keys" below) for best-effort
+cross-format relay. Ordinary `_dd.*` keys have no special meaning and flow through the
+generic `AttrValue` -> `AnyValue` mapping.
 
 #### Zero-ID detection
 
@@ -212,8 +248,9 @@ discarded, saturating-incrementing the emitted
 `Resource.attributes` mandates that "attribute keys MUST be unique." If the typed slot
 is `None` and the attribute key is present, the attribute value is emitted unchanged (the
 non-promotion rule above applies). The other typed slot/attribute-map pairs from the
-parent RFC do not apply on OTLP egress: `Span.trace_id` is a single 16-byte wire field
-(no `_dd.p.tid` duplication), `Span.status` egresses through OTLP's `Status.message` field with any `error.message`
+parent RFC do not apply on OTLP egress: `TraceEvent.trace_id` supplies the single
+16-byte wire `Span.trace_id` field (with no `_dd.p.tid` duplication), `Span.status`
+egresses through OTLP's `Status.message` field with any `error.message`
 attribute left in place as a regular attribute, and the chunk-state pair is the cross-format
 synthesis covered under "Reserved OTLP bridge keys for Datadog-native state" below.
 
@@ -336,9 +373,9 @@ indistinguishable from a missing priority after an OTLP hop, and Datadog egress 
 missing priority is `AutoKeep`, so the round trip would invert the sampling decision.
 
 The reserved key names, their per-member `AnyValue` types, the presence rules for
-optional and default-valued members, and the resolution of conflicting `datadog.chunk.*`
-values across spans in one `ScopeSpans` are implementation choices that satisfy this
-contract.
+optional and default-valued members, and the resolution of conflicting
+`datadog.chunk.*` values across spans in one trace-ID partition of a `ScopeSpans` are
+implementation choices that satisfy this contract.
 
 ## Rationale
 
@@ -368,6 +405,12 @@ contract.
 
 ## Drawbacks
 
+- Partitioning a `ScopeSpans` duplicates its `Resource` and `Scope` in memory and in
+  Vector's internal wire format once per distinct `trace_id`. OTLP egress re-coalesces
+  compatible non-empty partitions, but the duplication remains through the topology and
+  any disk buffer.
+- Empty wire `ScopeSpans` values, including their resource and scope state, no longer
+  produce an event because no required top-level trace ID can be derived.
 - Best-effort recovery of Datadog state from reserved OTLP resource and span attributes
   is not guaranteed: a transform that drops or rewrites one of these attributes on
   OTLP-stage traffic loses the corresponding Datadog state. Operators should not use
@@ -377,8 +420,8 @@ contract.
 
 - [OTLP traces protocol](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto)
   -- the primary shape this RFC adopts. The container `TraceEvent` is structurally one
-  `ScopeSpans` plus its `Resource`, with explicit Datadog contexts projected through
-  reserved OTLP bridge attributes when present.
+  trace-ID partition of a `ScopeSpans` plus its `Resource`, with explicit Datadog
+  contexts projected through reserved OTLP bridge attributes when present.
 - The OpenTelemetry [Collector OTLP receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
   is the reference implementation of the OTLP ingress semantics; Vector's OTLP source
   follows the same wire decoding.
@@ -400,8 +443,8 @@ extension) are owned by the parent RFC's Plan of Attack and must land first. OTL
 then proceeds through these obligations:
 
 1. Implement `LegacyTraceEvent -> TraceEvent` conversion and unique detection of
-   historical pre-hint OTLP layouts. The converter must fan out a legacy event that
-   carries more than one `ScopeSpans` grouping.
+   historical pre-hint OTLP layouts. The converter must fan out every recovered
+   `ScopeSpans` by distinct `trace_id` in the stable first-seen order defined above.
 2. Implement `TraceEvent -> OTLP` encoding satisfying the mapping and bridge-key
    contracts above.
 3. Establish the `OTLP -> Vector -> OTLP` effective-equivalence guarantee and validate

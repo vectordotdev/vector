@@ -4,8 +4,8 @@ This sub-RFC of [RFC 25329 -- Internal Trace Data Model](../2026-04-29-25329-tra
 specifies the bidirectional mapping between the typed `TraceEvent` defined in the parent RFC
 and the Datadog agent-to-backend trace protobuf. It establishes the Datadog ingress and
 egress paths, the effective-equivalence round-trip guarantee for
-`Datadog -> Vector -> Datadog`, the multi-service chunk split/coalesce rules, the reserved
-Datadog event and span contexts that carry agent-payload, tracer-payload, chunk, and
+`Datadog -> Vector -> Datadog`, the trace-ID-and-service chunk split/coalesce rules, the
+reserved Datadog event and span contexts that carry agent-payload, tracer-payload, chunk, and
 `meta_struct` state, and
 the cross-format conformance rule for `OTLP -> Vector -> datadog_traces`.
 
@@ -57,7 +57,9 @@ Trace Context, and other informational entries are defined in the
 ## Cross cutting concerns
 
 - APM stats aggregation in the `datadog_traces` sink, today reading magic keys from
-  `TraceEvent`, will read typed fields after this RFC and its parent land.
+  `TraceEvent`, will read typed fields after this RFC and its parent land. The sink
+  re-coalesces service partitions for one trace before aggregation so trace-wide inputs
+  such as the root span's `_sample_rate` remain available to every span.
 - The OTLP-side reservation of `datadog.*` resource and span attributes for synthesis
   of Datadog-native context on OTLP egress is the OTLP mapping sub-RFC's concern; this
   sub-RFC owns the context values those keys carry on cross-format relay.
@@ -69,9 +71,10 @@ Trace Context, and other informational entries are defined in the
 - The bidirectional mapping between `TraceEvent` and Datadog `AgentPayload` /
   `TracerPayload` / `TraceChunk` / `Span` messages.
 - The parent RFC's effective-equivalence round-trip guarantee, applied to
-  `Datadog -> Vector -> Datadog`. Span order within a chunk, and the specific chunk
-  grouping when the producer-side grouping was non-conforming, are details the Datadog
-  backend does not observe and so may differ.
+  `Datadog -> Vector -> Datadog`. Stable partitioning preserves span order within each
+  trace-ID group. For a non-conforming multi-trace chunk, the relative positions of
+  spans from distinct trace IDs and their resulting egress chunk grouping are details
+  the Datadog backend does not observe and so may differ.
 - The three Datadog span-attribute partitions (`meta`, `metrics`, `meta_struct`) and how
   the two scalar partitions map into `Span.attributes` by `AttrValue` variant while
   `meta_struct` is preserved in `Span.datadog.meta_struct`.
@@ -79,8 +82,9 @@ Trace Context, and other informational entries are defined in the
   `TraceEvent.datadog.{agent,tracer}`.
 - The chunk-scoped typed state in `TraceEvent.datadog.chunk = Some(...)`
   (`priority`, `origin`, `dropped`, `tags`).
-- The multi-service chunk split rule on ingress and the corresponding re-coalescence rule
-  on egress, including the cross-grouping invariant for non-conforming multi-trace chunks.
+- The stable partition of each chunk by its wire spans' reconstructed trace ID and
+  `Span.service` on ingress, storing the ID in `TraceEvent.trace_id`, and the
+  corresponding re-coalescence by trace ID on egress.
 - The authoritative reconstruction policy for explicitly present Datadog namespace
   state and the common-field fallback when that state is absent.
 - The cross-format conformance rule for `OTLP -> Vector -> datadog_traces`: a
@@ -201,22 +205,27 @@ removal of that path must still report an empty-`tracerPayloads` payload so an o
 on an Agent old enough to emit it gets a diagnosable signal.
 
 An `AgentPayload` with at least one `TracerPayload` carrying at least one `TraceChunk`
-with at least one span expands into one `TraceEvent` per
-`(TracerPayload, distinct Span.service, TraceChunk)` triple.
+with at least one span expands into one `TraceEvent` per distinct
+`(reconstructed wire trace ID, Span.service)` pair within each
+`(TracerPayload, TraceChunk)`.
 
 The grouping rules are:
 
-- Each `TraceChunk` carrying at least one span becomes one `TraceEvent`. A chunk whose
-  spans use more than one `Span.service` is split into one event per distinct service,
-  in first-seen `Span.service` order; egress re-coalesces such events back into a single
-  chunk (see below). A `TraceChunk` whose `spans` repeated field is empty produces zero
-  `TraceEvent`s, extending the empty-`tracerPayloads` and
-  empty-`chunks` rule above one level down: no `Span.service` is available to populate
+- Scan each `TraceChunk`'s successfully decoded spans in wire order. The first span for
+  a `(trace_id, service)` pair creates a group at the end of the group sequence; later
+  spans with that pair append to the existing group. Emit one `TraceEvent` per group in
+  first-seen pair order, storing the pair's ID in `TraceEvent.trace_id` and preserving
+  span order within each group. A
+  conforming single-trace, single-service chunk remains one event; a multi-service or
+  non-conforming multi-trace chunk splits as needed. Egress re-coalesces service groups
+  for the same trace (see below). A `TraceChunk` whose `spans` repeated field is empty
+  produces zero `TraceEvent`s, extending the empty-`tracerPayloads` and
+  empty-`chunks` rule above one level down: no wire span is available to supply the
+  required `TraceEvent.trace_id`, no `Span.service` is available to populate
   `Resource.service`, and a chunk envelope with no spans carries nothing the Datadog
   backend would observe. Datadog ingress therefore never synthesizes an event that
   exists only to satisfy the parent RFC's empty-spans rule; that rule still governs
-  Datadog egress, which receives empty events from OTLP-sourced relays and from
-  transforms that filter every span out.
+  Datadog egress for typed input and events that transforms filter empty.
 - The enclosing `TracerPayload`'s metadata (`hostname`, `env`, `containerID`,
   `languageName`, `tracerVersion`, etc.) populates the event's `Resource`. Per-span
   `Span.service` populates `Resource.service`.
@@ -235,10 +244,13 @@ The grouping rules are:
 
 The `datadog_agent` legacy shim applies the same grouping. Today's
 `convert_dd_tracer_payload` emits one `LegacyTraceEvent` per `TraceChunk`, including
-when that chunk contains more than one `Span.service`. Pre-flip source output keeps
-that one-event-per-chunk shape so existing legacy VRL is unchanged. The shim splits
-the chunk's successfully converted spans by distinct `Span.service` into the same
-typed events native ingest would have produced, in first-seen service order.
+when that chunk contains spans with more than one `Span.service` or reconstructed wire
+trace ID.
+Pre-flip source output keeps that one-event-per-chunk shape so existing legacy VRL is
+unchanged. The shim splits
+the chunk's successfully converted spans by distinct reconstructed trace ID and
+`Span.service` pairs into the same typed events native ingest would have produced, in
+first-seen pair order.
 Metadata, finalizers, and acknowledgements on the resulting sequence follow the
 parent RFC's conversion contract. An empty-spans
 legacy chunk converts to zero typed events, matching native ingest.
@@ -252,8 +264,8 @@ legacy chunk converts to zero typed events, matching native ingest.
 | `TracerPayload.tags`                                          | `TraceEvent.datadog.tracer.tags`                      |
 | `TraceChunk.{priority, origin, droppedTrace, tags}`           | `TraceEvent.datadog.chunk = Some(...)`                |
 | `TracerPayload` non-host/env scalar fields (see below)        | `Resource.attributes` under defined keys              |
-| `Span.traceID` (u64)                                          | `Span.trace_id.low_u64`                               |
-| `Span.meta["_dd.p.tid"]` (hex u64) if present (see below)     | `Span.trace_id.high_u64`                              |
+| `Span.traceID` (u64)                                          | `TraceEvent.trace_id.low_u64`                         |
+| `Span.meta["_dd.p.tid"]` (hex u64) if present (see below)     | `TraceEvent.trace_id.high_u64`                        |
 | `Span.spanID`, `Span.parentID`                                | `Span.span_id`, `Span.parent_span_id`                 |
 | `Span.name`                                                   | `Span.name`                                           |
 | `Span.resource`                                               | `Span.datadog.resource_name`                          |
@@ -338,19 +350,19 @@ wire `meta` map, parsed, and removed before the remaining `meta` entries flow in
 `Span.attributes`. It never appears in `Span.attributes` even transiently. The value is parsed as a
 hex-encoded `u64`. A value that cannot be parsed that way indicates a malformed span, and
 the span is dropped under the parent RFC's malformed-input rule even when the low half is
-non-zero, because trace identity cannot be reconstructed. A well-formed value is consumed
-into `Span.trace_id.high_u64`. An absent `_dd.p.tid`, or a key present with an empty
-value, is treated as equivalent to absent: the high half is zero and the span is not
+non-zero, because trace identity cannot be reconstructed. A well-formed value contributes
+to the grouping key stored in `TraceEvent.trace_id`. An absent `_dd.p.tid`, or a key
+present with an empty value, is treated as equivalent to absent: the high half is zero and the span is not
 dropped, yielding a valid 64-bit trace ID. The accepted lexical forms are an
 implementation choice.
 
-The tag is sink-owned: Datadog egress derives it exclusively from the typed
-`Span.trace_id.high_u64()`, so `trace_id` is the single source of truth for trace
-identity. If the high half is non-zero, egress writes `meta["_dd.p.tid"]` as a zero-
+The tag is sink-owned: Datadog egress derives it exclusively from
+`TraceEvent.trace_id.high_u64()`, so the event-level ID is the single source of truth
+for trace identity. If the high half is non-zero, egress writes `meta["_dd.p.tid"]` as a zero-
 padded 16-character lowercase hex string to match the Datadog Agent's canonical form; if
-zero, the tag is omitted. Before writing the trace_id-derived value, any `_dd.p.tid`
+zero, the tag is omitted. Before writing the event-ID-derived value, any `_dd.p.tid`
 entry placed into `meta` by the attribute partition step is removed, so the
-trace_id-derived write is the sole source for this key regardless of what a transform
+event-ID-derived write is the sole source for this key regardless of what a transform
 may have written to `attributes["_dd.p.tid"]`. Removing such an entry is reported;
 Datadog has no wire dropped-attribute count to update.
 
@@ -542,8 +554,8 @@ On Datadog egress, the sink:
 - Reconstructs each `SpanEvent.attributes` entry as an `AttributeAnyValue` from the
   `AttrValue` variant per "`SpanEvent.attributes` typed value mapping" above, not the
   `meta` / `metrics` partitioning rule.
-- Emits `Span.trace_id.low_u64()` as the wire `Span.traceID`; writes
-  `meta["_dd.p.tid"]` from `Span.trace_id.high_u64()` if non-zero, omits it if zero
+- Emits `TraceEvent.trace_id.low_u64()` as every contained wire `Span.traceID`; writes
+  `meta["_dd.p.tid"]` from `TraceEvent.trace_id.high_u64()` if non-zero, omits it if zero
   (see "`_dd.p.tid`" above).
 - Resolves the typed slot/attribute-map pair `Span.status` versus
   `Span.attributes."error.message"`:
@@ -647,16 +659,25 @@ default and whose missing `priority` is treated as the egress value `AutoKeep`.
 Grouping keys use that same effective priority, so `None` and
 `Some(DatadogChunkContext::default())` share an egress group as `AutoKeep`. Within each
 `TracerPayload`, group spans across events by the effective `DatadogChunkContext` plus
-`trace_id`, and emit one `TraceChunk` per group. An explicit `Some(AutoReject)`,
+`TraceEvent.trace_id`, and emit one `TraceChunk` per group. This
+re-coalesces the service partitions of a conforming chunk while keeping a
+non-conforming multi-trace chunk separated by ID. An explicit `Some(AutoReject)`,
 including a Datadog-decoded all-default chunk whose wire priority was `0`, does not share
 that group.
+
+The sink forms these effective chunk/trace groups before APM stats aggregation, not
+only before wire serialization. Every service partition in one group is presented to
+the aggregator together, preserving trace-wide context such as `_sample_rate` carried
+only by the root span. The computation within a reconstructed group remains governed by
+RFC 9862.
 
 - Empty events: an event whose `spans` vector is empty contributes no spans to any
   group; it emits one additional `TraceChunk` whose `priority`, `origin`, `tags`, and
   `dropped` are taken from the effective chunk context and whose `spans` is empty,
-  satisfying the parent RFC's empty-spans guideline. Datadog ingress does not produce
-  such events (see "Ingress and egress mapping"), so they reach this step only from an
-  OTLP-sourced relay or from a transform that filtered every span out.
+  satisfying the parent RFC's empty-spans guideline. The Datadog wire shape has no
+  carrier for that empty event's `TraceEvent.trace_id`. Datadog ingress does not
+  produce such events, so they reach this step only from typed input or a transform
+  that filtered every span out, outside the pure-relay guarantee.
 - Tags comparison and serialization: the `tags` comparison is canonical structural
   equality with deterministic key ordering. `DatadogChunkContext.tags` entries are serialized to
   the wire `TraceChunk.tags` (`map<string, string>`) via `dd_value_to_string`. For
@@ -670,9 +691,10 @@ that group.
   different `TracerPayload` and `TraceChunk` as well, which is correct (the mutated
   envelope should not be coalesced with the original).
 - Round-trip shapes: a multi-service wire chunk that was split into multiple events on
-  ingest re-coalesces into one chunk on egress; a non-conforming multi-trace chunk
-  produces one egress chunk per `trace_id`. Both shapes are equivalent to the input as
-  observed by the Datadog backend (see Scope).
+  ingest re-coalesces into one chunk on egress; a non-conforming multi-trace chunk,
+  including one with several services per trace, produces one egress chunk per
+  `trace_id`. Both shapes are equivalent to the input as observed by the Datadog
+  backend (see Scope).
 
 #### Cross-format conformance: `OTLP -> Vector -> datadog_traces`
 
@@ -773,20 +795,20 @@ not authoritative.
   behaviour relative to the pre-RFC sink appears only when a transform mutates one of the
   two without the other; in that case the typed value is selected and the divergence is
   observable, matching the precedent set on the other Datadog typed slot/attribute pairs
-  (`Resource.{service,environment,host}` and `Span.trace_id.high_u64`).
-- The Datadog egress chunk-grouping rule `(effective DatadogChunkContext, trace_id)` relies on a
-  producer-side convention parallel to the `meta` / `metrics` story: the `TraceChunk`
-  proto describes a chunk as "a list of spans with the same trace ID", and Datadog
-  producers honor this by construction. For the conforming case, multi-service chunks
-  split on ingest re-coalesce into one egress chunk and single-service chunks pass
-  through unchanged; for a non-conforming multi-trace chunk, egress emits one chunk
-  per `trace_id`. Both shapes are effectively equivalent at the Datadog backend,
-  since chunk grouping is an ingestion-time transport detail rather than a semantic
-  primitive. All four `DatadogChunkContext` fields contribute to the grouping key; `dropped`
-  (`droppedTrace` on the wire) is chunk-scoped sampler state, not a per-group
-  attribute: two chunks that share the same `(priority, origin, tags, trace_id)` but
-  differ on `droppedTrace` must remain distinct egress chunks, otherwise the relay
-  re-emits the second chunk's spans with the wrong dropped flag.
+  (`Resource.{service,environment,host}` and `TraceEvent.trace_id.high_u64`).
+- The Datadog egress chunk-grouping rule
+  `(effective DatadogChunkContext, TraceEvent.trace_id)`
+  follows directly from the typed model's single-trace-ID invariant. For the conforming
+  case, multi-service chunks split on ingest re-coalesce into one egress chunk and
+  single-service chunks pass through unchanged; for a non-conforming multi-trace chunk,
+  egress emits one chunk per `trace_id`. Both shapes are effectively equivalent at the
+  Datadog backend, since chunk grouping is an ingestion-time transport detail rather
+  than a semantic primitive. All four `DatadogChunkContext` fields contribute to the
+  grouping key; `dropped` (`droppedTrace` on the wire) is chunk-scoped sampler state,
+  not a per-group attribute: two chunks that share the same
+  `(priority, origin, tags, TraceEvent.trace_id)` but differ on `droppedTrace` must
+  remain distinct egress chunks, otherwise the relay re-emits the second chunk's spans
+  with the wrong dropped flag.
 - Attribute iteration order within `SpanEvent.attributes` is not preserved by the
   parent RFC's key-sorted `Attributes` carrier. Although the upstream Datadog
   `Span.proto` notes that this order "should be preserved," the comment is not honored
@@ -889,9 +911,9 @@ boundary, temporary `TraceEventCompat` enum, legacy-layout hint precursor, and i
 `TypedTrace` proto extension) in the parent RFC:
 
 1. Implement `LegacyTraceEvent -> TraceEvent` conversion and unique detection of
-   historical pre-hint Datadog layouts. The converter must split a multi-service
-   chunk and apply the parent RFC's metadata and acknowledgement contract to the
-   resulting sequence.
+   historical pre-hint Datadog layouts. The converter must split each chunk by
+   reconstructed trace ID and `Span.service` in stable first-seen pair order and apply
+   the parent RFC's metadata and acknowledgement contract to the resulting sequence.
 2. Implement `TraceEvent -> Datadog` encoding satisfying the mapping and egress contracts
    above.
 3. Establish the `Datadog -> Vector -> Datadog` effective-equivalence guarantee,
@@ -899,7 +921,8 @@ boundary, temporary `TraceEventCompat` enum, legacy-layout hint precursor, and i
 4. Establish the enumerated `OTLP -> Vector -> datadog_traces` conformance rules against
    the current Datadog Agent reference.
 5. Migrate the `datadog_traces` sink and APM stats aggregation after the parent RFC's
-   compile-time consumer gate.
+   compile-time consumer gate. Reconstruct effective chunk/trace groups before invoking
+   the aggregator so service partitions share root-span context.
 6. Publish the user migration guide, then migrate the `datadog_agent` source after typed
    input passes end-to-end through Datadog export. Typed source events retain the
    migration hint for the parent RFC's deprecation window.

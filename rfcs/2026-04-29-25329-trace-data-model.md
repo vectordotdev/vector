@@ -1,12 +1,12 @@
 # RFC 25329 - 2026-04-29 - Internal Trace Data Model
 
 This RFC replaces the inner representation of Vector's `TraceEvent`, today a thin newtype over
-`LogEvent`, with a strongly-typed container that mirrors the wire-level batching of OTLP and
-Datadog APM traces. Each `TraceEvent` carries one `Resource`, one `Scope`, a
-`DatadogEventContext`, and the `Vec<Span>` belonging to that grouping, plus the existing
-`EventMetadata`. The Datadog context isolates source-native state that has no format-independent
-semantic home; its default value represents no Datadog state. The container shape, together with
-the wire-format mappings specified in the
+`LogEvent`, with a strongly-typed, trace-homogeneous container derived from the wire-level
+batching of OTLP and Datadog APM traces. Each `TraceEvent` carries one `TraceId`, one `Resource`,
+one `Scope`, a `DatadogEventContext`, and the `Vec<Span>` belonging to that trace and grouping,
+plus the existing `EventMetadata`. The Datadog context isolates source-native state that has no
+format-independent semantic home; its default value represents no Datadog state. The container
+shape, together with the wire-format mappings specified in the
 two sub-RFCs below, yields zero-loss `OTLP -> Vector -> OTLP` and
 `Datadog -> Vector -> Datadog` round trips, including across Vector's disk buffers, and gives
 transforms a uniform typed surface across the two source formats.
@@ -72,15 +72,15 @@ the entries below are the format-agnostic shared vocabulary.
 
 - First-class OpenTelemetry signal support
   ([vectordotdev/vector#1444](https://github.com/vectordotdev/vector/issues/1444)).
-- VRL trace-specific semantics on the new typed surface (`.resource.service`,
+- VRL trace-specific semantics on the new typed surface (`.trace_id`, `.resource.service`,
   `.datadog.chunk.priority`, `.spans[i].name`, etc.).
 
 ## Scope
 
 ### In scope
 
-- Define `TraceEvent` as an array of spans plus supporting resource data, replacing the
-  current `TraceEvent(LogEvent)`.
+- Define `TraceEvent` as one `TraceId`, an array of spans, and supporting resource data,
+  replacing the current `TraceEvent(LogEvent)`.
 - Define the typed surface that supports both wire formats: `TraceEvent`, `Span`,
   `Resource`, `Scope`, `DatadogEventContext`, `DatadogAgentEnvelope`,
   `DatadogTracerContext`, `DatadogChunkContext`, `DatadogSpanContext`, `Attributes`,
@@ -104,9 +104,11 @@ the entries below are the format-agnostic shared vocabulary.
   `Datadog -> Vector -> Datadog` as a model-level claim; the per-wire-format mappings that
   satisfy this claim are in the OTLP mapping and Datadog mapping sub-RFCs respectively.
   Effective equivalence means backend-observable identity, not byte-level identity; details
-  the backend does not observe (e.g. span order within a chunk, specific chunk grouping)
-  may differ. The guarantee applies to pure-relay pipelines only: any VRL write to a
-  trace event is best-effort and forfeits the round-trip claim for the modified event.
+  the backend does not observe (e.g. the relative ordering of spans from distinct trace
+  IDs in a non-conforming wire grouping, the grouping of such spans into chunks, or the
+  assignment of spans among equivalent `ScopeSpans`) may differ. The guarantee applies
+  to pure-relay pipelines only: any VRL write to a trace event is best-effort and
+  forfeits the round-trip claim for the modified event.
 
 ### Out of scope
 
@@ -129,9 +131,10 @@ Wire-format-specific exclusions (the OTLP deprecated-environment rewrite,
 Datadog `Span.error` normalization, `meta`/`metrics` producer-side disjointness, etc.) are
 declared in the corresponding sub-RFC's Scope section.
 
-- **All-zero `TraceId` or `SpanId`** are rejected on every ingress path; the span (or
-  link) carrying the zero ID is dropped. See "Identifiers" for the drop granularity and
-  the sub-RFCs for per-format detection.
+- **All-zero `TraceId` or `SpanId`** are rejected on every ingress path. A source-wire
+  span or link carrying the zero ID is dropped; an invalid typed event ID rejects that
+  event. See "Identifiers" for the drop granularity and the sub-RFCs for per-format
+  detection.
 - **Wire-domain normalization**: durations and timestamps outside a destination field's
   numeric domain are clamped to the nearest representable endpoint on encode and
   reported. Derived timestamps follow the same rule. The mapping sub-RFCs identify
@@ -158,6 +161,9 @@ Numeric boundary behavior follows one policy throughout the model and mappings:
   `Metric` behaves and is the primary blocker to useful trace transforms.
 - Cross-format routing (e.g. `opentelemetry` source -> `datadog_traces` sink) requires
   bespoke translation reading undocumented magic keys. Each new sink duplicates this work.
+- OTLP `ScopeSpans` may contain spans from several traces. Preserving that grouping as one
+  topology event would force filtering and sampling decisions for unrelated trace IDs to
+  share an event boundary.
 - `TraceEvent` corrupts numeric ID precision via `trace_id as i64` on both the
   `datadog_agent` source and the `datadog_traces` sink
   ([#14687](https://github.com/vectordotdev/vector/issues/14687)).
@@ -181,16 +187,21 @@ transforms:
 ```
 
 `trace_representation` initially defaults to `legacy`. Typed mode accepts only trace input and
-converts before running VRL; path access never converts. A Datadog legacy event that holds a
-multi-service chunk becomes one typed event per distinct `Span.service`, and the program then
-runs independently on each result. VRL conditions do not convert, so typed conditions require an
-upstream typed `remap`. Because conversion is one-way, legacy mode rejects typed input with a
-representation-mismatch mapping error.
+converts before running VRL; path access never converts. Conversion partitions a legacy event
+into trace-homogeneous typed events: an OTLP grouping becomes one event per distinct wire
+`Span.trace_id`, and a Datadog chunk becomes one event per distinct reconstructed wire trace
+ID and `Span.service` pair. Each ID is stored at the resulting event root. The program then
+runs independently on each result. VRL conditions do not convert, so typed conditions require
+an upstream typed `remap`. Because conversion is one-way, legacy mode rejects typed input with
+a representation-mismatch mapping error.
 
-In `typed` mode, a `TraceEvent` exposes its `Resource`, `Scope`, Datadog-native context,
-and `Vec<Span>` directly:
+In `typed` mode, a `TraceEvent` exposes its `TraceId`, `Resource`, `Scope`,
+Datadog-native context, and `Vec<Span>` directly:
 
 ```coffee
+# Read the event's trace ID.
+trace = .trace_id
+
 # Route by resource service.
 if .resource.service == "checkout" { ... }
 
@@ -222,11 +233,13 @@ source-specific ingest layouts.
 
 The `trace_to_log` transform is retained and emits exactly one `LogEvent` per
 `TraceEvent`; it does not fan out spans. The log root is the canonical typed VRL object
-with exactly the `resource`, `scope`, `datadog`, and `spans` fields and the same nested
+with exactly the `trace_id`, `resource`, `scope`, `datadog`, and `spans` fields and the same nested
 projections, nulls, strings, bytes, and numeric values that typed-path reads expose.
 `EventMetadata` and finalizers transfer to the log as event metadata rather than being
-inserted into its fields. This defines one source-independent output shape; the user
-migration guide provides the old-to-new field mapping and examples.
+inserted into its fields. During coexistence, converting one legacy input may first
+produce several trace-ID partitions and therefore several logs, one per resulting
+`TraceEvent`. This defines one source-independent output shape; the user migration
+guide provides the old-to-new field mapping and examples.
 
 ### Implementation
 
@@ -234,29 +247,34 @@ migration guide provides the old-to-new field mapping and examples.
 
 ```rust
 pub struct TraceEvent {
+    trace_id: TraceId,
     resource: Resource,
     scope:    Scope,
     /// Datadog-native state. The default value means that none is present.
     datadog:  DatadogEventContext,
-    /// Spans belonging to this resource/scope grouping.
+    /// Spans belonging to `trace_id` within this resource/scope grouping.
     spans:    Vec<Span>,
     metadata: EventMetadata,
 }
 ```
 
-Each `TraceEvent` carries spans that share a single `Resource` -- meaning a single service.
+Each `TraceEvent` carries a single `TraceId` and `Resource` -- meaning a single service.
+Every span belongs to that event-level trace ID.
+
 The mapping to wire-level structures differs by format:
 
-- **OTLP**: one `TraceEvent` per `ScopeSpans` (1:1). The enclosing `ResourceSpans`
-  provides `Resource`. See the OTLP mapping sub-RFC for the per-field mapping.
-- **Datadog**: the Datadog mapping sub-RFC specifies how agent, tracer, chunk, service,
-  and span wire groupings map to `TraceEvent`.
+- **OTLP**: each `ScopeSpans` is partitioned by the wire `Span.trace_id`, yielding one
+  `TraceEvent` per distinct ID with that ID stored in `TraceEvent.trace_id`. The
+  enclosing `ResourceSpans` provides `Resource`. See the OTLP mapping sub-RFC for the
+  grouping algorithm and per-field mapping.
+- **Datadog**: each `TraceChunk` is partitioned by the full trace ID reconstructed from
+  the wire `Span.traceID` and `_dd.p.tid`, and by wire `Span.service`. The Datadog
+  mapping sub-RFC specifies the grouping and re-coalescence rules.
 
 #### `Span`
 
 ```rust
 pub struct Span {
-    pub trace_id:       TraceId,
     pub span_id:        SpanId,
     pub parent_span_id: Option<SpanId>,
     pub trace_state:    TraceState,
@@ -397,27 +415,29 @@ that link or event; and an invalid required span field drops the span. The corre
 in-band dropped count is saturating-incremented when the receiving or destination
 representation carries one, and the drop is reported. Sibling items continue through
 the mapping.
-If every span in a candidate event is rejected, the event itself is dropped and reported.
+If a non-empty wire grouping or candidate partition yields no accepted spans, it
+produces no event and the drop is reported.
 
 Zero `TraceId` and `SpanId` values are unrepresentable in a well-formed event by the
-`NonZero` types above. Every construction site rejects and reports zero inputs.
-The internal `TypedTrace` proto decode applies the same rule
-(covering disk-buffer replay after partial writes and `vector` source/sink transport errors): a
-buffered or wire-transported event whose `trace_id` or `span_id` decodes to zero is treated as
-corruption. A `trace_id` whose decoded byte length is not exactly 16 is treated identically to a
-zero `trace_id`: the same per-link or per-span disposition and reporting apply.
+`NonZero` types above. Every construction site rejects and reports zero inputs. On
+source-wire ingress, an invalid trace ID drops the span from which the event-level ID
+would have been derived; an invalid span or link ID drops that span or link. On internal
+`TypedTrace` proto decode, a zero or wrong-length top-level `trace_id` rejects the event
+as corruption, while the corresponding invalid `span_id` or link ID follows the
+smallest-item disposition above.
 
-A `TraceEvent` whose `spans` vector is otherwise empty -- whether produced by a source or
-by a transform filtering every span out -- passes through unchanged. Sinks emit the
-corresponding empty wire shape, fire finalizers on successful delivery, and report the
-condition. The internal proto encoder applies the same rule. Whether an ingress
-synthesizes such an event from an empty wire grouping is a per-format mapping decision.
+A `TraceEvent` whose `spans` vector becomes empty retains its top-level `trace_id` and
+passes through unchanged. Sinks emit the corresponding empty wire shape, fire
+finalizers on successful delivery, and report the condition. OTLP and Datadog ingress
+produce no event from an empty wire grouping because neither format supplies an ID for
+it. The internal proto and typed JSON retain the ID on empty events.
 
 ##### VRL surface for `TraceId` and `SpanId`
 
 `TraceId` and `SpanId` are exposed to VRL as lowercase hex strings without a leading `0x`:
-`TraceId` as 32 characters (16 bytes), `SpanId` as 16 characters (8 bytes), zero-padded
-on the left. Reading returns the canonical lowercase form; writing accepts case-
+trace IDs as 32 characters (16 bytes); and span IDs as 16 characters (8 bytes).
+All are zero-padded on the left.
+Reading returns the canonical lowercase form; writing accepts case-
 insensitive hex with optional zero-padding (so `"abc"` and `"0000000000000abc"` both
 round-trip to the same `SpanId`). A non-hex string, an over-length string (more than
 32 / 16 characters after trimming), or an all-zero string raises a VRL runtime error --
@@ -602,6 +622,9 @@ pub struct SpanLink {
 }
 ```
 
+`SpanLink.trace_id` remains on the link because it identifies the linked trace target,
+which may differ from the enclosing `TraceEvent.trace_id`.
+
 VRL constructs complete events and links before inserting them into their vectors:
 
 ```coffee
@@ -767,9 +790,11 @@ A present but unrecognized hint returns the same error without attempting detect
 - A converting consumer (a protocol sink, `remap` in typed mode, or `trace_to_log`)
   consumes `TraceEventCompat` at every trace-event intake path through a fallible
   conversion yielding zero or more `TraceEvent`s. The conversion must be one-to-many:
-  each typed event carries a single `Resource.service`, so a Datadog legacy event
-  holding a multi-service `TraceChunk` becomes one event per distinct `Span.service`,
-  and a multi-`ScopeSpans` OTLP legacy event becomes one event per grouping. The
+  each typed event carries a single `Resource.service` and one `TraceId`, so a Datadog
+  legacy event becomes one event per distinct reconstructed wire trace ID and
+  `Span.service` pair, and each `ScopeSpans` in an OTLP legacy event becomes one event
+  per distinct wire `Span.trace_id`. Each group ID becomes `TraceEvent.trace_id`;
+  converted spans carry no duplicate. The
   `Legacy` arm selects its shim from the hint, or from the unique format-shape detector
   match for a hintless record. A conversion error retains the original
   `LegacyTraceEvent` with its metadata and finalizers so the caller can report and drop
@@ -818,9 +843,10 @@ for the renamed `LegacyTrace` / `LegacyTraceArray` variants and add sibling
 `TypedTrace` / `TypedTraceArray` variants at field tag 4. The legacy message field tags
 and shapes remain unchanged.
 
-The typed messages mirror the Rust model: `TypedTrace` carries `Resource`, `Scope`,
-`DatadogEventContext`, repeated `Span`, and full metadata; every typed `Span` carries
-`DatadogSpanContext`. Nested messages carry the fields and numeric domains defined above.
+The typed messages mirror the Rust model: `TypedTrace` carries `trace_id`, `Resource`,
+`Scope`, `DatadogEventContext`, repeated `Span`, and full metadata; every typed `Span`
+carries `DatadogSpanContext`. Nested messages carry the fields and
+numeric domains defined above.
 Proto presence preserves every `Option<String>` distinction and
 `datadog.chunk = None` versus `Some(DatadogChunkContext::default())`; an unset
 `AttrValue` oneof represents
@@ -828,6 +854,9 @@ Proto presence preserves every `Option<String>` distinction and
 16-byte big-endian values, timestamps and durations are fixed-width unsigned
 nanoseconds, and flags retain the full 32-bit word. Timestamp encoding applies the
 numeric boundary policy defined in Scope.
+
+A decoded `TypedTrace` whose top-level `trace_id` is zero or not exactly 16 bytes is
+treated as internal-wire corruption and rejected.
 
 The oneof tag is the discriminator. The fallible decode boundary (see Plan of Attack) is
 a hard prerequisite for the typed proto step and must ship first. An older Vector that
@@ -888,7 +917,7 @@ conversion routines and detectors deleted.
 #### JSON encoding
 
 The `json` and `native_json` codecs serialize `TraceEventCompat` untagged: `Legacy` is
-today's inner map and `Typed` is the canonical `{resource, scope, datadog, spans}`
+today's inner map and `Typed` is the canonical `{trace_id, resource, scope, datadog, spans}`
 object, with the same nested values that typed VRL and `trace_to_log` expose.
 `EventMetadata` is omitted. `native_json` still wraps the payload as `{"trace": ...}`.
 These codecs emit the representation they received and do not convert.
@@ -905,10 +934,13 @@ untyped-forwarder gate.
 
 ### Architectural choices
 
-- The container shape mirrors the wire-level batching of both OTLP and Datadog so source
-  ingest and sink egress are mechanical translations rather than regroupings. Sharing
-  resource-, scope-, and chunk-scoped state at the event level keeps that sharing intact
-  across disk-buffer serialization without reconstruction or read-side interning.
+- The container shape refines the wire-level batching of OTLP and Datadog by partitioning
+  each wire grouping into trace-homogeneous events. This makes the event a safe unit for
+  trace-ID-local transforms while retaining resource-, scope-, and chunk-scoped sharing
+  within each partition. A complete distributed trace may still span several events, so
+  trace-wide transforms remain stateful. Partitioning at source or legacy-conversion
+  ingress ensures every downstream consumer sees the invariant and lets fan-out retain
+  the original metadata, finalizers, and wire order.
 - The always-present Datadog namespaces separate native wire state from normalized trace
   semantics without introducing a format-discriminated event union. Their default values
   mean no Datadog state. `Option<DatadogChunkContext>` still distinguishes no chunk state
@@ -1011,14 +1043,22 @@ untyped-forwarder gate.
   `kafka`) also change when the payload becomes typed. During coexistence those codecs
   remain untagged, so legacy output is unchanged until a source flips or a typed
   `remap` sits upstream. Downstream readers of that JSON must update.
-- Topology granularity is coarser than per-span: each event carries up to a chunk's
-  worth of spans (typically tens to hundreds, larger in deep call trees). Buffer-size
-  limits expressed in events bound span counts less directly than the previous
+- Topology granularity is coarser than per-span: each event carries the spans for one
+  `TraceEvent.trace_id` within one resource/scope or Datadog chunk/service partition. Buffer-size
+  limits expressed in events still bound span counts less directly than the previous
   `LogEvent`-per-span design. Event-count accounting continues to return `1` per
   `TraceEvent` (not per span), so `component_received_events_total` and related
   accounting count container events, not individual spans. This is consistent with how
   `Metric` reports (one event per metric, not per sample); dashboards that expect
   per-span event counts will read lower values than the actual span throughput.
+- Partitioning duplicates the event's `Resource`, `Scope`, Datadog context, and metadata
+  once per emitted trace-ID/resource partition (or trace-ID/service partition for
+  Datadog). The duplication persists across disk serialization even if the in-memory
+  implementation shares immutable values.
+- A wire grouping containing `K` distinct trace IDs produces `K` or more typed events
+  when service partitioning also applies. Event-count telemetry and typed `remap`
+  execution both increase with that fan-out. A program that intended to aggregate over
+  an entire `ScopeSpans` must use stateful aggregation rather than one VRL invocation.
 - Per-span operations (filter, sample, mutate one span) require VRL iteration over
   `.spans` rather than per-event treatment. A future topology-level expand-on-input /
   collapse-on-output shim could let single-span transforms operate unchanged.
@@ -1047,15 +1087,16 @@ untyped-forwarder gate.
 
 - [OTLP traces protocol](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto)
   -- the primary shape this RFC adopts. The container `TraceEvent` is structurally one
-  `ScopeSpans` plus its `Resource`; always-present Datadog event and span namespaces
-  carry the source-native delta that has no common semantic home.
+  trace-ID partition of a `ScopeSpans` plus its `Resource`; always-present Datadog event
+  and span namespaces carry the source-native delta that has no common semantic home.
 - Each mapping sub-RFC's own Prior Art section covers the wire format it targets and the
   reference implementations for it, including the Datadog APM protobuf and the Datadog
   Agent's OTLP ingest.
 - [2024-03-22-20170 draft](https://github.com/hdost/vector/blob/add-trace-data-model/rfcs/2024-03-22-20170-trace-data-model.md)
   -- an earlier draft that modelled the event as a `ResourceSpans` (batch of multiple
   scope/spans groupings). The current RFC adopts a similar container shape but at finer
-  granularity (one event per `ScopeSpans` rather than per `ResourceSpans`).
+  granularity (one event per trace-ID partition within a `ScopeSpans` rather than per
+  `ResourceSpans`).
 
 ## Alternatives
 
@@ -1063,8 +1104,8 @@ Wire-format-specific alternatives are documented in the corresponding mapping su
 
 ### OTLP-only schema with Datadog round-trip via import/export encoding
 
-Adopt the OTLP wire schema unchanged as the internal model -- `TraceEvent` carries one
-`Resource`, one `Scope`, and a `Vec<Span>`, with no Datadog-specific typed fields -- and
+Adopt only OTLP-derived fields in the internal model -- `TraceEvent` carries one
+`TraceId`, one `Resource`, one `Scope`, and a `Vec<Span>`, with no Datadog-specific typed fields -- and
 achieve `Datadog -> Vector -> Datadog` round-trip transparency through an
 import/export layer that encodes every Datadog-specific concept under reserved attribute
 keys. This moves the proposal's event- and span-level Datadog contexts into internal
@@ -1072,7 +1113,8 @@ attribute maps rather than limiting reserved attributes to the OTLP wire bridge.
 
 The appeal is OTLP's status as the de facto industry trace schema. A single canonical
 container removes `TraceEvent.datadog`, `Span.datadog`, and the `SamplingPriority` enum
-from the API surface, leaving only the OpenTelemetry-shaped `Resource` / `Scope` / `Span`.
+from the API surface, leaving only `TraceId` and the OpenTelemetry-shaped
+`Resource` / `Scope` / `Span`.
 Cross-format consumers see one schema.
 
 Rejected because the encoding required to carry all Datadog-specific concepts under OTLP
@@ -1109,23 +1151,38 @@ surface:
   egress. The proposal's typed fields make the partition once at the type level.
 - **The round-trip guarantee weakens from structural to conventional.** The proposal's
   `Datadog -> Vector -> Datadog` guarantee rests on structural identity:
-  `TraceEvent.datadog.chunk = Some(...)` is read back into one `TraceChunk` per event by container
-  traversal. Under the alternative, the guarantee rests on every transform respecting
-  the reserved-key convention; any transform that drops `datadog.chunk.priority` from a
-  span's attributes silently loses the chunk's sampling priority on egress. Today's
+  every trace/service partition carries its `TraceEvent.datadog.chunk = Some(...)`
+  context directly, and egress re-coalesces partitions with equal context and
+  `TraceEvent.trace_id`. Under the alternative, the guarantee rests on every transform respecting
+  the reserved-key convention; any transform that drops `datadog.chunk.priority` from
+  a span's attributes silently loses the chunk's sampling priority on egress. Today's
   `TraceEvent(LogEvent)` exhibits the same convention-dependent failure mode and is
   part of why this RFC exists.
 
-The proposal already adopts OTLP as the primary shape: `Resource`, `Scope`, and `Span`
-are OTLP types, semantic conventions name the typed resource fields, attribute keys
-follow OpenTelemetry naming, and the Datadog mapping is expressed as projections onto
-that primary shape. The explicit `TraceEvent.datadog` and `Span.datadog` namespaces are
-the minimal extension that keeps Datadog-native concepts typed and chunk-scoped state
-structurally distinct from per-span state without presenting them as common semantics.
-The pure-OTLP alternative trades that extension for attribute conventions on every
-internal consumer.
+The proposal already adopts OTLP as the primary shape: `TraceEvent.trace_id` promotes
+the wire span grouping key, `Resource`, `Scope`, and the remaining `Span` fields follow
+OTLP, semantic conventions name the typed resource fields, and attribute keys follow
+OpenTelemetry naming. The Datadog mapping is expressed as projections onto that primary
+shape. The explicit `TraceEvent.datadog` and `Span.datadog` namespaces are the minimal
+extension that keeps Datadog-native concepts typed and chunk-scoped state structurally
+distinct from per-span state without presenting them as common semantics. The pure-OTLP
+alternative trades that extension for attribute conventions on every internal consumer.
 
-### One span per event (`TraceEvent { span: Span, metadata }`)
+### One wire grouping per event
+
+Map each OTLP `ScopeSpans` or Datadog `TraceChunk` directly to one `TraceEvent`. This
+minimizes copies of resource, scope, chunk, and metadata state and makes source ingest
+and sink egress nearly mechanical.
+
+Rejected because OTLP permits one `ScopeSpans` to contain spans from several trace IDs,
+and malformed Datadog input can do the same. A filter or sampler operating on such an
+event would receive unrelated traces as one topology unit. Stable partitioning by
+`trace_id` provides one invariant across both formats and stores that identity directly
+on every `TraceEvent`. The cost is duplicated event-level context when one wire grouping
+contains several traces; a complete distributed trace can still span several events
+across resource, scope, service, or chunk boundaries.
+
+### One span per event (`TraceEvent { trace_id, span, metadata }`)
 
 Carry a single span per event. This shape offers two ergonomic advantages: the internal memory usage
 of a single span (with the resources shared) is more consistent and granular, and per-span
@@ -1138,9 +1195,9 @@ Rejected because Vector's disk buffers serialize each event as one record: `Arc`
 on serialization, every span on disk gets a full inline copy of resource/scope/chunk, and on read
 every span gets an independent allocation, thus costing Vector both extra costs in serialization and
 deserialization as well as the associated memory expansion and sink-level reassembly mechanics. The
-container shape eliminates the inflation by aligning the event boundary with the wire-batching
-boundary, so the shared context appears once per grouping on disk and in memory regardless of how
-the path is buffered, and `Arc` machinery is not needed.
+container shape limits the inflation by sharing context across all same-trace spans in one
+resource/scope or chunk/service partition. Partitioning by trace ID duplicates context when a wire
+group contains several traces, but avoids duplicating it once per span.
 
 ### Parallel `Event` variants for new and old trace formats
 
@@ -1343,8 +1400,9 @@ stage.
    untagged and representation-preserving. Pass-through transforms accept both variants
    without converting `Legacy` to `Typed`.
    `sample` remains per-event,
-   so a multi-service Datadog chunk changes from incidental whole-chunk atomicity to one
-   decision per `(TraceChunk, Span.service)` only when the event is already typed;
+   so typed input receives one decision per trace-homogeneous resource/scope or
+   chunk/service partition. This does not make sampling trace-stable across every event
+   carrying the same `TraceEvent.trace_id`;
    `trace_to_log` emits a uniform source-independent layout.
    Before the next stage, every migrated consumer must accept
    both legacy and typed input and all typed VRL and round-trip contracts must hold.
@@ -1374,7 +1432,7 @@ stage.
 - Topology-level per-span shim: a transform mode that fans out a `TraceEvent` into per-
   span events, runs a downstream transform once per span, and collapses results back
   into the container. Lets single-span transforms be authored without explicit iteration
-  while keeping the wire-aligned event shape as the source of truth.
+  while keeping the trace-homogeneous partition as the source of truth.
 - VRL helpers for trace-state parsing/encoding: `parse_trace_state`,
   `encode_trace_state`, `merge_span_attributes`. Format-specific decode helpers
   (`decode_otlp_span`, `decode_datadog_span`) are listed in the respective mapping sub-
@@ -1386,10 +1444,10 @@ stage.
 - Link-based routing: a trace-aware router transform that emits to different sinks
   based on `SpanLink` targets.
 - Stateful trace-aggregator transforms: tail-based sampling, per-trace APM-stats
-  aggregation, and similar trace-scoped operations expressed as transforms over the
-  wire-aligned container shape.
+  aggregation, and similar trace-scoped operations that gather trace-homogeneous event
+  fragments by `TraceEvent.trace_id`.
 - Trace- or chunk-stable sampling: an intentional sampling guarantee that makes a
-  single keep/drop decision per `trace_id` (or per chunk identifier) and applies it
+  single keep/drop decision per `TraceEvent.trace_id` (or per chunk identifier) and applies it
   consistently to every event derived from that trace/chunk. Today's `sample` transform
   has no such guarantee; it operates per-event, and any per-chunk atomicity is
   incidental to the pre-migration `LogEvent`-per-chunk layout. This may be added to
