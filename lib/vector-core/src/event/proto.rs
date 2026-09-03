@@ -37,6 +37,10 @@ pub enum EventProtoError {
     NanFloat,
     #[snafu(display("event protobuf contained an invalid timestamp"))]
     InvalidTimestamp,
+    #[snafu(display(
+        "event protobuf contained an AgentDDSketch whose k and n bin lists have different lengths"
+    ))]
+    MismatchedSketchBins,
 }
 
 fn require_variant<T>(value: Option<T>) -> Result<T, EventProtoError> {
@@ -226,7 +230,7 @@ impl TryFrom<MetricValue> for super::MetricValue {
             },
             MetricValue::Sketch(sketch) => match require_variant(sketch.sketch)? {
                 sketch::Sketch::AgentDdSketch(ddsketch) => Self::Sketch {
-                    sketch: ddsketch.into(),
+                    sketch: ddsketch.try_into()?,
                 },
             },
         })
@@ -558,8 +562,10 @@ impl From<AgentDDSketch> for Sketch {
     }
 }
 
-impl From<sketch::AgentDdSketch> for MetricSketch {
-    fn from(sketch: sketch::AgentDdSketch) -> Self {
+impl TryFrom<sketch::AgentDdSketch> for MetricSketch {
+    type Error = EventProtoError;
+
+    fn try_from(sketch: sketch::AgentDdSketch) -> Result<Self, Self::Error> {
         // These safe conversions are annoying because the Datadog Agent internally uses i16/u16,
         // but the proto definition uses i32/u32, so we have to jump through these hoops.
         let keys = sketch
@@ -576,7 +582,7 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
             .into_iter()
             .map(|n| n.try_into().unwrap_or(u16::MAX))
             .collect::<Vec<_>>();
-        MetricSketch::AgentDDSketch(
+        Ok(MetricSketch::AgentDDSketch(
             AgentDDSketch::from_raw(
                 sketch.count,
                 sketch.min,
@@ -586,8 +592,8 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
                 &keys,
                 &counts,
             )
-            .expect("keys/counts were unexpectedly mismatched"),
-        )
+            .ok_or(EventProtoError::MismatchedSketchBins)?,
+        ))
     }
 }
 
@@ -1053,6 +1059,29 @@ mod tests {
         assert_eq!(
             crate::event::Metric::try_from(proto),
             Err(EventProtoError::UnrecognizedEventVariant)
+        );
+    }
+
+    #[test]
+    fn mismatched_sketch_bins_is_an_error() {
+        let proto = Metric {
+            name: "requests".into(),
+            value: Some(MetricValue::Sketch(Sketch {
+                sketch: Some(sketch::Sketch::AgentDdSketch(sketch::AgentDdSketch {
+                    count: 1,
+                    min: 0.0,
+                    max: 1.0,
+                    sum: 1.0,
+                    avg: 1.0,
+                    k: vec![1],
+                    n: vec![1, 2],
+                })),
+            })),
+            ..Metric::default()
+        };
+        assert_eq!(
+            crate::event::Metric::try_from(proto),
+            Err(EventProtoError::MismatchedSketchBins)
         );
     }
 
