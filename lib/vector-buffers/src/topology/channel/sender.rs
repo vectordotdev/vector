@@ -172,23 +172,34 @@ enum UsageAccounting {
     NotAccepted,
 }
 
+#[derive(Clone, Debug)]
+struct UsageInstrumentation {
+    handle: BufferUsageHandle,
+    provides_instrumentation: bool,
+}
+
 impl UsageAccounting {
-    fn record(self, instrumentation: &BufferUsageHandle, item_count: usize, item_size: usize) {
+    fn record(self, instrumentation: &UsageInstrumentation, item_count: usize, item_size: usize) {
         match self {
-            Self::Accepted => instrumentation
+            Self::Accepted if !instrumentation.provides_instrumentation => instrumentation
+                .handle
                 .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64),
             Self::DroppedNewest => {
-                instrumentation.increment_received_event_count_and_byte_size(
-                    item_count as u64,
-                    item_size as u64,
-                );
-                instrumentation.increment_dropped_event_count_and_byte_size(
-                    item_count as u64,
-                    item_size as u64,
-                    true,
-                );
+                instrumentation
+                    .handle
+                    .increment_received_event_count_and_byte_size(
+                        item_count as u64,
+                        item_size as u64,
+                    );
+                instrumentation
+                    .handle
+                    .increment_dropped_event_count_and_byte_size(
+                        item_count as u64,
+                        item_size as u64,
+                        true,
+                    );
             }
-            Self::NotAccepted => {}
+            _ => {}
         }
     }
 }
@@ -221,8 +232,7 @@ pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
-    usage_instrumentation: Option<BufferUsageHandle>,
-    drop_newest_usage_instrumentation: Option<BufferUsageHandle>,
+    usage_instrumentation: Option<UsageInstrumentation>,
     #[derivative(Debug = "ignore")]
     send_duration: Option<Registered<BufferSendDuration>>,
     #[derivative(Debug = "ignore")]
@@ -237,7 +247,6 @@ impl<T: Bufferable> BufferSender<T> {
             overflow: None,
             when_full,
             usage_instrumentation: None,
-            drop_newest_usage_instrumentation: None,
             send_duration: None,
             custom_instrumentation: None,
         }
@@ -250,7 +259,6 @@ impl<T: Bufferable> BufferSender<T> {
             overflow: Some(Box::new(overflow)),
             when_full: WhenFull::Overflow,
             usage_instrumentation: None,
-            drop_newest_usage_instrumentation: None,
             send_duration: None,
             custom_instrumentation: None,
         }
@@ -267,12 +275,15 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     /// Configures this sender to instrument the items passing through it.
-    pub fn with_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
-        self.usage_instrumentation = Some(handle);
-    }
-
-    pub(crate) fn with_drop_newest_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
-        self.drop_newest_usage_instrumentation = Some(handle);
+    pub fn with_usage_instrumentation(
+        &mut self,
+        handle: BufferUsageHandle,
+        provides_instrumentation: bool,
+    ) {
+        self.usage_instrumentation = Some(UsageInstrumentation {
+            handle,
+            provides_instrumentation,
+        });
     }
 
     /// Configures this sender to instrument the send duration.
@@ -307,11 +318,17 @@ impl<T: Bufferable> BufferSender<T> {
         if let Some(instrumentation) = self.custom_instrumentation.as_ref() {
             instrumentation.on_send(&mut item);
         }
-        let item_sizing = self
-            .usage_instrumentation
-            .as_ref()
-            .or(self.drop_newest_usage_instrumentation.as_ref())
-            .map(|_| (item.event_count(), item.size_of()));
+        let item_sizing = match (&self.usage_instrumentation, self.when_full) {
+            (None, _)
+            | (
+                Some(UsageInstrumentation {
+                    provides_instrumentation: true,
+                    ..
+                }),
+                WhenFull::Block | WhenFull::Overflow,
+            ) => None,
+            _ => Some((item.event_count(), item.size_of())),
+        };
 
         let accounting = match self.when_full {
             WhenFull::Block => match self.base.send(item).await? {
@@ -360,14 +377,10 @@ impl<T: Bufferable> BufferSender<T> {
             }
         };
 
-        if let Some((item_count, item_size)) = item_sizing {
-            if let Some(instrumentation) = self.usage_instrumentation.as_ref() {
-                accounting.record(instrumentation, item_count, item_size);
-            } else if matches!(&accounting, UsageAccounting::DroppedNewest)
-                && let Some(instrumentation) = self.drop_newest_usage_instrumentation.as_ref()
-            {
-                accounting.record(instrumentation, item_count, item_size);
-            }
+        if let Some(instrumentation) = self.usage_instrumentation.as_ref()
+            && let Some((item_count, item_size)) = item_sizing
+        {
+            accounting.record(instrumentation, item_count, item_size);
         }
         if let Some(send_duration) = self.send_duration.as_ref()
             && let Some(send_reference) = send_reference

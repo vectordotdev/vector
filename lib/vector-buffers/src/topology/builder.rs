@@ -164,11 +164,9 @@ impl<T: Bufferable> TopologyBuilder<T> {
 
             sender.with_send_duration_instrumentation(stage_idx, &span);
             if !provides_instrumentation {
-                sender.with_usage_instrumentation(usage_handle.clone());
-                receiver.with_usage_instrumentation(usage_handle);
-            } else if stage.when_full == WhenFull::DropNewest {
-                sender.with_drop_newest_usage_instrumentation(usage_handle);
+                receiver.with_usage_instrumentation(usage_handle.clone());
             }
+            sender.with_usage_instrumentation(usage_handle.clone(), provides_instrumentation);
 
             current_stage = Some((sender, receiver));
         }
@@ -252,7 +250,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         let mut sender = BufferSender::new(sender.into(), mode);
         let mut receiver = BufferReceiver::new(receiver.into());
 
-        sender.with_usage_instrumentation(usage_handle.clone());
+        sender.with_usage_instrumentation(usage_handle.clone(), false);
         receiver.with_usage_instrumentation(usage_handle);
 
         (sender, receiver)

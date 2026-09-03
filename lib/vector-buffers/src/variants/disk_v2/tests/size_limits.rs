@@ -489,7 +489,7 @@ async fn buffer_sender_drop_newest_tracks_intentional_drop() {
             )
             .await;
             let mut sender = BufferSender::new(SenderAdapter::from(writer), WhenFull::DropNewest);
-            sender.with_drop_newest_usage_instrumentation(usage.clone());
+            sender.with_usage_instrumentation(usage.clone(), true);
 
             sender
                 .send(record.clone(), None)
