@@ -68,12 +68,10 @@ Trace Context, and other informational entries are defined in the
 
 - The bidirectional mapping between `TraceEvent` and Datadog `AgentPayload` /
   `TracerPayload` / `TraceChunk` / `Span` messages.
-- Effective-equivalence round-trip through a single Vector instance for
-  `Datadog -> Vector -> Datadog` when the pipeline does not otherwise mutate the data:
-  byte-for-byte identity is not required, but the output must be ingested by the Datadog
-  backend as the same data as the original. Details the backend does not observe (e.g.
-  span order within a chunk, specific chunk grouping when the producer-side grouping was
-  non-conforming) may differ.
+- The parent RFC's effective-equivalence round-trip guarantee, applied to
+  `Datadog -> Vector -> Datadog`. Span order within a chunk, and the specific chunk
+  grouping when the producer-side grouping was non-conforming, are details the Datadog
+  backend does not observe and so may differ.
 - The three Datadog span-attribute partitions (`meta`, `metrics`, `meta_struct`) and how
   the two scalar partitions map into `Span.attributes` by `AttrValue` variant while
   `meta_struct` is preserved in `Span.datadog.meta_struct`.
@@ -483,14 +481,6 @@ payloads unchanged.
 `Resource.host` / `Resource.environment` fields directly. The tracer context is
 always present because protobuf cannot distinguish an omitted map from an empty map.
 
-VRL access:
-
-```coffee
-.agent_host      = .datadog.agent.host_name
-.agent_apm_mode  = .datadog.agent.tags."_dd.apm_mode"
-.tracer_apm_mode = .datadog.tracer.tags."_dd.apm_mode"
-```
-
 #### Datadog chunk context
 
 Datadog `TraceChunk.priority`, `origin`, `droppedTrace`, and `tags` apply uniformly to
@@ -506,15 +496,6 @@ reserved for events with no source priority, such as an OTLP event without recov
 Datadog chunk state. On Datadog egress, that `None` emits `AutoKeep` (wire 1), matching
 today's `datadog_traces` sink and the Datadog Agent OTLP ingest at its default sampling
 rate. Wire `0` is reserved for an explicit `AutoReject`.
-
-VRL access:
-
-```coffee
-.priority       = .datadog.chunk.priority
-.origin         = .datadog.chunk.origin
-.dropped        = .datadog.chunk.dropped
-.decision_maker = .datadog.chunk.tags."_dd.p.dm"
-```
 
 #### Datadog egress derivation rules
 
@@ -807,12 +788,10 @@ not authoritative.
   differ on `droppedTrace` must remain distinct egress chunks, otherwise the relay
   re-emits the second chunk's spans with the wrong dropped flag.
 - Attribute iteration order within `SpanEvent.attributes` is not preserved by the
-  parent RFC's `Attributes` carrier (sorted by key). The
-  upstream Datadog `Span.proto` notes that this order "should be preserved," but the
-  comment is not honored by Datadog's primary tracer SDKs or by the Datadog Agent's
-  OTLP receiver path. The reordering is therefore not backend-observable and falls
-  under the parent RFC's Scope clause for "details the backend does not observe." No
-  exclusion or carrier change is warranted.
+  parent RFC's key-sorted `Attributes` carrier. Although the upstream Datadog
+  `Span.proto` notes that this order "should be preserved," the comment is not honored
+  by Datadog's own producers, so the reordering falls under the Scope clause for details
+  the backend does not observe and needs no exclusion.
 
 ## Drawbacks
 
@@ -828,9 +807,6 @@ not authoritative.
   carried by such links are not surfaced through the Datadog wire. This is a cross-
   format asymmetry consistent with cross-format zero-loss being out of scope in the
   parent RFC.
-- Additional parent-RFC-level drawbacks (VRL-config breakage on typed-path migration,
-  per-span operations requiring `.spans` iteration, etc.) apply to Datadog-sourced and
-  Datadog-bound events as well.
 
 ## Prior Art
 

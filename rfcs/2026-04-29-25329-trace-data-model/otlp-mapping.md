@@ -34,11 +34,10 @@ parent RFC's `AttrValue`.
 
 - The bidirectional mapping between `TraceEvent` and OTLP `ResourceSpans` / `ScopeSpans` /
   `Span` messages.
-- Effective-equivalence round-trip through a single Vector instance for
-  `OTLP -> Vector -> OTLP` when the pipeline does not otherwise mutate the data: byte-for-byte
-  identity is not required, but the output must be ingested by an OTLP backend as the same data
-  as the original. Details the backend does not observe (e.g. attribute iteration order within
-  `Span.attributes` when the producer-side ordering was non-canonical) may differ.
+- The parent RFC's effective-equivalence round-trip guarantee, applied to
+  `OTLP -> Vector -> OTLP`. Attribute iteration order within `Span.attributes`, when the
+  producer-side ordering was non-canonical, is one detail an OTLP backend does not
+  observe and so may differ.
 - The promotion rule for the three semantic-convention attributes (`service.name`,
   `deployment.environment.name`, `host.name`) into typed `Resource` slots, including the
   legacy-key acceptance for `deployment.environment`.
@@ -290,30 +289,19 @@ unique-keyed by construction.
 
 #### Default-valued / absent equivalence
 
-OTLP defines several "field absent" / "field default-valued" pairs as semantically
-equivalent at the spec level, in which case the model represents both forms as the default
-value and the round-trip preserves spec-defined semantic equivalence even when the wire
-bytes differ:
+OTLP's spec defines its "field absent" and "field default-valued" forms as semantically
+equivalent for `ResourceSpans.resource`, `ScopeSpans.scope`, `Span.status`, and
+`Span.kind`. The typed model relies on that equivalence rather than tracking wire
+presence: it carries `Resource` and `Scope` as values rather than `Option`s, represents
+an unset status as `SpanStatus::Unset`, and egress emits each field unconditionally at
+its default. A round trip therefore preserves the spec-defined semantics even where the
+wire bytes differ, and no exclusion is needed.
 
-- `ResourceSpans.resource` (proto comment: "If this field is not set then no resource info
-  is known") and `ScopeSpans.scope` (proto comment: "Semantically when InstrumentationScope
-  isn't set, it is equivalent with an empty instrumentation scope name (unknown)") -- absent
-  on the wire is spec-equivalent to a default-valued message. The model carries
-  `TraceEvent.resource` and `TraceEvent.scope` as values rather than `Option`, and egress
-  emits the field unconditionally. `Scope.{name,version}` and both `schema_url` fields
-  are non-optional proto3 strings, so decoding cannot distinguish absent from empty;
-  they map empty to `None` and egress as the proto3 default. OTLP additionally defines
-  an empty scope name as unknown.
-- `Span.status` (proto comment: "Semantically when Status isn't set, it means span's
-  status code is unset, i.e. assume STATUS_CODE_UNSET (code = 0)") -- the model represents
-  this as `SpanStatus::Unset` and egress emits the corresponding zero-coded `Status`. A
-  status code outside the three known values (`UNSET = 0`, `OK = 1`, `ERROR = 2`) ingests
-  as `SpanStatus::Other(code, message)` and egresses as the same code and message, so
-  unknown status codes introduced by future OpenTelemetry versions round-trip unchanged.
-- `Span.kind` -- `SPAN_KIND_UNSPECIFIED = 0` is the proto3 default; absent and zero-valued
-  are byte-identical anyway. A value outside the six known enum numbers ingests as
-  `SpanKind::Other(n)` and egresses as the same integer, so unknown kind values introduced
-  by future OpenTelemetry versions round-trip unchanged.
+`Scope.{name, version}` and both `schema_url` fields
+are non-optional proto3 strings, so decoding cannot distinguish absent from empty and they
+map empty to `None`. Unknown `Span.status.code` or `Span.kind` values are carried by
+the parent RFC's escape-hatch variants and egress as the same integer, so values
+introduced by future OpenTelemetry versions round-trip unchanged.
 
 #### Reserved OTLP bridge keys for Datadog-native state
 
@@ -384,9 +372,6 @@ contract.
   is not guaranteed: a transform that drops or rewrites one of these attributes on
   OTLP-stage traffic loses the corresponding Datadog state. Operators should not use
   the reserved keys for unrelated custom attributes.
-- Additional parent-RFC-level drawbacks (VRL-config breakage on typed-path migration,
-  per-span operations requiring `.spans` iteration, etc.) apply to OTLP-sourced and
-  OTLP-bound events as well.
 
 ## Prior Art
 

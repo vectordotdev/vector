@@ -67,11 +67,6 @@ the entries below are the format-agnostic shared vocabulary.
 - **W3C Trace Context** (informational): the W3C recommendation defining the
   [`traceparent` and `tracestate` HTTP headers](https://www.w3.org/TR/trace-context/). The
   proposed `TraceFlags` and `TraceState` types correspond to these headers.
-- **Zipkin v2, Jaeger, OpenTracing** (informational): other trace data models referenced in
-  passing for context. None are targeted by this RFC and they are not constraints on the
-  design. Zipkin v2 is documented at the [Zipkin API](https://zipkin.io/zipkin-api/#/default/get_spans);
-  Jaeger at [jaegertracing.io](https://www.jaegertracing.io/docs/latest/architecture/#span);
-  OpenTracing at the [OpenTracing spec](https://github.com/opentracing/specification/blob/master/specification.md).
 
 ## Cross cutting concerns
 
@@ -1054,14 +1049,9 @@ untyped-forwarder gate.
   -- the primary shape this RFC adopts. The container `TraceEvent` is structurally one
   `ScopeSpans` plus its `Resource`; always-present Datadog event and span namespaces
   carry the source-native delta that has no common semantic home.
-- [Datadog APM agent-to-backend protobuf](https://github.com/DataDog/datadog-agent/tree/main/pkg/proto/datadog/trace)
-  -- the second native format Vector targets.
-- [Datadog Agent OTLP ingest](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/api/otlp.go)
-  -- the normative reference for the enumerated Agent-aligned derivations; see the
-  [Datadog mapping sub-RFC](2026-04-29-25329-trace-data-model/datadog-mapping.md) for the
-  role specification and the cross-format conformance rule. Adopting an existing reference
-  rather than defining a parallel mapping minimises divergence between Vector's
-  `OTLP -> datadog_traces` path and the Datadog Agent's own OTLP ingest.
+- Each mapping sub-RFC's own Prior Art section covers the wire format it targets and the
+  reference implementations for it, including the Datadog APM protobuf and the Datadog
+  Agent's OTLP ingest.
 - [2024-03-22-20170 draft](https://github.com/hdost/vector/blob/add-trace-data-model/rfcs/2024-03-22-20170-trace-data-model.md)
   -- an earlier draft that modelled the event as a `ResourceSpans` (batch of multiple
   scope/spans groupings). The current RFC adopts a similar container shape but at finer
