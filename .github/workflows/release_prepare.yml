@@ -11,14 +11,6 @@ on:
         description: Released VRL version to pin, for example 0.28.0
         required: true
         type: string
-      alpine_version:
-        description: Optional Alpine base image version
-        required: false
-        type: string
-      debian_version:
-        description: Optional Debian base image version
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -82,8 +74,6 @@ jobs:
           cargo vdev release prepare
           --version "${{ inputs.version }}"
           --vrl-version "${{ inputs.vrl_version }}"
-          --alpine-version "${{ inputs.alpine_version }}"
-          --debian-version "${{ inputs.debian_version }}"
           --dry-run
 
       - name: Push preparation branch

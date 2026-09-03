@@ -631,8 +631,6 @@ fn release_file_allowed(file: &str) -> bool {
         ".github/release-state.json"
             | "Cargo.lock"
             | "Cargo.toml"
-            | "distribution/docker/alpine/Dockerfile"
-            | "distribution/docker/debian/Dockerfile"
             | "distribution/install.sh"
             | "website/cue/reference/administration/interfaces/kubectl.cue"
             | "website/cue/reference/versions.cue"

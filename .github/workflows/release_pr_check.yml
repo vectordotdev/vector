@@ -8,7 +8,6 @@ on:
       - "Cargo.lock"
       - "Cargo.toml"
       - "changelog.d/**"
-      - "distribution/docker/**"
       - "distribution/install.sh"
       - "website/content/en/highlights/**"
       - "website/content/en/releases/**"
