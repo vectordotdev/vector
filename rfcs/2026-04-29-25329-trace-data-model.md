@@ -361,10 +361,7 @@ The agent envelope's `host_name`, `env`, and `agent_version` strings read and wr
 UTF-8 VRL bytes, and `rare_sampler_enabled` reads and writes as a VRL boolean. All agent
 fields are writable; an explicitly authored value is authoritative on Datadog egress.
 `DatadogAgentEnvelope.target_tps` and `error_tps` use the same NaN boundary behavior as
-`AttrValue::Double`: NaN reads as VRL null, and an unchanged null write to the same
-resolved field preserves the original NaN payload and bits. A newly authored null at
-either required double field is invalid. This retention applies recursively when an
-unchanged containing Datadog object is written back.
+`AttrValue::Double` below.
 
 #### `Resource` and `Scope`
 
@@ -448,10 +445,8 @@ clears it to `None`, and writing the empty string `""` is equivalent to `del()`.
 ##### VRL surface for `Span.duration`
 
 VRL reads `Span.duration` as floating-point seconds and accepts integer or float seconds
-on write. A write must be finite and non-negative. It is converted to nanoseconds by
-rounding to the nearest integer nanosecond, with exact halfway values rounded up, and
-must fit `std::time::Duration`; other values raise a runtime error. Conversion and
-validation complete before the stored duration is changed; `-0.0` is accepted as zero.
+on write. Invalid values raise a runtime error.
+Conversion and validation complete before the stored duration is changed.
 
 #### Status, kind, and sampling priority
 
@@ -679,9 +674,8 @@ Per-format wire mappings live in the sub-RFCs.
 VRL accesses an `Attributes` map through the existing `Value` API. Conversion is
 recursive: bytes, booleans, integers, floats, arrays, objects, and null map to the
 corresponding `AttrValue` variants. A new `Value::Bytes` write becomes
-`AttrValue::String` when it is valid UTF-8 and `AttrValue::Bytes` otherwise. On an
-unchanged write back to the same resolved typed path, the original `String` / `Bytes`
-discriminator is preserved instead.
+`AttrValue::String` when it is valid UTF-8 and `AttrValue::Bytes` otherwise. Writes
+to an `AttrValue` that do not change its value retain the discriminator.
 
 `AttrValue::Double(NaN)` reads as `Value::Null`, because VRL floats exclude NaN; an
 unchanged null write back to that same path preserves the NaN discriminator and bits.
@@ -789,55 +783,42 @@ A present but unrecognized hint returns the same error without attempting detect
 
 - Metadata, finalizer, allocation-size, and event-count operations dispatch to either
   variant so generic topology and buffering code can operate without converting.
-- Temporary untyped forwarding methods (`get(path)`, `insert(path, value)`, `as_map()`,
-  etc.) preserve the legacy component API while every producer still emits
-  `TraceEventCompat::Legacy`. They are removed before any producer flips to typed
-  output; the resulting compiler errors locate every remaining consumer of the legacy
-  layout.
+- Temporary untyped forwarding methods preserve the legacy component API while every
+  producer still emits `TraceEventCompat::Legacy`. They are removed before any producer
+  flips to typed output; the resulting compiler errors locate every remaining consumer
+  of the legacy layout.
 - Typed field accessors exist only on `TraceEvent`. `TraceEventCompat` does not expose
-  typed accessors, so typed code cannot accidentally access an unconverted legacy event
-  or enter a migration-only panic state.
-- A converting consumer (a protocol sink, `remap` in typed mode, or `trace_to_log`) consumes
-  `TraceEventCompat` at every trace-event intake path and invokes a fallible
-  `try_into_typed()` conversion that yields zero or
-  more `TraceEvent`s. The `Typed` arm returns a one-element sequence containing its
-  `TraceEvent` without migration work. The `Legacy` arm selects a source-specific
-  shim from the hint or, for a hintless record, the unique format-shape detector
-  match. A Datadog legacy event is one `TraceChunk` and therefore becomes one typed
-  event per distinct `Span.service`; a singular conversion cannot satisfy that mapping
-  because each typed event has only one `Resource.service`, so it would drop spans or
-  assign some the wrong service. An OTLP legacy event that already carries more than
-  one `ScopeSpans` grouping (for example a `use_otlp_decoding` batch) becomes one
-  typed event per `ScopeSpans`. A conversion error retains the original
-  `LegacyTraceEvent`, including metadata and finalizers, so the caller can report and
-  drop it according to normal acknowledgement semantics. There is no reverse
-  conversion. A converting transform that emits traces wraps each result as
-  `TraceEventCompat::Typed`.
+  them, so typed code cannot access an unconverted legacy event. This type separation,
+  rather than a runtime check, is the enforcement mechanism.
+- A converting consumer (a protocol sink, `remap` in typed mode, or `trace_to_log`)
+  consumes `TraceEventCompat` at every trace-event intake path through a fallible
+  conversion yielding zero or more `TraceEvent`s. The conversion must be one-to-many:
+  each typed event carries a single `Resource.service`, so a Datadog legacy event
+  holding a multi-service `TraceChunk` becomes one event per distinct `Span.service`,
+  and a multi-`ScopeSpans` OTLP legacy event becomes one event per grouping. The
+  `Legacy` arm selects its shim from the hint, or from the unique format-shape detector
+  match for a hintless record. A conversion error retains the original
+  `LegacyTraceEvent` with its metadata and finalizers so the caller can report and drop
+  it under normal acknowledgement semantics. There is no reverse conversion.
 - Pass-through transforms that emit traces (`sample`, `delay`, and similar) are
-  representation-preserving: they dispatch on `TraceEventCompat` and emit the same
-  variant they received. They do not convert `Legacy` to `Typed`. Converting at
-  `sample` would send `Typed` into a downstream `remap` that still defaults to
-  `legacy` and rejects typed input, so a common `source -> sample -> remap` pipeline
-  would enter the mapping-error path as soon as `sample` migrated. On `Legacy` they
-  keep using the existing path API; on `Typed` they use typed accessors. `sample`'s
-  unit is one decision per received event, so a multi-service Datadog chunk becomes
-  one decision per `(TraceChunk, Span.service)` only when that event is already typed.
-- Successful conversion clones the original `EventMetadata` onto every resulting
-  `TraceEvent`, sharing secrets, `datadog_api_key`, source identity, the
-  `vector.trace_legacy_layout` hint, and `EventFinalizers`. Acknowledgements therefore
-  wait for every resulting event, matching Vector's existing fan-out behavior (for
-  example remap assigning an array to `.`). A successful conversion that yields no
-  events consumes the original; its finalizers fire on drop. The default unused-event
-  status (`EventStatus::Dropped`) does not fail the batch. Per-span drops that the
-  selected mapping reports while converting a well-formed layout are not
-  conversion-API failures: remaining spans still produce typed events.
+  representation-preserving: they emit the same variant they received and never convert
+  `Legacy` to `Typed`. Converting at `sample` would send `Typed` into a downstream
+  `remap` that still defaults to `legacy` and rejects typed input, so a common
+  `source -> sample -> remap` pipeline would enter the mapping-error path as soon as
+  `sample` migrated.
+- Successful conversion clones the original `EventMetadata`, including its
+  `EventFinalizers`, onto every resulting `TraceEvent`, so acknowledgements wait for
+  every result as they do for Vector's existing fan-out. A conversion that yields no
+  events consumes the original without failing the batch. Per-span drops reported while
+  converting a well-formed layout are not conversion failures; the remaining spans still
+  produce typed events.
 - `remap.trace_representation` selects the VRL representation before program execution.
-  Typed mode calls `try_into_typed()` before constructing `VrlTarget` and then runs the
-  program once per resulting typed event; legacy mode accepts only `Legacy`.
-  Pre-execution conversion failure uses the normal mapping-error, `drop_on_error`,
-  and `reroute_dropped` behavior against the original event. A successful conversion
-  that yields no events is not a mapping error: remap emits nothing. Once converted,
-  each event remains typed even when later VRL failure forwards it unmodified.
+  Typed mode converts before constructing `VrlTarget` and runs the program once per
+  resulting typed event; legacy mode accepts only `Legacy`. Pre-execution conversion
+  failure uses the normal mapping-error, `drop_on_error`, and `reroute_dropped`
+  behavior against the original event, while a conversion yielding no events is not a
+  mapping error and emits nothing. Once converted, an event remains typed even when a
+  later VRL failure forwards it unmodified.
 
 Per-component shims are unidirectional (`LegacyTraceEvent -> TraceEvent` only). The
 `datadog_agent` source ships with a shim and format-shape detector that know the
@@ -893,16 +874,12 @@ Single-event encoding via `EventWrapper` is 1:1:
 1:1-or-N: during coexistence, in-memory `TraceArray` (a
 `Vec<TraceEventCompat>`) can hold a mix of variants when a source that emits typed
 events natively and one that still emits legacy events fan in to the same downstream
-component, but the wire `EventArray.events` oneof must select one variant. That split
-cannot live in `Encodable::encode`: the disk writer calls it once per record and it
-returns one byte buffer. Mixed arrays are therefore split into maximal contiguous
-homogeneous `EventArray`s *before* any one-record encoder, preserving original event
-order and per-event finalizer and acknowledgement behavior. Each run is then encoded
-and written as its own record. Decoders see only
-homogeneous wire arrays; mixing reappears at fan-in points downstream without changing
-the order observed by stateful components. The `vector` sink already encodes
-`EventWrapper` 1:1, so this split applies to the disk-buffer `EventArray` path and any
-other caller that encodes an `EventArray` as a single record.
+component, but the wire `EventArray.events` oneof must select one variant. A mixed
+array is therefore encoded as several homogeneous wire arrays. Encoding must preserve
+the original event order and each event's finalizer and acknowledgement behavior, so
+that a mixed array is observationally equivalent to a homogeneous one for every
+downstream stateful component. Decoders see only homogeneous wire arrays; mixing
+reappears at fan-in points downstream.
 
 Retiring the `TraceEventCompat` enum does not immediately retire the proto:
 `LegacyTrace`,
