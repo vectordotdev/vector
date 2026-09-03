@@ -1,5 +1,6 @@
 use chrono::{Offset, TimeZone, Utc};
 use chrono_tz::Tz;
+use rstest::rstest;
 use vector_lib::{
     config::LogNamespace,
     lookup::{PathPrefix, metadata_path},
@@ -723,14 +724,21 @@ fn uri_path_field_cannot_smuggle_double_encoded_traversal() {
 }
 
 #[test]
-fn uri_path_field_cannot_smuggle_query() {
-    // Templates with no `?` build successfully. A field value that smuggles
-    // `?...` into the path (e.g. tenant=`ok?tenant=evil`) is caught at
-    // render time via the query-rejection check.
+fn uri_path_field_cannot_smuggle_query_or_fragment() {
+    // Templates with no `?`/`#` build successfully. A field value that
+    // smuggles `?...` or `#...` into the path (e.g. tenant=`ok?tenant=evil`)
+    // is caught at render time: neither is part of the operator-authored
+    // path prefix, and `http::Uri` would truncate at `#` before the checker
+    // sees the full value.
     let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
     let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
     assert!(matches!(
         c.confine("https://api.internal/ingest/ok?tenant=evil")
+            .unwrap_err(),
+        ConfineError::OutsideBase { .. }
+    ));
+    assert!(matches!(
+        c.confine("https://api.internal/ingest/ok#evil")
             .unwrap_err(),
         ConfineError::OutsideBase { .. }
     ));
@@ -746,8 +754,6 @@ fn uri_fragment_prevents_suffix_hiding() {
     // Without raw fragment checking, http::Uri would truncate to:
     //   https://api.internal/base/ok
     // and the /ingest suffix is never checked or used.
-    use crate::event::Event;
-    use vector_lib::event::LogEvent;
 
     let config = ConfinementConfig::default();
     let tpl = UriTemplate::try_from("https://api.internal/base/{{ tenant }}/ingest").unwrap();
@@ -767,32 +773,6 @@ fn uri_fragment_prevents_suffix_hiding() {
 }
 
 #[test]
-fn uri_path_field_cannot_smuggle_fragment() {
-    // Dynamic URI templates cannot have field-injected fragments.
-    // Although `http::Uri` strips fragments server-side, the raw `#` can
-    // affect client-side routing/logging and must be rejected.
-    let tpl = Template::try_from("https://api.internal/ingest/{{ tenant }}").unwrap();
-    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
-
-    // Check that we detect fragments before parsing strips them
-    let test_uri = "https://api.internal/ingest/ok#evil";
-    assert!(test_uri.contains('#'), "Test URI should contain #");
-
-    // Fragment in path value should be rejected
-    let result = c.confine(test_uri);
-    assert!(
-        result.is_err(),
-        "Expected fragment to be rejected, got {:?} for {}",
-        result,
-        test_uri
-    );
-    assert!(matches!(
-        result.unwrap_err(),
-        ConfineError::OutsideBase { .. }
-    ));
-}
-
-#[test]
 fn uri_template_with_query_or_fragment_rejected_at_build() {
     // URI templates with field references AND `?` / `#` are rejected. A
     // field-rendered value could smuggle a query segment, or a `#frag`
@@ -808,6 +788,9 @@ fn uri_template_with_query_or_fragment_rejected_at_build() {
         "https://api.internal/ingest/{{ tenant }}?source=vector",
         "https://api.internal/base/{{ tenant }}/ingest#frag",
         "https://api.internal/base/{{ tenant }}#frag",
+        // A field extending a pathless authority still hits this check
+        // when a query is present.
+        "https://api.internal{{ path }}?date=x",
     ] {
         let tpl = Template::try_from(*template_str).unwrap();
         assert!(
@@ -821,33 +804,7 @@ fn uri_template_with_query_or_fragment_rejected_at_build() {
 }
 
 #[test]
-fn static_uri_with_query_allowed() {
-    // A fully static URI (no `{{ }}`) with a query string is safe: the
-    // rendered value is fixed and cannot be influenced by event data.
-    // No checker is installed; `Ok(None)` is the expected result.
-    let tpl = Template::try_from("https://api.internal/ingest?source=vector").unwrap();
-    assert!(
-        ConfinementChecker::for_uri_template(&tpl)
-            .unwrap()
-            .is_none()
-    );
-}
-
-#[test]
-fn static_uri_with_fragment_allowed() {
-    // A fully static URI (no `{{ }}`) with a fragment is safe: the
-    // rendered value is fixed and cannot be influenced by event data.
-    // No checker is installed; `Ok(None)` is the expected result.
-    let tpl = Template::try_from("https://api.internal/ingest#section").unwrap();
-    assert!(
-        ConfinementChecker::for_uri_template(&tpl)
-            .unwrap()
-            .is_none()
-    );
-}
-
-#[test]
-fn prefix_template_with_leading_strftime_needs_no_confinement() {
+fn prefix_template_with_strftime_confinement() {
     // A non-URI template whose first component is strftime (e.g. S3
     // `key_prefix: "%Y/%m/"`, Kafka topic `%Y-%m`) has no literal prefix but
     // also no event-field references. Its rendered value is operator-authored
@@ -861,10 +818,7 @@ fn prefix_template_with_leading_strftime_needs_no_confinement() {
             "expected no prefix confinement for {template_str}"
         );
     }
-}
 
-#[test]
-fn prefix_template_with_strftime_and_fields_still_confined() {
     // When the template also references event fields, confinement still
     // applies to the literal prefix.
     let tpl = Template::try_from("logs-%Y/{{ tenant }}/").unwrap();
@@ -873,232 +827,95 @@ fn prefix_template_with_strftime_and_fields_still_confined() {
         .unwrap();
     assert!(checker.confine("logs-2001/tenant-a/").is_ok());
     assert!(checker.confine("other/tenant-a/").is_err());
-}
 
-#[test]
-fn uri_template_with_strftime_query_builds_and_renders() {
-    // A URI with a strftime directive in an operator-authored query but no
-    // event-field references (e.g. `?date=%Y-%m-%d`) must build and render,
-    // not require the global opt-out. The query structure is fixed by the
-    // template; only the time-derived values change.
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-    let mut event = Event::Log(LogEvent::from("x"));
-    event
-        .as_mut_log()
-        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
-
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("https://logs.example.com/ingest?date=%Y-%m-%d").unwrap();
-    let confined = tpl.confine(&config, "http", "uri").unwrap();
-
-    assert_eq!(
-        confined.render_string(&event).unwrap(),
-        "https://logs.example.com/ingest?date=2001-02-03"
-    );
-    // Runtime confinement still applies to the authority.
-    assert!(
-        confined
-            .check_confinement("https://other.example.com/ingest?date=2001-02-03")
-            .is_err()
-    );
-}
-
-#[test]
-fn uri_template_with_strftime_fragment_builds_and_renders() {
-    // Same as the query case, but for an operator-authored fragment. The
-    // fragment structure is fixed by the template; only the time-derived
-    // values change.
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-    let mut event = Event::Log(LogEvent::from("x"));
-    event
-        .as_mut_log()
-        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
-
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("https://logs.example.com/ingest#%Y-%m-%d").unwrap();
-    let confined = tpl.confine(&config, "http", "uri").unwrap();
-
-    assert_eq!(
-        confined.render_string(&event).unwrap(),
-        "https://logs.example.com/ingest#2001-02-03"
-    );
-    // Runtime confinement still applies to the authority.
-    assert!(
-        confined
-            .check_confinement("https://other.example.com/ingest#2001-02-03")
-            .is_err()
-    );
-}
-
-#[test]
-fn uri_template_with_strftime_query_and_fragment_builds_and_renders() {
-    // Combined case: operator-authored query AND fragment, both with
-    // strftime directives and no field references. Both must be recorded
-    // as prefixes and enforced at render.
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-    let mut event = Event::Log(LogEvent::from("x"));
-    event
-        .as_mut_log()
-        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
-
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("https://logs.example.com/ingest?date=%Y-%m-%d#%H").unwrap();
-    let confined = tpl.confine(&config, "http", "uri").unwrap();
-
-    assert_eq!(
-        confined.render_string(&event).unwrap(),
-        "https://logs.example.com/ingest?date=2001-02-03#04"
-    );
-}
-
-#[test]
-fn uri_template_with_strftime_query_rejects_query_escape() {
-    // Negative case: the rendered query must stay within the operator-
-    // authored prefix. A query that escaped the prefix (e.g. a template
-    // bug or a mis-recorded prefix) is rejected at render.
-    let tpl = Template::try_from("https://logs.example.com/ingest?date=%Y-%m-%d").unwrap();
-    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
-
-    // Within the operator-authored prefix: fine.
-    assert!(
-        c.confine("https://logs.example.com/ingest?date=2001-02-03")
-            .is_ok()
-    );
-    // Different query structure: rejected.
-    assert!(
-        c.confine("https://logs.example.com/ingest?other=2001-02-03")
-            .is_err()
-    );
-    // No query at all: rejected.
-    assert!(c.confine("https://logs.example.com/ingest").is_err());
-}
-
-#[test]
-fn uri_template_with_strftime_fragment_rejects_fragment_escape() {
-    // Negative case: the rendered fragment must stay within the operator-
-    // authored prefix.
-    let tpl = Template::try_from("https://logs.example.com/ingest#date-%Y-%m-%d").unwrap();
-    let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
-
-    // Within the operator-authored prefix: fine.
-    assert!(
-        c.confine("https://logs.example.com/ingest#date-2001-02-03")
-            .is_ok()
-    );
-    // Different fragment structure: rejected.
-    assert!(c.confine("https://logs.example.com/ingest#other").is_err());
-    // Missing fragment: rejected.
-    assert!(c.confine("https://logs.example.com/ingest").is_err());
-}
-
-#[test]
-fn uri_template_with_strftime_query_on_pathless_uri_builds_and_renders() {
-    // A URI with no explicit `/` after the host — `?` terminates the static
-    // authority just as `/` does — must build and render, not fail with
-    // `PartialUriAuthority`.
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-    let mut event = Event::Log(LogEvent::from("x"));
-    event
-        .as_mut_log()
-        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
-
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("https://logs.example.com?date=%Y-%m-%d").unwrap();
-    let confined = tpl.confine(&config, "http", "uri").unwrap();
-
-    assert_eq!(
-        confined.render_string(&event).unwrap(),
-        "https://logs.example.com?date=2001-02-03"
-    );
-    // Runtime confinement still applies to the authority and query prefix.
-    assert!(
-        confined
-            .check_confinement("https://other.example.com?date=2001-02-03")
-            .is_err()
-    );
-    assert!(
-        confined
-            .check_confinement("https://logs.example.com?other=2001-02-03")
-            .is_err()
-    );
-}
-
-#[test]
-fn uri_template_with_strftime_fragment_on_pathless_uri_builds_and_renders() {
-    // Same as the query case, but with a fragment terminating the authority.
-    let ts = Utc
-        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
-        .single()
-        .expect("invalid timestamp");
-    let mut event = Event::Log(LogEvent::from("x"));
-    event
-        .as_mut_log()
-        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
-
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("https://logs.example.com#date-%Y-%m-%d").unwrap();
-    let confined = tpl.confine(&config, "http", "uri").unwrap();
-
-    assert_eq!(
-        confined.render_string(&event).unwrap(),
-        "https://logs.example.com#date-2001-02-03"
-    );
-    assert!(
-        confined
-            .check_confinement("https://other.example.com#date-2001-02-03")
-            .is_err()
-    );
-}
-
-#[test]
-fn pathless_uri_with_field_extending_authority_still_rejected() {
-    // A field reference extending the host with no `/`, `?`, or `#` after it
-    // still leaves the authority unterminated — must stay rejected.
-    for template_str in &[
-        "https://api.internal{{ path }}",
-        "https://tenant.{{ env }}.example.com",
-    ] {
-        let tpl = Template::try_from(*template_str).unwrap();
-        assert!(
-            matches!(
-                ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
-                BuildError::PartialUriAuthority { .. }
-            ),
-            "expected PartialUriAuthority for {template_str}"
-        );
-    }
-
-    // Field references mixed with a query hit the stricter build-time check.
-    let tpl = Template::try_from("https://api.internal{{ path }}?date=x").unwrap();
-    assert!(matches!(
-        ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
-        BuildError::DynamicUriQueryOrFragment { .. }
-    ));
-}
-
-#[test]
-fn prefix_template_with_leading_strftime_and_fields_rejected() {
-    // A template whose FIRST component is strftime AND that references
-    // event fields has no literal prefix to confine to, and does contain
-    // event-controlled content — it must still be rejected (NoDerivableBase)
-    // without the opt-out.
+    // But a template whose FIRST component is strftime AND that references
+    // event fields has no literal prefix to confine to while still carrying
+    // event-controlled content — rejected (NoDerivableBase) without the
+    // opt-out.
     let tpl = Template::try_from("%Y/{{ tenant }}/").unwrap();
     assert!(matches!(
         ConfinementChecker::for_prefix_template(&tpl).unwrap_err(),
         BuildError::NoDerivableBase { .. }
     ));
+}
+
+#[rstest]
+// Operator-authored strftime directives in a URI query or fragment, with no
+// event-field references (e.g. `?date=%Y-%m-%d`), must build and render
+// without the global opt-out: the query/fragment structure is fixed by the
+// template; only the time-derived values change. `?` and `#` also terminate
+// the static authority on pathless URIs.
+#[case::query(
+    "https://logs.example.com/ingest?date=%Y-%m-%d",
+    "https://logs.example.com/ingest?date=2001-02-03"
+)]
+#[case::fragment(
+    "https://logs.example.com/ingest#%Y-%m-%d",
+    "https://logs.example.com/ingest#2001-02-03"
+)]
+#[case::query_and_fragment(
+    "https://logs.example.com/ingest?date=%Y-%m-%d#%H",
+    "https://logs.example.com/ingest?date=2001-02-03#04"
+)]
+#[case::query_on_pathless_uri(
+    "https://logs.example.com?date=%Y-%m-%d",
+    "https://logs.example.com?date=2001-02-03"
+)]
+#[case::fragment_on_pathless_uri(
+    "https://logs.example.com#date-%Y-%m-%d",
+    "https://logs.example.com#date-2001-02-03"
+)]
+fn uri_template_with_strftime_query_or_fragment_builds_and_renders(
+    #[case] template: &str,
+    #[case] expected: &str,
+) {
+    let ts = Utc
+        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+        .single()
+        .expect("invalid timestamp");
+    let mut event = Event::Log(LogEvent::from("x"));
+    event
+        .as_mut_log()
+        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
+
+    let config = ConfinementConfig::default();
+    let confined = UriTemplate::try_from(template)
+        .unwrap()
+        .confine(&config, "http", "uri")
+        .unwrap();
+
+    assert_eq!(confined.render_string(&event).unwrap(), expected);
+
+    // Runtime confinement still applies to the authority.
+    let other_authority = expected.replacen("logs.example.com", "other.example.com", 1);
+    assert!(confined.check_confinement(&other_authority).is_err());
+}
+
+#[test]
+fn uri_template_with_strftime_query_or_fragment_rejects_escape() {
+    // Negative case: the rendered query/fragment must stay within the
+    // operator-authored prefix. A different structure — or a missing
+    // query/fragment entirely — is rejected.
+    for (template, accepted, rejected, missing) in [
+        (
+            "https://logs.example.com/ingest?date=%Y-%m-%d",
+            "https://logs.example.com/ingest?date=2001-02-03",
+            "https://logs.example.com/ingest?other=2001-02-03",
+            "https://logs.example.com/ingest",
+        ),
+        (
+            "https://logs.example.com/ingest#date-%Y-%m-%d",
+            "https://logs.example.com/ingest#date-2001-02-03",
+            "https://logs.example.com/ingest#other",
+            "https://logs.example.com/ingest",
+        ),
+    ] {
+        let tpl = Template::try_from(template).unwrap();
+        let c = ConfinementChecker::for_uri_template(&tpl).unwrap().unwrap();
+        assert!(c.confine(accepted).is_ok());
+        assert!(c.confine(rejected).is_err());
+        assert!(c.confine(missing).is_err());
+    }
 }
 
 #[test]
@@ -1195,8 +1012,6 @@ fn confined_template_rejects_escape() {
     ));
 }
 
-// Regression tests for F1c: type-safe ConfinedUriTemplate
-
 #[test]
 fn http_prefix_treated_as_non_uri_for_confine() {
     // `confine` does not interpret content as URI, so `http://` prefixes
@@ -1246,22 +1061,27 @@ fn uri_template_confine_enforces_uri_semantics() {
     ));
 }
 
-#[test]
-fn uri_template_confine_rejects_partial_authority() {
-    // URI templates must have a fully static authority (host) component.
-    // Field references inside the host are rejected at build time.
-
+#[rstest]
+// URIs — dynamic or static — must be absolute http(s) URIs with a fully
+// static authority. Reject at build time otherwise.
+#[case::relative_uri("/api/{{ tenant }}", "authority")]
+#[case::schemeless("//api.example.com/{{ tenant }}", "authority")]
+#[case::static_relative_uri("/api/endpoint", "authority")]
+#[case::static_schemeless("//api.example.com/path", "authority")]
+#[case::unsupported_scheme("ftp://files.example.com/{{ path }}", "ftp")]
+#[case::static_unsupported_scheme("ftp://files.example.com/path", "ftp")]
+fn uri_template_confine_rejects_invalid_scheme_or_authority(
+    #[case] template: &str,
+    #[case] err_fragment: &str,
+) {
     let config = ConfinementConfig::default();
-
-    // Field reference inside the authority (host) component
-    let tpl = UriTemplate::try_from("https://trusted.example{{ ext }}/path").unwrap();
-    let err = tpl.confine(&config, "http", "uri").unwrap_err();
-    // The error chain should contain PartialUriAuthority
-    let err_str = err.to_string();
+    let err = UriTemplate::try_from(template)
+        .unwrap()
+        .confine(&config, "http", "uri")
+        .unwrap_err();
     assert!(
-        err_str.contains("host") && err_str.contains("authority"),
-        "Expected PartialUriAuthority error, got {:?}",
-        err_str
+        err.to_string().contains(err_fragment),
+        "expected error containing {err_fragment:?} for {template}, got {err:?}"
     );
 }
 
@@ -1274,50 +1094,6 @@ fn uri_template_confine_opt_out_returns_correct_type() {
     let tpl = UriTemplate::try_from("{{ endpoint }}").unwrap();
     // Type annotation ensures we get ConfinedUriTemplate, not ConfinedTemplate
     let _confined_confined_uri: ConfinedUriTemplate = tpl.confine(&config, "http", "uri").unwrap();
-}
-
-// Tests for URI scheme validation (blocker #1)
-
-#[test]
-fn uri_template_confine_rejects_relative_uri() {
-    // Relative URIs like `/path/{{ field }}` lack scheme and authority
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("/api/{{ tenant }}").unwrap();
-    let err = tpl.confine(&config, "http", "uri").unwrap_err();
-    let err_str = err.to_string();
-    assert!(
-        err_str.contains("authority"),
-        "Expected NoStaticUriAuthority for relative URI, got {:?}",
-        err_str
-    );
-}
-
-#[test]
-fn uri_template_confine_rejects_schemeless_uri() {
-    // Schemeless URIs like `//host/path` are not HTTP/HTTPS
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("//api.example.com/{{ tenant }}").unwrap();
-    let err = tpl.confine(&config, "http", "uri").unwrap_err();
-    let err_str = err.to_string();
-    assert!(
-        err_str.contains("authority"),
-        "Expected NoStaticUriAuthority for schemeless URI, got {:?}",
-        err_str
-    );
-}
-
-#[test]
-fn uri_template_confine_rejects_unsupported_scheme() {
-    // Non-HTTP(S) schemes like ftp:// must be rejected
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("ftp://files.example.com/{{ path }}").unwrap();
-    let err = tpl.confine(&config, "http", "uri").unwrap_err();
-    let err_str = err.to_string();
-    assert!(
-        err_str.contains("ftp"),
-        "Expected UnsupportedUriScheme for ftp://, got {:?}",
-        err_str
-    );
 }
 
 #[test]
@@ -1381,99 +1157,19 @@ fn uri_template_confine_accepts_strftime_only_path() {
     );
 }
 
-// Tests for static URI validation
-
-#[test]
-fn static_uri_template_rejects_ftp_scheme() {
-    // Static FTP URIs must be rejected even though there are no dynamic fields
+#[rstest]
+// Static URIs (no `{{ }}`) have fixed, operator-authored values — accepted
+// without a runtime checker, including query strings and fragments.
+#[case::http("http://api.example.com/path")]
+#[case::https("https://secure.example.com/api")]
+#[case::with_query("https://api.example.com/ingest?source=vector")]
+#[case::with_fragment("https://api.example.com/ingest#section")]
+fn static_uri_template_accepts_valid_uri(#[case] uri: &str) {
     let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("ftp://files.example.com/path").unwrap();
-    let err = tpl.confine(&config, "http", "uri").unwrap_err();
-    let err_str = err.to_string();
-    assert!(
-        err_str.contains("ftp"),
-        "Expected UnsupportedUriScheme error for ftp, got: {:?}",
-        err_str
-    );
-}
-
-#[test]
-fn static_uri_template_rejects_relative_path() {
-    // Static relative URIs (no scheme) must be rejected
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("/api/endpoint").unwrap();
-    let err = tpl.confine(&config, "http", "uri").unwrap_err();
-    let err_str = err.to_string();
-    assert!(
-        err_str.contains("authority") || err_str.contains("scheme"),
-        "Expected authority/scheme error for relative URI, got: {:?}",
-        err_str
-    );
-}
-
-#[test]
-fn static_uri_template_rejects_schemeless() {
-    // Static schemeless URIs (//host/path) must be rejected
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("//api.example.com/path").unwrap();
-    let err = tpl.confine(&config, "http", "uri").unwrap_err();
-    let err_str = err.to_string();
-    assert!(
-        err_str.contains("authority") || err_str.contains("scheme"),
-        "Expected authority/scheme error for schemeless URI, got: {:?}",
-        err_str
-    );
-}
-
-#[test]
-fn static_uri_template_accepts_valid_http() {
-    // Valid static HTTP URIs must be accepted (no checker needed)
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("http://api.example.com/path").unwrap();
-    let confined = tpl.confine(&config, "http", "uri").unwrap();
-    // Can still render the static value
-    let event = crate::event::Event::Log(vector_lib::event::LogEvent::from("x"));
-    assert_eq!(
-        confined.render_string(&event).unwrap(),
-        "http://api.example.com/path"
-    );
-}
-
-#[test]
-fn static_uri_template_accepts_valid_https() {
-    // Valid static HTTPS URIs must be accepted (no checker needed)
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("https://secure.example.com/api").unwrap();
-    let confined = tpl.confine(&config, "https", "uri").unwrap();
-    let event = crate::event::Event::Log(vector_lib::event::LogEvent::from("x"));
-    assert_eq!(
-        confined.render_string(&event).unwrap(),
-        "https://secure.example.com/api"
-    );
-}
-
-#[test]
-fn static_uri_template_retains_query_acceptance() {
-    // Static URIs with query strings must still be accepted
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("https://api.example.com/ingest?source=vector").unwrap();
-    let confined = tpl.confine(&config, "http", "uri").unwrap();
-    let event = crate::event::Event::Log(vector_lib::event::LogEvent::from("x"));
-    assert_eq!(
-        confined.render_string(&event).unwrap(),
-        "https://api.example.com/ingest?source=vector"
-    );
-}
-
-#[test]
-fn static_uri_template_retains_fragment_acceptance() {
-    // Static URIs with fragments must still be accepted
-    let config = ConfinementConfig::default();
-    let tpl = UriTemplate::try_from("https://api.example.com/ingest#section").unwrap();
-    let confined = tpl.confine(&config, "http", "uri").unwrap();
-    let event = crate::event::Event::Log(vector_lib::event::LogEvent::from("x"));
-    assert_eq!(
-        confined.render_string(&event).unwrap(),
-        "https://api.example.com/ingest#section"
-    );
+    let confined = UriTemplate::try_from(uri)
+        .unwrap()
+        .confine(&config, "http", "uri")
+        .unwrap();
+    let event = Event::Log(LogEvent::from("x"));
+    assert_eq!(confined.render_string(&event).unwrap(), uri);
 }
