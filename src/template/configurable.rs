@@ -130,10 +130,6 @@ impl UriTemplate {
         component_name: &'static str,
         field_name: &'static str,
     ) -> crate::Result<ConfinedUriTemplate> {
-        // Full opt-out: bypass all confinement for this template (startup AND
-        // runtime). The `vector_security_confinement_disabled` gauge is owned by
-        // the topology, not emitted here. Return ConfinedUriTemplate without a
-        // checker so the type is correct even when opting out.
         if config.dangerously_allow_unconfined_template_resolution {
             ConfinementConfig::warn_unconfined_template("sink", component_name, field_name);
             return Ok(ConfinedUriTemplate::new(ConfinedTemplate {

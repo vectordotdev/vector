@@ -70,10 +70,7 @@ impl ConfinedTemplate {
 /// A template confined via [`UriTemplate::confine`], for HTTP/HTTPS URI fields.
 ///
 /// The field is private to this module, so a `ConfinedUriTemplate` can only be
-/// obtained through [`UriTemplate::confine`] — a prefix-confined
-/// [`ConfinedTemplate`] can never be wired into a URI field. Rendering forwards
-/// to the inner [`ConfinedTemplate`], whose checker enforces URI-specific
-/// confinement at render time.
+/// obtained through [`UriTemplate::confine`].
 #[derive(Derivative, Clone, Display, PartialEq, Eq, Hash)]
 #[derivative(Debug = "transparent")]
 pub struct ConfinedUriTemplate(ConfinedTemplate);

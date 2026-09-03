@@ -164,20 +164,12 @@ pub(crate) enum ConfineError {
 
 /// Confinement checker stored on a [`Template`] at build time.
 ///
-/// Use [`ConfinementChecker::for_prefix_template`] for non-URI fields (object-store
-/// keys, Kafka topics, Redis keys, tenant IDs) and [`ConfinementChecker::for_uri_template`]
-/// for HTTP/HTTPS URI fields. The checker type is determined by caller intent, not by
-/// inspecting template content.
-///
-/// Common guards (NUL bytes, length limit) run at render time before dispatching
-/// to the specific checker.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ConfinementChecker {
     Prefix(PrefixChecker),
     // Boxed so the checker stays small: `UriChecker` carries several strings,
     // and `ConfinedTemplate` embeds this enum, which in turn is embedded in
-    // sink configs (e.g. `ElasticsearchCommonMode`). Keeping the variant small
-    // avoids `clippy::large_enum_variant` on those config enums.
+    // sink configs.
     Uri(Box<UriChecker>),
 }
 
