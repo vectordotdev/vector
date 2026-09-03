@@ -474,15 +474,14 @@ Datadog egress, in order:
 
 The result is one entry per non-`Null` key in exactly one wire partition.
 
-**`dd_value_to_string` rule.** Wherever a Datadog `map<string, string>` wire field
-requires every `AttrValue` to be coerced to a plain `String`, `String` is emitted
-verbatim and `Bytes` as its UTF-8 lossy string. `Bool`, `Int`, and finite `Double` use
-their JSON scalar spelling; non-finite doubles use `"NaN"`, `"Infinity"`, and
-`"-Infinity"`. `Array` and `Map` use deterministic JSON with recursively sorted map
-keys, lossy UTF-8 for bytes, the same quoted strings for non-finite doubles, and JSON
-`null` for nested nulls. Top-level `Null` map entries are filtered out because the wire
-map has no representation for "key present, value absent," and are reported. These rules
-are total and do not depend on a JSON library's non-finite-number behavior.
+**`dd_value_to_string` rule.** Several Datadog wire fields are `map<string, string>` and
+therefore require every `AttrValue` to be coerced to a plain `String`. All of them use
+one shared coercion, named `dd_value_to_string` throughout this document, which is total
+over every `AttrValue` variant, deterministic for a given value (including recursive
+ordering within `Array` and `Map`), and independent of any JSON library's non-finite-number
+behavior. A top-level `Null` map entry has no wire representation, so it is omitted and
+reported rather than coerced. The specific rendering of each variant is an implementation
+choice satisfying those properties.
 
 #### Datadog event-scoped state
 
@@ -536,14 +535,8 @@ When `Span.datadog.span_type` is `None` on Datadog egress (the normal case for O
 spans), the sink derives the wire `Span.type` from `Span.kind` and `Span.attributes`,
 following the Datadog Agent's
 [`SpanKind2Type`](https://github.com/DataDog/datadog-agent/blob/main/pkg/trace/transform/otelutil.go)
-logic:
-
-- `Server` -> `"web"`.
-- `Client` -> `"db"` if `db.system` attribute names a database system other than
-  `redis` or `memcached`; `"cache"` if `db.system` is `redis` or `memcached`; `"http"`
-  otherwise.
-- All other kinds (`Internal`, `Producer`, `Consumer`, `Unspecified`, `Other`) ->
-  `"custom"`.
+logic. Per the deferral above, the individual kind-to-type cases track that upstream
+reference and are not fixed by this document.
 
 If `Span.datadog.span_type` is `Some(v)`, the value is emitted as-is (Datadog-sourced spans
 carry it directly). Because Datadog has no span-kind wire field, `Span.kind` is always
