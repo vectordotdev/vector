@@ -1,15 +1,15 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::commands::release::generate_cue;
 use crate::utils::{command::run_command, git, paths};
+use crate::{app::CommandExt as _, commands::release::generate_cue};
 use anyhow::{Context, Result, anyhow, bail};
 use chrono::Utc;
-use semver::Version;
+use semver::{Prerelease, Version};
 use std::{
     env, fs,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 use toml_edit::DocumentMut;
 
@@ -31,9 +31,6 @@ pub struct Cli {
     /// The new VRL version.
     #[arg(long)]
     vrl_version: Version,
-    /// The development version to use after this release, for example `0.60.0-dev`.
-    #[arg(long)]
-    next_version: Version,
     /// Optional: The Alpine version to use in `distribution/docker/alpine/Dockerfile`.
     /// You can find the latest version here: <https://alpinelinux.org/releases/>.
     #[arg(long)]
@@ -63,25 +60,23 @@ struct Prepare {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        if !self.version.pre.is_empty() {
-            bail!("release version must not contain a prerelease suffix");
+        if !self.version.pre.is_empty() || !self.version.build.is_empty() {
+            bail!("release version must be a stable semantic version");
         }
-        if self.next_version.pre.as_str() != "dev" {
-            bail!("next version must use the `-dev` prerelease suffix");
+        if !self.vrl_version.pre.is_empty() || !self.vrl_version.build.is_empty() {
+            bail!("VRL version must be a stable semantic version");
         }
-        if self.next_version <= self.version {
-            bail!("next version must be newer than the release version");
-        }
+        let next_vector_version = next_minor_development_version(&self.version)?;
 
         let repo_root = paths::find_repo_root()?;
         env::set_current_dir(&repo_root)?;
 
         let prepare = Prepare {
             new_vector_version: self.version.clone(),
-            next_vector_version: self.next_version,
+            next_vector_version,
             vrl_version: self.vrl_version,
-            alpine_version: self.alpine_version,
-            debian_version: self.debian_version,
+            alpine_version: self.alpine_version.filter(|version| !version.is_empty()),
+            debian_version: self.debian_version.filter(|version| !version.is_empty()),
             repo_root,
             latest_vector_version: git::latest_release_version()?,
             release_branch: format!("v{}.{}", self.version.major, self.version.minor),
@@ -120,6 +115,11 @@ impl Prepare {
 
         self.update_vector_version(&self.repo_root.join(KUBECLT_CUE_FILE))?;
         self.update_vector_version(&self.repo_root.join(INSTALL_SCRIPT))?;
+
+        Command::new("cargo")
+            .args(["metadata", "--locked", "--no-deps", "--format-version", "1"])
+            .stdout(Stdio::null())
+            .check_run()?;
 
         if !self.dry_run {
             self.open_release_pr()?;
@@ -399,7 +399,7 @@ fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result
     Ok(doc.to_string())
 }
 
-fn update_vector_package_version(
+pub(super) fn update_vector_package_version(
     cargo_toml_contents: &str,
     expected_version: &str,
     release_version: &str,
@@ -417,6 +417,16 @@ fn update_vector_package_version(
 
     doc["package"]["version"] = toml_edit::value(release_version);
     Ok(doc.to_string())
+}
+
+pub(super) fn next_minor_development_version(version: &Version) -> Result<Version> {
+    let minor = version
+        .minor
+        .checked_add(1)
+        .context("minor version overflow")?;
+    let mut next = Version::new(version.major, minor, 0);
+    next.pre = Prerelease::new("dev")?;
+    Ok(next)
 }
 
 fn format_vrl_changelog_block(changelog: &str) -> String {
@@ -508,8 +518,8 @@ fn get_vrl_changelog(version: &Version) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use crate::commands::release::prepare::{
-        format_vrl_changelog_block, insert_block_after_changelog, update_vector_package_version,
-        update_vrl_to_version,
+        format_vrl_changelog_block, insert_block_after_changelog, next_minor_development_version,
+        update_vector_package_version, update_vrl_to_version,
     };
     use indoc::indoc;
 
@@ -555,6 +565,15 @@ mod tests {
             error
                 .to_string()
                 .contains("expected package version 0.58.0-dev")
+        );
+    }
+
+    #[test]
+    fn test_next_minor_development_version() {
+        let release = "0.59.3".parse().expect("valid version");
+        assert_eq!(
+            next_minor_development_version(&release).expect("next version"),
+            "0.60.0-dev".parse().expect("valid version")
         );
     }
 

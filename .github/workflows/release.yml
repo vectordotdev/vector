@@ -13,7 +13,7 @@ jobs:
   preflight:
     name: Validate release tag
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: read
@@ -27,40 +27,22 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          rust: true
+          vdev: false
+
       - name: Validate release metadata
         id: metadata
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          version=${GITHUB_REF_NAME#v}
-          cargo_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
-          [[ "$cargo_version" == "$version" ]]
-          jq -e \
-            --arg version "$version" \
-            '.schema_version == 1 and
-             .status == "prepared" and
-             .version == $version and
-             (.prepared_from | test("^[0-9a-f]{40}$")) and
-             (.next_version | test("^[0-9]+\\.[0-9]+\\.[0-9]+-dev$"))' \
-            .github/release-metadata.json >/dev/null
-
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
-            echo "Tagged release commit $GITHUB_SHA is not on master" >&2
-            exit 1
-          fi
-
-          pr_count=$(gh api \
-            "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
-            --jq "[.[] | select(.merged_at != null and .base.ref == \"master\" and .head.ref == \"release/prepare-v${version}\" and .head.repo.full_name == \"${GITHUB_REPOSITORY}\" and .merge_commit_sha == \"${GITHUB_SHA}\")] | length")
-          if [[ "$pr_count" != "1" ]]; then
-            echo "Expected one merged preparation PR for $GITHUB_SHA, found $pr_count" >&2
-            exit 1
-          fi
-
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "next_version=$(jq -r '.next_version' .github/release-metadata.json)" >> "$GITHUB_OUTPUT"
+        run: >-
+          cargo vdev release workflow publication-check
+          --tag "$GITHUB_REF_NAME"
+          --sha "$GITHUB_SHA"
+          --repository "$GITHUB_REPOSITORY"
 
   Release:
     needs: preflight
@@ -78,7 +60,7 @@ jobs:
     name: Open post-release housekeeping PR
     needs: [preflight, Release]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Create Vector bot token
         id: app-token
@@ -96,139 +78,48 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          rust: true
+          vdev: false
+
       - name: Validate housekeeping state
         id: preflight
         env:
-          BOT_APP: ${{ steps.app-token.outputs.app-slug }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          VERSION: ${{ needs.preflight.outputs.version }}
-          NEXT_VERSION: ${{ needs.preflight.outputs.next_version }}
-        run: |
-          set -euo pipefail
+        run: >-
+          cargo vdev release workflow housekeeping-check
+          --version "${{ needs.preflight.outputs.version }}"
+          --release-commit "$GITHUB_SHA"
+          --bot-app "${{ steps.app-token.outputs.app-slug }}"
+          --repository "$GITHUB_REPOSITORY"
 
-          current=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
-          version_is_newer() {
-            local candidate=$1
-            local baseline=$2
-            [[ "$candidate" != "$baseline" ]] &&
-              [[ "$(printf '%s\n%s\n' "$baseline" "$candidate" | sort -V | tail -1)" == "$candidate" ]]
-          }
+      - name: Create housekeeping branch
+        if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.skip_change != 'true'
+        run: git switch -c "release/housekeeping-v${{ needs.preflight.outputs.version }}"
 
-          if [[ "$current" == "$NEXT_VERSION" ]] && \
-             jq -e --arg version "$VERSION" \
-               '.status == "development" and .last_release.version == $version' \
-               .github/release-metadata.json >/dev/null; then
-            echo "Housekeeping for v${VERSION} is already merged."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+      - name: Generate housekeeping change
+        if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.skip_change != 'true'
+        run: >-
+          cargo vdev release workflow housekeeping-prepare
+          --version "${{ needs.preflight.outputs.version }}"
+          --release-commit "$GITHUB_SHA"
 
-          if [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev$ ]]; then
-            last_release=$(jq -r '.last_release.version // empty' .github/release-metadata.json)
-            if jq -e --arg current "$current" \
-                 '.status == "development" and .version == $current' \
-                 .github/release-metadata.json >/dev/null && \
-               [[ "$last_release" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && \
-               version_is_newer "$last_release" "$VERSION"; then
-              echo "Master has advanced past v${VERSION}; housekeeping is no longer needed."
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          elif [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && \
-               version_is_newer "$current" "$VERSION" && \
-               jq -e --arg current "$current" \
-                 '.status == "prepared" and
-                  .version == $current and
-                  (.prepared_from | test("^[0-9a-f]{40}$"))' \
-                 .github/release-metadata.json >/dev/null; then
-            echo "Master is preparing a release after v${VERSION}; housekeeping is no longer needed."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [[ "$current" != "$VERSION" ]]; then
-            echo "Expected master version $VERSION, found $current" >&2
-            exit 1
-          fi
-          jq -e --arg version "$VERSION" \
-            '.status == "prepared" and .version == $version' \
-            .github/release-metadata.json >/dev/null
-
-          branch="release/housekeeping-v${VERSION}"
-          existing=$(gh pr list \
-            --repo "$GITHUB_REPOSITORY" \
-            --head "$branch" \
-            --base master \
-            --app "$BOT_APP" \
-            --state open \
-            --json isCrossRepository,url \
-            --jq '[.[] | select(.isCrossRepository == false)][0].url // empty')
-          if [[ -n "$existing" ]]; then
-            echo "Housekeeping PR already exists: $existing"
-            {
-              echo "skip=false"
-              echo "skip_change=true"
-              echo "pr_url=$existing"
-            } >> "$GITHUB_OUTPUT"
-            echo "Existing housekeeping PR: $existing" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
-            echo "Branch $branch exists without an open PR" >&2
-            exit 1
-          fi
-
-          {
-            echo "skip=false"
-            echo "skip_change=false"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Create housekeeping change
+      - name: Commit housekeeping change
         if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.skip_change != 'true'
         env:
-          VERSION: ${{ needs.preflight.outputs.version }}
           NEXT_VERSION: ${{ needs.preflight.outputs.next_version }}
         run: |
-          set -euo pipefail
-
-          git switch -c "release/housekeeping-v${VERSION}"
-          perl -0pi -e \
-            's/^version = "[^"]+"/version = "$ENV{NEXT_VERSION}"/m' \
-            Cargo.toml
-          perl -0pi -e \
-            's{^vrl = \{\s*(.*?)\s*,\s*version = "[^"]+"\s*\}$}{vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", $1 }}m' \
-            Cargo.toml
-          grep -Fq 'vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main",' Cargo.toml
-          if grep -Eq '^vrl = .*version = ' Cargo.toml; then
-            echo "Failed to restore the VRL main-branch dependency" >&2
-            exit 1
-          fi
-          cargo update -p vector
-          cargo update -p vrl
-
-          jq -n \
-            --arg version "$NEXT_VERSION" \
-            --arg released_version "$VERSION" \
-            --arg tag "v${VERSION}" \
-            --arg commit "$GITHUB_SHA" \
-            '{
-              schema_version: 1,
-              status: "development",
-              version: $version,
-              last_release: {
-                version: $released_version,
-                tag: $tag,
-                commit: $commit
-              }
-            }' > .github/release-metadata.json
-
-          cargo metadata --locked --no-deps --format-version 1 >/dev/null
           git config user.name "vectordotdev-bot[bot]"
           git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
           git add Cargo.toml Cargo.lock .github/release-metadata.json
           git commit -m "chore(releasing): begin ${NEXT_VERSION}"
-          git push --set-upstream origin "release/housekeeping-v${VERSION}"
+
+      - name: Push housekeeping branch
+        if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.skip_change != 'true'
+        run: git push --set-upstream origin "release/housekeeping-v${{ needs.preflight.outputs.version }}"
 
       - name: Open and enable auto-merge for housekeeping PR
         if: steps.preflight.outputs.skip != 'true'

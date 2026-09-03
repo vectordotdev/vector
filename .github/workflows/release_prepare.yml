@@ -7,10 +7,6 @@ on:
         description: Stable Vector version to prepare, for example 0.59.0
         required: true
         type: string
-      next_version:
-        description: Development version for housekeeping, for example 0.60.0-dev
-        required: true
-        type: string
       vrl_version:
         description: Released VRL version to pin, for example 0.28.0
         required: true
@@ -53,65 +49,24 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
+      - name: Set up release tooling
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          cue: true
+          rust: true
+          vdev: false
+
       - name: Validate requested release
         id: preflight
         env:
-          BOT_APP: ${{ steps.app-token.outputs.app-slug }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          VERSION: ${{ inputs.version }}
-          NEXT_VERSION: ${{ inputs.next_version }}
-          VRL_VERSION: ${{ inputs.vrl_version }}
-        run: |
-          set -euo pipefail
-
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          [[ "$NEXT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev$ ]]
-          [[ "$VRL_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-
-          current=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
-          if [[ "$current" != "${VERSION}-dev" ]]; then
-            echo "Expected Cargo.toml version ${VERSION}-dev, found $current" >&2
-            exit 1
-          fi
-
-          jq -e --arg version "$current" \
-            '.schema_version == 1 and .status == "development" and .version == $version' \
-            .github/release-metadata.json >/dev/null
-
-          if git rev-parse --verify --quiet "refs/tags/v${VERSION}"; then
-            echo "Tag v${VERSION} already exists" >&2
-            exit 1
-          fi
-
-          branch="release/prepare-v${VERSION}"
-          existing=$(gh pr list \
-            --repo "$GITHUB_REPOSITORY" \
-            --head "$branch" \
-            --base master \
-            --app "$BOT_APP" \
-            --state open \
-            --json isCrossRepository,url \
-            --jq '[.[] | select(.isCrossRepository == false)][0].url // empty')
-          if [[ -n "$existing" ]]; then
-            echo "Preparation PR already exists: $existing"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Existing preparation PR: $existing" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
-            echo "Branch $branch exists without an open PR" >&2
-            exit 1
-          fi
-
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-
-      - name: Set up release tooling
-        if: steps.preflight.outputs.skip != 'true'
-        uses: ./.github/actions/setup
-        with:
-          cue: true
-          vdev: true
+        run: >-
+          cargo vdev release workflow prepare-check
+          --version "${{ inputs.version }}"
+          --vrl-version "${{ inputs.vrl_version }}"
+          --bot-app "${{ steps.app-token.outputs.app-slug }}"
+          --repository "$GITHUB_REPOSITORY"
 
       - name: Configure Git
         if: steps.preflight.outputs.skip != 'true'
@@ -123,30 +78,13 @@ jobs:
         if: steps.preflight.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          VERSION: ${{ inputs.version }}
-          NEXT_VERSION: ${{ inputs.next_version }}
-          VRL_VERSION: ${{ inputs.vrl_version }}
-          ALPINE_VERSION: ${{ inputs.alpine_version }}
-          DEBIAN_VERSION: ${{ inputs.debian_version }}
-        run: |
-          set -euo pipefail
-
-          args=(
-            release prepare
-            --version "$VERSION"
-            --next-version "$NEXT_VERSION"
-            --vrl-version "$VRL_VERSION"
-            --dry-run
-          )
-          if [[ -n "$ALPINE_VERSION" ]]; then
-            args+=(--alpine-version "$ALPINE_VERSION")
-          fi
-          if [[ -n "$DEBIAN_VERSION" ]]; then
-            args+=(--debian-version "$DEBIAN_VERSION")
-          fi
-
-          cargo vdev "${args[@]}"
-          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+        run: >-
+          cargo vdev release prepare
+          --version "${{ inputs.version }}"
+          --vrl-version "${{ inputs.vrl_version }}"
+          --alpine-version "${{ inputs.alpine_version }}"
+          --debian-version "${{ inputs.debian_version }}"
+          --dry-run
 
       - name: Push preparation branch
         if: steps.preflight.outputs.skip != 'true'
@@ -159,7 +97,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ inputs.version }}
-          NEXT_VERSION: ${{ inputs.next_version }}
+          NEXT_VERSION: ${{ steps.preflight.outputs.next_version }}
           VRL_VERSION: ${{ inputs.vrl_version }}
         run: |
           set -euo pipefail
