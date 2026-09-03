@@ -69,8 +69,8 @@ pub(crate) enum BuildError {
 
     #[snafu(display(
         "HTTP/HTTPS template {prefix:?} has a `{{{{ field }}}}` reference inside \
-         the authority (host) component: the static prefix does not contain a \
-         `/` after the host, so the rendered host is partly event-controlled. \
+         the authority (host) component: the static prefix has no `/`, `?`, or \
+         `#` after the host, so the rendered host is partly event-controlled. \
          Add a `/` after the static host in your URI template, or set \
          `dangerously_allow_unconfined_template_resolution: true` to opt out."
     ))]
@@ -505,16 +505,20 @@ impl UriChecker {
             });
         }
         // `http::Uri` normalises a missing path to `"/"`, so `uri.path()` can't
-        // tell us whether the prefix actually had a `/` closing off the host. Check
-        // the raw prefix instead: no `/` after `://` means the `{{ field }}`
-        // reference sits inside (or extends) the authority we just parsed.
+        // tell us whether the prefix actually had a `/` closing off the host.
+        // Check the raw prefix instead: none of `/`, `?`, or `#` after `://`
+        // means the authority runs to the end of the static prefix, so a
+        // `{{ field }}` reference (or a strftime directive) sits inside (or
+        // extends) the authority we just parsed. `?` and `#` terminate the
+        // authority just as `/` does (RFC 3986), so pathless URIs like
+        // `https://logs.example.com?date=%Y-%m-%d` carry a static authority.
         let after_scheme = prefix
             .split_once("://")
             .map(|(_, rest)| rest)
             .ok_or_else(|| BuildError::NoStaticUriAuthority {
                 prefix: prefix.to_string(),
             })?;
-        if !after_scheme.contains('/') {
+        if !after_scheme.contains(['/', '?', '#']) {
             return Err(BuildError::PartialUriAuthority {
                 prefix: prefix.to_string(),
             });

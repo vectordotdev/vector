@@ -1001,6 +1001,94 @@ fn uri_template_with_strftime_fragment_rejects_fragment_escape() {
 }
 
 #[test]
+fn uri_template_with_strftime_query_on_pathless_uri_builds_and_renders() {
+    // A URI with no explicit `/` after the host — `?` terminates the static
+    // authority just as `/` does — must build and render, not fail with
+    // `PartialUriAuthority`.
+    let ts = Utc
+        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+        .single()
+        .expect("invalid timestamp");
+    let mut event = Event::Log(LogEvent::from("x"));
+    event
+        .as_mut_log()
+        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
+
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://logs.example.com?date=%Y-%m-%d").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://logs.example.com?date=2001-02-03"
+    );
+    // Runtime confinement still applies to the authority and query prefix.
+    assert!(
+        confined
+            .check_confinement("https://other.example.com?date=2001-02-03")
+            .is_err()
+    );
+    assert!(
+        confined
+            .check_confinement("https://logs.example.com?other=2001-02-03")
+            .is_err()
+    );
+}
+
+#[test]
+fn uri_template_with_strftime_fragment_on_pathless_uri_builds_and_renders() {
+    // Same as the query case, but with a fragment terminating the authority.
+    let ts = Utc
+        .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+        .single()
+        .expect("invalid timestamp");
+    let mut event = Event::Log(LogEvent::from("x"));
+    event
+        .as_mut_log()
+        .insert(log_schema().timestamp_key_target_path().unwrap(), ts);
+
+    let config = ConfinementConfig::default();
+    let tpl = UriTemplate::try_from("https://logs.example.com#date-%Y-%m-%d").unwrap();
+    let confined = tpl.confine(&config, "http", "uri").unwrap();
+
+    assert_eq!(
+        confined.render_string(&event).unwrap(),
+        "https://logs.example.com#date-2001-02-03"
+    );
+    assert!(
+        confined
+            .check_confinement("https://other.example.com#date-2001-02-03")
+            .is_err()
+    );
+}
+
+#[test]
+fn pathless_uri_with_field_extending_authority_still_rejected() {
+    // A field reference extending the host with no `/`, `?`, or `#` after it
+    // still leaves the authority unterminated — must stay rejected.
+    for template_str in &[
+        "https://api.internal{{ path }}",
+        "https://tenant.{{ env }}.example.com",
+    ] {
+        let tpl = Template::try_from(*template_str).unwrap();
+        assert!(
+            matches!(
+                ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
+                BuildError::PartialUriAuthority { .. }
+            ),
+            "expected PartialUriAuthority for {template_str}"
+        );
+    }
+
+    // Field references mixed with a query hit the stricter build-time check.
+    let tpl = Template::try_from("https://api.internal{{ path }}?date=x").unwrap();
+    assert!(matches!(
+        ConfinementChecker::for_uri_template(&tpl).unwrap_err(),
+        BuildError::DynamicUriQueryOrFragment { .. }
+    ));
+}
+
+#[test]
 fn prefix_template_with_leading_strftime_and_fields_rejected() {
     // A template whose FIRST component is strftime AND that references
     // event fields has no literal prefix to confine to, and does contain
