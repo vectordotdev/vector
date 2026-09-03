@@ -432,6 +432,18 @@ impl ChunkedGelfDecoder {
 
         // A lone chunk is already complete, but it cannot reuse the ID of a pending message.
         if total_chunks == 1 {
+            if chunk_len > self.max_length {
+                return Err(ChunkedGelfDecoderError::MaxLengthExceed {
+                    message_id,
+                    sequence_number,
+                    length: chunk_len,
+                    max_length: self.max_length,
+                });
+            }
+
+            // Copy before taking the shared-state lock, then keep the lock from the ID check
+            // through return so another decoder clone cannot insert this ID between them.
+            let chunk = Bytes::copy_from_slice(&chunk);
             let pending = self.state.lock().expect("poisoned lock");
             if let Some(message_state) = pending.messages.get(&message_id) {
                 return Err(ChunkedGelfDecoderError::TotalChunksMismatch {
@@ -441,17 +453,7 @@ impl ChunkedGelfDecoder {
                     received_total_chunks: total_chunks,
                 });
             }
-            drop(pending);
-
-            if chunk_len > self.max_length {
-                return Err(ChunkedGelfDecoderError::MaxLengthExceed {
-                    message_id,
-                    sequence_number,
-                    length: chunk_len,
-                    max_length: self.max_length,
-                });
-            }
-            return Ok(Some(Bytes::copy_from_slice(&chunk)));
+            return Ok(Some(chunk));
         }
 
         let mut pending = self.state.lock().expect("poisoned lock");
