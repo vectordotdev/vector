@@ -3,9 +3,7 @@
   "allOf": [
     {
       "type": "object",
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "properties": {
         "extra": {
           "oneOf": [
@@ -34,9 +32,7 @@
       "anyOf": [
         {
           "not": {
-            "required": [
-              "type"
-            ]
+            "required": ["type"]
           }
         },
         {
@@ -55,10 +51,7 @@
       "oneOf": [
         {
           "type": "object",
-          "required": [
-            "type",
-            "value"
-          ],
+          "required": ["type", "value"],
           "properties": {
             "type": {
               "const": "Foo",
@@ -80,10 +73,7 @@
         },
         {
           "type": "object",
-          "required": [
-            "count",
-            "type"
-          ],
+          "required": ["count", "type"],
           "properties": {
             "count": {
               "type": "integer",

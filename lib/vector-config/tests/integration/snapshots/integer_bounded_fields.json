@@ -1,11 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2019-09/schema",
   "type": "object",
-  "required": [
-    "float",
-    "small",
-    "unsigned"
-  ],
+  "required": ["float", "small", "unsigned"],
   "properties": {
     "float": {
       "type": "number",
