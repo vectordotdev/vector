@@ -463,14 +463,19 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 					max_length: {
 						description: """
 																The maximum length of a single GELF message, in bytes. Messages longer than this length are
-																dropped. If this option is not set, the decoder does not limit the length of messages and
-																the per-message memory is unbounded.
+																dropped.
 
 																**Note**: A message can be composed of multiple chunks, and this limit applies to the whole
 																message, not to individual chunks.
 
 																This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
 																The message payload is the concatenation of all chunk payloads.
+
+																**Note**: The decoder also caps the payload buffered across *all* incomplete messages
+																at 128 MiB, so no chunked message can exceed that whatever this is set to.
+
+																An unchunked message is never buffered, so neither limit applies to it; its size is
+																bounded by whatever the source accepts as one frame.
 																"""
 						required: false
 						type: uint: {}
@@ -479,8 +484,11 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 						description: """
 																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
 																dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
-																If this option is not set, the decoder does not limit the number of pending messages and the memory usage
-																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
+
+																Chunks belonging to messages that are already pending are still accepted once the limit is
+																reached, so in-flight messages can complete.
+
+																**Note**: The decoder caps this at 4096 internally. Higher values do not raise it.
 																"""
 						required: false
 						type: uint: {}
