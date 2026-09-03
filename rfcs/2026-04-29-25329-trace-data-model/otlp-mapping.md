@@ -42,12 +42,10 @@ parent RFC's `AttrValue`.
 - The 1:1 mapping between `AttrValue` variants and OTLP's `string_value` / `bytes_value` /
   `int_value` / `bool_value` / `double_value` / `array_value` / `kvlist_value` (with unset
   oneof representing `AttrValue::Null`).
-- Synthesis on OTLP egress (and lift on OTLP ingress) of Datadog-native contexts into
-  reserved resource attributes (`datadog.agent`, `datadog.tracer.tags`) and span
-  attributes (`datadog.chunk.priority`, `datadog.chunk.origin`,
-  `datadog.chunk.dropped`, `datadog.chunk.tags`, `datadog.span.resource`,
-  `datadog.span.type`, `datadog.span.meta_struct`) for best-effort cross-format relay;
-  the keys are defined here and their contents are specified by the Datadog sub-RFC.
+- Reservation of the `datadog.` attribute-key prefix at the OTLP wire boundary, at both
+  resource and span scope, for synthesis on OTLP egress and lift on OTLP ingress of the
+  Datadog-native contexts, for best-effort cross-format relay. This sub-RFC reserves the
+  prefix while the Datadog sub-RFC specifies the context values those keys carry.
 - The OTLP mapping targets fields at the OpenTelemetry
   [`Stable`](https://opentelemetry.io/docs/specs/otel/versioning-and-stability/)
   stability tier or higher.
@@ -70,13 +68,10 @@ below.
   `deployment.environment.name` on OTLP egress. If both keys are present on ingress, the
   deprecated value is dropped (the stable key wins). See the deprecated-environment
   paragraph under Implementation.
-- **Reserved cross-format OTLP attributes** (`datadog.agent`,
-  `datadog.tracer.tags`, `datadog.chunk.*`, `datadog.span.resource`,
-  `datadog.span.type`, `datadog.span.meta_struct`): lifted into typed
-  `TraceEvent.datadog` / `Span.datadog` slots on OTLP ingress and stripped;
-  synthesized from those slots on OTLP egress, removing or replacing any existing
-  common attribute at the same key. The Datadog sub-RFC specifies the contents these
-  keys carry; this sub-RFC reserves them.
+- **Reserved cross-format OTLP attributes** under the `datadog.` prefix are lifted into
+  the typed `TraceEvent.datadog` / `Span.datadog` slots on OTLP ingress and stripped,
+  then synthesized from those slots on OTLP egress, removing or replacing any existing
+  common attribute at the same key.
 - **OTLP fields at `Development` or `Alpha` stability tier** are dropped on OTLP ingress.
 - **`Span.end_time_unix_nano < start_time_unix_nano`** is clamped to zero duration on
   ingress and reported. The egress reconstruction emits
@@ -156,11 +151,10 @@ contract.
 | `Span.status.{code,message}` (see status)                          | `Span.status.{code,message}`                  |
 | `Span.dropped_*_count`                                             | `Span.dropped_*_count`                        |
 
-Reserved bridge attributes are exceptions to the generic attribute rows:
-resource-level `datadog.agent` / `datadog.tracer.tags` lift into
-`TraceEvent.datadog`, while span-level `datadog.chunk.*` / `datadog.span.*` lift
+Attributes under the reserved `datadog.` prefix are exceptions to the generic attribute
+rows: resource-level keys lift into `TraceEvent.datadog`, while span-level keys lift
 into `TraceEvent.datadog.chunk` or `Span.datadog`. The bridge section below defines
-the exact paths and types.
+that reservation.
 
 On OTLP egress, `TraceEvent`s sharing a `Resource` (including `Resource.schema_url`) and
 the same resource-level Datadog bridge projection are gathered into one
@@ -323,75 +317,40 @@ bytes differ:
 #### Reserved OTLP bridge keys for Datadog-native state
 
 The generic `AttrValue` -> `AnyValue` mapping does not carry the separate Datadog
-contexts through OTLP. The OTLP sink therefore synthesizes them under reserved
-`datadog.*` keys, and OTLP ingress lifts the same keys into typed contexts and strips
-them from the common attribute maps.
+contexts through OTLP. This mapping therefore reserves the `datadog.` attribute-key
+prefix at the OTLP wire boundary: OTLP egress synthesizes the typed Datadog contexts
+under reserved keys, and OTLP ingress lifts those keys back into the typed contexts
+and strips them from the common attribute maps. The agent envelope and tracer tags are
+event-scoped and use `Resource.attributes`; chunk state and Datadog-native span fields
+use `Span.attributes`.
 
-Resource-level keys:
+The contract is:
 
-- `Resource.attributes."datadog.agent"` -- carries
-  `TraceEvent.datadog.agent` as a `kvlist_value`. A present envelope emits the outer
-  object even when all members are default-valued, preserving `Some(Default)` versus
-  `None`. Members are `host_name`, `env`, `agent_version` (`string_value`);
-  `target_tps`, `error_tps` (`double_value`); `rare_sampler_enabled` (`bool_value`);
-  and `tags` (`kvlist_value`).
-- `Resource.attributes."datadog.tracer.tags"` -- carries
-  `TraceEvent.datadog.tracer.tags` as a `kvlist_value`; omitted when empty.
+- The typed namespace is the single source of truth on egress. A common attribute at a
+  reserved key is removed and replaced when the typed value requires emission; the
+  removal saturating-increments the corresponding emitted dropped count and is
+  reported. Ingress lifting and stripping ensures OTLP egress through the same Vector
+  emits each value once.
+- A reserved key or nested member that is malformed -- wrong `AnyValue` variant,
+  unrecognized member, or out-of-domain value -- is stripped without populating the
+  typed slot, saturating-increments the enclosing item's `dropped_attributes_count`,
+  and is reported. Valid siblings continue to lift.
+- Ordinary `_dd.*` resource and span attributes are not reserved, carry no
+  Datadog-native meaning, and never acquire Datadog egress authority from their
+  spelling.
+- Recovery of Datadog state through these keys is best-effort and is explicitly outside
+  the OTLP round-trip guarantee.
 
-Span-level keys:
+One consequence not derivable from the rules above:
+`datadog.chunk.priority` is emitted whenever the typed priority is `Some`, including
+`AutoReject` (wire `0`). Omitting `0` as a proto3 default would make an explicit reject
+indistinguishable from a missing priority after an OTLP hop, and Datadog egress of a
+missing priority is `AutoKeep`, so the round trip would invert the sampling decision.
 
-- `Span.attributes."datadog.chunk.priority"` -- carries
-  `TraceEvent.datadog.chunk.priority` as `int_value` (the integer-form
-  `SamplingPriority` wire value).
-- `Span.attributes."datadog.chunk.origin"` -- carries
-  `TraceEvent.datadog.chunk.origin` as `string_value`.
-- `Span.attributes."datadog.chunk.dropped"` -- carries
-  `TraceEvent.datadog.chunk.dropped` as `bool_value`; omitted when `false`.
-- `Span.attributes."datadog.chunk.tags"` -- carries
-  `TraceEvent.datadog.chunk.tags` as a `kvlist_value`; omitted when empty.
-- `Span.attributes."datadog.span.resource"` -- carries
-  `Span.datadog.resource_name` as `string_value`.
-- `Span.attributes."datadog.span.type"` -- carries
-  `Span.datadog.span_type` as `string_value`.
-- `Span.attributes."datadog.span.meta_struct"` -- carries
-  `Span.datadog.meta_struct` as a `kvlist_value` whose entries are `bytes_value`;
-  omitted when empty.
-
-On ingress, a reserved key is lifted only when its `AnyValue` uses the exact outer
-variant listed above. Within `datadog.agent`, recognized members of the wrong type use
-their typed defaults and are reported; unknown members are ignored and reported, while
-valid siblings are retained. Within `datadog.span.meta_struct`, a non-`bytes_value`
-entry is dropped and reported. `datadog.chunk.priority` additionally requires its
-`int_value` to fit the internal sampling-priority discriminator domain. A malformed
-resource-level key saturating-increments `Resource.dropped_attributes_count`; a
-malformed span-level key or nested member saturating-increments
-`Span.dropped_attributes_count`. The reserved attribute is stripped in every case, and
-valid sibling keys continue to lift.
-
-Chunk keys are synthesized only when `TraceEvent.datadog.chunk` is `Some`. Optional or
-default-valued fields within that context are omitted, except `datadog.chunk.priority`:
-that key is emitted whenever `priority` is `Some`, including `AutoReject` (wire `0`).
-Omitting `0` as a proto3 default would make an explicit reject indistinguishable from a
-missing priority after an OTLP hop, and Datadog egress of a missing priority is
-`AutoKeep`. An all-default `Some` with `priority = None` therefore still emits no chunk
-keys and re-ingests as `None`; preserving Datadog chunk presence through
-an OTLP hop is part of the explicitly best-effort cross-format path, not the OTLP
-round-trip guarantee. Optional span fields are likewise omitted when `None`.
-
-On OTLP egress, the typed namespace is the single source of truth for every reserved
-key. Any common attribute at the same key is removed and replaced only when the typed
-value requires emission. Removing a conflicting resource or span attribute
-saturating-increments the corresponding emitted dropped count and is reported. On
-ingress, lifting and stripping ensures that OTLP egress through the same Vector emits
-each value once. Cross-format recovery via these keys is best-effort and is explicitly
-outside the OTLP round-trip guarantee.
-
-For per-span chunk-context recovery on OTLP ingress, spans within the same `ScopeSpans`
-typically share chunk-context values. If they carry conflicting values for the same
-`datadog.chunk.*` key, the wire-order-first value wins and the conflict is reported.
-Any successfully lifted chunk key materializes
-`Some(DatadogChunkContext::default())` before applying its value; if all chunk keys are
-absent or malformed, `TraceEvent.datadog.chunk` is `None`.
+The reserved key names, their per-member `AnyValue` types, the presence rules for
+optional and default-valued members, and the resolution of conflicting `datadog.chunk.*`
+values across spans in one `ScopeSpans` are implementation choices that satisfy this
+contract.
 
 ## Rationale
 
