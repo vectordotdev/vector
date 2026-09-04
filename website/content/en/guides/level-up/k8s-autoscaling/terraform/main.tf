@@ -113,9 +113,6 @@ resource "aws_instance" "k3s" {
     printf 'tls-san:\n  - %s\n' "$PUBLIC_IP" > /etc/rancher/k3s/config.yaml
     curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.36.2+k3s1" INSTALL_K3S_EXEC="--disable=traefik,servicelb --tls-san $PUBLIC_IP" sh -
 
-    # Make kubeconfig world-readable so ubuntu user can read it
-    chmod 644 /etc/rancher/k3s/k3s.yaml
-
     # Install helm
     curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
