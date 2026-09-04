@@ -18,5 +18,7 @@ paths:
   - "src/sinks/opentelemetry/**"
   - "src/internal_events/opentelemetry_*"
   - "tests/e2e/opentelemetry/traces/**"
+  - "tests/e2e/opentelemetry/mod.rs"
   - "tests/e2e/opentelemetry-traces/**"
   - "lib/codecs/src/**/otlp.rs"
+  - "lib/opentelemetry-proto/**"
