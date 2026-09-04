@@ -66,7 +66,6 @@ components: sinks: azure_logs_ingestion: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.azure_logs_ingestion.configuration

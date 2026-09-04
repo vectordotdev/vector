@@ -82,61 +82,7 @@ generated: components: sinks: configuration: {
 			Configure output for component when generated with graph command
 			"""
 		required: false
-		type: object: options: {
-			edge_attributes: {
-				description: """
-					Edge attributes to add to the edges linked to this component's node in resulting graph
-
-					They are added to the edge as provided
-					"""
-				required: false
-				type: object: {
-					examples: [{
-						example_input: {
-							color: "red"
-							label: "Example Edge"
-							width: "5.0"
-						}
-					}]
-					options: "*": {
-						description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-						required:    true
-						type: object: {
-							examples: [{
-								color: "red"
-								label: "Example Edge"
-								width: "5.0"
-							}]
-							options: "*": {
-								description: "A single graph edge attribute in graphviz DOT language."
-								required:    true
-								type: string: {}
-							}
-						}
-					}
-				}
-			}
-			node_attributes: {
-				description: """
-					Node attributes to add to this component's node in resulting graph
-
-					They are added to the node as provided
-					"""
-				required: false
-				type: object: {
-					examples: [{
-						color: "red"
-						name:  "Example Node"
-						width: "5.0"
-					}]
-					options: "*": {
-						description: "A single graph node attribute in graphviz DOT language."
-						required:    true
-						type: string: {}
-					}
-				}
-			}
-		}
+		type:     _schemaDefinitions["vector::config::dot_graph::GraphConfig"]
 	}
 	healthcheck: {
 		description: "Healthcheck configuration."
@@ -193,52 +139,6 @@ generated: components: sinks: configuration: {
 			should not be proxied.
 			"""
 		required: false
-		type: object: options: {
-			enabled: {
-				description: "Enables proxying support."
-				required:    false
-				type: bool: default: true
-			}
-			http: {
-				description: """
-					Proxy endpoint to use when proxying HTTP traffic.
-
-					Must be a valid URI string.
-					"""
-				required: false
-				type: string: examples: ["http://foo.bar:3128"]
-			}
-			https: {
-				description: """
-					Proxy endpoint to use when proxying HTTPS traffic.
-
-					Must be a valid URI string.
-					"""
-				required: false
-				type: string: examples: ["http://foo.bar:3128"]
-			}
-			no_proxy: {
-				description: """
-					A list of hosts to avoid proxying.
-
-					Multiple patterns are allowed:
-
-					| Pattern             | Example match                                                               |
-					| ------------------- | --------------------------------------------------------------------------- |
-					| Domain names        | `example.com` matches requests to `example.com`                     |
-					| Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
-					| IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
-					| [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
-					| Splat               | `*` matches all hosts                                                   |
-
-					[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-					"""
-				required: false
-				type: array: {
-					default: []
-					items: type: string: examples: ["localhost", ".foo.bar", "*"]
-				}
-			}
-		}
+		type:     _schemaDefinitions["vector_core::config::proxy::ProxyConfig"]
 	}
 }

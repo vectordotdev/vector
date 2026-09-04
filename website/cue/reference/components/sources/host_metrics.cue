@@ -27,7 +27,6 @@ components: sources: host_metrics: {
 	}
 
 	support: {
-		notices: []
 		requirements: []
 		warnings: [
 			"""

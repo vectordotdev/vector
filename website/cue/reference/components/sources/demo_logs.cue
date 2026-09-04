@@ -29,7 +29,6 @@ components: sources: demo_logs: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
