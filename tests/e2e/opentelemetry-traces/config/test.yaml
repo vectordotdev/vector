@@ -1,0 +1,24 @@
+features:
+  - e2e-tests-opentelemetry
+
+test: "e2e"
+
+test_filter: "opentelemetry::traces::"
+
+runner:
+  needs_docker_socket: true
+
+matrix:
+  # Determines which `otel/opentelemetry-collector-contrib` version to use
+  collector_version: ["0.157.0"]
+
+# Only trigger this integration test if relevant OTEL source/sink files change
+paths:
+  - "src/sources/opentelemetry/**"
+  - "src/sinks/opentelemetry/**"
+  - "src/internal_events/opentelemetry_*"
+  - "tests/e2e/opentelemetry/traces/**"
+  - "tests/e2e/opentelemetry/mod.rs"
+  - "tests/e2e/opentelemetry-traces/**"
+  - "lib/codecs/src/**/otlp.rs"
+  - "lib/opentelemetry-proto/**"
