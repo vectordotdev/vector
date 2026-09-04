@@ -313,17 +313,11 @@ impl<T: Bufferable> BufferSender<T> {
         if let Some(instrumentation) = self.custom_instrumentation.as_ref() {
             instrumentation.on_send(&mut item);
         }
-        let item_sizing = match (&self.usage_instrumentation, self.when_full) {
-            (None, _)
-            | (
-                Some(UsageInstrumentation {
-                    provides_instrumentation: true,
-                    ..
-                }),
-                WhenFull::Block | WhenFull::Overflow,
-            ) => None,
-            _ => Some((item.event_count(), item.size_of())),
-        };
+        let mut item_sizing = self
+            .usage_instrumentation
+            .as_ref()
+            .filter(|instrumentation| !instrumentation.provides_instrumentation)
+            .map(|_| (item.event_count(), item.size_of()));
 
         let accounting = match self.when_full {
             WhenFull::Block => match self.base.send(item).await? {
@@ -333,7 +327,16 @@ impl<T: Bufferable> BufferSender<T> {
             },
             WhenFull::DropNewest => match self.base.try_send(item).await? {
                 TryWriteOutcome::Written => UsageAccounting::Accepted,
-                TryWriteOutcome::Full(_) => UsageAccounting::DroppedNewest,
+                TryWriteOutcome::Full(item) => {
+                    if self
+                        .usage_instrumentation
+                        .as_ref()
+                        .is_some_and(|instrumentation| instrumentation.provides_instrumentation)
+                    {
+                        item_sizing = Some((item.event_count(), item.size_of()));
+                    }
+                    UsageAccounting::DroppedNewest
+                }
                 TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
             },
             WhenFull::Overflow => {
@@ -374,8 +377,6 @@ impl<T: Bufferable> BufferSender<T> {
 
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
-            && (!instrumentation.provides_instrumentation
-                || matches!(&accounting, UsageAccounting::DroppedNewest))
         {
             accounting.record(&instrumentation.handle, item_count, item_size);
         }
