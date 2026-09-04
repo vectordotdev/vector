@@ -339,3 +339,15 @@ fn vector_sink_otel_sink_traces_match() {
         "Traces received by collector-source should match deduplicated traces forwarded through Vector to collector-sink"
     );
 }
+
+#[test]
+fn vector_component_received_events_total_counts_individual_spans() {
+    // This test verifies that when use_otlp_decoding is enabled, the
+    // component_received_events_total metric counts individual spans
+    // within OTLP batches, not the number of OTLP requests.
+    // This ensures consistency with other Vector sources and with the same
+    // OpenTelemetry source when use_otlp_decoding is disabled.
+    use crate::opentelemetry::assert_component_received_events_total;
+
+    assert_component_received_events_total("traces", EXPECTED_SPAN_COUNT);
+}
