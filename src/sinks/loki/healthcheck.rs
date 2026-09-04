@@ -33,7 +33,7 @@ pub async fn healthcheck(
         let status = fetch_status(&uri.uri, auth.as_ref(), &client).await?;
         return match status {
             http::StatusCode::OK => Ok(()),
-            code => Err(format!("A non-successful status returned: {}", code.as_u16()).into()),
+            _ => Err(format!("A non-successful status returned: {status}").into()),
         };
     }
 

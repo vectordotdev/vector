@@ -14,7 +14,7 @@ use crate::{
     sinks::{
         prelude::*,
         util::{
-            HttpEndpoint,
+            HttpEndpoint, UriSerde,
             test::{build_test_server, build_test_server_generic, load_sink},
         },
     },
@@ -144,6 +144,61 @@ async fn healthcheck_includes_auth() {
             "Basic dXNlcm5hbWU6c29tZV9wYXNzd29yZA=="
         )),
         output[0].0.headers.get("authorization")
+    );
+}
+
+#[tokio::test]
+async fn healthcheck_uses_configured_uri_with_uri_auth_precedence() {
+    let (config, _cx) = load_sink::<LokiConfig>(
+        r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+            encoding.codec = "json"
+            auth.strategy = "basic"
+            auth.user = "username"
+            auth.password = "some_password"
+        "#,
+    )
+    .unwrap();
+
+    let (_guard, addr) = test_util::addr::next_addr();
+    let (rx, _trigger, server) = build_test_server(addr);
+    tokio::spawn(server);
+
+    // Credentials embedded in the configured healthcheck URI take precedence
+    // over the sink auth ("user:pass", not "username:some_password").
+    let healthcheck_uri: UriSerde = format!("http://user:pass@{addr}/ready")
+        .parse()
+        .expect("could not create healthcheck URI");
+
+    let tls =
+        TlsSettings::from_options(config.tls.as_ref()).expect("could not create TLS settings");
+    let proxy = ProxyConfig::default();
+    let client = HttpClient::new(tls, &proxy).expect("could not create HTTP client");
+
+    healthcheck(
+        config.endpoint.clone(),
+        config.auth.clone(),
+        Some(healthcheck_uri),
+        client,
+    )
+    .await
+    .expect("healthcheck failed");
+
+    let (parts, _) = rx
+        .take(1)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .next()
+        .expect("healthcheck made no request");
+    // The configured URI is probed directly, not `endpoint` + `ready`.
+    assert_eq!(parts.uri.path(), "/ready");
+    assert_eq!(
+        parts.headers.get("authorization"),
+        Some(&http::header::HeaderValue::from_static(
+            "Basic dXNlcjpwYXNz"
+        )),
     );
 }
 
