@@ -69,9 +69,9 @@ parsing.
 When CPU saturation occurs, Vector applies **backpressure instead of dropping
 events**. Vector's `http_server` source keeps accepting connections but stalls
 on responses until it can process the backlog, so the NGINX Ingress
-Controller and the load generator experience stalled connections. This only
-avoids event loss as long as those stalled connections stay open. If the
-NGINX Ingress Controller or the load generator times out and closes one
+Controller and the load generator experience stalled connections. This backpressure mechanism
+avoids event loss only as long as those stalled connections stay open. If the
+NGINX Ingress Controller or the load generator times out and closes a connection
 first, the in-flight request's events are lost along with it.
 
 ## Test environment
@@ -228,7 +228,7 @@ so every pod receives a share of traffic as soon as it's Ready, independent of h
 {{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/ingress-chart/templates/ingress.yaml" dir="true" >}}
 
 Note that `proxy-read-timeout` and `proxy-send-timeout` are left at their
-60s defaults. Under overload, a stalled connection that exceeds those
+60-second defaults. Under overload, a stalled connection that exceeds those
 timeouts is closed by NGINX before Vector finishes processing it, losing
 that request's events rather than just delaying them.
 
@@ -336,7 +336,7 @@ saturation crossover is 55 / 16.93 ≈ **3.25 pods** at 100% CPU. At a 70%
 utilization target, the expected equilibrium is ⌈3.25 / 0.70⌉ = ⌈4.64⌉ = **5 pods**.
 
 We can now configure the HPA to find the minimum pod count that keeps CPU
-utilization around the 70% target.
+utilization around the 70% target:
 
 ```bash
 # Reset to 1 pod and keep autoscaling disabled until the scale-down completes.
@@ -356,8 +356,6 @@ helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0
 
 The following timeline shows how the HPA scales the deployment from one replica to five replicas:
 <!-- RESULTS-HPA-START -->
-
-**Scale-up timeline (no manual intervention):**
 
 | Time | Replicas | Avg CPU | Event |
 | ---- | -------- | ------- | ----- |
@@ -510,9 +508,12 @@ KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh 4
 
 ### Stabilizing at 6?
 
-All the calculations made and empirical evidence suggests that 5 is the correct
-number of pods for the HPA to find the equilibrium. However, running this a few
-times might yield different results.
+All the calculations and empirical evidence suggest that 5 is the correct
+number of pods for the HPA to find the equilibrium. However, running this phase
+of testing a few times might yield different results.
+
+The following timeline shows a test run in which the HPA stabilized at six pods
+instead of the expected five:
 
 | Time | Replicas | Avg CPU | Event |
 | ---- | -------- | ------- | ----- |
@@ -524,30 +525,37 @@ times might yield different results.
 | t=137 s | **6** | 67% | — |
 | t=182 s | **6** | **60%** | **Stable, equilibrium** |
 
-But... Why? We are using the 70% CPU threshold and didn't alter the autoscaler's
-default 10% tolerance band. 60% is clearly outside the 63-77% band. This only
-happened because the HPA overshot the pod count — and it's possible this occured
-due to a variety of reasons, with the likely explanation that some pods running slower than expected.
-However, according to the HPA algorithm both are valid resting points. After
-determining that the current CPU load falls outside the threshold, it then
-calculates the number of pods according to the following formula
+But ... why did the HPA settle at six pods? We are using the 70% CPU threshold
+and didn't alter the HPA's default 10% tolerance band. Yet the observed CPU
+utilization of 60% is clearly outside the resulting 63–77% target range. This
+happened because the HPA overshot the pod count, likely because some pods
+parsed data more slowly than the benchmark predicted.
+
+However, according to the HPA algorithm, both five pods and six pods are valid
+stable replica counts. When the HPA determines that the current CPU utilization
+falls outside the target range, it calculates the desired number of pods
+according to the following formula
 ([source](https://github.com/kubernetes/kubernetes/blob/v1.36.2/pkg/controller/podautoscaler/replica_calculator.go#L117-L118)):
 
 ```text
 desired = ⌈ currentReplicas × (currentAvgCPU / 70%) ⌉
 ```
 
-This can lead to some very interesting results, just like the 6 pod stabilization,
-even though the CPU load falls squarely out of bounds.
+This calculation can produce unexpected but valid outcomes, such as the
+six-pod stabilization observed in the repeated Phase 4 run, even when the
+average CPU utilization falls outside the configured target range. When the
+HPA recalculates the desired replica count using the observed 60% CPU
+utilization, it still selects six pods:
 
 ```text
 desired = ⌈ 6 × (60% / 70%) ⌉ = ⌈ 5.1428571429 ⌉ = 6
 ```
 
-Past the saturation point, the workload is no longer CPU-bound. The *total* CPU
-demand is fixed, and the HPA spreads it across the available pods. A pod that
+Once the deployment passes the saturation point, the workload is no longer
+CPU-bound. The *total* CPU demand becomes fixed, and the HPA spreads that
+demand across the available pods. Slower pods change this number: A pod that
 parses 10% slower needs approximately 10% more CPU for the same 55 MiB/s
-workload, increasing the total CPU demand. Faster pods reduce it.
+workload, increasing the total CPU demand. Faster pods reduce the total CPU demand.
 
 Based on Phase 1's results, the total workload demand is:
 
@@ -555,31 +563,34 @@ Based on Phase 1's results, the total workload demand is:
 total CPU demand = (55 / 16.93) × 100% = 324.9 pod-percent
 ```
 
-Based on the calculated total CPU demand we can calculate theoretical
-stabilization pod counts. The table below sweeps the per-pod speed ±10% (and
-also 15% slower).
+Using the total CPU demand, we can calculate theoretical stabilization pod
+counts. The following table shows the theoretical stabilization points for
+per-pod speeds ranging from 10% faster than the benchmark to 15% slower. A ✅
+indicates a stable resting point.
 
-A ✅ marks a stable resting point where the HPA does not scale.
+| Per-pod speed vs. benchmark | +10% faster | Benchmark   | 10% slower  | 15% slower  |
+| --------------------------- | ----------- | ----------- | ----------- | ----------- |
+| Per-pod throughput          | 18.62 MiB/s | 16.93 MiB/s | 15.24 MiB/s | 14.39 MiB/s |
+| Total CPU demand            | 295%        | 325%        | 361%        | 382%        |
+| **4 pods**                  | 74% ✅      | 81%         | 90%         | 96%         |
+| **5 pods**                  | 59% ✅      | 65% ✅      | 72% ✅      | 76% ✅      |
+| **6 pods**                  | 49%         | 54%         | 60% ✅      | 64% ✅      |
+| **7 pods**                  | 42%         | 46%         | 52%         | 55%         |
 
-| Per-pod speed vs. benchmark | +10% faster | Benchmark | 10% slower | 15% slower |
-| --------------------------- | ----------- | --------- | ---------- | ---------- |
-| Per-pod throughput (MiB/s)  | 18.62       | 16.93     | 15.24      | 14.39      |
-| Total CPU demand            | 295%        | 325%      | 361%       | 382%       |
-| **4 pods**                  | 74% ✅      | 81%       | 90%        | 96%        |
-| **5 pods**                  | 59% ✅      | 65% ✅    | 72% ✅     | 76% ✅     |
-| **6 pods**                  | 49%         | 54%       | 60% ✅     | 64% ✅     |
-| **7 pods**                  | 42%         | 46%       | 52%        | 55%        |
+These values are theoretical because they're based on Phase 1's results. Even
+when the HPA stabilized at the expected five pods, the observed CPU utilization
+was around 70% instead of the projected 65%. Real-world scenarios will likely
+fall somewhere in between the benchmark and the 10% slower band, which can lead
+to the results we observed.
 
-We can see that these values are theoretical, since they're based on Phase 1's results.
-Even when we stabilized at the expected 5 pods the CPU utilization was around 70%
-instead of the projected 65%. Real world scenarios will likely fall somewhere
-in between the benchmark and the 10% slower band, which can lead to the results
-we observed.
+Comparing the observed CPU utilization (70%) with the theoretical prediction
+(64.97%) shows a difference of 7.74%:
 
 ```text
 ((70% - 64.97%) / 64.97%) × 100 = 7.74%
 ```
 
-In the original Phase 4 run we're about 7.74% slower than the predicted benchmark.
+This suggests that the pods in the original Phase 4 run parsed data about
+7.74% more slowly than the benchmark predicted.
 
 ---
