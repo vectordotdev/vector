@@ -82,12 +82,12 @@ where
             break;
         }
         let result = scan(&request);
-        let is_latest = receiver.has_changed().is_ok()
-            && receiver
-                .borrow()
+        let latest = receiver.borrow();
+        if receiver.has_changed().is_ok()
+            && latest
                 .as_ref()
-                .is_some_and(|latest| latest.generation == request.generation);
-        if is_latest {
+                .is_some_and(|latest| latest.generation == request.generation)
+        {
             report(&request, result);
         }
     }
@@ -349,6 +349,42 @@ mod tests {
         release_tx.send(()).unwrap();
         assert_eq!(recv(&reported_rx), PathBuf::from("latest"));
         assert!(started_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn scanner_scheduling_waits_for_latest_report() {
+        let (report_started_tx, report_started_rx) = mpsc::channel();
+        let (release_report_tx, release_report_rx) = mpsc::channel();
+        let (reported_tx, reported_rx) = mpsc::channel();
+        let scanner = Arc::new(OrphanedDiskBufferScanner::spawn(
+            |_| Ok(Vec::new()),
+            move |request, _| {
+                report_started_tx.send(()).unwrap();
+                release_report_rx.recv().unwrap();
+                reported_tx.send(request.data_dir.clone()).unwrap();
+            },
+        ));
+        scanner.schedule("first".into(), HashSet::new());
+        recv(&report_started_rx);
+
+        let (schedule_started_tx, schedule_started_rx) = mpsc::channel();
+        let (schedule_finished_tx, schedule_finished_rx) = mpsc::channel();
+        let scheduler = Arc::clone(&scanner);
+        let schedule = std::thread::spawn(move || {
+            schedule_started_tx.send(()).unwrap();
+            scheduler.schedule("latest".into(), HashSet::new());
+            schedule_finished_tx.send(()).unwrap();
+        });
+        recv(&schedule_started_rx);
+        assert!(schedule_finished_rx.try_recv().is_err());
+
+        release_report_tx.send(()).unwrap();
+        recv(&schedule_finished_rx);
+        assert_eq!(recv(&reported_rx), PathBuf::from("first"));
+        recv(&report_started_rx);
+        release_report_tx.send(()).unwrap();
+        assert_eq!(recv(&reported_rx), PathBuf::from("latest"));
+        schedule.join().unwrap();
     }
 
     #[test]
