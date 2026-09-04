@@ -1,5 +1,5 @@
 [![Nightly](https://github.com/vectordotdev/vector/actions/workflows/nightly.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/nightly.yml)
-[![E2E Test Suite](https://github.com/vectordotdev/vector/actions/workflows/e2e.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/e2e.yml)
+[![Integration/E2E Test Suite](https://github.com/vectordotdev/vector/actions/workflows/integration.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/integration.yml)
 [![Component Features](https://github.com/vectordotdev/vector/actions/workflows/component_features.yml/badge.svg)](https://github.com/vectordotdev/vector/actions/workflows/component_features.yml)
 
 <p align="center">
@@ -14,6 +14,7 @@
     <a href="https://vector.dev/components/">Integrations</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://chat.vector.dev">Chat</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/releases/latest/download/">Download</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://github.com/vectordotdev/vector/pkgs/container/vector">Container Images</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://rust-doc.vector.dev/">Rust Crate Docs</a>
   </strong>
 </p>

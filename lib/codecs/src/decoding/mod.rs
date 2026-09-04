@@ -1,6 +1,9 @@
 //! A collection of support structures that are used in the process of decoding
 //! bytes into events.
 
+mod config;
+mod decoder;
+mod decompression;
 mod error;
 pub mod format;
 pub mod framing;
@@ -8,6 +11,9 @@ pub mod framing;
 use std::fmt::Debug;
 
 use bytes::{Bytes, BytesMut};
+pub use config::DecodingConfig;
+pub use decoder::Decoder;
+pub use decompression::{DecompressionAlgorithm, DecompressionConfig, Decompressor};
 pub use error::StreamDecodingError;
 pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
@@ -27,13 +33,14 @@ pub use framing::{
     ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
     NewlineDelimitedDecoderOptions, OctetCountingDecoder, OctetCountingDecoderConfig,
-    OctetCountingDecoderOptions, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
+    OctetCountingDecoderOptions, OversizedAction, VarintLengthDelimitedDecoder,
+    VarintLengthDelimitedDecoderConfig,
 };
 use smallvec::SmallVec;
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LogNamespace},
-    event::Event,
+    event::{Event, EventMetadata},
     schema,
 };
 
@@ -266,7 +273,7 @@ pub enum DeserializerConfig {
 
     /// Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
     ///
-    /// This decoder can output all types of events (logs, metrics, traces).
+    /// This decoder can output all types of events: logs, metrics, and traces.
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -276,7 +283,7 @@ pub enum DeserializerConfig {
 
     /// Decodes the raw bytes as [native JSON format][vector_native_json].
     ///
-    /// This decoder can output all types of events (logs, metrics, traces).
+    /// This decoder can output all types of events: logs, metrics, and traces.
     ///
     /// This codec is **[experimental][experimental]**.
     ///
@@ -290,13 +297,13 @@ pub enum DeserializerConfig {
     ///
     /// The GELF specification is more strict than the actual Graylog receiver.
     /// Vector's decoder adheres more strictly to the GELF spec, with
-    /// the exception that some characters such as `@`  are allowed in field names.
+    /// the exception that some characters such as `@` are allowed in field names.
     ///
-    /// Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
-    /// by Graylog, and is much more relaxed than the GELF spec.
+    /// Other GELF codecs, such as Loki's, use a [Go SDK][implementation] that is maintained
+    /// by Graylog and is much more relaxed than the GELF spec.
     ///
-    /// Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
-    /// the codec may continue to relax the enforcement of specification.
+    /// Going forward, Vector will use the [Go SDK][implementation] as the reference implementation, which means
+    /// the codec may continue to relax the enforcement of the specification.
     ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
     /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
@@ -307,7 +314,7 @@ pub enum DeserializerConfig {
     /// [influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
     Influxdb(InfluxdbDeserializerConfig),
 
-    /// Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+    /// Decodes the raw bytes as an [Apache Avro][apache_avro] message.
     ///
     /// [apache_avro]: https://avro.apache.org/
     Avro {
@@ -372,7 +379,7 @@ impl DeserializerConfig {
                 AvroDeserializerConfig {
                     avro_options: avro.clone(),
                 }
-                .build(),
+                .build()?,
             )),
             DeserializerConfig::Bytes => Ok(Deserializer::Bytes(BytesDeserializerConfig.build())),
             DeserializerConfig::Json(config) => Ok(Deserializer::Json(config.build())),
@@ -420,6 +427,12 @@ impl DeserializerConfig {
             DeserializerConfig::Gelf(_) => FramingConfig::ChunkedGelf(Default::default()),
             _ => FramingConfig::Bytes,
         }
+    }
+
+    /// Returns `true` when this is a VRL deserializer.
+    /// Sources can use this to decide whether to call `Decoder::with_metadata_template`.
+    pub fn is_vrl(&self) -> bool {
+        matches!(self, DeserializerConfig::Vrl(_))
     }
 
     /// Return the type of event build by this deserializer.
@@ -482,6 +495,7 @@ impl DeserializerConfig {
                         CharacterDelimitedDecoderOptions {
                             delimiter: b',',
                             max_length: Some(usize::MAX),
+                            ..
                         },
                 }),
             ) => "application/json",
@@ -538,6 +552,17 @@ pub enum Deserializer {
     Vrl(VrlDeserializer),
 }
 
+impl Deserializer {
+    /// Attaches a metadata template to the inner deserializer, if it supports
+    /// one.
+    pub fn with_metadata_template(self, metadata: EventMetadata) -> Self {
+        match self {
+            Deserializer::Vrl(d) => Deserializer::Vrl(d.with_metadata_template(metadata)),
+            other => other,
+        }
+    }
+}
+
 impl format::Deserializer for Deserializer {
     fn parse(
         &self,
@@ -577,6 +602,7 @@ mod tests {
                 character_delimited: CharacterDelimitedDecoderOptions {
                     delimiter: 0,
                     max_length: None,
+                    ..
                 }
             })
         ));

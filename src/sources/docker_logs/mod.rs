@@ -22,7 +22,6 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{Stream, StreamExt};
 use serde_with::serde_as;
 use tokio::sync::mpsc;
-use tracing_futures::Instrument;
 use vector_lib::{
     codecs::{BytesDeserializer, BytesDeserializerConfig},
     config::{LegacyKey, LogNamespace},
@@ -41,6 +40,7 @@ use vrl::{
 use super::util::MultilineConfig;
 use crate::{
     SourceSender,
+    common::backoff::ExponentialBackoff,
     config::{DataType, SourceConfig, SourceContext, SourceOutput, log_schema},
     docker::{DockerTlsConfig, docker},
     event::{self, EstimatedJsonEncodedSizeOf, LogEvent, Value, merge_state::LogEventMergeState},
@@ -165,10 +165,8 @@ pub struct DockerLogsConfig {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
-    #[configurable(derived)]
     multiline: Option<MultilineConfig>,
 
-    #[configurable(derived)]
     tls: Option<DockerTlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -468,6 +466,8 @@ struct DockerLogsSource {
     /// It may contain shortened container id.
     hostname: Option<String>,
     backoff_duration: Duration,
+    /// Backoff strategy for events stream retries
+    events_backoff: ExponentialBackoff,
 }
 
 impl DockerLogsSource {
@@ -521,6 +521,7 @@ impl DockerLogsSource {
             main_recv,
             hostname,
             backoff_duration: backoff_secs,
+            events_backoff: ExponentialBackoff::default(),
         })
     }
 
@@ -620,6 +621,9 @@ impl DockerLogsSource {
                 value = self.events.next() => {
                     match value {
                         Some(Ok(mut event)) => {
+                            // Reset backoff on successful event
+                            self.events_backoff.reset();
+
                             let action = event.action.unwrap();
                             let actor = event.actor.take().unwrap();
                             let id = actor.id.unwrap();
@@ -662,17 +666,47 @@ impl DockerLogsSource {
                                 error,
                                 container_id: None,
                             });
-                            return;
+                            // Retry events stream with exponential backoff
+                            if !self.retry_events_stream_with_backoff("Docker events stream failed").await {
+                                error!("Docker events stream failed and retry exhausted, shutting down.");
+                                return;
+                            }
                         },
                         None => {
-                            // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
-                            error!(message = "Docker log event stream has ended unexpectedly.", internal_log_rate_limit = false);
-                            info!(message = "Shutting down docker_logs source.");
-                            return;
+                            // Retry events stream with exponential backoff
+                            if !self.retry_events_stream_with_backoff("Docker events stream ended").await {
+                                error!("Docker events stream ended and retry exhausted, shutting down.");
+                                return;
+                            }
                         }
                     };
                 }
             };
+        }
+    }
+
+    /// Retry events stream with exponential backoff
+    /// Returns true if retry was attempted, false if exhausted or shutdown
+    async fn retry_events_stream_with_backoff(&mut self, reason: &str) -> bool {
+        if let Some(delay) = self.events_backoff.next() {
+            warn!(
+                message = reason,
+                action = "retrying with backoff",
+                delay_ms = delay.as_millis()
+            );
+            tokio::select! {
+                _ = tokio::time::sleep(delay) => {
+                    self.events = Box::pin(self.esb.core.docker_logs_event_stream());
+                    true
+                }
+                _ = self.esb.shutdown.clone() => {
+                    info!("Shutdown signal received during retry backoff.");
+                    false
+                }
+            }
+        } else {
+            error!(message = "Events stream retry exhausted.", reason = reason);
+            false
         }
     }
 
@@ -703,39 +737,36 @@ impl EventStreamBuilder {
     /// Spawn a task to runs event stream until shutdown.
     fn start(&self, id: ContainerId, backoff: Option<Duration>) -> ContainerState {
         let this = self.clone();
-        tokio::spawn(
-            async move {
-                if let Some(duration) = backoff {
-                    tokio::time::sleep(duration).await;
-                }
+        crate::spawn_in_current_span(async move {
+            if let Some(duration) = backoff {
+                tokio::time::sleep(duration).await;
+            }
 
-                match this
-                    .core
-                    .docker
-                    .inspect_container(id.as_str(), None::<InspectContainerOptions>)
-                    .await
-                {
-                    Ok(details) => match ContainerMetadata::from_details(details) {
-                        Ok(metadata) => {
-                            let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
-                            this.run_event_stream(info).await;
-                            return;
-                        }
-                        Err(error) => emit!(DockerLogsTimestampParseError {
-                            error,
-                            container_id: id.as_str()
-                        }),
-                    },
-                    Err(error) => emit!(DockerLogsContainerMetadataFetchError {
+            match this
+                .core
+                .docker
+                .inspect_container(id.as_str(), None::<InspectContainerOptions>)
+                .await
+            {
+                Ok(details) => match ContainerMetadata::from_details(details) {
+                    Ok(metadata) => {
+                        let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                        this.run_event_stream(info).await;
+                        return;
+                    }
+                    Err(error) => emit!(DockerLogsTimestampParseError {
                         error,
                         container_id: id.as_str()
                     }),
-                }
-
-                this.finish(Err((id, ErrorPersistence::Transient)));
+                },
+                Err(error) => emit!(DockerLogsContainerMetadataFetchError {
+                    error,
+                    container_id: id.as_str()
+                }),
             }
-            .in_current_span(),
-        );
+
+            this.finish(Err((id, ErrorPersistence::Transient)));
+        });
 
         ContainerState::new_running()
     }
@@ -744,7 +775,7 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            tokio::spawn(this.run_event_stream(info).in_current_span());
+            crate::spawn_in_current_span(this.run_event_stream(info));
         }
     }
 
@@ -1304,7 +1335,7 @@ fn line_agg_adapter(
     let line_agg_in = inner.map(move |mut log| {
         let message_value = match log_namespace {
             LogNamespace::Vector => log
-                .remove(event_path!())
+                .remove(&vrl::path::OwnedTargetPath::event_root())
                 .expect("`.` must exist in the event"),
             LogNamespace::Legacy => log
                 .remove(
@@ -1330,7 +1361,7 @@ fn line_agg_adapter(
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
     line_agg_out.map(move |(_, message, mut log, _)| {
         match log_namespace {
-            LogNamespace::Vector => log.insert(event_path!(), message),
+            LogNamespace::Vector => log.insert(&vrl::path::OwnedTargetPath::event_root(), message),
             LogNamespace::Legacy => log.insert(
                 log_schema()
                     .message_key_target_path()

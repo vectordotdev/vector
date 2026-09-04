@@ -14,6 +14,15 @@ pub struct Opts {
     sub_command: Option<SubCommand>,
 }
 
+impl Opts {
+    pub fn dangerously_allow_env_var_interpolation(&self) -> bool {
+        matches!(
+            &self.sub_command,
+            Some(SubCommand::Install(opts)) if opts.dangerously_allow_env_var_interpolation
+        )
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
 struct InstallOpts {
@@ -54,6 +63,15 @@ struct InstallOpts {
         value_delimiter(',')
     )]
     config_dirs: Vec<PathBuf>,
+
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
+    #[arg(
+        long,
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub dangerously_allow_env_var_interpolation: bool,
 }
 
 impl InstallOpts {
@@ -94,6 +112,18 @@ impl InstallOpts {
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
+struct UninstallOpts {
+    /// The name of the service.
+    #[arg(long)]
+    name: Option<String>,
+
+    /// How long to wait for the service to stop before uninstalling, in seconds.
+    #[arg(default_value = "10", long)]
+    stop_timeout: u32,
+}
+
+#[derive(Parser, Debug)]
+#[command(rename_all = "kebab-case")]
 struct RestartOpts {
     /// The name of the service.
     #[arg(long)]
@@ -104,7 +134,39 @@ struct RestartOpts {
     stop_timeout: u32,
 }
 
+#[derive(Parser, Debug)]
+#[command(rename_all = "kebab-case")]
+struct StopOpts {
+    /// The name of the service.
+    #[arg(long)]
+    name: Option<String>,
+
+    /// How long to wait for the service to stop, in seconds.
+    #[arg(default_value = "10", long)]
+    stop_timeout: u32,
+}
+
 impl RestartOpts {
+    fn service_info(&self) -> ServiceInfo {
+        let mut default_service = ServiceInfo::default();
+        let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
+
+        default_service.name = OsString::from(service_name);
+        default_service
+    }
+}
+
+impl UninstallOpts {
+    fn service_info(&self) -> ServiceInfo {
+        let mut default_service = ServiceInfo::default();
+        let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
+
+        default_service.name = OsString::from(service_name);
+        default_service
+    }
+}
+
+impl StopOpts {
     fn service_info(&self) -> ServiceInfo {
         let mut default_service = ServiceInfo::default();
         let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
@@ -138,11 +200,11 @@ enum SubCommand {
     /// Install the service.
     Install(InstallOpts),
     /// Uninstall the service.
-    Uninstall(StandardOpts),
+    Uninstall(UninstallOpts),
     /// Start the service.
     Start(StandardOpts),
     /// Stop the service.
-    Stop(StandardOpts),
+    Stop(StopOpts),
     /// Restart the service.
     Restart(RestartOpts),
 }
@@ -173,9 +235,9 @@ impl Default for ServiceInfo {
 #[derive(Debug, Clone, PartialEq)]
 enum ControlAction {
     Install,
-    Uninstall,
+    Uninstall { stop_timeout: Duration },
     Start,
-    Stop,
+    Stop { stop_timeout: Duration },
     Restart { stop_timeout: Duration },
 }
 
@@ -187,10 +249,17 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 control_service(&opts.service_info(), ControlAction::Install)
             }
             SubCommand::Uninstall(opts) => {
-                control_service(&opts.service_info(), ControlAction::Uninstall)
+                let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
+                control_service(
+                    &opts.service_info(),
+                    ControlAction::Uninstall { stop_timeout },
+                )
             }
             SubCommand::Start(opts) => control_service(&opts.service_info(), ControlAction::Start),
-            SubCommand::Stop(opts) => control_service(&opts.service_info(), ControlAction::Stop),
+            SubCommand::Stop(opts) => {
+                let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
+                control_service(&opts.service_info(), ControlAction::Stop { stop_timeout })
+            }
             SubCommand::Restart(opts) => {
                 let stop_timeout = Duration::from_secs(opts.stop_timeout as u64);
                 control_service(
@@ -224,17 +293,17 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
             &service_definition,
             vector_windows::service_control::ControlAction::Install,
         ),
-        ControlAction::Uninstall => vector_windows::service_control::control(
+        ControlAction::Uninstall { stop_timeout } => vector_windows::service_control::control(
             &service_definition,
-            vector_windows::service_control::ControlAction::Uninstall,
+            vector_windows::service_control::ControlAction::Uninstall { stop_timeout },
         ),
         ControlAction::Start => vector_windows::service_control::control(
             &service_definition,
             vector_windows::service_control::ControlAction::Start,
         ),
-        ControlAction::Stop => vector_windows::service_control::control(
+        ControlAction::Stop { stop_timeout } => vector_windows::service_control::control(
             &service_definition,
-            vector_windows::service_control::ControlAction::Stop,
+            vector_windows::service_control::ControlAction::Stop { stop_timeout },
         ),
         ControlAction::Restart { stop_timeout } => vector_windows::service_control::control(
             &service_definition,
@@ -254,8 +323,8 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
 fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(config_paths)?;
     match config::load_from_paths(&config_paths) {
-        Ok(_) => Some(
-            config_paths
+        Ok(_) => {
+            let mut args: Vec<OsString> = config_paths
                 .iter()
                 .flat_map(|config_path| match config_path {
                     config::ConfigPath::File(path, format) => {
@@ -271,8 +340,12 @@ fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<O
                         vec![OsString::from("--config-dir"), path.as_os_str().into()]
                     }
                 })
-                .collect::<Vec<OsString>>(),
-        ),
+                .collect();
+            if config::env_var_interpolation_enabled() {
+                args.push(OsString::from("--dangerously-allow-env-var-interpolation"));
+            }
+            Some(args)
+        }
         Err(errs) => {
             handle_config_errors(errs);
             None

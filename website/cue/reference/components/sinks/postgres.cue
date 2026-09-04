@@ -4,7 +4,6 @@ components: sinks: postgres: {
 	title: "PostgreSQL"
 
 	classes: {
-		commonly_used: false
 		delivery:      "exactly_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -18,7 +17,6 @@ components: sinks: postgres: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -56,10 +54,12 @@ components: sinks: postgres: {
 			to catch the exception and set the desired default value.
 			""",
 		]
-		notices: []
 	}
 
-	configuration: generated.components.sinks.postgres.configuration
+	configuration: generated.components.sinks.postgres.configuration & {
+		endpoint: type: string: examples: ["postgres://localhost:5432"]
+		table: type: string: examples: ["my_table"]
+	}
 
 	input: {
 		logs: true

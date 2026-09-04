@@ -16,24 +16,20 @@ pub struct MqttCommonConfig {
     pub host: String,
 
     /// TCP port of the MQTT server to connect to.
-    #[configurable(derived)]
     #[serde(default = "default_port")]
     #[derivative(Default(value = "default_port()"))]
     pub port: u16,
 
     /// MQTT username.
     #[serde(default)]
-    #[configurable(derived)]
     pub user: Option<String>,
 
     /// MQTT password.
     #[serde(default)]
-    #[configurable(derived)]
     pub password: Option<String>,
 
     /// MQTT client ID.
     #[serde(default)]
-    #[configurable(derived)]
     pub client_id: Option<String>,
 
     /// Connection keep-alive interval.
@@ -47,7 +43,6 @@ pub struct MqttCommonConfig {
     pub max_packet_size: usize,
 
     /// TLS configuration.
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 }
 
@@ -96,7 +91,7 @@ pub enum ConfigurationError {
     /// Invalid credentials provided error
     #[snafu(display("Username and password must be either both provided or both missing."))]
     InvalidCredentials,
-    /// Invalid client ID provied error
+    /// Invalid client ID provided error
     #[snafu(display(
         "Client ID must be 1-23 characters long and must consist of only alphanumeric characters."
     ))]

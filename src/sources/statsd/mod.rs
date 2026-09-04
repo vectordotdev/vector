@@ -1,5 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    num::NonZeroU64,
     time::Duration,
 };
 
@@ -81,18 +82,15 @@ pub enum ConversionUnit {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The size of the receive buffer used for each connection.
     receive_buffer_bytes: Option<usize>,
 
     #[serde(default = "default_sanitize")]
-    #[configurable(derived)]
     sanitize: bool,
 
     #[serde(default = "default_convert_to")]
-    #[configurable(derived)]
     convert_to: ConversionUnit,
 }
 
@@ -112,16 +110,12 @@ impl UdpConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsSourceConfig>,
 
@@ -139,16 +133,22 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
+
     ///	Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
     /// - "/" is replaced with "-"
     /// - All whitespace is replaced with "_"
     /// - All non alphanumeric characters (A-Z, a-z, 0-9, _, or -) are removed.
     #[serde(default = "default_sanitize")]
-    #[configurable(derived)]
     sanitize: bool,
 
     #[serde(default = "default_convert_to")]
-    #[configurable(derived)]
     convert_to: ConversionUnit,
 }
 
@@ -163,6 +163,7 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
             connection_limit: None,
+            tls_handshake_timeout_secs: None,
             sanitize: default_sanitize(),
             convert_to: default_convert_to(),
         }
@@ -182,8 +183,8 @@ const fn default_convert_to() -> ConversionUnit {
 }
 
 impl GenerateConfig for StatsdConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::Udp(UdpConfig::from_address(
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::Udp(UdpConfig::from_address(
             SocketListenAddr::SocketAddr(SocketAddr::V4(SocketAddrV4::new(
                 Ipv4Addr::LOCALHOST,
                 8125,
@@ -219,9 +220,11 @@ impl SourceConfig for StatsdConfig {
                     config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
+                    None, // tls_reloader: not wired for this source
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     None,
+                    config.tls_handshake_timeout_secs,
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -421,6 +424,7 @@ mod test {
     use crate::{
         series,
         test_util::{
+            addr::next_addr,
             collect_limited,
             components::{
                 COMPONENT_ERROR_TAGS, SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance,
@@ -429,7 +433,6 @@ mod test {
             metrics::{
                 AbsoluteMetricState, assert_counter, assert_distribution, assert_gauge, assert_set,
             },
-            next_addr,
         },
     };
 
@@ -441,11 +444,11 @@ mod test {
     #[tokio::test]
     async fn test_statsd_udp() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
             let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
-                let bind_addr = next_addr();
+                let (_guard, bind_addr) = next_addr();
                 let socket = UdpSocket::bind(bind_addr).await.unwrap();
                 socket.connect(in_addr).await.unwrap();
                 while let Some(bytes) = receiver.next().await {
@@ -460,7 +463,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_tcp() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
             let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
@@ -481,7 +484,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_error() {
         assert_source_error(&COMPONENT_ERROR_TAGS, async move {
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
             let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
@@ -527,14 +530,14 @@ mod test {
 
     #[tokio::test]
     async fn test_statsd_udp_conversion_disabled() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
         let mut config = UdpConfig::from_address(in_addr.into());
         config.convert_to = ConversionUnit::Milliseconds;
         let statsd_config = StatsdConfig::Udp(config);
         let (mut sender, mut receiver) = mpsc::channel(200);
 
         tokio::spawn(async move {
-            let bind_addr = next_addr();
+            let (_guard, bind_addr) = next_addr();
             let socket = UdpSocket::bind(bind_addr).await.unwrap();
             socket.connect(in_addr).await.unwrap();
             while let Some(bytes) = receiver.next().await {
@@ -543,7 +546,7 @@ mod test {
         });
 
         let component_key = ComponentKey::from("statsd_conversion_disabled");
-        let (tx, rx) = SourceSender::new_test_sender_with_buffer(4096);
+        let (tx, rx) = SourceSender::new_test_sender_with_options(4096, None);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)
@@ -580,7 +583,7 @@ mod test {
         // packet we send has a lot of metrics per packet.  We could technically count them all up
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
-        let (tx, rx) = SourceSender::new_test_sender_with_buffer(4096);
+        let (tx, rx) = SourceSender::new_test_sender_with_options(4096, None);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)
@@ -674,7 +677,7 @@ mod test {
         // packet we send has a lot of metrics per packet.  We could technically count them all up
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
-        let (tx, _rx) = SourceSender::new_test_sender_with_buffer(4096);
+        let (tx, _rx) = SourceSender::new_test_sender_with_options(4096, None);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)

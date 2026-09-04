@@ -54,11 +54,11 @@ async fn sends_request() {
 async fn sends_authenticated_request() {
     let outputs = send_request(
         indoc! {r#"
-                tenant_id = "tenant-%Y"
-                [auth]
-                strategy = "basic"
-                user = "user"
-                password = "password"
+                tenant_id: "tenant-%Y"
+                auth:
+                  strategy: "basic"
+                  user: "user"
+                  password: "password"
             "#},
         vec![create_event("gauge-2".into(), 32.0)],
     )
@@ -84,13 +84,13 @@ async fn sends_authenticated_request() {
 async fn sends_authenticated_aws_request() {
     let outputs = send_request(
         indoc! {r#"
-                tenant_id = "tenant-%Y"
-                [aws]
-                region = "foo"
-                [auth]
-                strategy = "aws"
-                access_key_id = "foo"
-                secret_access_key = "bar"
+                tenant_id: "tenant-%Y"
+                aws:
+                  region: "foo"
+                auth:
+                  strategy: "aws"
+                  access_key_id: "foo"
+                  secret_access_key: "bar"
             "#},
         vec![create_event("gauge-2".into(), 32.0)],
     )
@@ -108,7 +108,7 @@ async fn sends_authenticated_aws_request() {
 #[tokio::test]
 async fn sends_x_scope_orgid_header() {
     let outputs = send_request(
-        r#"tenant_id = "tenant""#,
+        r#"tenant_id: "tenant""#,
         vec![create_event("gauge-3".into(), 12.0)],
     )
     .await;
@@ -121,7 +121,7 @@ async fn sends_x_scope_orgid_header() {
 #[tokio::test]
 async fn sends_templated_x_scope_orgid_header() {
     let outputs = send_request(
-        r#"tenant_id = "tenant-%Y""#,
+        r#"tenant_id: "tenant-%Y""#,
         vec![create_event("gauge-3".into(), 12.0)],
     )
     .await;
@@ -136,11 +136,44 @@ async fn sends_templated_x_scope_orgid_header() {
 }
 
 #[tokio::test]
+async fn sends_custom_headers() {
+    let outputs = send_request(
+        indoc! {r#"
+                request:
+                  headers:
+                    X-Custom-Header: "custom-value"
+                    X-Another-Header: "another-value"
+            "#},
+        vec![create_event("gauge-4".into(), 42.0)],
+    )
+    .await;
+
+    assert_eq!(outputs.len(), 1);
+    let (headers, req) = &outputs[0];
+
+    // Verify custom headers are present
+    assert_eq!(headers["x-custom-header"], "custom-value");
+    assert_eq!(headers["x-another-header"], "another-value");
+
+    // Verify standard headers are still present
+    assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
+    assert_eq!(headers["content-type"], "application/x-protobuf");
+
+    // Verify the metric data is correct
+    assert_eq!(req.timeseries.len(), 1);
+    assert_eq!(
+        req.timeseries[0].labels,
+        labels!("__name__" => "gauge-4", "production" => "true", "region" => "us-west-1")
+    );
+    assert_eq!(req.timeseries[0].samples[0].value, 42.0);
+}
+
+#[tokio::test]
 async fn retains_state_between_requests() {
     // This sink converts all incremental events to absolute, and
     // should accumulate their totals between batches.
     let outputs = send_request(
-        r"batch.max_events = 1",
+        "batch:\n  max_events: 1",
         vec![
             create_inc_event("counter-1".into(), 12.0),
             create_inc_event("counter-2".into(), 13.0),
@@ -166,7 +199,7 @@ async fn retains_state_between_requests() {
 #[tokio::test]
 async fn aggregates_batches() {
     let outputs = send_request(
-        r"batch.max_events = 3",
+        "batch:\n  max_events: 3",
         vec![
             create_inc_event("counter-1".into(), 12.0),
             create_inc_event("counter-1".into(), 14.0),
@@ -192,12 +225,11 @@ async fn aggregates_batches() {
 #[tokio::test]
 async fn doesnt_aggregate_batches() {
     let outputs = send_request(
-        indoc! {
-            r"
-            batch.max_events = 3
-            batch.aggregate = false
-            "
-        },
+        indoc! {"
+            batch:
+              max_events: 3
+              aggregate: false
+        "},
         vec![
             create_inc_event("counter-1".into(), 12.0),
             create_inc_event("counter-1".into(), 14.0),
@@ -230,12 +262,14 @@ async fn doesnt_aggregate_batches() {
 
 async fn send_request(config: &str, events: Vec<Event>) -> Vec<(HeaderMap, proto::WriteRequest)> {
     assert_sink_compliance(&HTTP_SINK_TAGS, async {
-        let addr = test_util::next_addr();
+        let (_guard, addr) = test_util::addr::next_addr();
         let (rx, trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let config = format!("endpoint = \"http://{addr}/write\"\n{config}");
-        let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
+        let config = indoc::formatdoc! {r#"
+            endpoint: "http://{addr}/write"
+            {config}"#};
+        let config: RemoteWriteConfig = serde_yaml::from_str(&config).unwrap();
         let cx = SinkContext::default();
 
         let (sink, _) = config.build(cx).await.unwrap();
@@ -286,4 +320,33 @@ fn create_inc_event(name: String, value: f64) -> Event {
     )
     .with_timestamp(Some(chrono::Utc::now()))
     .into()
+}
+
+#[tokio::test]
+async fn conflicting_auth_headers_rejected() {
+    let config = indoc! {r#"
+        endpoint: "http://localhost:9090/api/v1/write"
+        request:
+          headers:
+            Authorization: "Bearer my-token"
+        auth:
+          strategy: "bearer"
+          token: "another-token"
+    "#};
+
+    let config: RemoteWriteConfig = serde_yaml::from_str(config).unwrap();
+    let cx = SinkContext::default();
+
+    let result = config.build(cx).await;
+    match result {
+        Err(error) => {
+            let error_msg = error.to_string();
+            assert!(
+                error_msg
+                    .contains("Authorization header can not be used with defined auth options"),
+                "Expected auth conflict error, got: {error_msg}"
+            );
+        }
+        Ok(_) => panic!("Expected an error for conflicting auth settings, but build succeeded"),
+    }
 }

@@ -5,7 +5,7 @@ use vector_lib::config::clone_input_definitions;
 use crate::{
     conditions::{AnyCondition, ConditionConfig, VrlConfig},
     config::{
-        DataType, GenerateConfig, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
         TransformOutput,
     },
     schema,
@@ -55,6 +55,8 @@ impl Eq for Route {}
 #[serde(deny_unknown_fields)]
 pub struct ExclusiveRouteConfig {
     /// An array of named routes. The route names are expected to be unique.
+    /// Routes are evaluated in order from first to last, and only the first matching route receives each event
+    /// (first-match-wins).
     #[configurable(metadata(docs::examples = "routes_example()"))]
     pub routes: Vec<Route>,
 }
@@ -79,8 +81,8 @@ fn routes_example() -> Vec<Route> {
 }
 
 impl GenerateConfig for ExclusiveRouteConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             routes: routes_example(),
         })
         .unwrap()
@@ -99,7 +101,7 @@ impl TransformConfig for ExclusiveRouteConfig {
         Input::all()
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         let mut counts = std::collections::HashMap::new();
@@ -132,11 +134,30 @@ impl TransformConfig for ExclusiveRouteConfig {
         }
     }
 
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let errors: Vec<String> = self
+            .routes
+            .iter()
+            .filter_map(|route| {
+                route
+                    .condition
+                    .validate(&context.enrichment_tables, &context.metrics_storage)
+                    .err()
+                    .map(|e| format!("route \"{}\": {e}", route.name))
+            })
+            .collect();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let mut outputs: Vec<_> = self
             .routes

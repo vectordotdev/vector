@@ -90,7 +90,7 @@ where
 #[tokio::test]
 async fn test_sender_block() {
     // Get a non-overflow buffer in blocking mode with a capacity of 3.
-    let (mut tx, rx, _) = build_buffer(3, WhenFull::Block, None).await;
+    let (mut tx, rx, _) = build_buffer(3, WhenFull::Block, None);
 
     // We should be able to send three messages through unimpeded.
     assert_current_send_capacity(&mut tx, Some(3), None);
@@ -113,7 +113,7 @@ async fn test_sender_block() {
 #[tokio::test]
 async fn test_sender_drop_newest() {
     // Get a non-overflow buffer in "drop newest" mode with a capacity of 3.
-    let (mut tx, rx, _) = build_buffer(3, WhenFull::DropNewest, None).await;
+    let (mut tx, rx, _) = build_buffer(3, WhenFull::DropNewest, None);
 
     // We should be able to send three messages through unimpeded.
     assert_current_send_capacity(&mut tx, Some(3), None);
@@ -138,7 +138,7 @@ async fn test_sender_drop_newest() {
 async fn test_sender_overflow_block() {
     // Get an overflow buffer, where the overflow buffer is in blocking mode, and both the base
     // and overflow buffers have a capacity of 2.
-    let (mut tx, rx, _) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::Block)).await;
+    let (mut tx, rx, _) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::Block));
 
     // We should be able to send four message through unimpeded -- two for the base sender, and
     // two for the overflow sender.
@@ -164,7 +164,7 @@ async fn test_sender_overflow_block() {
 async fn test_sender_overflow_drop_newest() {
     // Get an overflow buffer, where the overflow buffer is in "drop newest" mode, and both the
     // base and overflow buffers have a capacity of 2.
-    let (mut tx, rx, _) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::DropNewest)).await;
+    let (mut tx, rx, _) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::DropNewest));
 
     // We should be able to send four message through unimpeded -- two for the base sender, and
     // two for the overflow sender.
@@ -190,7 +190,7 @@ async fn test_sender_overflow_drop_newest() {
 #[tokio::test]
 async fn test_buffer_metrics_normal() {
     // Get a regular blocking buffer.
-    let (mut tx, rx, handle) = build_buffer(5, WhenFull::Block, None).await;
+    let (mut tx, rx, handle) = build_buffer(5, WhenFull::Block, None);
 
     // Send three items through, and make sure the buffer usage stats reflect that.
     assert_current_send_capacity(&mut tx, Some(5), None);
@@ -217,7 +217,7 @@ async fn test_buffer_metrics_normal() {
 #[tokio::test]
 async fn test_buffer_metrics_drop_newest() {
     // Get a buffer that drops the newest items when full.
-    let (mut tx, rx, handle) = build_buffer(2, WhenFull::DropNewest, None).await;
+    let (mut tx, rx, handle) = build_buffer(2, WhenFull::DropNewest, None);
 
     // Send three items through, and make sure the buffer usage stats reflect that.
     assert_current_send_capacity(&mut tx, Some(2), None);
@@ -239,4 +239,34 @@ async fn test_buffer_metrics_drop_newest() {
     assert_eq!(3, snapshot.received_event_count);
     assert_eq!(2, snapshot.sent_event_count);
     assert_eq!(1, snapshot.dropped_event_count_intentional);
+}
+
+#[tokio::test]
+async fn test_buffer_metrics_overflow_block() {
+    // Get an overflow buffer, where the overflow buffer is in blocking mode, and both the base
+    // and overflow buffers have a capacity of 2.
+    let (mut tx, rx, handle) = build_buffer(2, WhenFull::Overflow, Some(WhenFull::Block));
+
+    // Send four items through, and make sure the buffer usage stats reflect each item entering
+    // exactly one stage: two in the base buffer and two in the overflow buffer.
+    assert_current_send_capacity(&mut tx, Some(2), Some(2));
+    assert_send_ok_with_capacities(&mut tx, 7, Some(1), Some(2)).await;
+    assert_send_ok_with_capacities(&mut tx, 8, Some(0), Some(2)).await;
+    assert_send_ok_with_capacities(&mut tx, 2, Some(0), Some(1)).await;
+    assert_send_ok_with_capacities(&mut tx, 1, Some(0), Some(0)).await;
+
+    let snapshot = handle.snapshot();
+    assert_eq!(4, snapshot.received_event_count);
+    assert_eq!(0, snapshot.sent_event_count);
+    assert_eq!(0, snapshot.dropped_event_count_intentional);
+
+    // Then, when we collect all of the messages from the receiver, the metrics should also reflect that.
+    let mut results: Vec<u64> = drain_receiver(tx, rx).await;
+    results.sort_unstable();
+    assert_eq!(results, vec![1, 2, 7, 8]);
+
+    let snapshot = handle.snapshot();
+    assert_eq!(4, snapshot.received_event_count);
+    assert_eq!(4, snapshot.sent_event_count);
+    assert_eq!(0, snapshot.dropped_event_count_intentional);
 }

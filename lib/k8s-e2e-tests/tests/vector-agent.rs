@@ -74,7 +74,7 @@ async fn default_agent() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -199,7 +199,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -351,7 +351,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -453,7 +453,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -580,7 +580,7 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -769,7 +769,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1012,7 +1012,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![&config_override_name(&override_name, true), CONFIG],
                 ..Default::default()
@@ -1207,7 +1207,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1416,7 +1416,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![&config_override_name(&override_name, true), CONFIG],
                 ..Default::default()
@@ -1576,7 +1576,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1738,7 +1738,7 @@ async fn existing_config_file() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1839,7 +1839,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -1994,7 +1994,7 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![
                     &config_override_name(&override_name, true),
@@ -2060,7 +2060,7 @@ async fn simple_checkpoint() -> Result<(), Box<dyn std::error::Error>> {
             "test-vector",
             "vector",
             "vector",
-            "https://helm.vector.dev",
+            &helm_chart_repo(),
             VectorConfig {
                 custom_helm_values: vec![HELM_VALUES_AGENT],
                 ..Default::default()

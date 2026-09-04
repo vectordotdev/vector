@@ -1,5 +1,7 @@
 use std::{convert::TryFrom, sync::Arc};
 
+use vrl::event_path;
+
 use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
@@ -17,7 +19,7 @@ use crate::{
     event::Value,
     schema,
     sinks::{VectorSink, util::test::load_sink},
-    template::Template,
+    template::{Template, UnconfinedTemplate},
     test_util::{
         components::{
             DATA_VOLUME_SINK_TAGS, SINK_TAGS, run_and_assert_data_volume_sink_compliance,
@@ -53,7 +55,7 @@ async fn build_sink(codec: &str, remove_timestamp: bool) -> (uuid::Uuid, VectorS
         .unwrap();
     assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-    *test_name = Template::try_from(stream.to_string()).unwrap();
+    *test_name = UnconfinedTemplate::try_from(stream.to_string()).unwrap();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -85,7 +87,7 @@ async fn build_sink_with_compression(codec: &str, compression: &str) -> (uuid::U
         .unwrap();
     assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-    *test_name = Template::try_from(stream.to_string()).unwrap();
+    *test_name = UnconfinedTemplate::try_from(stream.to_string()).unwrap();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -109,8 +111,11 @@ fn namespaced_timestamp_generator(
 ) -> impl Fn(usize) -> Event {
     move |index: usize| {
         let mut log = LogEvent::default();
-        log.insert("message", line_generator(index));
-        log.insert(timestamp_field.as_str(), Value::from(timestamp));
+        log.insert(event_path!("message"), line_generator(index));
+        log.insert(
+            &vrl::path::parse_target_path(&timestamp_field).unwrap(),
+            Value::from(timestamp),
+        );
 
         // We need vector metadata for it to pick up that it is in the Vector namespace.
         LogNamespace::Vector.insert_standard_vector_source_metadata(&mut log, "loki", Utc::now());
@@ -282,7 +287,7 @@ async fn json_nested_fields() {
     let generator = |idx| {
         let mut event = event_generator(idx);
         let log = event.as_mut_log();
-        log.insert("foo.bar", "baz");
+        log.insert(event_path!("foo", "bar"), "baz");
         event
     };
     let (lines, events) = generate_events_with_stream(generator, 10, Some(batch));
@@ -325,7 +330,7 @@ async fn many_streams() {
 
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
-            labels = {test_name = "{{ stream_id }}"}
+            labels = {test_name = "stream-{{ stream_id }}"}
             encoding.codec = "text"
             tenant_id = "default"
         "#;
@@ -339,9 +344,9 @@ async fn many_streams() {
         if idx < 10 {
             let log = event.as_mut_log();
             if idx % 2 == 0 {
-                log.insert("stream_id", stream1.to_string());
+                log.insert(event_path!("stream_id"), stream1.to_string());
             } else {
-                log.insert("stream_id", stream2.to_string());
+                log.insert(event_path!("stream_id"), stream2.to_string());
             }
         }
         event
@@ -353,8 +358,8 @@ async fn many_streams() {
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
-    let (_, outputs1) = fetch_stream(stream1.to_string(), "default").await;
-    let (_, outputs2) = fetch_stream(stream2.to_string(), "default").await;
+    let (_, outputs1) = fetch_stream(format!("stream-{stream1}"), "default").await;
+    let (_, outputs2) = fetch_stream(format!("stream-{stream2}"), "default").await;
 
     assert_eq!(outputs1.len() + outputs2.len(), lines.len());
 
@@ -385,14 +390,14 @@ async fn interpolate_stream_key() {
 
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
-            labels = {"{{ stream_key }}" = "placeholder"}
+            labels = {"key_{{ stream_key }}" = "placeholder"}
             encoding.codec = "text"
             tenant_id = "default"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
     config.labels.insert(
-        Template::try_from("{{ stream_key }}").unwrap(),
-        Template::try_from(stream.to_string()).unwrap(),
+        Template::try_from("key_{{ stream_key }}").unwrap(),
+        UnconfinedTemplate::try_from(stream.to_string()).unwrap(),
     );
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -401,7 +406,9 @@ async fn interpolate_stream_key() {
     let generator = |idx| {
         let mut event = event_generator(idx);
         if idx < 10 {
-            event.as_mut_log().insert("stream_key", "test_name");
+            event
+                .as_mut_log()
+                .insert(event_path!("stream_key"), "test_name");
         }
         event
     };
@@ -412,7 +419,7 @@ async fn interpolate_stream_key() {
 
     tokio::time::sleep(tokio::time::Duration::new(1, 0)).await;
 
-    let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+    let (_, outputs) = fetch_stream_with_key("key_test_name", stream.to_string(), "default").await;
 
     assert_eq!(outputs.len(), lines.len());
 
@@ -434,7 +441,7 @@ async fn many_tenants() {
         + r#"
             labels = {test_name = "placeholder"}
             encoding.codec = "text"
-            tenant_id = "{{ tenant_id }}"
+            tenant_id = "tenant{{ tenant_id }}"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
 
@@ -444,7 +451,7 @@ async fn many_tenants() {
         .unwrap();
     assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-    *test_name = Template::try_from(stream.to_string()).unwrap();
+    *test_name = UnconfinedTemplate::try_from(stream.to_string()).unwrap();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -459,7 +466,7 @@ async fn many_tenants() {
     for (i, event) in events.iter_mut().enumerate() {
         let log = event.as_mut_log();
 
-        log.insert("tenant_id", if i % 2 == 0 { "tenant1" } else { "tenant2" });
+        log.insert(event_path!("tenant_id"), if i % 2 == 0 { "1" } else { "2" });
     }
 
     run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
@@ -631,7 +638,7 @@ async fn test_out_of_order_events(
     config.out_of_order_action = action;
     config.labels.insert(
         Template::try_from("test_name").unwrap(),
-        Template::try_from(stream.to_string()).unwrap(),
+        UnconfinedTemplate::try_from(stream.to_string()).unwrap(),
     );
     config.batch.max_events = Some(batch_size);
     config.batch.max_bytes = Some(4_000_000);
@@ -674,7 +681,11 @@ fn get_timestamp(event: &Event) -> DateTime<Utc> {
 }
 
 async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
-    let query = format!("%7Btest_name%3D\"{stream}\"%7D");
+    fetch_stream_with_key("test_name", stream, tenant).await
+}
+
+async fn fetch_stream_with_key(key: &str, stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
+    let query = format!("%7B{key}%3D\"{stream}\"%7D");
     let query = format!(
         "{}/loki/api/v1/query_range?query={}&direction=forward",
         loki_address(),

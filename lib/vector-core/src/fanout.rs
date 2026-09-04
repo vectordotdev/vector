@@ -7,7 +7,10 @@ use tokio::sync::mpsc;
 use tokio_util::sync::ReusableBoxFuture;
 use vector_buffers::topology::channel::BufferSender;
 
-use crate::{config::ComponentKey, event::EventArray};
+use crate::{
+    config::ComponentKey,
+    event::{EventArray, EventContainer},
+};
 
 pub enum ControlMessage {
     /// Adds a new sink to the fanout.
@@ -45,15 +48,17 @@ pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 pub struct Fanout {
     senders: IndexMap<ComponentKey, Option<Sender>>,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
+    upstream_component: ComponentKey,
 }
 
 impl Fanout {
-    pub fn new() -> (Self, ControlChannel) {
+    pub fn new(upstream_component: ComponentKey) -> (Self, ControlChannel) {
         let (control_tx, control_rx) = mpsc::unbounded_channel();
 
         let fanout = Self {
             senders: Default::default(),
             control_channel: control_rx,
+            upstream_component,
         };
 
         (fanout, control_tx)
@@ -105,6 +110,20 @@ impl Fanout {
                 );
             }
             None => panic!("Pausing unknown sink from fanout: {id}"),
+        }
+    }
+
+    /// Waits for the next control message and applies it.
+    ///
+    /// Returns `true` if a message was processed, `false` if the control
+    /// channel was closed.
+    pub async fn recv_control_message(&mut self) -> bool {
+        match self.control_channel.recv().await {
+            Some(msg) => {
+                self.apply_control_message(msg);
+                true
+            }
+            None => false,
         }
     }
 
@@ -205,6 +224,27 @@ impl Fanout {
 
         // Wait for any senders that are paused to be replaced first before continuing with the send.
         self.wait_for_replacements().await;
+
+        // Drop empty event batches before they reach any downstream buffer, this is technically
+        // programmer error. In debug/test builds the `debug_assert!` makes the underlying bug fail
+        // loudly.
+        debug_assert!(
+            !events.is_empty(),
+            "Fanout received empty event batch from upstream component '{}'",
+            self.upstream_component,
+        );
+        // TODO: Wrap the conditional below with `std::hint::unlikely` once it stabilizes. This is an
+        // applicable situation to use it in since the following conditional should never evaluate to
+        // true.
+        #[cfg(not(debug_assertions))]
+        if events.is_empty() {
+            warn!(
+                message = "Dropping empty event batch emitted by upstream component. This is likely a bug in that component.",
+                component_id = %self.upstream_component,
+                downstream_count = self.senders.len(),
+            );
+            return Ok(());
+        }
 
         // Nothing to send if we have no sender.
         if self.senders.is_empty() {
@@ -318,6 +358,10 @@ impl<'a> SendGroup<'a> {
 
     fn try_detach_send(&mut self, id: &ComponentKey) -> bool {
         if let Some(send) = self.sends.remove(id) {
+            // Deliberately not instrumented with the current span: this drains a send to a sink
+            // that has just been detached from the topology, so it is unrelated to the upstream
+            // component that owns this fanout. Attaching the current span would mis-tag this
+            // task's logs with the upstream component's identity rather than the detached sink's.
             tokio::spawn(async move {
                 if let Err(e) = send.await {
                     warn!(
@@ -473,7 +517,7 @@ mod tests {
             channel::{BufferReceiver, BufferSender},
         },
     };
-    use vrl::value::Value;
+    use vrl::{event_path, value::Value};
 
     use super::{ControlMessage, Fanout};
     use crate::{
@@ -482,36 +526,37 @@ mod tests {
         test_util::{collect_ready, collect_ready_events},
     };
 
-    async fn build_sender_pair(
+    fn build_sender_pair(
         capacity: usize,
     ) -> (BufferSender<EventArray>, BufferReceiver<EventArray>) {
         TopologyBuilder::standalone_memory(
             NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
             WhenFull::Block,
             &Span::current(),
+            None,
+            None,
         )
-        .await
     }
 
-    async fn build_sender_pairs(
+    fn build_sender_pairs(
         capacities: &[usize],
     ) -> Vec<(BufferSender<EventArray>, BufferReceiver<EventArray>)> {
         let mut pairs = Vec::new();
         for capacity in capacities {
-            pairs.push(build_sender_pair(*capacity).await);
+            pairs.push(build_sender_pair(*capacity));
         }
         pairs
     }
 
-    async fn fanout_from_senders(
+    fn fanout_from_senders(
         capacities: &[usize],
     ) -> (
         Fanout,
         UnboundedSender<ControlMessage>,
         Vec<BufferReceiver<EventArray>>,
     ) {
-        let (mut fanout, control) = Fanout::new();
-        let pairs = build_sender_pairs(capacities).await;
+        let (mut fanout, control) = Fanout::new(ComponentKey::from("test_upstream"));
+        let pairs = build_sender_pairs(capacities);
 
         let mut receivers = Vec::new();
         for (i, (sender, receiver)) in pairs.into_iter().enumerate() {
@@ -522,13 +567,13 @@ mod tests {
         (fanout, control, receivers)
     }
 
-    async fn add_sender_to_fanout(
+    fn add_sender_to_fanout(
         fanout: &mut Fanout,
         receivers: &mut Vec<BufferReceiver<EventArray>>,
         sender_id: usize,
         capacity: usize,
     ) {
-        let (sender, receiver) = build_sender_pair(capacity).await;
+        let (sender, receiver) = build_sender_pair(capacity);
         receivers.push(receiver);
 
         fanout.add(ComponentKey::from(sender_id.to_string()), sender);
@@ -542,13 +587,13 @@ mod tests {
             .expect("sending control message should not fail");
     }
 
-    async fn replace_sender_in_fanout(
+    fn replace_sender_in_fanout(
         control: &UnboundedSender<ControlMessage>,
         receivers: &mut [BufferReceiver<EventArray>],
         sender_id: usize,
         capacity: usize,
     ) -> BufferReceiver<EventArray> {
-        let (sender, receiver) = build_sender_pair(capacity).await;
+        let (sender, receiver) = build_sender_pair(capacity);
         let old_receiver = mem::replace(&mut receivers[sender_id], receiver);
 
         control
@@ -567,13 +612,13 @@ mod tests {
         old_receiver
     }
 
-    async fn start_sender_replace(
+    fn start_sender_replace(
         control: &UnboundedSender<ControlMessage>,
         receivers: &mut [BufferReceiver<EventArray>],
         sender_id: usize,
         capacity: usize,
     ) -> (BufferReceiver<EventArray>, BufferSender<EventArray>) {
-        let (sender, receiver) = build_sender_pair(capacity).await;
+        let (sender, receiver) = build_sender_pair(capacity);
         let old_receiver = mem::replace(&mut receivers[sender_id], receiver);
 
         control
@@ -608,7 +653,7 @@ mod tests {
             .expect("must have at least one event");
         let event = event.into_log();
         event
-            .get("message")
+            .get(event_path!("message"))
             .and_then(Value::as_bytes)
             .and_then(|b| String::from_utf8(b.to_vec()).ok())
             .expect("must be valid log event with `message` field")
@@ -616,7 +661,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_writes_to_all() {
-        let (mut fanout, _, receivers) = fanout_from_senders(&[2, 2]).await;
+        let (mut fanout, _, receivers) = fanout_from_senders(&[2, 2]);
         let events = make_event_array(2);
 
         let clones = events.clone();
@@ -632,7 +677,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_notready() {
-        let (mut fanout, _, mut receivers) = fanout_from_senders(&[2, 1, 2]).await;
+        let (mut fanout, _, mut receivers) = fanout_from_senders(&[2, 1, 2]);
         let events = make_events(2);
 
         // First send should immediately complete because all senders have capacity:
@@ -661,7 +706,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_grow() {
-        let (mut fanout, _, mut receivers) = fanout_from_senders(&[4, 4]).await;
+        let (mut fanout, _, mut receivers) = fanout_from_senders(&[4, 4]);
         let events = make_events(3);
 
         // Send in the first two events to our initial two senders:
@@ -675,7 +720,7 @@ mod tests {
             .expect("should not fail");
 
         // Now add a third sender:
-        add_sender_to_fanout(&mut fanout, &mut receivers, 2, 4).await;
+        add_sender_to_fanout(&mut fanout, &mut receivers, 2, 4);
 
         // Send in the last event which all three senders will now get:
         fanout
@@ -696,7 +741,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink() {
-        let (mut fanout, control, receivers) = fanout_from_senders(&[4, 4]).await;
+        let (mut fanout, control, receivers) = fanout_from_senders(&[4, 4]);
         let events = make_events(3);
 
         // Send in the first two events to our initial two senders:
@@ -772,7 +817,7 @@ mod tests {
         ];
 
         for (sender_id, should_complete, expected_last_seen) in cases {
-            let (mut fanout, control, mut receivers) = fanout_from_senders(&[2, 1, 2]).await;
+            let (mut fanout, control, mut receivers) = fanout_from_senders(&[2, 1, 2]);
 
             // First send should immediately complete because all senders have capacity:
             let mut first_send = spawn(fanout.send(events[0].clone().into(), None));
@@ -812,7 +857,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_no_sinks() {
-        let (mut fanout, _) = Fanout::new();
+        let (mut fanout, _) = Fanout::new(ComponentKey::from("test_upstream"));
         let events = make_events(2);
 
         fanout
@@ -825,9 +870,19 @@ mod tests {
             .expect("should not fail");
     }
 
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    #[should_panic(expected = "Fanout received empty event batch from upstream component")]
+    async fn fanout_panics_on_empty_event_array_in_debug_builds() {
+        let (mut fanout, _, _receivers) = fanout_from_senders(&[2, 2]);
+        let empty: EventArray = Vec::<LogEvent>::new().into();
+
+        _ = fanout.send(empty, None).await;
+    }
+
     #[tokio::test]
     async fn fanout_replace() {
-        let (mut fanout, control, mut receivers) = fanout_from_senders(&[4, 4, 4]).await;
+        let (mut fanout, control, mut receivers) = fanout_from_senders(&[4, 4, 4]);
         let events = make_events(3);
 
         // First two sends should immediately complete because all senders have capacity:
@@ -841,7 +896,7 @@ mod tests {
             .expect("should not fail");
 
         // Replace the first sender with a brand new one before polling again:
-        let old_first_receiver = replace_sender_in_fanout(&control, &mut receivers, 0, 4).await;
+        let old_first_receiver = replace_sender_in_fanout(&control, &mut receivers, 0, 4);
 
         // And do the third send which should also complete since all senders still have capacity:
         fanout
@@ -868,7 +923,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_wait() {
-        let (mut fanout, control, mut receivers) = fanout_from_senders(&[4, 4]).await;
+        let (mut fanout, control, mut receivers) = fanout_from_senders(&[4, 4]);
         let events = make_events(3);
 
         // First two sends should immediately complete because all senders have capacity:
@@ -881,7 +936,7 @@ mod tests {
         // doesn't let any writes through until we replace it properly.  We get back the receiver
         // we've replaced, but also the sender that we want to eventually install:
         let (old_first_receiver, new_first_sender) =
-            start_sender_replace(&control, &mut receivers, 0, 4).await;
+            start_sender_replace(&control, &mut receivers, 0, 4);
 
         // Third send should return pending because now we have an in-flight replacement:
         let mut third_send = spawn(fanout.send(events[2].clone().into(), None));

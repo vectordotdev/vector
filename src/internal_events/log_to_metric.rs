@@ -1,10 +1,13 @@
 use std::num::ParseFloatError;
 
-use metrics::counter;
-use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
 };
 
+#[derive(NamedInternalEvent)]
 pub struct LogToMetricFieldNullError<'a> {
     pub field: &'a str,
 }
@@ -20,7 +23,7 @@ impl InternalEvent for LogToMetricFieldNullError<'_> {
             null_field = %self.field
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "field_null",
             "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -32,6 +35,7 @@ impl InternalEvent for LogToMetricFieldNullError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct LogToMetricParseFloatError<'a> {
     pub field: &'a str,
     pub error: ParseFloatError,
@@ -49,7 +53,7 @@ impl InternalEvent for LogToMetricParseFloatError<'_> {
             stage = error_stage::PROCESSING
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_parsing_float",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -62,6 +66,7 @@ impl InternalEvent for LogToMetricParseFloatError<'_> {
 }
 
 //  Metric Metadata Events and Errors
+#[derive(NamedInternalEvent)]
 pub struct MetricMetadataInvalidFieldValueError<'a> {
     pub field: &'a str,
     pub field_value: &'a str,
@@ -79,7 +84,7 @@ impl InternalEvent for MetricMetadataInvalidFieldValueError<'_> {
             stage = error_stage::PROCESSING
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "invalid_field_value",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -91,6 +96,7 @@ impl InternalEvent for MetricMetadataInvalidFieldValueError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct MetricMetadataParseError<'a> {
     pub field: &'a str,
     pub kind: &'a str,
@@ -107,7 +113,7 @@ impl InternalEvent for MetricMetadataParseError<'_> {
             stage = error_stage::PROCESSING
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => format!("failed_parsing_{}", self.kind),
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
@@ -119,11 +125,12 @@ impl InternalEvent for MetricMetadataParseError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct MetricMetadataMetricDetailsNotFoundError {}
 
 impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
     fn emit(self) {
-        let reason = "Missing required metric details. Required one of gauge, distribution, histogram, summary, counter";
+        let reason = "Missing required metric details. Required one of gauge, distribution, aggregated_histogram, aggregated_summary, counter";
         error!(
             message = reason,
             error_code = "missing_metric_details",
@@ -131,7 +138,7 @@ impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
             stage = error_stage::PROCESSING
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "missing_metric_details",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,

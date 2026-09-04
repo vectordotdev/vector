@@ -1,6 +1,7 @@
 pub mod logs;
 pub mod metrics;
 pub mod traces;
+pub mod metrics_native;
 
 use std::{io, path::Path, process::Command};
 
@@ -70,6 +71,7 @@ where
         vrl_value,
         &vrl::protobuf::encode::Options {
             use_json_names: true,
+            allow_lossy_string_coercion: true,
         },
     )
     .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;
@@ -114,4 +116,58 @@ pub fn assert_service_name_with<ResourceT, F>(
             panic!("{resource_name}[{i}] 'service.name' is not a string value");
         }
     }
+}
+
+/// Verifies that the component_received_events_total internal metric counts
+/// individual log records/metrics/spans, not batch requests.
+/// This ensures consistency when use_otlp_decoding is enabled.
+pub fn assert_component_received_events_total(data_type: &str, expected_count: usize) {
+    let metrics_content = read_file_helper(data_type, "vector-internal-metrics-sink.log")
+        .expect("Failed to read internal metrics file");
+
+    // Parse the metrics file to find component_received_events_total
+    let mut found_metric = false;
+    let mut total_events = 0u64;
+
+    for line in metrics_content.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        // Parse the JSON metric
+        let metric: serde_json::Value = serde_json::from_str(line)
+            .unwrap_or_else(|e| panic!("Failed to parse metrics JSON: {e}"));
+
+        // Look for component_received_events_total metric
+        if let Some(name) = metric.get("name").and_then(|v| v.as_str())
+            && name == "component_received_events_total"
+        {
+            // Check if this is for our opentelemetry source
+            if let Some(tags) = metric.get("tags")
+                && let Some(component_id) = tags.get("component_id").and_then(|v| v.as_str())
+                && component_id == "source0"
+            {
+                found_metric = true;
+                // Get the counter value
+                if let Some(counter) = metric.get("counter")
+                    && let Some(value) = counter.get("value").and_then(|v| v.as_f64())
+                {
+                    total_events = value as u64;
+                }
+            }
+        }
+    }
+
+    assert!(
+        found_metric,
+        "Could not find component_received_events_total metric for source0 in internal metrics"
+    );
+
+    // Verify that the metric counts individual items, not batch requests
+    assert_eq!(
+        total_events, expected_count as u64,
+        "component_received_events_total should count individual items ({expected_count}), \
+         not batch requests. Found: {total_events}"
+    );
 }

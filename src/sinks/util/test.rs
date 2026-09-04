@@ -4,7 +4,6 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::{FutureExt, SinkExt, TryFutureExt, channel::mpsc, stream};
 use futures_util::StreamExt;
 use http::request::Parts;
@@ -15,6 +14,7 @@ use hyper::{
 };
 use serde::Deserialize;
 use stream_cancel::{Trigger, Tripwire};
+use vector_common::decompression::CappedDecoder;
 
 use crate::{
     Error,
@@ -93,7 +93,7 @@ where
                     let response = responder();
                     if response.status().is_success() {
                         tokio::spawn(async move {
-                            let bytes = hyper::body::to_bytes(body).await.unwrap();
+                            let bytes = http_body::Body::collect(body).await.unwrap().to_bytes();
                             tx.send((parts, bytes)).await.unwrap();
                         });
                     }
@@ -117,14 +117,20 @@ pub async fn get_received_gzip(
     rx: mpsc::Receiver<(Parts, Bytes)>,
     assert_parts: impl Fn(Parts),
 ) -> Vec<String> {
-    get_received(rx, assert_parts, |body| MultiGzDecoder::new(body.reader())).await
+    get_received(rx, assert_parts, |body| {
+        CappedDecoder::gzip(body.reader()).into_reader()
+    })
+    .await
 }
 
 pub async fn get_received_zlib(
     rx: mpsc::Receiver<(Parts, Bytes)>,
     assert_parts: impl Fn(Parts),
 ) -> Vec<String> {
-    get_received(rx, assert_parts, |body| ZlibDecoder::new(body.reader())).await
+    get_received(rx, assert_parts, |body| {
+        CappedDecoder::zlib(body.reader()).into_reader()
+    })
+    .await
 }
 
 async fn get_received<D>(

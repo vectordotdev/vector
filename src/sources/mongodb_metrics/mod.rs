@@ -195,7 +195,7 @@ impl MongoDbMetrics {
         let doc = self
             .client
             .database("admin")
-            .run_command(doc! { "isMaster": 1 }, None)
+            .run_command(doc! { "isMaster": 1 })
             .await
             .map_err(CollectError::Mongo)?;
         let msg: CommandIsMaster = from_document(doc).map_err(CollectError::Bson)?;
@@ -216,7 +216,7 @@ impl MongoDbMetrics {
         let doc = self
             .client
             .database("admin")
-            .run_command(doc! { "buildInfo": 1 }, None)
+            .run_command(doc! { "buildInfo": 1 })
             .await
             .map_err(CollectError::Mongo)?;
         from_document(doc).map_err(CollectError::Bson)
@@ -281,10 +281,7 @@ impl MongoDbMetrics {
 
         let command = doc! { "serverStatus": 1, "opLatencies": { "histograms": true }};
         let db = self.client.database("admin");
-        let doc = db
-            .run_command(command, None)
-            .await
-            .map_err(CollectError::Mongo)?;
+        let doc = db.run_command(command).await.map_err(CollectError::Mongo)?;
         let byte_size = document_size(&doc);
         emit!(EndpointBytesReceived {
             byte_size,
@@ -1012,6 +1009,10 @@ fn document_size(doc: &Document) -> usize {
 /// `endpoint` argument would not be required, but field `original_uri` in `ClientOptions` is private.
 /// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
 /// Based on ClientOptions::parse_uri -- <https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708>
+#[expect(
+    clippy::string_slice,
+    reason = "all indices come from find() on ASCII chars ('/', '?', '=', '@', ':'), guaranteed char boundaries"
+)]
 fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
     let mut endpoint = endpoint.to_owned();
     if options.credential.is_some() {
@@ -1167,8 +1168,8 @@ mod integration_tests {
                 assert!((timestamp - Utc::now()).num_seconds() < 1);
                 // validate basic tags
                 let tags = metric.tags().expect("existed tags");
-                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint[..]));
-                assert_eq!(tags.get("host"), Some(&host[..]));
+                assert_eq!(tags.get("endpoint"), Some(clean_endpoint.as_str()));
+                assert_eq!(tags.get("host"), Some(host.as_str()));
             }
         })
         .await;

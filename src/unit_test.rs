@@ -51,6 +51,15 @@ pub struct Opts {
     /// Output path for JUnit reports
     #[arg(id = "junit-report", long, value_delimiter(','))]
     junit_report_paths: Option<Vec<PathBuf>>,
+
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
+    #[arg(
+        long,
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub dangerously_allow_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -188,14 +197,17 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
                 match junit_reporter.write_reports(test_suite_elapsed) {
                     Ok(()) => {}
                     Err(error) => {
-                        error!("Failed to execute tests:\n{}.", error);
+                        error!("Failed to write test output:\n{}.", error);
                         return exitcode::CONFIG;
                     }
                 }
             }
         }
         Err(errors) => {
-            error!("Failed to execute tests:\n{}.", errors.join("\n"));
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Failed to execute tests:\n{}.", errors.join("\n"));
+            }
             return exitcode::CONFIG;
         }
     }

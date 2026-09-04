@@ -1,11 +1,11 @@
-use metrics::counter;
 use mongodb::{bson, error::Error as MongoError};
 use vector_lib::{
-    internal_event::{InternalEvent, error_stage, error_type},
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct MongoDbMetricsEventsReceived<'a> {
     pub count: usize,
     pub byte_size: JsonSize,
@@ -22,18 +22,19 @@ impl InternalEvent for MongoDbMetricsEventsReceived<'_> {
             endpoint = self.endpoint,
         );
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.byte_size.get() as u64);
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct MongoDbMetricsRequestError<'a> {
     pub error: MongoError,
     pub endpoint: &'a str,
@@ -49,7 +50,7 @@ impl InternalEvent for MongoDbMetricsRequestError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -57,6 +58,7 @@ impl InternalEvent for MongoDbMetricsRequestError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct MongoDbMetricsBsonParseError<'a> {
     pub error: bson::de::Error,
     pub endpoint: &'a str,
@@ -72,7 +74,7 @@ impl InternalEvent for MongoDbMetricsBsonParseError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
             "endpoint" => self.endpoint.to_owned(),

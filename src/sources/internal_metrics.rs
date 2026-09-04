@@ -35,7 +35,6 @@ pub struct InternalMetricsConfig {
     #[configurable(metadata(docs::human_name = "Scrape Interval"))]
     pub scrape_interval_secs: Duration,
 
-    #[configurable(derived)]
     pub tags: TagsConfig,
 
     /// Overrides the default namespace for the metrics emitted by the source.
@@ -196,8 +195,13 @@ impl InternalMetrics<'_> {
 mod tests {
     use std::collections::BTreeMap;
 
-    use metrics::{counter, gauge, histogram};
-    use vector_lib::{metric_tags, metrics::Controller};
+    use strum::IntoEnumIterator;
+    use vector_lib::{
+        counter, gauge, histogram,
+        internal_event::{CounterName, GaugeName, HistogramName},
+        metric_tags,
+        metrics::Controller,
+    };
 
     use super::*;
     use crate::{
@@ -223,14 +227,20 @@ mod tests {
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        gauge!("foo").set(1.0);
-        gauge!("foo").set(2.0);
-        counter!("bar").increment(3);
-        counter!("bar").increment(4);
-        histogram!("baz").record(5.0);
-        histogram!("baz").record(6.0);
-        histogram!("quux", "host" => "foo").record(8.0);
-        histogram!("quux", "host" => "foo").record(8.1);
+        let gauge_name = GaugeName::iter().next().unwrap();
+        let counter_name = CounterName::iter().next().unwrap();
+        let mut histogram_iter = HistogramName::iter();
+        let histogram_name = histogram_iter.next().unwrap();
+        let histogram_tagged_name = histogram_iter.next().unwrap();
+
+        gauge!(gauge_name).set(1.0);
+        gauge!(gauge_name).set(2.0);
+        counter!(counter_name).increment(3);
+        counter!(counter_name).increment(4);
+        histogram!(histogram_name).record(5.0);
+        histogram!(histogram_name).record(6.0);
+        histogram!(histogram_tagged_name, "host" => "foo").record(8.0);
+        histogram!(histogram_tagged_name, "host" => "foo").record(8.1);
 
         let controller = Controller::get().expect("no controller");
 
@@ -243,10 +253,16 @@ mod tests {
             .map(|metric| (metric.name().to_string(), metric))
             .collect::<BTreeMap<String, Metric>>();
 
-        assert_eq!(&MetricValue::Gauge { value: 2.0 }, output["foo"].value());
-        assert_eq!(&MetricValue::Counter { value: 7.0 }, output["bar"].value());
+        assert_eq!(
+            &MetricValue::Gauge { value: 2.0 },
+            output[gauge_name.as_str()].value()
+        );
+        assert_eq!(
+            &MetricValue::Counter { value: 7.0 },
+            output[counter_name.as_str()].value()
+        );
 
-        match &output["baz"].value() {
+        match &output[histogram_name.as_str()].value() {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count,
@@ -256,14 +272,14 @@ mod tests {
                 // [`metrics::handle::Histogram::new`] are hard-coded. If this
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
-                assert_eq!(buckets[9].count, 2);
+                assert_eq!(buckets[15].count, 2);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 11.0);
             }
             _ => panic!("wrong type"),
         }
 
-        match &output["quux"].value() {
+        match &output[histogram_tagged_name.as_str()].value() {
             MetricValue::AggregatedHistogram {
                 buckets,
                 count,
@@ -273,8 +289,8 @@ mod tests {
                 // [`metrics::handle::Histogram::new`] are hard-coded. If this
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
-                assert_eq!(buckets[9].count, 1);
-                assert_eq!(buckets[10].count, 1);
+                assert_eq!(buckets[15].count, 1);
+                assert_eq!(buckets[16].count, 1);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 16.1);
             }
@@ -282,7 +298,7 @@ mod tests {
         }
 
         let labels = metric_tags!("host" => "foo");
-        assert_eq!(Some(&labels), output["quux"].tags());
+        assert_eq!(Some(&labels), output[histogram_tagged_name.as_str()].tags());
     }
 
     async fn event_from_config(config: InternalMetricsConfig) -> Event {

@@ -6,5 +6,19 @@ edition = "2024"
 publish = false
 license = "MPL-2.0"
 
+[lints]
+workspace = true
+
 [dependencies]
+indoc.workspace = true
 vrl.workspace = true
+enrichment = { path = "../enrichment" }
+vector-vrl-metrics = { path = "../metrics", optional = true }
+vector-vrl-category.workspace = true
+
+dnstap-parser = { path = "../dnstap-parser", optional = true }
+
+[features]
+default = ["dnstap", "vrl-metrics"]
+dnstap = ["dep:dnstap-parser"]
+vrl-metrics = ["dep:vector-vrl-metrics"]

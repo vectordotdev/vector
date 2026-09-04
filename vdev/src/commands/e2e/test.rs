@@ -20,17 +20,13 @@ pub struct Cli {
     /// The desired environment (optional)
     environment: Option<String>,
 
-    /// Whether to compile the test runner with all integration test features
-    #[arg(short = 'a', long)]
-    build_all: bool,
-
-    /// Reuse existing test runner image instead of rebuilding (useful in CI)
-    #[arg(long)]
-    reuse_image: bool,
-
     /// Number of retries to allow on each integration test case.
     #[arg(short = 'r', long)]
     retries: Option<u8>,
+
+    /// Collect code coverage using cargo-llvm-cov (outputs target/coverage/lcov.info)
+    #[arg(long)]
+    coverage: bool,
 
     /// Extra test command arguments
     args: Vec<String>,
@@ -42,10 +38,9 @@ impl Cli {
             ComposeTestLocalConfig::e2e(),
             &self.e2e_test,
             self.environment.as_ref(),
-            self.build_all,
-            self.reuse_image,
             self.retries.unwrap_or_default(),
             &self.args,
+            self.coverage,
         )
     }
 }

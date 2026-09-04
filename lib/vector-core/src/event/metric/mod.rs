@@ -1,4 +1,3 @@
-#[cfg(feature = "vrl")]
 use std::convert::TryFrom;
 use std::{
     convert::AsRef,
@@ -15,11 +14,10 @@ use vector_common::{
     request_metadata::GetEventCountTags,
 };
 use vector_config::configurable_component;
-#[cfg(feature = "vrl")]
 use vrl::compiler::value::VrlValueConvert;
 
 use super::{
-    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,
+    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, MergeFinalizable,
     estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
 };
 use crate::config::telemetry;
@@ -326,6 +324,20 @@ impl Metric {
         self.series.remove_tag(key)
     }
 
+    /// Removes a tag from this metric, returning its full value set.
+    pub fn remove_tag_set(&mut self, key: &str) -> Option<TagValueSet> {
+        match &mut self.series.tags {
+            None => None,
+            Some(tags) => {
+                let result = tags.remove_set(key);
+                if tags.is_empty() {
+                    self.series.tags = None;
+                }
+                result
+            }
+        }
+    }
+
     /// Removes all the tags.
     pub fn remove_tags(&mut self) {
         self.series.remove_tags();
@@ -334,8 +346,8 @@ impl Metric {
     /// Returns `true` if `name` tag is present, and matches the provided `value`
     pub fn tag_matches(&self, name: &str, value: &str) -> bool {
         self.tags()
-            .filter(|t| t.get(name).filter(|v| *v == value).is_some())
-            .is_some()
+            .as_ref()
+            .is_some_and(|t| t.get(name).as_ref().is_some_and(|v| *v == value))
     }
 
     /// Returns the string value of a tag, if it exists
@@ -478,6 +490,12 @@ impl Finalizable for Metric {
     }
 }
 
+impl MergeFinalizable for Metric {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.metadata.merge_finalizers(finalizers);
+    }
+}
+
 impl GetEventCountTags for Metric {
     fn get_tags(&self) -> TaggedEventsSent {
         let source = if telemetry().tags().emit_source {
@@ -520,7 +538,6 @@ pub enum MetricKind {
     Absolute,
 }
 
-#[cfg(feature = "vrl")]
 impl TryFrom<vrl::value::Value> for MetricKind {
     type Error = String;
 
@@ -536,7 +553,6 @@ impl TryFrom<vrl::value::Value> for MetricKind {
     }
 }
 
-#[cfg(feature = "vrl")]
 impl From<MetricKind> for vrl::value::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
@@ -894,6 +910,33 @@ mod test {
         );
 
         assert!(!new_reset_histogram.subtract(&old_histogram));
+    }
+
+    #[test]
+    fn subtract_aggregated_histograms_bucket_redistribution() {
+        // Test for issue #24415: when total count is higher but individual bucket counts is sometimes lower
+        let old_histogram = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 15,
+                sum: 15.0,
+                buckets: buckets!(1.0 => 10, 2.0 => 5),
+            },
+        );
+
+        let mut new_histogram_with_redistribution = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 20,
+                sum: 20.0,
+                // Total count is higher (20 > 15), but bucket1 count is lower (8 < 10)
+                buckets: buckets!(1.0 => 8, 2.0 => 12),
+            },
+        );
+
+        assert!(!new_histogram_with_redistribution.subtract(&old_histogram));
     }
 
     #[test]

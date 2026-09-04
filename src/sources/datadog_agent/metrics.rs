@@ -13,10 +13,11 @@ use vector_lib::{
 };
 use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
+use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload};
+use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
 use crate::{
-    SourceSender,
     common::{
-        datadog::{DatadogMetricType, DatadogSeriesMetric},
+        datadog::{DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogSeriesMetric},
         http::ErrorMessage,
     },
     config::log_schema,
@@ -26,14 +27,7 @@ use crate::{
     },
     internal_events::EventsReceived,
     schema,
-    sources::{
-        datadog_agent::{
-            ApiKeyQueryParams, DatadogAgentSource,
-            ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload},
-            handle_request,
-        },
-        util::extract_tag_key_and_value,
-    },
+    sources::util::{extract_tag_key_and_value, http::capped_body},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -41,17 +35,13 @@ pub(crate) struct DatadogSeriesRequest {
     pub(crate) series: Vec<DatadogSeriesMetric>,
 }
 
-pub(crate) fn build_warp_filter(
-    acknowledgements: bool,
-    multiple_outputs: bool,
-    out: SourceSender,
+pub(super) fn build_warp_filter(
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    let output = multiple_outputs.then_some(super::METRICS);
-    let sketches_service = sketches_service(acknowledgements, output, out.clone(), source.clone());
-    let series_v1_service =
-        series_v1_service(acknowledgements, output, out.clone(), source.clone());
-    let series_v2_service = series_v2_service(acknowledgements, output, out, source);
+    let sketches_service = sketches_service(handler.clone(), source.clone());
+    let series_v1_service = series_v1_service(handler.clone(), source.clone());
+    let series_v2_service = series_v2_service(handler, source);
     sketches_service
         .or(series_v1_service)
         .unify()
@@ -61,9 +51,7 @@ pub(crate) fn build_warp_filter(
 }
 
 fn sketches_service(
-    acknowledgements: bool,
-    output: Option<&'static str>,
-    out: SourceSender,
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -72,8 +60,8 @@ fn sketches_service(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
-        .and_then(
+        .and(capped_body())
+        .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
                   api_token: Option<String>,
@@ -93,16 +81,14 @@ fn sketches_service(
                             &source.events_received,
                         )
                     });
-                handle_request(events, acknowledgements, out.clone(), output)
-            },
-        )
+                handler.clone().handle_request(events, super::METRICS)
+            }
+        })
         .boxed()
 }
 
 fn series_v1_service(
-    acknowledgements: bool,
-    output: Option<&'static str>,
-    out: SourceSender,
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -111,8 +97,8 @@ fn series_v1_service(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
-        .and_then(
+        .and(capped_body())
+        .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
                   api_token: Option<String>,
@@ -135,16 +121,14 @@ fn series_v1_service(
                             &source.events_received,
                         )
                     });
-                handle_request(events, acknowledgements, out.clone(), output)
-            },
-        )
+                handler.clone().handle_request(events, super::METRICS)
+            }
+        })
         .boxed()
 }
 
 fn series_v2_service(
-    acknowledgements: bool,
-    output: Option<&'static str>,
-    out: SourceSender,
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -153,8 +137,8 @@ fn series_v2_service(
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
-        .and_then(
+        .and(capped_body())
+        .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
                   api_token: Option<String>,
@@ -174,9 +158,9 @@ fn series_v2_service(
                             &source.events_received,
                         )
                     });
-                handle_request(events, acknowledgements, out.clone(), output)
-            },
-        )
+                handler.clone().handle_request(events, super::METRICS)
+            }
+        })
         .boxed()
 }
 
@@ -299,15 +283,22 @@ pub(crate) fn decode_ddseries_v2(
             };
 
             serie.resources.into_iter().for_each(|r| {
-                // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
-                // the hostname can be found in MetricSeries::resources and that is the only value stored there.
+                // As per https://github.com/DataDog/datadog-agent/blob/965622d50073913d95176606ebcbd0f7553627b6/pkg/serializer/internal/metrics/iterable_series.go#L201-L264
+                // MetricSeries::resources can contain host, device, and other series resources.
                 if r.r#type.eq("host") {
                     log_schema()
                         .host_key()
                         .and_then(|key| tags.replace(key.to_string(), r.name));
+                } else if r.r#type.eq("device") {
+                    // The `device` resource type is used by Agent checks (disk, SNMP/NDM, etc.)
+                    // and must be preserved as a plain `device` tag to match the v1 series behavior.
+                    tags.replace("device".into(), r.name);
                 } else {
-                    // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
-                    tags.replace(format!("resource.{}", r.r#type), r.name);
+                    // Preserve other resources in the generic metric tags.
+                    tags.insert(
+                        format!("{DATADOG_METRIC_RESOURCE_TAG_PREFIX}{}", r.r#type),
+                        r.name,
+                    );
                 }
             });
             (!serie.source_type_name.is_empty())

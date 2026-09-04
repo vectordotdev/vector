@@ -11,11 +11,10 @@ use tokio::{
     time::{self, Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::IntervalStream;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace, log_schema},
@@ -27,7 +26,6 @@ use vrl::{path::OwnedValuePath, value::Kind};
 
 use crate::{
     SourceSender,
-    codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{
@@ -46,13 +44,10 @@ mod tests;
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ExecConfig {
-    #[configurable(derived)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     pub scheduled: Option<ScheduledConfig>,
 
-    #[configurable(derived)]
     pub streaming: Option<StreamingConfig>,
 
     /// The command to run, plus any arguments required.
@@ -81,10 +76,8 @@ pub struct ExecConfig {
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
 
-    #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
@@ -726,10 +719,10 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    drop(tokio::spawn(async move {
+    drop(crate::spawn_in_current_span(async move {
         debug!("Start capturing {} command output.", origin);
 
-        let mut stream = FramedRead::new(reader, decoder);
+        let mut stream = DecoderFramedRead::new(reader, decoder);
         while let Some(result) = stream.next().await {
             match result {
                 Ok(next) => {
@@ -741,7 +734,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

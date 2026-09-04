@@ -128,7 +128,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 		required:    false
 		type: uint: {
 			examples: [
-				600,
+				600
 			]
 			unit: "seconds"
 		}
@@ -138,7 +138,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 		required:    false
 		type: array: {
 			default: [
-				"**/*",
+				"**/*"
 			]
 			items: type: string: examples: ["**/include/**"]
 		}
@@ -168,16 +168,7 @@ generated: components: sources: kubernetes_logs: configuration: {
 	internal_metrics: {
 		description: "Configuration of internal metrics for file-based components."
 		required:    false
-		type: object: options: include_file_tag: {
-			description: """
-				Whether or not to include the "file" tag on the component's corresponding internal metrics.
-
-				This is useful for distinguishing between different files while monitoring. However, the tag's
-				cardinality is unbounded.
-				"""
-			required: false
-			type: bool: default: false
-		}
+		type:        _schemaDefinitions["vector::internal_events::file::FileInternalMetricsConfig"]
 	}
 	kube_config_file: {
 		description: """
@@ -202,15 +193,48 @@ generated: components: sources: kubernetes_logs: configuration: {
 			unit:    "bytes"
 		}
 	}
+	max_merged_line_action: {
+		description: """
+			The behavior when a merged line exceeds `max_merged_line_bytes`.
+
+			When set to `drop` (the default), the entire oversized merged line is discarded.
+			When set to `truncate`, the line is truncated to `max_merged_line_bytes` bytes and
+			emitted as a partial event. Any remaining partial events for that line are discarded.
+
+			This option has no effect if `max_merged_line_bytes` is not set.
+			"""
+		required: false
+		type: string: {
+			default: "drop"
+			enum: {
+				drop: "Drop the entire oversized frame."
+				truncate: """
+					Truncate the frame to the maximum allowed size and emit the partial content.
+
+					The remainder of the oversized frame is discarded up to the next delimiter.
+					"""
+			}
+		}
+	}
 	max_merged_line_bytes: {
 		description: """
-			The maximum number of bytes a line can contain - after merging - before being discarded.
+			The maximum number of bytes a line can contain after merging partial events.
 
 			This protects against malformed lines or tailing incorrect files.
+			The behavior when a merged line exceeds this limit is controlled by
+			`max_merged_line_action`: `drop` (default) discards the line, `truncate` truncates
+			it to this limit and appends a `..TRUNCATED` suffix.
 
-			Note that, if auto_partial_merge is false, this config will be ignored. Also, if max_line_bytes is too small to reach the continuation character, then this
-			config will have no practical impact (the same is true of `auto_partial_merge`). Finally, the smaller of `max_merged_line_bytes` and `max_line_bytes` will apply
-			if auto_partial_merge is true, so if this is set to be 1 MiB, for example, but `max_line_bytes` is set to ~2.5 MiB, then every line greater than 1 MiB will be dropped.
+			Note that, if `auto_partial_merge` is false, this config will be ignored. Also, if
+			`max_line_bytes` is too small to reach the continuation character, then this config
+			will have no practical impact (the same is true of `auto_partial_merge`).
+
+			When `max_merged_line_action` is `drop`, the smaller of `max_merged_line_bytes` and
+			`max_line_bytes` is used as the file-level read limit to avoid wasted I/O.
+			When `max_merged_line_action` is `truncate`, individual lines up to `max_line_bytes`
+			are allowed through so the merger can truncate the combined result. Note that
+			`max_line_bytes` still applies at the file level and always drops individual lines
+			that exceed it; truncation at that level is not currently supported.
 			"""
 		required: false
 		type: uint: unit: "bytes"

@@ -9,7 +9,6 @@ components: transforms: window: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      true
@@ -22,7 +21,6 @@ components: transforms: window: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.window.configuration

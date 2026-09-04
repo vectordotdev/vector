@@ -16,11 +16,7 @@ generated: components: sources: journald: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: options: enabled: {
-			description: "Whether or not end-to-end acknowledgements are enabled for this source."
-			required:    false
-			type: bool: {}
-		}
+		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	batch_size: {
 		description: """
@@ -136,6 +132,10 @@ generated: components: sources: journald: configuration: {
 			If empty or not present, all units are accepted.
 
 			Unit names lacking a `.` have `.service` appended to make them a valid service unit name.
+
+			**Note:** This option matches only the `_SYSTEMD_UNIT` field, which is narrower than `journalctl --unit`.
+			Messages from systemd about unit lifecycle (start/stop) have `_SYSTEMD_UNIT=init.scope` and will not match.
+			To capture these, explicitly include `init.scope` or use `include_matches` for finer control.
 			"""
 		required: false
 		type: array: {

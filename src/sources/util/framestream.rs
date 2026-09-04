@@ -1,5 +1,5 @@
 #[cfg(unix)]
-use std::os::unix::{fs::PermissionsExt, io::AsRawFd};
+use std::os::unix::fs::PermissionsExt;
 use std::{
     convert::TryInto,
     fs,
@@ -419,6 +419,7 @@ pub fn build_framestream_tcp_source(
             addr,
             listenfd,
             &tls,
+            None, // tls_reloader: not wired for this source
             frame_handler
                 .allowed_origins()
                 .map(|origins| origins.to_vec()),
@@ -713,12 +714,12 @@ pub fn build_framestream_unix_source(
     // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
     if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
         _ = nix::sys::socket::setsockopt(
-            listener.as_raw_fd(),
+            &listener,
             nix::sys::socket::sockopt::RcvBuf,
             &(socket_receive_buffer_size),
         );
         let rcv_buf_size =
-            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::RcvBuf);
+            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::RcvBuf);
         info!(
             "Unix socket receive buffer size modified to {}.",
             rcv_buf_size.unwrap()
@@ -728,12 +729,12 @@ pub fn build_framestream_unix_source(
     // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
     if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
         _ = nix::sys::socket::setsockopt(
-            listener.as_raw_fd(),
+            &listener,
             nix::sys::socket::sockopt::SndBuf,
             &(socket_send_buffer_size),
         );
         let snd_buf_size =
-            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::SndBuf);
+            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::SndBuf);
         info!(
             "Unix socket buffer send size modified to {}.",
             snd_buf_size.unwrap()
@@ -908,7 +909,7 @@ async fn spawn_event_handling_tasks(
 ) -> JoinHandle<()> {
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks).await;
 
-    tokio::spawn(async move {
+    crate::spawn_in_current_span(async move {
         future::ready({
             if let Some(evt) = event_handler.handle_event(received_from, event_data)
                 && event_sink.send_event(evt).await.is_err()
@@ -973,7 +974,7 @@ mod test {
         event::{Event, LogEvent},
         shutdown::SourceShutdownCoordinator,
         sources::util::net::SocketListenAddr,
-        test_util::{collect_n, collect_n_stream, next_addr},
+        test_util::{addr::next_addr, collect_n, collect_n_stream},
     };
 
     #[derive(Clone)]
@@ -1304,7 +1305,7 @@ mod test {
         sock_sink: &mut S,
         frames: Vec<Result<Bytes, std::io::Error>>,
     ) {
-        let mut stream = stream::iter(frames.into_iter());
+        let mut stream = stream::iter(frames);
         //send and send_all consume the sink
         _ = sock_sink.send_all(&mut stream).await;
     }
@@ -1475,7 +1476,7 @@ mod test {
     async fn blocked_framestream_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1499,7 +1500,7 @@ mod test {
     async fn normal_framestream_singlethreaded_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1542,7 +1543,7 @@ mod test {
     async fn normal_framestream_multithreaded_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1585,7 +1586,7 @@ mod test {
     async fn multiple_content_types_tcp() {
         let source_name = "test_source";
         let (tx, _) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,

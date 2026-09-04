@@ -4,7 +4,6 @@ components: sinks: loki: {
 	title: "Loki"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
@@ -15,11 +14,13 @@ components: sinks: loki: {
 	features: {
 		auto_generated:   true
 		acknowledgements: true
-		healthcheck: enabled: true
+		healthcheck: {
+			enabled:  true
+			uses_uri: true
+		}
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    1_000_000
 				max_events:   100_000
 				timeout_secs: 1.0
@@ -66,7 +67,6 @@ components: sinks: loki: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.loki.configuration
@@ -158,7 +158,5 @@ components: sinks: loki: {
 		}
 	}
 
-	telemetry: metrics: {
-		streams_total: components.sources.internal_metrics.output.metrics.streams_total
-	}
+	telemetry: metrics: {}
 }

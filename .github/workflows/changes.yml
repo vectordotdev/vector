@@ -32,6 +32,10 @@ on:
         value: ${{ jobs.source.outputs.source }}
       dependencies:
         value: ${{ jobs.source.outputs.dependencies }}
+      deny:
+        value: ${{ jobs.source.outputs.deny }}
+      deprecations:
+        value: ${{ jobs.source.outputs.deprecations }}
       internal_events:
         value: ${{ jobs.source.outputs.internal_events }}
       cue:
@@ -46,12 +50,12 @@ on:
         value: ${{ jobs.source.outputs.website_only }}
       install:
         value: ${{ jobs.source.outputs.install }}
+      prettier:
+        value: ${{ jobs.source.outputs.prettier }}
       test-yml:
         value: ${{ jobs.source.outputs.test-yml }}
       integration-yml:
         value: ${{ jobs.source.outputs.integration-yml }}
-      cli-yml:
-        value: ${{ jobs.source.outputs.cli-yml }}
       test-make-command-yml:
         value: ${{ jobs.source.outputs.test-make-command-yml }}
       msrv-yml:
@@ -90,6 +94,8 @@ on:
         value: ${{ jobs.int_tests.outputs.dnstap }}
       docker-logs:
         value: ${{ jobs.int_tests.outputs.docker-logs }}
+      doris:
+        value: ${{ jobs.int_tests.outputs.doris }}
       elasticsearch:
         value: ${{ jobs.int_tests.outputs.elasticsearch }}
       eventstoredb:
@@ -120,6 +126,8 @@ on:
         value: ${{ jobs.int_tests.outputs.nats }}
       nginx:
         value: ${{ jobs.int_tests.outputs.nginx }}
+      opensearch:
+        value: ${{ jobs.int_tests.outputs.opensearch }}
       opentelemetry:
         value: ${{ jobs.int_tests.outputs.opentelemetry }}
       postgres:
@@ -149,6 +157,11 @@ on:
         value: ${{ jobs.int_tests.outputs.any }}
       e2e-tests-any:
         value: ${{ jobs.e2e_tests.outputs.any }}
+
+# Workflow-level permissions - read access to repository contents
+permissions:
+  contents: read # Required to checkout code
+
 env:
   BASE_SHA: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_sha) || github.event.pull_request.base.sha }}
   HEAD_SHA: ${{ inputs.head_ref || (github.event_name == 'merge_group' && github.event.merge_group.head_sha) || github.event.pull_request.head.sha }}
@@ -162,6 +175,8 @@ jobs:
     outputs:
       source: ${{ steps.filter.outputs.source }}
       dependencies: ${{ steps.filter.outputs.dependencies }}
+      deny: ${{ steps.filter.outputs.deny }}
+      deprecations: ${{ steps.filter.outputs.deprecations }}
       internal_events: ${{ steps.filter.outputs.internal_events }}
       cue: ${{ steps.filter.outputs.cue }}
       component_docs: ${{ steps.filter.outputs.component_docs }}
@@ -170,116 +185,159 @@ jobs:
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
+      prettier: ${{ steps.filter.outputs.prettier }}
       test-yml: ${{ steps.filter.outputs.test-yml }}
       integration-yml: ${{ steps.filter.outputs.integration-yml }}
-      cli-yml: ${{ steps.filter.outputs.cli-yml }}
       test-make-command-yml: ${{ steps.filter.outputs.test-make-command-yml }}
       msrv-yml: ${{ steps.filter.outputs.msrv-yml }}
       cross-yml: ${{ steps.filter.outputs.cross-yml }}
       unit_mac-yml: ${{ steps.filter.outputs.unit_mac-yml }}
       unit_windows-yml: ${{ steps.filter.outputs.unit_windows-yml }}
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-    - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
-      id: filter
-      with:
-        base: ${{ env.BASE_SHA }}
-        ref:  ${{ env.HEAD_SHA }}
-        filters: |
-          source:
-            - ".cargo/**"
-            - "benches/**"
-            - "lib/**"
-            - "proto/**"
-            - "scripts/**"
-            - "src/**"
-            - "tests/**"
-            - "build.rs"
-            - "Cargo.lock"
-            - "Cargo.toml"
-            - "Makefile"
-            - "rust-toolchain.toml"
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          dependencies:
-            - ".cargo/**"
-            - 'Cargo.toml'
-            - 'Cargo.lock'
-            - 'rust-toolchain.toml'
-            - 'Makefile'
-            - 'scripts/cross/**'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          cue:
-            - 'website/cue/**'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          component_docs:
-            - 'scripts/generate-component-docs.rb'
-            - "vdev/**"
-            - 'website/cue/**/base/**.cue'
-            - ".github/workflows/changes.yml"
-          markdown:
-            - '**/**.md'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          scripts:
-            - '**/**.sh'
-            - ".github/workflows/changes.yml"
-          internal_events:
-            - 'src/internal_events/**'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          docker:
-            - 'distribution/docker/**'
-            - "vdev/**"
-            - ".github/workflows/changes.yml"
-          install:
-            - ".github/workflows/install-sh.yml"
-            - "distribution/install.sh"
-            - ".github/workflows/changes.yml"
-          k8s:
-            - "src/sources/kubernetes_logs/**"
-            - "lib/k8s-e2e-tests/**"
-            - "lib/k8s-test-framework/**"
-            - ".github/workflows/k8s_e2e.yml"
-            - ".github/workflows/changes.yml"
-          website:
-            - "website/**"
-          not_website:
-            - "!website/**"
-          test-yml:
-            - ".github/workflows/test.yml"
-            - ".github/workflows/changes.yml"
-          integration-yml:
-            - ".github/workflows/integration.yml"
-            - ".github/workflows/changes.yml"
-          cli-yml:
-            - ".github/workflows/cli.yml"
-            - ".github/workflows/changes.yml"
-          test-make-command-yml:
-            - ".github/workflows/test-make-command.yml"
-            - ".github/workflows/changes.yml"
-          msrv-yml:
-            - ".github/workflows/msrv.yml"
-            - ".github/workflows/changes.yml"
-          cross-yml:
-            - ".github/workflows/cross.yml"
-            - ".github/workflows/changes.yml"
-          unit_mac-yml:
-            - ".github/workflows/unit_mac.yml"
-            - ".github/workflows/changes.yml"
-          unit_windows-yml:
-            - ".github/workflows/unit_windows.yml"
-            - ".github/workflows/changes.yml"
-
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          base: ${{ env.BASE_SHA }}
+          ref: ${{ env.HEAD_SHA }}
+          filters: |
+            source:
+              - ".cargo/**"
+              - "benches/**"
+              - "lib/**"
+              - "proto/**"
+              - "scripts/**"
+              - "src/**"
+              - "tests/**"
+              - "build.rs"
+              - "Cargo.lock"
+              - "Cargo.toml"
+              - "Makefile"
+              - "rust-toolchain.toml"
+              - "vdev/**"
+              - ".github/workflows/changes.yml"
+            dependencies:
+              - ".cargo/**"
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - 'Makefile'
+              - 'scripts/cross/**'
+              - "vdev/Cargo.toml"
+              - ".github/workflows/changes.yml"
+            deny:
+              - '**/Cargo.toml'
+              - 'Cargo.lock'
+              - ".github/workflows/deny.yml"
+            deprecations:
+              - 'deprecation.d/**'
+              - 'website/data/deprecations.json'
+              - "vdev/Cargo.toml"
+              - ".github/workflows/deprecation.yaml"
+              - ".github/workflows/changes.yml"
+            cue:
+              - 'website/cue/**'
+              - "vdev/Cargo.toml"
+              - 'vdev/src/commands/build/docs_json.rs'
+              - ".github/workflows/changes.yml"
+            component_docs:
+              - 'Makefile'
+              - "vdev/Cargo.toml"
+              - 'website/Makefile'
+              - 'website/package.json'
+              - 'website/yarn.lock'
+              - 'website/generated/example-configs/**'
+              - 'vdev/src/commands/build/component_docs/**'
+              - 'vdev/src/commands/build/component_examples.rs'
+              - 'vdev/src/commands/build/docs_json.rs'
+              - 'vdev/src/commands/check/component_examples.rs'
+              - 'website/cue/**/*.cue'
+              - 'docs/generated/**'
+              # If changes to the VRL sha is made the combined generated cue file will change which
+              # may cause issues
+              - 'Cargo.lock'
+              - ".github/workflows/changes.yml"
+            markdown:
+              - '**/**.md'
+              - "vdev/Cargo.toml"
+              - ".github/workflows/changes.yml"
+            scripts:
+              - '**/**.sh'
+              - ".github/workflows/changes.yml"
+            internal_events:
+              - 'src/internal_events/**'
+              - "vdev/Cargo.toml"
+              - ".github/workflows/changes.yml"
+            docker:
+              - 'distribution/docker/**'
+              - "vdev/Cargo.toml"
+              - ".github/workflows/changes.yml"
+            install:
+              - ".github/workflows/install-sh.yml"
+              - "distribution/install.sh"
+              - ".github/workflows/changes.yml"
+            k8s:
+              - "src/sources/kubernetes_logs/**"
+              - "lib/k8s-e2e-tests/**"
+              - "lib/k8s-test-framework/**"
+              - "scripts/test-e2e-kubernetes.sh"
+              - "scripts/build-docker.sh"
+              - "scripts/deploy-chart-test.sh"
+              - ".github/workflows/k8s_e2e.yml"
+              - ".github/workflows/changes.yml"
+            website:
+              - "website/**"
+            not_website:
+              - "!website/**"
+            prettier:
+              - "**/*.yml"
+              - "**/*.yaml"
+              - "**/*.js"
+              - "**/*.ts"
+              - "**/*.tsx"
+              - "**/*.json"
+              - ".prettierrc.json"
+              - ".prettierignore"
+              - ".github/workflows/changes.yml"
+            test-yml:
+              - ".github/workflows/test.yml"
+              - ".github/workflows/unit-tests.yml"
+              - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
+            integration-yml:
+              - ".github/workflows/integration.yml"
+              - ".github/workflows/changes.yml"
+            test-make-command-yml:
+              - ".github/workflows/test-make-command.yml"
+              - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
+            msrv-yml:
+              - ".github/workflows/msrv.yml"
+              - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
+            cross-yml:
+              - ".github/workflows/cross.yml"
+              - ".github/workflows/changes.yml"
+            unit_mac-yml:
+              - ".github/workflows/unit_mac.yml"
+              - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
+            unit_windows-yml:
+              - ".github/workflows/unit_windows.yml"
+              - ".github/workflows/changes.yml"
 
   # Detects changes that are specific to integration tests
   int_tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     if: ${{ inputs.int_tests }}
+    permissions:
+      contents: read
     outputs:
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
@@ -294,6 +352,7 @@ jobs:
       datadog-traces: ${{ steps.filter.outputs.datadog-traces }}
       dnstap: ${{ steps.filter.outputs.dnstap }}
       docker-logs: ${{ steps.filter.outputs.docker-logs }}
+      doris: ${{ steps.filter.outputs.doris }}
       elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
       eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
       fluent: ${{ steps.filter.outputs.fluent }}
@@ -309,6 +368,7 @@ jobs:
       mqtt: ${{ steps.filter.outputs.mqtt }}
       nats: ${{ steps.filter.outputs.nats }}
       nginx: ${{ steps.filter.outputs.nginx }}
+      opensearch: ${{ steps.filter.outputs.opensearch }}
       opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
       postgres: ${{ steps.filter.outputs.postgres }}
       prometheus: ${{ steps.filter.outputs.prometheus }}
@@ -318,23 +378,24 @@ jobs:
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - uses: ./.github/actions/setup
         with:
           vdev: true
+          mold: false
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
-      # sources the paths from the scripts/integration/.../test.yaml files
+      # sources the paths from the tests/integration/.../config/test.yaml files
       - name: Create filter rules for integrations
         run: vdev int ci-paths > int_test_filters.yaml
 
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
-          ref:  ${{ env.HEAD_SHA }}
+          ref: ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
@@ -357,6 +418,7 @@ jobs:
             "datadog-traces": ${{ steps.filter.outputs.datadog-traces }},
             "dnstap": ${{ steps.filter.outputs.dnstap }},
             "docker-logs": ${{ steps.filter.outputs.docker-logs }},
+            "doris": ${{ steps.filter.outputs.doris }},
             "elasticsearch": ${{ steps.filter.outputs.elasticsearch }},
             "eventstoredb": ${{ steps.filter.outputs.eventstoredb }},
             "fluent": ${{ steps.filter.outputs.fluent }},
@@ -372,6 +434,7 @@ jobs:
             "mqtt": ${{ steps.filter.outputs.mqtt }},
             "nats": ${{ steps.filter.outputs.nats }},
             "nginx": ${{ steps.filter.outputs.nginx }},
+            "opensearch": ${{ steps.filter.outputs.opensearch }},
             "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
             "postgres": ${{ steps.filter.outputs.postgres }},
             "prometheus": ${{ steps.filter.outputs.prometheus }},
@@ -390,7 +453,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: int_tests_changes
           path: int_tests_changes.json
@@ -398,33 +461,37 @@ jobs:
   # Detects changes that are specific to e2e tests
   e2e_tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     if: ${{ inputs.e2e_tests }}
+    permissions:
+      contents: read
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
       opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
       opentelemetry-traces: ${{ steps.filter.outputs.opentelemetry-traces }}
+      opentelemetry-metrics-native: ${{ steps.filter.outputs.opentelemetry-metrics-native }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - uses: ./.github/actions/setup
         with:
           vdev: true
+          mold: false
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which
-      # sources the paths from the scripts/e2e/.../test.yaml files
+      # sources the paths from the tests/e2e/.../test.yaml files
       - name: Create filter rules for e2e tests
         run: vdev e2e ci-paths > int_test_filters.yaml
 
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
-          ref:  ${{ env.HEAD_SHA }}
+          ref: ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
@@ -438,7 +505,8 @@ jobs:
             "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
             "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }},
             "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }},
-            "opentelemetry-traces": ${{ steps.filter.outputs.opentelemetry-traces }}
+            "opentelemetry-traces": ${{ steps.filter.outputs.opentelemetry-traces }},
+            "opentelemetry-metrics-native": ${{ steps.filter.outputs.opentelemetry-metrics-native }}
           }
           EOF
           )
@@ -450,7 +518,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: e2e_tests_changes
           path: e2e_tests_changes.json

@@ -4,8 +4,7 @@ use std::{
 };
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-
-use crate::stats::EwmaDefault;
+use vector_lib::stats::EwmaDefault;
 
 const EWMA_WEIGHT: f64 = 0.1;
 const MINIMUM_PERMITS: usize = 2;

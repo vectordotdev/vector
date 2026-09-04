@@ -12,7 +12,6 @@ components: transforms: "remap": {
 		"""
 
 	classes: {
-		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      false
@@ -31,7 +30,6 @@ components: transforms: "remap": {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.remap.configuration

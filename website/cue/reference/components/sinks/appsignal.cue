@@ -4,7 +4,6 @@ components: sinks: appsignal: {
 	title: "AppSignal"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: appsignal: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   100
 				max_bytes:    450_000_000
 				timeout_secs: 1.0
@@ -58,7 +56,6 @@ components: sinks: appsignal: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.appsignal.configuration

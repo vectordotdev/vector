@@ -1,7 +1,6 @@
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
-    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -70,10 +69,19 @@ impl UdpSinkConfig {
         }
     }
 
-    fn build_connector(&self) -> crate::Result<UdpConnector> {
+    /// Parses the configured address into its host and port components.
+    ///
+    /// The address must include a port; this is a pure check (no network I/O)
+    /// shared by validation and `build_connector`.
+    pub fn parse_address(&self) -> crate::Result<(String, u16)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
+        Ok((host, port))
+    }
+
+    fn build_connector(&self) -> crate::Result<UdpConnector> {
+        let (host, port) = self.parse_address()?;
         Ok(UdpConnector::new(host, port, self.send_buffer_bytes))
     }
 
@@ -112,11 +120,9 @@ impl UdpConnector {
         }
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
+        ExponentialBackoff::default()
     }
 
     async fn connect(&self) -> Result<UdpSocket, UdpError> {

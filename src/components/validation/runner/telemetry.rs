@@ -13,7 +13,7 @@ use crate::{
     proto::vector::Server as VectorServer,
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::{internal_logs::InternalLogsConfig, internal_metrics::InternalMetricsConfig},
-    test_util::next_addr,
+    test_util::addr::next_addr,
 };
 
 const INTERNAL_LOGS_KEY: &str = "_telemetry_logs";
@@ -32,7 +32,8 @@ pub struct Telemetry {
 impl Telemetry {
     /// Creates a telemetry collector by attaching the relevant components to an existing `ConfigBuilder`.
     pub fn attach_to_config(config_builder: &mut ConfigBuilder) -> Self {
-        let listen_addr = GrpcAddress::from(next_addr());
+        let (_guard, addr) = next_addr();
+        let listen_addr = GrpcAddress::from(addr);
         info!(%listen_addr, "Attaching telemetry components.");
 
         // Attach an internal logs and internal metrics source, and send them on to a dedicated Vector

@@ -1,7 +1,4 @@
-use vector_lib::{
-    config::{LogNamespace, clone_input_definitions},
-    configurable::configurable_component,
-};
+use vector_lib::{config::clone_input_definitions, configurable::configurable_component};
 
 use super::{
     common::{
@@ -25,22 +22,19 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
-    #[configurable(derived)]
     #[serde(default)]
     pub fields: Option<FieldMatchConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_cache_config")]
     pub cache: CacheConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub time_settings: Option<TimedCacheConfig>,
 }
 
 impl GenerateConfig for DedupeConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             fields: None,
             cache: default_cache_config(),
             time_settings: None,
@@ -73,9 +67,8 @@ impl TransformConfig for DedupeConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::Log,
@@ -107,6 +100,20 @@ mod tests {
             test::create_topology,
         },
     };
+
+    const TEST_SOURCE_COMPONENT_ID: &str = "in";
+    const TEST_UPSTREAM_COMPONENT_ID: &str = "transform";
+    const TEST_SOURCE_TYPE: &str = "unit_test_stream";
+
+    fn set_expected_metadata(event: &mut Event) {
+        event.set_source_id(Arc::new(ComponentKey::from(TEST_SOURCE_COMPONENT_ID)));
+        event.set_upstream_id(Arc::new(OutputId::from(TEST_UPSTREAM_COMPONENT_ID)));
+        event.set_source_type(TEST_SOURCE_TYPE);
+        // The schema definition is copied from the source for dedupe.
+        event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+    }
 
     #[test]
     fn generate_config() {
@@ -162,35 +169,32 @@ mod tests {
     }
 
     async fn basic(transform_config: DedupeConfig, first_path: &str, second_path: &str) {
+        let first_path = vrl::path::parse_target_path(first_path).unwrap();
+        let second_path = vrl::path::parse_target_path(second_path).unwrap();
         assert_transform_compliance(async {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) =
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert(first_path, "some value");
-            event1.as_mut_log().insert(second_path, "another value");
+            event1.as_mut_log().insert(&first_path, "some value");
+            event1.as_mut_log().insert(&second_path, "another value");
 
             // Test that unmatched field isn't considered
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert(first_path, "some value2");
-            event2.as_mut_log().insert(second_path, "another value");
+            event2.as_mut_log().insert(&first_path, "some value2");
+            event2.as_mut_log().insert(&second_path, "another value");
 
             // Test that matched field is considered
             let mut event3 = Event::Log(LogEvent::from("message"));
-            event3.as_mut_log().insert(first_path, "some value");
-            event3.as_mut_log().insert(second_path, "another value2");
+            event3.as_mut_log().insert(&first_path, "some value");
+            event3.as_mut_log().insert(&second_path, "another value2");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
-            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event1
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             // Second event differs in matched field so should be output even though it
@@ -198,12 +202,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(ComponentKey::from("in")));
-            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event2
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event2);
             assert_eq!(new_event, event2);
 
             // Third event has the same value for "matched" as first event, so it should be dropped.
@@ -236,21 +235,20 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched1", "some value");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched1"), "some value");
 
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched2", "some value");
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched2"), "some value");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
-            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event1
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             // Second event has a different matched field name with the same value,
@@ -258,12 +256,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(ComponentKey::from("in")));
-            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event2
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event2);
             assert_eq!(new_event, event2);
 
             drop(tx);
@@ -296,24 +289,27 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched1", "value1");
-            event1.as_mut_log().insert("matched2", "value2");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched1"), "value1");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched2"), "value2");
 
             // Add fields in opposite order
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched2", "value2");
-            event2.as_mut_log().insert("matched1", "value1");
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched2"), "value2");
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched1"), "value1");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
-            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event1
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             // Second event is the same just with different field order, so it
@@ -349,22 +345,20 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", "some value");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), "some value");
 
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched", "some value2");
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), "some value2");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
-            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
-
-            // the schema definition is copied from the source for dedupe
-            event1
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             // Second event gets output because it's not a dupe. This causes the first
@@ -372,12 +366,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(ComponentKey::from("in")));
-            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event2
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event2);
 
             assert_eq!(new_event, event2);
 
@@ -386,7 +375,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             drop(tx);
@@ -430,19 +419,15 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", "some value");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), "some value");
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
-            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
-
-            // the schema definition is copied from the source for dedupe
-            event1
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             // Second time the event gets dropped because it's a dupe.
@@ -450,11 +435,11 @@ mod tests {
 
             tokio::time::sleep(Duration::from_millis(101)).await;
 
-            // Third time the event is a dupe but enought time has passed to accept it.
+            // Third time the event is a dupe but enough time has passed to accept it.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             drop(tx);
@@ -486,21 +471,18 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", "123");
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), "123");
 
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched", 123);
+            event2.as_mut_log().insert(vrl::event_path!("matched"), 123);
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
-            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event1
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             // Second event should also get passed through even though the string
@@ -508,12 +490,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(ComponentKey::from("in")));
-            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event2
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event2);
             assert_eq!(new_event, event2);
 
             drop(tx);
@@ -547,23 +524,22 @@ mod tests {
             let mut map1 = ObjectMap::new();
             map1.insert("key".into(), "123".into());
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", map1);
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), map1);
 
             let mut map2 = ObjectMap::new();
             map2.insert("key".into(), 123.into());
             let mut event2 = Event::Log(LogEvent::from("message"));
-            event2.as_mut_log().insert("matched", map2);
+            event2
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), map2);
 
             // First event should always be passed through as-is.
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
-            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event1
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             // Second event should also get passed through even though the string
@@ -571,12 +547,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(ComponentKey::from("in")));
-            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event2
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event2);
             assert_eq!(new_event, event2);
 
             drop(tx);
@@ -606,7 +577,9 @@ mod tests {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             let mut event1 = Event::Log(LogEvent::from("message"));
-            event1.as_mut_log().insert("matched", Value::Null);
+            event1
+                .as_mut_log()
+                .insert(vrl::event_path!("matched"), Value::Null);
 
             let mut event2 = Event::Log(LogEvent::from("message"));
 
@@ -614,12 +587,7 @@ mod tests {
             tx.send(event1.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event1.set_source_id(Arc::new(ComponentKey::from("in")));
-            event1.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event1
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event1);
             assert_eq!(new_event, event1);
 
             // Second event should also get passed through as null is different than
@@ -627,12 +595,7 @@ mod tests {
             tx.send(event2.clone()).await.unwrap();
             let new_event = out.recv().await.unwrap();
 
-            event2.set_source_id(Arc::new(ComponentKey::from("in")));
-            event2.set_upstream_id(Arc::new(OutputId::from("transform")));
-            // the schema definition is copied from the source for dedupe
-            event2
-                .metadata_mut()
-                .set_schema_definition(&Arc::new(Definition::default_legacy_namespace()));
+            set_expected_metadata(&mut event2);
             assert_eq!(new_event, event2);
 
             drop(tx);

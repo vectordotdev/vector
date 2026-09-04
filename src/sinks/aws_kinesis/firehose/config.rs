@@ -5,6 +5,7 @@ use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkErro
 use futures::FutureExt;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
+use vector_lib::stream::BatcherSettings;
 
 use super::{
     KinesisClient, KinesisError, KinesisRecord, KinesisResponse, KinesisSinkBaseConfig, build_sink,
@@ -13,7 +14,10 @@ use super::{
 };
 use crate::{
     aws::{ClientBuilder, create_client, is_retriable_error},
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     sinks::{
         Healthcheck, VectorSink,
         util::{
@@ -68,7 +72,6 @@ pub struct KinesisFirehoseSinkConfig {
     #[serde(flatten)]
     pub base: KinesisSinkBaseConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
 }
@@ -118,16 +121,42 @@ impl KinesisFirehoseSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy).await?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+    fn input(&self) -> Input {
+        self.base.input()
+    }
 
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        self.base.acknowledgements()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedKinesisFirehose {
+    batch_settings: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for KinesisFirehoseSinkConfig {
+    type Validated = ValidatedKinesisFirehose;
+
+    fn validate(&self) -> crate::Result<ValidatedKinesisFirehose> {
         let batch_settings = self
             .batch
             .validate()?
             .limit_max_bytes(MAX_PAYLOAD_SIZE)?
             .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
+
+        Ok(ValidatedKinesisFirehose { batch_settings })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedKinesisFirehose,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.create_client(&cx.proxy).await?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
 
         let sink = build_sink::<
             KinesisFirehoseClient,
@@ -138,7 +167,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         >(
             &self.base,
             self.base.partition_key_field.clone(),
-            batch_settings,
+            validated.batch_settings,
             KinesisFirehoseClient { client },
             KinesisRetryLogic {
                 retry_partial: self.base.request_retry_partial,
@@ -147,22 +176,15 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 
         Ok((sink, healthcheck))
     }
-
-    fn input(&self) -> Input {
-        self.base.input()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        self.base.acknowledgements()
-    }
 }
 
 impl GenerateConfig for KinesisFirehoseSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"stream_name = "my-stream"
-            encoding.codec = "json""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"stream_name: my-stream
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }
@@ -196,5 +218,36 @@ impl RetryLogic for KinesisRetryLogic {
         } else {
             RetryAction::Successful
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_produces_batch_settings() {
+        let config = KinesisFirehoseSinkConfig {
+            batch: BatchConfig::<KinesisFirehoseDefaultBatchSettings>::default(),
+            base: KinesisSinkBaseConfig {
+                stream_name: String::from("test"),
+                region: crate::aws::RegionOrEndpoint::with_both(
+                    "us-east-1",
+                    "http://localhost:4566",
+                ),
+                encoding: vector_lib::codecs::JsonSerializerConfig::default().into(),
+                compression: crate::sinks::util::Compression::None,
+                request: Default::default(),
+                tls: None,
+                auth: Default::default(),
+                request_retry_partial: false,
+                acknowledgements: Default::default(),
+                partition_key_field: None,
+            },
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.batch_settings.item_limit, MAX_PAYLOAD_EVENTS);
+        assert_eq!(validated.batch_settings.size_limit, MAX_PAYLOAD_SIZE);
     }
 }

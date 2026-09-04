@@ -11,9 +11,12 @@ use serde::{
 use vector_config::configurable_component;
 use vector_lib::{
     TimeZone, compile_vrl,
-    event::{Event, LogEvent, VrlTarget},
+    enrichment::TableRegistry,
+    event::{Event, LogEvent, MetricTagMode, VrlTarget},
+    lookup::OwnedTargetPath,
     sensitive_string::SensitiveString,
 };
+use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     compiler::{CompilationResult, CompileConfig, Program, runtime::Runtime},
     core::Value,
@@ -53,7 +56,7 @@ pub enum HttpServerAuthConfig {
 
     /// Custom authentication using VRL code.
     ///
-    /// Takes in request and validates it using VRL code.
+    /// Takes in request and validates it using VRL code. The VRL program must return a boolean.
     Custom {
         /// The VRL boolean expression.
         source: String,
@@ -135,6 +138,7 @@ impl HttpServerAuthConfig {
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<HttpServerAuthMatcher> {
         match self {
             HttpServerAuthConfig::Basic { username, password } => {
@@ -144,23 +148,20 @@ impl HttpServerAuthConfig {
                 ))
             }
             HttpServerAuthConfig::Custom { source } => {
-                let functions = vrl::stdlib::all()
-                    .into_iter()
-                    .chain(vector_lib::enrichment::vrl_functions())
-                    .chain(vector_vrl_functions::all())
-                    .collect::<Vec<_>>();
-
                 let state = TypeState::default();
 
                 let mut config = CompileConfig::default();
                 config.set_custom(enrichment_tables.clone());
-                config.set_read_only();
+                config.set_custom(metrics_storage.clone());
+                // Lock the event body (.field) as read-only, but leave metadata (%field) writable
+                // so the VRL program can enrich authenticated events via %field = value.
+                config.set_read_only_path(OwnedTargetPath::event_root(), true);
 
                 let CompilationResult {
                     program,
                     warnings,
                     config: _,
-                } = compile_vrl(source, &functions, &state, config)
+                } = compile_vrl(source, &vector_vrl_functions::all(), &state, config)
                     .map_err(|diagnostics| format_vrl_diagnostics(source, diagnostics))?;
 
                 if !program.final_type_info().result.is_boolean() {
@@ -176,6 +177,14 @@ impl HttpServerAuthConfig {
             }
         }
     }
+
+    /// Validates the auth configuration against the given enrichment tables,
+    /// compiling any custom VRL program so `vector validate --no-environment`
+    /// catches syntax/type errors while resolving enrichment table names.
+    pub fn validate(&self, enrichment_tables: &TableRegistry) -> crate::Result<()> {
+        self.build(enrichment_tables, &MetricsStorage::default())
+            .map(|_| ())
+    }
 }
 
 /// Built auth matcher with validated configuration
@@ -185,7 +194,9 @@ impl HttpServerAuthConfig {
 pub enum HttpServerAuthMatcher {
     /// Matcher for comparing exact value of Authorization header
     AuthHeader(HeaderValue, &'static str),
-    /// Matcher for running VRL script for requests, to allow for custom validation
+    /// Matcher for running VRL script for requests, to allow for custom validation.
+    /// Metadata (`%field`) writes in the program are extracted and returned to the caller
+    /// for injection into authenticated events.
     Vrl {
         /// Compiled VRL script
         program: Program,
@@ -193,18 +204,19 @@ pub enum HttpServerAuthMatcher {
 }
 
 impl HttpServerAuthMatcher {
-    /// Compares passed headers to the matcher
+    /// Validates the request. Returns `Ok(Some(enrichment))` when auth passes and the VRL program
+    /// wrote `%field` values; returns `Ok(None)` when auth passes with no metadata enrichment.
     pub fn handle_auth(
         &self,
         address: Option<&SocketAddr>,
         headers: &HeaderMap<HeaderValue>,
         path: &str,
-    ) -> Result<(), ErrorMessage> {
+    ) -> Result<Option<ObjectMap>, ErrorMessage> {
         match self {
             HttpServerAuthMatcher::AuthHeader(expected, err_message) => {
                 if let Some(header) = headers.get(AUTHORIZATION) {
                     if expected == header {
-                        Ok(())
+                        Ok(None)
                     } else {
                         Err(ErrorMessage::new(
                             StatusCode::UNAUTHORIZED,
@@ -230,7 +242,7 @@ impl HttpServerAuthMatcher {
         headers: &HeaderMap<HeaderValue>,
         path: &str,
         program: &Program,
-    ) -> Result<(), ErrorMessage> {
+    ) -> Result<Option<ObjectMap>, ErrorMessage> {
         let mut target = VrlTarget::new(
             Event::Log(LogEvent::from_map(
                 ObjectMap::from([
@@ -257,7 +269,7 @@ impl HttpServerAuthMatcher {
                 Default::default(),
             )),
             program.info(),
-            false,
+            MetricTagMode::Single,
         );
         let timezone = TimeZone::default();
 
@@ -266,16 +278,22 @@ impl HttpServerAuthMatcher {
             warn!("Handling auth failed: {}", e);
             ErrorMessage::new(StatusCode::UNAUTHORIZED, "Auth failed".to_owned())
         })? {
-            vrl::core::Value::Boolean(result) => {
-                if result {
-                    Ok(())
+            vrl::core::Value::Boolean(true) => {
+                let enrichment = if let VrlTarget::LogEvent(_, metadata) = &target {
+                    metadata
+                        .value()
+                        .as_object()
+                        .filter(|m| !m.is_empty())
+                        .cloned()
                 } else {
-                    Err(ErrorMessage::new(
-                        StatusCode::UNAUTHORIZED,
-                        "Auth failed".to_owned(),
-                    ))
-                }
+                    None
+                };
+                Ok(enrichment)
             }
+            vrl::core::Value::Boolean(false) => Err(ErrorMessage::new(
+                StatusCode::UNAUTHORIZED,
+                "Auth failed".to_owned(),
+            )),
             _ => Err(ErrorMessage::new(
                 StatusCode::UNAUTHORIZED,
                 "Invalid return value".to_owned(),
@@ -289,7 +307,7 @@ mod tests {
     use indoc::indoc;
 
     use super::*;
-    use crate::test_util::{next_addr, random_string};
+    use crate::test_util::{addr::next_addr, random_string};
 
     impl HttpServerAuthMatcher {
         fn auth_header(self) -> (HeaderValue, &'static str) {
@@ -363,7 +381,7 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(&Default::default());
+        let matcher = basic_auth.build(&Default::default(), &Default::default());
 
         assert!(matcher.is_ok());
         assert!(matches!(
@@ -379,7 +397,10 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let (_, error_message) = basic_auth.build(&Default::default()).unwrap().auth_header();
+        let (_, error_message) = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap()
+            .auth_header();
         assert_eq!("Invalid username/password", error_message);
     }
 
@@ -392,7 +413,10 @@ mod tests {
             password: password.clone().into(),
         };
 
-        let (header, _) = basic_auth.build(&Default::default()).unwrap().auth_header();
+        let (header, _) = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap()
+            .auth_header();
         assert_eq!(
             Authorization::basic(&username, &password).0.encode(),
             header
@@ -405,7 +429,11 @@ mod tests {
             source: "invalid VRL source".to_string(),
         };
 
-        assert!(custom_auth.build(&Default::default()).is_err());
+        assert!(
+            custom_auth
+                .build(&Default::default(), &Default::default())
+                .is_err()
+        );
     }
 
     #[test]
@@ -418,7 +446,11 @@ mod tests {
             .to_string(),
         };
 
-        assert!(custom_auth.build(&Default::default()).is_err());
+        assert!(
+            custom_auth
+                .build(&Default::default(), &Default::default())
+                .is_err()
+        );
     }
 
     #[test]
@@ -430,7 +462,11 @@ mod tests {
             .to_string(),
         };
 
-        assert!(custom_auth.build(&Default::default()).is_ok());
+        assert!(
+            custom_auth
+                .build(&Default::default(), &Default::default())
+                .is_ok()
+        );
     }
 
     #[test]
@@ -440,9 +476,12 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(&Default::default()).unwrap();
+        let matcher = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
-        let result = matcher.handle_auth(Some(&next_addr()), &HeaderMap::new(), "/");
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &HeaderMap::new(), "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -457,11 +496,14 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(&Default::default()).unwrap();
+        let matcher = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("Basic wrong"));
-        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -478,14 +520,17 @@ mod tests {
             password: password.clone().into(),
         };
 
-        let matcher = basic_auth.build(&Default::default()).unwrap();
+        let matcher = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(
             AUTHORIZATION,
             Authorization::basic(&username, &password).0.encode(),
         );
-        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_ok());
     }
@@ -496,40 +541,47 @@ mod tests {
             source: r#".headers.authorization == "test""#.to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
-        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_ok());
     }
 
     #[test]
     fn custom_auth_matcher_should_be_able_to_check_address() {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let addr_string = addr.ip().to_string();
         let custom_auth = HttpServerAuthConfig::Custom {
             source: format!(".address == \"{addr_string}\""),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let headers = HeaderMap::new();
-        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_ok());
     }
 
     #[test]
     fn custom_auth_matcher_should_work_with_missing_address_too() {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let addr_string = addr.ip().to_string();
         let custom_auth = HttpServerAuthConfig::Custom {
             source: format!(".address == \"{addr_string}\""),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let headers = HeaderMap::new();
         let result = matcher.handle_auth(None, &headers, "/");
@@ -543,10 +595,13 @@ mod tests {
             source: r#".path == "/ok""#.to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let headers = HeaderMap::new();
-        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/ok");
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/ok");
 
         assert!(result.is_ok());
     }
@@ -557,10 +612,13 @@ mod tests {
             source: r#".path == "/ok""#.to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let headers = HeaderMap::new();
-        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/bad");
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/bad");
 
         assert!(result.is_err());
     }
@@ -571,11 +629,14 @@ mod tests {
             source: r#".headers.authorization == "test""#.to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("wrong value"));
-        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -589,15 +650,89 @@ mod tests {
             source: "abort".to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
-        let result = matcher.handle_auth(Some(&next_addr()), &headers, "/");
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
         assert_eq!(401, error.code());
         assert_eq!("Auth failed", error.message());
+    }
+
+    // Backward-compat: existing `custom` scripts that don't write metadata still work and return
+    // Ok(None) — no enrichment, no change in behavior.
+    #[test]
+    fn custom_auth_matcher_returns_none_enrichment_when_no_metadata_written() {
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: r#".headers.authorization == "Bearer token""#.to_string(),
+        };
+
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer token"));
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
+
+        assert!(result.is_ok());
+        assert_eq!(
+            None,
+            result.unwrap(),
+            "no metadata written => no enrichment"
+        );
+    }
+
+    // Existing `custom` scripts that write metadata via `%field = value` now enrich events.
+    #[test]
+    fn custom_auth_matcher_returns_enrichment_when_metadata_written() {
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: indoc! {r#"
+                %tenant_id = "acme"
+                true
+                "#}
+            .to_string(),
+        };
+
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
+
+        let headers = HeaderMap::new();
+        let (_guard, addr) = next_addr();
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
+
+        assert!(result.is_ok());
+        let enrichment = result.unwrap().expect("expected enrichment map");
+        assert_eq!(
+            enrichment.get("tenant_id").cloned(),
+            Some(vrl::core::Value::from("acme")),
+        );
+    }
+
+    // Existing `custom` scripts still cannot mutate event body fields.
+    #[test]
+    fn custom_auth_build_fails_when_event_body_write_attempted() {
+        let custom_auth = HttpServerAuthConfig::Custom {
+            source: indoc! {r#"
+                .new_field = "value"
+                true
+                "#}
+            .to_string(),
+        };
+
+        assert!(
+            custom_auth
+                .build(&Default::default(), &Default::default())
+                .is_err(),
+            "writing to event body (.field) must be rejected at compile time"
+        );
     }
 }

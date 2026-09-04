@@ -6,11 +6,6 @@ components: {
 		_args: kind: string
 		let Args = _args
 
-		// `commonly_used` specifies if the component is commonly used or not.
-		// Setting this to `true` will surface the component from other,
-		// less commonly used, components.
-		commonly_used: bool
-
 		if Args.kind == "source" || Args.kind == "sink" {
 			delivery: #DeliveryStatus
 		}
@@ -353,7 +348,6 @@ components: {
 			// relevant if a component has an `egress_method` of "batch".
 			batch: {
 				enabled:       bool
-				common?:       bool
 				max_bytes?:    uint | null
 				max_events?:   uint | null
 				timeout_secs?: float | null
@@ -469,8 +463,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: {
-		description:        string
-		relevant_when?:     string
+		description:    string
+		relevant_when?: string
+		deprecated:     bool | *false
+		if deprecated {
+			deprecated_message?: string
+		}
 		tags?:              #MetricTags
 		name?:              Name
 		type?:              #MetricType
@@ -562,13 +560,6 @@ components: {
 		// For example, a transform might be known to have performance issues
 		// or a lack of support for specific features, etc.
 		warnings: [...string] | null // Allow for empty list
-
-		// `notices` communicates useful information to the user that is neither
-		// a requirement or a warning.
-		//
-		// For example, the `lua` transform offers a Lua version notice that
-		// communicate which version of Lua is embedded.
-		notices: [...string] | null // Allow for empty list
 	}
 
 	sources:    #Components
@@ -583,7 +574,6 @@ components: {
 
 		configuration: {
 			_gcp_api_key: {
-				common:      false
 				description: "A [Google Cloud API key](\(urls.gcp_authentication_api_key)) used to authenticate access the pubsub project and topic. Either this or `credentials_path` must be set."
 				required:    false
 				type: string: {
@@ -592,7 +582,6 @@ components: {
 				}
 			}
 			_gcp_credentials_path: {
-				common:      true
 				description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
 				required:    false
 				type: string: {
@@ -601,12 +590,10 @@ components: {
 				}
 			}
 			_source_acknowledgements: {
-				common:      true
 				description: "Controls how acknowledgements are handled by this source. These settings override the global `acknowledgement` settings. This setting is deprecated in favor of enabling `acknowledgements` in the destination sink."
 				required:    false
 				type: object: options: {
 					enabled: {
-						common:      true
 						description: "Controls if the source will wait for destination sinks to deliver the events before acknowledging receipt."
 						warnings: ["This setting is deprecated in favor of enabling `acknowledgements` in the destination sink.", "Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
 						required: false
@@ -623,12 +610,10 @@ components: {
 				}
 				let Args = _args
 
-				common:      false
 				description: "Configures the TLS options for incoming/outgoing connections."
 				required:    false
 				type: object: options: {
 					enabled: {
-						common: false
 						description: """
 							Whether to require TLS for incoming/outgoing connections.
 
@@ -640,7 +625,6 @@ components: {
 					}
 
 					ca_file: {
-						common: false
 						description: """
 							Absolute path to an additional CA certificate file.
 
@@ -654,7 +638,6 @@ components: {
 					}
 					if Args.can_add_client_metadata {
 						client_metadata_key: {
-							common:      false
 							description: "Event field for client certificate metadata."
 							required:    false
 							type: string: {
@@ -664,7 +647,6 @@ components: {
 						}
 					}
 					crt_file: {
-						common: false
 						description: """
 							Absolute path to a certificate file used to identify this server.
 
@@ -680,7 +662,6 @@ components: {
 						}
 					}
 					key_file: {
-						common: false
 						description: """
 							Absolute path to a private key file used to identify this server.
 
@@ -693,7 +674,6 @@ components: {
 						}
 					}
 					key_pass: {
-						common: false
 						description: """
 							Passphrase used to unlock the encrypted key file.
 
@@ -708,7 +688,6 @@ components: {
 
 					if Args.can_verify_certificate {
 						verify_certificate: {
-							common: false
 							description: """
 								Enables certificate verification.
 
@@ -737,13 +716,11 @@ components: {
 				}
 				let Args = _args
 
-				common:      false
 				description: "Configures the TLS options for incoming/outgoing connections."
 				required:    false
 				type: object: options: {
 					if !Args.enabled_by_scheme {
 						enabled: {
-							common: true
 							description: """
 								Whether to require TLS for incoming/outgoing connections.
 
@@ -756,7 +733,6 @@ components: {
 					}
 
 					ca_file: {
-						common: false
 						description: """
 							Absolute path to an additional CA certificate file.
 
@@ -769,7 +745,6 @@ components: {
 						}
 					}
 					crt_file: {
-						common: true
 						description: """
 							Absolute path to a certificate file used to identify this server.
 
@@ -785,7 +760,6 @@ components: {
 						}
 					}
 					key_file: {
-						common: true
 						description: """
 							Absolute path to a private key file used to identify this server.
 
@@ -798,7 +772,6 @@ components: {
 						}
 					}
 					key_pass: {
-						common: false
 						description: """
 							Passphrase used to unlock the encrypted key file.
 
@@ -811,7 +784,6 @@ components: {
 						}
 					}
 					alpn_protocols: {
-						common: false
 						description: """
 							Sets the list of supported ALPN protocols.
 
@@ -830,7 +802,6 @@ components: {
 
 					if Args.can_verify_certificate {
 						verify_certificate: {
-							common: false
 							description: """
 								Enables certificate verification.
 
@@ -850,7 +821,6 @@ components: {
 
 					if Args.can_verify_hostname {
 						verify_hostname: {
-							common: false
 							description: """
 								Enables hostname verification.
 
@@ -869,7 +839,6 @@ components: {
 			}
 
 			_proxy: {
-				common: false
 				description: """
 					Proxy configuration.
 
@@ -882,13 +851,11 @@ components: {
 				required: false
 				type: object: options: {
 					enabled: {
-						common:      false
 						description: "Enables proxying support."
 						required:    false
 						type: bool: default: true
 					}
 					http: {
-						common: false
 						description: """
 							Proxy endpoint to use when proxying HTTP traffic.
 
@@ -898,7 +865,6 @@ components: {
 						type: string: examples: ["http://foo.bar:3128"]
 					}
 					https: {
-						common: false
 						description: """
 							Proxy endpoint to use when proxying HTTPS traffic.
 
@@ -908,7 +874,6 @@ components: {
 						type: string: examples: ["http://foo.bar:3128"]
 					}
 					no_proxy: {
-						common: false
 						description: """
 							A list of hosts to avoid proxying.
 
@@ -942,7 +907,6 @@ components: {
 				}
 				let Args = _args
 
-				common:      false
 				description: "Configures the authentication strategy."
 				required:    false
 				type: object: options: {
@@ -981,7 +945,6 @@ components: {
 			}
 
 			_http_basic_auth: {
-				common:      false
 				description: "Options for HTTP Basic Authentication."
 				required:    false
 				type: object: {
@@ -1006,7 +969,6 @@ components: {
 			}
 
 			_timezone: {
-				common:      false
 				description: """
 					The name of the time zone to apply to timestamp conversions that do not contain an explicit time
 					zone. This overrides the global [`timezone` option](\(urls.vector_configuration)/global-options#timezone).
@@ -1021,7 +983,6 @@ components: {
 			}
 
 			_types: {
-				common:      true
 				description: _coercing_fields
 				required:    false
 

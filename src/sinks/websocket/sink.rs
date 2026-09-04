@@ -19,7 +19,9 @@ use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream
 use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, emit,
+    EstimatedJsonEncodedSizeOf,
+    codecs::encoding::Serializer,
+    emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
@@ -37,9 +39,9 @@ impl WebSocketSink {
     pub(crate) fn new(
         config: &WebSocketSinkConfig,
         connector: WebSocketConnector,
+        transformer: Transformer,
+        serializer: Serializer,
     ) -> crate::Result<Self> {
-        let transformer = config.encoding.transformer();
-        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
@@ -226,8 +228,9 @@ mod tests {
         http::Auth,
         test_util::{
             CountReceiver,
+            addr::next_addr,
             components::{SINK_TAGS, run_and_assert_sink_compliance},
-            next_addr, random_lines_with_stream, trace_init,
+            random_lines_with_stream, trace_init,
         },
         tls::{self, MaybeTlsSettings, TlsConfig, TlsEnableableConfig},
     };
@@ -236,7 +239,7 @@ mod tests {
     async fn test_websocket() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
@@ -261,7 +264,7 @@ mod tests {
             token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string().into(),
         });
         let auth_clone = auth.clone();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
@@ -282,7 +285,7 @@ mod tests {
     async fn test_tls_websocket() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let tls_config = Some(TlsEnableableConfig::test_config());
         let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
@@ -313,7 +316,7 @@ mod tests {
     async fn test_websocket_reconnect() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
@@ -406,19 +409,19 @@ mod tests {
                                     let hdr = req.headers().get("Authorization");
                                     if let Some(h) = hdr {
                                         match a {
-                                            Auth::Bearer { token } => {
-                                                if format!("Bearer {}", token.inner())
-                                                    != h.to_str().unwrap()
-                                                {
-                                                    return Err(
-                                                        http::Response::<Option<String>>::new(None),
-                                                    );
-                                                }
+                                            Auth::Bearer { token }
+                                                if format!("Bearer {}", token.inner()) != h.to_str().unwrap() =>
+                                            {
+                                                return Err(
+                                                    http::Response::<Option<String>>::new(None),
+                                                );
                                             }
+                                            Auth::Bearer { .. } => {}
                                             Auth::Basic {
                                                 user: _user,
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
+                                            Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
                                             #[cfg(feature = "aws-core")]
                                             _ => {}
                                         }

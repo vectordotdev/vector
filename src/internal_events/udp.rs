@@ -1,24 +1,27 @@
-use metrics::counter;
-use vector_lib::internal_event::{
-    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{
+        ComponentEventsDropped, CounterName, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
 };
 
 use crate::internal_events::SocketOutgoingConnectionError;
 
 // TODO: Get rid of this. UDP is connectionless, so there's no "successful" connect event, only
 // successfully binding a socket that can be used for receiving.
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct UdpSocketConnectionEstablished;
 
 impl InternalEvent for UdpSocketConnectionEstablished {
     fn emit(self) {
         debug!(message = "Connected.");
-        counter!("connection_established_total", "mode" => "udp").increment(1);
+        counter!(CounterName::ConnectionEstablishedTotal, "mode" => "udp").increment(1);
     }
 }
 
 // TODO: Get rid of this. UDP is connectionless, so there's no "unsuccessful" connect event, only
 // unsuccessfully binding a socket that can be used for receiving.
+#[derive(NamedInternalEvent)]
 pub struct UdpSocketOutgoingConnectionError<E> {
     pub error: E,
 }
@@ -31,7 +34,7 @@ impl<E: std::error::Error> InternalEvent for UdpSocketOutgoingConnectionError<E>
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct UdpSendIncompleteError {
     pub data_size: usize,
     pub sent: usize,
@@ -49,19 +52,19 @@ impl InternalEvent for UdpSendIncompleteError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         )
         .increment(1);
         // deprecated
-        counter!("connection_send_errors_total", "mode" => "udp").increment(1);
+        counter!(CounterName::ConnectionSendErrorsTotal, "mode" => "udp").increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct UdpChunkingError {
     pub error: vector_common::Error,
     pub data_size: usize,
@@ -78,7 +81,7 @@ impl InternalEvent for UdpChunkingError {
             stage = error_stage::SENDING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         )

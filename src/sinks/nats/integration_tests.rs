@@ -38,6 +38,7 @@ fn generate_sink_config(url: &str, subject: &str) -> NatsSinkConfig {
         auth: None,
         request: Default::default(),
         jetstream: false.into(),
+        confinement: Default::default(),
     }
 }
 
@@ -48,7 +49,15 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     // successfully published.
 
     // Create Sink
-    let sink = NatsSink::new(conf.clone()).await?;
+    let confined_subject = conf
+        .subject
+        .clone()
+        .confine(&conf.confinement, "nats", "subject")
+        .expect("subject should confine");
+    let server_addresses = conf
+        .parse_server_addresses()
+        .expect("server addresses should parse");
+    let sink = NatsSink::new(conf.clone(), confined_subject, server_addresses.clone()).await?;
     let sink = VectorSink::from_event_streamsink(sink);
 
     // Establish the consumer subscription.
@@ -56,7 +65,7 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     let options: async_nats::ConnectOptions = (&conf).try_into().context(ConfigSnafu)?;
     let consumer = conf
         .clone()
-        .connect(options)
+        .connect(options, server_addresses)
         .await
         .expect("failed to connect with test consumer");
     let mut sub = consumer
@@ -252,7 +261,7 @@ async fn nats_tls_valid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
             ..Default::default()
         },
     });
@@ -293,9 +302,9 @@ async fn nats_tls_client_cert_valid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
-            crt_file: Some("tests/data/nats/nats-client.pem".into()),
-            key_file: Some("tests/data/nats/nats-client.key".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
+            crt_file: Some("tests/integration/nats/data/nats-client.pem".into()),
+            key_file: Some("tests/integration/nats/data/nats-client.key".into()),
             ..Default::default()
         },
     });
@@ -319,7 +328,7 @@ async fn nats_tls_client_cert_invalid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
             ..Default::default()
         },
     });
@@ -343,13 +352,13 @@ async fn nats_tls_jwt_auth_valid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
             ..Default::default()
         },
     });
     conf.auth = Some(NatsAuthConfig::CredentialsFile {
         credentials_file: NatsAuthCredentialsFile {
-            path: "tests/data/nats/nats.creds".into(),
+            path: "tests/integration/nats/data/nats.creds".into(),
         },
     });
 
@@ -372,13 +381,13 @@ async fn nats_tls_jwt_auth_invalid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
             ..Default::default()
         },
     });
     conf.auth = Some(NatsAuthConfig::CredentialsFile {
         credentials_file: NatsAuthCredentialsFile {
-            path: "tests/data/nats/nats-bad.creds".into(),
+            path: "tests/integration/nats/data/nats-bad.creds".into(),
         },
     });
 
@@ -459,7 +468,7 @@ async fn nats_jetstream_message_id_valid() {
     conf.encoding = JsonSerializerConfig::default().into();
 
     let header_config = NatsHeaderConfig {
-        message_id: Some(Template::try_from("{{ id }}").unwrap()),
+        message_id: Some(UnconfinedTemplate::try_from("{{ id }}").unwrap()),
     };
 
     conf.jetstream = JetStreamConfig {
@@ -467,7 +476,17 @@ async fn nats_jetstream_message_id_valid() {
         headers: Some(header_config),
     };
 
-    let sink = NatsSink::new(conf.clone()).await.unwrap();
+    let confined_subject = conf
+        .subject
+        .clone()
+        .confine(&conf.confinement, "nats", "subject")
+        .expect("subject should confine");
+    let server_addresses = conf
+        .parse_server_addresses()
+        .expect("server addresses should parse");
+    let sink = NatsSink::new(conf.clone(), confined_subject, server_addresses)
+        .await
+        .unwrap();
     let sink = VectorSink::from_event_streamsink(sink);
 
     let event_id = "123";

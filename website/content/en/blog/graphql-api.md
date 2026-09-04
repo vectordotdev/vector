@@ -9,6 +9,8 @@ badges:
 tags: ["graphql", "api", "metrics"]
 ---
 
+{{< grpc-migration-warning >}}
+
 Although Vector is an observability tool, it's nonetheless important to be able
 to observe Vector itself, especially in production environments where it serves
 as critical infrastructure. That's why we're excited to announce the new [Vector
@@ -34,19 +36,22 @@ tuned!
 
 Start up Vector locally with the following config:
 
-```toml
-[api]
-enabled = true
+```yaml
+api:
+  enabled: true
 
-[sources.demo]
-type = "demo_logs"
-format = "json"
-interval = 1.0
+sources:
+  demo:
+    type: "demo_logs"
+    format: "json"
+    interval: 1.0
 
-[sinks.console]
-type = "console"
-inputs = ["demo"]
-encoding.codec = "text"
+sinks:
+  console:
+    type: "console"
+    inputs: ["demo"]
+    encoding:
+      codec: "text"
 ```
 
 You can then access
@@ -188,12 +193,12 @@ query {
 
 The API is an opt-in feature that spawns an HTTP server to accept queries.
 
-To enable, open your `vector.toml`, and add the following:
+To enable, open your `vector.yaml`, and add the following:
 
-```toml
-[api]
-  enabled = true
-  address = "127.0.0.1:8686" # optional. Change IP/port if required
+```yaml
+api:
+  enabled: true
+  address: "127.0.0.1:8686" # optional. Change IP/port if required
 ```
 
 After restarting Vector, you can access an API playground at

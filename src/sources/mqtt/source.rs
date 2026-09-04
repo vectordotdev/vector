@@ -1,6 +1,7 @@
 use itertools::Itertools;
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
+use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
 use vector_lib::{
+    codecs::Decoder,
     config::{LegacyKey, LogNamespace},
     internal_event::EventsReceived,
     lookup::path,
@@ -8,10 +9,10 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    codecs::Decoder,
     common::mqtt::MqttConnector,
     event::{BatchNotifier, Event},
     internal_events::{EndpointBytesReceived, StreamClosedError},
+    serde::OneOrMany,
     shutdown::ShutdownSignal,
     sources::{mqtt::MqttSourceConfig, util},
 };
@@ -41,10 +42,25 @@ impl MqttSource {
     pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let (client, mut connection) = self.connector.connect();
 
-        client
-            .subscribe(&self.config.topic, QoS::AtLeastOnce)
-            .await
-            .map_err(|_| ())?;
+        match &self.config.topic {
+            OneOrMany::One(topic) => {
+                client
+                    .subscribe(topic, QoS::AtLeastOnce)
+                    .await
+                    .map_err(|_| ())?;
+            }
+            OneOrMany::Many(topics) => {
+                client
+                    .subscribe_many(
+                        topics
+                            .iter()
+                            .cloned()
+                            .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
+                    )
+                    .await
+                    .map_err(|_| ())?;
+            }
+        }
 
         loop {
             tokio::select! {
@@ -80,7 +96,7 @@ impl MqttSource {
         let events_received = register!(EventsReceived);
 
         let (batch, _batch_receiver) = BatchNotifier::maybe_new_with_receiver(false);
-        // Error is logged by `crate::codecs::Decoder`, no further handling
+        // Error is logged by `vector_lib::codecs::Decoder`, no further handling
         // is needed here.
         let decoded = util::decode_message(
             self.decoder.clone(),

@@ -10,8 +10,7 @@ components: sources: datadog_agent: {
 		"""
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"
@@ -49,7 +48,6 @@ components: sources: datadog_agent: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
@@ -83,6 +81,13 @@ components: sources: datadog_agent: {
 				If [multiple_outputs](#multiple_outputs) is enabled, received trace events will go to this output stream. Use `<component_id>.traces` as an input to downstream transforms and sinks.
 				"""
 		},
+		{
+			name: "llmobs"
+			description: """
+				If [multiple_outputs](#multiple_outputs) is enabled, received LLM Observability events will go to this output stream. Use `<component_id>.llmobs` as an input to downstream transforms and sinks.
+				"""
+		},
+
 	]
 
 	output: {
@@ -220,9 +225,33 @@ components: sources: datadog_agent: {
 				duration distribution).
 				"""
 		}
+		request_timeouts: {
+			title: "Request timeout handling"
+			body: """
+				When the Datadog Agent sends a request to this Vector source, and the source
+				blocks on sending the events in that request to the connected transforms or sinks,
+				the Agent will eventually time out the request and drop the connection. When that
+				happens, by default, Vector will emit an "Events dropped." error and increment
+				the `component_discarded_events_total` internal metric.
+
+				However, while it is technically true that Vector has dropped the events, the
+				Agent will retry resending that request indefinitely, which means the events will
+				eventually be received unless the blockage above is permanent or the Agent is
+				killed before the request is accepted.
+
+				To prevent this potentially misleading telemetry, you can configure
+				the `send_timeout_secs` option to a
+				value _less than_ the Agent's timeout, which defaults to 10 seconds.
+				This will cause Vector to respond to the Agent when such blockages occur with a HTTP 503
+				Service Unavailable response, emit a warning instead of an error,
+				and increment the `component_timed_out_requests_total` internal metric.
+				"""
+		}
 	}
 
 	telemetry: metrics: {
+		component_timed_out_events_total:     components.sources.internal_metrics.output.metrics.component_timed_out_events_total
+		component_timed_out_requests_total:   components.sources.internal_metrics.output.metrics.component_timed_out_requests_total
 		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
 		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
 		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total

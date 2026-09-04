@@ -57,8 +57,8 @@ pub fn default_namespace() -> String {
 }
 
 impl GenerateConfig for ApacheMetricsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             endpoints: vec!["http://localhost:8080/server-status/?auto".to_owned()],
             scrape_interval_secs: default_scrape_interval_secs(),
             namespace: default_namespace(),
@@ -173,7 +173,7 @@ fn apache_metrics(
                     .map_err(crate::Error::from)
                     .and_then(|response| async {
                         let (header, body) = response.into_parts();
-                        let body = hyper::body::to_bytes(body).await?;
+                        let body = http_body::Body::collect(body).await?.to_bytes();
                         Ok((header, body))
                     })
                     .into_stream()
@@ -290,9 +290,10 @@ mod test {
         Error,
         config::SourceConfig,
         test_util::{
+            addr::next_addr,
             collect_ready,
             components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
-            next_addr, wait_for_tcp,
+            wait_for_tcp,
         },
     };
 
@@ -303,7 +304,7 @@ mod test {
 
     #[tokio::test]
     async fn test_apache_up() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
@@ -381,11 +382,10 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
                 match m.tags() {
                     Some(tags) => {
-                        assert_eq!(
-                            tags.get("endpoint"),
-                            Some(&format!("http://{in_addr}/metrics")[..])
-                        );
-                        assert_eq!(tags.get("host"), Some(&in_addr.to_string()[..]));
+                        let endpoint = format!("http://{in_addr}/metrics");
+                        let host = in_addr.to_string();
+                        assert_eq!(tags.get("endpoint"), Some(endpoint.as_str()));
+                        assert_eq!(tags.get("host"), Some(host.as_str()));
                     }
                     None => error!(message = "No tags for metric.", metric = ?m),
                 }
@@ -396,7 +396,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
     #[tokio::test]
     async fn test_apache_error() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
@@ -448,7 +448,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
     #[tokio::test]
     async fn test_apache_down() {
         // will have nothing bound
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let (tx, rx) = SourceSender::new_test();
 

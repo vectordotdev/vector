@@ -86,6 +86,12 @@ pub(crate) trait HttpClientContext {
         None
     }
 
+    /// (Optional) Get the request body to send with the HTTP request.
+    /// Returns the body as a String if one should be sent, or None for an empty body.
+    fn get_request_body(&self) -> Option<String> {
+        None
+    }
+
     // This function can be defined to enrich events with additional HTTP
     // metadata. This function should be used rather than internal enrichment so
     // that accurate byte count metrics can be emitted.
@@ -190,8 +196,23 @@ pub(crate) async fn call<
                 builder = builder.header(http::header::ACCEPT, &inputs.content_type);
             }
 
-            // building an empty request should be infallible
-            let mut request = builder.body(Body::empty()).expect("error creating request");
+            // Get the request body from the context (if any)
+            let body = match context.get_request_body() {
+                Some(body_str) => {
+                    // Set Content-Type header if not already set
+                    if !inputs
+                        .headers
+                        .contains_key(http::header::CONTENT_TYPE.as_str())
+                    {
+                        builder = builder.header(http::header::CONTENT_TYPE, "application/json");
+                    }
+                    Body::from(body_str)
+                }
+                None => Body::empty(),
+            };
+
+            // building the request should be infallible
+            let mut request = builder.body(body).expect("error creating request");
 
             if let Some(auth) = &inputs.auth {
                 auth.apply(&mut request);
@@ -211,7 +232,7 @@ pub(crate) async fn call<
                 })
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
-                    let body = hyper::body::to_bytes(body).await?;
+                    let body = http_body::Body::collect(body).await?.to_bytes();
                     emit!(EndpointBytesReceived {
                         byte_size: body.len(),
                         protocol: "http",

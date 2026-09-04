@@ -14,9 +14,10 @@ use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{statsd::config::Mode, util::service::net::UdpConnectorConfig},
     test_util::{
+        addr::next_addr,
         collect_n,
         components::{SINK_TAGS, assert_sink_compliance},
-        next_addr, trace_init,
+        trace_init,
     },
 };
 
@@ -34,7 +35,7 @@ fn tags() -> MetricTags {
 async fn test_send_to_statsd() {
     trace_init();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
 
     let config = StatsdSinkConfig {
         default_namespace: Some("ns".into()),

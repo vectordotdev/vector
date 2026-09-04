@@ -9,8 +9,8 @@ use crate::sinks::prelude::*;
 
 #[derive(Clone, Debug)]
 pub(super) struct AmqpEncoder {
-    pub(super) encoder: crate::codecs::Encoder<()>,
-    pub(super) transformer: crate::codecs::Transformer,
+    pub(super) encoder: vector_lib::codecs::Encoder<()>,
+    pub(super) transformer: vector_lib::codecs::Transformer,
 }
 
 impl encoding::Encoder<Event> for AmqpEncoder {

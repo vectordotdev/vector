@@ -4,10 +4,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{
-    StreamExt,
-    channel::mpsc::{Receiver, TryRecvError},
-};
+use futures::{StreamExt, channel::mpsc::Receiver};
 use http::request::Parts;
 use indoc::indoc;
 use vector_lib::{
@@ -29,12 +26,13 @@ use crate::{
         },
     },
     test_util::{
+        addr::next_addr,
         components::{
             COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, SINK_TAGS,
             run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
             run_and_assert_sink_error,
         },
-        next_addr, random_lines_with_stream,
+        random_lines_with_stream,
     },
     tls::TlsError,
 };
@@ -86,7 +84,7 @@ async fn start_test_detail(
         "#};
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(config).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{addr}");
@@ -194,9 +192,9 @@ async fn telemetry() {
 async fn handles_failure_v1() {
     let (_expected, mut rx) =
         start_test_error(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
-    let res = rx.try_next();
+    let res = rx.try_recv();
 
-    assert!(matches!(res, Err(TryRecvError { .. })));
+    assert!(res.is_err());
 }
 
 #[tokio::test]
@@ -208,9 +206,9 @@ async fn handles_failure_v1() {
 async fn handles_failure_v2() {
     let (_expected, mut rx) =
         start_test_error(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
-    let res = rx.try_next();
+    let res = rx.try_recv();
 
-    assert!(matches!(res, Err(TryRecvError { .. })));
+    assert!(res.is_err());
 }
 
 #[tokio::test]
@@ -242,7 +240,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
         "#})
     .unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
@@ -321,7 +319,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
         "#})
     .unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{addr}");
@@ -375,7 +373,7 @@ async fn headers_inner(api_status: ApiStatus) {
         "#})
     .unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it to our local server
     let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
@@ -446,7 +444,7 @@ async fn does_not_send_too_big_payloads() {
         "#})
     .unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
@@ -498,7 +496,7 @@ async fn global_options() {
     };
     let (mut config, cx) = load_sink_with_context::<DatadogLogsConfig>(config, cx).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{addr}");
@@ -545,7 +543,7 @@ async fn override_global_options() {
     };
     let (mut config, cx) = load_sink_with_context::<DatadogLogsConfig>(config, cx).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{addr}");

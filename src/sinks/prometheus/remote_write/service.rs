@@ -1,11 +1,15 @@
-use std::task::{Context, Poll};
+use std::{
+    collections::BTreeMap,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 #[cfg(feature = "aws-core")]
 use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use bytes::Bytes;
-use http::Uri;
+use http::{HeaderValue, Uri};
 
 use super::request_builder::RemoteWriteRequest;
 use crate::{
@@ -13,7 +17,11 @@ use crate::{
     internal_events::EndpointBytesSent,
     sinks::{
         prelude::*,
-        util::{auth::Auth, http::HttpResponse},
+        util::{
+            HttpEndpoint,
+            auth::Auth,
+            http::{HttpResponse, OrderedHeaderName},
+        },
     },
 };
 
@@ -30,10 +38,11 @@ mod headers {
 
 #[derive(Clone)]
 pub(super) struct RemoteWriteService {
-    pub(super) endpoint: Uri,
+    pub(super) endpoint: HttpEndpoint,
     pub(super) auth: Option<Auth>,
     pub(super) client: HttpClient,
     pub(super) compression: super::Compression,
+    pub(super) headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
 }
 
 impl Service<RemoteWriteRequest> for RemoteWriteService {
@@ -48,9 +57,10 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut request: RemoteWriteRequest) -> Self::Future {
         let client = self.client.clone();
-        let endpoint = self.endpoint.clone();
+        let endpoint = self.endpoint.as_uri().clone();
         let auth = self.auth.clone();
         let compression = self.compression;
+        let headers = Arc::clone(&self.headers);
 
         Box::pin(async move {
             let metadata = std::mem::take(request.metadata_mut());
@@ -64,12 +74,13 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
                 request.request,
                 request.tenant_id.as_ref(),
                 auth,
+                headers,
             )
             .await?;
 
             let response = client.send(http_request).await?;
             let (parts, body) = response.into_parts();
-            let body = hyper::body::to_bytes(body).await?;
+            let body = http_body::Body::collect(body).await?.to_bytes();
             let http_response = hyper::Response::from_parts(parts, body);
 
             if http_response.status().is_success() {
@@ -106,6 +117,7 @@ pub(super) async fn build_request(
     body: Bytes,
     tenant_id: Option<&String>,
     auth: Option<Auth>,
+    custom_headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
 ) -> crate::Result<http::Request<hyper::Body>> {
     let mut builder = http::Request::builder()
         .method(method)
@@ -119,6 +131,11 @@ pub(super) async fn build_request(
 
     if let Some(tenant_id) = tenant_id {
         builder = builder.header(headers::X_SCOPE_ORGID, tenant_id);
+    }
+
+    // Apply custom headers
+    for (name, value) in custom_headers.iter() {
+        builder = builder.header(name.inner().clone(), value.clone());
     }
 
     let mut request = builder.body(body)?;

@@ -1,6 +1,6 @@
 pub mod request_limiter;
 
-use std::{io, mem::drop, net::SocketAddr, time::Duration};
+use std::{io, mem::drop, net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt, future::BoxFuture};
@@ -14,33 +14,36 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::sleep,
 };
-use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::codec::Decoder;
 use tracing::Instrument;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::StreamDecodingError,
+    codecs::{ReadyFrames, StreamDecodingError, internal_events::DecoderFramingError},
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    event::{BatchNotifier, BatchStatus, Event},
     finalization::AddBatchNotifier,
     lookup::{OwnedValuePath, path},
+    shutdown::ShutdownSignal,
+    source_sender::SourceSender,
+    tcp::TcpKeepaliveConfig,
+    tls::{
+        CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings,
+        TlsAcceptorReloader,
+    },
 };
 use vrl::value::ObjectMap;
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
 use crate::{
-    SourceSender,
-    codecs::ReadyFrames,
     config::SourceContext,
-    event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
-        ConnectionOpen, DecoderFramingError, OpenGauge, SocketBindError, SocketEventsReceived,
-        SocketMode, SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
-        TcpSocketTlsConnectionError,
+        ConnectionOpen, OpenGauge, SocketBindError, SocketEventsReceived, SocketMode,
+        SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
+        TcpSocketTlsConnectionError, TcpSocketTlsHandshakeTimeout, TcpSourceConnectionClosed,
     },
-    shutdown::ShutdownSignal,
-    sources::util::AfterReadExt,
-    tcp::TcpKeepaliveConfig,
-    tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
+    net::is_graceful_tls_shutdown,
+    sources::util::{AfterReadExt, LenientFramedRead},
 };
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
@@ -49,10 +52,14 @@ pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
     tls: &MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
     allowlist: Option<Vec<IpNet>>,
 ) -> crate::Result<MaybeTlsListener> {
     match addr {
-        SocketListenAddr::SocketAddr(addr) => tls.bind(&addr).await.map_err(Into::into),
+        SocketListenAddr::SocketAddr(addr) => tls
+            .bind_reloadable(&addr, tls_reloader)
+            .await
+            .map_err(Into::into),
         SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset)? {
             Some(listener) => TcpListener::from_std(listener)
                 .map(Into::into)
@@ -115,9 +122,11 @@ where
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: Duration,
         tls: MaybeTlsSettings,
+        tls_reloader: Option<TlsAcceptorReloader>,
         tls_client_metadata_key: Option<OwnedValuePath>,
         receive_buffer_bytes: Option<usize>,
         max_connection_duration_secs: Option<u64>,
+        tls_handshake_timeout_secs: Option<NonZeroU64>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
@@ -129,7 +138,7 @@ where
 
         Ok(Box::pin(async move {
             let listenfd = ListenFd::from_env();
-            let listener = try_bind_tcp_listener(addr, listenfd, &tls, allowlist)
+            let listener = try_bind_tcp_listener(addr, listenfd, &tls, tls_reloader, allowlist)
                 .await
                 .map_err(|error| {
                     emit!(SocketBindError {
@@ -207,6 +216,7 @@ where
                                 keepalive,
                                 receive_buffer_bytes,
                                 max_connection_duration_secs,
+                                tls_handshake_timeout_secs,
                                 source,
                                 tripwire,
                                 peer_addr,
@@ -221,6 +231,12 @@ where
                             tokio::spawn(
                                 fut.map(move |()| {
                                     drop(open_token);
+                                    // Paired with the ConnectionOpen emit above:
+                                    // fires exactly once per accepted connection,
+                                    // including paths that return early from
+                                    // handle_stream (TLS handshake failure,
+                                    // shutdown during handshake).
+                                    emit!(TcpSourceConnectionClosed);
                                     drop(tcp_connection_permit);
                                 })
                                 .instrument(span.or_current()),
@@ -241,6 +257,7 @@ async fn handle_stream<T>(
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
     max_connection_duration_secs: Option<u64>,
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
     peer_addr: SocketAddr,
@@ -254,12 +271,26 @@ async fn handle_stream<T>(
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
 {
+    let handshake_timeout = OptionFuture::from(
+        tls_handshake_timeout_secs.map(|secs| tokio::time::sleep(Duration::from_secs(secs.get()))),
+    );
+    tokio::pin!(handshake_timeout);
+
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
                 emit!(TcpSocketTlsConnectionError { error });
                 return;
             }
+        },
+        Some(_) = &mut handshake_timeout => {
+            emit!(TcpSocketTlsHandshakeTimeout {
+                peer_addr,
+                timeout: Duration::from_secs(
+                    tls_handshake_timeout_secs.map_or(0, NonZeroU64::get),
+                ),
+            });
+            return;
         },
         _ = &mut shutdown_signal => {
             return;
@@ -291,7 +322,8 @@ async fn handle_stream<T>(
         .and_then(|stream| stream.ssl().peer_certificate())
         .map(CertificateMetadata::from);
 
-    let reader = FramedRead::new(socket, source.decoder());
+    let reader = LenientFramedRead::new(socket, source.decoder());
+
     let mut reader = ReadyFrames::new(reader);
 
     let connection_close_timeout = OptionFuture::from(
@@ -401,7 +433,19 @@ async fn handle_stream<T>(
                                 if let Some(ack_bytes) = acker.build_ack(ack){
                                     let stream = reader.get_mut().get_mut();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {
-                                        emit!(TcpSendAckError{ error });
+                                        // Per spec, `*Error` events MUST only be
+                                        // emitted on real errors. A peer-initiated
+                                        // graceful TLS shutdown during the ack
+                                        // write is a lifecycle event, not an error
+                                        // — log at warn and skip the emit.
+                                        if is_graceful_tls_shutdown(&error) {
+                                            warn!(
+                                                message = "Connection closed by peer before acknowledgement could be sent.",
+                                                error = %error,
+                                            );
+                                        } else {
+                                            emit!(TcpSendAckError { error });
+                                        }
                                         break;
                                     }
                                 }

@@ -94,9 +94,10 @@ type TagValueRef<'a> = Option<&'a str>;
 
 /// Tag values for a metric series.  This may be empty, a single value, or a set of values. This is
 /// used to provide the storage for `TagValueSet`.
-#[derive(Clone, Configurable, Debug, Eq, PartialEq)]
+#[derive(Clone, Configurable, Debug, Eq, PartialEq, Default)]
 pub enum TagValueSet {
     /// This represents a set containing no value.
+    #[default]
     Empty,
 
     /// This represents a set containing a single value. This is stored separately to avoid the
@@ -109,12 +110,6 @@ pub enum TagValueSet {
     /// elements. This allows us to retrieve the last element inserted which in turn allows us to
     /// emulate the set having a single value.
     Set(IndexSet<TagValue>),
-}
-
-impl Default for TagValueSet {
-    fn default() -> Self {
-        Self::Empty
-    }
 }
 
 impl Display for TagValueSet {
@@ -425,12 +420,15 @@ impl<'de> Deserialize<'de> for TagValueSet {
         enum Variants {
             // Backwards compatibility for existing data
             String(String),
+            // A single bare tag is serialized as null.
+            Null(()),
             // This is the new form of tag values
             Array(Vec<TagValue>),
         }
 
         Variants::deserialize(de).map(|v| match v {
             Variants::String(s) => Self::from([s]),
+            Variants::Null(()) => Self::from([TagValue::Bare]),
             Variants::Array(a) => Self::from(a),
         })
     }
@@ -473,6 +471,11 @@ impl MetricTags {
     /// Iterates over all the tag value sets
     pub fn iter_sets(&self) -> impl Iterator<Item = (&str, &TagValueSet)> {
         self.0.iter().map(|(key, value)| (key.as_str(), value))
+    }
+
+    /// Iterates over all the tag value sets, consuming the tags.
+    pub fn into_iter_sets(self) -> impl Iterator<Item = (String, TagValueSet)> {
+        self.0.into_iter()
     }
 
     /// Iterate over references to all values of each tag.
@@ -531,6 +534,12 @@ impl MetricTags {
 
     pub fn remove(&mut self, name: &str) -> Option<String> {
         self.0.remove(name).and_then(TagValueSet::into_single)
+    }
+
+    /// Remove a tag and return its full [`TagValueSet`], preserving all values rather than reducing
+    /// to a single string like [`Self::remove`].
+    pub fn remove_set(&mut self, name: &str) -> Option<TagValueSet> {
+        self.0.remove(name)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &str> {
@@ -614,7 +623,7 @@ mod test_support {
 
     use quickcheck::{Arbitrary, Gen};
 
-    use super::*;
+    use super::{BTreeMap, MetricTags, TagValue, TagValueSet};
 
     impl Arbitrary for TagValue {
         fn arbitrary(g: &mut Gen) -> Self {
@@ -644,6 +653,44 @@ mod tests {
     use proptest::prelude::*;
 
     use super::*;
+
+    fn make_tags(pairs: &[(&str, &str)]) -> MetricTags {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn remove_set_returns_full_value_set() {
+        let mut tags = MetricTags::default();
+        tags.insert("k".to_string(), TagValue::Value("a".to_string()));
+        tags.insert("k".to_string(), TagValue::Value("b".to_string()));
+
+        let removed = tags.remove_set("k").expect("tag should exist");
+        assert_eq!(removed.len(), 2);
+        assert!(removed.contains(&TagValue::Value("a".to_string())));
+        assert!(removed.contains(&TagValue::Value("b".to_string())));
+        assert!(!tags.contains_key("k"));
+    }
+
+    #[test]
+    fn remove_set_missing_returns_none() {
+        let mut tags = make_tags(&[("a", "1")]);
+        assert!(tags.remove_set("missing").is_none());
+        assert!(tags.contains_key("a"));
+    }
+
+    #[test]
+    fn single_bare_tag_value_set_json_roundtrip() {
+        let value = TagValueSet::from([TagValue::Bare]);
+
+        let encoded = serde_json::to_string(&value).unwrap();
+        let decoded: TagValueSet = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(encoded, "null");
+        assert_eq!(decoded, value);
+    }
 
     proptest! {
         #[test]

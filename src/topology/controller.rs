@@ -10,7 +10,7 @@ use crate::{
     extra_context::ExtraContext,
     internal_events::{VectorRecoveryError, VectorReloadError, VectorReloaded},
     signal::ShutdownError,
-    topology::RunningTopology,
+    topology::{ReloadError, RunningTopology},
 };
 
 #[derive(Clone, Debug)]
@@ -39,7 +39,7 @@ pub struct TopologyController {
     pub config_paths: Vec<config::ConfigPath>,
     pub require_healthy: Option<bool>,
     #[cfg(feature = "api")]
-    pub api_server: Option<api::Server>,
+    pub api_server: Option<api::GrpcServer>,
     pub extra_context: ExtraContext,
 }
 
@@ -70,37 +70,33 @@ impl TopologyController {
         #[cfg(feature = "api")]
         if !new_config.api.enabled {
             if let Some(server) = self.api_server.take() {
-                debug!("Dropping api server.");
-                drop(server)
+                debug!("Stopping gRPC API server.");
+                drop(server);
             }
         } else if self.api_server.is_none() {
-            use std::sync::atomic::AtomicBool;
+            debug!("Starting gRPC API server.");
 
-            use tokio::runtime::Handle;
-
-            use crate::internal_events::ApiStarted;
-
-            debug!("Starting api server.");
-
-            self.api_server = match api::Server::start(
-                self.topology.config(),
-                self.topology.watch(),
-                Arc::<AtomicBool>::clone(&self.topology.running),
-                &Handle::current(),
-            ) {
+            match api::GrpcServer::start(self.topology.config(), self.topology.watch()).await {
                 Ok(api_server) => {
-                    emit!(ApiStarted {
-                        addr: new_config.api.address.unwrap(),
-                        playground: new_config.api.playground,
-                        graphql: new_config.api.graphql,
-                    });
-
-                    Some(api_server)
+                    let addr = api_server.addr();
+                    info!(
+                        message = "GRPC API server started.",
+                        addr = %addr,
+                    );
+                    self.api_server = Some(api_server);
                 }
                 Err(error) => {
-                    let error = error.to_string();
-                    error!("An error occurred that Vector couldn't handle: {}.", error);
-                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed { error });
+                    let error_string = error.to_string();
+                    error!(
+                        message = "An error occurred that Vector couldn't handle.",
+                        error = %error_string,
+                        internal_log_rate_limit = false,
+                    );
+                    // Fail fast when API is explicitly enabled but fails to start
+                    // This ensures users don't run with a broken configuration thinking top/tap will work
+                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed {
+                        error: error_string,
+                    });
                 }
             }
         }
@@ -110,33 +106,65 @@ impl TopologyController {
             .reload_config_and_respawn(new_config, self.extra_context.clone())
             .await
         {
-            Ok(true) => {
-                #[cfg(feature = "api")]
-                // Pass the new config to the API server.
-                if let Some(ref api_server) = self.api_server {
-                    api_server.update_config(self.topology.config());
-                }
-
+            Ok(()) => {
                 emit!(VectorReloaded {
                     config_paths: &self.config_paths
                 });
                 ReloadOutcome::Success
             }
-            Ok(false) => {
-                emit!(VectorReloadError);
+            Err(ReloadError::GlobalOptionsChanged { changed_fields }) => {
+                error!(
+                    message = "Config reload rejected due to non-reloadable global options.",
+                    changed_fields = %changed_fields.join(", "),
+                    internal_log_rate_limit = false,
+                );
+                emit!(VectorReloadError {
+                    reason: "global_options_changed",
+                });
                 ReloadOutcome::RolledBack
             }
-            // Trigger graceful shutdown for what remains of the topology
-            Err(()) => {
-                emit!(VectorReloadError);
+            Err(ReloadError::GlobalDiffFailed { source }) => {
+                error!(
+                    message = "Config reload rejected because computing global diff failed.",
+                    error = %source,
+                    internal_log_rate_limit = false,
+                );
+                emit!(VectorReloadError {
+                    reason: "global_diff_failed",
+                });
+                ReloadOutcome::RolledBack
+            }
+            Err(ReloadError::TopologyBuildFailed) => {
+                emit!(VectorReloadError {
+                    reason: "topology_build_failed",
+                });
+                ReloadOutcome::RolledBack
+            }
+            Err(ReloadError::FailedToRestore) => {
+                emit!(VectorReloadError {
+                    reason: "restore_failed",
+                });
                 emit!(VectorRecoveryError);
                 ReloadOutcome::FatalError(ShutdownError::ReloadFailedToRestore)
             }
         }
     }
 
-    pub async fn stop(self) {
-        self.topology.stop().await;
+    /// Stops the topology. Returns `true` if every component finished on its own before the
+    /// graceful shutdown deadline, or `false` if any component had to be forcefully killed.
+    #[cfg_attr(not(feature = "api"), allow(unused_mut))]
+    pub async fn stop(mut self) -> bool {
+        // Phase 1: Mark the gRPC API as unavailable so that external probes
+        // (e.g. Kubernetes readiness) fail early and stop routing traffic
+        // to this instance.
+        #[cfg(feature = "api")]
+        if let Some(server) = self.api_server.as_mut() {
+            server.set_not_serving().await;
+        }
+
+        // Phase 2: Drain the topology -- shuts down sources, waits for
+        // in-flight events to flush through transforms and sinks.
+        self.topology.stop().await
     }
 
     // The `sources_finished` method on `RunningTopology` only considers sources that are currently

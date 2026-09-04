@@ -3,6 +3,8 @@ use std::{
     iter::FromIterator,
     net::SocketAddr,
     str,
+    sync::Arc,
+    time::Duration,
 };
 
 use bytes::Bytes;
@@ -14,6 +16,7 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
+use tokio::time::timeout;
 use vector_lib::{
     codecs::{
         BytesDecoder, BytesDeserializer, CharacterDelimitedDecoderConfig,
@@ -29,7 +32,7 @@ use vector_lib::{
 };
 use vrl::{
     compiler::value::Collection,
-    value,
+    event_path, value,
     value::{Kind, ObjectMap},
 };
 
@@ -50,10 +53,13 @@ use crate::{
         ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
+        addr::{PortGuard, next_addr},
         components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
-        next_addr, spawn_collect_n, trace_init, wait_for_tcp,
+        spawn_collect_n, trace_init, wait_for_tcp,
     },
 };
+
+use crate::sources::datadog_agent::llmobs::decode_llmobs_body;
 
 const DD_API_KEY: &str = "12345678abcdefgh12345678abcdefgh";
 const DD_API_LOGS_V1_PATH: &str = "/v1/input/";
@@ -62,6 +68,23 @@ const DD_API_SERIES_V1_PATH: &str = "/api/v1/series";
 const DD_API_SERIES_V2_PATH: &str = "/api/v2/series";
 const DD_API_SKETCHES_PATH: &str = "/api/beta/sketches";
 const DD_API_TRACES_PATH: &str = "/api/v0.2/traces";
+const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+
+fn make_llmobs_source() -> DatadogAgentSource {
+    let decoder = vector_lib::codecs::Decoder::new(
+        Framer::Bytes(BytesDecoder::new()),
+        Deserializer::Bytes(BytesDeserializer),
+    );
+    DatadogAgentSource::new(
+        true,
+        decoder,
+        "http",
+        None,
+        LogNamespace::Legacy,
+        false,
+        true,
+    )
+}
 
 fn test_logs_schema_definition() -> schema::Definition {
     schema::Definition::empty_legacy_namespace().with_event_field(
@@ -97,7 +120,7 @@ fn test_decode_log_body() {
     fn inner(msgs: Vec<LogMsg>) -> TestResult {
         let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
         let api_key = None;
-        let decoder = crate::codecs::Decoder::new(
+        let decoder = vector_lib::codecs::Decoder::new(
             Framer::Bytes(BytesDecoder::new()),
             Deserializer::Bytes(BytesDeserializer),
         );
@@ -114,7 +137,7 @@ fn test_decode_log_body() {
 
         let events = decode_log_body(body, api_key, &source).unwrap();
         assert_eq!(events.len(), msgs.len());
-        for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
+        for (msg, event) in msgs.into_iter().zip(events) {
             let log = event.as_log();
             assert_eq!(log["message"], msg.message.into());
             assert_eq!(log["status"], msg.status.into());
@@ -153,7 +176,7 @@ fn test_decode_log_body_parse_ddtags() {
 
     let body = Bytes::from(serde_json::to_string(&log_msgs).unwrap());
     let api_key = None;
-    let decoder = crate::codecs::Decoder::new(
+    let decoder = vector_lib::codecs::Decoder::new(
         Framer::Bytes(BytesDecoder::new()),
         Deserializer::Bytes(BytesDeserializer),
     );
@@ -190,7 +213,7 @@ fn test_decode_log_body_parse_ddtags() {
 fn test_decode_log_body_empty_object() {
     let body = Bytes::from("{}");
     let api_key = None;
-    let decoder = crate::codecs::Decoder::new(
+    let decoder = vector_lib::codecs::Decoder::new(
         Framer::Bytes(BytesDecoder::new()),
         Deserializer::Bytes(BytesDeserializer),
     );
@@ -225,8 +248,62 @@ async fn source(
     Option<impl Stream<Item = Event>>,
     Option<impl Stream<Item = Event>>,
     SocketAddr,
+    PortGuard,
 ) {
-    let (mut sender, recv) = SourceSender::new_test_finalize(status);
+    let (sender, recv) = SourceSender::new_test_finalize(status);
+    let (logs_output, metrics_output, address, guard) = source_with_sender(
+        sender,
+        status,
+        acknowledgements,
+        store_api_key,
+        multiple_outputs,
+        split_metric_namespace,
+    )
+    .await;
+    (recv, logs_output, metrics_output, address, guard)
+}
+
+async fn source_with_timeout(
+    status: EventStatus,
+    acknowledgements: bool,
+    store_api_key: bool,
+    multiple_outputs: bool,
+    split_metric_namespace: bool,
+    send_timeout: Duration,
+) -> (
+    impl Stream<Item = Event> + Unpin,
+    Option<impl Stream<Item = Event>>,
+    Option<impl Stream<Item = Event>>,
+    SocketAddr,
+    PortGuard,
+) {
+    let (sender, recv) = SourceSender::new_test_sender_with_options(1, Some(send_timeout));
+    let (logs_output, metrics_output, address, guard) = source_with_sender(
+        sender,
+        status,
+        acknowledgements,
+        store_api_key,
+        multiple_outputs,
+        split_metric_namespace,
+    )
+    .await;
+    let recv = recv.into_stream().flat_map(into_event_stream);
+    (recv, logs_output, metrics_output, address, guard)
+}
+
+async fn source_with_sender(
+    mut sender: SourceSender,
+    status: EventStatus,
+    acknowledgements: bool,
+    store_api_key: bool,
+    multiple_outputs: bool,
+    split_metric_namespace: bool,
+) -> (
+    Option<impl Stream<Item = Event>>,
+    Option<impl Stream<Item = Event>>,
+    SocketAddr,
+    PortGuard,
+) {
     let mut logs_output = None;
     let mut metrics_output = None;
     if multiple_outputs {
@@ -241,16 +318,16 @@ async fn source(
                 .flat_map(into_event_stream),
         );
     }
-    let address = next_addr();
-    let config = toml::from_str::<DatadogAgentConfig>(&format!(
+    let (guard, address) = next_addr();
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(&format!(
         indoc! { r#"
-            address = "{}"
-            compression = "none"
-            store_api_key = {}
-            acknowledgements = {}
-            multiple_outputs = {}
-            split_metric_namespace = {}
-            trace_proto = "v1v2"
+            address: "{}"
+            compression: none
+            store_api_key: {}
+            acknowledgements: {}
+            multiple_outputs: {}
+            split_metric_namespace: {}
+            trace_proto: v1v2
         "#},
         address, store_api_key, acknowledgements, multiple_outputs, split_metric_namespace
     ))
@@ -262,19 +339,23 @@ async fn source(
         config.build(context).await.unwrap().await.unwrap();
     });
     wait_for_tcp(address).await;
-    (recv, logs_output, metrics_output, address)
+    (logs_output, metrics_output, address, guard)
 }
 
 async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
-    reqwest::Client::new()
-        .post(format!("http://{address}{path}"))
-        .headers(headers)
-        .body(body.to_owned())
-        .send()
-        .await
-        .unwrap()
-        .status()
-        .as_u16()
+    timeout(
+        HTTP_REQUEST_TIMEOUT,
+        reqwest::Client::new()
+            .post(format!("http://{address}{path}"))
+            .headers(headers)
+            .body(body.to_owned())
+            .send(),
+    )
+    .await
+    .expect("send_with_path request timed out")
+    .unwrap()
+    .status()
+    .as_u16()
 }
 
 async fn send_and_collect(
@@ -304,7 +385,8 @@ fn dd_api_key_headers() -> HeaderMap {
 #[tokio::test]
 async fn full_payload_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -358,7 +440,8 @@ async fn full_payload_v1() {
 #[tokio::test]
 async fn full_payload_v2() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -412,7 +495,8 @@ async fn full_payload_v2() {
 #[tokio::test]
 async fn no_api_key() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -466,7 +550,8 @@ async fn no_api_key() {
 #[tokio::test]
 async fn api_key_in_url() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -508,7 +593,7 @@ async fn api_key_in_url() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -523,7 +608,8 @@ async fn api_key_in_url() {
 #[tokio::test]
 async fn api_key_in_query_params() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -565,7 +651,7 @@ async fn api_key_in_query_params() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -580,7 +666,8 @@ async fn api_key_in_query_params() {
 #[tokio::test]
 async fn api_key_in_header() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -622,7 +709,7 @@ async fn api_key_in_header() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -637,7 +724,7 @@ async fn api_key_in_header() {
 #[tokio::test]
 async fn delivery_failure() {
     trace_init();
-    let (rx, _, _, addr) = source(EventStatus::Rejected, true, true, false, true).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Rejected, true, true, false, true).await;
 
     spawn_collect_n(
         async move {
@@ -671,9 +758,72 @@ async fn delivery_failure() {
 }
 
 #[tokio::test]
+async fn send_timeout_returns_service_unavailable() {
+    trace_init();
+    let (rx, _, _, addr, _guard) = source_with_timeout(
+        EventStatus::Delivered,
+        false,
+        true,
+        false,
+        true,
+        Duration::from_millis(50),
+    )
+    .await;
+
+    let body = serde_json::to_string(&[LogMsg {
+        message: Bytes::from("foo"),
+        timestamp: Utc
+            .timestamp_opt(123, 0)
+            .single()
+            .expect("invalid timestamp"),
+        hostname: Bytes::from("festeburg"),
+        status: Bytes::from("notice"),
+        service: Bytes::from("vector"),
+        ddsource: Bytes::from("curl"),
+        ddtags: Bytes::from("one,two,three"),
+    }])
+    .unwrap();
+
+    assert_eq!(
+        200,
+        send_with_path(addr, &body, HeaderMap::new(), DD_API_LOGS_V1_PATH).await
+    );
+
+    assert_eq!(
+        503,
+        send_with_path(addr, &body, HeaderMap::new(), DD_API_LOGS_V1_PATH).await
+    );
+    drop(rx);
+}
+
+#[test]
+fn parse_config_with_send_timeout_secs() {
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            send_timeout_secs: 1.5
+        "#})
+    .unwrap();
+
+    assert_eq!(config.send_timeout_secs, Some(1.5));
+    assert_eq!(config.send_timeout(), Some(Duration::from_secs_f64(1.5)));
+}
+
+#[test]
+fn parse_config_without_send_timeout_secs() {
+    let config = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+        "#})
+    .unwrap();
+
+    assert_eq!(config.send_timeout_secs, None);
+    assert_eq!(config.send_timeout(), None);
+}
+
+#[tokio::test]
 async fn ignores_disabled_acknowledgements() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Rejected, false, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Rejected, false, true, false, true).await;
 
         let events = send_and_collect(
             addr,
@@ -705,7 +855,8 @@ async fn ignores_disabled_acknowledgements() {
 #[tokio::test]
 async fn ignores_api_key() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, false, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, false, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -759,7 +910,8 @@ async fn ignores_api_key() {
 #[tokio::test]
 async fn decode_series_endpoint_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let dd_metric_request = DatadogSeriesRequest {
             series: vec![
@@ -856,7 +1008,7 @@ async fn decode_series_endpoint_v1() {
             );
 
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -882,7 +1034,7 @@ async fn decode_series_endpoint_v1() {
             );
 
             assert_eq!(
-                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[1].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -913,7 +1065,7 @@ async fn decode_series_endpoint_v1() {
             );
 
             assert_eq!(
-                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[2].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -951,7 +1103,7 @@ async fn decode_series_endpoint_v1() {
             assert_eq!(metric.namespace(), Some("system"));
 
             assert_eq!(
-                &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[3].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
         }
@@ -962,7 +1114,8 @@ async fn decode_series_endpoint_v1() {
 #[tokio::test]
 async fn decode_sketches() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut buf = Vec::new();
         let sketch = ddmetric_proto::sketch_payload::Sketch {
@@ -1046,7 +1199,7 @@ async fn decode_sketches() {
             }
 
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1062,7 +1215,8 @@ async fn decode_sketches() {
 #[tokio::test]
 async fn decode_traces() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut headers = dd_api_key_headers();
         headers.insert("X-Datadog-Reported-Languages", "ada".parse().unwrap());
@@ -1177,7 +1331,7 @@ async fn decode_traces() {
             assert_eq!(trace_v1.as_map()["host"], "a_hostname".into());
             assert_eq!(trace_v1.as_map()["env"], "an_environment".into());
             assert_eq!(trace_v1.as_map()["language_name"], "ada".into());
-            assert!(trace_v1.contains("spans"));
+            assert!(trace_v1.contains(vrl::event_path!("spans")));
             assert_eq!(trace_v1.as_map()["spans"].as_array().unwrap().len(), 1);
             let span_from_trace_v1 = trace_v1.as_map()["spans"].as_array().unwrap()[0]
                 .as_object()
@@ -1208,12 +1362,12 @@ async fn decode_traces() {
                 0.577.into()
             );
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
             let apm_event = events[1].as_trace();
-            assert!(apm_event.contains("spans"));
+            assert!(apm_event.contains(event_path!("spans")));
             assert_eq!(apm_event.as_map()["host"], "a_hostname".into());
             assert_eq!(apm_event.as_map()["env"], "an_environment".into());
             assert_eq!(apm_event.as_map()["language_name"], "ada".into());
@@ -1226,7 +1380,7 @@ async fn decode_traces() {
             assert_eq!(span_from_apm_event["resource"], "a_resource".into());
 
             assert_eq!(
-                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[1].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -1257,7 +1411,7 @@ async fn decode_traces() {
                 trace_v2.as_map()["error_tps"],
                 Value::Float(NotNan::new(10.0f64).unwrap())
             );
-            assert!(trace_v2.contains("spans"));
+            assert!(trace_v2.contains(vrl::event_path!("spans")));
             assert_eq!(trace_v2.as_map()["spans"].as_array().unwrap().len(), 1);
             let span_from_trace_v2 = trace_v2.as_map()["spans"].as_array().unwrap()[0]
                 .as_object()
@@ -1288,7 +1442,7 @@ async fn decode_traces() {
                 0.577.into()
             );
             assert_eq!(
-                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[2].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
         }
@@ -1299,7 +1453,7 @@ async fn decode_traces() {
 #[tokio::test]
 async fn split_outputs() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (_, rx_logs, rx_metrics, addr) =
+        let (_, rx_logs, rx_metrics, addr, _guard) =
             source(EventStatus::Delivered, true, true, true, true).await;
 
         let mut log_event = send_and_collect(
@@ -1377,7 +1531,7 @@ async fn split_outputs() {
                 ),
             );
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 "abcdefgh12345678abcdefgh12345678"
             );
         }
@@ -1400,7 +1554,7 @@ async fn split_outputs() {
             assert_eq!(log["ddtags"], "one,two,three".into());
             assert_eq!(*log.get_source_type().unwrap(), "datadog_agent".into());
             assert_eq!(
-                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                event.metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
             assert_eq!(
@@ -1419,6 +1573,7 @@ fn test_config_outputs_with_disabled_data_types() {
         disable_logs: bool,
         disable_metrics: bool,
         disable_traces: bool,
+        disable_llmobs: bool,
     }
 
     for TestCase {
@@ -1426,48 +1581,56 @@ fn test_config_outputs_with_disabled_data_types() {
         disable_logs,
         disable_metrics,
         disable_traces,
+        disable_llmobs,
     } in [
         TestCase {
             multiple_outputs: true,
             disable_logs: true,
             disable_metrics: true,
             disable_traces: true,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: true,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: false,
             disable_metrics: true,
             disable_traces: false,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: false,
             disable_metrics: false,
             disable_traces: true,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: true,
             disable_metrics: true,
             disable_traces: false,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: true,
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
         },
         TestCase {
             multiple_outputs: false,
             disable_logs: true,
             disable_metrics: true,
             disable_traces: true,
+            disable_llmobs: false,
         },
     ] {
         let config = DatadogAgentConfig {
@@ -1481,10 +1644,12 @@ fn test_config_outputs_with_disabled_data_types() {
             disable_logs,
             disable_metrics,
             disable_traces,
+            disable_llmobs,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: Default::default(),
+            send_timeout_secs: None,
         };
 
         let outputs: Vec<DataType> = config
@@ -1493,7 +1658,10 @@ fn test_config_outputs_with_disabled_data_types() {
             .map(|output| output.ty)
             .collect();
         if multiple_outputs {
-            assert_eq!(outputs.contains(&DataType::Log), !disable_logs);
+            assert_eq!(
+                outputs.contains(&DataType::Log),
+                !disable_logs || !disable_llmobs
+            );
             assert_eq!(outputs.contains(&DataType::Trace), !disable_traces);
             assert_eq!(outputs.contains(&DataType::Metric), !disable_metrics);
         } else {
@@ -1924,10 +2092,12 @@ fn test_config_outputs() {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: Default::default(),
+            send_timeout_secs: None,
         };
 
         let mut outputs = config
@@ -1949,7 +2119,8 @@ fn test_config_outputs() {
 #[tokio::test]
 async fn decode_series_endpoint_v2() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let series = vec![
             ddmetric_proto::metric_payload::MetricSeries {
@@ -2063,7 +2234,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
-                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2093,7 +2264,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
-                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[1].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2126,7 +2297,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), Some("another_namespace"));
 
             assert_eq!(
-                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[2].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2158,7 +2329,7 @@ async fn decode_series_endpoint_v2() {
             assert_eq!(metric.namespace(), None);
 
             assert_eq!(
-                &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
+                events[3].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
 
@@ -2196,9 +2367,10 @@ async fn decode_series_endpoint_v2() {
 
 #[test]
 fn test_output_schema_definition_json_vector_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "json"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: json
         "#})
     .unwrap()
     .outputs(LogNamespace::Vector)
@@ -2255,9 +2427,10 @@ fn test_output_schema_definition_json_vector_namespace() {
 
 #[test]
 fn test_output_schema_definition_bytes_vector_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "bytes"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: bytes
         "#})
     .unwrap()
     .outputs(LogNamespace::Vector)
@@ -2315,9 +2488,10 @@ fn test_output_schema_definition_bytes_vector_namespace() {
 
 #[test]
 fn test_output_schema_definition_json_legacy_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "json"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: json
         "#})
     .unwrap()
     .outputs(LogNamespace::Legacy)
@@ -2345,9 +2519,10 @@ fn test_output_schema_definition_json_legacy_namespace() {
 
 #[test]
 fn test_output_schema_definition_bytes_legacy_namespace() {
-    let definition = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-            address = "0.0.0.0:8012"
-            decoding.codec = "bytes"
+    let definition = serde_yaml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address: "0.0.0.0:8012"
+            decoding:
+              codec: bytes
         "#})
     .unwrap()
     .outputs(LogNamespace::Legacy)
@@ -2402,7 +2577,7 @@ async fn test_series_v1_split_metric_namespace_impl(
     expected_name: &str,
     expected_namespace: Option<&str>,
 ) {
-    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, split).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, split).await;
 
     let dd_metric_request = DatadogSeriesRequest {
         series: vec![DatadogSeriesMetric {
@@ -2454,7 +2629,7 @@ async fn test_series_v2_split_metric_namespace_impl(
     expected_name: &str,
     expected_namespace: Option<&str>,
 ) {
-    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, split).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, split).await;
 
     let series = vec![ddmetric_proto::metric_payload::MetricSeries {
         resources: vec![ddmetric_proto::metric_payload::Resource {
@@ -2510,12 +2685,95 @@ async fn series_v2_split_metric_namespace_false() {
     .await;
 }
 
+#[tokio::test]
+async fn series_v2_resources_preserved_as_tags() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, false).await;
+
+        let series = vec![ddmetric_proto::metric_payload::MetricSeries {
+            resources: vec![
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "host".to_string(),
+                    name: "test_host".to_string(),
+                },
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "device".to_string(),
+                    name: "sda".to_string(),
+                },
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "database_instance".to_string(),
+                    name: "mongo-repro-01".to_string(),
+                },
+                ddmetric_proto::metric_payload::Resource {
+                    r#type: "database_instance".to_string(),
+                    name: "mongo-repro-02".to_string(),
+                },
+            ],
+            metric: "system.disk.free".to_string(),
+            tags: vec![
+                "env:prod".to_string(),
+                "resource.database_instance:custom".to_string(),
+            ],
+            points: vec![ddmetric_proto::metric_payload::MetricPoint {
+                value: 100.0,
+                timestamp: 1542182950,
+            }],
+            r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
+            unit: "".to_string(),
+            source_type_name: "".to_string(),
+            interval: 0,
+            metadata: None,
+        }];
+
+        let series_payload = ddmetric_proto::MetricPayload { series };
+        let mut buf = Vec::new();
+        series_payload.encode(&mut buf).unwrap();
+        let body = unsafe { String::from_utf8_unchecked(buf) };
+
+        let events = send_and_collect(
+            addr,
+            body,
+            dd_api_key_headers(),
+            DD_API_SERIES_V2_PATH,
+            rx,
+            1,
+        )
+        .await;
+
+        let metric = events[0].as_metric();
+        let tags = metric.tags().unwrap();
+
+        // The `device` resource type must be preserved as a plain `device` tag,
+        // NOT as `resource.device`. This matches v1 series behavior.
+        assert_eq!(tags.get("device"), Some("sda"));
+        assert!(
+            tags.get("resource.device").is_none(),
+            "device should not be prefixed with 'resource.'"
+        );
+        let database_instances: Vec<_> = tags
+            .iter_all()
+            .filter_map(|(name, value)| (name == "resource.database_instance").then_some(value))
+            .collect();
+        assert_eq!(
+            database_instances,
+            vec![
+                Some("custom"),
+                Some("mongo-repro-01"),
+                Some("mongo-repro-02")
+            ]
+        );
+        assert_eq!(tags.get("env"), Some("prod"));
+    })
+    .await;
+}
+
 async fn test_sketches_split_metric_namespace_impl(
     split: bool,
     expected_name: &str,
     expected_namespace: Option<&str>,
 ) {
-    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, split).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, split).await;
 
     let mut buf = Vec::new();
     let sketch = ddmetric_proto::sketch_payload::Sketch {
@@ -2576,7 +2834,7 @@ async fn sketches_split_metric_namespace_false() {
 
 impl ValidatableComponent for DatadogAgentConfig {
     fn validation_configuration() -> ValidationConfiguration {
-        use crate::codecs::DecodingConfig;
+        use vector_lib::codecs::DecodingConfig;
 
         let config = DatadogAgentConfig {
             address: "0.0.0.0:9007".parse().unwrap(),
@@ -2586,6 +2844,7 @@ impl ValidatableComponent for DatadogAgentConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
                     delimiter: b',',
                     max_length: Some(usize::MAX),
+                    oversized_action: Default::default(),
                 },
             }
             .into(),
@@ -2595,10 +2854,12 @@ impl ValidatableComponent for DatadogAgentConfig {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            disable_llmobs: false,
             parse_ddtags: false,
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: Default::default(),
+            send_timeout_secs: None,
         };
 
         let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
@@ -2633,3 +2894,114 @@ impl ValidatableComponent for DatadogAgentConfig {
 }
 
 register_validatable_component!(DatadogAgentConfig);
+
+#[test]
+fn test_decode_llmobs_body() {
+    let body = Bytes::from(
+        r#"[
+        {
+            "event_type": "span",
+            "_dd.tracer_version": "2.17.0",
+            "spans": [{
+                "span_id": "abc123",
+                "trace_id": "xyz789",
+                "name": "my.workflow",
+                "start_ns": 1707763310981223236,
+                "duration": 12345678900,
+                "status": "ok",
+                "meta": { "span": { "kind": "llm" }, "model_name": "gpt-4" },
+                "metrics": { "input_tokens": 64, "output_tokens": 128 },
+                "tags": ["env:prod", "service:myapp"],
+                "_dd": { "ml_app": "my-llm-app" }
+            }]
+        }
+    ]"#,
+    );
+
+    let source = make_llmobs_source();
+    let events = decode_llmobs_body(body, None, &source).unwrap();
+    assert_eq!(events.len(), 1);
+
+    let log = events[0].as_log();
+    assert_eq!(log["span_id"], "abc123".into());
+    assert_eq!(log["trace_id"], "xyz789".into());
+    assert_eq!(log["name"], "my.workflow".into());
+    assert_eq!(log["status"], "ok".into());
+    assert_eq!(log["ml_app"], "my-llm-app".into());
+    assert_eq!(
+        log["_dd"].as_object().unwrap()["tracer_version"],
+        "2.17.0".into()
+    );
+}
+
+#[test]
+fn test_decode_llmobs_body_single_envelope() {
+    // Real SDK clients (e.g. dd-trace-py's `LLMObsSpanEncoder`) POST a single JSON object,
+    // not a JSON array of objects.
+    let body = Bytes::from(
+        r#"{
+            "_dd.stage": "raw",
+            "event_type": "span",
+            "_dd.tracer_version": "2.17.0",
+            "spans": [{
+                "span_id": "abc123",
+                "trace_id": "xyz789",
+                "name": "my.workflow",
+                "start_ns": 1707763310981223236,
+                "duration": 12345678900,
+                "status": "ok",
+                "meta": { "span": { "kind": "llm" }, "model_name": "gpt-4" },
+                "metrics": { "input_tokens": 64, "output_tokens": 128 },
+                "tags": ["env:prod", "service:myapp"],
+                "_dd": { "ml_app": "my-llm-app" }
+            }]
+        }"#,
+    );
+
+    let source = make_llmobs_source();
+    let events = decode_llmobs_body(body, None, &source).unwrap();
+    assert_eq!(events.len(), 1);
+
+    let log = events[0].as_log();
+    assert_eq!(log["span_id"], "abc123".into());
+    assert_eq!(log["trace_id"], "xyz789".into());
+    assert_eq!(log["name"], "my.workflow".into());
+    assert_eq!(log["status"], "ok".into());
+    assert_eq!(log["ml_app"], "my-llm-app".into());
+    assert_eq!(
+        log["_dd"].as_object().unwrap()["tracer_version"],
+        "2.17.0".into()
+    );
+}
+
+#[test]
+fn test_decode_llmobs_body_empty_spans() {
+    let body = Bytes::from(r#"[{"event_type": "span", "spans": []}]"#);
+    let source = make_llmobs_source();
+    let events = decode_llmobs_body(body, None, &source).unwrap();
+    assert_eq!(events.len(), 0);
+}
+
+#[test]
+fn test_decode_llmobs_body_invalid_json() {
+    let body = Bytes::from("not json");
+    let source = make_llmobs_source();
+    assert!(decode_llmobs_body(body, None, &source).is_err());
+}
+
+#[test]
+fn test_decode_llmobs_body_api_key() {
+    let body = Bytes::from(r#"[{"event_type":"span","spans":[{"span_id":"a","trace_id":"b"}]}]"#);
+    let api_key: Option<Arc<str>> = Some(Arc::from("test1234test1234test1234test1234"));
+    let source = make_llmobs_source();
+
+    let events = decode_llmobs_body(body, api_key, &source).unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(
+        events[0]
+            .metadata()
+            .datadog_api_key()
+            .map(|k| k.as_ref().to_owned()),
+        Some("test1234test1234test1234test1234".to_owned())
+    );
+}

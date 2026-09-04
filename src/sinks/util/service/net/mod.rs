@@ -8,7 +8,6 @@ use std::{
     io,
     net::SocketAddr,
     task::{Context, Poll, ready},
-    time::Duration,
 };
 
 use futures_util::{FutureExt, future::BoxFuture};
@@ -242,9 +241,7 @@ impl NetworkConnector {
 
     async fn connect_backoff(&self) -> NetworkConnection {
         // TODO: Make this configurable.
-        let mut backoff = ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60));
+        let mut backoff = ExponentialBackoff::default();
 
         loop {
             match self.connect().await {
@@ -346,14 +343,14 @@ impl Service<Vec<u8>> for NetworkService {
 
                     // Send the socket back to the service, since theoretically it's still valid to
                     // reuse given that we may have simply overrun the OS socket buffers, etc.
-                    let _ = tx.send(Some(socket));
+                    tx.send(Some(socket)).ok();
 
                     Ok(sent)
                 }
                 Err(e) => {
                     // We need to signal back to the service that it needs to create a fresh socket
                     // since this one could be tainted.
-                    let _ = tx.send(None);
+                    tx.send(None).ok();
 
                     Err(e)
                 }

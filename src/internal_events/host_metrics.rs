@@ -1,7 +1,9 @@
-use metrics::counter;
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
+};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HostMetricsScrapeError {
     pub message: &'static str,
 }
@@ -15,7 +17,7 @@ impl InternalEvent for HostMetricsScrapeError {
         );
 
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -23,7 +25,7 @@ impl InternalEvent for HostMetricsScrapeError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HostMetricsScrapeDetailError<E> {
     pub message: &'static str,
     pub error: E,
@@ -39,7 +41,7 @@ impl<E: std::fmt::Display> InternalEvent for HostMetricsScrapeDetailError<E> {
         );
 
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -47,7 +49,7 @@ impl<E: std::fmt::Display> InternalEvent for HostMetricsScrapeDetailError<E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HostMetricsScrapeFilesystemError {
     pub message: &'static str,
     pub error: heim::Error,
@@ -65,7 +67,7 @@ impl InternalEvent for HostMetricsScrapeFilesystemError {
         );
 
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::RECEIVING,
         )

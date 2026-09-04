@@ -265,7 +265,7 @@ async fn test_spawn_reader_thread() {
 
     let buf = Cursor::new("hello world\nhello rocket 🚀");
     let reader = BufReader::new(buf);
-    let decoder = crate::codecs::Decoder::default();
+    let decoder = vector_lib::codecs::Decoder::default();
     let (sender, mut receiver) = channel(1024);
 
     spawn_reader_thread(reader, decoder, STDOUT, sender);
@@ -372,7 +372,7 @@ async fn test_run_command_linux() {
         assert_eq!(*log.get_source_type().unwrap(), "exec".into());
         assert_eq!(*log.get_message().unwrap(), "Hello World!".into());
         assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
-        assert!(log.get(PID_KEY).is_some());
+        assert!(log.get(vrl::event_path!(PID_KEY)).is_some());
         assert!(log.get_timestamp().is_some());
 
         assert_eq!(8, log.all_event_fields().unwrap().count());

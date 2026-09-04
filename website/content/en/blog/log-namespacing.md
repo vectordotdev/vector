@@ -39,27 +39,30 @@ so you can try out Log Namespacing on individual sources.
 The following example enables the `log_namespace` feature globally, then disables it for a single
 source.
 
-```toml
-schema.log_namespace = true
+```yaml
+schema:
+  log_namespace: true
 
-[sources.input_with_log_namespace]
-type = "demo_logs"
-format = "shuffle"
-lines = ["input_with_log_namespace"]
-interval = 1
+sources:
+  input_with_log_namespace:
+    type: "demo_logs"
+    format: "shuffle"
+    lines: ["input_with_log_namespace"]
+    interval: 1
 
-[sources.input_without_log_namespace]
-type = "demo_logs"
-format = "shuffle"
-lines = ["input_without_log_namespace"]
-interval = 1
-log_namespace = false
+  input_without_log_namespace:
+    type: "demo_logs"
+    format: "shuffle"
+    lines: ["input_without_log_namespace"]
+    interval: 1
+    log_namespace: false
 
-[sinks.console]
-type = "console"
-inputs = ["input_with_log_namespace", "input_without_log_namespace"]
-encoding.codec = "json"
-
+sinks:
+  console:
+    type: "console"
+    inputs: ["input_with_log_namespace", "input_without_log_namespace"]
+    encoding:
+      codec: "json"
 ```
 
 ## How It Works
@@ -167,6 +170,6 @@ sure a meaning exists for all required fields. If a source does not provide a re
 a meaning needs to be manually adjusted for any reason, the VRL function [set_semantic_meaning] can
 be used.
 
-[global log schema]: /docs/reference/configuration/global-options/#log_schema
+[global log schema]: /docs/reference/configuration/schema/#log_schema
 [set_semantic_meaning]: /docs/reference/vrl/functions/#set_semantic_meaning
 [remap]: /docs/reference/configuration/transforms/remap/

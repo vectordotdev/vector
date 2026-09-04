@@ -1,25 +1,25 @@
 use std::{error::Error, time::Duration};
 
 use http::Response;
-use metrics::{counter, histogram};
 use vector_lib::{
-    internal_event::{InternalEvent, error_stage, error_type},
+    NamedInternalEvent, counter, histogram,
+    internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
 const HTTP_STATUS_LABEL: &str = "status";
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpServerRequestReceived;
 
 impl InternalEvent for HttpServerRequestReceived {
     fn emit(self) {
         debug!(message = "Received HTTP request.");
-        counter!("http_server_requests_received_total").increment(1);
+        counter!(CounterName::HttpServerRequestsReceivedTotal).increment(1);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpServerResponseSent<'a, B> {
     pub response: &'a Response<B>,
     pub latency: Duration,
@@ -31,12 +31,12 @@ impl<B> InternalEvent for HttpServerResponseSent<'_, B> {
             HTTP_STATUS_LABEL,
             self.response.status().as_u16().to_string(),
         )];
-        counter!("http_server_responses_sent_total", labels).increment(1);
-        histogram!("http_server_handler_duration_seconds", labels).record(self.latency);
+        counter!(CounterName::HttpServerResponsesSentTotal, labels).increment(1);
+        histogram!(HistogramName::HttpServerHandlerDurationSeconds, labels).record(self.latency);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpBytesReceived<'a> {
     pub byte_size: usize,
     pub http_path: &'a str,
@@ -52,7 +52,7 @@ impl InternalEvent for HttpBytesReceived<'_> {
             protocol = %self.protocol
         );
         counter!(
-            "component_received_bytes_total",
+            CounterName::ComponentReceivedBytesTotal,
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
         )
@@ -60,7 +60,7 @@ impl InternalEvent for HttpBytesReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpEventsReceived<'a> {
     pub count: usize,
     pub byte_size: JsonSize,
@@ -78,15 +78,15 @@ impl InternalEvent for HttpEventsReceived<'_> {
             protocol = %self.protocol,
         );
 
-        histogram!("component_received_events_count").record(self.count as f64);
+        histogram!(HistogramName::ComponentReceivedEventsCount).record(self.count as f64);
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "http_path" => self.http_path.to_string(),
             "protocol" => self.protocol,
         )
@@ -95,7 +95,7 @@ impl InternalEvent for HttpEventsReceived<'_> {
 }
 
 #[cfg(feature = "sources-utils-http")]
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpBadRequest<'a> {
     code: u16,
     error_code: String,
@@ -125,7 +125,7 @@ impl InternalEvent for HttpBadRequest<'_> {
             http_code = %self.code,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => self.error_code,
             "error_type" => error_type::REQUEST_FAILED,
             "error_stage" => error_stage::RECEIVING,
@@ -134,7 +134,7 @@ impl InternalEvent for HttpBadRequest<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpDecompressError<'a> {
     pub error: &'a dyn Error,
     pub encoding: &'a str,
@@ -151,7 +151,7 @@ impl InternalEvent for HttpDecompressError<'_> {
             encoding = %self.encoding
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => "failed_decompressing_payload",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::RECEIVING,
@@ -160,6 +160,7 @@ impl InternalEvent for HttpDecompressError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct HttpInternalError<'a> {
     pub message: &'a str,
 }
@@ -172,7 +173,7 @@ impl InternalEvent for HttpInternalError<'_> {
             stage = error_stage::RECEIVING
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
         )

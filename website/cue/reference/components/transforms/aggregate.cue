@@ -10,7 +10,6 @@ components: transforms: aggregate: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      true
@@ -22,7 +21,6 @@ components: transforms: aggregate: {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

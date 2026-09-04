@@ -69,21 +69,16 @@ pub struct LogplexConfig {
     #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -92,7 +87,6 @@ pub struct LogplexConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 }
@@ -146,7 +140,14 @@ impl LogplexConfig {
 
         // for metadata that is added to the events dynamically from config options
         if log_namespace == LogNamespace::Legacy {
-            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+            // Custom auth programs can inject any VRL value, not just bytes; widen the unknown
+            // field kind accordingly so schema-aware downstream components don't reject events.
+            let unknown_kind = if matches!(self.auth, Some(HttpServerAuthConfig::Custom { .. })) {
+                Kind::any()
+            } else {
+                Kind::bytes()
+            };
+            schema_definition = schema_definition.unknown_fields(unknown_kind);
         }
 
         schema_definition
@@ -170,8 +171,8 @@ impl Default for LogplexConfig {
 }
 
 impl GenerateConfig for LogplexConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(LogplexConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(LogplexConfig::default()).unwrap()
     }
 }
 
@@ -284,6 +285,14 @@ impl LogplexSource {
 }
 
 impl HttpSource for LogplexSource {
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
+    fn name() -> &'static str {
+        LogplexConfig::NAME
+    }
+
     fn build_events(
         &self,
         body: Bytes,
@@ -444,8 +453,9 @@ mod tests {
         config::{SourceConfig, SourceContext, log_schema},
         serde::{default_decoding, default_framing_message_based},
         test_util::{
+            addr::{PortGuard, next_addr},
             components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
-            next_addr, random_string, spawn_collect_n, wait_for_tcp,
+            random_string, spawn_collect_n, wait_for_tcp,
         },
     };
 
@@ -459,9 +469,9 @@ mod tests {
         query_parameters: Vec<String>,
         status: EventStatus,
         acknowledgements: bool,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             LogplexConfig {
@@ -482,7 +492,7 @@ mod tests {
             .unwrap()
         });
         wait_for_tcp(address).await;
-        (recv, address)
+        (recv, address, _guard)
     }
 
     async fn send(
@@ -521,7 +531,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
-            let (rx, addr) = source(
+            let (rx, addr, _guard) = source(
                 Some(auth.clone()),
                 vec!["appname".to_string(), "absent".to_string()],
                 EventStatus::Delivered,
@@ -567,7 +577,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
-            let (rx, addr) = source(
+            let (rx, addr, _guard) = source(
                 Some(auth.clone()),
                 vec!["*".to_string()],
                 EventStatus::Delivered,
@@ -612,7 +622,8 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
-            let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
+            let (rx, addr, _guard) =
+                source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
 
             let events = spawn_collect_n(
                 async move {
@@ -635,7 +646,8 @@ mod tests {
     async fn logplex_ignores_disabled_acknowledgements() {
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, false).await;
+        let (rx, addr, _guard) =
+            source(Some(auth.clone()), vec![], EventStatus::Rejected, false).await;
 
         let events = spawn_collect_n(
             async move {
@@ -654,7 +666,8 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_auth_failure() {
-        let (_rx, addr) = source(Some(make_auth()), vec![], EventStatus::Delivered, true).await;
+        let (_rx, addr, _guard) =
+            source(Some(make_auth()), vec![], EventStatus::Delivered, true).await;
 
         assert_eq!(
             401,

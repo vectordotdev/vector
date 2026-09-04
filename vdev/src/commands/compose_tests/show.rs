@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::collections::HashSet;
 
-use crate::{environment::Environment, testing::config::ComposeTestConfig};
+use crate::{testing::config::ComposeTestConfig, utils::environment::Environment};
 
 use super::active_projects::{find_active_environment, load_active_projects};
 

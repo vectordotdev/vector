@@ -6,6 +6,7 @@ use std::{
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
+use metrics::Counter;
 use serde::Serialize;
 use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
@@ -19,6 +20,7 @@ use vector_lib::{
     schema,
     transform::Transform,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{ComponentKey, OutputId, dot_graph::GraphConfig, schema::Options as SchemaOptions};
 use crate::extra_context::ExtraContext;
@@ -59,12 +61,21 @@ pub struct TransformOuter<T>
 where
     T: Configurable + Serialize + 'static,
 {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 
-    #[configurable(derived)]
     pub inputs: Inputs<T>,
+
+    /// Enable CPU usage metrics for this transform.
+    ///
+    /// When set to `true`, each poll of the transform task is timed using the OS thread CPU clock
+    /// and the accumulated nanoseconds are reported as the `component_cpu_usage_ns_total` counter,
+    /// tagged with `component_id`, `component_kind`, and `component_type`.
+    ///
+    /// Defaults to `false`. Enable only for transforms where CPU attribution is needed, as it
+    /// adds a `clock_gettime` call on every future poll.
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub measure_cpu_usage: bool,
 
     #[configurable(metadata(docs::hidden))]
     #[serde(flatten)]
@@ -86,6 +97,7 @@ where
             inputs,
             inner,
             graph: Default::default(),
+            measure_cpu_usage: false,
         }
     }
 
@@ -106,6 +118,7 @@ where
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
             graph: self.graph,
+            measure_cpu_usage: self.measure_cpu_usage,
         }
     }
 }
@@ -119,6 +132,8 @@ pub struct TransformContext {
     pub globals: GlobalOptions,
 
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
+
+    pub metrics_storage: MetricsStorage,
 
     /// Tracks the schema IDs assigned to schemas exposed by the transform.
     ///
@@ -138,6 +153,13 @@ pub struct TransformContext {
     /// Extra context data provided by the running app and shared across all components. This can be
     /// used to pass shared settings or other data from outside the components.
     pub extra_context: ExtraContext,
+
+    /// Counter handle for `component_cpu_usage_ns_total`, pre-tagged with this transform's
+    /// component identity. `Some` only when `measure_cpu_usage` is enabled on the
+    /// `TransformOuter`. Transforms that spawn helper tokio tasks at construction time
+    /// (e.g. `aws_ec2_metadata`, `throttle`) clone this and pass it to [`crate::cpu_time::spawn_timed`] so
+    /// their CPU is attributed to the component alongside the main transform task.
+    pub cpu_ns: Option<Counter>,
 }
 
 impl Default for TransformContext {
@@ -146,10 +168,12 @@ impl Default for TransformContext {
             key: Default::default(),
             globals: Default::default(),
             enrichment_tables: Default::default(),
+            metrics_storage: Default::default(),
             schema_definitions: HashMap::from([(None, HashMap::new())]),
             merged_schema_definition: schema::Definition::any(),
             schema: SchemaOptions::default(),
             extra_context: Default::default(),
+            cpu_ns: None,
         }
     }
 }
@@ -211,24 +235,36 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// of events flowing through the transform.
     fn outputs(
         &self,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        globals: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-
-        // This only exists for transforms that create logs from non-logs, to know which namespace
-        // to use, such as `metric_to_log`
-        global_log_namespace: LogNamespace,
     ) -> Vec<TransformOutput>;
 
-    /// Validates that the configuration of the transform is valid.
+    /// Validates structural constraints on the transform configuration that do not require
+    /// environment resources: reserved output names, duplicate route names, invalid sample
+    /// rates, and similar config-level checks.
     ///
-    /// This would generally be where logical conditions were checked, such as ensuring a transform
-    /// isn't using a named output that matches a reserved output name, and so on.
+    /// Called during config compilation so errors are reported on both `vector validate`
+    /// and normal startup/reload. This is the first validation phase, run before any
+    /// context-dependent checks.
     ///
     /// # Errors
     ///
     /// If validation does not succeed, an error variant containing a list of all validation errors
     /// is returned.
-    fn validate(&self, _merged_definition: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+
+    /// Validates the transform configuration against the schema and enrichment context.
+    /// Compiles VRL programs, builds conditions, and resolves enrichment table references.
+    /// Only called from `vector validate` (via `validate_transforms`), not during normal startup
+    /// because `build()` performs equivalent checks with real resources.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
+    fn validate_with_context(&self, _context: &TransformContext) -> Result<(), Vec<String>> {
         Ok(())
     }
 
@@ -273,9 +309,14 @@ pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
 ) -> impl Iterator<Item = OutputId> + '_ {
     transform
         .outputs(
-            vector_lib::enrichment::TableRegistry::default(),
+            &TransformContext {
+                schema: SchemaOptions {
+                    log_namespace: Some(global_log_namespace.into()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
             &[(key.clone().into(), schema::Definition::any())],
-            global_log_namespace,
         )
         .into_iter()
         .map(move |output| OutputId {

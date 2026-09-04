@@ -76,6 +76,8 @@ static JOURNALCTL: LazyLock<PathBuf> = LazyLock::new(|| "journalctl".into());
 enum BuildError {
     #[snafu(display("journalctl failed to execute: {}", source))]
     JournalctlSpawn { source: io::Error },
+    #[snafu(display("failed to parse output of `journalctl --version`: {:?}", output))]
+    JournalctlParseVersion { output: String },
     #[snafu(display(
         "The unit {:?} is duplicated in both include_units and exclude_units",
         unit
@@ -87,6 +89,11 @@ enum BuildError {
         value,
     ))]
     DuplicatedMatches { field: String, value: String },
+    #[snafu(display(
+        "`current_boot_only: false` not supported for systemd versions 250 through 257 (got {}).",
+        systemd_version
+    ))]
+    AllBootsNotSupported { systemd_version: u32 },
 }
 
 type Matches = HashMap<String, HashSet<String>>;
@@ -109,6 +116,10 @@ pub struct JournaldConfig {
     /// If empty or not present, all units are accepted.
     ///
     /// Unit names lacking a `.` have `.service` appended to make them a valid service unit name.
+    ///
+    /// **Note:** This option matches only the `_SYSTEMD_UNIT` field, which is narrower than `journalctl --unit`.
+    /// Messages from systemd about unit lifecycle (start/stop) have `_SYSTEMD_UNIT=init.scope` and will not match.
+    /// To capture these, explicitly include `init.scope` or use `include_matches` for finer control.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "ntpd", docs::examples = "sysinit.target"))]
     pub include_units: Vec<String>,
@@ -193,7 +204,6 @@ pub struct JournaldConfig {
     #[serde(default)]
     pub journal_namespace: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -364,8 +374,16 @@ impl SourceConfig for JournaldConfig {
             .clone()
             .unwrap_or_else(|| JOURNALCTL.clone());
 
+        let systemd_version = get_systemd_version_from_journalctl(&journalctl_path).await?;
+
+        if !self.current_boot_only && (250..=257).contains(&systemd_version) {
+            // https://github.com/vectordotdev/vector/issues/18068
+            return Err(BuildError::AllBootsNotSupported { systemd_version }.into());
+        }
+
         let starter = StartJournalctl::new(
             journalctl_path,
+            systemd_version,
             self.journal_directory.clone(),
             self.journal_namespace.clone(),
             self.current_boot_only,
@@ -500,7 +518,7 @@ impl JournaldSource {
         let events_received = register!(EventsReceived);
 
         // Spawn stderr handler task
-        let stderr_handler = tokio::spawn(Self::handle_stderr(stderr_stream));
+        let stderr_handler = crate::spawn_in_current_span(Self::handle_stderr(stderr_stream));
 
         let batch_size = self.batch_size;
         let result = loop {
@@ -679,6 +697,7 @@ type JournalStream = BoxStream<'static, Result<Bytes, BoxedFramingError>>;
 
 struct StartJournalctl {
     path: PathBuf,
+    systemd_version: u32,
     journal_dir: Option<PathBuf>,
     journal_namespace: Option<String>,
     current_boot_only: bool,
@@ -689,6 +708,7 @@ struct StartJournalctl {
 impl StartJournalctl {
     const fn new(
         path: PathBuf,
+        systemd_version: u32,
         journal_dir: Option<PathBuf>,
         journal_namespace: Option<String>,
         current_boot_only: bool,
@@ -697,6 +717,7 @@ impl StartJournalctl {
     ) -> Self {
         Self {
             path,
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,
@@ -722,8 +743,16 @@ impl StartJournalctl {
             command.arg(format!("--namespace={namespace}"));
         }
 
+        // By default entries from all boots are included
+        // systemd 242 introduces support for --boot=all
+        // systemd 250 lets --follow imply --boot (with no facility to override)
+        // systemd 258 allows to override --boot as implied by --follow
         if self.current_boot_only {
-            command.arg("--boot");
+            if self.systemd_version < 250 {
+                command.arg("--boot");
+            }
+        } else if self.systemd_version >= 258 {
+            command.arg("--boot=all");
         }
 
         if let Some(cursor) = checkpoint {
@@ -776,12 +805,43 @@ impl Drop for RunningJournalctl {
     }
 }
 
+async fn get_systemd_version_from_journalctl(journalctl_path: &PathBuf) -> crate::Result<u32> {
+    let stdout = Command::new(journalctl_path)
+        .arg("--version")
+        .output()
+        .await
+        .context(JournalctlSpawnSnafu)?
+        .stdout;
+
+    // output format: `systemd {version_number} ({full_version}){newline}{config ...}`
+    let stdout = String::from_utf8_lossy(&stdout);
+    Ok(stdout
+        .split_whitespace()
+        .nth(1)
+        .and_then(|s| s.parse::<u32>().ok())
+        .ok_or_else(|| BuildError::JournalctlParseVersion {
+            output: {
+                let cutoff = 40;
+                let length = stdout.chars().count();
+                format!(
+                    "{}{}",
+                    stdout.chars().take(cutoff).collect::<String>(),
+                    if length > cutoff {
+                        format!(" ..{} more char(s)", length - cutoff)
+                    } else {
+                        "".to_string()
+                    }
+                )
+            },
+        })?)
+}
+
 fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     match log_namespace {
         LogNamespace::Vector => {
             if let Some(host) = log
                 .get(metadata_path!(JournaldConfig::NAME, "metadata"))
-                .and_then(|meta| meta.get(HOSTNAME))
+                .and_then(|meta| meta.get(path!(HOSTNAME)))
             {
                 log.insert(metadata_path!(JournaldConfig::NAME, "host"), host.clone());
             }
@@ -804,8 +864,8 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
         LogNamespace::Vector => log
             .get(metadata_path!(JournaldConfig::NAME, "metadata"))
             .and_then(|meta| {
-                meta.get(SOURCE_TIMESTAMP)
-                    .or_else(|| meta.get(RECEIVED_TIMESTAMP))
+                meta.get(path!(SOURCE_TIMESTAMP))
+                    .or_else(|| meta.get(path!(RECEIVED_TIMESTAMP)))
             }),
         LogNamespace::Legacy => log
             .get(event_path!(SOURCE_TIMESTAMP))
@@ -995,7 +1055,7 @@ impl Finalizer {
     ) -> Self {
         if acknowledgements {
             let (finalizer, mut ack_stream) = OrderedFinalizer::new(Some(shutdown));
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 while let Some((status, cursor)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         checkpointer.lock().await.set(cursor).await;
@@ -1049,10 +1109,7 @@ impl Checkpointer {
             0 => Ok(None),
             _ => {
                 let text = String::from_utf8_lossy(&buf);
-                match text.find('\n') {
-                    Some(nl) => Ok(Some(String::from(&text[..nl]))),
-                    None => Ok(None), // Maybe return an error?
-                }
+                Ok(text.split_once('\n').map(|(line, _)| line.to_string()))
             }
         }
     }
@@ -1517,6 +1574,7 @@ mod tests {
     fn command_options() {
         let path = PathBuf::from("journalctl");
 
+        let systemd_version = 239;
         let journal_dir = None;
         let journal_namespace = None;
         let current_boot_only = false;
@@ -1526,6 +1584,7 @@ mod tests {
 
         let command = create_command(
             &path,
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,
@@ -1536,7 +1595,7 @@ mod tests {
         let cmd_line = format!("{command:?}");
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--namespace="));
-        assert!(!cmd_line.contains("--boot"));
+        assert!(!cmd_line.contains("--boot=all"));
         assert!(cmd_line.contains("--since=2000-01-01"));
 
         let journal_dir = None;
@@ -1546,6 +1605,7 @@ mod tests {
 
         let command = create_command(
             &path,
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,
@@ -1564,6 +1624,7 @@ mod tests {
 
         let command = create_command(
             &path,
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,
@@ -1577,10 +1638,31 @@ mod tests {
         assert!(cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--after-cursor="));
         assert!(cmd_line.contains("--merge"));
+
+        let systemd_version = 258;
+        let journal_dir = None;
+        let journal_namespace = None;
+        let current_boot_only = false;
+        let extra_args = vec![];
+
+        let command = create_command(
+            &path,
+            systemd_version,
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+            cursor,
+            extra_args,
+        );
+        let cmd_line = format!("{command:?}");
+        assert!(cmd_line.contains("--boot=all"));
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create_command(
         path: &Path,
+        systemd_version: u32,
         journal_dir: Option<PathBuf>,
         journal_namespace: Option<String>,
         current_boot_only: bool,
@@ -1590,6 +1672,7 @@ mod tests {
     ) -> Command {
         StartJournalctl::new(
             path.into(),
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,
@@ -1722,7 +1805,9 @@ mod tests {
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
         let mut event = Event::from(LogEvent::from(vrl::value::Value::from(json)));
 
-        event.as_mut_log().insert("timestamp", chrono::Utc::now());
+        event
+            .as_mut_log()
+            .insert(event_path!("timestamp"), chrono::Utc::now());
 
         let definitions = config.outputs(namespace).remove(0).schema_definition(true);
 

@@ -11,7 +11,9 @@ pub mod sample;
 pub mod aggregate;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub mod aws_ec2_metadata;
-#[cfg(feature = "transforms-exclusive-route")]
+#[cfg(feature = "transforms-delay")]
+pub mod delay;
+#[cfg(feature = "transforms-exclusive_route")]
 mod exclusive_route;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
@@ -31,6 +33,8 @@ pub mod route;
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
+#[cfg(feature = "transforms-trace_to_log")]
+pub mod trace_to_log;
 #[cfg(feature = "transforms-window")]
 pub mod window;
 

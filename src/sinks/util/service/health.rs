@@ -29,7 +29,7 @@ const UNHEALTHY_AMOUNT_OF_ERRORS: usize = 5;
 /// Options for determining the health of an endpoint.
 #[serde_as]
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct HealthConfig {
     /// Initial delay between attempts to reactivate endpoints once they become unhealthy.
@@ -54,6 +54,15 @@ const fn default_retry_max_duration_secs() -> std::time::Duration {
     Duration::from_secs(RETRY_MAX_DURATION_SECONDS_DEFAULT)
 }
 
+impl Default for HealthConfig {
+    fn default() -> Self {
+        Self {
+            retry_initial_backoff_secs: default_retry_initial_backoff_secs(),
+            retry_max_duration_secs: default_retry_max_duration_secs(),
+        }
+    }
+}
+
 impl HealthConfig {
     pub fn build<S, L>(
         &self,
@@ -76,7 +85,7 @@ impl HealthConfig {
             open,
             // An exponential backoff starting from retry_initial_backoff_sec and doubling every time
             // up to retry_max_duration_secs.
-            backoff: ExponentialBackoff::from_millis(2)
+            backoff: ExponentialBackoff::default()
                 .factor((self.retry_initial_backoff_secs.saturating_mul(1000) / 2).max(1))
                 .max_delay(self.retry_max_duration_secs),
         }
@@ -328,5 +337,19 @@ mod tests {
 
         counters.inc_healthy();
         assert!(counters.healthy(snapshot).is_ok());
+    }
+
+    #[test]
+    fn health_config_default_matches_deserialize_defaults() {
+        let config = HealthConfig::default();
+
+        assert_eq!(
+            config.retry_initial_backoff_secs,
+            RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT
+        );
+        assert_eq!(
+            config.retry_max_duration_secs,
+            Duration::from_secs(RETRY_MAX_DURATION_SECONDS_DEFAULT)
+        );
     }
 }

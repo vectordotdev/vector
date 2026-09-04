@@ -1,7 +1,4 @@
-use vector_lib::{
-    config::{LogNamespace, clone_input_definitions},
-    configurable::configurable_component,
-};
+use vector_lib::{config::clone_input_definitions, configurable::configurable_component};
 
 use super::transform::Window;
 use crate::{
@@ -45,8 +42,8 @@ pub struct WindowConfig {
 }
 
 impl GenerateConfig for WindowConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(r#"flush_when = ".message == \"value\"""#).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(r#"flush_when: '.message == "value"'"#).unwrap()
     }
 }
 
@@ -66,9 +63,12 @@ impl TransformConfig for WindowConfig {
             Window::new(
                 self.forward_when
                     .as_ref()
-                    .map(|condition| condition.build(&context.enrichment_tables))
+                    .map(|condition| {
+                        condition.build(&context.enrichment_tables, &context.metrics_storage)
+                    })
                     .transpose()?,
-                self.flush_when.build(&context.enrichment_tables)?,
+                self.flush_when
+                    .build(&context.enrichment_tables, &context.metrics_storage)?,
                 self.num_events_before,
                 self.num_events_after,
             )
@@ -82,14 +82,35 @@ impl TransformConfig for WindowConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         // The event is not modified, so the definition is passed through as-is
         vec![TransformOutput::new(
             DataType::Log,
             clone_input_definitions(input_definitions),
         )]
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if let Some(Err(e)) = self
+            .forward_when
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            errors.push(format!("forward_when: {e}"));
+        }
+        if let Err(e) = self
+            .flush_when
+            .validate(&context.enrichment_tables, &context.metrics_storage)
+        {
+            errors.push(format!("flush_when: {e}"));
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }

@@ -4,7 +4,7 @@ use std::{
     num::NonZeroUsize,
     panic,
     sync::{Arc, LazyLock},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
@@ -28,7 +28,6 @@ use smallvec::SmallVec;
 use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
-use tracing::Instrument;
 use vector_lib::{
     codecs::decoding::FramingError,
     config::{LegacyKey, LogNamespace, log_schema},
@@ -38,6 +37,7 @@ use vector_lib::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
     lookup::{PathPrefix, metadata_path, path},
+    source_sender::SendError,
 };
 
 use crate::{
@@ -48,11 +48,11 @@ use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
-        EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
-        SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
-        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsMessageSendBatchError,
-        SqsMessageSentPartialError, SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored,
-        StreamClosedError,
+        EventsReceived, S3ObjectProcessingFailed, S3ObjectProcessingSucceeded,
+        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
+        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
+        SqsMessageReceiveSucceeded, SqsMessageSendBatchError, SqsMessageSentPartialError,
+        SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -166,22 +166,24 @@ pub(super) struct Config {
     #[configurable(metadata(docs::examples = 1))]
     pub(super) max_number_of_messages: u32,
 
-    #[configurable(derived)]
     #[serde(default)]
     #[derivative(Default)]
     pub(super) tls_options: Option<TlsConfig>,
 
     // Client timeout configuration for SQS operations. Take care when configuring these settings
     // to allow enough time for the polling interval configured in `poll_secs`.
-    #[configurable(derived)]
     #[derivative(Default)]
     #[serde(default)]
     #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
 
     /// Configuration for deferring events to another queue based on their age.
-    #[configurable(derived)]
     pub(super) deferred: Option<DeferredConfig>,
+}
+
+pub(super) struct S3Options {
+    pub(super) compression: super::Compression,
+    pub(super) request_payer: Option<super::S3RequestPayer>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -232,7 +234,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
     PipelineSend {
-        source: crate::source_sender::ClosedError,
+        source: vector_lib::source_sender::SendError,
         bucket: String,
         key: String,
     },
@@ -277,10 +279,10 @@ pub struct State {
     region: Region,
 
     s3_client: S3Client,
+    s3_options: S3Options,
     sqs_client: SqsClient,
 
     multiline: Option<line_agg::Config>,
-    compression: super::Compression,
 
     queue_url: String,
     poll_secs: i32,
@@ -304,7 +306,7 @@ impl Ingestor {
         sqs_client: SqsClient,
         s3_client: S3Client,
         config: Config,
-        compression: super::Compression,
+        s3_options: S3Options,
         multiline: Option<line_agg::Config>,
         decoder: Decoder,
     ) -> Result<Ingestor, IngestorNewError> {
@@ -317,9 +319,9 @@ impl Ingestor {
             region,
 
             s3_client,
+            s3_options,
             sqs_client,
 
-            compression,
             multiline,
 
             queue_url: config.queue_url,
@@ -357,7 +359,7 @@ impl Ingestor {
                 acknowledgements,
             );
             let fut = process.run();
-            let handle = tokio::spawn(fut.in_current_span());
+            let handle = crate::spawn_in_current_span(fut);
             handles.push(handle);
         }
 
@@ -402,9 +404,7 @@ impl IngestorProcess {
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
-            backoff: ExponentialBackoff::from_millis(2)
-                .factor(250)
-                .max_delay(Duration::from_secs(30)),
+            backoff: ExponentialBackoff::default().max_delay(Duration::from_secs(30)),
         }
     }
 
@@ -671,12 +671,15 @@ impl IngestorProcess {
             }
         }
 
+        let download_start = Instant::now();
+
         let object_result = self
             .state
             .s3_client
             .get_object()
             .bucket(s3_event.s3.bucket.name.clone())
             .key(s3_event.s3.object.key.clone())
+            .set_request_payer(self.state.s3_options.request_payer.map(Into::into))
             .send()
             .await
             .context(GetObjectSnafu {
@@ -702,7 +705,7 @@ impl IngestorProcess {
 
         let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
         let object_reader = super::s3_object_decoder(
-            self.state.compression,
+            self.state.s3_options.compression,
             &s3_event.s3.object.key,
             object.content_encoding.as_deref(),
             object.content_type.as_deref(),
@@ -783,16 +786,26 @@ impl IngestorProcess {
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
-            Err(_) => {
+            Err(SendError::Closed) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Some(crate::source_sender::ClosedError)
+                Some(SendError::Closed)
             }
+            Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
         };
 
         // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
+
+        let bucket = &s3_event.s3.bucket.name;
+        let duration = download_start.elapsed();
+
+        if read_error.is_some() {
+            emit!(S3ObjectProcessingFailed { bucket, duration });
+        } else {
+            emit!(S3ObjectProcessingSucceeded { bucket, duration });
+        }
 
         // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
         // reference must be dropped before the status of the batch is sent to the channel.
@@ -1236,10 +1249,9 @@ fn test_s3_sns_testevent() {
 
 #[test]
 fn parse_sqs_config() {
-    let config: Config = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-        "#,
+    let config: Config = serde_yaml::from_str(
+        r#"queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+"#,
     )
     .unwrap();
     assert_eq!(
@@ -1248,14 +1260,12 @@ fn parse_sqs_config() {
     );
     assert!(config.deferred.is_none());
 
-    let config: Config = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-            [deferred]
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
-            max_age_secs = 3600
-        "#,
-    )
+    let config: Config = serde_yaml::from_str(indoc::indoc! {r#"
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        deferred:
+          queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+          max_age_secs: 3600
+    "#})
     .unwrap();
     assert_eq!(
         config.queue_url,
@@ -1270,21 +1280,17 @@ fn parse_sqs_config() {
     );
     assert_eq!(deferred.max_age_secs, 3600);
 
-    let test: Result<Config, toml::de::Error> = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-            [deferred]
-            max_age_secs = 3600
-        "#,
-    );
+    let test: Result<Config, serde_yaml::Error> = serde_yaml::from_str(indoc::indoc! {r#"
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        deferred:
+          max_age_secs: 3600
+    "#});
     assert!(test.is_err());
 
-    let test: Result<Config, toml::de::Error> = toml::from_str(
-        r#"
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
-            [deferred]
-            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
-        "#,
-    );
+    let test: Result<Config, serde_yaml::Error> = serde_yaml::from_str(indoc::indoc! {r#"
+        queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        deferred:
+          queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+    "#});
     assert!(test.is_err());
 }

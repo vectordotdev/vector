@@ -46,15 +46,6 @@ site_generation = 2
 # Search
 [params.search]
 algolia_autocomplete_theme = "classic"
-typesense_index = "vector_docs"
-
-# Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
-typesense_public_dev_apikey = "aTFLzhfCVeTj619Pxkhmz18798Nsau0Z"
-typesense_dev_host = "dnm1k9zrpctsvjowp"
-
-# Note that it's okay to use this on the front end: https://typesense.com/docs/guide/security.html#public-api-key
-typesense_public_prod_apikey = "BdepvpnczVgPL008lqhuBlkZo5s0rrWE"
-typesense_prod_host = "gk6e3zbyuntvc5dap"
 
 # VRL JSON server
 
@@ -66,7 +57,7 @@ delimiter = ""
 mediaType = "text/netlify"
 baseName = "_redirects"
 
-# Outputs (including search.json and _redirects files)
+# Outputs (including the VRL JSON endpoint and _redirects files)
 [outputs]
 home = ["HTML", "JSON", "RSS", "REDIRECTS"]
 
@@ -93,8 +84,9 @@ discord = "https://chat.vector.dev"
 
 # Datadog configuration
 [params.datadog_config]
-application_id = "0b95923b-b06d-445b-893f-a861e93d6ea3"
-client_token = "puba5f23a97d613091ae2ca8c0f4a135af4"
+application_id = "894af722-5919-4a62-97fc-33f49bc52803"
+client_token = "pubcee1dc56e7f5bd03397cc3624eb7961c"
+site = "datadoghq.com"
 service_name = "vector"
 
 ## Menus
@@ -263,8 +255,8 @@ parent = "community"
 weight = 1
 
 [[languages.en.menus.footer]]
-name = "Twitter"
-url = "https://twitter.com/vectordotdev"
+name = "X"
+url = "https://x.com/vectordotdev"
 parent = "community"
 weight = 2
 
@@ -275,7 +267,7 @@ parent = "community"
 weight = 3
 
 [[languages.en.menus.footer]]
-name = "Download"
+name = "Product"
 url = "/download"
 identifier = "download"
 weight = 5
@@ -284,6 +276,18 @@ weight = 5
 name = "Releases"
 url = "/releases"
 weight = 1
+parent = "download"
+
+[[languages.en.menus.footer]]
+name = "Deprecations"
+url = "/deprecations"
+weight = 2
+parent = "download"
+
+[[languages.en.menus.footer]]
+name = "Highlights"
+url = "/highlights"
+weight = 3
 parent = "download"
 
 # Extra links under the "Meta" section in the docs
@@ -318,9 +322,9 @@ weight = 2
 
 # Mini icons in navbar and footer
 [[languages.en.menus.comms]]
-name = "Twitter"
-params = { color = "twitter-blue", icon = "twitter" }
-url = "https://twitter.com/vectordotdev"
+name = "X"
+params = { color = "black", dark = "white", icon = "x" }
+url = "https://x.com/vectordotdev"
 weight = 1
 
 [[languages.en.menus.comms]]

@@ -1,29 +1,29 @@
 use std::{
+    collections::HashMap,
     fmt,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
+    sync::{LazyLock, Mutex},
 };
 
+use super::{
+    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, EncodeAlpnProtocolsSnafu,
+    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
+    ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu, SetCertificateSnafu,
+    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+};
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
-    pkcs12::{ParsedPkcs12_2, Pkcs12},
+    pkcs12::Pkcs12,
     pkey::{PKey, Private},
     ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
     stack::Stack,
-    x509::{X509, store::X509StoreBuilder},
+    x509::{X509, store::X509StoreBuilder, verify::X509CheckFlags},
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
-
-use super::{
-    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, DerExportSnafu,
-    EncodeAlpnProtocolsSnafu, FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu,
-    NewStoreBuilderSnafu, ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result,
-    SetAlpnProtocolsSnafu, SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError,
-    TlsIdentitySnafu, X509ParseSnafu,
-};
 
 pub const PEM_START_MARKER: &str = "-----BEGIN ";
 
@@ -40,7 +40,6 @@ pub const TEST_PEM_CLIENT_KEY_PATH: &str =
 
 /// Configures the TLS options for incoming/outgoing connections.
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TlsEnableableConfig {
@@ -83,7 +82,6 @@ pub struct TlsSourceConfig {
 
 /// TLS configuration.
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
@@ -177,13 +175,18 @@ pub struct TlsSettings {
     verify_certificate: bool,
     pub(super) verify_hostname: bool,
     authorities: Vec<X509>,
-    pub(super) identity: Option<IdentityStore>, // openssl::pkcs12::ParsedPkcs12 doesn't impl Clone yet
+    pub(super) identity: Option<IdentityStore>,
     alpn_protocols: Option<Vec<u8>>,
     server_name: Option<String>,
 }
 
+/// Identity store in PEM format
 #[derive(Clone)]
-pub(super) struct IdentityStore(Vec<u8>, String);
+pub(super) struct IdentityStore {
+    cert: X509,
+    key: PKey<Private>,
+    ca: Option<Vec<X509>>,
+}
 
 impl TlsSettings {
     /// Generate a filled out settings struct from the given optional
@@ -220,37 +223,30 @@ impl TlsSettings {
         })
     }
 
-    /// Returns the identity as PKCS12
-    ///
-    /// # Panics
-    ///
-    /// Panics if the identity is invalid.
-    fn identity(&self) -> Option<ParsedPkcs12_2> {
-        // This data was test-built previously, so we can just use it
-        // here and expect the results will not fail. This can all be
-        // reworked when `openssl::pkcs12::ParsedPkcs12` gains the Clone
-        // impl.
-        self.identity.as_ref().map(|identity| {
-            Pkcs12::from_der(&identity.0)
-                .expect("Could not build PKCS#12 archive from parsed data")
-                .parse2(&identity.1)
-                .expect("Could not parse stored PKCS#12 archive")
-        })
+    /// The configured SNI server name override, if any.
+    pub fn server_name(&self) -> Option<&str> {
+        self.server_name.as_deref()
     }
 
-    /// Returns the identity as PEM data
+    /// Whether certificate hostname verification is enabled.
+    pub fn verify_hostname(&self) -> bool {
+        self.verify_hostname
+    }
+
+    /// Returns the identity as PEM encoded byte arrays
     ///
     /// # Panics
     ///
     /// Panics if the identity is missing, invalid, or the authorities to chain are invalid.
     pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
-        self.identity().map(|identity| {
-            let mut cert = identity
-                .cert
-                .expect("Identity required")
-                .to_pem()
+        self.identity.as_ref().map(|identity| {
+            // we have verified correct formatting at ingest time
+            let mut cert = identity.cert.to_pem().expect("Invalid stored identity");
+            let key = identity
+                .key
+                .private_key_to_pem_pkcs8()
                 .expect("Invalid stored identity");
-            if let Some(chain) = identity.ca {
+            if let Some(chain) = identity.ca.as_ref() {
                 for authority in chain {
                     cert.extend(
                         authority
@@ -259,11 +255,6 @@ impl TlsSettings {
                     );
                 }
             }
-            let key = identity
-                .pkey
-                .expect("Private key required")
-                .private_key_to_pem_pkcs8()
-                .expect("Invalid stored private key");
             (cert, key)
         })
     }
@@ -295,18 +286,18 @@ impl TlsSettings {
         } else {
             SslVerifyMode::NONE
         });
-        if let Some(identity) = self.identity() {
-            if let Some(cert) = &identity.cert {
-                context.set_certificate(cert).context(SetCertificateSnafu)?;
-            }
-            if let Some(pkey) = &identity.pkey {
-                context.set_private_key(pkey).context(SetPrivateKeySnafu)?;
-            }
+        if let Some(identity) = &self.identity {
+            context
+                .set_certificate(&identity.cert)
+                .context(SetCertificateSnafu)?;
+            context
+                .set_private_key(&identity.key)
+                .context(SetPrivateKeySnafu)?;
 
-            if let Some(chain) = identity.ca {
+            if let Some(chain) = &identity.ca {
                 for cert in chain {
                     context
-                        .add_extra_chain_cert(cert)
+                        .add_extra_chain_cert(cert.clone())
                         .context(AddExtraChainCertSnafu)?;
                 }
             }
@@ -343,9 +334,11 @@ impl TlsSettings {
 
         if let Some(alpn) = &self.alpn_protocols {
             if for_server {
-                let server_proto = alpn.clone();
-                // See https://github.com/sfackler/rust-openssl/pull/2360.
-                let server_proto_ref: &'static [u8] = Box::leak(server_proto.into_boxed_slice());
+                // The server ALPN select callback requires a `'static` protocol list (see
+                // https://github.com/sfackler/rust-openssl/pull/2360). Intern it so the intentional
+                // leak happens at most once per distinct list, rather than leaking a fresh copy
+                // every time the context is (re)built.
+                let server_proto_ref = intern_alpn_protocols(alpn);
                 context.set_alpn_select_callback(move |_, client_proto| {
                     select_next_proto(server_proto_ref, client_proto).ok_or(AlpnError::NOACK)
                 });
@@ -359,18 +352,73 @@ impl TlsSettings {
         Ok(())
     }
 
+    /// Apply per-connection TLS settings.
+    ///
+    /// `skip_server_name` must be set when the connection targets a forward proxy rather than the
+    /// upstream destination. The `server_name` override applies only to the destination; applying it
+    /// to the proxy's own TLS connection would verify the proxy certificate against the upstream
+    /// name and fail.
     pub fn apply_connect_configuration(
         &self,
         connection: &mut ConnectConfiguration,
+        skip_server_name: bool,
     ) -> std::result::Result<(), openssl::error::ErrorStack> {
-        connection.set_verify_hostname(self.verify_hostname);
-        if let Some(server_name) = &self.server_name {
-            // Prevent native TLS lib from inferring default SNI using domain name from url.
+        if let Some(server_name) = self.server_name.as_deref().filter(|_| !skip_server_name) {
+            // Use the configured server name for both SNI and certificate hostname
+            // verification. `ConnectConfiguration::into_ssl` (called by the connector
+            // after this callback) would otherwise apply the URL host to SNI and the
+            // verify parameter, overriding the configured server name and causing a
+            // hostname mismatch. Disabling both here prevents that override.
             connection.set_use_server_name_indication(false);
-            connection.set_hostname(server_name)?;
+            connection.set_verify_hostname(false);
+
+            let server_ip = server_name.parse::<std::net::IpAddr>();
+
+            // SNI must be a hostname, not an IP literal.
+            if server_ip.is_err() {
+                connection.set_hostname(server_name)?;
+            }
+
+            if self.verify_hostname {
+                // Mirror `ConnectConfiguration::into_ssl`'s `setup_verify_hostname` so that
+                // verification against `server_name` behaves exactly as it would against the
+                // URL host, just with our name instead:
+                // https://github.com/rust-openssl/rust-openssl/blob/db9c9e2f5db2ad7b45fd894e8d297ee15bfd0c7c/openssl/src/ssl/connector.rs#L380-L389
+                let param = connection.param_mut();
+                // Disallow partial-wildcard matches such as `w*.example.com` matching
+                // `www.example.com`, so a wildcard label must be the entire leftmost label
+                // (`*.example.com`).
+                param.set_hostflags(X509CheckFlags::NO_PARTIAL_WILDCARDS);
+                match server_ip {
+                    Ok(ip) => param.set_ip(ip)?,
+                    Err(_) => param.set_host(server_name)?,
+                }
+            }
+        } else {
+            connection.set_verify_hostname(self.verify_hostname);
         }
         Ok(())
     }
+}
+
+/// Return a `'static` copy of a server ALPN protocol list, leaking each distinct list at most once.
+///
+/// `SslContextBuilder::set_alpn_select_callback` requires the protocol list to outlive the context
+/// with a `'static` lifetime, so the bytes must be leaked. Interning by content means rebuilding an
+/// acceptor with the same ALPN configuration (e.g. on every certificate reload) reuses the existing
+/// allocation instead of leaking a fresh copy each time, keeping the leak bounded and one-time.
+fn intern_alpn_protocols(protocols: &[u8]) -> &'static [u8] {
+    static INTERNED: LazyLock<Mutex<HashMap<Vec<u8>, &'static [u8]>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+
+    let mut interned = INTERNED.lock().expect("mutex poisoned");
+
+    if let Some(existing) = interned.get(protocols).copied() {
+        return existing;
+    }
+    let leaked: &'static [u8] = Box::leak(protocols.to_vec().into_boxed_slice());
+    interned.insert(protocols.to_vec(), leaked);
+    leaked
 }
 
 impl TlsConfig {
@@ -401,7 +449,7 @@ impl TlsConfig {
                 let (data, filename) = open_read(filename, "certificate")?;
                 der_or_pem(
                     data,
-                    |der| self.parse_pkcs12_identity(der),
+                    |der| self.parse_pkcs12_identity(&der),
                     |pem| self.parse_pem_identity(&pem, &filename),
                 )
             }
@@ -430,45 +478,43 @@ impl TlsConfig {
         match &self.key_file {
             None => Err(TlsError::MissingKey),
             Some(key_file) => {
-                let name = crt_file.to_string_lossy().to_string();
                 let mut crt_stack = X509::stack_from_pem(pem.as_bytes())
                     .with_context(|_| X509ParseSnafu { filename: crt_file })?
                     .into_iter();
 
-                let crt = crt_stack.next().ok_or(TlsError::MissingCertificate)?;
+                let cert = crt_stack.next().ok_or(TlsError::MissingCertificate)?;
                 let key = load_key(key_file.as_path(), self.key_pass.as_ref())?;
 
                 let mut ca_stack = Stack::new().context(NewCaStackSnafu)?;
                 for intermediate in crt_stack {
                     ca_stack.push(intermediate).context(CaStackPushSnafu)?;
                 }
-
-                let pkcs12 = Pkcs12::builder()
-                    .ca(ca_stack)
-                    .name(&name)
-                    .pkey(&key)
-                    .cert(&crt)
-                    .build2("")
-                    .context(Pkcs12Snafu)?;
-                let identity = pkcs12.to_der().context(DerExportSnafu)?;
-
-                // Build the resulting parsed PKCS#12 archive,
-                // but don't store it, as it cannot be cloned.
-                // This is just for error checking.
-                pkcs12.parse2("").context(TlsIdentitySnafu)?;
-
-                Ok(Some(IdentityStore(identity, String::new())))
+                let ca: Vec<X509> = ca_stack
+                    .iter()
+                    .map(std::borrow::ToOwned::to_owned)
+                    .collect();
+                Ok(Some(IdentityStore {
+                    cert,
+                    key,
+                    ca: Some(ca),
+                }))
             }
         }
     }
 
     /// Parse identity from a DER encoded PKCS#12 archive
-    fn parse_pkcs12_identity(&self, der: Vec<u8>) -> Result<Option<IdentityStore>> {
-        let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12Snafu)?;
+    fn parse_pkcs12_identity(&self, der: &[u8]) -> Result<Option<IdentityStore>> {
+        let pkcs12 = Pkcs12::from_der(der).context(ParsePkcs12Snafu)?;
         // Verify password
         let key_pass = self.key_pass.as_deref().unwrap_or("");
-        pkcs12.parse2(key_pass).context(ParsePkcs12Snafu)?;
-        Ok(Some(IdentityStore(der, key_pass.to_string())))
+        let parsed = pkcs12.parse2(key_pass).context(ParsePkcs12Snafu)?;
+        // extract cert, key and ca and store as PEM sow e can return an IdentityStore
+        let cert = parsed.cert.ok_or(TlsError::MissingCertificate)?;
+        let key = parsed.pkey.ok_or(TlsError::MissingKey)?;
+        let ca: Option<Vec<X509>> = parsed
+            .ca
+            .map(|stack| stack.iter().map(std::borrow::ToOwned::to_owned).collect());
+        Ok(Some(IdentityStore { cert, key, ca }))
     }
 }
 
@@ -810,6 +856,109 @@ mod test {
         let _error = TlsSettings::from_options(Some(&options))
             .expect_err("from_options failed to check certificate");
         // Actual error is an ASN parse, doesn't really matter
+    }
+
+    // End-to-end regression test for the OpenSSL hostname-mismatch bug: the server presents a
+    // certificate for `localhost` (CN=localhost, no SAN) while the client connects by IP, so the
+    // connection URL host (`127.0.0.1`) does not match the certificate. Verification must instead
+    // use the configured `server_name`.
+    #[tokio::test]
+    async fn server_name_is_used_for_hostname_verification() {
+        use std::{net::SocketAddr, pin::Pin};
+
+        use openssl::ssl::{SslConnector, SslMethod};
+
+        // Connects to `addr` by IP, driving `into_ssl` with `url_host` exactly as
+        // `hyper-openssl` does (it passes the connection URL host).
+        async fn connect(
+            server_name: Option<&str>,
+            skip_server_name: bool,
+            url_host: &str,
+            addr: SocketAddr,
+        ) -> std::result::Result<(), String> {
+            let settings = TlsSettings::from_options(Some(&TlsConfig {
+                ca_file: Some("tests/data/ca/intermediate_server/certs/ca-chain.cert.pem".into()),
+                server_name: server_name.map(Into::into),
+                ..Default::default()
+            }))
+            .unwrap();
+
+            let tcp = tokio::net::TcpStream::connect(addr)
+                .await
+                .map_err(|e| e.to_string())?;
+            let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+            settings
+                .apply_context(&mut builder)
+                .map_err(|e| e.to_string())?;
+            let mut config = builder.build().configure().unwrap();
+            settings
+                .apply_connect_configuration(&mut config, skip_server_name)
+                .map_err(|e| e.to_string())?;
+            let ssl = config.into_ssl(url_host).map_err(|e| e.to_string())?;
+            let mut stream = tokio_openssl::SslStream::new(ssl, tcp).unwrap();
+            Pin::new(&mut stream)
+                .connect()
+                .await
+                .map_err(|e| e.to_string())
+        }
+
+        let server_settings = MaybeTlsSettings::from_config(
+            Some(&TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    crt_file: Some(TEST_PEM_CRT_PATH.into()),
+                    key_file: Some(TEST_PEM_KEY_PATH.into()),
+                    ..Default::default()
+                },
+            }),
+            true,
+        )
+        .unwrap();
+        let reloader = server_settings
+            .reloadable_acceptor()
+            .unwrap()
+            .expect("tls enabled, so an acceptor should exist");
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut listener = server_settings
+            .bind_reloadable(&addr, Some(reloader))
+            .await
+            .unwrap();
+        let local_addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            while let Ok(mut stream) = listener.accept().await {
+                stream.handshake().await.ok();
+            }
+        });
+
+        // With `server_name` set to the certificate's name, verification uses it and succeeds even
+        // though the connection host is the IP. This passes only because `server_name` is applied
+        // to hostname verification (the bug this fixes).
+        connect(Some("localhost"), false, "127.0.0.1", local_addr)
+            .await
+            .expect("handshake should succeed when server_name matches the certificate");
+
+        // Control: without `server_name`, verification falls back to the connection host (the IP),
+        // which the certificate does not cover, so it fails. This proves verification is active.
+        let error = connect(None, false, "127.0.0.1", local_addr)
+            .await
+            .expect_err("handshake should fail when verifying against the IP");
+        assert!(
+            error.contains("certificate verify failed"),
+            "expected a certificate verification failure, got: {error}"
+        );
+
+        // With `skip_server_name` (as when dialing a proxy), the `server_name` override is ignored
+        // and verification falls back to the connection host (the IP), which fails. This is what
+        // keeps an HTTPS proxy's own certificate verified against the proxy host.
+        let error = connect(Some("localhost"), true, "127.0.0.1", local_addr)
+            .await
+            .expect_err("handshake should fail when the server_name override is skipped");
+        assert!(
+            error.contains("certificate verify failed"),
+            "expected a certificate verification failure, got: {error}"
+        );
+
+        server.abort();
     }
 
     #[test]

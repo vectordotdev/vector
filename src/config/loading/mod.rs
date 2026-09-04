@@ -1,5 +1,6 @@
 mod config_builder;
 mod loader;
+mod representation;
 mod secret;
 mod source;
 
@@ -8,10 +9,10 @@ use std::{
     fmt::Debug,
     fs::{File, ReadDir},
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Mutex, OnceLock},
 };
 
-use config_builder::ConfigBuilderLoader;
+pub use config_builder::ConfigBuilderLoader;
 use glob::glob;
 use loader::process::Process;
 pub use loader::*;
@@ -20,11 +21,28 @@ pub use source::*;
 use vector_lib::configurable::NamedComponent;
 
 use super::{
-    Config, ConfigPath, Format, FormatHint, builder::ConfigBuilder, format, validation, vars,
+    Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, validation,
+    vars,
 };
-use crate::{config::ProviderConfig, signal};
+use crate::signal;
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
+
+static ALLOW_ENV_VAR_INTERPOLATION: OnceLock<bool> = OnceLock::new();
+
+/// Sets whether environment variable interpolation is enabled for the process.
+/// Must be called exactly once at startup before any config loading.
+pub fn set_env_var_interpolation(allow: bool) {
+    ALLOW_ENV_VAR_INTERPOLATION
+        .set(allow)
+        .expect("set_env_var_interpolation must only be called once");
+}
+
+/// Returns whether environment variable interpolation is currently enabled.
+/// Defaults to `false` if [`set_env_var_interpolation`] has not been called.
+pub fn env_var_interpolation_enabled() -> bool {
+    *ALLOW_ENV_VAR_INTERPOLATION.get().unwrap_or(&false)
+}
 
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
@@ -124,7 +142,7 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
 }
 
 pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String>> {
-    let builder = load_builder_from_paths(config_paths)?;
+    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
@@ -142,22 +160,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
-    // Load secret backends first
-    let mut secrets_backends_loader = load_secret_backends_from_paths(config_paths)?;
-    // And then, if needed, retrieve secrets from configured backends
-    let mut builder = if secrets_backends_loader.has_secrets_to_retrieve() {
-        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
-        let resolved_secrets = secrets_backends_loader
-            .retrieve(&mut signal_handler.subscribe())
-            .await
-            .map_err(|e| vec![e])?;
-        load_builder_from_paths_with_secrets(config_paths, resolved_secrets)?
-    } else {
-        debug!(message = "No secret placeholder found, skipping secret resolution.");
-        load_builder_from_paths(config_paths)?
-    };
-
-    builder.allow_empty = allow_empty;
+    let mut builder =
+        load_builder_from_paths_with_secrets(config_paths, signal_handler, allow_empty).await?;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -168,15 +172,26 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "Provider configured.", provider = ?provider.get_component_name());
     }
 
-    let (new_config, build_warnings) = builder.build_with_warnings()?;
+    finalize_config(builder).await
+}
 
-    validation::check_buffer_preconditions(&new_config).await?;
+/// Loads a `ConfigBuilder` from paths, resolving `SECRET[...]` placeholders
+/// from the configured backends first, like the run path does.
+pub(crate) async fn load_builder_from_paths_with_secrets(
+    config_paths: &[ConfigPath],
+    signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
+) -> Result<ConfigBuilder, Vec<String>> {
+    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
 
-    for warning in build_warnings {
-        warn!("{}", warning);
-    }
-
-    Ok(new_config)
+    ConfigBuilderLoader::default()
+        .allow_empty(allow_empty)
+        .secrets(secrets)
+        .load_from_paths(config_paths)
 }
 
 pub async fn load_from_str_with_secrets(
@@ -185,23 +200,23 @@ pub async fn load_from_str_with_secrets(
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
-    // Load secret backends first
-    let mut secrets_backends_loader = load_secret_backends_from_input(input.as_bytes(), format)?;
-    // And then, if needed, retrieve secrets from configured backends
-    let mut builder = if secrets_backends_loader.has_secrets_to_retrieve() {
-        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
-        let resolved_secrets = secrets_backends_loader
-            .retrieve(&mut signal_handler.subscribe())
-            .await
-            .map_err(|e| vec![e])?;
-        load_builder_from_input_with_secrets(input.as_bytes(), format, resolved_secrets)?
-    } else {
-        debug!(message = "No secret placeholder found, skipping secret resolution.");
-        load_builder_from_input(input.as_bytes(), format)?
-    };
+    let secrets_backends_loader =
+        loader_from_input(SecretBackendLoader::default(), input.as_bytes(), format)?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
 
-    builder.allow_empty = allow_empty;
+    let builder = ConfigBuilderLoader::default()
+        .allow_empty(allow_empty)
+        .secrets(secrets)
+        .load_from_input(input.as_bytes(), format)?;
     signal_handler.clear();
+
+    finalize_config(builder).await
+}
+
+async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> {
     let (new_config, build_warnings) = builder.build_with_warnings()?;
 
     validation::check_buffer_preconditions(&new_config).await?;
@@ -213,7 +228,11 @@ pub async fn load_from_str_with_secrets(
     Ok(new_config)
 }
 
-fn loader_from_input<T, L, R>(mut loader: L, input: R, format: Format) -> Result<T, Vec<String>>
+pub(super) fn loader_from_input<T, L, R>(
+    mut loader: L,
+    input: R,
+    format: Format,
+) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -223,7 +242,10 @@ where
 }
 
 /// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
-fn loader_from_paths<T, L>(mut loader: L, config_paths: &[ConfigPath]) -> Result<T, Vec<String>>
+pub(super) fn loader_from_paths<T, L>(
+    mut loader: L,
+    config_paths: &[ConfigPath],
+) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -259,53 +281,11 @@ where
     }
 }
 
-/// Uses `ConfigBuilderLoader` to process `ConfigPaths`, deserializing to a `ConfigBuilder`.
-pub fn load_builder_from_paths(config_paths: &[ConfigPath]) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_paths(ConfigBuilderLoader::new(), config_paths)
-}
-
-fn load_builder_from_input<R: std::io::Read>(
-    input: R,
-    format: Format,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_input(ConfigBuilderLoader::new(), input, format)
-}
-
-/// Uses `ConfigBuilderLoader` to process `ConfigPaths`, performing secret replacement and deserializing to a `ConfigBuilder`
-pub fn load_builder_from_paths_with_secrets(
-    config_paths: &[ConfigPath],
-    secrets: HashMap<String, String>,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_paths(ConfigBuilderLoader::with_secrets(secrets), config_paths)
-}
-
-fn load_builder_from_input_with_secrets<R: std::io::Read>(
-    input: R,
-    format: Format,
-    secrets: HashMap<String, String>,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_input(ConfigBuilderLoader::with_secrets(secrets), input, format)
-}
-
-/// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
+/// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a JSON object.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
-) -> Result<toml::value::Table, Vec<String>> {
+) -> Result<serde_json::Map<String, serde_json::Value>, Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
-}
-
-/// Uses `SecretBackendLoader` to process `ConfigPaths`, deserializing to a `SecretBackends`.
-pub fn load_secret_backends_from_paths(
-    config_paths: &[ConfigPath],
-) -> Result<SecretBackendLoader, Vec<String>> {
-    loader_from_paths(SecretBackendLoader::new(), config_paths)
-}
-
-fn load_secret_backends_from_input<R: std::io::Read>(
-    input: R,
-    format: Format,
-) -> Result<SecretBackendLoader, Vec<String>> {
-    loader_from_input(SecretBackendLoader::new(), input, format)
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
@@ -339,34 +319,42 @@ fn load_from_inputs(
     }
 }
 
-pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<String, Vec<String>> {
+pub fn prepare_input<R: std::io::Read>(
+    mut input: R,
+    interpolate_env: bool,
+) -> Result<String, Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
         .map_err(|e| vec![e.to_string()])?;
 
-    let mut vars: HashMap<String, String> = std::env::vars_os()
-        .filter_map(|(k, v)| match (k.into_string(), v.into_string()) {
-            (Ok(k), Ok(v)) => Some((k, v)),
-            _ => None,
-        })
-        .collect();
+    if interpolate_env {
+        let mut vars: HashMap<String, String> = std::env::vars_os()
+            .filter_map(|(k, v)| match (k.into_string(), v.into_string()) {
+                (Ok(k), Ok(v)) => Some((k, v)),
+                _ => None,
+            })
+            .collect();
 
-    if !vars.contains_key("HOSTNAME")
-        && let Ok(hostname) = crate::get_hostname()
-    {
-        vars.insert("HOSTNAME".into(), hostname);
+        if !vars.contains_key("HOSTNAME")
+            && let Ok(hostname) = crate::get_hostname()
+        {
+            vars.insert("HOSTNAME".into(), hostname);
+        }
+        vars::interpolate(&source_string, &vars)
+    } else {
+        Ok(source_string)
     }
-    vars::interpolate(&source_string, &vars)
 }
 
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
 {
-    let with_vars = prepare_input(input)?;
+    // Via configurations that load from raw string, skip interpolation of env
+    let with_vars = prepare_input(input, false)?;
 
-    format::deserialize(&with_vars, format)
+    representation::deserialize_config(&with_vars, format)
 }
 
 #[cfg(not(windows))]
@@ -388,84 +376,4 @@ fn default_config_paths() -> Vec<ConfigPath> {
     let default_path = default_path();
 
     vec![ConfigPath::File(default_path, Some(Format::Yaml))]
-}
-
-#[cfg(all(
-    test,
-    feature = "sinks-elasticsearch",
-    feature = "transforms-sample",
-    feature = "sources-demo_logs",
-    feature = "sinks-console"
-))]
-mod tests {
-    use std::path::PathBuf;
-
-    use super::load_builder_from_paths;
-    use crate::config::{ComponentKey, ConfigPath};
-
-    #[test]
-    fn load_namespacing_folder() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("namespacing")
-            .join("success");
-        let configs = vec![ConfigPath::Dir(path)];
-        let builder = load_builder_from_paths(&configs).unwrap();
-        assert!(
-            builder
-                .transforms
-                .contains_key(&ComponentKey::from("apache_parser"))
-        );
-        assert!(
-            builder
-                .sources
-                .contains_key(&ComponentKey::from("apache_logs"))
-        );
-        assert!(
-            builder
-                .sinks
-                .contains_key(&ComponentKey::from("es_cluster"))
-        );
-        assert_eq!(builder.tests.len(), 2);
-    }
-
-    #[test]
-    fn load_namespacing_ignore_invalid() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("namespacing")
-            .join("ignore-invalid");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths(&configs).unwrap();
-    }
-
-    #[test]
-    fn load_directory_ignores_unknown_file_formats() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("config-dir")
-            .join("ignore-unknown");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths(&configs).unwrap();
-    }
-
-    #[test]
-    fn load_directory_globals() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("config-dir")
-            .join("globals");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths(&configs).unwrap();
-    }
-
-    #[test]
-    fn load_directory_globals_duplicates() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("config-dir")
-            .join("globals-duplicate");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths(&configs).unwrap();
-    }
 }

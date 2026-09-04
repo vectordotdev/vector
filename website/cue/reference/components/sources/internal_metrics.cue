@@ -9,8 +9,7 @@ components: sources: internal_metrics: {
 		"""
 
 	classes: {
-		commonly_used: true
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"
@@ -27,7 +26,6 @@ components: sources: internal_metrics: {
 	}
 
 	support: {
-		notices: []
 		requirements: []
 		warnings: []
 	}
@@ -54,6 +52,12 @@ components: sources: internal_metrics: {
 		}
 
 		// Instance-level "process" metrics
+		active_endpoints: {
+			description:       "The number of active endpoints this component is sending data to."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		active_clients: {
 			description:       "Number of clients attached to a component."
 			type:              "gauge"
@@ -79,10 +83,22 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		api_started_total: {
-			description:       "The number of times the Vector GraphQL API has been started."
+			description:       "The number of times the Vector API has been started."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
+		}
+		component_timed_out_events_total: {
+			description:       "The total number of events for which this source responded with a timeout error."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_timed_out_requests_total: {
+			description:       "The total number of requests for which this source responded with a timeout error."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
 		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
@@ -153,6 +169,24 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		adaptive_concurrency_back_pressure: {
+			description:       "A histogram of whether back-pressure was applied during the current window."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		adaptive_concurrency_past_rtt_mean: {
+			description:       "The mean round-trip time (RTT) from the past window."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		adaptive_concurrency_reached_limit: {
+			description:       "A histogram of whether the concurrency limit was reached during the current window."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		checkpoints_total: {
 			description:       "The total number of files checkpointed."
 			type:              "counter"
@@ -191,20 +225,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		connection_read_errors_total: {
-			description:       "The total number of errors reading datagram."
-			type:              "counter"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				mode: {
-					description: ""
-					required:    true
-					enum: {
-						udp: "User Datagram Protocol"
-					}
-				}
-			}
-		}
 		container_processed_events_total: {
 			description:       "The total number of container events processed."
 			type:              "counter"
@@ -223,6 +243,24 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		doris_bytes_loaded_total: {
+			description:       "The total number of bytes loaded into Doris."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		doris_rows_filtered_total: {
+			description:       "The total number of rows filtered by Doris during stream load."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		doris_rows_loaded_total: {
+			description:       "The total number of rows successfully loaded into Doris."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		k8s_format_picker_edge_cases_total: {
 			description:       "The total number of edge cases encountered while picking format of the Kubernetes log message."
 			type:              "counter"
@@ -235,6 +273,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		k8s_event_namespace_annotation_failures_total: {
+			description:       "The total number of failures to annotate a Kubernetes event with namespace metadata."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		k8s_event_node_annotation_failures_total: {
+			description:       "The total number of failures to annotate a Kubernetes event with node metadata."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		events_discarded_total: {
 			description:       "The total number of events discarded by this component."
 			type:              "counter"
@@ -243,50 +293,106 @@ components: sources: internal_metrics: {
 				reason: _reason
 			}
 		}
-		buffer_byte_size: {
-			description:       "The number of bytes current in the buffer."
+		component_latency_seconds: {
+			description: """
+				The elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+				"""
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		component_latency_mean_seconds: {
+			description: """
+				The mean elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+
+				This value is smoothed over time using an exponentially weighted moving average (EWMA).
+				"""
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _internal_metrics_tags
 		}
-		buffer_events: {
+		buffer_size_bytes: {
+			description:       "The number of bytes currently in the buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _buffer_tags
+		}
+		buffer_size_events: {
 			description:       "The number of events currently in the buffer."
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _buffer_tags
 		}
 		buffer_discarded_events_total: {
 			description:       "The number of events dropped by this non-blocking buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _buffer_tags & {
+				intentional: {
+					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
+					required:    true
+				}
+			}
 		}
-		buffer_received_event_bytes_total: {
+		buffer_discarded_bytes_total: {
+			description:       "The number of bytes dropped by this non-blocking buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _buffer_tags & {
+				intentional: {
+					description: "True if the events were discarded intentionally, like a `filter` transform, or false if due to an error."
+					required:    true
+				}
+			}
+		}
+		buffer_errors_total: {
+			description:       "The total number of errors encountered by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				error_code: _buffer_error_code
+				error_type: _error_type
+				stage:      _stage
+			}
+		}
+		buffer_received_bytes_total: {
 			description:       "The number of bytes received by this buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _buffer_tags
 		}
 		buffer_received_events_total: {
 			description:       "The number of events received by this buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _buffer_tags
 		}
 		buffer_send_duration_seconds: {
 			description:       "The duration spent sending a payload to this buffer."
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				stage: _buffer_stage
+			}
 		}
-		buffer_sent_event_bytes_total: {
+		buffer_sent_bytes_total: {
 			description:       "The number of bytes sent by this buffer."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _buffer_tags
 		}
 		buffer_sent_events_total: {
 			description:       "The number of events sent by this buffer."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _buffer_tags
+		}
+		component_cpu_usage_ns_total: {
+			description:       "The CPU time consumed by a component in nanoseconds. Available for transforms only. Emitted only on Linux, macOS, and Windows."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -439,6 +545,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags: _component_tags & {output: _output}
 		}
+		datadog_logs_reserved_attribute_conflicts_total: {
+			description:       "The total number of conflicts encountered when relocating fields with semantic meaning to a Datadog reserved attribute."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {meaning: _meaning}
+		}
 		internal_metrics_cardinality: {
 			description:       "The total number of metrics emitted from the internal metrics registry."
 			type:              "gauge"
@@ -560,7 +672,7 @@ components: sources: internal_metrics: {
 		}
 		open_files: {
 			description:       "The total number of open files."
-			type:              "counter"
+			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
@@ -623,6 +735,28 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		http_client_errors_total: {
+			description:       "The total number of HTTP request errors."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				error_kind: {
+					description: "The type of error returned by the HTTP client."
+					required:    true
+				}
+			}
+		}
+		http_client_error_rtt_seconds: {
+			description:       "The round-trip time (RTT) of failed HTTP requests."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				error_kind: {
+					description: "The type of error returned by the HTTP client."
+					required:    true
+				}
+			}
+		}
 		http_requests_total: {
 			description:       "The total number of HTTP requests issued by this component."
 			type:              "counter"
@@ -658,12 +792,6 @@ components: sources: internal_metrics: {
 				status: _status
 			}
 		}
-		invalid_record_total: {
-			description:       "The total number of invalid records that have been discarded."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		lua_memory_used_bytes: {
 			description:       "The total memory currently being used by the Lua runtime."
 			type:              "gauge"
@@ -688,23 +816,83 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		protobuf_decode_errors_total: {
-			description:       "The total number of [Protocol Buffers](\(urls.protobuf)) errors thrown during communication between Vector instances."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		send_errors_total: {
-			description:       "The total number of errors sending messages."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		source_lag_time_seconds: {
 			description:       "The difference between the timestamp recorded in each event and the time when it was ingested, expressed as fractional seconds."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		source_send_batch_latency_seconds: {
+			description:       "The time elapsed blocking on the downstream channel to accept an entire batch of events received at the source"
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		source_send_latency_seconds: {
+			description:       "The time elapsed blocking on the downstream channel to accept a single chunk from a batch of events received at the source"
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		source_buffer_max_byte_size: {
+			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
+		}
+		source_buffer_max_event_size: {
+			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
+		}
+		source_buffer_max_size_bytes: {
+			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_max_size_events: {
+			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_utilization: {
+			description:       "The utilization level of the source buffer. The outputs of the source send data to this buffer."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_utilization_level: {
+			description:       "The current utilization level of the source buffer. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_utilization_mean: {
+			description:       "The mean utilization level of the source buffer. The outputs of the source send data to this buffer. The mean utilization is smoothed over time using an exponentially weighted moving average (EWMA)."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
 		}
 		splunk_pending_acks: {
 			description:       "The number of outstanding Splunk HEC indexer acknowledgement acks."
@@ -712,8 +900,30 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		streams_total: {
-			description:       "The total number of streams."
+		s3_object_processing_failed_duration_seconds: {
+			description:       "The time taken to process an S3 object that failed, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				bucket: {
+					description: "The name of the S3 bucket."
+					required:    true
+				}
+			}
+		}
+		s3_object_processing_succeeded_duration_seconds: {
+			description:       "The time taken to process an S3 object that succeeded, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				bucket: {
+					description: "The name of the S3 bucket."
+					required:    true
+				}
+			}
+		}
+		sqs_message_defer_succeeded_total: {
+			description:       "The total number of SQS messages successfully deferred."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -763,24 +973,76 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		stdin_reads_failed_total: {
-			description:       "The total number of errors reading from stdin."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
 		tag_value_limit_exceeded_total: {
 			description: """
 				The total number of events discarded because the tag has been rejected after
-				hitting the configured `value_limit`.
+				hitting the configured `value_limit`. When `internal_metrics.include_extended_tags`
+				is enabled in the `tag_cardinality_limit` transform, this metric includes
+				`metric_name` and `tag_key` labels. By default, this metric has no labels to
+				keep cardinality low.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
+			tags: _component_tags & {
+				metric_name: {
+					description: """
+						The name of the metric whose tag value limit was exceeded.
+						Only present when `internal_metrics.include_extended_tags` is enabled.
+						"""
+					required: false
+				}
+				tag_key: {
+					description: """
+						The key of the tag whose value limit was exceeded.
+						Only present when `internal_metrics.include_extended_tags` is enabled.
+						"""
+					required: false
+				}
+			}
+		}
+		transform_buffer_max_byte_size: {
+			description:        "The maximum number of bytes the buffer that feeds into a transform can hold."
+			type:               "gauge"
+			default_namespace:  "vector"
+			tags:               _component_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
+		}
+		transform_buffer_max_event_size: {
+			description:        "The maximum number of events the buffer that feeds into a transform can hold."
+			type:               "gauge"
+			default_namespace:  "vector"
+			tags:               _component_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
+		}
+		transform_buffer_max_size_bytes: {
+			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
+			type:              "gauge"
+			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		timestamp_parse_errors_total: {
-			description:       "The total number of errors encountered parsing [RFC 3339](\(urls.rfc_3339)) timestamps."
-			type:              "counter"
+		transform_buffer_max_size_events: {
+			description:       "The maximum number of events the buffer that feeds into a transform can hold."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		transform_buffer_utilization: {
+			description:       "The utilization level of the buffer that feeds into a transform."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		transform_buffer_utilization_level: {
+			description:       "The current utilization level of the buffer that feeds into a transform."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		transform_buffer_utilization_mean: {
+			description:       "The mean utilization level of the buffer that feeds into a transform. This value is smoothed over time using an exponentially weighted moving average (EWMA)."
+			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
@@ -789,20 +1051,6 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
-		}
-		utf8_convert_errors_total: {
-			description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
-			type:              "counter"
-			default_namespace: "vector"
-			tags: _component_tags & {
-				mode: {
-					description: "The connection mode used by the component."
-					required:    true
-					enum: {
-						udp: "User Datagram Protocol"
-					}
-				}
-			}
 		}
 		utilization: {
 			description:       "A ratio from 0 to 1 of the load on a component. A value of 0 would indicate a completely idle component that is simply waiting for input. A value of 1 would indicate a that is never idle. This value is updated every 5 seconds."
@@ -832,7 +1080,7 @@ components: sources: internal_metrics: {
 					required:    true
 				}
 				revision: {
-					description: "Revision identifer, related to versioned releases."
+					description: "Revision identifier, related to versioned releases."
 					required:    true
 				}
 			}
@@ -889,22 +1137,6 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 
-		// config metrics
-		config_reload_rejected: {
-			description:       "Number of configuration reload attempts that were rejected."
-			type:              "counter"
-			default_namespace: "vector"
-			tags: _internal_metrics_tags & {
-				reason: _reason
-			}
-		}
-		config_reloaded: {
-			description:       "Number of times a new configuration was loaded successfully."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
-
 		// Helpful tag groupings
 		_component_tags: _internal_metrics_tags & {
 			component_kind: _component_kind
@@ -936,6 +1168,29 @@ components: sources: internal_metrics: {
 			required:    true
 			examples: ["file", "http", "honeycomb", "splunk_hec"]
 		}
+		_buffer_tags: _component_tags & {
+			buffer_id: _buffer_id
+			stage:     _buffer_stage
+		}
+		_buffer_id: {
+			description: "The unique identifier of the buffer."
+			required:    true
+		}
+		_buffer_error_code: {
+			description: "The specific error code emitted for a buffer read failure."
+			required:    true
+			enum: {
+				"deser_failed":                "The buffer record could not be deserialized."
+				"checksum_mismatch":           "The buffer record checksum did not match the expected value."
+				"decode_failed":               "The buffer record could not be decoded."
+				"incompatible_record_version": "The buffer record version is incompatible with this reader."
+				"partial_write":               "The buffer contained a partially written record."
+			}
+		}
+		_buffer_stage: {
+			description: "The numbered stage within the buffer pipeline."
+			required:    true
+		}
 		_endpoint: {
 			description: "The absolute path of originating file."
 			required:    true
@@ -958,6 +1213,7 @@ components: sources: internal_metrics: {
 				"match_failed":                "The match operation failed."
 				"out_of_order":                "The event was out of order."
 				"parse_failed":                "The parsing operation failed."
+				"reader_failed":               "The buffer reader failed."
 				"read_failed":                 "The file read operation failed."
 				"render_error":                "The rendering operation failed."
 				"stream_closed":               "The downstream was closed, forwarding the event(s) failed."
@@ -990,6 +1246,20 @@ components: sources: internal_metrics: {
 			description: "The hostname of the originating system."
 			required:    true
 			examples: [_values.local_host]
+		}
+		_meaning: {
+			description: "The semantic meaning."
+			required:    true
+			enum: {
+				service:   "The service typically represents the application that generated the event."
+				message:   "The main text message of the event."
+				timestamp: "The main timestamp of the event."
+				host:      "The hostname of the machine where the event was generated."
+				tags:      "The tags of an event, generally a key-value paired list."
+				source:    "The source of the event."
+				severity:  "The severity of the event."
+				trace_id:  "The Id of the trace associated to the event."
+			}
 		}
 		_mode: {
 			description: "The connection mode used by the component."

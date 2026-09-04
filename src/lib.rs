@@ -31,13 +31,14 @@ extern crate tracing;
 #[macro_use]
 extern crate vector_lib;
 
+#[cfg(all(target_os = "linux", feature = "antithesis-scenario-disk"))]
+extern crate antithesis_instrumentation as _;
+
 pub use indoc::indoc;
+// re-export codecs for convenience
+pub use vector_lib::codecs;
 
-#[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
-#[global_allocator]
-static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-#[cfg(all(feature = "tikv-jemallocator", feature = "allocation-tracing"))]
+#[cfg(all(unix, feature = "tikv-jemallocator"))]
 #[global_allocator]
 static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
     self::internal_telemetry::allocations::get_grouped_tracing_allocator(
@@ -72,10 +73,10 @@ pub mod app;
 pub mod async_read;
 #[cfg(feature = "aws-config")]
 pub mod aws;
-#[allow(unreachable_pub)]
-pub mod codecs;
 pub mod common;
+pub mod completion;
 mod convert_config;
+pub mod cpu_time;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
 pub mod extra_context;
@@ -105,10 +106,8 @@ pub mod signal;
 pub(crate) mod sink_ext;
 #[allow(unreachable_pub)]
 pub mod sinks;
-pub mod source_sender;
 #[allow(unreachable_pub)]
 pub mod sources;
-pub mod stats;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 pub mod tap;
@@ -128,8 +127,9 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use source_sender::SourceSender;
-pub use vector_lib::{Error, Result, event, metrics, schema, shutdown, tcp, tls};
+pub use vector_lib::{
+    Error, Result, event, metrics, schema, shutdown, source_sender::SourceSender, tcp, tls,
+};
 
 static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 static USE_COLOR: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
@@ -236,6 +236,8 @@ pub fn get_hostname() -> std::io::Result<String> {
         hostname::get()?.to_string_lossy().into_owned()
     })
 }
+
+pub(crate) use vector_lib::spawn_in_current_span;
 
 /// Spawn a task with the given name. The name is only used if
 /// built with [`tokio_unstable`][tokio_unstable].

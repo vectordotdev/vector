@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc};
 use vector_lib::{
     codecs::{
-        BytesEncoder,
+        BytesEncoder, Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming,
         decoding::{self, DeserializerConfig},
         encoding::{
             self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig,
@@ -26,7 +26,6 @@ use super::{
     RunnerMetrics,
     sync::{Configuring, TaskCoordinator},
 };
-use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
 /// The codec used by the external resource.
 ///
@@ -239,6 +238,8 @@ fn serializer_config_to_deserializer(
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
         #[cfg(feature = "codecs-opentelemetry")]
         SerializerConfig::Otlp => todo!(),
+        #[cfg(feature = "codecs-syslog")]
+        SerializerConfig::Syslog(_) => todo!(),
     };
 
     deserializer_config.build()
@@ -252,6 +253,7 @@ fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decod
                 character_delimited: decoding::CharacterDelimitedDecoderOptions {
                     delimiter: config.character_delimited.delimiter,
                     max_length: None,
+                    oversized_action: Default::default(),
                 },
             })
         }

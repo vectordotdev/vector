@@ -11,7 +11,7 @@ use crate::{
             sink::PulsarSink,
         },
     },
-    template::Template,
+    template::{ConfinementConfig, Template},
     test_util::{
         components::{SINK_TAGS, assert_sink_compliance},
         random_lines_with_stream, random_string, trace_init,
@@ -72,7 +72,19 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
         .unwrap();
 
     assert_sink_compliance(&SINK_TAGS, async move {
-        let sink = PulsarSink::new(pulsar, cnf).unwrap();
+        let sink = PulsarSink::new(
+            pulsar,
+            cnf.clone(),
+            topic
+                .clone()
+                .confine(
+                    &ConfinementConfig::default(),
+                    PulsarSinkConfig::NAME,
+                    "topic",
+                )
+                .unwrap(),
+        )
+        .unwrap();
         let sink = VectorSink::from_event_streamsink(sink);
         sink.run(input_events).await
     })
@@ -93,7 +105,7 @@ async fn pulsar_happy_reuse(mut cnf: PulsarSinkConfig) {
 async fn pulsar_happy() {
     let cnf = PulsarSinkConfig {
         endpoint: pulsar_address("pulsar", 6650),
-        // overriden by test
+        // overridden by test
         ..Default::default()
     };
 
@@ -109,7 +121,7 @@ async fn pulsar_happy_tls() {
             verify_certificate: None,
             verify_hostname: None,
         }),
-        // overriden by test
+        // overridden by test
         ..Default::default()
     };
 

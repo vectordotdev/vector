@@ -37,6 +37,6 @@ and let us know.
 [aws_s3_source]: /docs/reference/configuration/sources/aws_s3/
 [aws_sqs_sink]: /docs/reference/configuration/sinks/aws_sqs/
 [chat]: https://chat.vector.dev
-[cloudwatch_guide]: /guides/advanced/cloudwatch-logs-firehose/
+[cloudwatch_guide]: /guides/aws/cloudwatch-logs-firehose/
 [rube_goldberg]: https://en.wikipedia.org/wiki/Rube_Goldberg_machine
 [sinks]: /docs/reference/configuration/sinks/

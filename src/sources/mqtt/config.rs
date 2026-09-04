@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rand::Rng;
+use rand::RngExt;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_lib::{
@@ -20,7 +20,7 @@ use crate::{
         TlsSnafu,
     },
     config::{SourceConfig, SourceContext, SourceOutput},
-    serde::{default_decoding, default_framing_message_based},
+    serde::{OneOrMany, default_decoding, default_framing_message_based},
 };
 
 /// Configuration for the `mqtt` source.
@@ -32,18 +32,15 @@ pub struct MqttSourceConfig {
     #[serde(flatten)]
     pub common: MqttCommonConfig,
 
-    /// MQTT topic from which messages are to be read.
-    #[configurable(derived)]
+    /// MQTT topic or topics from which messages are to be read.
     #[serde(default = "default_topic")]
     #[derivative(Default(value = "default_topic()"))]
-    pub topic: String,
+    pub topic: OneOrMany<String>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
@@ -63,8 +60,8 @@ pub struct MqttSourceConfig {
     pub topic_key: OptionalValuePath,
 }
 
-fn default_topic() -> String {
-    "vector".to_owned()
+fn default_topic() -> OneOrMany<String> {
+    OneOrMany::One("vector".into())
 }
 
 fn default_topic_key() -> OptionalValuePath {
@@ -148,12 +145,21 @@ impl MqttSourceConfig {
 
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
-            let client_auth = None;
-            let alpn = Some(vec!["mqtt".into()]);
+            let client_auth = tls.identity_pem();
+            // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
+            // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
+            let alpn = self
+                .common
+                .tls
+                .as_ref()
+                .and_then(|tls| tls.options.alpn_protocols.as_ref())
+                .filter(|protocols| !protocols.is_empty())
+                .map(|protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect())
+                .unwrap_or_else(|| vec![b"mqtt".to_vec()]);
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,
                 client_auth,
-                alpn,
+                alpn: Some(alpn),
             }));
         }
 

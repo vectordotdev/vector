@@ -5,7 +5,7 @@ use vector_lib::{
     stream::batcher::limiter::ItemBatchSize,
 };
 
-use crate::codecs::Encoder;
+use vector_lib::codecs::Encoder;
 
 /// Uses the configured encoder to determine batch sizing.
 #[derive(Default, Clone)]

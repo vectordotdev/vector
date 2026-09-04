@@ -22,13 +22,14 @@ pub use encoder::ElasticsearchEncoder;
 use http::{Request, uri::InvalidUri};
 use snafu::Snafu;
 use vector_lib::{
-    configurable::configurable_component, internal_event, sensitive_string::SensitiveString,
+    NamedInternalEvent, configurable::configurable_component, internal_event::InternalEvent,
+    sensitive_string::SensitiveString,
 };
 
 use crate::{
     event::{EventRef, LogEvent},
     internal_events::TemplateRenderingError,
-    template::{Template, TemplateParseError},
+    template::{ConfinedTemplate, TemplateParseError, UnconfinedTemplate},
 };
 
 /// Elasticsearch Authentication strategies.
@@ -61,9 +62,11 @@ pub enum ElasticsearchAuthConfig {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ElasticsearchMode {
     /// Ingests documents in bulk, using the bulk API `index` action.
     #[serde(alias = "normal")]
+    #[default]
     Bulk,
 
     /// Ingests documents in bulk, using the bulk API `create` action.
@@ -75,15 +78,9 @@ pub enum ElasticsearchMode {
     DataStream,
 }
 
-impl Default for ElasticsearchMode {
-    fn default() -> Self {
-        Self::Bulk
-    }
-}
-
 /// Bulk API actions.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
     /// The `index` action.
@@ -130,7 +127,7 @@ impl TryFrom<&str> for BulkAction {
 
 /// Elasticsearch version types.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum VersionType {
     /// The `internal` type.
@@ -172,20 +169,21 @@ impl_generate_config_from_default!(ElasticsearchConfig);
 #[derive(Debug, Clone)]
 pub enum ElasticsearchCommonMode {
     Bulk {
-        index: Template,
+        index: ConfinedTemplate,
         template_fallback_index: Option<String>,
-        action: Template,
-        version: Option<Template>,
+        action: UnconfinedTemplate,
+        version: Option<UnconfinedTemplate>,
         version_type: VersionType,
     },
-    DataStream(DataStreamConfig),
+    DataStream(DataStreamMode),
 }
 
+#[derive(NamedInternalEvent)]
 struct VersionValueParseError<'a> {
     value: &'a str,
 }
 
-impl internal_event::InternalEvent for VersionValueParseError<'_> {
+impl InternalEvent for VersionValueParseError<'_> {
     fn emit(self) {
         warn!("{self}")
     }
@@ -207,6 +205,19 @@ impl ElasticsearchCommonMode {
             } => index
                 .render_string(log)
                 .or_else(|error| {
+                    // Confined errors are intentional security drops — never fall back
+                    // to the default index, as that would silently accept an attack event.
+                    if matches!(
+                        error,
+                        crate::template::TemplateRenderingError::Confined { .. }
+                    ) {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some("index"),
+                            drop_event: true,
+                        });
+                        return Err(());
+                    }
                     if let Some(fallback) = template_fallback_index {
                         emit!(TemplateRenderingError {
                             error,
@@ -282,7 +293,7 @@ impl ElasticsearchCommonMode {
         }
     }
 
-    const fn as_data_stream_config(&self) -> Option<&DataStreamConfig> {
+    const fn as_data_stream_config(&self) -> Option<&DataStreamMode> {
         match self {
             Self::DataStream(value) => Some(value),
             _ => None,
@@ -295,6 +306,7 @@ impl ElasticsearchCommonMode {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ElasticsearchApiVersion {
     /// Auto-detect the API version.
     ///
@@ -305,19 +317,14 @@ pub enum ElasticsearchApiVersion {
     /// incorrect API calls.
     ///
     /// [es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
+    #[default]
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,
-    /// Use the Elasticsearch 7.x API.
+    /// Use the Elasticsearch 7.x-compatible API, including OpenSearch.
     V7,
     /// Use the Elasticsearch 8.x API.
     V8,
-}
-
-impl Default for ElasticsearchApiVersion {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 #[derive(Debug, Snafu)]

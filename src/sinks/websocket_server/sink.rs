@@ -7,7 +7,7 @@ use std::{
 use super::{
     WebSocketListenerSinkConfig,
     buffering::MessageBufferingConfig,
-    config::{ExtraMetricTagsConfig, SubProtocolConfig},
+    config::{ExtraMetricTagsConfig, SubProtocolConfig, ValidatedWebSocketListenerSink},
 };
 use crate::{
     codecs::{Encoder, Transformer},
@@ -22,6 +22,9 @@ use crate::{
         websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
     },
 };
+
+#[cfg(test)]
+use crate::config::ValidatedSink;
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
@@ -37,7 +40,6 @@ use tokio_tungstenite::tungstenite::{
     handshake::server::{ErrorResponse, Request, Response},
 };
 use tokio_util::codec::Encoder as _;
-use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
 use vector_lib::{
@@ -63,20 +65,33 @@ pub struct WebSocketListenerSink {
 }
 
 impl WebSocketListenerSink {
+    #[cfg(test)]
     pub fn new(config: WebSocketListenerSinkConfig, cx: SinkContext) -> crate::Result<Self> {
+        let validated = config.validate()?;
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
-        let transformer = config.encoding.transformer();
-        let serializer = config.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
+        Self::from_validated(config, &validated, tls, cx)
+    }
+
+    /// Constructs the sink from the validated state, performing only the
+    /// context-dependent work: building the auth matcher from the enrichment
+    /// tables / metrics storage.
+    pub(crate) fn from_validated(
+        config: WebSocketListenerSinkConfig,
+        validated: &ValidatedWebSocketListenerSink,
+        tls: MaybeTlsSettings,
+        cx: SinkContext,
+    ) -> crate::Result<Self> {
         let auth = config
             .auth
-            .map(|config| config.build(&cx.enrichment_tables))
+            .map(|config| config.build(&cx.enrichment_tables, &cx.metrics_storage))
             .transpose()?;
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
             tls,
             address: config.address,
-            transformer,
+            transformer: validated.transformer.clone(),
             encoder,
             auth,
             extra_tags_config: config.internal_metrics.extra_tags,
@@ -129,20 +144,17 @@ impl WebSocketListenerSink {
         let open_gauge = OpenGauge::new();
 
         while let Ok(stream) = listener.accept().await {
-            tokio::spawn(
-                Self::handle_connection(
-                    auth.clone(),
-                    message_buffering.clone(),
-                    subprotocol.clone(),
-                    Arc::clone(&peers),
-                    Arc::clone(&client_checkpoints),
-                    Arc::clone(&buffer),
-                    stream,
-                    extra_tags_config.clone(),
-                    open_gauge.clone(),
-                )
-                .in_current_span(),
-            );
+            crate::spawn_in_current_span(Self::handle_connection(
+                auth.clone(),
+                message_buffering.clone(),
+                subprotocol.clone(),
+                Arc::clone(&peers),
+                Arc::clone(&client_checkpoints),
+                Arc::clone(&buffer),
+                stream,
+                extra_tags_config.clone(),
+                open_gauge.clone(),
+            ));
         }
     }
 
@@ -360,19 +372,16 @@ impl StreamSink<Event> for WebSocketListenerSink {
         )));
         let client_checkpoints = Arc::new(Mutex::new(HashMap::default()));
 
-        tokio::spawn(
-            Self::handle_connections(
-                self.auth,
-                self.message_buffering.clone(),
-                self.subprotocol.clone(),
-                Arc::clone(&peers),
-                self.extra_tags_config,
-                Arc::clone(&client_checkpoints),
-                Arc::clone(&message_buffer),
-                listener,
-            )
-            .in_current_span(),
-        );
+        crate::spawn_in_current_span(Self::handle_connections(
+            self.auth,
+            self.message_buffering.clone(),
+            self.subprotocol.clone(),
+            Arc::clone(&peers),
+            self.extra_tags_config,
+            Arc::clone(&client_checkpoints),
+            Arc::clone(&message_buffer),
+            listener,
+        ));
 
         while input.as_mut().peek().await.is_some() {
             let mut event = input.next().await.unwrap();
@@ -456,8 +465,8 @@ mod tests {
             config::InternalMetricsConfig,
         },
         test_util::{
+            addr::next_addr,
             components::{SINK_TAGS, run_and_assert_sink_compliance},
-            next_addr,
         },
     };
 
@@ -475,7 +484,7 @@ mod tests {
         let event = Event::Log(LogEvent::from("foo"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -502,7 +511,7 @@ mod tests {
         let event2 = Event::Log(LogEvent::from("foo2"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -534,7 +543,7 @@ mod tests {
         let event = Event::Log(LogEvent::from("foo"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -563,7 +572,7 @@ mod tests {
         let event = Event::Log(LogEvent::from("foo"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -601,7 +610,7 @@ mod tests {
         let event = Event::Log(LogEvent::from("foo"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -660,9 +669,10 @@ mod tests {
     async fn sink_spec_compliance() {
         let event = Event::Log(LogEvent::from("foo"));
 
+        let (_guard, address) = next_addr();
         let sink = WebSocketListenerSink::new(
             WebSocketListenerSinkConfig {
-                address: next_addr(),
+                address,
                 ..Default::default()
             },
             SinkContext::default(),
@@ -683,7 +693,7 @@ mod tests {
         let event2 = Event::Log(LogEvent::from("foo2"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -728,7 +738,7 @@ mod tests {
         let event2 = Event::Log(LogEvent::from("foo2"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -772,7 +782,7 @@ mod tests {
         let event3 = Event::Log(LogEvent::from("foo3"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -882,7 +892,7 @@ mod tests {
                 )
                 .unwrap();
                 // Removing message_id from message, since it is not part of the event
-                base_msg.remove("message_id", true);
+                base_msg.remove(vrl::path!("message_id"), true);
                 let msg_text = serde_json::to_string(&base_msg).unwrap();
                 let expected = serde_json::to_string(expected.clone().into_log().value()).unwrap();
                 assert_eq!(expected, msg_text);
@@ -894,7 +904,8 @@ mod tests {
                 }
             }
 
-            let _ = tx.close().await;
+            // Error is ignored since it only fails if the channel is already closed.
+            tx.close().await.ok();
         })
     }
 

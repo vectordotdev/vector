@@ -1,17 +1,18 @@
 use std::time::Duration;
 
-use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_lib::{
+    NamedInternalEvent, counter, histogram,
     internal_event::{
-        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+        ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL,
+        error_stage, error_type,
     },
     json_size::JsonSize,
 };
 
 use super::prelude::io_error_code;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ExecEventsReceived<'a> {
     pub count: usize,
     pub command: &'a str,
@@ -27,19 +28,19 @@ impl InternalEvent for ExecEventsReceived<'_> {
             command = %self.command,
         );
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "command" => self.command.to_owned(),
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "command" => self.command.to_owned(),
         )
         .increment(self.byte_size.get() as u64);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ExecFailedError<'a> {
     pub command: &'a str,
     pub error: std::io::Error,
@@ -56,7 +57,7 @@ impl InternalEvent for ExecFailedError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "command" => self.command.to_owned(),
             "error_type" => error_type::COMMAND_FAILED,
             "error_code" => io_error_code(&self.error),
@@ -66,7 +67,7 @@ impl InternalEvent for ExecFailedError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ExecTimeoutError<'a> {
     pub command: &'a str,
     pub elapsed_seconds: u64,
@@ -84,7 +85,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "command" => self.command.to_owned(),
             "error_type" => error_type::TIMED_OUT,
             "stage" => error_stage::RECEIVING,
@@ -93,7 +94,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ExecCommandExecuted<'a> {
     pub command: &'a str,
     pub exit_status: Option<i32>,
@@ -119,14 +120,14 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             elapsed_millis = %self.exec_duration.as_millis(),
         );
         counter!(
-            "command_executed_total",
+            CounterName::CommandExecutedTotal,
             "command" => self.command.to_owned(),
             "exit_status" => exit_status.clone(),
         )
         .increment(1);
 
         histogram!(
-            "command_execution_duration_seconds",
+            HistogramName::CommandExecutionDurationSeconds,
             "exit_status" => exit_status,
             "command" => self.command.to_owned(),
         )
@@ -179,6 +180,7 @@ impl std::fmt::Display for ExecFailedToSignalChild {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct ExecFailedToSignalChildError<'a> {
     pub command: &'a tokio::process::Command,
     pub error: ExecFailedToSignalChild,
@@ -194,7 +196,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "command" => format!("{:?}", self.command.as_std()),
             "error_code" => self.error.to_error_code(),
             "error_type" => error_type::COMMAND_FAILED,
@@ -204,6 +206,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct ExecChannelClosedError;
 
 impl InternalEvent for ExecChannelClosedError {
@@ -215,7 +218,7 @@ impl InternalEvent for ExecChannelClosedError {
             stage = error_stage::RECEIVING,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::COMMAND_FAILED,
             "stage" => error_stage::RECEIVING,
         )

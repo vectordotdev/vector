@@ -1,6 +1,7 @@
-use vector_lib::opentelemetry::proto::LOGS_REQUEST_MESSAGE_TYPE;
-use vector_lib::opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
-use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
+use vector_lib::opentelemetry::proto::{
+    LOGS_REQUEST_MESSAGE_TYPE, collector::logs::v1::ExportLogsServiceRequest,
+    common::v1::any_value::Value as AnyValueEnum,
+};
 
 use crate::opentelemetry::{
     assert_service_name_with, parse_line_to_export_type_request, read_file_helper,
@@ -139,4 +140,16 @@ fn vector_sink_otel_sink_logs_match() {
         collector_request, vector_request,
         "Collector and Vector log requests should match"
     );
+}
+
+#[test]
+fn vector_component_received_events_total_counts_individual_log_records() {
+    // This test verifies that when use_otlp_decoding is enabled, the
+    // component_received_events_total metric counts individual log records
+    // within OTLP batches, not the number of batch requests.
+    // This ensures consistency with other Vector sources and with the same
+    // OpenTelemetry source when use_otlp_decoding is disabled.
+    use crate::opentelemetry::assert_component_received_events_total;
+
+    assert_component_received_events_total("logs", EXPECTED_LOG_COUNT);
 }

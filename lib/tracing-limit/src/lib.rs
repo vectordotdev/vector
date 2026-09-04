@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 //! Rate limiting for tracing events.
 //!
 //! This crate provides a tracing-subscriber layer that rate limits log events to prevent
@@ -12,6 +13,10 @@
 //! - **2nd occurrence**: Emits a "suppressing" warning
 //! - **3rd+ occurrences**: Silent until window expires
 //! - **After window**: Emits a summary of suppressed count, then next event normally
+//!
+//! Note: the suppressed-count summary and the resumption of normal emission are both
+//! triggered by the *next arriving event* after the window has elapsed, not by the
+//! window expiry itself. If the event stops firing, no summary is ever emitted.
 //!
 //! # Rate limit grouping
 //!
@@ -163,6 +168,7 @@ where
     /// - 1st occurrence: Emitted normally
     /// - 2nd occurrence: Shows "suppressing" warning
     /// - 3rd+ occurrences: Silent until window expires
+    /// - After window: Summary and next event emitted on next arrival (see module-level note)
     pub fn with_default_limit(mut self, internal_log_rate_limit: u64) -> Self {
         self.internal_log_rate_limit = internal_log_rate_limit;
         self
@@ -377,15 +383,17 @@ where
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
             self.inner.on_event(&event, ctx.clone());
-        } else {
-            let values = [(
-                &fields.field(RATE_LIMIT_FIELD).unwrap(),
-                Some(&rate_limit as &dyn Value),
-            )];
+        } else if let Some(rate_limit_field) = fields.field(RATE_LIMIT_FIELD) {
+            let values = [(&rate_limit_field, Some(&rate_limit as &dyn Value))];
 
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
             self.inner.on_event(&event, ctx.clone());
+        } else {
+            // If the event metadata has neither a "message" nor "internal_log_rate_limit" field,
+            // we cannot create a proper synthetic event. This can happen with custom debug events
+            // that have their own field structure. In this case, we simply skip emitting the
+            // rate limit notification rather than panicking.
         }
     }
 }
@@ -1009,6 +1017,44 @@ mod test {
                 event!("Hello!", component_id: "foo"),
                 event!("Internal log [Hello!] is being suppressed to avoid flooding."),
                 event!("Hello!", component_id: "bar"),
+            ]
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn events_with_custom_fields_no_message_dont_panic() {
+        // Verify events without "message" or "internal_log_rate_limit" fields don't panic
+        // when rate limiting skips suppression notifications.
+        let (events, sub) = setup_test(1);
+        tracing::subscriber::with_default(sub, || {
+            // Use closure to ensure all events share the same callsite
+            let emit_event = || {
+                debug!(component_id = "test_component", utilization = 0.85);
+            };
+
+            // First window: emit 5 events, only the first one should be logged
+            for _ in 0..5 {
+                emit_event();
+                MockClock::advance(Duration::from_millis(100));
+            }
+
+            // Advance to the next window
+            MockClock::advance(Duration::from_millis(1000));
+
+            // Second window: this event should be logged
+            emit_event();
+        });
+
+        let events = events.lock().unwrap();
+
+        // First event from window 1, first event from window 2
+        // Suppression notifications are skipped (no message field)
+        assert_eq!(
+            *events,
+            vec![
+                event!("", component_id: "test_component", utilization: "0.85"),
+                event!("", component_id: "test_component", utilization: "0.85"),
             ]
         );
     }

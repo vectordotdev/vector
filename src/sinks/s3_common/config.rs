@@ -141,12 +141,11 @@ fn example_tags() -> HashMap<String, String> {
 ///
 /// [aws_docs]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative, PartialEq, Eq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum S3StorageClass {
     /// Standard Redundancy.
-    #[derivative(Default)]
+    #[default]
     Standard,
 
     /// Reduced Redundancy.
@@ -228,8 +227,7 @@ impl From<S3ServerSideEncryption> for ServerSideEncryption {
 ///
 /// [canned_acl]: https://docs.aws.amazon.com/AmazonS3/latest/dev/acl-overview.html#canned-acl
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum S3CannedAcl {
     /// Bucket/object are private.
@@ -238,7 +236,7 @@ pub enum S3CannedAcl {
     /// access.
     ///
     /// This is the default.
-    #[derivative(Default)]
+    #[default]
     Private,
 
     /// Bucket/object can be read publicly.

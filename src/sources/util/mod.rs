@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 #[cfg(feature = "sources-http_server")]
 mod body_decoding;
+pub mod decompression;
 #[cfg(feature = "sources-file")]
 mod encoding_config;
 #[cfg(all(unix, feature = "sources-dnstap"))]
@@ -17,7 +18,7 @@ pub mod grpc;
 pub mod http;
 #[cfg(any(
     feature = "sources-http_client",
-    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus_scrape",
     feature = "sources-okta"
 ))]
 pub mod http_client;
@@ -41,6 +42,7 @@ mod unix_datagram;
 mod unix_stream;
 mod wrappers;
 
+pub use decompression::{max_decompressed_size_bytes, set_max_decompressed_size_bytes};
 #[cfg(feature = "sources-file")]
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
@@ -53,7 +55,7 @@ pub use unix::change_socket_permissions;
 pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-net-unix",))]
 pub use unix_stream::build_unix_stream_source;
-pub use wrappers::{AfterRead, AfterReadExt};
+pub use wrappers::{AfterRead, AfterReadExt, LenientFramedRead};
 
 #[cfg(feature = "sources-http_server")]
 pub use self::body_decoding::Encoding;
@@ -64,8 +66,8 @@ pub use self::http::add_headers;
 #[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
 #[cfg(any(
-    feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-remote-write",
+    feature = "sources-prometheus_scrape",
+    feature = "sources-prometheus_remote_write",
     feature = "sources-utils-http-encoding"
 ))]
 pub use self::http::decompress_body;

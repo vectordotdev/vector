@@ -1,3 +1,3 @@
 pub mod config;
-pub mod service;
-pub mod sink;
+pub mod connection_string;
+pub mod shared_key_policy;

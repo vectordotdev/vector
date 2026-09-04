@@ -1,6 +1,6 @@
 #[cfg(unix)]
 use std::path::PathBuf;
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -9,12 +9,14 @@ use listenfd::ListenFd;
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     codecs::{
         BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
         decoding::{Deserializer, Framer},
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, path},
 };
@@ -29,7 +31,9 @@ use crate::{
         DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, log_schema,
     },
     event::Event,
-    internal_events::{SocketBindError, SocketMode, SocketReceiveError, StreamClosedError},
+    internal_events::{
+        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+    },
     net,
     shutdown::ShutdownSignal,
     sources::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket},
@@ -76,16 +80,12 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
-        #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
 
-        #[configurable(derived)]
         permit_origin: Option<IpAllowlistConfig>,
 
-        #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
 
         /// The size of the receive buffer used for each connection.
@@ -96,11 +96,18 @@ pub enum Mode {
 
         /// The maximum number of TCP connections that are allowed at any given time.
         connection_limit: Option<u32>,
+
+        /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+        ///
+        /// This bounds how long a connection can hold its slot against `connection_limit`
+        /// before the TLS handshake finishes, protecting against clients that open a
+        /// connection but never complete (or never start) a handshake.
+        #[configurable(metadata(docs::type_unit = "seconds"))]
+        tls_handshake_timeout_secs: Option<NonZeroU64>,
     },
 
     /// Listen on UDP.
     Udp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
         /// The size of the receive buffer used for the listening socket.
@@ -151,6 +158,7 @@ impl Default for SyslogConfig {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
             },
             host_key: None,
             max_length: crate::serde::default_max_length(),
@@ -160,8 +168,8 @@ impl Default for SyslogConfig {
 }
 
 impl GenerateConfig for SyslogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(SyslogConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(SyslogConfig::default()).unwrap()
     }
 }
 
@@ -184,6 +192,7 @@ impl SourceConfig for SyslogConfig {
                 tls,
                 receive_buffer_bytes,
                 connection_limit,
+                tls_handshake_timeout_secs,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -202,9 +211,11 @@ impl SourceConfig for SyslogConfig {
                     keepalive,
                     shutdown_secs,
                     tls,
+                    None, // tls_reloader: not wired for this source
                     tls_client_metadata_key,
                     receive_buffer_bytes,
                     None,
+                    tls_handshake_timeout_secs,
                     cx,
                     false.into(),
                     connection_limit,
@@ -341,6 +352,8 @@ pub fn udp(
             r#type = "udp"
         );
 
+        let bytes_received = register!(BytesReceived::from(Protocol::UDP));
+
         let mut stream = UdpFramed::new(
             socket,
             Decoder::new(
@@ -353,9 +366,17 @@ pub fn udp(
         .take_until(shutdown)
         .filter_map(|frame| {
             let host_key = host_key.clone();
+            let bytes_received = bytes_received.clone();
             async move {
                 match frame {
-                    Ok(((mut events, _byte_size), received_from)) => {
+                    Ok(((mut events, byte_size), received_from)) => {
+                        let count = events.len();
+                        bytes_received.emit(ByteSize(byte_size));
+                        emit!(SocketEventsReceived {
+                            mode: SocketMode::Udp,
+                            byte_size: events.estimated_json_encoded_size_of(),
+                            count,
+                        });
                         let received_from = received_from.ip().to_string().into();
                         handle_events(&mut events, &host_key, Some(received_from), log_namespace);
                         Some(events.remove(0))
@@ -452,7 +473,8 @@ mod test {
     use std::{collections::HashMap, fmt, str::FromStr};
 
     use chrono::prelude::*;
-    use rand::{Rng, rng};
+    use indoc::indoc;
+    use rand::{RngExt, rng};
     use serde::Deserialize;
     use tokio::time::{Duration, Instant, sleep};
     use tokio_util::codec::BytesCodec;
@@ -471,8 +493,9 @@ mod test {
         event::{Event, LogEvent},
         test_util::{
             CountReceiver,
+            addr::next_addr,
             components::{SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance},
-            next_addr, random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
+            random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
         },
     };
 
@@ -655,25 +678,25 @@ mod test {
 
     #[test]
     fn config_tcp() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "tcp"
-            address = "127.0.0.1:1235"
-          "#,
-        )
+            mode: tcp
+            address: "127.0.0.1:1235"
+            "#,
+        })
         .unwrap();
         assert!(matches!(config.mode, Mode::Tcp { .. }));
     }
 
     #[test]
     fn config_tcp_with_receive_buffer_size() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "tcp"
-            address = "127.0.0.1:1235"
-            receive_buffer_bytes = 256
-          "#,
-        )
+            mode: tcp
+            address: "127.0.0.1:1235"
+            receive_buffer_bytes: 256
+            "#,
+        })
         .unwrap();
 
         let receive_buffer_bytes = match config.mode {
@@ -689,12 +712,12 @@ mod test {
 
     #[test]
     fn config_tcp_keepalive_empty() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "tcp"
-            address = "127.0.0.1:1235"
-          "#,
-        )
+            mode: tcp
+            address: "127.0.0.1:1235"
+            "#,
+        })
         .unwrap();
 
         let keepalive = match config.mode {
@@ -707,13 +730,14 @@ mod test {
 
     #[test]
     fn config_tcp_keepalive_full() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "tcp"
-            address = "127.0.0.1:1235"
-            keepalive.time_secs = 7200
-          "#,
-        )
+            mode: tcp
+            address: "127.0.0.1:1235"
+            keepalive:
+              time_secs: 7200
+            "#,
+        })
         .unwrap();
 
         let keepalive = match config.mode {
@@ -728,27 +752,27 @@ mod test {
 
     #[test]
     fn config_udp() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "udp"
-            address = "127.0.0.1:1235"
-            max_length = 32187
-          "#,
-        )
+            mode: udp
+            address: "127.0.0.1:1235"
+            max_length: 32187
+            "#,
+        })
         .unwrap();
         assert!(matches!(config.mode, Mode::Udp { .. }));
     }
 
     #[test]
     fn config_udp_with_receive_buffer_size() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "udp"
-            address = "127.0.0.1:1235"
-            max_length = 32187
-            receive_buffer_bytes = 256
-          "#,
-        )
+            mode: udp
+            address: "127.0.0.1:1235"
+            max_length: 32187
+            receive_buffer_bytes: 256
+            "#,
+        })
         .unwrap();
 
         let receive_buffer_bytes = match config.mode {
@@ -765,12 +789,12 @@ mod test {
     #[cfg(unix)]
     #[test]
     fn config_unix() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "unix"
-            path = "127.0.0.1:1235"
-          "#,
-        )
+            mode: unix
+            path: "127.0.0.1:1235"
+            "#,
+        })
         .unwrap();
         assert!(matches!(config.mode, Mode::Unix { .. }));
     }
@@ -778,13 +802,13 @@ mod test {
     #[cfg(unix)]
     #[test]
     fn config_unix_permissions() {
-        let config: SyslogConfig = toml::from_str(
+        let config: SyslogConfig = serde_yaml::from_str(indoc! {
             r#"
-            mode = "unix"
-            path = "127.0.0.1:1235"
-            socket_file_mode = 0o777
-          "#,
-        )
+            mode: unix
+            path: "127.0.0.1:1235"
+            socket_file_mode: 511
+            "#,
+        })
         .unwrap();
         let socket_file_mode = match config.mode {
             Mode::Unix {
@@ -822,21 +846,21 @@ mod test {
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("host", "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
+            expected.insert(event_path!("host"), "74794bfb6795");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
 
-            expected.insert("meta.sequenceId", "1");
-            expected.insert("meta.sysUpTime", "37");
-            expected.insert("meta.language", "EN");
-            expected.insert("origin.software", "test");
-            expected.insert("origin.ip", "192.168.0.1");
+            expected.insert(event_path!("meta", "sequenceId"), "1");
+            expected.insert(event_path!("meta", "sysUpTime"), "37");
+            expected.insert(event_path!("meta", "language"), "EN");
+            expected.insert(event_path!("origin", "software"), "test");
+            expected.insert(event_path!("origin", "ip"), "192.168.0.1");
 
-            expected.insert("severity", "notice");
-            expected.insert("facility", "user");
-            expected.insert("version", 1);
-            expected.insert("appname", "root");
-            expected.insert("procid", 8449);
-            expected.insert("source_ip", "192.168.0.254");
+            expected.insert(event_path!("severity"), "notice");
+            expected.insert(event_path!("facility"), "user");
+            expected.insert(event_path!("version"), 1);
+            expected.insert(event_path!("appname"), "root");
+            expected.insert(event_path!("procid"), 8449);
+            expected.insert(event_path!("source_ip"), "192.168.0.254");
         }
 
         assert_event_data_eq!(
@@ -869,20 +893,20 @@ mod test {
                     .expect("invalid timestamp"),
             );
             expected.insert(
-                log_schema().host_key().unwrap().to_string().as_str(),
+                (PathPrefix::Event, log_schema().host_key().unwrap()),
                 "74794bfb6795",
             );
-            expected.insert("hostname", "74794bfb6795");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
             expected.insert(
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("severity", "notice");
-            expected.insert("facility", "user");
-            expected.insert("version", 1);
-            expected.insert("appname", "root");
-            expected.insert("procid", 8449);
-            expected.insert("source_ip", "192.168.0.254");
+            expected.insert(event_path!("severity"), "notice");
+            expected.insert(event_path!("facility"), "user");
+            expected.insert(event_path!("version"), 1);
+            expected.insert(event_path!("appname"), "root");
+            expected.insert(event_path!("procid"), 8449);
+            expected.insert(event_path!("source_ip"), "192.168.0.254");
         }
 
         let event = event_from_bytes(
@@ -914,7 +938,7 @@ mod test {
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
-                .get("empty")
+                .get(event_path!("empty"))
                 .expect("empty exists")
                 .is_object()
         }
@@ -979,7 +1003,7 @@ mod test {
         let event =
             event_from_bytes("host", None, raw.to_owned().into(), LogNamespace::Legacy).unwrap();
         assert_eq!(
-            event.as_log().get(r#"origin."foo.bar""#),
+            event.as_log().get(event_path!("origin", "foo.bar")),
             Some(&Value::from("baz"))
         );
     }
@@ -998,7 +1022,7 @@ mod test {
 
         let mut expected = Event::Log(LogEvent::from(msg));
         {
-            let value = event.as_log().get("timestamp").unwrap();
+            let value = event.as_log().get(event_path!("timestamp")).unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
@@ -1013,19 +1037,19 @@ mod test {
                 expected_date,
             );
             expected.insert(
-                log_schema().host_key().unwrap().to_string().as_str(),
+                (PathPrefix::Event, log_schema().host_key().unwrap()),
                 "74794bfb6795",
             );
             expected.insert(
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert("severity", "notice");
-            expected.insert("facility", "user");
-            expected.insert("appname", "root");
-            expected.insert("procid", 8539);
-            expected.insert("source_ip", "192.168.0.254");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
+            expected.insert(event_path!("severity"), "notice");
+            expected.insert(event_path!("facility"), "user");
+            expected.insert(event_path!("appname"), "root");
+            expected.insert(event_path!("procid"), 8539);
+            expected.insert(event_path!("source_ip"), "192.168.0.254");
         }
 
         assert_event_data_eq!(event, expected);
@@ -1047,7 +1071,7 @@ mod test {
 
         let mut expected = Event::Log(LogEvent::from(msg));
         {
-            let value = event.as_log().get("timestamp").unwrap();
+            let value = event.as_log().get(event_path!("timestamp")).unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
 
             let expected = expected.as_mut_log();
@@ -1064,14 +1088,14 @@ mod test {
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("host", "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert("severity", "info");
-            expected.insert("facility", "local7");
-            expected.insert("appname", "liblogging-stdlog");
-            expected.insert("origin.software", "rsyslogd");
-            expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("source_ip", "192.168.0.254");
+            expected.insert(event_path!("host"), "74794bfb6795");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
+            expected.insert(event_path!("severity"), "info");
+            expected.insert(event_path!("facility"), "local7");
+            expected.insert(event_path!("appname"), "liblogging-stdlog");
+            expected.insert(event_path!("origin", "software"), "rsyslogd");
+            expected.insert(event_path!("origin", "swVersion"), "8.24.0");
+            expected.insert(event_path!("source_ip"), "192.168.0.254");
             expected.insert(event_path!("origin", "x-pid"), "8979");
             expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
@@ -1100,13 +1124,13 @@ mod test {
                 log_schema().source_type_key_target_path().unwrap(),
                 "syslog",
             );
-            expected.insert("host", "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert("severity", "info");
-            expected.insert("facility", "local7");
-            expected.insert("appname", "liblogging-stdlog");
-            expected.insert("origin.software", "rsyslogd");
-            expected.insert("origin.swVersion", "8.24.0");
+            expected.insert(event_path!("host"), "74794bfb6795");
+            expected.insert(event_path!("hostname"), "74794bfb6795");
+            expected.insert(event_path!("severity"), "info");
+            expected.insert(event_path!("facility"), "local7");
+            expected.insert(event_path!("appname"), "liblogging-stdlog");
+            expected.insert(event_path!("origin", "software"), "rsyslogd");
+            expected.insert(event_path!("origin", "swVersion"), "8.24.0");
             expected.insert(event_path!("origin", "x-pid"), "9043");
             expected.insert(event_path!("origin", "x-info"), "http://www.rsyslog.com");
         }
@@ -1121,7 +1145,7 @@ mod test {
     async fn test_tcp_syslog() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 10000;
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
 
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Tcp {
@@ -1131,6 +1155,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
             });
 
             let key = ComponentKey::from("in");
@@ -1174,8 +1199,74 @@ mod test {
             let output_messages: Vec<SyslogMessageRfc5424> = output_events
                 .into_iter()
                 .map(|mut e| {
-                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("hostname")); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("source_ip")); // Vector adds this field which will cause a parse error.
+                    e.into()
+                })
+                .collect();
+            assert_eq!(output_messages, input_messages);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_udp_syslog() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let num_messages: usize = 1000;
+            let (_guard, in_addr) = next_addr();
+
+            // Create and spawn the source.
+            let config = SyslogConfig::from_mode(Mode::Udp {
+                address: in_addr.into(),
+                receive_buffer_bytes: Some(4 * 1024 * 1024),
+            });
+
+            let key = ComponentKey::from("in");
+            let (tx, rx) = SourceSender::new_test();
+            let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+            let shutdown_complete = shutdown.shutdown_tripwire();
+
+            let source = config
+                .build(context)
+                .await
+                .expect("source should not fail to build");
+            tokio::spawn(source);
+
+            // Give UDP a brief moment to start listening.
+            sleep(Duration::from_millis(150)).await;
+
+            let output_events = CountReceiver::receive_events(rx);
+
+            // Craft and send syslog messages as individual UDP datagrams.
+            let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
+                .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
+                .collect();
+
+            let input_lines: Vec<String> =
+                input_messages.iter().map(|msg| msg.to_string()).collect();
+
+            let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            for line in input_lines {
+                socket.send_to(line.as_bytes(), in_addr).await.unwrap();
+            }
+
+            // Wait a short period of time to ensure the messages get sent.
+            sleep(Duration::from_secs(2)).await;
+
+            // Shutdown the source, and make sure we've got all the messages we sent in.
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+                .await;
+            shutdown_complete.await;
+
+            let output_events = output_events.await;
+            assert_eq!(output_events.len(), num_messages);
+
+            let output_messages: Vec<SyslogMessageRfc5424> = output_events
+                .into_iter()
+                .map(|mut e| {
+                    e.as_mut_log().remove(event_path!("hostname")); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("source_ip")); // Vector adds this field which will cause a parse error.
                     e.into()
                 })
                 .collect();
@@ -1252,8 +1343,8 @@ mod test {
             let output_messages: Vec<SyslogMessageRfc5424> = output_events
                 .into_iter()
                 .map(|mut e| {
-                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("hostname")); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("source_ip")); // Vector adds this field which will cause a parse error.
                     e.into()
                 })
                 .collect();
@@ -1266,7 +1357,7 @@ mod test {
     async fn test_octet_counting_syslog() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 10000;
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
 
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Tcp {
@@ -1276,6 +1367,7 @@ mod test {
                 tls: None,
                 receive_buffer_bytes: None,
                 connection_limit: None,
+                tls_handshake_timeout_secs: None,
             });
 
             let key = ComponentKey::from("in");
@@ -1330,8 +1422,8 @@ mod test {
             let output_messages: Vec<SyslogMessageRfc5424> = output_events
                 .into_iter()
                 .map(|mut e| {
-                    e.as_mut_log().remove("hostname"); // Vector adds this field which will cause a parse error.
-                    e.as_mut_log().remove("source_ip"); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("hostname")); // Vector adds this field which will cause a parse error.
+                    e.as_mut_log().remove(event_path!("source_ip")); // Vector adds this field which will cause a parse error.
                     e.into()
                 })
                 .collect();

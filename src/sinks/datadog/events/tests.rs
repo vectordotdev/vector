@@ -1,15 +1,12 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use futures::{
-    StreamExt,
-    channel::mpsc::{Receiver, TryRecvError},
-    stream::Stream,
-};
+use futures::{StreamExt, channel::mpsc::Receiver, stream::Stream};
 use hyper::StatusCode;
 use indoc::indoc;
 use similar_asserts::assert_eq;
 use vector_lib::event::{BatchNotifier, BatchStatus};
+use vrl::event_path;
 
 use super::*;
 use crate::{
@@ -17,8 +14,9 @@ use crate::{
     event::EventArray,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
+        addr::next_addr,
         components::{self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
-        next_addr, random_lines_with_stream,
+        random_lines_with_stream,
     },
 };
 
@@ -32,8 +30,8 @@ fn random_events_with_stream(
         lines,
         stream.map(|mut events| {
             events.iter_logs_mut().for_each(|log| {
-                log.insert("title", "All!");
-                log.insert("invalid", "Tik");
+                log.insert(event_path!("title"), "All!");
+                log.insert(event_path!("invalid"), "Tik");
             });
             events
         }),
@@ -49,7 +47,7 @@ async fn start_test(
         "#};
     let (mut config, cx) = load_sink::<DatadogEventsConfig>(config).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{addr}");
@@ -104,7 +102,7 @@ async fn smoke() {
 async fn handles_failure() {
     let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
 
-    assert!(matches!(rx.try_next(), Err(TryRecvError { .. })));
+    assert!(rx.try_recv().is_err());
 }
 
 #[tokio::test]
@@ -114,7 +112,7 @@ async fn api_key_in_metadata() {
         "#})
     .unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{addr}");

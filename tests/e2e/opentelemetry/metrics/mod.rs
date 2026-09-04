@@ -2,12 +2,12 @@ use crate::opentelemetry::{
     assert_service_name_with, parse_line_to_export_type_request, read_file_helper,
 };
 
-use vector_lib::opentelemetry::proto::METRICS_REQUEST_MESSAGE_TYPE;
-use vector_lib::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
-use vector_lib::opentelemetry::proto::common::v1::KeyValue;
-use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
-use vector_lib::opentelemetry::proto::metrics::v1::metric::Data as MetricData;
-use vector_lib::opentelemetry::proto::metrics::v1::{Gauge, Sum};
+use vector_lib::opentelemetry::proto::{
+    METRICS_REQUEST_MESSAGE_TYPE,
+    collector::metrics::v1::ExportMetricsServiceRequest,
+    common::v1::{KeyValue, any_value::Value as AnyValueEnum},
+    metrics::v1::{Gauge, Sum, metric::Data as MetricData},
+};
 
 const EXPECTED_METRIC_COUNT: usize = 400; // 200 via gRPC + 200 via HTTP (50 of each type: Gauge, Sum, Histogram, ExponentialHistogram)
 
@@ -301,4 +301,16 @@ fn vector_sink_otel_sink_metrics_match() {
         collector_request, vector_request,
         "Collector and Vector metric requests should match"
     );
+}
+
+#[test]
+fn vector_component_received_events_total_counts_individual_metrics() {
+    // This test verifies that when use_otlp_decoding is enabled, the
+    // component_received_events_total metric counts individual metrics
+    // within OTLP batches, not the number of batch requests.
+    // This ensures consistency with other Vector sources and with the same
+    // OpenTelemetry source when use_otlp_decoding is disabled.
+    use crate::opentelemetry::assert_component_received_events_total;
+
+    assert_component_received_events_total("metrics", EXPECTED_METRIC_COUNT);
 }
