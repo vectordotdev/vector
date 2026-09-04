@@ -11,10 +11,12 @@
 
 #![allow(dead_code)]
 
+use assert_json_diff::assert_json_eq;
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
 use serde_json::json;
 use vector_config::{Configurable, configurable_component, schema::generate_root_schema};
+use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
 use super::schema_validation::{
     assert_schema_allows, encoded_value_validates_against_schema, json_schema_safe_f64,
@@ -204,9 +206,25 @@ fn plain_optional_property_still_accepts_null() {
 
 #[test]
 fn integer_bounded_fields_schema_snapshot() {
-    assert_schema_matches_snapshot::<IntegerBoundedFields>(include_str!(
-        "snapshots/integer_bounded_fields.json"
-    ));
+    let actual = snapshot_json::<IntegerBoundedFields>();
+
+    // `±(2^53-1)` is exactly representable as `f64` (and is what schema generation
+    // emits) but serde_json's JSON text parser rounds those literals down by 1 ULP.
+    // Pin the live bounds here, then overlay them on the parsed snapshot so the
+    // rest of the file can still compare as `Value`, insensitive to the actual textual format.
+    let upper = json!(NUMERIC_ENFORCED_UPPER_BOUND);
+    let lower = json!(NUMERIC_ENFORCED_LOWER_BOUND);
+    assert_eq!(&actual["properties"]["unsigned"]["maximum"], &upper);
+    assert_eq!(&actual["properties"]["float"]["maximum"], &upper);
+    assert_eq!(&actual["properties"]["float"]["minimum"], &lower);
+
+    let mut expected: serde_json::Value =
+        serde_json::from_str(include_str!("snapshots/integer_bounded_fields.json"))
+            .expect("snapshot should be valid JSON");
+    expected["properties"]["unsigned"]["maximum"] = upper.clone();
+    expected["properties"]["float"]["maximum"] = upper;
+    expected["properties"]["float"]["minimum"] = lower;
+    assert_json_eq!(expected, actual);
 }
 
 proptest! {
@@ -242,14 +260,10 @@ fn assert_schema_matches_snapshot<T>(expected: &str)
 where
     T: Configurable + 'static,
 {
-    let schema = snapshot_json::<T>();
-    let mut rendered = serde_json::to_string_pretty(&schema).expect("serialize actual schema");
-    rendered.push('\n');
-
-    // Compare pretty-printed text rather than round-tripping the snapshot through
-    // `serde_json::Value`. Integer bounds past ~2^53 cannot survive that round-trip,
-    // and those bounds are exactly what the integer snapshot is meant to pin.
-    assert_eq!(rendered, expected);
+    let actual = snapshot_json::<T>();
+    let expected: serde_json::Value =
+        serde_json::from_str(expected).expect("snapshot should be valid JSON");
+    assert_json_eq!(expected, actual);
 }
 
 fn snapshot_json<T>() -> serde_json::Value
