@@ -75,8 +75,7 @@ where
                     // The whole item was filtered out (e.g. every sub-item over the
                     // protobuf nesting budget). Report the drop directly via the
                     // ledger's usage handle so it shows up in the disk-v2 stage's
-                    // `received` / `dropped` metrics — `BufferSender` does not carry
-                    // its own handle for backends that `provides_instrumentation()`.
+                    // `received` / `dropped` metrics.
                     writer.track_dropped(pre_count, pre_size);
                     return Ok(TryWriteOutcome::Dropped);
                 };
@@ -375,6 +374,11 @@ impl<T: Bufferable> BufferSender<T> {
             }
         };
 
+        // Backend filter drops are accounted directly through the backend's own
+        // usage handle (e.g. disk-v2's ledger), so they show up in the buffer
+        // stage's `received` / `dropped` metrics even when the `BufferSender`
+        // does not carry instrumentation. This block only reports fullness-driven
+        // drops captured via `UsageAccounting::DroppedNewest`.
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
         {
