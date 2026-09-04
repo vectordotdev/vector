@@ -683,22 +683,36 @@ impl RunningTopology {
                     .disk_usage_snapshot();
                 let buffer_dirs = disk_buffer_directories(&self.config, key);
                 let drain_in_background = !wait_for_sinks.contains(*key);
-                if let Some(usage) = usage
-                    && (usage.event_count > 0 || usage.byte_size > 0)
-                {
-                    let message = if drain_in_background {
-                        "Removing disk-buffered sink with remaining accounted data; its current instance will continue processing in the background before shutdown."
-                    } else {
-                        "Removing disk-buffered sink with remaining accounted data; reload will wait while its current instance finishes processing."
-                    };
-                    warn!(
-                        component_id = %key,
-                        ?buffer_dirs,
-                        accounted_events = usage.event_count,
-                        accounted_bytes = usage.byte_size,
-                        drain_in_background,
-                        message,
-                    );
+                match usage {
+                    Some(usage) if usage.event_count > 0 || usage.byte_size > 0 => {
+                        let message = if drain_in_background {
+                            "Removing disk-buffered sink with remaining accounted data; its current instance will continue processing in the background before shutdown."
+                        } else {
+                            "Removing disk-buffered sink with remaining accounted data; reload will wait while its current instance finishes processing."
+                        };
+                        warn!(
+                            component_id = %key,
+                            ?buffer_dirs,
+                            accounted_events = usage.event_count,
+                            accounted_bytes = usage.byte_size,
+                            drain_in_background,
+                            message,
+                        );
+                    }
+                    None => {
+                        let message = if drain_in_background {
+                            "Removing disk-buffered sink while its usage is unavailable; its current instance will continue processing in the background before shutdown."
+                        } else {
+                            "Removing disk-buffered sink while its usage is unavailable; reload will wait while its current instance finishes processing."
+                        };
+                        warn!(
+                            component_id = %key,
+                            ?buffer_dirs,
+                            drain_in_background,
+                            message,
+                        );
+                    }
+                    Some(_) => {}
                 }
             }
 
