@@ -91,21 +91,55 @@ impl ApplicationConfig {
         )
         .await?;
 
-        Self::from_config(config_paths, config, extra_context).await
+        // Subscribe to shutdown signals before starting the topology so that a signal arriving
+        // during startup -- which can block on network I/O, e.g. sink healthchecks or build-time
+        // API probes -- can interrupt it, instead of being queued and ignored until startup
+        // completes.
+        let mut signal_rx = signal_handler.subscribe();
+
+        Self::from_config(config_paths, config, extra_context, &mut signal_rx).await
     }
 
     pub async fn from_config(
         config_paths: Vec<ConfigPath>,
         config: Config,
         extra_context: ExtraContext,
+        signal_rx: &mut SignalRx,
     ) -> Result<Self, ExitCode> {
         #[cfg(feature = "api")]
         let api = config.api;
 
-        let (topology, graceful_crash_receiver) =
-            RunningTopology::start_init_validated(config, extra_context.clone())
-                .await
-                .ok_or(exitcode::CONFIG)?;
+        // Starting the topology can block on network I/O (e.g. sink healthchecks or build-time
+        // API probes). Race it against shutdown signals so that a signal received during startup
+        // aborts it immediately, instead of being queued and ignored until startup completes.
+        let mut start = Box::pin(RunningTopology::start_init_validated(
+            config,
+            extra_context.clone(),
+        ));
+
+        let (topology, graceful_crash_receiver) = loop {
+            tokio::select! {
+                biased;
+                result = &mut start => {
+                    break match result {
+                        Some(topology) => topology,
+                        None => return Err(exitcode::CONFIG),
+                    };
+                }
+                signal = signal_rx.recv() => {
+                    match signal {
+                        // A shutdown signal (or a closed signal channel) arrived while startup was
+                        // still in progress. There is no running topology to drain, so abort
+                        // startup and exit the same way a running Vector would on such a signal.
+                        Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
+                            return Err(exitcode::OK);
+                        }
+                        // Reload signals have no effect during startup; ignore them.
+                        _ => continue,
+                    }
+                }
+            }
+        };
 
         Ok(Self {
             config_paths,
