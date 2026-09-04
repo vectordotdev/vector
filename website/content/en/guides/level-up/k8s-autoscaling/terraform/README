@@ -1,5 +1,5 @@
 Provisions the single-node K3s cluster (EC2 c5.4xlarge) used by the
-k8s-autoscaling guide's benchmark. See ../k8s-autoscaling.md for the guide
+k8s-autoscaling guide's benchmark. See ../../k8s-autoscaling.md for the guide
 this cluster is meant to reproduce.
 
 Prerequisites
