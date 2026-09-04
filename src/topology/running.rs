@@ -1645,12 +1645,17 @@ async fn resolve_draining_disk_buffer_sinks(
     drains: &mut Vec<DrainingDiskBufferSink>,
     required_paths: HashSet<PathBuf>,
 ) {
+    let required_canonical_paths = required_paths
+        .iter()
+        .filter_map(|path| std::fs::canonicalize(path).ok())
+        .collect::<HashSet<_>>();
     let mut remaining = Vec::with_capacity(drains.len());
     for drain in drains.drain(..) {
-        let conflicts = drain
-            .buffer_paths
-            .iter()
-            .any(|path| required_paths.contains(path));
+        let conflicts = drain.buffer_paths.iter().any(|path| {
+            required_paths.contains(path)
+                || std::fs::canonicalize(path)
+                    .is_ok_and(|path| required_canonical_paths.contains(&path))
+        });
         if drain.task.is_finished() || conflicts {
             if let Err(error) = drain.task.await {
                 error!(%error, "Failed to join background disk buffer drain task.");
@@ -1727,6 +1732,8 @@ mod disk_buffer_drain_tests {
         },
     };
 
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
     use tokio::sync::oneshot;
     use vector_lib::{
         buffers::{BufferConfig, BufferType, WhenFull},
@@ -1830,6 +1837,65 @@ mod disk_buffer_drain_tests {
         unrelated_tx.send(()).unwrap();
         drains.pop().unwrap().task.await.unwrap().unwrap();
         assert!(unrelated_finished.load(Ordering::SeqCst));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn rebuild_waits_for_drain_through_symlink_alias() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let sink_key = ComponentKey::from("readded");
+        let buffer = BufferConfig::Single(BufferType::DiskV2 {
+            max_size: NonZeroU64::new(268_435_488).unwrap(),
+            when_full: WhenFull::Block,
+        });
+        let (tx, rx) = buffer
+            .build::<EventArray>(
+                Some(data_dir.path().to_path_buf()),
+                sink_key.to_string(),
+                tracing::Span::none(),
+            )
+            .await
+            .unwrap();
+        drop(tx);
+        let target = data_dir.path().join("buffer/v2/readded");
+        let alias = data_dir.path().join("buffer-alias");
+        symlink(&target, &alias).unwrap();
+        let (finish_tx, finish_rx) = oneshot::channel();
+        let (_, registry) = UtilizationEmitter::new();
+        let utilization_sender =
+            registry.add_component(sink_key.clone(), gauge!(GaugeName::Utilization));
+        let drain = tokio::spawn(async move {
+            _ = finish_rx.await;
+            Ok(TaskOutput::Sink(Utilization::new(
+                utilization_sender,
+                sink_key,
+                rx.into_stream(),
+            )))
+        });
+        let mut drains = vec![DrainingDiskBufferSink {
+            task: drain,
+            buffer_paths: vec![alias],
+        }];
+
+        {
+            let resolve = resolve_draining_disk_buffer_sinks(&mut drains, HashSet::from([target]));
+            tokio::pin!(resolve);
+            assert!(futures::poll!(&mut resolve).is_pending());
+            finish_tx.send(()).unwrap();
+            resolve.await;
+        }
+
+        assert!(drains.is_empty());
+        assert!(
+            buffer
+                .build::<EventArray>(
+                    Some(data_dir.path().to_path_buf()),
+                    "readded".into(),
+                    tracing::Span::none(),
+                )
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]
