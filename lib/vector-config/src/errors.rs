@@ -61,4 +61,19 @@ pub enum GenerateError {
     /// In order to make a schema "optional", which implies allowing it to match `null`, it must not
     /// be a schema reference and it must already have an instance type, or types, defined.
     InvalidOptionalSchema,
+
+    /// A flattened `Option` of a tagged enum shares its tag name with another property.
+    ///
+    /// Absence of the flattened block is encoded as a missing tag. A sibling that serializes under
+    /// the same name makes that encoding incorrect, so this layout is rejected.
+    FlattenedOptionalEnumTagCollision {
+        /// The flattened enum type.
+        enum_type: &'static str,
+
+        /// Serialized name of the enum tag field. (e.g. `type`)
+        tag_field: String,
+
+        /// Serialized name of the sibling property that collides with the tag.
+        sibling_field: String,
+    },
 }

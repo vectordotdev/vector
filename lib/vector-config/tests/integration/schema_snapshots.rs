@@ -15,7 +15,9 @@ use assert_json_diff::assert_json_eq;
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
 use serde_json::json;
-use vector_config::{Configurable, configurable_component, schema::generate_root_schema};
+use vector_config::{
+    Configurable, GenerateError, configurable_component, schema::generate_root_schema,
+};
 use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
 use super::schema_validation::{
@@ -49,6 +51,23 @@ enum InternallyTaggedMode {
 struct FlattenedOptionalEnum {
     /// A required sibling so the parent is not entirely flattened.
     name: String,
+
+    #[serde(flatten)]
+    mode: Option<InternallyTaggedMode>,
+}
+
+/// Same flatten as [`FlattenedOptionalEnum`], plus a sibling whose serialized
+/// name equals the enum tag. Schema generation rejects this layout: the absence
+/// encoding cannot tell the sibling from a present variant.
+#[derive(Clone, Debug)]
+#[configurable_component]
+struct FlattenedOptionalEnumWithSiblingTag {
+    /// A required sibling so the parent is not entirely flattened.
+    name: String,
+
+    /// A sibling whose JSON name is the flattened enum's tag field.
+    #[serde(rename = "type")]
+    kind: String,
 
     #[serde(flatten)]
     mode: Option<InternallyTaggedMode>,
@@ -143,6 +162,20 @@ fn flattened_optional_enum_schema_snapshot() {
 #[test]
 fn flattened_optional_enum_omitted_block_validates() {
     assert_schema_allows::<FlattenedOptionalEnum>(json!({ "name": "example" }));
+}
+
+#[test]
+fn flattened_optional_enum_sibling_tag_is_rejected() {
+    let error = generate_root_schema::<FlattenedOptionalEnumWithSiblingTag>()
+        .expect_err("sibling tag collision should fail schema generation");
+    assert!(matches!(
+        error,
+        GenerateError::FlattenedOptionalEnumTagCollision {
+            tag_field,
+            sibling_field,
+            ..
+        } if tag_field == "type" && sibling_field == "type"
+    ));
 }
 
 #[test]

@@ -432,6 +432,9 @@ pub(crate) fn generate_optional_schema(
 /// rather than `oneOf` because a trailing `#[serde(untagged)]` object or map variant also has no
 /// tag field; both alternatives then match a serialized `Some(fallback)` value.
 ///
+/// A sibling property that serializes under the same name as the tag is rejected: the absence
+/// encoding would treat that sibling as a present variant. That layout is unused and is not modeled.
+///
 /// When `T` is not tagged that way, this falls back to `Option<T>`'s normal (nullable property)
 /// schema so flatten-of-struct and similar shapes stay unchanged.
 ///
@@ -442,10 +445,23 @@ pub fn generate_flattened_optional_schema(
     optional: &ConfigurableRef,
     generator: &RefCell<SchemaGenerator>,
     overrides: Option<Metadata>,
+    sibling_field_names: &[&str],
 ) -> Result<SchemaObject, GenerateError> {
     let Some(tag_field) = enum_tag_field_from_metadata(&inner.make_metadata()) else {
         return get_or_generate_schema(optional, generator, overrides);
     };
+
+    if let Some(sibling_field) = sibling_field_names
+        .iter()
+        .copied()
+        .find(|name| *name == tag_field)
+    {
+        return Err(GenerateError::FlattenedOptionalEnumTagCollision {
+            enum_type: inner.type_name(),
+            tag_field,
+            sibling_field: sibling_field.to_owned(),
+        });
+    }
 
     let inner_schema = get_or_generate_schema(inner, generator, None)?;
     let mut schema = SchemaObject {
