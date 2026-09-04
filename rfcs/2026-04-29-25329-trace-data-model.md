@@ -92,7 +92,8 @@ the entries below are the format-agnostic shared vocabulary.
 - Add the fallible `trace_span_status`, `trace_span_link`, `trace_span_event`, and
   `trace_flags` VRL functions for atomic construction and related-field updates.
 - Define the migration strategy that lets each trace-producing or trace-consuming component
-  migrate independently: the temporary
+  migrate independently: an initial sink-local validation stage behind existing buffers,
+  the temporary
   `enum TraceEventCompat { Legacy(LegacyTraceEvent), Typed(TraceEvent) }`
   coexistence, the per-source `Legacy -> TraceEvent` shim mechanism keyed on
   `vector.trace_legacy_layout`, and the compile-time gating that catches unmigrated
@@ -1004,9 +1005,14 @@ untyped-forwarder gate.
 
 ### Migration approach
 
+- Before changing the topology event payload, the sink-local stage defined below uses the
+  canonical model and shared per-format routines inside trace protocol sinks after their
+  existing buffers. This validates the model, mappings, and egress contracts while the
+  rest of the system remains legacy.
 - The migration uses a temporary
   `enum TraceEventCompat { Legacy(LegacyTraceEvent), Typed(TraceEvent) }` as the
-  `Event::Trace` payload so each trace source, sink, and transform can migrate in its
+  `Event::Trace` payload after that sink-local validation so each trace source, sink,
+  and transform can migrate in its
   own PR while the rest of the system continues to operate against the representation
   it expects. `TraceEvent` itself is always typed. See "Wholesale migration" under
   Alternatives for why a single atomic replacement was rejected.
@@ -1074,6 +1080,9 @@ untyped-forwarder gate.
 - Every trace source and sink must be rewritten to produce/consume the typed container.
   The Plan of Attack sequences this so each component migrates independently, but it is
   non-trivial work.
+- The sink-local validation stage temporarily converts replayed legacy records after they
+  leave each protocol sink's buffer. Conversion therefore repeats after replay, and the
+  post-buffer adapter is removed once the shared coexistence boundary reaches the sink.
 - The temporary public `TraceEventCompat` type and its wrapping and unwrapping at
   component boundaries add migration-only API and mechanical changes. The foundational
   migration step must rename today's untyped `TraceEvent` representation to
@@ -1359,16 +1368,15 @@ This Plan of Attack covers the format-agnostic data-model and migration work own
 this RFC. Per-format shims, encoders, and source and sink flips are sequenced in the
 [OTLP mapping](2026-04-29-25329-trace-data-model/otlp-mapping.md) and
 [Datadog mapping](2026-04-29-25329-trace-data-model/datadog-mapping.md) sub-RFCs.
-Format-agnostic prerequisites land first; per-format shims may then land in either
-order; this RFC's consumer and VRL work and the compile-time gate follow; source flips
-are independent after that gate; cleanup is last. Converting consumers must accept
-`TraceEventCompat` and fallibly convert it to `TraceEvent` before any source emits
-typed events, because shims are unidirectional. Pass-through transforms must accept both
+Format-agnostic prerequisites land first, followed by sink-local validation and then
+system-wide coexistence. Consumer and VRL work and the compile-time gate follow; source
+flips are independent after that gate; cleanup is last. Once coexistence begins,
+converting consumers must accept
+`TraceEventCompat` and fallibly convert it to `TraceEvent` before any source emits typed
+events, because shims are unidirectional. Pass-through transforms must accept both
 variants without converting.
 
-The format-agnostic work is organized into six stages. A stage may span multiple PRs;
-its exit criteria, rather than a prescribed internal implementation, gate the next
-stage.
+The work is organized into seven stages.
 
 1. **Establish the migration boundary.** Make internal proto decoding fallible so an
    unknown oneof variant is reported and drops only the affected message rather than
@@ -1376,8 +1384,21 @@ stage.
    `vector.trace_legacy_layout` precursor to both trace sources. This release must both
    tolerate future event variants and identify every newly written legacy trace layout,
    and must precede every `TypedTrace` producer.
-2. **Introduce the model without changing behavior.** Add the supporting types and the
-   permanent typed `TraceEvent`, rename today's untyped representation to
+2. **Validate the canonical model and mappings behind sink buffers.** Add the supporting
+   types and the permanent typed `TraceEvent` definition under an internal module path,
+   without replacing the current public `TraceEvent(LogEvent)` payload. Implement both
+   format mappings as shared conversion and encoding routines, including format-shape
+   detection for historical pre-hint records. Migrate each trace protocol sink at its
+   intake boundary: after reading the existing `EventArray` from its configured buffer,
+   convert the untyped trace into zero or more canonical `TraceEvent`s and use only that
+   typed model for partitioning, APM stats aggregation, and wire encoding. Generic
+   representation-preserving sinks do not convert. Topology channels, disk buffers,
+   `vector` source/sink hops, VRL, and JSON encoding continue to carry and expose only
+   the legacy representation. Use this stage to validate the canonical model and both
+   mappings against their round-trip, cross-format, metadata, finalizer, and stable-order
+   contracts before making either representation a system-wide alternative.
+3. **Introduce coexistence without changing topology behavior.** Promote the typed model
+   to its permanent public `TraceEvent` export, rename today's untyped representation to
    `LegacyTraceEvent`, and make the temporary
    `TraceEventCompat::{Legacy, Typed}` enum the payload of `Event::Trace` and
    `TraceArray` while all components continue to use `Legacy`. Adapt existing producers
@@ -1387,18 +1408,22 @@ stage.
    inner map. Both compatibility variants must survive disk-buffer and `vector`
    source/sink boundaries, and optional-value and Datadog child-presence distinctions must
    survive those boundaries.
-3. **Land both format mappings.** Implement and register both format shims and
-   format-shape detectors, including a typed-shape detector for JSON / `native_json`
-   input, then implement both typed encoders per the sub-RFCs. Do not
+4. **Integrate the validated mappings with coexistence.** Register the shared format
+   converters and format-shape detectors from stage 2 as the two
+   `LegacyTraceEvent -> TraceEvent` shims, add the typed-shape detector for JSON /
+   `native_json` input, and adapt the already-migrated protocol sinks to accept
+   `TraceEventCompat` at every intake path. A `Typed` input passes through directly; a
+   `Legacy` input uses the same conversion validated behind the sink buffer in stage 2.
+   Remove the temporary direct conversion from the old public trace payload. Do not
    expose the typed `remap` mode until both legacy layouts can be converted explicitly.
-4. **Establish typed VRL and migrate consumers.** Implement the typed paths, fallible
-   trace constructors, and the trace-only
+5. **Establish typed VRL and migrate remaining consumers.** Implement the typed paths,
+   fallible trace constructors, and the trace-only
    `remap.trace_representation = "typed"` mode. The transform converts legacy input
    before constructing `VrlTarget` and runs once per resulting typed event; paths never
-   convert. Then migrate `sample` and `trace_to_log`. Protocol sinks and `trace_to_log`
-   convert at intake and use only `TraceEvent`. `json` and `native_json` encoding remain
-   untagged and representation-preserving. Pass-through transforms accept both variants
-   without converting `Legacy` to `Typed`.
+   convert. Then migrate `sample` and `trace_to_log`; `trace_to_log` converts at intake
+   and uses only `TraceEvent`. Protocol sinks already satisfy this contract from stage 4.
+   `json` and `native_json` encoding remain untagged and representation-preserving.
+   Pass-through transforms accept both variants without converting `Legacy` to `Typed`.
    `sample` remains per-event,
    so typed input receives one decision per trace-homogeneous resource/scope or
    chunk/service partition. This does not make sampling trace-stable across every event
@@ -1406,7 +1431,7 @@ stage.
    `trace_to_log` emits a uniform source-independent layout.
    Before the next stage, every migrated consumer must accept
    both legacy and typed input and all typed VRL and round-trip contracts must hold.
-5. **Use the compile-time gate, publish migration guidance, and flip producers.** Remove
+6. **Use the compile-time gate, publish migration guidance, and flip producers.** Remove
    untyped forwarding methods from `TraceEventCompat` and migrate every resulting Rust
    call site. Publish the VRL migration guide, then leave the typed mode available for
    the announced migration interval. The OTLP and Datadog sources may begin emitting
@@ -1416,7 +1441,7 @@ stage.
    source retains its `vector.trace_legacy_layout` hint through the coexistence and
    deprecated-proto window. Across `vector` network hops, each downstream receiver must
    support `TypedTrace` before its upstream sender emits typed trace records.
-6. **Retire coexistence.** After both source flips, remove the compatibility enum and
+7. **Retire coexistence.** After both source flips, remove the compatibility enum and
    `LegacyTraceEvent`, replacing `TraceEventCompat` with an alias to `TraceEvent`. Change
    the `remap` default to `typed`, reject an explicitly configured `legacy` mode, and
    retain the option through a deprecation window. Legacy proto decoding now converts

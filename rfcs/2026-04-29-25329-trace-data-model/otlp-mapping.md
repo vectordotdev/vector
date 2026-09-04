@@ -437,23 +437,21 @@ escape hatch). This sub-RFC inherits those choices.
 
 ## Plan Of Attack
 
-The format-agnostic prerequisites (fallible proto decode boundary, temporary
-`TraceEventCompat` enum, legacy-layout hint precursor, and internal `TypedTrace` proto
-extension) are owned by the parent RFC's Plan of Attack and must land first. OTLP work
-then proceeds through these obligations:
+The parent RFC's stages 2 and 4 define the common sink-local validation and subsequent
+coexistence integration. This sub-RFC supplies the following OTLP-specific work:
 
-1. Implement `LegacyTraceEvent -> TraceEvent` conversion and unique detection of
-   historical pre-hint OTLP layouts. The converter must fan out every recovered
-   `ScopeSpans` by distinct `trace_id` in the stable first-seen order defined above.
+1. Implement the OTLP converter and unique detection of historical pre-hint layouts.
 2. Implement `TraceEvent -> OTLP` encoding satisfying the mapping and bridge-key
    contracts above.
-3. Establish the `OTLP -> Vector -> OTLP` effective-equivalence guarantee and validate
-   every declared exclusion.
-4. Migrate the OTLP sink and then, after the parent RFC's compile-time consumer gate, the
-   source. Typed input must pass end-to-end through OTLP export before the source emits
-   typed events; typed source events retain the migration hint for the window specified
-   by the parent RFC.
-5. Publish the OTLP field mapping and bridge-key conventions in the user migration
+3. During the parent RFC's sink-local stage, migrate the OTLP sink and establish the
+   `OTLP -> Vector -> OTLP` effective-equivalence guarantee, validating every declared
+   exclusion.
+4. During coexistence integration, register the converter as the OTLP shim and adapt
+   every OTLP sink intake path to accept both variants.
+5. After the parent RFC's compile-time consumer gate, migrate the source. Typed input
+   must pass end-to-end through OTLP export before the source emits typed events; typed
+   source events retain the migration hint for the window specified by the parent RFC.
+6. Publish the OTLP field mapping and bridge-key conventions in the user migration
    guide.
 
 ## Future Improvements

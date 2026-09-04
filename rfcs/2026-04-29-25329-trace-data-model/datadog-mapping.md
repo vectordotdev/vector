@@ -906,26 +906,28 @@ Datadog protos may land independently. That removal must report a payload whose
 `tracerPayloads` is empty, including one that still carries `traces` / `transactions`
 spans, rather than treating it as a lossless empty modern payload.
 
-The remaining work starts after the format-agnostic prerequisites (fallible proto decode
-boundary, temporary `TraceEventCompat` enum, legacy-layout hint precursor, and internal
-`TypedTrace` proto extension) in the parent RFC:
+The parent RFC's stages 2 and 4 define the common sink-local validation and subsequent
+coexistence integration. This sub-RFC supplies the following Datadog-specific work:
 
-1. Implement `LegacyTraceEvent -> TraceEvent` conversion and unique detection of
-   historical pre-hint Datadog layouts. The converter must split each chunk by
-   reconstructed trace ID and `Span.service` in stable first-seen pair order and apply
-   the parent RFC's metadata and acknowledgement contract to the resulting sequence.
+1. Implement the Datadog converter and unique detection of historical pre-hint layouts.
+   The converter must split each chunk by reconstructed trace ID and `Span.service` in
+   stable first-seen pair order and apply the parent RFC's metadata and acknowledgement
+   contract to the resulting sequence.
 2. Implement `TraceEvent -> Datadog` encoding satisfying the mapping and egress contracts
    above.
-3. Establish the `Datadog -> Vector -> Datadog` effective-equivalence guarantee,
-   and validate every declared exclusion.
-4. Establish the enumerated `OTLP -> Vector -> datadog_traces` conformance rules against
-   the current Datadog Agent reference.
-5. Migrate the `datadog_traces` sink and APM stats aggregation after the parent RFC's
-   compile-time consumer gate. Reconstruct effective chunk/trace groups before invoking
-   the aggregator so service partitions share root-span context.
-6. Publish the user migration guide, then migrate the `datadog_agent` source after typed
-   input passes end-to-end through Datadog export. Typed source events retain the
-   migration hint for the parent RFC's deprecation window.
+3. During the parent RFC's sink-local stage, migrate the `datadog_traces` sink and APM
+   stats aggregation. Reconstruct effective chunk/trace groups before invoking the
+   aggregator so service partitions share root-span context. Establish the
+   `Datadog -> Vector -> Datadog` effective-equivalence guarantee, validate every
+   declared exclusion, and establish the enumerated
+   `OTLP -> Vector -> datadog_traces` conformance rules against the current Datadog
+   Agent reference.
+4. During coexistence integration, register the converter as the Datadog shim and adapt
+   every `datadog_traces` intake path to accept both variants.
+5. Publish the user migration guide, then migrate the `datadog_agent` source after the
+   parent RFC's compile-time consumer gate and after typed input passes end-to-end
+   through Datadog export. Typed source events retain the migration hint for the parent
+   RFC's deprecation window.
 
 ## Future Improvements
 
