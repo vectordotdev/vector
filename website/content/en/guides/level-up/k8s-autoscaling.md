@@ -158,6 +158,10 @@ overloads Vector, and the consumer discards the output.
 
 ## Collecting throughput and CPU metrics
 
+Throughout this guide, **throughput** refers to the input byte rate at Vector's
+`http_server` source, used as a proxy for pipeline throughput. It does not measure
+successful delivery to the downstream consumer.
+
 Each Vector pod exposes [`ObservabilityService`](https://github.com/vectordotdev/vector/blob/master/proto/vector/observability.proto) on port 8686 ([gRPC](https://grpc.io/)). For
 each phase of our testing, we measured throughput by port-forwarding to a pod,
 capturing two `GetComponents` samples 30 seconds apart, and calculating the difference in `receivedBytesTotal` for
