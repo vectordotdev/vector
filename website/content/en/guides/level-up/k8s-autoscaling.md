@@ -2,7 +2,7 @@
 date: "2026-07-01"
 title: Load balancing and scaling Vector on Kubernetes
 short: K8s autoscaling
-description: Observe a single Vector pod reaching its CPU ceiling, eliminate the ceiling by manually scaling horizontally behind an L7 load balancer, and then automate that scaling with the Kubernetes HPA to reach a stable replica count that maintains target average CPU utilization.
+description: Learn how to scale a CPU-bound Vector deployment on Kubernetes, first manually with an L7 load balancer and then automatically with the Horizontal Pod Autoscaler.
 authors: ["thomasqueirozb"]
 domain: platforms
 weight: 7
