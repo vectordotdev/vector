@@ -2,6 +2,10 @@ use std::{
     collections::HashSet,
     fs, io,
     path::{Path, PathBuf},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     thread,
 };
 
@@ -21,7 +25,13 @@ struct ScanRequest {
 // Scans are diagnostic only, so a watch channel retains just the latest reload request while the
 // current blocking filesystem traversal finishes.
 pub(super) struct OrphanedDiskBufferScanner {
+    scheduler: Mutex<ScanScheduler>,
+    generation: Arc<AtomicU64>,
+}
+
+struct ScanScheduler {
     sender: watch::Sender<Option<ScanRequest>>,
+    generation: u64,
 }
 
 impl OrphanedDiskBufferScanner {
@@ -32,16 +42,24 @@ impl OrphanedDiskBufferScanner {
     fn spawn<S, R>(scan: S, report: R) -> Self
     where
         S: Fn(&ScanRequest) -> io::Result<Vec<PathBuf>> + Send + 'static,
-        R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>) + Send + 'static,
+        R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>, &AtomicU64) + Send + 'static,
     {
         let (sender, receiver) = watch::channel(None);
+        let generation = Arc::new(AtomicU64::new(0));
+        let worker_generation = Arc::clone(&generation);
         if let Err(error) = thread::Builder::new()
             .name("orphaned-disk-buffer-scanner".into())
-            .spawn(move || run_scanner(receiver, scan, report))
+            .spawn(move || run_scanner(receiver, worker_generation, scan, report))
         {
             warn!(%error, message = "Failed to start unreferenced disk buffer scanner thread.");
         }
-        Self { sender }
+        Self {
+            scheduler: Mutex::new(ScanScheduler {
+                sender,
+                generation: 0,
+            }),
+            generation,
+        }
     }
 
     pub(super) fn scan(&self, config: &Config, temporary_exclusions: HashSet<PathBuf>) {
@@ -56,10 +74,28 @@ impl OrphanedDiskBufferScanner {
     }
 
     fn schedule(&self, data_dir: PathBuf, configured_buffer_paths: HashSet<PathBuf>) {
-        self.sender.send_modify(move |pending| {
-            let generation = pending
-                .as_ref()
-                .map_or(1, |request| request.generation.wrapping_add(1));
+        self.schedule_with(data_dir, configured_buffer_paths, || {});
+    }
+
+    fn schedule_with<F>(
+        &self,
+        data_dir: PathBuf,
+        configured_buffer_paths: HashSet<PathBuf>,
+        before_publish: F,
+    ) where
+        F: FnOnce(),
+    {
+        let mut scheduler = self.scheduler.lock().unwrap_or_else(|error| {
+            warn!(message = "Disk buffer scan scheduler mutex was poisoned; recovering.");
+            error.into_inner()
+        });
+        scheduler.generation = scheduler.generation.wrapping_add(1);
+        let generation = scheduler.generation;
+        // Updating eligibility and publishing the request are serialized among schedulers. Scan
+        // and report never take this lock, so a slow warning cannot delay a reload.
+        self.generation.store(generation, Ordering::SeqCst);
+        before_publish();
+        scheduler.sender.send_modify(move |pending| {
             *pending = Some(ScanRequest {
                 generation,
                 data_dir,
@@ -69,10 +105,20 @@ impl OrphanedDiskBufferScanner {
     }
 }
 
-fn run_scanner<S, R>(mut receiver: watch::Receiver<Option<ScanRequest>>, scan: S, report: R)
-where
+impl Drop for OrphanedDiskBufferScanner {
+    fn drop(&mut self) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+fn run_scanner<S, R>(
+    mut receiver: watch::Receiver<Option<ScanRequest>>,
+    generation: Arc<AtomicU64>,
+    scan: S,
+    report: R,
+) where
     S: Fn(&ScanRequest) -> io::Result<Vec<PathBuf>>,
-    R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>),
+    R: Fn(&ScanRequest, io::Result<Vec<PathBuf>>, &AtomicU64),
 {
     while executor::block_on(receiver.changed()).is_ok() {
         let Some(request) = receiver.borrow_and_update().clone() else {
@@ -82,13 +128,8 @@ where
             break;
         }
         let result = scan(&request);
-        let latest = receiver.borrow();
-        if receiver.has_changed().is_ok()
-            && latest
-                .as_ref()
-                .is_some_and(|latest| latest.generation == request.generation)
-        {
-            report(&request, result);
+        if generation.load(Ordering::SeqCst) == request.generation {
+            report(&request, result, &generation);
         }
     }
 }
@@ -97,10 +138,17 @@ fn scan_orphaned_disk_buffers(request: &ScanRequest) -> io::Result<Vec<PathBuf>>
     find_orphaned_disk_buffers(&request.data_dir, &request.configured_buffer_paths)
 }
 
-fn report_orphaned_disk_buffers(request: &ScanRequest, result: io::Result<Vec<PathBuf>>) {
+fn report_orphaned_disk_buffers(
+    request: &ScanRequest,
+    result: io::Result<Vec<PathBuf>>,
+    generation: &AtomicU64,
+) {
     let orphaned_buffers = match result {
         Ok(orphaned_buffers) => orphaned_buffers,
         Err(error) => {
+            if generation.load(Ordering::SeqCst) != request.generation {
+                return;
+            }
             warn!(
                 data_dir = request.data_dir.to_string_lossy().as_ref(),
                 %error,
@@ -112,6 +160,9 @@ fn report_orphaned_disk_buffers(request: &ScanRequest, result: io::Result<Vec<Pa
 
     let disk_buffer_root = request.data_dir.join("buffer").join("v2");
     for orphaned_buffer in orphaned_buffers {
+        if generation.load(Ordering::SeqCst) != request.generation {
+            break;
+        }
         let Ok(orphaned_buffer_id) = orphaned_buffer.strip_prefix(&disk_buffer_root) else {
             warn!(
                 buffer_dir = orphaned_buffer.to_string_lossy().as_ref(),
@@ -291,7 +342,11 @@ mod tests {
         fs,
         num::NonZeroU64,
         path::PathBuf,
-        sync::{Arc, Mutex, mpsc},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicU64, Ordering},
+            mpsc,
+        },
         time::Duration,
     };
 
@@ -335,7 +390,7 @@ mod tests {
                 release_rx.lock().unwrap().recv().unwrap();
                 Ok(vec![request.data_dir.clone()])
             },
-            move |request, _| reported_tx.send(request.data_dir.clone()).unwrap(),
+            move |request, _, _| reported_tx.send(request.data_dir.clone()).unwrap(),
         );
 
         scanner.schedule("first".into(), HashSet::new());
@@ -352,20 +407,82 @@ mod tests {
     }
 
     #[test]
-    fn scanner_scheduling_waits_for_latest_report() {
+    fn concurrent_schedulers_publish_in_generation_order_and_coalesce() {
+        let (scan_started_tx, scan_started_rx) = mpsc::channel();
+        let (release_scan_tx, release_scan_rx) = mpsc::channel();
+        let release_scan_rx = Arc::new(Mutex::new(release_scan_rx));
+        let (reported_tx, reported_rx) = mpsc::channel();
+        let scanner = Arc::new(OrphanedDiskBufferScanner::spawn(
+            move |request| {
+                scan_started_tx.send(request.data_dir.clone()).unwrap();
+                release_scan_rx.lock().unwrap().recv().unwrap();
+                Ok(Vec::new())
+            },
+            move |request, _, _| reported_tx.send(request.data_dir.clone()).unwrap(),
+        ));
+        scanner.schedule("active".into(), HashSet::new());
+        assert_eq!(recv(&scan_started_rx), PathBuf::from("active"));
+
+        let (first_locked_tx, first_locked_rx) = mpsc::channel();
+        let (release_first_tx, release_first_rx) = mpsc::channel();
+        let first_scanner = Arc::clone(&scanner);
+        let first = std::thread::spawn(move || {
+            first_scanner.schedule_with("first".into(), HashSet::new(), || {
+                first_locked_tx.send(()).unwrap();
+                release_first_rx.recv().unwrap();
+            });
+        });
+        recv(&first_locked_rx);
+
+        let (second_started_tx, second_started_rx) = mpsc::channel();
+        let (second_finished_tx, second_finished_rx) = mpsc::channel();
+        let second_scanner = Arc::clone(&scanner);
+        let second = std::thread::spawn(move || {
+            second_started_tx.send(()).unwrap();
+            second_scanner.schedule("second".into(), HashSet::new());
+            second_finished_tx.send(()).unwrap();
+        });
+        recv(&second_started_rx);
+        assert!(second_finished_rx.try_recv().is_err());
+
+        release_first_tx.send(()).unwrap();
+        first.join().unwrap();
+        recv(&second_finished_rx);
+        second.join().unwrap();
+        release_scan_tx.send(()).unwrap();
+
+        assert_eq!(recv(&scan_started_rx), PathBuf::from("second"));
+        assert!(reported_rx.try_recv().is_err());
+        release_scan_tx.send(()).unwrap();
+        assert_eq!(recv(&reported_rx), PathBuf::from("second"));
+        assert!(scan_started_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn scanner_scheduling_does_not_wait_for_reporting_and_suppresses_stale_remainder() {
         let (report_started_tx, report_started_rx) = mpsc::channel();
         let (release_report_tx, release_report_rx) = mpsc::channel();
         let (reported_tx, reported_rx) = mpsc::channel();
         let scanner = Arc::new(OrphanedDiskBufferScanner::spawn(
-            |_| Ok(Vec::new()),
-            move |request, _| {
-                report_started_tx.send(()).unwrap();
-                release_report_rx.recv().unwrap();
-                reported_tx.send(request.data_dir.clone()).unwrap();
+            |request| {
+                Ok(vec![
+                    request.data_dir.join("first"),
+                    request.data_dir.join("second"),
+                ])
+            },
+            move |request, result, generation| {
+                for path in result.unwrap() {
+                    if generation.load(Ordering::SeqCst) != request.generation {
+                        break;
+                    }
+                    report_started_tx.send(path.clone()).unwrap();
+                    release_report_rx.recv().unwrap();
+                    reported_tx.send(path).unwrap();
+                }
             },
         ));
         scanner.schedule("first".into(), HashSet::new());
-        recv(&report_started_rx);
+        assert_eq!(recv(&report_started_rx), PathBuf::from("first/first"));
 
         let (schedule_started_tx, schedule_started_rx) = mpsc::channel();
         let (schedule_finished_tx, schedule_finished_rx) = mpsc::channel();
@@ -376,35 +493,41 @@ mod tests {
             schedule_finished_tx.send(()).unwrap();
         });
         recv(&schedule_started_rx);
-        assert!(schedule_finished_rx.try_recv().is_err());
+        recv(&schedule_finished_rx);
 
         release_report_tx.send(()).unwrap();
-        recv(&schedule_finished_rx);
-        assert_eq!(recv(&reported_rx), PathBuf::from("first"));
-        recv(&report_started_rx);
+        assert_eq!(recv(&reported_rx), PathBuf::from("first/first"));
+        assert_eq!(recv(&report_started_rx), PathBuf::from("latest/first"));
+        assert!(reported_rx.try_recv().is_err());
         release_report_tx.send(()).unwrap();
-        assert_eq!(recv(&reported_rx), PathBuf::from("latest"));
+        assert_eq!(recv(&reported_rx), PathBuf::from("latest/first"));
+        assert_eq!(recv(&report_started_rx), PathBuf::from("latest/second"));
+        release_report_tx.send(()).unwrap();
+        assert_eq!(recv(&reported_rx), PathBuf::from("latest/second"));
         schedule.join().unwrap();
     }
 
     #[test]
-    fn scanner_schedule_and_drop_are_nonblocking_and_worker_terminates() {
+    fn drop_during_blocked_scan_suppresses_report_and_worker_terminates() {
         let (release_tx, release_rx) = mpsc::channel();
         let release_rx = Arc::new(Mutex::new(release_rx));
         let (started_tx, started_rx) = mpsc::channel();
         let (worker_tx, worker_rx) = mpsc::channel::<()>();
+        let (reported_tx, reported_rx) = mpsc::channel();
         let scanner = OrphanedDiskBufferScanner::spawn(
             move |_| {
                 started_tx.send(()).unwrap();
                 release_rx.lock().unwrap().recv().unwrap();
                 Ok(Vec::new())
             },
-            move |_, _| drop(worker_tx.clone()),
+            move |_, _, _| {
+                let _worker_lifetime = &worker_tx;
+                reported_tx.send(()).unwrap();
+            },
         );
         scanner.schedule("scan".into(), HashSet::new());
         recv(&started_rx);
 
-        scanner.schedule("latest".into(), HashSet::new());
         drop(scanner);
         release_tx.send(()).unwrap();
 
@@ -412,7 +535,49 @@ mod tests {
             worker_rx.recv_timeout(Duration::from_secs(2)),
             Err(mpsc::RecvTimeoutError::Disconnected)
         ));
+        assert!(matches!(
+            reported_rx.recv_timeout(Duration::from_secs(2)),
+            Err(mpsc::RecvTimeoutError::Disconnected)
+        ));
         assert!(started_rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn drop_during_report_suppresses_remaining_output() {
+        let (report_blocked_tx, report_blocked_rx) = mpsc::channel();
+        let (release_report_tx, release_report_rx) = mpsc::channel();
+        let (reported_tx, reported_rx) = mpsc::channel();
+        let scanner = OrphanedDiskBufferScanner::spawn(
+            |request| {
+                Ok(vec![
+                    request.data_dir.join("first"),
+                    request.data_dir.join("second"),
+                ])
+            },
+            move |request, result, generation| {
+                for (index, path) in result.unwrap().into_iter().enumerate() {
+                    if generation.load(Ordering::SeqCst) != request.generation {
+                        break;
+                    }
+                    reported_tx.send(path).unwrap();
+                    if index == 0 {
+                        report_blocked_tx.send(()).unwrap();
+                        release_report_rx.recv().unwrap();
+                    }
+                }
+            },
+        );
+        scanner.schedule("scan".into(), HashSet::new());
+        assert_eq!(recv(&reported_rx), PathBuf::from("scan/first"));
+        recv(&report_blocked_rx);
+
+        drop(scanner);
+        release_report_tx.send(()).unwrap();
+
+        assert!(matches!(
+            reported_rx.recv_timeout(Duration::from_secs(2)),
+            Err(mpsc::RecvTimeoutError::Disconnected)
+        ));
     }
 
     #[test]
@@ -432,7 +597,7 @@ mod tests {
                     release_rx.recv().unwrap();
                     Ok(Vec::new())
                 },
-                |_, _| {},
+                |_, _, _| {},
             );
             scanner.schedule("scan".into(), HashSet::new());
             recv(&started_rx);
@@ -497,7 +662,11 @@ mod tests {
             configured_buffer_paths: HashSet::new(),
         };
 
-        report_orphaned_disk_buffers(&request, Ok(vec![PathBuf::from("elsewhere")]));
+        report_orphaned_disk_buffers(
+            &request,
+            Ok(vec![PathBuf::from("elsewhere")]),
+            &AtomicU64::new(1),
+        );
     }
 
     #[test]
