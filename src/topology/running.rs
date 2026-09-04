@@ -1645,16 +1645,81 @@ async fn resolve_draining_disk_buffer_sinks(
     drains: &mut Vec<DrainingDiskBufferSink>,
     required_paths: HashSet<PathBuf>,
 ) {
+    resolve_draining_disk_buffer_sinks_with(drains, required_paths, |path| {
+        std::fs::canonicalize(path)
+    })
+    .await;
+}
+
+async fn resolve_draining_disk_buffer_sinks_with<F>(
+    drains: &mut Vec<DrainingDiskBufferSink>,
+    required_paths: HashSet<PathBuf>,
+    canonicalize: F,
+) where
+    F: Fn(&std::path::Path) -> std::io::Result<PathBuf> + Send + 'static,
+{
+    if drains.is_empty() {
+        return;
+    }
+
+    if required_paths.is_empty() {
+        let mut remaining = Vec::with_capacity(drains.len());
+        for drain in drains.drain(..) {
+            if drain.task.is_finished() {
+                if let Err(error) = drain.task.await {
+                    error!(%error, "Failed to join background disk buffer drain task.");
+                }
+            } else {
+                remaining.push(drain);
+            }
+        }
+        *drains = remaining;
+        return;
+    }
+
+    let paths = required_paths
+        .iter()
+        .cloned()
+        .chain(
+            drains
+                .iter()
+                .flat_map(|drain| drain.buffer_paths.iter().cloned()),
+        )
+        .collect::<HashSet<_>>();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let resolver = std::thread::Builder::new()
+        .name("disk-buffer-path-resolver".into())
+        .spawn(move || {
+            let canonical_paths = paths
+                .into_iter()
+                .filter_map(|path| canonicalize(&path).ok().map(|canonical| (path, canonical)))
+                .collect::<HashMap<_, _>>();
+            _ = sender.send(canonical_paths);
+        });
+    let canonical_paths = match resolver {
+        Ok(_) => match receiver.await {
+            Ok(paths) => paths,
+            Err(error) => {
+                warn!(%error, message = "Failed to receive resolved disk buffer paths; falling back to raw path comparison.");
+                HashMap::new()
+            }
+        },
+        Err(error) => {
+            warn!(%error, message = "Failed to start disk buffer path resolver thread; falling back to raw path comparison.");
+            HashMap::new()
+        }
+    };
     let required_canonical_paths = required_paths
         .iter()
-        .filter_map(|path| std::fs::canonicalize(path).ok())
+        .filter_map(|path| canonical_paths.get(path).cloned())
         .collect::<HashSet<_>>();
     let mut remaining = Vec::with_capacity(drains.len());
     for drain in drains.drain(..) {
         let conflicts = drain.buffer_paths.iter().any(|path| {
             required_paths.contains(path)
-                || std::fs::canonicalize(path)
-                    .is_ok_and(|path| required_canonical_paths.contains(&path))
+                || canonical_paths
+                    .get(path)
+                    .is_some_and(|path| required_canonical_paths.contains(path))
         });
         if drain.task.is_finished() || conflicts {
             if let Err(error) = drain.task.await {
@@ -1744,6 +1809,7 @@ mod disk_buffer_drain_tests {
     use super::{
         DrainingDiskBufferSink, TaskOutput, active_draining_disk_buffer_paths,
         register_draining_disk_buffer_sink, resolve_draining_disk_buffer_sinks,
+        resolve_draining_disk_buffer_sinks_with,
     };
     use crate::{
         config::{ComponentKey, Config, unit_test::UnitTestSourceConfig},
@@ -1790,6 +1856,121 @@ mod disk_buffer_drain_tests {
             tokio::task::yield_now().await;
         }
         assert!(active_draining_disk_buffer_paths(&mut drains).is_empty());
+        assert!(drains.is_empty());
+    }
+
+    #[tokio::test]
+    async fn resolving_without_drains_does_not_touch_the_filesystem() {
+        let mut drains = Vec::new();
+
+        resolve_draining_disk_buffer_sinks_with(
+            &mut drains,
+            HashSet::from([PathBuf::from("required")]),
+            |_| panic!("canonicalization must not run without drains"),
+        )
+        .await;
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn drain_path_resolution_does_not_block_the_tokio_worker() {
+        let (drain_tx, drain_rx) = oneshot::channel();
+        let drain = tokio::spawn(async move {
+            _ = drain_rx.await;
+            Ok(TaskOutput::Healthcheck)
+        });
+        let mut drains = vec![DrainingDiskBufferSink {
+            task: drain,
+            buffer_paths: vec![PathBuf::from("draining")],
+        }];
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        {
+            let resolve = resolve_draining_disk_buffer_sinks_with(
+                &mut drains,
+                HashSet::from([PathBuf::from("required")]),
+                move |path| {
+                    started_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                    Ok(path.to_path_buf())
+                },
+            );
+            tokio::pin!(resolve);
+
+            assert!(futures::poll!(&mut resolve).is_pending());
+            started_rx
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap();
+            let worker_ran = Arc::new(AtomicBool::new(false));
+            let worker_ran_task = Arc::clone(&worker_ran);
+            tokio::spawn(async move {
+                worker_ran_task.store(true, Ordering::SeqCst);
+            });
+            tokio::task::yield_now().await;
+            assert!(worker_ran.load(Ordering::SeqCst));
+
+            release_tx.send(()).unwrap();
+            release_tx.send(()).unwrap();
+            resolve.await;
+        }
+        drain_tx.send(()).unwrap();
+        drains.pop().unwrap().task.await.unwrap().unwrap();
+    }
+
+    #[test]
+    fn runtime_shutdown_does_not_wait_for_drain_path_resolution() {
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        runtime.block_on(async {
+            tokio::spawn(async move {
+                let mut drains = vec![DrainingDiskBufferSink {
+                    task: tokio::spawn(std::future::pending()),
+                    buffer_paths: vec![PathBuf::from("draining")],
+                }];
+                resolve_draining_disk_buffer_sinks_with(
+                    &mut drains,
+                    HashSet::from([PathBuf::from("required")]),
+                    move |path| {
+                        started_tx.send(()).unwrap();
+                        release_rx.recv().unwrap();
+                        Ok(path.to_path_buf())
+                    },
+                )
+                .await;
+            });
+            tokio::task::yield_now().await;
+            started_rx
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap();
+        });
+
+        let started = std::time::Instant::now();
+        drop(runtime);
+        assert!(started.elapsed() < std::time::Duration::from_millis(250));
+        release_tx.send(()).unwrap();
+        release_tx.send(()).unwrap();
+    }
+
+    #[tokio::test]
+    async fn reaping_finished_drains_does_not_touch_the_filesystem() {
+        let finished = tokio::spawn(async { Ok(TaskOutput::Healthcheck) });
+        while !finished.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        let mut drains = vec![DrainingDiskBufferSink {
+            task: finished,
+            buffer_paths: vec![PathBuf::from("finished")],
+        }];
+
+        resolve_draining_disk_buffer_sinks_with(&mut drains, HashSet::new(), |_| {
+            panic!("canonicalization must not run when no paths are required")
+        })
+        .await;
+
         assert!(drains.is_empty());
     }
 
