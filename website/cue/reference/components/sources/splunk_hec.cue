@@ -48,7 +48,6 @@ components: sources: splunk_hec: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
