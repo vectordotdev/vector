@@ -80,8 +80,8 @@ enum ShutdownTaskKey {
 impl fmt::Display for ShutdownTaskKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Component(key) => key.fmt(formatter),
-            Self::Auxiliary(label) => label.fmt(formatter),
+            Self::Component(key) => write!(formatter, "component:{key}"),
+            Self::Auxiliary(label) => write!(formatter, "auxiliary:{label}"),
         }
     }
 }
