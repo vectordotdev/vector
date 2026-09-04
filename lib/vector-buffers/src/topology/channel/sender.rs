@@ -327,11 +327,7 @@ impl<T: Bufferable> BufferSender<T> {
             WhenFull::DropNewest => match self.base.try_send(item).await? {
                 TryWriteOutcome::Written => UsageAccounting::Accepted,
                 TryWriteOutcome::Full(item) => {
-                    if self
-                        .usage_instrumentation
-                        .as_ref()
-                        .is_some_and(|instrumentation| instrumentation.provides_instrumentation)
-                    {
+                    if self.usage_instrumentation.is_some() && item_sizing.is_none() {
                         item_sizing = Some((item.event_count(), item.size_of()));
                     }
                     UsageAccounting::DroppedNewest
