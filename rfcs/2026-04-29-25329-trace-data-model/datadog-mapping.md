@@ -156,24 +156,12 @@ normalization also apply.
 
 ### User Experience
 
-The Datadog wire mapping is invisible to VRL: programs read and write the typed
-`TraceEvent` surface defined in the parent RFC. The Datadog-specific surface a VRL author
-sees is the `TraceEvent.datadog` and `Span.datadog` namespaces. The
-event namespace carries the optional agent envelope, tracer tags, and optional chunk;
-the span namespace carries `resource_name`, `span_type`, and `meta_struct`. This sub-RFC
-specifies how those typed paths map to and from the Datadog wire format.
-
-```coffee
-# Read a Datadog chunk-scoped tag.
-decision_maker = .datadog.chunk.tags."_dd.p.dm"
-
-# Read agent- and tracer-payload state.
-agent_apm_mode = .datadog.agent.tags."_dd.apm_mode"
-tracer_apm_mode = .datadog.tracer.tags."_dd.apm_mode"
-
-# Inspect a meta_struct sub-entry (msgpack-encoded; Vector exposes it as bytes).
-meta_struct_event = .spans[0].datadog.meta_struct."dd.event_payload"
-```
+The Datadog wire mapping is a projection onto the typed `TraceEvent` defined in the
+parent RFC. The Datadog-specific fields are the `TraceEvent.datadog` and `Span.datadog`
+namespaces. The event namespace carries the optional agent envelope, tracer tags, and
+optional chunk; the span namespace carries `resource_name`, `span_type`, and
+`meta_struct`. This sub-RFC specifies how those typed fields map to and from the Datadog
+wire format.
 
 ### Implementation
 

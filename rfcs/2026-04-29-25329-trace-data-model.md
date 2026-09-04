@@ -13,9 +13,9 @@ transforms a uniform typed surface across the two source formats.
 
 The full proposal is split across three documents:
 
-- This document defines the typed data model, the VRL surface, the temporary
+- This document defines the typed data model, the temporary
   `TraceEventCompat` coexistence enum and shim mechanism, and Vector's internal
-  protobuf serialization.
+  protobuf serialization. The VRL encoding of the typed model is out of scope.
 - [Trace Data Model: Datadog Mapping](2026-04-29-25329-trace-data-model/datadog-mapping.md)
   specifies the bidirectional mapping between `TraceEvent` and the Datadog agent-to-backend
   protobuf, including the cross-format conformance rule for `OTLP -> Vector -> datadog_traces`.
@@ -72,8 +72,6 @@ the entries below are the format-agnostic shared vocabulary.
 
 - First-class OpenTelemetry signal support
   ([vectordotdev/vector#1444](https://github.com/vectordotdev/vector/issues/1444)).
-- VRL trace-specific semantics on the new typed surface (`.trace_id`, `.resource.service`,
-  `.datadog.chunk.priority`, `.spans[i].name`, etc.).
 
 ## Scope
 
@@ -86,11 +84,6 @@ the entries below are the format-agnostic shared vocabulary.
   `DatadogTracerContext`, `DatadogChunkContext`, `DatadogSpanContext`, `Attributes`,
   `SpanEvent`, `SpanLink`, `TraceId`, `SpanId`, the closed-with-escape-hatch enums (`SpanKind`, `SpanStatus`,
   `SamplingPriority`), `TraceFlags`, and `TraceState`.
-- Define the VRL surface for the typed `TraceEvent`, including the `del()` semantics and
-  the typed-slot/attribute-map pairs (with precedence semantics owned by each mapping
-  sub-RFC).
-- Add the fallible `trace_span_status`, `trace_span_link`, `trace_span_event`, and
-  `trace_flags` VRL functions for atomic construction and related-field updates.
 - Define the migration strategy that lets each trace-producing or trace-consuming component
   migrate independently: an initial sink-local validation stage behind existing buffers,
   the temporary
@@ -117,12 +110,19 @@ the entries below are the format-agnostic shared vocabulary.
 - APM stats computation semantics (already covered by RFC 9862).
 - Zero-loss cross-format round-trip (`Datadog -> OTLP -> Datadog` or
   `OTLP -> Datadog -> OTLP`).
+- The VRL language surface for the typed model: path encodings, `del()`
+  semantics, `trace_span_*` / `trace_flags` functions, enum spellings, duration
+  units at the VRL boundary, `AttrValue` ↔ `Value` conversion, and both the
+  former normative VRL subsections and any illustrative VRL sketch. Those
+  details will be specified when typed VRL is implemented. This RFC still
+  defines the `remap.trace_representation` opt-in, convert-before-program, and
+  the rule that VRL writes forfeit the round-trip guarantee.
 - Implementation mechanics that do not change a specified contract. Rust API
   shapes, crate and constructor internals, protobuf field layouts beyond the
   discriminator tags and presence rules, review checklists, and similar
   decisions remain implementation-time choices. This RFC and the mapping
-  sub-RFCs specify the invariants, VRL surface, and wire mappings those
-  choices must satisfy.
+  sub-RFCs specify the invariants and wire mappings those choices must
+  satisfy.
 
 ### Zero-loss round-trip exclusions
 
@@ -175,7 +175,7 @@ Numeric boundary behavior follows one policy throughout the model and mappings:
 
 ### User Experience
 
-During coexistence, a `remap` transform must opt in to the typed VRL surface:
+During coexistence, a `remap` transform must opt in to the typed representation:
 
 ```yaml
 transforms:
@@ -196,33 +196,12 @@ runs independently on each result. VRL conditions do not convert, so typed condi
 an upstream typed `remap`. Because conversion is one-way, legacy mode rejects typed input with
 a representation-mismatch mapping error.
 
-In `typed` mode, a `TraceEvent` exposes its `TraceId`, `Resource`, `Scope`,
-Datadog-native context, and `Vec<Span>` directly:
-
-```coffee
-# Read the event's trace ID.
-trace = .trace_id
-
-# Route by resource service.
-if .resource.service == "checkout" { ... }
-
-# Filter health-check spans across the whole event.
-.spans = filter(.spans, |_, span| { span.name != "GET /health" })
-
-# Mark slow client spans as errors.
-.spans = map_values(.spans, |span| {
-    if span.kind == "client" && span.duration > 1.0 {
-        span.status = trace_span_status!("error", message: "slow query")
-    }
-    span
-})
-```
-
-The typed surface is uniform across both wire formats: the same paths are valid regardless
-of source. `.datadog` and each `.spans[i].datadog` always read as objects whose default
-values represent no Datadog-native state; `.datadog.agent` and `.datadog.chunk` read as
-`null` when their wire envelopes are absent. Format-specific encoding details are
-documented in the OTLP mapping and Datadog mapping sub-RFCs.
+The typed `TraceEvent` is uniform across both wire formats: the same fields are valid
+regardless of source. `TraceEvent.datadog` and each `Span.datadog` isolate Datadog-native
+wire state; their default values represent no Datadog-native state. `DatadogEventContext.agent`
+and `DatadogEventContext.chunk` are `None` when their wire envelopes are absent.
+Format-specific encoding details are documented in the OTLP mapping and Datadog mapping
+sub-RFCs. The VRL encoding of these fields is out of scope.
 
 This uniformity is also the ingest invariant for every trace source: when the source wire
 format carries data that has a typed home in the model, ingest stores it in the
@@ -233,9 +212,8 @@ than source-envelope sub-objects. Sink egress projects from that typed surface, 
 source-specific ingest layouts.
 
 The `trace_to_log` transform is retained and emits exactly one `LogEvent` per
-`TraceEvent`; it does not fan out spans. The log root is the canonical typed VRL object
-with exactly the `trace_id`, `resource`, `scope`, `datadog`, and `spans` fields and the same nested
-projections, nulls, strings, bytes, and numeric values that typed-path reads expose.
+`TraceEvent`; it does not fan out spans. The log root is the canonical typed object
+with exactly the `trace_id`, `resource`, `scope`, `datadog`, and `spans` fields.
 `EventMetadata` and finalizers transfer to the log as event metadata rather than being
 inserted into its fields. During coexistence, converting one legacy input may first
 produce several trace-ID partitions and therefore several logs, one per resulting
@@ -306,8 +284,8 @@ pub struct Span {
 
 `TraceEvent.datadog` and `Span.datadog` isolate Datadog-native wire state while remaining
 part of the single typed schema. An event with no Datadog wire state lifted on ingress
-carries default contexts. VRL programs and Vector internals can read and write the same
-paths regardless of source, and Datadog egress treats explicitly authored namespace
+carries default contexts. Typed consumers read and write the same fields regardless of
+source, and Datadog egress treats explicitly authored namespace
 state as authoritative without consulting event provenance. Typed namespace slots are
 preferable to format-discriminated event variants because common consumers still
 operate on one `TraceEvent` shape.
@@ -361,20 +339,6 @@ The namespace contains only source-native Datadog wire state. Normalized trace s
 including trace and span identifiers, status, common resource fields, events, links, and
 ordinary attributes, remain in the format-independent model. `DatadogEventContext` and
 `DatadogSpanContext` are logically always present and default-valued.
-
-##### VRL surface for Datadog-native contexts
-
-The namespace projects the structs above directly. Agent, tracer, and chunk tag maps use
-the `Attributes` conversion rules below. `Span.datadog.meta_struct` is instead a
-bytes-only map: entries read as VRL bytes, an entry write accepts `Value::Bytes`, and a
-whole-map write accepts an object only when every value is bytes. Conversion of the
-complete write succeeds before mutation; `del()` removes an individual entry.
-
-The agent envelope's `host_name`, `env`, and `agent_version` strings read and write as
-UTF-8 VRL bytes, and `rare_sampler_enabled` reads and writes as a VRL boolean. All agent
-fields are writable; an explicitly authored value is authoritative on Datadog egress.
-`DatadogAgentEnvelope.target_tps` and `error_tps` use the same NaN boundary behavior as
-`AttrValue::Double` below.
 
 #### `Resource` and `Scope`
 
@@ -433,25 +397,6 @@ finalizers on successful delivery, and report the condition. OTLP and Datadog in
 produce no event from an empty wire grouping because neither format supplies an ID for
 it. The internal proto and typed JSON retain the ID on empty events.
 
-##### VRL surface for `TraceId` and `SpanId`
-
-`TraceId` and `SpanId` are exposed to VRL as lowercase hex strings without a leading `0x`:
-trace IDs as 32 characters (16 bytes); and span IDs as 16 characters (8 bytes).
-All are zero-padded on the left.
-Reading returns the canonical lowercase form; writing accepts case-
-insensitive hex with optional zero-padding (so `"abc"` and `"0000000000000abc"` both
-round-trip to the same `SpanId`). A non-hex string, an over-length string (more than
-32 / 16 characters after trimming), or an all-zero string raises a VRL runtime error --
-the all-zero rejection mirrors the construction-time `NonZeroU128` / `NonZeroU64`
-invariant. `Span.parent_span_id` is `Option<SpanId>`; deleting the field via `del()`
-clears it to `None`, and writing the empty string `""` is equivalent to `del()`.
-
-##### VRL surface for `Span.duration`
-
-VRL reads `Span.duration` as floating-point seconds and accepts integer or float seconds
-on write. Invalid values raise a runtime error.
-Conversion and validation complete before the stored duration is changed.
-
 #### Status, kind, and sampling priority
 
 ```rust
@@ -498,51 +443,8 @@ matching a known variant's wire number is always carried as that variant, never 
 `Other(n)`. Every construction site must normalize raw values through a shared validated
 constructor.
 
-##### VRL surface for the closed-with-escape-hatch enums
-
-`SpanKind` and `SamplingPriority` share a VRL access pattern:
-
-- The discriminator is a snake_case string for each known variant (`SpanKind`:
-  `"unspecified"` / `"internal"` / `"server"` / `"client"` / `"producer"` / `"consumer"`;
-  `SamplingPriority`: `"user_reject"` / `"auto_reject"` / `"auto_keep"` / `"user_keep"`)
-  and an integer for the `Other`
-  variant. Reading returns the snake_case string when the value matches a known variant
-  and the raw integer otherwise. Writing a recognized string sets the corresponding
-  variant; writing an integer that matches a known variant's wire number sets that
-  variant (so `.spans[i].kind = 3` is equivalent to `.spans[i].kind = "client"`); other
-  integers within the `i32` domain set `Other(n)`. An integer outside the `i32` domain,
-  or any other value (e.g. a non-canonical string), raises a VRL runtime error before
-  mutation.
-- On typed event paths, `SpanStatus.code` and `SpanStatus.message` are read-only
-  projections. `code` reads as `"unset"` / `"ok"` / `"error"` for known variants and as
-  the raw integer for `Other(n)`; `message` reads the inner string for `Error(s)` /
-  `Other(_, s)` and `""` for `Unset` / `Ok`. Writing or deleting either child path
-  raises a VRL runtime error. Status values are replaced atomically:
-
-  ```coffee
-  .spans[i].status = trace_span_status!("error", message: "slow query")
-  .spans[i].status = trace_span_status!("ok")
-  del(.spans[i].status) # resets to Unset
-  ```
-
-  `trace_span_status` returns the canonical `{ code, message }` object accepted by
-  whole-status assignment and accepts the same string / integer discriminator domain as
-  `SpanStatus`; integer codes must fit `i32`. An `"error"` code requires a non-empty
-  `message`; `"unset"` / `"ok"` reject a `message`; `Other(n)` accepts an optional
-  message defaulting to `""`.
-  Invalid combinations return a descriptive error before assignment, so the target
-  remains unchanged. `del(.spans[i].status)` atomically replaces the status with `Unset`
-  and returns the previous status value. Local copies (for example, `span` inside
-  `map_values`) remain ordinary VRL objects; their complete status is validated when
-  written back to the typed event.
-
 The typed model and wire codecs can transport `Error("")`, which is required for
-Datadog `error != 0` spans that carry no `error.message`. VRL intentionally cannot
-create that value: `trace_span_status` and whole-status writes reject it. A pure relay
-therefore preserves the value, while a VRL program that writes the status directly or
-as part of a containing object must supply a non-empty error message. This is within the
-Scope rule that VRL-modified events are best-effort rather than covered by the
-round-trip guarantee.
+Datadog `error != 0` spans that carry no `error.message`.
 
 #### Empty strings in optional string slots
 
@@ -561,44 +463,14 @@ bits, so OTLP's reserved bits 10-31 and future additions round-trip unchanged. I
 the low W3C trace-flags byte and the OTLP parent- / link-target-remoteness tristate as
 derived views without narrowing the stored value.
 
-VRL reads and writes `Span.flags` / `SpanLink.flags` as the raw `u32`. The fallible
-`trace_flags` function returns an atomically updated raw integer without losing unknown
-bits:
-
-```coffee
-.spans[i].flags = trace_flags!(
-    raw: .spans[i].flags,
-    sampled: true,
-    context_is_remote: false,
-)
-```
-
-`raw` defaults to `0`; omitted derived arguments preserve their bits in `raw`.
-`context_is_remote: null` clears both remoteness bits, `false` sets known-local, and
-`true` sets known-remote. Values outside the `u32` range or arguments of the wrong type
-return a descriptive error before assignment.
-
 `TraceState` stores the W3C `tracestate` header verbatim. Sources copy the header in
 unchanged; sinks emit it unchanged
 unless a transform mutated it. Vector does not validate the header against the W3C
 grammar, enforce the 32-entry or 512-byte limits, reject invalid members, or deduplicate
 keys: the raw string is preserved and re-emitted as-is. Validation is the responsibility
 of the producing tracing SDK, not the relay. This is consistent with `TraceFlags`, which
-also preserves unknown bits without validation.
-
-`.spans[i].trace_state` and
-`.spans[i].links[j].trace_state` are read and written as raw header strings; programs
-needing structured access wait for the deferred VRL helpers (`parse_trace_state`,
-`encode_trace_state`) listed under "Future Improvements". A direct write to the raw
-string remains the producer's responsibility, consistent with the non-validating relay
-stance above. Any structured Rust accessor API is an implementation-time choice.
-
-#### VRL surface for dropped counts
-
-Every `u32` `dropped_*_count` field reads as a VRL integer. Explicit assignment, whether
-direct or through a containing object or trace constructor, accepts only integers in the
-field's domain; other values raise a runtime error before mutation. Saturating arithmetic
-applies only to mapping- or relay-generated increments, not to explicit VRL writes.
+also preserves unknown bits without validation. Any structured Rust accessor API is an
+implementation-time choice.
 
 #### Events and links
 
@@ -626,28 +498,6 @@ pub struct SpanLink {
 `SpanLink.trace_id` remains on the link because it identifies the linked trace target,
 which may differ from the enclosing `TraceEvent.trace_id`.
 
-VRL constructs complete events and links before inserting them into their vectors:
-
-```coffee
-span.events = push(span.events, trace_span_event!(
-    name: "exception",
-    time: now(),
-    attributes: { "exception.type": "Timeout" },
-))
-
-span.links = push(span.links, trace_span_link!(
-    trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
-    span_id: "00f067aa0ba902b7",
-))
-```
-
-`trace_span_event` requires `name` and `time`; `attributes` and
-`dropped_attributes_count` default to `{}` and `0`. `trace_span_link` requires non-zero
-`trace_id` and `span_id`; `trace_state`, `flags`, `attributes`, and
-`dropped_attributes_count` default to `""`, `0`, `{}`, and `0`. Both functions validate
-all arguments before returning the canonical object, so a failed construction does not
-partially modify the destination vector.
-
 #### `Attributes` and `AttrValue`
 
 ```rust
@@ -673,21 +523,6 @@ into nested `Map` / `Array` values). The `Attributes` newtype exists so future i
 (key validation, size bounds) can be added without requiring a migration.
 Per-format wire mappings live in the sub-RFCs.
 
-##### VRL surface for `AttrValue`
-
-VRL accesses an `Attributes` map through the existing `Value` API. Conversion is
-recursive: bytes, booleans, integers, floats, arrays, objects, and null map to the
-corresponding `AttrValue` variants. A new `Value::Bytes` write becomes
-`AttrValue::String` when it is valid UTF-8 and `AttrValue::Bytes` otherwise. Writes
-to an `AttrValue` that do not change its value retain the discriminator.
-
-`AttrValue::Double(NaN)` reads as `Value::Null`, because VRL floats exclude NaN; an
-unchanged null write back to that same path preserves the NaN discriminator and bits.
-Other null writes store `AttrValue::Null`, preserving explicit null versus an absent map
-entry. `Value::Timestamp` and `Value::Regex` have no `AttrValue` representation and
-raise a runtime error. If any recursive conversion fails, the entire typed-path write
-fails before mutation. Removing an entry requires `del()` per the typed-path rules below.
-
 #### Typed slot/attribute-map pairs
 
 Several common typed slots correspond to attribute-map keys that wire formats also use:
@@ -697,47 +532,11 @@ Several common typed slots correspond to attribute-map keys that wire formats al
 - `Resource.host` versus `Resource.attributes."host.name"`.
 - `Span.status` (`Error` / `Other` message) versus `Span.attributes."error.message"`.
 
-The in-memory model permits both forms to coexist. Reading from the typed slot is the
-supported VRL pattern; the matching attribute-map key exists only as a wire-shape
+The in-memory model permits both forms to coexist. The typed slot is the canonical
+field; the matching attribute-map key exists only as a wire-shape
 detail. Ingress lifting (when an attribute key populates a typed slot) and egress
 synthesis (when a typed slot populates an attribute key or a canonical wire location)
 are wire-format-specific and are specified by each mapping sub-RFC.
-
-#### VRL `del()` semantics on typed paths
-
-The rules below mirror the existing `Metric` VRL surface. VRL's `del()` operator removes a key from
-its parent; on the typed `TraceEvent` structure the result depends on what the path
-resolves to:
-
-- **`Option`-wrapped typed slot**: `del()` clears the slot to `None`. Writing `""` to an
-  `Option<String>` slot sets `Some("")` and is distinct from `del()`.
-- **Map entry** in an `Attributes` map or in `Span.datadog.meta_struct`: `del()` removes
-  the entry from its map.
-- **`Vec` element**: `del()` removes that element; the vector shrinks and subsequent
-  indices renumber.
-- **Semantically unset required slot** (`Span.status`): `del()` atomically writes
-  `SpanStatus::Unset` and returns the previous status. This is the only required field
-  with such a slot, because `Unset` is the domain's semantic absence rather than merely
-  a default.
-- **Required Datadog context** (`TraceEvent.datadog`, `TraceEvent.datadog.tracer`, or
-  `Span.datadog`): `del()` atomically resets the context to its default value and
-  returns the previous object.
-- **Required typed field or container**: `del()` raises a VRL runtime error, whether or
-  not the field has a representable default. Write the replacement explicitly (for
-  example, `.spans[i].duration = 0` or `.spans = []`).
-- **Root path (`del(.)`)**: raises a VRL runtime error.
-
-Which paths fall into each category follows from the type definitions above.
-
-Writing beneath `.datadog.agent` or `.datadog.chunk` while that child is `null`
-validates the complete operation against a temporary default context and materializes
-the child only on success. A failed write leaves it `null`. The surrounding `.datadog`
-object is always present.
-
-Reading through the same paths is the inverse: `Option`-wrapped slots that are `None`
-read as `null`, absent attribute-map entries read as `null`, out-of-bounds vector indices
-read as `null`, and required typed fields within present containers always read a
-concrete value.
 
 #### Retention of `TraceEvent` and `Event::Trace`
 
@@ -844,10 +643,7 @@ for the renamed `LegacyTrace` / `LegacyTraceArray` variants and add sibling
 `TypedTrace` / `TypedTraceArray` variants at field tag 4. The legacy message field tags
 and shapes remain unchanged.
 
-The typed messages mirror the Rust model: `TypedTrace` carries `trace_id`, `Resource`,
-`Scope`, `DatadogEventContext`, repeated `Span`, and full metadata; every typed `Span`
-carries `DatadogSpanContext`. Nested messages carry the fields and
-numeric domains defined above.
+The typed payload encodes the `TraceEvent` defined above.
 Proto presence preserves every `Option<String>` distinction and
 `datadog.chunk = None` versus `Some(DatadogChunkContext::default())`; an unset
 `AttrValue` oneof represents
@@ -919,8 +715,7 @@ conversion routines and detectors deleted.
 
 The `json` and `native_json` codecs serialize `TraceEventCompat` untagged: `Legacy` is
 today's inner map and `Typed` is the canonical `{trace_id, resource, scope, datadog, spans}`
-object, with the same nested values that typed VRL and `trace_to_log` expose.
-`EventMetadata` is omitted. `native_json` still wraps the payload as `{"trace": ...}`.
+object. `EventMetadata` is omitted. `native_json` still wraps the payload as `{"trace": ...}`.
 These codecs emit the representation they received and do not convert.
 
 JSON input does not carry `EventMetadata`, so the layout hint is unavailable. Decode
@@ -967,17 +762,7 @@ untyped-forwarder gate.
   construction: OTLP defines all-zero IDs as invalid, and Datadog uses zero only as the
   "no parent" sentinel (already `None`). Unsigned integers also fix the existing
   `i64`-coercion precision bug
-  ([#14687](https://github.com/vectordotdev/vector/issues/14687)). VRL hex strings match
-  the dominant external representation (W3C `traceparent`, OTLP debug logs, Datadog UI,
-  Jaeger / Zipkin search), so programs comparing IDs against those sources do not format-
-  convert at the boundary.
-- `SpanStatus` uses atomic whole-value construction, with read-only child projections,
-  so VRL cannot leave an intermediate or partially authored status. `del(.status)` is
-  the narrow exception to required-field deletion because `Unset` is the domain's
-  semantic absence, not merely a default. `SpanKind` and `SamplingPriority` permit
-  direct discriminator writes because they have no correlated message field.
-- VRL `del()` on typed paths follows the existing `Metric` surface so typed-event access
-  has one mental model across event variants.
+  ([#14687](https://github.com/vectordotdev/vector/issues/14687)).
 - `TraceFlags` is sized to the OTLP wire field (`u32`), not the W3C `traceparent` byte
   (`u8`), so an `OTLP -> Vector -> OTLP` relay round-trips the full `Span.flags` /
   `Link.flags` word: the W3C trace-flags byte (bits 0-7), OTLP's parent- / link-target-
@@ -987,20 +772,14 @@ untyped-forwarder gate.
   link. Unknown bits, including forward-compat W3C additions such as the Level 2
   `random` flag, must round-trip without changing the type. A bitfield representation
   that dropped undefined bits would lose that data.
-- `trace_span_link` and `trace_span_event` validate complete vector elements before
-  insertion; `trace_flags` updates the correlated remoteness bits while retaining every
-  unknown bit. A full `trace_span` constructor is omitted because it would mirror most
-  of the large `Span` structure for an operation expected to be rare in VRL.
 - `Span.duration` is stored as integer nanoseconds because both wire formats carry
   duration that way, while conversion to floating-point seconds progressively loses
   nanosecond precision as magnitude grows. Wire-domain corner cases are clamped on the
-  corresponding boundary and declared as exclusions in the relevant sub-RFC. VRL
-  exposes approximate float seconds at the boundary for ergonomic comparisons; see
-  "Duration as `f64` seconds" under Alternatives.
+  corresponding boundary and declared as exclusions in the relevant sub-RFC.
 - `Attributes` stores leaves as `AttrValue` rather than VRL `Value` so the wire
   string-versus-bytes discriminator and NaN doubles are preserved structurally. That
   avoids several round-trip exclusions from both sub-RFCs at the cost of one conversion
-  layer at the VRL boundary. The reuse alternative and the wider VRL `Value` fix are
+  layer at a later VRL boundary. The reuse alternative and the wider VRL `Value` fix are
   recorded under Alternatives and Future Improvements.
 
 ### Migration approach
@@ -1064,16 +843,16 @@ untyped-forwarder gate.
 - A wire grouping containing `K` distinct trace IDs produces `K` or more typed events
   when service partitioning also applies. Event-count telemetry and typed `remap`
   execution both increase with that fan-out. A program that intended to aggregate over
-  an entire `ScopeSpans` must use stateful aggregation rather than one VRL invocation.
-- Per-span operations (filter, sample, mutate one span) require VRL iteration over
-  `.spans` rather than per-event treatment. A future topology-level expand-on-input /
+  an entire `ScopeSpans` must use stateful aggregation rather than one remap invocation.
+- Per-span operations (filter, sample, mutate one span) require iteration over the
+  event's spans vector rather than per-event treatment. A future topology-level expand-on-input /
   collapse-on-output shim could let single-span transforms operate unchanged.
 - The internal `event.proto` gains a new `TypedTrace` variant alongside the renamed
   `LegacyTrace`. `vector` source/sink chains spanning the typed migration must upgrade
   receivers before senders. A receiver at the migration-boundary release but without
   the `TypedTrace` variant drops and reports the message; the pipeline continues running,
   but the hop is not lossless. See "Wire serialization" for details. This ordering is
-  documented in the release notes alongside the VRL-path migration.
+  documented in the release notes alongside the remap-mode migration.
 - Pre-hint legacy records depend on unique format-shape detection after consumers become
   typed-only. Any unrecognized or ambiguous historical layout must be drained or
   segregated before the typed-only release rather than being converted heuristically.
@@ -1260,9 +1039,7 @@ nanoseconds, while a floating-point seconds view progressively loses nanosecond
 precision as duration magnitude grows. Storing `duration` as `std::time::Duration`
 preserves the wire domain for all non-negative values. Datadog's `int64` wire field
 permits negative values that `std::time::Duration` cannot represent; these are clamped
-to zero on ingress and declared in the Datadog mapping sub-RFC. The VRL surface exposes
-approximate float seconds at the boundary; a complementary integer-nanosecond view
-(`.spans[i].duration_nanos`) is documented under "Future Improvements".
+to zero on ingress and declared in the Datadog mapping sub-RFC.
 
 ### `SpanStatus` as a closed enum
 
@@ -1359,8 +1136,8 @@ for both. Each rejected alternative fails at least one:
   even when absent. Should either use indirection after measuring representative event
   sizes and allocation behavior? Sparsely populated maps may likewise benefit from a
   compact optional carrier where empty and absent are semantically equivalent.
-  Any sparse representation must preserve the always-present logical projection,
-  optional child distinctions, mutation semantics, and internal-wire contract.
+  Any sparse representation must preserve the always-present logical Datadog
+  contexts, optional child distinctions, mutation semantics, and internal-wire contract.
 
 ## Plan Of Attack
 
@@ -1416,11 +1193,11 @@ The work is organized into seven stages.
    `Legacy` input uses the same conversion validated behind the sink buffer in stage 2.
    Remove the temporary direct conversion from the old public trace payload. Do not
    expose the typed `remap` mode until both legacy layouts can be converted explicitly.
-5. **Establish typed VRL and migrate remaining consumers.** Implement the typed paths,
-   fallible trace constructors, and the trace-only
+5. **Establish typed VRL and migrate remaining consumers.** Implement the trace-only
    `remap.trace_representation = "typed"` mode. The transform converts legacy input
    before constructing `VrlTarget` and runs once per resulting typed event; paths never
-   convert. Then migrate `sample` and `trace_to_log`; `trace_to_log` converts at intake
+   convert. The VRL encoding of typed fields is out of scope for this RFC.
+   Then migrate `sample` and `trace_to_log`; `trace_to_log` converts at intake
    and uses only `TraceEvent`. Protocol sinks already satisfy this contract from stage 4.
    `json` and `native_json` encoding remain untagged and representation-preserving.
    Pass-through transforms accept both variants without converting `Legacy` to `Typed`.
@@ -1430,7 +1207,7 @@ The work is organized into seven stages.
    carrying the same `TraceEvent.trace_id`;
    `trace_to_log` emits a uniform source-independent layout.
    Before the next stage, every migrated consumer must accept
-   both legacy and typed input and all typed VRL and round-trip contracts must hold.
+   both legacy and typed input and the remap opt-in and round-trip contracts must hold.
 6. **Use the compile-time gate, publish migration guidance, and flip producers.** Remove
    untyped forwarding methods from `TraceEventCompat` and migrate every resulting Rust
    call site. Publish the VRL migration guide, then leave the typed mode available for
@@ -1462,10 +1239,6 @@ The work is organized into seven stages.
   `encode_trace_state`, `merge_span_attributes`. Format-specific decode helpers
   (`decode_otlp_span`, `decode_datadog_span`) are listed in the respective mapping sub-
   RFCs.
-- Lossless integer-nanosecond view for span duration: `.spans[i].duration` is exposed
-  as approximate float seconds. Workloads needing exact nanosecond access can have a
-  complementary `.spans[i].duration_nanos` view added without affecting the underlying
-  data model, or functions to set and extract seconds and nanoseconds separately.
 - Link-based routing: a trace-aware router transform that emits to different sinks
   based on `SpanLink` targets.
 - Stateful trace-aggregator transforms: tail-based sampling, per-trace APM-stats

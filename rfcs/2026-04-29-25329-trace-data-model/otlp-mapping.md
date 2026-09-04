@@ -111,10 +111,10 @@ timing" below.
 
 ### User Experience
 
-The OTLP wire mapping is invisible to VRL: programs read and write the typed `TraceEvent`
-surface defined in the parent RFC. The only OTLP-specific surface the user sees is the
-specification below of which wire fields populate which typed slots, used by operators
-diagnosing relay-path discrepancies and by component authors writing OTLP encoders /
+The OTLP wire mapping is a projection onto the typed `TraceEvent` defined in the parent
+RFC. The only OTLP-specific surface the user sees is the specification below of which
+wire fields populate which typed slots, used by operators diagnosing relay-path
+discrepancies and by component authors writing OTLP encoders /
 decoders.
 
 ### Implementation
@@ -234,9 +234,9 @@ empty `string_value` or a non-string variant is not promoted: the typed slot rem
 `None` and the attribute remains under its original key, preserving the producer's
 value and its presence on OTLP egress.
 
-VRL transforms that want to change the service, environment, or host should write to the
-typed slots (`.resource.service`, `.resource.environment`, `.resource.host`) rather than
-to the corresponding attribute-map keys. Because promotion strips the source attribute on
+A transform that changes the service, environment, or host writes the typed slots
+(`Resource.service`, `Resource.environment`, `Resource.host`) rather than
+the corresponding attribute-map keys. Because promotion strips the source attribute on
 ingress, the duplicate-key case arises only when (i) a transform writes to both the typed
 slot and the matching attribute key, or (ii) the source attribute was empty or non-string
 and the promotion rule above left it in place.
@@ -312,9 +312,8 @@ closed-enum-with-escape-hatch choice that makes future status codes round-trip u
 The parent RFC's `AttrValue` mirrors OTLP `AnyValue` directly, so the mapping is 1:1
 across the named variants. `AttrValue::Null` corresponds to an unset `AnyValue` oneof
 (equivalently, for proto3, a `KeyValue` whose `value` field is absent), and the
-mapping applies recursively into `Array` and `Map`. Conversion from VRL `Value` (for
-example `Value::Timestamp` and `Value::Regex` written by transforms) happens at the
-VRL-write boundary per the parent RFC's "VRL surface for `AttrValue`" rules; OTLP
+mapping applies recursively into `Array` and `Map`. `Value::Timestamp` and
+`Value::Regex` have no `AttrValue` representation, so OTLP
 egress never sees those variants in storage.
 
 OTLP attribute fields and nested `KeyValueList` values are repeated key-value sequences,
@@ -399,7 +398,7 @@ implementation choices that satisfy this contract.
   declares authoring intent and limits collisions with user-set OTLP attributes to a
   small reserved set. Ordinary `_dd.*` resource and span attributes remain common
   attributes and never acquire Datadog egress authority merely from their spelling.
-- Always-present logical Datadog contexts let VRL and typed consumers use stable paths
+- Always-present logical Datadog contexts let typed consumers use stable fields
   without first testing the source format. Default contexts synthesize no OTLP bridge
   attributes, so purely OTLP-native traffic pays no wire-size cost.
 
