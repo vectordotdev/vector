@@ -12,7 +12,6 @@ components: sinks: _datadog: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: {
@@ -25,7 +24,6 @@ components: sinks: _datadog: {
 			}
 		}
 		endpoint: {
-			common:        false
 			description:   "The endpoint to send data to."
 			relevant_when: "site is not set"
 			required:      false
@@ -35,7 +33,6 @@ components: sinks: _datadog: {
 			}
 		}
 		region: {
-			common:        false
 			description:   "The region to send data to."
 			required:      false
 			relevant_when: "endpoint is not set"
@@ -49,7 +46,6 @@ components: sinks: _datadog: {
 			}
 		}
 		site: {
-			common:        false
 			description:   "The [Datadog site](https://docs.datadoghq.com/getting_started/site) to send data to. "
 			required:      false
 			relevant_when: "endpoint is not set"

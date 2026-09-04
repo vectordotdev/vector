@@ -1,12 +1,14 @@
 //! Configuration functionality for the `AMQP` sink.
-use lapin::{BasicProperties, types::ShortString};
+use lapin::{BasicProperties, types::ShortString, uri::AMQPUri};
 use vector_lib::{
     codecs::TextSerializerConfig,
     internal_event::{error_stage, error_type},
 };
 
-use super::{channel::AmqpSinkChannels, sink::AmqpSink};
-use crate::{amqp::AmqpConfig, sinks::prelude::*};
+use super::{channel::AmqpSinkChannels, service::AmqpError, sink::AmqpSink};
+use crate::{
+    amqp::AmqpConfig, config::ValidatedSink, sinks::prelude::*, template::ConfinementConfig,
+};
 
 /// AMQP properties configuration.
 #[configurable_component]
@@ -79,10 +81,8 @@ pub struct AmqpSinkConfig {
     #[serde(flatten)]
     pub(crate) connection: AmqpConfig,
 
-    #[configurable(derived)]
     pub(crate) encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -93,6 +93,9 @@ pub struct AmqpSinkConfig {
     /// Maximum number of AMQP channels to keep active (channels are created as needed).
     #[serde(default = "default_max_channels")]
     pub(crate) max_channels: u32,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
 }
 
 const fn default_max_channels() -> u32 {
@@ -109,19 +112,21 @@ impl Default for AmqpSinkConfig {
             connection: AmqpConfig::default(),
             acknowledgements: AcknowledgementsConfig::default(),
             max_channels: default_max_channels(),
+            confinement: ConfinementConfig::default(),
         }
     }
 }
 
 impl GenerateConfig for AmqpSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"connection_string = "amqp://localhost:5672/%2f"
-            routing_key = "user_id"
-            exchange = "test"
-            encoding.codec = "json"
-            max_channels = 4"#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"connection_string: "amqp://localhost:5672/%2f"
+            routing_key: user_id
+            exchange: test
+            encoding:
+              codec: json
+            max_channels: 4"#,
+        })
         .unwrap()
     }
 }
@@ -129,10 +134,8 @@ impl GenerateConfig for AmqpSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "amqp")]
 impl SinkConfig for AmqpSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = AmqpSink::new(self.clone()).await?;
-        let hc = healthcheck(sink.channels.clone()).boxed();
-        Ok((VectorSink::from_event_streamsink(sink), hc))
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -141,6 +144,58 @@ impl SinkConfig for AmqpSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValidatedAmqpSink {
+    exchange: ConfinedTemplate,
+    routing_key: Option<ConfinedTemplate>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for AmqpSinkConfig {
+    type Validated = ValidatedAmqpSink;
+
+    fn validate(&self) -> crate::Result<ValidatedAmqpSink> {
+        if self.max_channels == 0 {
+            return Err(Box::new(AmqpError::PoolError {
+                error: "max_channels must be positive".into(),
+            }));
+        }
+        // Parse the connection string up front so malformed or unsupported-scheme
+        // AMQP URIs are rejected by `vector validate` rather than at build time.
+        self.connection
+            .connection_string
+            .parse::<AMQPUri>()
+            .map_err(|e| format!("Invalid connection string: {e}"))?;
+        let exchange = self
+            .exchange
+            .clone()
+            .confine(&self.confinement, Self::NAME, "exchange")?;
+        let routing_key = self
+            .routing_key
+            .clone()
+            .map(|t| t.confine(&self.confinement, Self::NAME, "routing_key"))
+            .transpose()?;
+        Ok(ValidatedAmqpSink {
+            exchange,
+            routing_key,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedAmqpSink,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedAmqpSink {
+            exchange,
+            routing_key,
+        } = validated.clone();
+        let sink = AmqpSink::new(self.clone(), exchange, routing_key).await?;
+        let hc = healthcheck(sink.channels.clone()).boxed();
+        Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 }
 
@@ -163,11 +218,97 @@ pub(super) async fn healthcheck(channels: AmqpSinkChannels) -> crate::Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ValidatedSink;
     use crate::config::format::{Format, deserialize};
+    use crate::template::{ConfinementConfig, Template};
+    use vrl::event_path;
 
     #[test]
     pub fn generate_config() {
         crate::test_util::test_generate_config::<AmqpSinkConfig>();
+    }
+
+    #[test]
+    fn validate_rejects_zero_max_channels() {
+        let config = AmqpSinkConfig {
+            max_channels: 0,
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(result.is_err(), "validation should reject max_channels = 0");
+    }
+
+    #[test]
+    fn validate_rejects_malformed_connection_string() {
+        let config = AmqpSinkConfig {
+            connection: AmqpConfig {
+                connection_string: "not a uri".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(
+            result.is_err(),
+            "validation should reject a malformed connection string"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_unsupported_scheme() {
+        let config = AmqpSinkConfig {
+            connection: AmqpConfig {
+                connection_string: "http://localhost:5672".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(
+            result.is_err(),
+            "validation should reject an unsupported AMQP URI scheme"
+        );
+    }
+
+    #[test]
+    fn validate_returns_confined_templates() {
+        let config = AmqpSinkConfig {
+            exchange: Template::try_from("test-exchange").unwrap(),
+            routing_key: Some(Template::try_from("test-key").unwrap()),
+            ..Default::default()
+        };
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.exchange.to_string(), "test-exchange");
+        assert_eq!(
+            validated.routing_key.as_ref().unwrap().to_string(),
+            "test-key"
+        );
+    }
+
+    #[test]
+    fn confinement_rejects_unconfined_exchange() {
+        let template = Template::try_from("{{ exchange }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "amqp", "exchange");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn confinement_opt_out_allows_unconfined_exchange() {
+        let template = Template::try_from("{{ exchange }}").unwrap();
+        let config = ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: true,
+        };
+        let result = template.confine(&config, "amqp", "exchange");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn confinement_allows_prefixed_exchange() {
+        let template = Template::try_from("events-{{ env }}").unwrap();
+        let config = ConfinementConfig::default();
+        let result = template.confine(&config, "amqp", "exchange");
+        assert!(result.is_ok());
     }
 
     fn assert_config_priority_eq(config: AmqpSinkConfig, event: &LogEvent, priority: u8) {
@@ -276,7 +417,7 @@ mod tests {
             let config: AmqpSinkConfig = deserialize(config, format).unwrap();
             let event = {
                 let mut event = LogEvent::from_str_legacy("message");
-                event.insert("priority", 2);
+                event.insert(event_path!("priority"), 2);
                 event
             };
             assert_config_priority_eq(config, &event, 2);

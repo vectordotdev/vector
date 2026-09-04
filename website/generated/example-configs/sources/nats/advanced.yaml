@@ -1,0 +1,8 @@
+sources:
+  my_source_id:
+    type: nats
+    connection_name: vector
+    subject: foo
+    subject_key_field: subject
+    subscriber_capacity: 65536
+    url: nats://demo.nats.io

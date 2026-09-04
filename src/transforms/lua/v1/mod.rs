@@ -324,6 +324,8 @@ pub fn format_error(error: &mlua::Error) -> String {
 mod tests {
     use std::sync::Arc;
 
+    use vrl::event_path;
+
     use super::*;
     use crate::{
         config::ComponentKey,
@@ -361,7 +363,7 @@ mod tests {
     #[test]
     fn lua_remove_field() {
         let mut log = LogEvent::default();
-        log.insert("name", "Bob");
+        log.insert(event_path!("name"), "Bob");
         let event = transform_one(
             r#"
               event["name"] = nil
@@ -370,13 +372,13 @@ mod tests {
         )
         .unwrap();
 
-        assert!(event.as_log().get("name").is_none());
+        assert!(event.as_log().get(event_path!("name")).is_none());
     }
 
     #[test]
     fn lua_drop_event() {
         let mut log = LogEvent::default();
-        log.insert("name", "Bob");
+        log.insert(event_path!("name"), "Bob");
         let event = transform_one(
             r"
               event = nil
@@ -449,7 +451,7 @@ mod tests {
             LogEvent::default(),
         )
         .unwrap();
-        assert_eq!(event.as_log().get("junk"), None);
+        assert_eq!(event.as_log().get(event_path!("junk")), None);
     }
 
     #[test]
@@ -566,8 +568,8 @@ mod tests {
     #[test]
     fn lua_pairs() {
         let mut event = LogEvent::default();
-        event.insert("name", "Bob");
-        event.insert("friend", "Alice");
+        event.insert(event_path!("name"), "Bob");
+        event.insert(event_path!("friend"), "Alice");
 
         let event = transform_one(
             r"

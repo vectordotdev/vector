@@ -14,7 +14,7 @@ use crate::{
     BufferInstrumentation, Bufferable, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     internal_events::BufferSendDuration,
-    variants::disk_v2::{self, ProductionFilesystem},
+    variants::disk_v2::{self, ProductionFilesystem, TryWriteOutcome},
 };
 
 /// Adapter for papering over various sender backends.
@@ -43,18 +43,55 @@ impl<T> SenderAdapter<T>
 where
     T: Bufferable,
 {
-    pub(crate) async fn send(&mut self, item: T) -> crate::Result<()> {
+    /// Whether this backend can only persist items satisfying [`Bufferable::is_fully_encodable`].
+    ///
+    /// In-memory stages hold the in-memory representation and have no wire format, so they can
+    /// accept any item regardless of its nesting depth. Disk stages encode to protobuf on write
+    /// and cannot.
+    ///
+    /// Callers use this to avoid assuming a stage is constrained: an item that one stage cannot
+    /// encode may be perfectly storable by another, so the check must be asked of the specific
+    /// stage rather than applied to every topology.
+    pub(crate) fn requires_encodable_items(&self) -> bool {
         match self {
-            Self::InMemory(tx) => tx.send(item).await.map_err(Into::into),
+            Self::InMemory(_) => false,
+            Self::DiskV2(_) => true,
+        }
+    }
+
+    pub(crate) async fn send(&mut self, item: T) -> crate::Result<TryWriteOutcome<T>> {
+        match self {
+            Self::InMemory(tx) => tx
+                .send(item)
+                .await
+                .map(|()| TryWriteOutcome::Written)
+                .map_err(Into::into),
             Self::DiskV2(writer) => {
+                let pre_count = item.event_count() as u64;
+                let pre_size = item.size_of() as u64;
                 let mut writer = writer.lock().await;
 
-                writer.write_record(item).await.map(|_| ()).map_err(|e| {
-                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
-                    // encoding should theoretically be recoverable -- encoded value was too big, or
-                    // error during encoding -- but the traits don't allow for recovering the
-                    // original event value because we have to consume it to do the encoding... but
-                    // that might not always be the case.
+                let Some(item) = item.filter_unencodable() else {
+                    // The whole item was filtered out (e.g. every sub-item over the
+                    // protobuf nesting budget). Report the drop directly via the
+                    // ledger's usage handle so it shows up in the disk-v2 stage's
+                    // `received` / `dropped` metrics — `BufferSender` does not carry
+                    // its own handle for backends that `provides_instrumentation()`.
+                    writer.track_dropped(pre_count, pre_size);
+                    return Ok(TryWriteOutcome::Dropped);
+                };
+                if item.event_count() as u64 != pre_count {
+                    let dropped_events = pre_count - item.event_count() as u64;
+                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+                    writer.track_dropped(dropped_events, dropped_bytes);
+                }
+
+                writer.write_record_outcome(item).await.map_err(|e| {
+                    // Record-level failures that can never succeed (a record too large to encode
+                    // within the max record size) are handled inside the writer and surfaced as a
+                    // dropped outcome. Anything that reaches this point -- I/O errors,
+                    // serialization failures, an inconsistent writer state -- is genuinely
+                    // unrecoverable.
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
@@ -63,21 +100,41 @@ where
         }
     }
 
-    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<Option<T>> {
+    pub(crate) async fn try_send(&mut self, item: T) -> crate::Result<TryWriteOutcome<T>> {
         match self {
             Self::InMemory(tx) => tx
                 .try_send(item)
-                .map(|()| None)
-                .or_else(|e| Ok(Some(e.into_inner()))),
+                .map(|()| TryWriteOutcome::Written)
+                .or_else(|e| Ok(TryWriteOutcome::Full(e.into_inner()))),
             Self::DiskV2(writer) => {
                 let mut writer = writer.lock().await;
 
+                // Filtering here is unconditional and independent of current occupancy.
+                // Whether an unencodable item should be dropped or handed to an overflow
+                // stage is a `WhenFull` policy decision, so it is made in `BufferSender`
+                // before the item ever reaches this backend: `WhenFull::Overflow` diverts
+                // items failing `is_fully_encodable` straight to the overflow stage, and
+                // anything arriving here is therefore expected to be persistable. Keeping
+                // the filter unconditional means a given item is treated the same at 99%
+                // full as at 100% full.
+                let pre_count = item.event_count() as u64;
+                let pre_size = item.size_of() as u64;
+                let Some(item) = item.filter_unencodable() else {
+                    writer.track_dropped(pre_count, pre_size);
+                    return Ok(TryWriteOutcome::Dropped);
+                };
+                if item.event_count() as u64 != pre_count {
+                    let dropped_events = pre_count - item.event_count() as u64;
+                    let dropped_bytes = pre_size.saturating_sub(item.size_of() as u64);
+                    writer.track_dropped(dropped_events, dropped_bytes);
+                }
+
                 writer.try_write_record(item).await.map_err(|e| {
-                    // TODO: Could some errors be handled and not be unrecoverable? Right now,
-                    // encoding should theoretically be recoverable -- encoded value was too big, or
-                    // error during encoding -- but the traits don't allow for recovering the
-                    // original event value because we have to consume it to do the encoding... but
-                    // that might not always be the case.
+                    // Record-level failures that can never succeed (a record too large to encode
+                    // within the max record size) are handled inside the writer and surfaced as a
+                    // dropped outcome. Anything that reaches this point -- I/O errors,
+                    // serialization failures, an inconsistent writer state -- is genuinely
+                    // unrecoverable.
                     error!("Disk buffer writer has encountered an unrecoverable error.");
 
                     e.into()
@@ -105,6 +162,33 @@ where
         match self {
             Self::InMemory(tx) => Some(tx.available_capacity()),
             Self::DiskV2(_) => None,
+        }
+    }
+}
+
+enum UsageAccounting {
+    Accepted,
+    DroppedNewest,
+    NotAccepted,
+}
+
+impl UsageAccounting {
+    fn record(self, instrumentation: &BufferUsageHandle, item_count: usize, item_size: usize) {
+        match self {
+            Self::Accepted => instrumentation
+                .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64),
+            Self::DroppedNewest => {
+                instrumentation.increment_received_event_count_and_byte_size(
+                    item_count as u64,
+                    item_size as u64,
+                );
+                instrumentation.increment_dropped_event_count_and_byte_size(
+                    item_count as u64,
+                    item_size as u64,
+                    true,
+                );
+            }
+            Self::NotAccepted => {}
         }
     }
 }
@@ -221,42 +305,62 @@ impl<T: Bufferable> BufferSender<T> {
             .as_ref()
             .map(|_| (item.event_count(), item.size_of()));
 
-        let mut was_dropped = false;
-
-        if let Some(instrumentation) = self.usage_instrumentation.as_ref()
-            && let Some((item_count, item_size)) = item_sizing
-        {
-            instrumentation
-                .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64);
-        }
-        match self.when_full {
-            WhenFull::Block => self.base.send(item).await?,
-            WhenFull::DropNewest => {
-                if self.base.try_send(item).await?.is_some() {
-                    was_dropped = true;
-                }
-            }
+        let accounting = match self.when_full {
+            WhenFull::Block => match self.base.send(item).await? {
+                TryWriteOutcome::Written => UsageAccounting::Accepted,
+                TryWriteOutcome::Full(_) => unreachable!("blocking sends wait until space exists"),
+                TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
+            },
+            WhenFull::DropNewest => match self.base.try_send(item).await? {
+                TryWriteOutcome::Written => UsageAccounting::Accepted,
+                TryWriteOutcome::Full(_) => UsageAccounting::DroppedNewest,
+                TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
+            },
             WhenFull::Overflow => {
-                if let Some(item) = self.base.try_send(item).await? {
-                    was_dropped = true;
+                // An item the base stage can never encode is routed to the overflow stage
+                // intact, whatever the current occupancy. Deciding this here, rather than
+                // letting the backend filter it, is what makes the behaviour
+                // state-independent: previously an over-nested item was pruned while the
+                // disk had room and forwarded whole once the disk reported full, so the
+                // same item took different paths at 99% and 100%.
+                //
+                // The check is gated on the base stage actually having a wire-format
+                // constraint. A memory stage overflowing to disk can store an over-nested
+                // item perfectly well, so diverting it past memory would send an item the
+                // base could have kept to a stage that must drop it.
+                if self.base.requires_encodable_items() && !item.is_fully_encodable() {
                     self.overflow
                         .as_mut()
                         .unwrap_or_else(|| unreachable!("overflow must exist"))
                         .send(item, send_reference)
                         .await?;
+                    UsageAccounting::NotAccepted
+                } else {
+                    match self.base.try_send(item).await? {
+                        TryWriteOutcome::Written => UsageAccounting::Accepted,
+                        TryWriteOutcome::Full(item) => {
+                            self.overflow
+                                .as_mut()
+                                .unwrap_or_else(|| unreachable!("overflow must exist"))
+                                .send(item, send_reference)
+                                .await?;
+                            UsageAccounting::NotAccepted
+                        }
+                        TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
+                    }
                 }
             }
-        }
+        };
 
+        // Backend filter drops are accounted directly through the backend's own
+        // usage handle (e.g. disk-v2's ledger), so they show up in the buffer
+        // stage's `received` / `dropped` metrics even when the `BufferSender`
+        // does not carry instrumentation. This block only reports fullness-driven
+        // drops captured via `was_dropped`.
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
-            && was_dropped
         {
-            instrumentation.increment_dropped_event_count_and_byte_size(
-                item_count as u64,
-                item_size as u64,
-                true,
-            );
+            accounting.record(instrumentation, item_count, item_size);
         }
         if let Some(send_duration) = self.send_duration.as_ref()
             && let Some(send_reference) = send_reference

@@ -10,33 +10,29 @@ generated: components: sinks: vector: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: options: enabled: {
-			description: """
-				Controls whether or not end-to-end acknowledgements are enabled.
-
-				When enabled for a sink, any source that supports end-to-end
-				acknowledgements that is connected to that sink waits for events
-				to be acknowledged by **all connected sinks** before acknowledging them at the source.
-
-				Enabling or disabling acknowledgements at the sink level takes precedence over any global
-				[`acknowledgements`][global_acks] configuration.
-
-				[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-				"""
-			required: false
-			type: bool: {}
-		}
+		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
 	}
 	address: {
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, use `routing.endpoints` instead."
 		description: """
 			The downstream Vector address to which to connect.
 
 			Both IP address and hostname are accepted formats.
 
 			The address _must_ include a port.
+
+			This option is mutually exclusive with `routing`. Set exactly one of
+			`address` or `routing`.
+
+			This option has been deprecated, use `routing.endpoints` instead.
+
+			Exactly one of `address` or `routing` must be set.
 			"""
-		required: true
-		type: string: examples: ["92.12.333.224:6000", "https://somehost:6000"]
+		required: false
+		required_one_of: ["address", "routing"]
+		required_one_of_group: "address_or_routing"
+		type: string: examples: ["http://127.0.0.1:6000", "https://somehost:6000"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -75,10 +71,6 @@ generated: components: sinks: vector: configuration: {
 			Compression algorithm for requests.
 
 			Supports `"none"`, `"gzip"`, or `"zstd"`.
-
-			For backward compatibility, boolean values are still accepted:
-			- `true` defaults to gzip compression
-			- `false` disables compression (deprecated syntax)
 			"""
 		required: false
 		type: string: {
@@ -98,6 +90,38 @@ generated: components: sinks: vector: configuration: {
 			}
 		}
 	}
+	keepalive: {
+		description: """
+			HTTP/2 keepalive settings for the sink's gRPC connections.
+
+			Keepalive is disabled unless this is configured. When enabled, the sink sends HTTP/2 PING
+			frames on idle connections so that a pooled connection to a downstream Vector instance that
+			has gone away (crashed, restarted, or cut off by a network partition) is detected and evicted
+			before it is reused, ensuring retries always go to a live connection.
+			"""
+		required: false
+		type: object: options: {
+			interval_secs: {
+				description: """
+					How often, in seconds, to send a keepalive PING on idle connections.
+
+					Shorter intervals detect dead connections faster at the cost of additional traffic.
+					gRPC guidance recommends no less than 60 seconds to avoid tripping `too_many_pings`
+					policies on servers or proxies between source and destination.
+					"""
+				required: false
+				type: uint: default: 60
+			}
+			timeout_secs: {
+				description: """
+					How long, in seconds, to wait for a keepalive PING acknowledgement before treating
+					the connection as dead and closing it.
+					"""
+				required: false
+				type: uint: default: 20
+			}
+		}
+	}
 	request: {
 		description: """
 			Middleware settings for outbound requests.
@@ -107,179 +131,88 @@ generated: components: sinks: vector: configuration: {
 			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
+		type:     _schemaDefinitions["vector::sinks::util::service::TowerRequestConfig"]
+	}
+	routing: {
+		description: """
+			Routing options for sending requests to one or more downstream Vector endpoints.
+
+			This option is mutually exclusive with `address`. Set exactly one of
+			`address` or `routing`.
+
+			Exactly one of `address` or `routing` must be set.
+			"""
+		required: false
+		required_one_of: ["address", "routing"]
+		required_one_of_group: "address_or_routing"
 		type: object: options: {
-			adaptive_concurrency: {
+			endpoints: {
 				description: """
-					Configuration of adaptive concurrency parameters.
+					The downstream Vector endpoints to which to connect.
 
-					These parameters typically do not require changes from the default, and incorrect values can lead to meta-stable or
-					unstable performance and sink behavior. Proceed with caution.
+					Both IP addresses and hostnames are accepted formats.
+
+					Each endpoint _must_ include a port.
 					"""
 				required: false
-				type: object: options: {
-					decrease_ratio: {
-						description: """
-																The fraction of the current value to set the new concurrency limit when decreasing the limit.
-
-																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
-																when latency increases.
-
-																**Note**: The new limit is rounded down after applying this ratio.
-																"""
-						required: false
-						type: float: default: 0.9
-					}
-					ewma_alpha: {
-						description: """
-																The weighting of new measurements compared to older measurements.
-
-																Valid values are greater than `0` and less than `1`.
-
-																ARC uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with
-																the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
-																unusually high response variability.
-																"""
-						required: false
-						type: float: default: 0.4
-					}
-					initial_concurrency: {
-						description: """
-																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
-
-																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
-																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
-																`adaptive_concurrency_limit` metric.
-																"""
-						required: false
-						type: uint: default: 1
-					}
-					max_concurrency_limit: {
-						description: """
-																The maximum concurrency limit.
-
-																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
-																"""
-						required: false
-						type: uint: default: 200
-					}
-					rtt_deviation_scale: {
-						description: """
-																Scale of RTT deviations which are not considered anomalous.
-
-																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
-
-																When calculating the past RTT average, a secondary “deviation” value is also computed that indicates how variable
-																those values are. That deviation is used when comparing the past RTT average to the current measurements, so we
-																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
-																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
-																"""
-						required: false
-						type: float: default: 2.5
-					}
+				type: array: {
+					default: []
+					items: type: string: examples: ["https://127.0.0.1:6000", "https://somehost:6000"]
 				}
 			}
-			concurrency: {
+			health: {
 				description: """
-					Configuration for outbound request concurrency.
+					Options for determining the health and backoff behavior of
+					load-balanced Vector endpoints.
 
-					This can be set either to one of the below enum values or to a positive integer, which denotes
-					a fixed concurrency limit.
+					This option is only used when `strategy` is set to `load_balance`.
 					"""
 				required: false
-				type: {
-					string: {
-						default: "adaptive"
-						enum: {
-							adaptive: """
-															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
-
-															[arc]: https://vector.dev/docs/architecture/arc/
-															"""
-							none: """
-															A fixed concurrency of 1.
-
-															Only one request can be outstanding at any given time.
-															"""
-						}
-					}
-					uint: {}
-				}
+				type:     _schemaDefinitions["core::option::Option<vector::sinks::util::service::health::HealthConfig>"]
 			}
-			rate_limit_duration_secs: {
-				description: "The time window used for the `rate_limit_num` option."
-				required:    false
-				type: uint: {
-					default: 1
-					unit:    "seconds"
-				}
-			}
-			rate_limit_num: {
-				description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
-				required:    false
-				type: uint: {
-					default: 9223372036854775807
-					unit:    "requests"
-				}
-			}
-			retry_attempts: {
-				description: "The maximum number of retries to make for failed requests."
-				required:    false
-				type: uint: {
-					default: 9223372036854775807
-					unit:    "retries"
-				}
-			}
-			retry_initial_backoff_secs: {
+			strategy: {
 				description: """
-					The amount of time to wait before attempting the first retry for a failed request.
+					Strategy for routing requests across configured endpoints.
 
-					After the first retry has failed, the Fibonacci sequence is used to select future backoffs.
+					When only one endpoint is configured, the sink uses the standard
+					single-endpoint service path and strategy-specific routing semantics are
+					not applied.
 					"""
 				required: false
-				type: uint: {
-					default: 1
-					unit:    "seconds"
-				}
-			}
-			retry_jitter_mode: {
-				description: "The jitter mode to use for retry backoff behavior."
-				required:    false
 				type: string: {
-					default: "Full"
+					default: "load_balance"
 					enum: {
-						Full: """
-															Full jitter.
+						failover: """
+															Use one endpoint at a time. When the active endpoint fails, continue
+															through the configured endpoints from the next endpoint.
 
-															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
-															strategy.
+															This mode keeps using the last successful endpoint until it fails. Use
+															`failover_primary` instead when retriable failures should re-check the
+															first configured endpoint before trying secondary endpoints.
 
-															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
-															of creating accidental denial of service (DoS) conditions against your own systems when
-															many clients are recovering from a failure state.
+															Requests are serialized for this strategy, regardless of the configured
+															request concurrency, to preserve one active endpoint at a time.
 															"""
-						None: "No jitter."
-					}
-				}
-			}
-			retry_max_duration_secs: {
-				description: "The maximum amount of time to wait between retries."
-				required:    false
-				type: uint: {
-					default: 30
-					unit:    "seconds"
-				}
-			}
-			timeout_secs: {
-				description: """
-					The time a request can take before being aborted.
+						failover_primary: """
+															Use one endpoint at a time. When the active endpoint fails, retry from
+															the configured endpoint order so the sink can return to its configured
+															primary endpoint.
 
-					Datadog highly recommends that you do not lower this value below the service's internal timeout, as this could
-					create orphaned requests, pile on retries, and result in duplicate data downstream.
-					"""
-				required: false
-				type: uint: {
-					default: 60
-					unit:    "seconds"
+															This is useful when receiver-side connection recycling, such as
+															`max_connection_age_secs`, should converge the sink back to the first
+															configured endpoint when it is available.
+
+															Requests are serialized for this strategy, regardless of the configured
+															request concurrency, to preserve one active endpoint at a time.
+															"""
+						load_balance: """
+															Distribute requests across healthy endpoints using Vector's existing
+															Tower distributed service. Endpoint health is tracked using
+															`routing.health`, and unhealthy endpoints are backed off and probed
+															according to that configuration. This mode does not preserve a single
+															active endpoint or prefer the first configured endpoint.
+															"""
+					}
 				}
 			}
 		}
@@ -287,105 +220,6 @@ generated: components: sinks: vector: configuration: {
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
-		type: object: options: {
-			alpn_protocols: {
-				description: """
-					Sets the list of supported ALPN protocols.
-
-					Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
-					that they are defined.
-					"""
-				required: false
-				type: array: items: type: string: examples: ["h2"]
-			}
-			ca_file: {
-				description: """
-					Absolute path to an additional CA certificate file.
-
-					The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/certificate_authority.crt"]
-			}
-			crt_file: {
-				description: """
-					Absolute path to a certificate file used to identify this server.
-
-					The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-					an inline string in PEM format.
-
-					If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.crt"]
-			}
-			enabled: {
-				description: """
-					Whether to require TLS for incoming or outgoing connections.
-
-					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
-					more information.
-					"""
-				required: false
-				type: bool: {}
-			}
-			key_file: {
-				description: """
-					Absolute path to a private key file used to identify this server.
-
-					The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-					"""
-				required: false
-				type: string: examples: ["/path/to/host_certificate.key"]
-			}
-			key_pass: {
-				description: """
-					Passphrase used to unlock the encrypted key file.
-
-					This has no effect unless `key_file` is set.
-					"""
-				required: false
-				type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-			}
-			server_name: {
-				description: """
-					Server name to use when using Server Name Indication (SNI).
-
-					Only relevant for outgoing connections.
-					"""
-				required: false
-				type: string: examples: ["www.example.com"]
-			}
-			verify_certificate: {
-				description: """
-					Enables certificate verification. For components that create a server, this requires that the
-					client connections have a valid client certificate. For components that initiate requests,
-					this validates that the upstream has a valid certificate.
-
-					If enabled, certificates must not be expired and must be issued by a trusted
-					issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
-					certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-					so on, until the verification process reaches a root certificate.
-
-					Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-					"""
-				required: false
-				type: bool: {}
-			}
-			verify_hostname: {
-				description: """
-					Enables hostname verification.
-
-					If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
-					the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
-
-					Only relevant for outgoing connections.
-
-					Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-					"""
-				required: false
-				type: bool: {}
-			}
-		}
+		type:        _schemaDefinitions["core::option::Option<vector_core::tls::settings::TlsEnableableConfig>"]
 	}
 }

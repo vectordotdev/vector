@@ -1,0 +1,7 @@
+sources:
+  my_source_id:
+    type: prometheus_remote_write
+    address: 0.0.0.0:9090
+    metadata_conflict_strategy: reject
+    path: /
+    skip_nan_values: false

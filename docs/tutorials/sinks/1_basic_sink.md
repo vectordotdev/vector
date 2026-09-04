@@ -40,7 +40,6 @@ sink's behaviour.
 #[derive(Clone, Debug)]
 /// A basic sink that dumps its output to stdout.
 pub struct BasicConfig {
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -66,8 +65,8 @@ our struct:
 
 ```rust
 impl GenerateConfig for BasicConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str("").unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str("{}").unwrap()
     }
 }
 ```
@@ -178,7 +177,7 @@ build with just the components required. We need to add this feature to the
 
 ```diff
   sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
-  sinks-azure_monitor_logs = []
+  sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
 + sinks-basic = []
   sinks-blackhole = []
   sinks-chronicle = []
@@ -197,7 +196,7 @@ sinks-logs = [
   "sinks-aws_sqs",
   "sinks-axiom",
   "sinks-azure_blob",
-  "sinks-azure_monitor_logs",
+  "sinks-azure_logs_ingestion",
 + "sinks-basic",
   "sinks-blackhole",
   "sinks-chronicle",

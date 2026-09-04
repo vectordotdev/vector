@@ -26,7 +26,6 @@ components: sources: internal_metrics: {
 	}
 
 	support: {
-		notices: []
 		requirements: []
 		warnings: []
 	}
@@ -315,22 +314,6 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
-		}
-		buffer_byte_size: {
-			description:        "The number of bytes currently in the buffer."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _buffer_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
-		}
-		buffer_events: {
-			description:        "The number of events currently in the buffer."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _buffer_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_events`](#buffer_size_events)."
 		}
 		buffer_size_bytes: {
 			description:       "The number of bytes currently in the buffer."

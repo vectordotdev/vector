@@ -1,13 +1,12 @@
-use http::Uri;
+use super::append_loki_path;
 
-use super::config::LokiConfig;
 use crate::{
     http::{Auth, HttpClient},
-    sinks::util::UriSerde,
+    sinks::util::{HttpEndpoint, UriSerde},
 };
 
 async fn fetch_status(
-    endpoint: &Uri,
+    endpoint: &http::Uri,
     auth: Option<&Auth>,
     client: &HttpClient,
 ) -> crate::Result<http::StatusCode> {
@@ -23,13 +22,14 @@ async fn fetch_status(
 }
 
 pub async fn healthcheck(
-    config: LokiConfig,
+    base_endpoint: HttpEndpoint,
+    auth: Option<Auth>,
     healthcheck_uri: Option<UriSerde>,
     client: HttpClient,
 ) -> crate::Result<()> {
     // Healthcheck URI has been explicitly configured
     if let Some(uri) = healthcheck_uri {
-        let auth = uri.auth.or(config.auth);
+        let auth = uri.auth.or(auth);
         let status = fetch_status(&uri.uri, auth.as_ref(), &client).await?;
         return match status {
             http::StatusCode::OK => Ok(()),
@@ -37,12 +37,26 @@ pub async fn healthcheck(
         };
     }
 
-    let endpoint = config.endpoint.append_path("ready")?;
-    let status = match fetch_status(&endpoint.uri, config.auth.as_ref(), &client).await? {
+    let status = match fetch_status(
+        append_loki_path(&base_endpoint, "ready")?.as_uri(),
+        auth.as_ref(),
+        &client,
+    )
+    .await?
+    {
         // Issue https://github.com/vectordotdev/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
             debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
-            fetch_status(&config.endpoint.uri, config.auth.as_ref(), &client).await?
+            // Probe the normalized base path with one trailing slash (`/loki/`,
+            // not `/loki`), matching the pre-`HttpEndpoint` behavior. Reverse
+            // proxies commonly redirect `/loki` to `/loki/`, and the healthcheck
+            // rejects non-200 responses rather than following them.
+            fetch_status(
+                append_loki_path(&base_endpoint, "/")?.as_uri(),
+                auth.as_ref(),
+                &client,
+            )
+            .await?
         }
         status => status,
     };

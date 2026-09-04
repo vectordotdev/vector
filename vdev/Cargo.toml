@@ -1,6 +1,6 @@
 [package]
 name = "vdev"
-version = "0.3.6"
+version = "0.3.18"
 edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
@@ -40,14 +40,14 @@ reqwest = { workspace = true, features = ["blocking"] }
 serde.workspace = true
 serde_json = { workspace = true, features = ["preserve_order"] }
 serde_yaml.workspace = true
-sha2 = "0.10.9"
+sha2 = "0.11.0"
 tempfile.workspace = true
 toml.workspace = true
 toml_edit = "0.23"
 semver.workspace = true
 strum.workspace = true
 indoc.workspace = true
-git2 = { version = "0.20.4" }
+git2 = { version = "0.21.0" }
 cfg-if.workspace = true
 convert_case.workspace = true
 # Used by check-events to walk Rust source via syn's AST. The extra features

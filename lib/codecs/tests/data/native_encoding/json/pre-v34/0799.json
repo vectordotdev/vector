@@ -1,1 +1,0 @@
-{"metric":{"name":"g","interval_ms":154693053,"kind":"incremental","sketch":{"sketch":{"AgentDDSketch":{"bins":{"k":[-2197,-1796,2086,2215,2218],"n":[1,1,1,1,1]},"count":5,"min":-607488.0,"max":847744.0,"sum":-70400.0,"avg":-654528.0}}}}}

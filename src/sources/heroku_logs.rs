@@ -69,21 +69,16 @@ pub struct LogplexConfig {
     #[configurable(metadata(docs::examples = "*"))]
     query_parameters: Vec<String>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -92,7 +87,6 @@ pub struct LogplexConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 }
@@ -146,7 +140,14 @@ impl LogplexConfig {
 
         // for metadata that is added to the events dynamically from config options
         if log_namespace == LogNamespace::Legacy {
-            schema_definition = schema_definition.unknown_fields(Kind::bytes());
+            // Custom auth programs can inject any VRL value, not just bytes; widen the unknown
+            // field kind accordingly so schema-aware downstream components don't reject events.
+            let unknown_kind = if matches!(self.auth, Some(HttpServerAuthConfig::Custom { .. })) {
+                Kind::any()
+            } else {
+                Kind::bytes()
+            };
+            schema_definition = schema_definition.unknown_fields(unknown_kind);
         }
 
         schema_definition
@@ -170,8 +171,8 @@ impl Default for LogplexConfig {
 }
 
 impl GenerateConfig for LogplexConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(LogplexConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(LogplexConfig::default()).unwrap()
     }
 }
 
@@ -284,6 +285,14 @@ impl LogplexSource {
 }
 
 impl HttpSource for LogplexSource {
+    fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+    }
+
+    fn name() -> &'static str {
+        LogplexConfig::NAME
+    }
+
     fn build_events(
         &self,
         body: Bytes,

@@ -14,13 +14,11 @@ generated: configuration: {
 						Vector in a Docker container, bind to `0.0.0.0`. Otherwise
 						the API will not be exposed outside the container.
 						"""
-					common:   true
 					required: false
 				}
 				enabled: {
 					type: bool: default: false
 					description: "Whether the API is enabled for this Vector instance."
-					common:      true
 					required:    false
 				}
 			}
@@ -32,61 +30,7 @@ generated: configuration: {
 			type: object: options: "*": {
 				type: object: options: {
 					graph: {
-						type: object: options: {
-							edge_attributes: {
-								type: object: {
-									options: "*": {
-										type: object: {
-											options: "*": {
-												type: string: {}
-												required:    true
-												description: "A single graph edge attribute in graphviz DOT language."
-											}
-											examples: [{
-												color: "red"
-												label: "Example Edge"
-												width: "5.0"
-											}]
-										}
-										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-										required:    true
-									}
-									examples: [{
-										example_input: {
-											color: "red"
-											label: "Example Edge"
-											width: "5.0"
-										}
-									}]
-								}
-								description: """
-																		Edge attributes to add to the edges linked to this component's node in resulting graph
-
-																		They are added to the edge as provided
-																		"""
-								required: false
-							}
-							node_attributes: {
-								type: object: {
-									options: "*": {
-										type: string: {}
-										required:    true
-										description: "A single graph node attribute in graphviz DOT language."
-									}
-									examples: [{
-										color: "red"
-										name:  "Example Node"
-										width: "5.0"
-									}]
-								}
-								description: """
-																		Node attributes to add to this component's node in resulting graph
-
-																		They are added to the node as provided
-																		"""
-								required: false
-							}
-						}
+						type: _schemaDefinitions["vector::config::dot_graph::GraphConfig"]
 						description: """
 														Extra graph configuration
 
@@ -216,6 +160,207 @@ generated: configuration: {
 						required:      false
 						relevant_when: "type = \"file\""
 					}
+					filter: {
+						type: object: options: {
+							bucket_size: {
+								type: uint: default: 4
+								description:   "Number of slots in each bucket"
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							concurrent_scanning: {
+								type: bool: default: false
+								description: """
+																		If set to true scanning will not block insertions.
+																		This may affect behavior since blocking scans would free up space before insertions.
+
+																		By default, scanning is blocking.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_bits: {
+								type: uint: default: 8
+								description:   "Number of bits to use to track counter. This will limit the max value."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_enabled: {
+								type: bool: default: false
+								description:   "Can be set to true to track a count alongside hashes."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_field: {
+								type: string: default: ""
+								description:   "Field in the incoming value used as the counter increment override."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_insertion_increment: {
+								type: int: default: 1
+								description:   "The amount to increment the counter by on every insertion. Negative values are allowed."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							counter_lookup_increment: {
+								type: int: default: 1
+								description:   "The amount to increment the counter by on every lookup. Negative values are allowed."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							export_interval: {
+								type: uint: {}
+								description: """
+																		The interval used for exporting data.
+
+																		By default, export is only done on exit.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							fingerprint_bits: {
+								type: uint: default: 8
+								description:   "Number of bits used for fingerprint."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_aging_strategy: {
+								type: object: options: {
+									value: {
+										type: uint: {}
+										description:   "Value to decrement by"
+										required:      true
+										relevant_when: "strategy = \"decrement\""
+									}
+									strategy: {
+										required: false
+										type: string: {
+											enum: {
+												halving:   "Aging LRU counters by halving their value on each scan."
+												decrement: "Aging LRU counters by decrementing by a fixed value on each scan."
+											}
+											default: "halving"
+										}
+										description: "The LRU aging strategy to use."
+									}
+								}
+								description:   "Strategy to use when aging LRU counters at each scan."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_bits: {
+								type: uint: default: 8
+								description: """
+																		Number of bits to use to track LRU counter.
+																		Low bit count will reduce the maximum LRU counter value, making the items expire sooner if
+																		unused.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_deletion_enabled: {
+								type: bool: default: false
+								description:   "Can be set to true to delete unused items on scan when LRU is used."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_enabled: {
+								type: bool: default: false
+								description:   "Can be set to true to use LRU strategy for kicking."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_increment: {
+								type: uint: default: 1
+								description:   "Value to increase LRU counter by on each item access."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							lru_starting_value: {
+								type: uint: default: 1
+								description: """
+																		Starting value for LRU counter on item insertion.
+																		Higher value will give newer items a higher probability to stay in the filter.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							max_entries: {
+								type: uint: {}
+								description: """
+																		Maximum number of entries that can be stored in the filter (actual capacity will usually be
+																		larger)
+																		"""
+								required: true
+							}
+							max_kicks: {
+								type: uint: default: 500
+								description:   "Max number of kicks when experiencing hash collisions."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							persistence_path: {
+								type: string: {}
+								description: """
+																		Path to the file to export data to periodically and on exit.
+																		Data will be imported from this file on startup and reload.
+
+																		If table `reload_behavior` is set to `clear-state` and this is set, the persisted state will
+																		still be read after reload.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							scanning_threads: {
+								type: uint: {}
+								description: """
+																		Number of threads to use for scanning and updating LRU/TTL.
+
+																		By default, scanning is single threaded.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							ttl_bits: {
+								type: uint: default: 8
+								description: """
+																		Number of bits to use to track TTL. Low bit count will reduce maximum TTL and also require a
+																		worse resolution to keep working.
+																		"""
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							ttl_enabled: {
+								type: bool: default: true
+								description:   "Can be set to true to also track TTL for entries."
+								required:      false
+								relevant_when: "type = \"cuckoo\""
+							}
+							type: {
+								required: true
+								type: string: enum: {
+									cuckoo: """
+																					Cuckoo filter
+
+																					Supports removal by accepting null values for keys, as well as TTL and LRU.
+																					"""
+									bloom: """
+																					Bloom filter
+
+																					Only supports insertion and presence check, no TTL
+																					"""
+								}
+								description: "The probabilistic filter to use."
+							}
+						}
+						description: """
+														Set to make the table act as a probabilistic filter instead of storing original values. This
+														will prevent reading values from the table - found keys will have empty value.
+														"""
+						required:      false
+						relevant_when: "type = \"memory\""
+					}
 					flush_interval: {
 						type: uint: {}
 						description: """
@@ -224,6 +369,9 @@ generated: configuration: {
 														but there is a longer delay before the data is visible in the table.
 														Since every TTL scan makes its changes visible, only use this value
 														if it is shorter than the `scan_interval`.
+
+														NOTE: For cuckoo filter, all writes are visible immediately. Flush interval still defines
+														when metrics for cuckoo filter are made visible.
 
 														By default, all writes are made visible immediately.
 														"""
@@ -517,7 +665,7 @@ generated: configuration: {
 																		backend request. Refer to the documentation of your `backend_type `to see which options
 																		are required to be set.
 																		"""
-								required:      false
+								required:      true
 								relevant_when: "version = \"v1_1\""
 							}
 							backend_type: {
@@ -549,124 +697,7 @@ generated: configuration: {
 						relevant_when: "type = \"exec\""
 					}
 					auth: {
-						type: object: options: {
-							access_key_id: {
-								type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
-								description: "The AWS access key ID."
-								required:    true
-							}
-							assume_role: {
-								type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
-								description: """
-																		The ARN of an [IAM role][iam_role] to assume.
-
-																		[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-																		"""
-								required: true
-							}
-							external_id: {
-								type: string: examples: ["randomEXAMPLEidString"]
-								description: """
-																		The optional unique external ID in conjunction with role to assume.
-
-																		[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
-																		"""
-								required: false
-							}
-							region: {
-								type: string: examples: ["us-west-2"]
-								description: """
-																		The [AWS region][aws_region] to send STS requests to.
-
-																		If not set, this defaults to the configured region
-																		for the service itself.
-
-																		[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
-																		"""
-								required: false
-							}
-							secret_access_key: {
-								type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
-								description: "The AWS secret access key."
-								required:    true
-							}
-							session_name: {
-								type: string: examples: ["vector-indexer-role"]
-								description: """
-																		The optional [RoleSessionName][role_session_name] is a unique session identifier for your assumed role.
-
-																		Should be unique per principal or reason.
-																		If not set, the session name is autogenerated like assume-role-provider-1736428351340
-
-																		[role_session_name]: https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
-																		"""
-								required: false
-							}
-							session_token: {
-								type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
-								description: """
-																		The AWS session token.
-																		See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
-																		"""
-								required: false
-							}
-							credentials_file: {
-								type: string: examples: ["/my/aws/credentials"]
-								description: "Path to the credentials file."
-								required:    true
-							}
-							profile: {
-								type: string: {
-									default: "default"
-									examples: ["develop"]
-								}
-								description: """
-																		The credentials profile to use.
-
-																		Used to select AWS credentials from a provided credentials file.
-																		"""
-								required: false
-							}
-							imds: {
-								type: object: options: {
-									connect_timeout_seconds: {
-										type: uint: {
-											default: 1
-											unit:    "seconds"
-										}
-										description: "Connect timeout for IMDS."
-										required:    false
-									}
-									max_attempts: {
-										type: uint: default: 4
-										description: "Number of IMDS retries for fetching tokens and metadata."
-										required:    false
-									}
-									read_timeout_seconds: {
-										type: uint: {
-											default: 1
-											unit:    "seconds"
-										}
-										description: "Read timeout for IMDS."
-										required:    false
-									}
-								}
-								description: "Configuration for authenticating with AWS through IMDS."
-								required:    false
-							}
-							load_timeout_secs: {
-								type: uint: {
-									examples: [30]
-									unit: "seconds"
-								}
-								description: """
-																		Timeout for successfully loading any credentials, in seconds.
-
-																		Relevant when the default credentials chain or `assume_role` is used.
-																		"""
-								required: false
-							}
-						}
+						type:          _schemaDefinitions["vector::aws::auth::AwsAuthentication"]
 						description:   "Configuration of the authentication strategy for interacting with AWS services."
 						required:      false
 						relevant_when: "type = \"aws_secrets_manager\""
@@ -678,96 +709,7 @@ generated: configuration: {
 						relevant_when: "type = \"aws_secrets_manager\""
 					}
 					tls: {
-						type: object: options: {
-							alpn_protocols: {
-								type: array: items: type: string: examples: ["h2"]
-								description: """
-																		Sets the list of supported ALPN protocols.
-
-																		Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
-																		that they are defined.
-																		"""
-								required: false
-							}
-							ca_file: {
-								type: string: examples: ["/path/to/certificate_authority.crt"]
-								description: """
-																		Absolute path to an additional CA certificate file.
-
-																		The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
-																		"""
-								required: false
-							}
-							crt_file: {
-								type: string: examples: ["/path/to/host_certificate.crt"]
-								description: """
-																		Absolute path to a certificate file used to identify this server.
-
-																		The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
-																		an inline string in PEM format.
-
-																		If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
-																		"""
-								required: false
-							}
-							key_file: {
-								type: string: examples: ["/path/to/host_certificate.key"]
-								description: """
-																		Absolute path to a private key file used to identify this server.
-
-																		The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
-																		"""
-								required: false
-							}
-							key_pass: {
-								type: string: examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-								description: """
-																		Passphrase used to unlock the encrypted key file.
-
-																		This has no effect unless `key_file` is set.
-																		"""
-								required: false
-							}
-							server_name: {
-								type: string: examples: ["www.example.com"]
-								description: """
-																		Server name to use when using Server Name Indication (SNI).
-
-																		Only relevant for outgoing connections.
-																		"""
-								required: false
-							}
-							verify_certificate: {
-								type: bool: {}
-								description: """
-																		Enables certificate verification. For components that create a server, this requires that the
-																		client connections have a valid client certificate. For components that initiate requests,
-																		this validates that the upstream has a valid certificate.
-
-																		If enabled, certificates must not be expired and must be issued by a trusted
-																		issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
-																		certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-																		so on, until the verification process reaches a root certificate.
-
-																		Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
-																		"""
-								required: false
-							}
-							verify_hostname: {
-								type: bool: {}
-								description: """
-																		Enables hostname verification.
-
-																		If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
-																		the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
-
-																		Only relevant for outgoing connections.
-
-																		Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
-																		"""
-								required: false
-							}
-						}
+						type:          _schemaDefinitions["core::option::Option<vector_core::tls::settings::TlsConfig>"]
 						description:   "TLS configuration."
 						required:      false
 						relevant_when: "type = \"aws_secrets_manager\""
@@ -800,7 +742,6 @@ generated: configuration: {
 					}
 				}
 				description: "A secret backend."
-				common:      false
 				required:    true
 			}
 			description: "All configured secrets backends."
@@ -884,61 +825,7 @@ generated: configuration: {
 						required: false
 					}
 					graph: {
-						type: object: options: {
-							edge_attributes: {
-								type: object: {
-									options: "*": {
-										type: object: {
-											options: "*": {
-												type: string: {}
-												required:    true
-												description: "A single graph edge attribute in graphviz DOT language."
-											}
-											examples: [{
-												color: "red"
-												label: "Example Edge"
-												width: "5.0"
-											}]
-										}
-										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-										required:    true
-									}
-									examples: [{
-										example_input: {
-											color: "red"
-											label: "Example Edge"
-											width: "5.0"
-										}
-									}]
-								}
-								description: """
-																		Edge attributes to add to the edges linked to this component's node in resulting graph
-
-																		They are added to the edge as provided
-																		"""
-								required: false
-							}
-							node_attributes: {
-								type: object: {
-									options: "*": {
-										type: string: {}
-										required:    true
-										description: "A single graph node attribute in graphviz DOT language."
-									}
-									examples: [{
-										color: "red"
-										name:  "Example Node"
-										width: "5.0"
-									}]
-								}
-								description: """
-																		Node attributes to add to this component's node in resulting graph
-
-																		They are added to the node as provided
-																		"""
-								required: false
-							}
-						}
+						type: _schemaDefinitions["vector::config::dot_graph::GraphConfig"]
 						description: """
 														Extra graph configuration
 
@@ -991,53 +878,7 @@ generated: configuration: {
 						required: true
 					}
 					proxy: {
-						type: object: options: {
-							enabled: {
-								type: bool: default: true
-								description: "Enables proxying support."
-								required:    false
-							}
-							http: {
-								type: string: examples: ["http://foo.bar:3128"]
-								description: """
-																		Proxy endpoint to use when proxying HTTP traffic.
-
-																		Must be a valid URI string.
-																		"""
-								required: false
-							}
-							https: {
-								type: string: examples: ["http://foo.bar:3128"]
-								description: """
-																		Proxy endpoint to use when proxying HTTPS traffic.
-
-																		Must be a valid URI string.
-																		"""
-								required: false
-							}
-							no_proxy: {
-								type: array: {
-									items: type: string: examples: ["localhost", ".foo.bar", "*"]
-									default: []
-								}
-								description: """
-																		A list of hosts to avoid proxying.
-
-																		Multiple patterns are allowed:
-
-																		| Pattern             | Example match                                                               |
-																		| ------------------- | --------------------------------------------------------------------------- |
-																		| Domain names        | `example.com` matches requests to `example.com`                     |
-																		| Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
-																		| IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
-																		| [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
-																		| Splat               | `*` matches all hosts                                                   |
-
-																		[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-																		"""
-								required: false
-							}
-						}
+						type: _schemaDefinitions["vector_core::config::proxy::ProxyConfig"]
 						description: """
 														Proxy configuration.
 
@@ -1060,61 +901,7 @@ generated: configuration: {
 			type: object: options: "*": {
 				type: object: options: {
 					graph: {
-						type: object: options: {
-							edge_attributes: {
-								type: object: {
-									options: "*": {
-										type: object: {
-											options: "*": {
-												type: string: {}
-												required:    true
-												description: "A single graph edge attribute in graphviz DOT language."
-											}
-											examples: [{
-												color: "red"
-												label: "Example Edge"
-												width: "5.0"
-											}]
-										}
-										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-										required:    true
-									}
-									examples: [{
-										example_input: {
-											color: "red"
-											label: "Example Edge"
-											width: "5.0"
-										}
-									}]
-								}
-								description: """
-																		Edge attributes to add to the edges linked to this component's node in resulting graph
-
-																		They are added to the edge as provided
-																		"""
-								required: false
-							}
-							node_attributes: {
-								type: object: {
-									options: "*": {
-										type: string: {}
-										required:    true
-										description: "A single graph node attribute in graphviz DOT language."
-									}
-									examples: [{
-										color: "red"
-										name:  "Example Node"
-										width: "5.0"
-									}]
-								}
-								description: """
-																		Node attributes to add to this component's node in resulting graph
-
-																		They are added to the node as provided
-																		"""
-								required: false
-							}
-						}
+						type: _schemaDefinitions["vector::config::dot_graph::GraphConfig"]
 						description: """
 														Extra graph configuration
 
@@ -1123,53 +910,7 @@ generated: configuration: {
 						required: false
 					}
 					proxy: {
-						type: object: options: {
-							enabled: {
-								type: bool: default: true
-								description: "Enables proxying support."
-								required:    false
-							}
-							http: {
-								type: string: examples: ["http://foo.bar:3128"]
-								description: """
-																		Proxy endpoint to use when proxying HTTP traffic.
-
-																		Must be a valid URI string.
-																		"""
-								required: false
-							}
-							https: {
-								type: string: examples: ["http://foo.bar:3128"]
-								description: """
-																		Proxy endpoint to use when proxying HTTPS traffic.
-
-																		Must be a valid URI string.
-																		"""
-								required: false
-							}
-							no_proxy: {
-								type: array: {
-									items: type: string: examples: ["localhost", ".foo.bar", "*"]
-									default: []
-								}
-								description: """
-																		A list of hosts to avoid proxying.
-
-																		Multiple patterns are allowed:
-
-																		| Pattern             | Example match                                                               |
-																		| ------------------- | --------------------------------------------------------------------------- |
-																		| Domain names        | `example.com` matches requests to `example.com`                     |
-																		| Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
-																		| IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
-																		| [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
-																		| Splat               | `*` matches all hosts                                                   |
-
-																		[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-																		"""
-								required: false
-							}
-						}
+						type: _schemaDefinitions["vector_core::config::proxy::ProxyConfig"]
 						description: """
 														Proxy configuration.
 
@@ -1192,61 +933,7 @@ generated: configuration: {
 			type: object: options: "*": {
 				type: object: options: {
 					graph: {
-						type: object: options: {
-							edge_attributes: {
-								type: object: {
-									options: "*": {
-										type: object: {
-											options: "*": {
-												type: string: {}
-												required:    true
-												description: "A single graph edge attribute in graphviz DOT language."
-											}
-											examples: [{
-												color: "red"
-												label: "Example Edge"
-												width: "5.0"
-											}]
-										}
-										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-										required:    true
-									}
-									examples: [{
-										example_input: {
-											color: "red"
-											label: "Example Edge"
-											width: "5.0"
-										}
-									}]
-								}
-								description: """
-																		Edge attributes to add to the edges linked to this component's node in resulting graph
-
-																		They are added to the edge as provided
-																		"""
-								required: false
-							}
-							node_attributes: {
-								type: object: {
-									options: "*": {
-										type: string: {}
-										required:    true
-										description: "A single graph node attribute in graphviz DOT language."
-									}
-									examples: [{
-										color: "red"
-										name:  "Example Node"
-										width: "5.0"
-									}]
-								}
-								description: """
-																		Node attributes to add to this component's node in resulting graph
-
-																		They are added to the node as provided
-																		"""
-								required: false
-							}
-						}
+						type: _schemaDefinitions["vector::config::dot_graph::GraphConfig"]
 						description: """
 														Extra graph configuration
 
@@ -1291,22 +978,7 @@ generated: configuration: {
 			group:       "pipeline_components"
 		}
 		acknowledgements: {
-			type: object: options: enabled: {
-				type: bool: {}
-				description: """
-					Controls whether or not end-to-end acknowledgements are enabled.
-
-					When enabled for a sink, any source that supports end-to-end
-					acknowledgements that is connected to that sink waits for events
-					to be acknowledged by **all connected sinks** before acknowledging them at the source.
-
-					Enabling or disabling acknowledgements at the sink level takes precedence over any global
-					[`acknowledgements`][global_acks] configuration.
-
-					[global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-					"""
-				required: false
-			}
+			type: _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
 			description: """
 				Controls how acknowledgements are handled for all sinks by default.
 
@@ -1315,7 +987,6 @@ generated: configuration: {
 
 				[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 				"""
-			common:   true
 			required: false
 			group:    "global_options"
 		}
@@ -1350,8 +1021,7 @@ generated: configuration: {
 
 				Vector must have write permissions to this directory.
 				"""
-			common: false
-			group:  "global_options"
+			group: "global_options"
 		}
 		expire_metrics_per_metric_set: {
 			type: array: items: type: object: options: {
@@ -1454,7 +1124,6 @@ generated: configuration: {
 				Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
 				so metrics live long enough to be emitted and captured.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}
@@ -1524,7 +1193,6 @@ generated: configuration: {
 				This is used if a component does not have its own specific log schema. All events use a log
 				schema, whether or not the default is used, to assign event fields on incoming events.
 				"""
-			common:   false
 			required: false
 			warnings: ["These settings are ignored when `schema.log_namespace` is set to `true`."]
 			group: "schema"
@@ -1541,53 +1209,7 @@ generated: configuration: {
 			group: "global_options"
 		}
 		proxy: {
-			type: object: options: {
-				enabled: {
-					type: bool: default: true
-					description: "Enables proxying support."
-					required:    false
-				}
-				http: {
-					type: string: examples: ["http://foo.bar:3128"]
-					description: """
-						Proxy endpoint to use when proxying HTTP traffic.
-
-						Must be a valid URI string.
-						"""
-					required: false
-				}
-				https: {
-					type: string: examples: ["http://foo.bar:3128"]
-					description: """
-						Proxy endpoint to use when proxying HTTPS traffic.
-
-						Must be a valid URI string.
-						"""
-					required: false
-				}
-				no_proxy: {
-					type: array: {
-						items: type: string: examples: ["localhost", ".foo.bar", "*"]
-						default: []
-					}
-					description: """
-						A list of hosts to avoid proxying.
-
-						Multiple patterns are allowed:
-
-						| Pattern             | Example match                                                               |
-						| ------------------- | --------------------------------------------------------------------------- |
-						| Domain names        | `example.com` matches requests to `example.com`                     |
-						| Wildcard domains    | `.example.com` matches requests to `example.com` and its subdomains |
-						| IP addresses        | `127.0.0.1` matches requests to `127.0.0.1`                         |
-						| [CIDR][cidr] blocks | `192.168.0.0/16` matches requests to any IP addresses in this range     |
-						| Splat               | `*` matches all hosts                                                   |
-
-						[cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-						"""
-					required: false
-				}
-			}
+			type: _schemaDefinitions["vector_core::config::proxy::ProxyConfig"]
 			description: """
 				Proxy configuration.
 
@@ -1597,7 +1219,6 @@ generated: configuration: {
 				to use based on the type of traffic being proxied. You can also set specific hosts that
 				should not be proxied.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}
@@ -1632,7 +1253,6 @@ generated: configuration: {
 				Determines whether `source` and `service` tags should be emitted with the
 				`component_sent_*` and `component_received_*` events.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}
@@ -1648,8 +1268,7 @@ generated: configuration: {
 
 				[tzdb]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 				"""
-			common: false
-			group:  "global_options"
+			group: "global_options"
 		}
 		wildcard_matching: {
 			type: string: enum: {
@@ -1662,7 +1281,6 @@ generated: configuration: {
 				Setting this to "relaxed" allows configurations with wildcards that do not match any inputs
 				to be accepted without causing an error.
 				"""
-			common:   false
 			required: false
 			group:    "global_options"
 		}

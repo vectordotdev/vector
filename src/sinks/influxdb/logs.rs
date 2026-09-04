@@ -1,6 +1,12 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
+)]
+
 use std::collections::{HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
+use derivative::Derivative;
 use futures::SinkExt;
 use http::{Request, Uri};
 use indoc::indoc;
@@ -9,23 +15,27 @@ use vector_lib::{
     configurable::configurable_component,
     lookup::{PathPrefix, lookup_v2::OptionalValuePath},
     schema,
+    sensitive_string::SensitiveString,
 };
 use vrl::{event_path, path::OwnedValuePath, value::Kind};
 
 use super::{
-    Field, InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion, encode_timestamp, healthcheck,
-    influx_line_protocol, influxdb_settings,
+    Field, InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, InfluxDbVersion,
+    ProtocolVersion, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
 };
 use crate::{
     codecs::Transformer,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
+    },
     event::{Event, KeyString, MetricTags, Value},
     http::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
         Healthcheck, VectorSink,
         util::{
-            BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, HttpEndpoint, SinkBatchSettings,
+            TowerRequestConfig,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
     },
@@ -43,28 +53,19 @@ impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
 
 /// Configuration for the `influxdb_logs` sink.
 #[configurable_component(sink("influxdb_logs", "Deliver log event data to InfluxDB."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDbLogsConfig {
-    /// The namespace of the measurement name to use.
-    ///
-    /// When specified, the measurement name is `<namespace>.vector`.
-    ///
-    #[configurable(
-        deprecated = "This field is deprecated, and `measurement` should be used instead."
-    )]
-    #[configurable(metadata(docs::examples = "service"))]
-    pub namespace: Option<String>,
-
     /// The name of the InfluxDB measurement that is written to.
     #[configurable(metadata(docs::examples = "vector-logs"))]
+    #[configurable(metadata(docs::required = true))]
     pub measurement: Option<String>,
 
     /// The endpoint to send data to.
     ///
     /// This should be a full HTTP URI, including the scheme, host, and port.
     #[configurable(metadata(docs::examples = "http://localhost:8086"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// The list of names of log fields that should be added as tags to each measurement.
     ///
@@ -75,28 +76,91 @@ pub struct InfluxDbLogsConfig {
     #[configurable(metadata(docs::examples = "parent.child_field"))]
     pub tags: Vec<KeyString>,
 
-    #[serde(flatten)]
-    pub influxdb1_settings: Option<InfluxDb1Settings>,
+    /// The InfluxDB API version to use.
+    ///
+    /// Omitting this option is deprecated and it will be required in a future release. When
+    /// unset, the version is temporarily inferred from the configured settings.
+    #[configurable(metadata(docs::examples = "2"))]
+    #[configurable(metadata(docs::examples = "1"))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub version: Option<InfluxDbVersion>,
 
-    #[serde(flatten)]
-    pub influxdb2_settings: Option<InfluxDb2Settings>,
+    /// The name of the database to write into.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "vector-database"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    #[configurable(metadata(docs::required_when = "version = \"1\""))]
+    pub database: Option<String>,
 
-    #[configurable(derived)]
+    /// The consistency level to use for writes.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "any"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub consistency: Option<String>,
+
+    /// The target retention policy for writes.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "autogen"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub retention_policy_name: Option<String>,
+
+    /// The username to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "todd"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub username: Option<String>,
+
+    /// The password to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v0.x/v1.x.
+    #[configurable(metadata(docs::examples = "${INFLUXDB_PASSWORD}"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"1\""))]
+    pub password: Option<SensitiveString>,
+
+    /// The name of the organization to write into.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "my-org"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::required_when = "version = \"2\""))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub org: Option<String>,
+
+    /// The name of the bucket to write into.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    #[configurable(metadata(docs::examples = "vector-bucket"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::required_when = "version = \"2\""))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub bucket: Option<String>,
+
+    /// The [token][token_docs] to authenticate with.
+    ///
+    /// Only relevant when using InfluxDB v2.x and above.
+    ///
+    /// [token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
+    #[configurable(metadata(docs::examples = "${INFLUXDB_TOKEN}"))]
+    #[configurable(metadata(docs::relevant_when = "version = \"2\""))]
+    #[configurable(metadata(docs::required_when = "version = \"2\""))]
+    #[configurable(metadata(docs::minimal = true))]
+    pub token: Option<SensitiveString>,
+
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -141,14 +205,15 @@ struct InfluxDbLogsSink {
 }
 
 impl GenerateConfig for InfluxDbLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            endpoint = "http://localhost:8086/"
-            namespace = "my-namespace"
-            tags = []
-            org = "my-org"
-            bucket = "my-bucket"
-            token = "${INFLUXDB_TOKEN}"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            endpoint: http://localhost:8086/
+            measurement: vector-logs
+            tags: []
+            version: "2"
+            org: my-org
+            bucket: my-bucket
+            token: ${INFLUXDB_TOKEN}
         "#})
         .unwrap()
     }
@@ -157,56 +222,118 @@ impl GenerateConfig for InfluxDbLogsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDbLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn input(&self) -> Input {
+        let requirements = schema::Requirement::empty()
+            .optional_meaning("message", Kind::bytes())
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("timestamp", Kind::timestamp());
+
+        Input::log().with_schema_requirement(requirements)
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub struct ValidatedInfluxDbLogs {
+    measurement: String,
+    tags: HashSet<KeyString>,
+    batch: BatchSettings<Buffer>,
+    // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
+    #[derivative(Debug = "ignore")]
+    uri: Uri,
+    token: SensitiveString,
+    protocol_version: ProtocolVersion,
+    host_key: Option<OwnedValuePath>,
+    message_key: Option<OwnedValuePath>,
+    source_type_key: Option<OwnedValuePath>,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for InfluxDbLogsConfig {
+    type Validated = ValidatedInfluxDbLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedInfluxDbLogs> {
         let measurement = self.get_measurement()?;
         let tags: HashSet<KeyString> = self.tags.iter().cloned().collect();
+
+        let batch = self.batch.into_batch_settings()?;
+
+        let settings = influxdb_settings(self.settings()?);
+
+        let uri = settings.write_uri(self.endpoint.clone())?;
+
+        let token = settings.token();
+        let protocol_version = settings.protocol_version();
+
+        // Only the config-provided keys are retained here; the `log_schema()`
+        // fallbacks are resolved in `build`, after the global log schema has
+        // been initialized. Resolving them here would capture the built-in
+        // defaults, since validation runs before `init_log_schema` at startup.
+        let host_key = self.host_key.as_ref().and_then(|k| k.path.clone());
+        let message_key = self.message_key.as_ref().and_then(|k| k.path.clone());
+        let source_type_key = self.source_type_key.as_ref().and_then(|k| k.path.clone());
+
+        Ok(ValidatedInfluxDbLogs {
+            measurement,
+            tags,
+            batch,
+            uri,
+            token,
+            protocol_version,
+            host_key,
+            message_key,
+            source_type_key,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedInfluxDbLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedInfluxDbLogs {
+            measurement,
+            tags,
+            batch,
+            uri,
+            token,
+            protocol_version,
+            host_key,
+            message_key,
+            source_type_key,
+        } = validated;
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = self.healthcheck(client.clone())?;
 
-        let batch = self.batch.into_batch_settings()?;
         let request = self.request.into_settings();
 
-        let settings = influxdb_settings(
-            self.influxdb1_settings.clone(),
-            self.influxdb2_settings.clone(),
-        )
-        .unwrap();
-
-        let endpoint = self.endpoint.clone();
-        let uri = settings.write_uri(endpoint).unwrap();
-
-        let token = settings.token();
-        let protocol_version = settings.protocol_version();
-
-        let host_key = self
-            .host_key
-            .as_ref()
-            .and_then(|k| k.path.clone())
+        // Resolve the `log_schema()` fallbacks here, after the global log schema
+        // has been initialized, so custom global log schema keys are honored.
+        let host_key = host_key
+            .clone()
             .or_else(|| log_schema().host_key().cloned())
             .expect("global log_schema.host_key to be valid path");
-
-        let message_key = self
-            .message_key
-            .as_ref()
-            .and_then(|k| k.path.clone())
+        let message_key = message_key
+            .clone()
             .or_else(|| log_schema().message_key().cloned())
             .expect("global log_schema.message_key to be valid path");
-
-        let source_type_key = self
-            .source_type_key
-            .as_ref()
-            .and_then(|k| k.path.clone())
+        let source_type_key = source_type_key
+            .clone()
             .or_else(|| log_schema().source_type_key().cloned())
             .expect("global log_schema.source_type_key to be valid path");
 
         let sink = InfluxDbLogsSink {
-            uri,
+            uri: uri.clone(),
             token: token.inner().to_owned(),
-            protocol_version,
-            measurement,
-            tags,
+            protocol_version: *protocol_version,
+            measurement: measurement.clone(),
+            tags: tags.clone(),
             transformer: self.encoding.clone(),
             host_key,
             message_key,
@@ -224,19 +351,6 @@ impl SinkConfig for InfluxDbLogsConfig {
 
         #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        let requirements = schema::Requirement::empty()
-            .optional_meaning("message", Kind::bytes())
-            .optional_meaning("host", Kind::bytes())
-            .optional_meaning("timestamp", Kind::timestamp());
-
-        Input::log().with_schema_requirement(requirements)
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -345,34 +459,98 @@ impl HttpSink for InfluxDbLogsSink {
 }
 
 impl InfluxDbLogsConfig {
-    fn get_measurement(&self) -> Result<String, &'static str> {
-        match (self.measurement.as_ref(), self.namespace.as_ref()) {
-            (Some(measure), Some(_)) => {
-                warn!("Option `namespace` has been superseded by `measurement`.");
-                Ok(measure.clone())
+    fn settings(&self) -> crate::Result<InfluxDbSettings> {
+        let version = match self.version {
+            Some(version) => {
+                self.validate_version(version)?;
+                version
             }
-            (Some(measure), None) => Ok(measure.clone()),
-            (None, Some(namespace)) => {
+            None => {
                 warn!(
-                    "Option `namespace` has been deprecated. Use `measurement` instead. \
-                       For example, you can use `measurement=<namespace>.vector` for the \
-                       same effect."
+                    "The `version` option is currently optional but will be required in a future release. \
+                     Please set it to `1` or `2` to match your InfluxDB settings."
                 );
-                Ok(format!("{namespace}.vector"))
+                self.infer_version()?
             }
-            (None, None) => Err("The `measurement` option is required."),
+        };
+        match version {
+            InfluxDbVersion::V1 => Ok(InfluxDbSettings::V1(InfluxDb1Settings {
+                database: self
+                    .database
+                    .clone()
+                    .ok_or("the `database` option is required when using InfluxDB v1")?,
+                consistency: self.consistency.clone(),
+                retention_policy_name: self.retention_policy_name.clone(),
+                username: self.username.clone(),
+                password: self.password.clone(),
+            })),
+            InfluxDbVersion::V2 => Ok(InfluxDbSettings::V2(InfluxDb2Settings {
+                org: self
+                    .org
+                    .clone()
+                    .ok_or("the `org` option is required when using InfluxDB v2")?,
+                bucket: self
+                    .bucket
+                    .clone()
+                    .ok_or("the `bucket` option is required when using InfluxDB v2")?,
+                token: self
+                    .token
+                    .clone()
+                    .ok_or("the `token` option is required when using InfluxDB v2")?,
+            })),
         }
+    }
+
+    const fn settings_present(&self) -> (bool, bool) {
+        let has_v1 = self.database.is_some()
+            || self.consistency.is_some()
+            || self.retention_policy_name.is_some()
+            || self.username.is_some()
+            || self.password.is_some();
+        let has_v2 = self.org.is_some() || self.bucket.is_some() || self.token.is_some();
+        (has_v1, has_v2)
+    }
+
+    fn infer_version(&self) -> crate::Result<InfluxDbVersion> {
+        let (has_v1, has_v2) = self.settings_present();
+        match (has_v1, has_v2) {
+            (true, true) => Err(
+                "Unclear settings. Both InfluxDB v1 and v2 settings are configured; configure only one version."
+                    .into(),
+            ),
+            (false, false) => Err("InfluxDB v1 or v2 should be configured as endpoint.".into()),
+            (true, false) => Ok(InfluxDbVersion::V1),
+            (false, true) => Ok(InfluxDbVersion::V2),
+        }
+    }
+
+    /// Rejects settings that belong to the version that was not selected, so that
+    /// an explicit `version` cannot silently ignore stale settings for the other version.
+    fn validate_version(&self, version: InfluxDbVersion) -> crate::Result<()> {
+        let (has_v1, has_v2) = self.settings_present();
+        match version {
+            InfluxDbVersion::V1 if has_v2 => Err(
+                "InfluxDB v1 settings are configured, but v2 settings were also provided; configure only one version."
+                    .into(),
+            ),
+            InfluxDbVersion::V2 if has_v1 => Err(
+                "InfluxDB v2 settings are configured, but v1 settings were also provided; configure only one version."
+                    .into(),
+            ),
+            _ => Ok(()),
+        }
+    }
+
+    fn get_measurement(&self) -> Result<String, &'static str> {
+        self.measurement
+            .clone()
+            .ok_or("The `measurement` option is required.")
     }
 
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let config = self.clone();
 
-        let healthcheck = healthcheck(
-            config.endpoint,
-            config.influxdb1_settings,
-            config.influxdb2_settings,
-            client,
-        )?;
+        let healthcheck = healthcheck(config.endpoint.clone(), config.settings()?, client)?;
 
         Ok(healthcheck)
     }
@@ -400,6 +578,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::ValidatedSink,
         sinks::{
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
             util::test::{build_test_server_status, load_sink},
@@ -423,8 +602,9 @@ mod tests {
     #[test]
     fn test_config_without_tags() {
         let config = indoc! {r#"
-            namespace: "vector-logs"
+            measurement: "vector-logs"
             endpoint: "http://localhost:9999"
+            version: "2"
             bucket: "my-bucket"
             org: "my-org"
             token: "my-token"
@@ -434,21 +614,98 @@ mod tests {
     }
 
     #[test]
-    fn test_config_measurement_from_namespace() {
+    fn test_config_measurement_required() {
         let config = indoc! {r#"
-            namespace: "ns"
             endpoint: "http://localhost:9999"
+            version: "2"
+            bucket: "my-bucket"
+            org: "my-org"
+            token: "my-token"
         "#};
 
         let sink_config = serde_yaml::from_str::<InfluxDbLogsConfig>(config).unwrap();
-        assert_eq!("ns.vector", sink_config.get_measurement().unwrap());
+        assert_eq!(
+            Err("The `measurement` option is required."),
+            sink_config.get_measurement()
+        );
+    }
+
+    #[test]
+    fn prepares_valid_config() {
+        let config = InfluxDbLogsConfig {
+            measurement: Some("vector".to_string()),
+            endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
+            org: Some("my-org".to_string()),
+            bucket: Some("my-bucket".to_string()),
+            token: Some("my-token".to_string().into()),
+            tags: vec![],
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            encoding: Default::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            host_key: None,
+            message_key: None,
+            source_type_key: None,
+        };
+
+        let validated = config.validate().expect("preparation should succeed");
+        assert_eq!(validated.measurement, "vector");
+        assert!(matches!(validated.protocol_version, ProtocolVersion::V2));
+        assert_eq!(
+            validated.uri.to_string(),
+            "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns"
+        );
+    }
+
+    #[test]
+    fn validate_retains_config_keys_without_log_schema_fallback() {
+        let config = InfluxDbLogsConfig {
+            measurement: Some("vector".to_string()),
+            endpoint: HttpEndpoint::parse("http://localhost:9999").unwrap(),
+            org: Some("my-org".to_string()),
+            bucket: Some("my-bucket".to_string()),
+            token: Some("my-token".to_string().into()),
+            host_key: Some(OptionalValuePath::new("custom_host")),
+            tags: vec![],
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            encoding: Default::default(),
+            batch: Default::default(),
+            request: Default::default(),
+            tls: None,
+            acknowledgements: Default::default(),
+            message_key: None,
+            source_type_key: None,
+        };
+
+        let validated = config.validate().expect("validation should succeed");
+        // Config-provided keys are retained...
+        assert_eq!(validated.host_key, Some(owned_value_path!("custom_host")));
+        // ...but unset keys stay unset: `validate` must not resolve the global
+        // `log_schema()` defaults, which aren't initialized yet at validation
+        // time in the startup path. The fallbacks are resolved in `build`.
+        assert_eq!(validated.message_key, None);
+        assert_eq!(validated.source_type_key, None);
     }
 
     #[test]
     fn test_encode_event_apply_rules() {
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert("host", "aws.cloud.eur");
-        event.as_mut_log().insert("timestamp", ts());
+        event
+            .as_mut_log()
+            .insert(event_path!("host"), "aws.cloud.eur");
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let mut sink = create_sink(
             "http://localhost:9999",
@@ -488,14 +745,20 @@ mod tests {
     #[test]
     fn test_encode_event_v1() {
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert("host", "aws.cloud.eur");
-        event.as_mut_log().insert("source_type", "file");
+        event
+            .as_mut_log()
+            .insert(event_path!("host"), "aws.cloud.eur");
+        event
+            .as_mut_log()
+            .insert(event_path!("source_type"), "file");
 
-        event.as_mut_log().insert("int", 4i32);
-        event.as_mut_log().insert("float", 5.5);
-        event.as_mut_log().insert("bool", true);
-        event.as_mut_log().insert("string", "thisisastring");
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(event_path!("int"), 4i32);
+        event.as_mut_log().insert(event_path!("float"), 5.5);
+        event.as_mut_log().insert(event_path!("bool"), true);
+        event
+            .as_mut_log()
+            .insert(event_path!("string"), "thisisastring");
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -533,14 +796,20 @@ mod tests {
     #[test]
     fn test_encode_event() {
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert("host", "aws.cloud.eur");
-        event.as_mut_log().insert("source_type", "file");
+        event
+            .as_mut_log()
+            .insert(event_path!("host"), "aws.cloud.eur");
+        event
+            .as_mut_log()
+            .insert(event_path!("source_type"), "file");
 
-        event.as_mut_log().insert("int", 4i32);
-        event.as_mut_log().insert("float", 5.5);
-        event.as_mut_log().insert("bool", true);
-        event.as_mut_log().insert("string", "thisisastring");
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(event_path!("int"), 4i32);
+        event.as_mut_log().insert(event_path!("float"), 5.5);
+        event.as_mut_log().insert(event_path!("bool"), true);
+        event
+            .as_mut_log()
+            .insert(event_path!("string"), "thisisastring");
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -579,8 +848,8 @@ mod tests {
     fn test_encode_event_without_tags() {
         let mut event = Event::Log(LogEvent::from("hello"));
 
-        event.as_mut_log().insert("value", 100);
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(event_path!("value"), 100);
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let mut sink = create_sink(
             "http://localhost:9999",
@@ -617,12 +886,12 @@ mod tests {
     fn test_encode_nested_fields() {
         let mut event = LogEvent::default();
 
-        event.insert("a", 1);
-        event.insert("nested.field", "2");
-        event.insert("nested.bool", true);
-        event.insert("nested.array[0]", "example-value");
-        event.insert("nested.array[2]", "another-value");
-        event.insert("nested.array[3]", 15);
+        event.insert(event_path!("a"), 1);
+        event.insert(event_path!("nested", "field"), "2");
+        event.insert(event_path!("nested", "bool"), true);
+        event.insert(event_path!("nested", "array", 0isize), "example-value");
+        event.insert(event_path!("nested", "array", 2isize), "another-value");
+        event.insert(event_path!("nested", "array", 3isize), 15);
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -657,10 +926,12 @@ mod tests {
     #[test]
     fn test_add_tag() {
         let mut event = Event::Log(LogEvent::from("hello"));
-        event.as_mut_log().insert("source_type", "file");
+        event
+            .as_mut_log()
+            .insert(event_path!("source_type"), "file");
 
-        event.as_mut_log().insert("as_a_tag", 10);
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(event_path!("as_a_tag"), 10);
+        event.as_mut_log().insert(event_path!("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -688,7 +959,10 @@ mod tests {
     #[tokio::test]
     async fn smoke_v1() {
         let rx = smoke_test(
-            r#"database = "my-database""#,
+            indoc! {r#"
+            version = "1"
+            database = "my-database"
+        "#},
             StatusCode::OK,
             BatchStatus::Delivered,
         )
@@ -702,7 +976,10 @@ mod tests {
     #[tokio::test]
     async fn smoke_v1_failure() {
         smoke_test(
-            r#"database = "my-database""#,
+            indoc! {r#"
+            version = "1"
+            database = "my-database"
+        "#},
             StatusCode::BAD_REQUEST,
             BatchStatus::Rejected,
         )
@@ -713,6 +990,7 @@ mod tests {
     async fn smoke_v2() {
         let rx = smoke_test(
             indoc! {r#"
+            version = "2"
             bucket = "my-bucket"
             org = "my-org"
             token = "my-token"
@@ -732,6 +1010,7 @@ mod tests {
     async fn smoke_v2_failure() {
         smoke_test(
             indoc! {r#"
+            version = "2"
             bucket = "my-bucket"
             org = "my-org"
             token = "my-token"
@@ -758,15 +1037,15 @@ mod tests {
         let (mut config, cx) = load_sink::<InfluxDbLogsConfig>(&config).unwrap();
 
         // Make sure we can build the config
-        _ = config.build(cx.clone()).await.unwrap();
+        _ = SinkConfig::build(&config, cx.clone()).await.unwrap();
 
         let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         let host = format!("http://{addr}");
-        config.endpoint = host;
+        config.endpoint = HttpEndpoint::parse(&host).unwrap();
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (rx, _trigger, server) = build_test_server_status(addr, status_code);
         tokio::spawn(server);
@@ -782,14 +1061,14 @@ mod tests {
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
             let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
-            event.insert(format!("key{i}").as_str(), format!("value{i}"));
+            event.insert(event_path!(format!("key{i}").as_str()), format!("value{i}"));
 
             let timestamp = Utc
                 .with_ymd_and_hms(1970, 1, 1, 0, 0, (i as u32) + 1)
                 .single()
                 .expect("invalid timestamp");
-            event.insert("timestamp", timestamp);
-            event.insert("source_type", "file");
+            event.insert(event_path!("timestamp"), timestamp);
+            event.insert(event_path!("source_type"), "file");
 
             events.push(Event::Log(event));
         }
@@ -882,7 +1161,7 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
-            InfluxDb2Settings,
+            InfluxDbVersion,
             logs::InfluxDbLogsConfig,
             test_util::{BUCKET, ORG, TOKEN, address_v2, onboarding_v2},
         },
@@ -903,16 +1182,18 @@ mod integration_tests {
         let cx = SinkContext::default();
 
         let config = InfluxDbLogsConfig {
-            namespace: None,
             measurement: Some(measure.clone()),
-            endpoint: endpoint.clone(),
+            endpoint: HttpEndpoint::parse(&endpoint).unwrap(),
             tags: Default::default(),
-            influxdb1_settings: None,
-            influxdb2_settings: Some(InfluxDb2Settings {
-                org: ORG.to_string(),
-                bucket: BUCKET.to_string(),
-                token: TOKEN.to_string().into(),
-            }),
+            version: Some(InfluxDbVersion::V2),
+            database: None,
+            consistency: None,
+            retention_policy_name: None,
+            username: None,
+            password: None,
+            org: Some(ORG.to_string()),
+            bucket: Some(BUCKET.to_string()),
+            token: Some(TOKEN.to_string().into()),
             encoding: Default::default(),
             batch: Default::default(),
             request: Default::default(),
@@ -923,17 +1204,17 @@ mod integration_tests {
             source_type_key: None,
         };
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (sink, _) = SinkConfig::build(&config, cx).await.unwrap();
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
         let mut event1 = LogEvent::from("message_1").with_batch_notifier(&batch);
-        event1.insert("host", "aws.cloud.eur");
-        event1.insert("source_type", "file");
+        event1.insert(event_path!("host"), "aws.cloud.eur");
+        event1.insert(event_path!("source_type"), "file");
 
         let mut event2 = LogEvent::from("message_2").with_batch_notifier(&batch);
-        event2.insert("host", "aws.cloud.eur");
-        event2.insert("source_type", "file");
+        event2.insert(event_path!("host"), "aws.cloud.eur");
+        event2.insert(event_path!("source_type"), "file");
 
         let mut namespaced_log =
             LogEvent::from(value!("namespaced message")).with_batch_notifier(&batch);

@@ -133,7 +133,6 @@ pub struct Ec2Metadata {
     #[derivative(Default(value = "default_refresh_timeout_secs()"))]
     refresh_timeout_secs: Duration,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     proxy: ProxyConfig,
 
@@ -759,7 +758,10 @@ mod integration_tests {
             lookup_v2::{OwnedSegment, OwnedValuePath},
         },
     };
-    use vrl::value::{ObjectMap, Value};
+    use vrl::{
+        path::parse_target_path,
+        value::{ObjectMap, Value},
+    };
     use warp::Filter;
 
     use super::*;
@@ -1027,10 +1029,16 @@ mod integration_tests {
 
             let log = LogEvent::default();
             let mut expected_log = log.clone();
-            expected_log.insert(format!("\"{PUBLIC_IPV4_KEY}\"").as_str(), "192.0.2.54");
-            expected_log.insert(format!("\"{REGION_KEY}\"").as_str(), "us-east-1");
             expected_log.insert(
-                format!("\"{TAGS_KEY}\"").as_str(),
+                &vrl::path::parse_target_path(&format!("\"{PUBLIC_IPV4_KEY}\"")).unwrap(),
+                "192.0.2.54",
+            );
+            expected_log.insert(
+                &vrl::path::parse_target_path(&format!("\"{REGION_KEY}\"")).unwrap(),
+                "us-east-1",
+            );
+            expected_log.insert(
+                &vrl::path::parse_target_path(&format!("\"{TAGS_KEY}\"")).unwrap(),
                 ObjectMap::from([
                     ("Name".into(), Value::from("test-instance")),
                     ("Test".into(), Value::from("test-tag")),
@@ -1119,7 +1127,9 @@ mod integration_tests {
                 let event = out.recv().await.unwrap();
 
                 assert_eq!(
-                    event.as_log().get("ec2.metadata.\"availability-zone\""),
+                    event
+                        .as_log()
+                        .get(&parse_target_path("ec2.metadata.\"availability-zone\"").unwrap()),
                     Some(&"us-east-1a".into())
                 );
 

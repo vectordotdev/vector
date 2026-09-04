@@ -4,6 +4,7 @@ use futures::{StreamExt, TryFutureExt};
 use serde_json::{Value, json};
 use tokio::time::{Duration, sleep};
 use vector_lib::{codecs::JsonSerializerConfig, lookup::lookup_v2::ConfigValuePath};
+use vrl::event_path;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
@@ -13,7 +14,7 @@ use crate::{
         elasticsearch::{
             BulkConfig, ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig,
         },
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
     template::Template,
     test_util::{
@@ -82,7 +83,7 @@ async fn firehose_put_records_without_partition_key() {
             imds: ImdsAuthentication::default(),
             region: None,
         })),
-        endpoints: vec![elasticsearch_address()],
+        endpoints: vec![HttpEndpoint::parse(&elasticsearch_address()).unwrap()],
         bulk: BulkConfig {
             index: Template::try_from(stream.clone()).expect("unable to parse Template"),
             ..Default::default()
@@ -174,13 +175,14 @@ async fn firehose_put_records_with_partition_key() {
 
     let events = events.map(move |mut events| {
         events.iter_logs_mut().for_each(move |log| {
-            log.insert("partition_key", partition_value);
+            log.insert(event_path!("partition_key"), partition_value);
         });
         events
     });
 
     input.iter_mut().for_each(move |log| {
-        log.as_mut_log().insert("partition_key", partition_value);
+        log.as_mut_log()
+            .insert(event_path!("partition_key"), partition_value);
     });
 
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -194,7 +196,7 @@ async fn firehose_put_records_with_partition_key() {
             imds: ImdsAuthentication::default(),
             region: None,
         })),
-        endpoints: vec![elasticsearch_address()],
+        endpoints: vec![HttpEndpoint::parse(&elasticsearch_address()).unwrap()],
         bulk: BulkConfig {
             index: Template::try_from(stream.clone()).expect("unable to parse Template"),
             ..Default::default()
@@ -267,22 +269,27 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
 
 /// creates ES domain with the given name and returns the ARN
 async fn ensure_elasticsearch_domain(domain_name: String) -> String {
-    let client = EsClient::from_conf(
-        aws_sdk_elasticsearch::config::Builder::new()
-            .credentials_provider(
-                AwsAuthentication::test_auth()
-                    .credentials_provider(
-                        test_region_endpoint().region().unwrap(),
-                        &Default::default(),
-                        None,
-                    )
-                    .await
-                    .unwrap(),
-            )
-            .endpoint_url(test_region_endpoint().endpoint().unwrap())
-            .region(test_region_endpoint().region())
-            .build(),
-    );
+    struct ElasticsearchClientBuilder;
+    impl crate::aws::ClientBuilder for ElasticsearchClientBuilder {
+        type Client = EsClient;
+
+        fn build(&self, config: &aws_types::SdkConfig) -> Self::Client {
+            EsClient::new(config)
+        }
+    }
+
+    let region_endpoint = test_region_endpoint();
+    let client = create_client::<ElasticsearchClientBuilder>(
+        &ElasticsearchClientBuilder,
+        &AwsAuthentication::test_auth(),
+        region_endpoint.region(),
+        region_endpoint.endpoint(),
+        &ProxyConfig::default(),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     let arn = match client
         .create_elasticsearch_domain()

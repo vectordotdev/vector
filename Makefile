@@ -19,7 +19,8 @@ else
     export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
     export DNSTAP_BENCHES := dnstap-benches
 endif
-export FEATURES ?=
+FEATURES ?=
+VDEV_FEATURE_ARGS = $(if $(strip $(FEATURES)),--features "$(FEATURES)")
 
 # When COVERAGE=true, swap cargo-nextest for cargo-llvm-cov so test targets collect
 # coverage data. Run `make coverage-report` afterwards to emit the lcov file.
@@ -52,6 +53,11 @@ export CURRENT_DIR = $(shell pwd)
 # Preserve any caller-supplied VDEV (e.g. CI exports the pinned prebuilt binary
 # via .github/actions/setup; falling back to `cargo vdev` recompiles vdev).
 VDEV ?= cargo vdev
+
+# Cargo writes artifacts to CARGO_TARGET_DIR when it is set, so recipes that run
+# a freshly built binary have to resolve the same directory rather than assume
+# `target` — otherwise they silently execute a stale binary from a previous build.
+CARGO_TARGET_DIR ?= target
 
 # Set dummy AWS credentials if not present - used for AWS and ES integration tests
 export AWS_ACCESS_KEY_ID ?= "dummy"
@@ -278,7 +284,7 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-amqp test-integration-appsignal test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
-test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch test-integration-opensearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
@@ -365,7 +371,7 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	$(VDEV) check rust
+	$(VDEV) check rust $(VDEV_FEATURE_ARGS)
 
 .PHONY: check-all
 check-all: ## Check everything
@@ -373,13 +379,17 @@ check-all: check-fmt check-clippy check-docs
 check-all: check-examples check-component-features
 check-all: check-scripts check-deny check-generated-docs check-licenses
 
+.PHONY: check-changelog-fragments
+check-changelog-fragments: ## Validate changelog fragments added in this branch/PR
+	$(VDEV) check changelog-fragments
+
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
 	$(VDEV) check component-features
 
 .PHONY: check-clippy
-check-clippy: ## Check code with Clippy
-	$(VDEV) check rust
+check-clippy: ## Check code with Clippy; when set, FEATURES is the exact feature set
+	$(VDEV) check rust $(VDEV_FEATURE_ARGS)
 
 .PHONY: check-docs
 check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
@@ -440,8 +450,9 @@ check-events: ## Check that events satisfy patterns set in https://github.com/ve
 	$(VDEV) check events
 
 .PHONY: check-generated-docs
-check-generated-docs: generate-docs ## Checks that the machine-generated component Cue docs are up-to-date.
+check-generated-docs: generate-docs ## Checks that machine-generated component docs and examples are up-to-date.
 	$(VDEV) check generated-docs
+	$(VDEV) check component-examples
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -509,7 +520,7 @@ generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
 	cargo build $(if $(findstring true,$(CI)),--quiet,)
-	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
+	$(CARGO_TARGET_DIR)/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
 	$(VDEV) build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 	./scripts/cue.sh fmt
@@ -530,8 +541,12 @@ generate-vector-vrl-docs: ## Generate VRL function documentation from Rust sourc
 generate-vrl-docs: ## Generate combined VRL function documentation for the website.
 	$(MAKE) -C website generate-vrl-docs
 
+.PHONY: generate-example-configs
+generate-example-configs: generate-component-docs ## Generate committed component configuration examples.
+	$(MAKE) -C website config-examples
+
 .PHONY: generate-docs
-generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs
+generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs generate-example-configs
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
@@ -556,7 +571,7 @@ ci-generate-publish-metadata: ## Generates the necessary metadata required for b
 
 .PHONY: clippy-fix
 clippy-fix:
-	$(VDEV) check rust --fix
+	$(VDEV) check rust $(VDEV_FEATURE_ARGS) --fix
 
 .PHONY: fmt
 fmt:

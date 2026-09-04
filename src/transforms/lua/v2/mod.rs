@@ -4,14 +4,13 @@ use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 pub use vector_lib::event::lua;
 use vector_lib::{
-    codecs::MetricTagValues,
     configurable::configurable_component,
     transform::runtime_transform::{RuntimeTransform, Timer},
 };
 
 use crate::{
     config::{self, CONFIG_PATHS, ComponentKey, DataType, Input, OutputId, TransformOutput},
-    event::{Event, lua::event::LuaEvent},
+    event::{Event, MetricTagMode, lua::event::LuaEvent},
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
     schema::Definition,
@@ -47,6 +46,29 @@ pub enum BuildError {
     RuntimeErrorGc { source: mlua::Error },
 }
 
+/// How metric tags are exposed to Lua scripts.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum LuaMetricTagValues {
+    /// Tag values are exposed as single strings, the same as they were before this config
+    /// option. Tags with multiple values show the last assigned value, and null values
+    /// are ignored.
+    #[default]
+    Single,
+    /// All tags are exposed as arrays of either string or null values.
+    Full,
+}
+
+impl From<LuaMetricTagValues> for MetricTagMode {
+    fn from(value: LuaMetricTagValues) -> Self {
+        match value {
+            LuaMetricTagValues::Single => Self::Single,
+            LuaMetricTagValues::Full => Self::Full,
+        }
+    }
+}
+
 /// Configuration for the version two of the `lua` transform.
 #[configurable_component]
 #[derive(Clone, Debug)]
@@ -60,6 +82,7 @@ pub struct LuaConfig {
     #[configurable(metadata(
         docs::examples = "function init()\n\tcount = 0\nend\n\nfunction process()\n\tcount = count + 1\nend\n\nfunction timer_handler(emit)\n\temit(make_counter(counter))\n\tcounter = 0\nend\n\nfunction shutdown(emit)\n\temit(make_counter(counter))\nend\n\nfunction make_counter(value)\n\treturn metric = {\n\t\tname = \"event_counter\",\n\t\tkind = \"incremental\",\n\t\ttimestamp = os.date(\"!*t\"),\n\t\tcounter = {\n\t\t\tvalue = value\n\t\t}\n \t}\nend",
         docs::examples = "-- external file with hooks and timers defined\nrequire('custom_module')",
+        docs::syntax_override = "lua",
     ))]
     source: Option<String>,
 
@@ -71,7 +94,6 @@ pub struct LuaConfig {
     #[configurable(metadata(docs::human_name = "Search Directories"))]
     search_dirs: Vec<PathBuf>,
 
-    #[configurable(derived)]
     hooks: HooksConfig,
 
     /// A list of timers which should be configured and executed periodically.
@@ -85,7 +107,7 @@ pub struct LuaConfig {
     /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
     #[serde(default)]
-    metric_tag_values: MetricTagValues,
+    metric_tag_values: LuaMetricTagValues,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -121,6 +143,7 @@ struct HooksConfig {
     #[configurable(metadata(
         docs::examples = "function (emit)\n\t-- Custom Lua code here\nend",
         docs::examples = "init",
+        docs::syntax_override = "lua",
     ))]
     init: Option<String>,
 
@@ -134,6 +157,7 @@ struct HooksConfig {
     #[configurable(metadata(
         docs::examples = "function (event, emit)\n\tevent.log.field = \"value\" -- set value of a field\n\tevent.log.another_field = nil -- remove field\n\tevent.log.first, event.log.second = nil, event.log.first -- rename field\n\t-- Very important! Emit the processed event.\n\temit(event)\nend",
         docs::examples = "process",
+        docs::syntax_override = "lua",
     ))]
     process: String,
 
@@ -146,6 +170,7 @@ struct HooksConfig {
     #[configurable(metadata(
         docs::examples = "function (emit)\n\t-- Custom Lua code here\nend",
         docs::examples = "shutdown",
+        docs::syntax_override = "lua",
     ))]
     shutdown: Option<String>,
 }
@@ -222,7 +247,7 @@ pub struct Lua {
     hook_process: mlua::RegistryKey,
     hook_shutdown: Option<mlua::RegistryKey>,
     timers: Vec<(Timer, mlua::RegistryKey)>,
-    multi_value_tags: bool,
+    tag_mode: MetricTagMode,
     source_id: Arc<ComponentKey>,
 }
 
@@ -292,8 +317,6 @@ impl Lua {
             timers.push((timer, handler_key));
         }
 
-        let multi_value_tags = config.metric_tag_values == MetricTagValues::Full;
-
         Ok(Self {
             lua,
             invocations_after_gc: 0,
@@ -301,7 +324,7 @@ impl Lua {
             hook_init,
             hook_process,
             hook_shutdown,
-            multi_value_tags,
+            tag_mode: config.metric_tag_values.into(),
             source_id: Arc::new(key),
         })
     }
@@ -323,7 +346,7 @@ impl Lua {
                 .call((
                     LuaEvent {
                         event,
-                        metric_multi_value_tags: self.multi_value_tags,
+                        metric_tag_mode: self.tag_mode,
                     },
                     emit,
                 ))
@@ -383,7 +406,7 @@ impl RuntimeTransform for Lua {
                     .call((
                         LuaEvent {
                             event,
-                            metric_multi_value_tags: self.multi_value_tags,
+                            metric_tag_mode: self.tag_mode,
                         },
                         wrap_emit_fn(scope, emit_fn, source_id)?,
                     ))
@@ -467,6 +490,8 @@ mod tests {
         mpsc::{self, Receiver, Sender},
     };
     use tokio_stream::wrappers::ReceiverStream;
+
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -626,11 +651,17 @@ mod tests {
             "#},
             |tx, out| async move {
                 let mut event = LogEvent::default();
-                event.insert("name", "Bob");
+                event.insert(event_path!("name"), "Bob");
 
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out, "in").await.as_log().get("name"), None);
+                assert_eq!(
+                    next_event(&out, "in")
+                        .await
+                        .as_log()
+                        .get(event_path!("name")),
+                    None
+                );
             },
         )
         .await;
@@ -671,7 +702,7 @@ mod tests {
             "#},
             |tx, out| async move {
                 let mut event = LogEvent::default();
-                event.insert("host", "127.0.0.1");
+                event.insert(event_path!("host"), "127.0.0.1");
                 tx.send(event.into()).await.unwrap();
 
                 assert!(out.lock().await.recv().await.is_some());
@@ -801,7 +832,13 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out, "in").await.as_log().get("junk"), None);
+                assert_eq!(
+                    next_event(&out, "in")
+                        .await
+                        .as_log()
+                        .get(event_path!("junk")),
+                    None
+                );
             },
         )
         .await;
@@ -847,7 +884,13 @@ mod tests {
                 let event = LogEvent::default();
                 tx.send(event.into()).await.unwrap();
 
-                assert_eq!(next_event(&out, "in").await.as_log().get("result"), None);
+                assert_eq!(
+                    next_event(&out, "in")
+                        .await
+                        .as_log()
+                        .get(event_path!("result")),
+                    None
+                );
             },
         )
         .await;
@@ -954,8 +997,8 @@ mod tests {
             "#},
             |tx, out| async move {
                 let mut event = LogEvent::default();
-                event.insert("name", "Bob");
-                event.insert("friend", "Alice");
+                event.insert(event_path!("name"), "Bob");
+                event.insert(event_path!("friend"), "Alice");
                 tx.send(event.into()).await.unwrap();
 
                 let output = next_event(&out, "in").await;

@@ -1,11 +1,21 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
+)]
+
 use std::{collections::BTreeMap, sync::Arc};
 
 use databend_client::APIClient as DatabendAPIClient;
+use derivative::Derivative;
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
 use vector_lib::{
-    codecs::encoding::{Framer, FramingConfig},
+    codecs::{
+        Transformer,
+        encoding::{Framer, FramingConfig},
+    },
     configurable::{component::GenerateConfig, configurable_component},
+    stream::BatcherSettings,
 };
 
 use super::{
@@ -17,13 +27,13 @@ use super::{
 };
 use crate::{
     codecs::{Encoder, EncodingConfig},
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::{Auth, MaybeAuth},
     sinks::{
         Healthcheck, VectorSink,
         util::{
             BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, UriSerde,
+            TowerRequestConfig, TowerRequestSettings, UriSerde,
         },
     },
     tls::TlsConfig,
@@ -52,34 +62,27 @@ pub struct DatabendConfig {
     pub database: Option<String>,
 
     /// The username and password to authenticate with. Overrides the username and password in DSN.
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub missing_field_as: DatabendMissingFieldAS,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub encoding: DatabendEncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: DatabendCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -89,12 +92,12 @@ pub struct DatabendConfig {
 }
 
 impl GenerateConfig for DatabendConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"endpoint = "databend://localhost:8000/default?sslmode=disable"
-            table = "default"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"endpoint: "databend://localhost:8000/default?sslmode=disable"
+            table: default
         "#,
-        )
+        })
         .unwrap()
     }
 }
@@ -102,8 +105,39 @@ impl GenerateConfig for DatabendConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "databend")]
 impl SinkConfig for DatabendConfig {
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let ua = format!("vector/{}", vector_version());
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn acknowledgements(&self) -> &AcknowledgementsConfig {
+        &self.acknowledgements
+    }
+}
+
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
+pub struct ValidatedDatabend {
+    // Omitted: `endpoint` embeds the basic-auth username/password in its URL.
+    #[derivative(Debug = "ignore")]
+    endpoint: String,
+    request_settings: TowerRequestSettings,
+    batch_settings: BatcherSettings,
+    file_format_options: BTreeMap<&'static str, &'static str>,
+    compression: Compression,
+    transformer: Transformer,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DatabendConfig {
+    type Validated = ValidatedDatabend;
+
+    fn validate(&self) -> crate::Result<ValidatedDatabend> {
+        // `DatabendService::new` rejects an empty table at build time, so
+        // reject it here to keep `vector validate --no-environment` from
+        // accepting a sink that cannot start.
+        if self.table.is_empty() {
+            return Err("`table` is required".into());
+        }
         let auth = self.auth.choose_one(&self.endpoint.auth)?;
         let authority = self
             .endpoint
@@ -143,8 +177,6 @@ impl SinkConfig for DatabendConfig {
             endpoint.set_path(&format!("/{database}"));
         }
         let endpoint = endpoint.to_string();
-        let health_client = DatabendAPIClient::new(&endpoint, Some(ua.clone())).await?;
-        let healthcheck = select_one(health_client).boxed();
 
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
@@ -161,51 +193,72 @@ impl SinkConfig for DatabendConfig {
             }
         };
         let encoding: EncodingConfig = self.encoding.clone().into();
-        let serializer = match self.encoding.config() {
+        match self.encoding.config() {
             DatabendSerializerConfig::Json(_) => {
                 file_format_options.insert("type", "NDJSON");
                 file_format_options.insert("missing_field_as", self.missing_field_as.as_str());
-                encoding.build()?
             }
             DatabendSerializerConfig::Csv(_) => {
                 file_format_options.insert("type", "CSV");
                 file_format_options.insert("field_delimiter", ",");
                 file_format_options.insert("record_delimiter", "\n");
                 file_format_options.insert("skip_header", "0");
-                encoding.build()?
             }
-        };
-        let framer = FramingConfig::NewlineDelimited.build();
+        }
         let transformer = encoding.transformer();
+
+        Ok(ValidatedDatabend {
+            endpoint,
+            request_settings,
+            batch_settings,
+            file_format_options,
+            compression,
+            transformer,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedDatabend,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedDatabend {
+            endpoint,
+            request_settings,
+            batch_settings,
+            file_format_options,
+            compression,
+            transformer,
+        } = validated;
+
+        let ua = format!("vector/{}", vector_version());
+        let health_client = DatabendAPIClient::new(endpoint, Some(ua.clone())).await?;
+        let healthcheck = select_one(health_client).boxed();
 
         let mut copy_options = BTreeMap::new();
         copy_options.insert("purge", "true");
 
-        let client = DatabendAPIClient::new(&endpoint, Some(ua)).await?;
+        let client = DatabendAPIClient::new(endpoint, Some(ua)).await?;
         let service = DatabendService::new(
             client,
             self.table.clone(),
-            file_format_options,
+            file_format_options.clone(),
             copy_options,
         )?;
         let service = ServiceBuilder::new()
-            .settings(request_settings, DatabendRetryLogic)
+            .settings(request_settings.clone(), DatabendRetryLogic)
             .service(service);
 
+        let encoding: EncodingConfig = self.encoding.clone().into();
+        let serializer = encoding.build()?;
+        let framer = FramingConfig::NewlineDelimited.build();
         let encoder = Encoder::<Framer>::new(framer, serializer);
-        let request_builder = DatabendRequestBuilder::new(compression, (transformer, encoder));
+        let request_builder =
+            DatabendRequestBuilder::new(*compression, (transformer.clone(), encoder));
 
-        let sink = DatabendSink::new(batch_settings, request_builder, service);
+        let sink = DatabendSink::new(*batch_settings, request_builder, service);
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
-    fn input(&self) -> Input {
-        Input::log()
-    }
-
-    fn acknowledgements(&self) -> &AcknowledgementsConfig {
-        &self.acknowledgements
     }
 }
 
@@ -221,6 +274,34 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatabendConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        use crate::config::ValidatedSink;
+        let config = serde_yaml::from_str::<DatabendConfig>(indoc::indoc! {r#"
+            endpoint: "databend://localhost:8000/mydatabase?sslmode=disable"
+            table: "mytable"
+        "#})
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert!(validated.endpoint.starts_with("databend://localhost:8000"));
+        assert!(matches!(validated.compression, Compression::None));
+    }
+
+    #[test]
+    fn validate_rejects_empty_table() {
+        use crate::config::ValidatedSink;
+        let config = serde_yaml::from_str::<DatabendConfig>(indoc::indoc! {r#"
+            endpoint: "databend://localhost:8000/mydatabase?sslmode=disable"
+            table: ""
+        "#})
+        .unwrap();
+        let err = config.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("`table` is required"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

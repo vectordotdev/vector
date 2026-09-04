@@ -20,7 +20,6 @@ components: transforms: incremental_to_absolute: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.incremental_to_absolute.configuration

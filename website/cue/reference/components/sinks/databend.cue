@@ -18,7 +18,6 @@ components: sinks: databend: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -72,7 +71,6 @@ components: sinks: databend: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.databend.configuration

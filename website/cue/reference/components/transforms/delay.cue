@@ -26,10 +26,11 @@ components: transforms: delay: {
 				items are emitted in the same millisecond.
 				""",
 		]
-		notices: []
 	}
 
-	configuration: generated.components.transforms.delay.configuration
+	configuration: generated.components.transforms.delay.configuration & {
+		delay_ms: type: uint: examples: [5000]
+	}
 
 	input: {
 		logs: true

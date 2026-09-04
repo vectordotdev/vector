@@ -62,33 +62,30 @@ type CacheValue = (Program, String, MeaningList);
 pub struct RemapConfig {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
-    /// Required if `file` is missing.
-    ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
-    #[configurable(metadata(
-        docs::examples = ". = parse_json!(.message)\n.new_field = \"new value\"\n.status = to_int!(.status)\n.duration = parse_duration!(.duration, \"s\")\n.new_name = del(.old_name)",
-        docs::syntax_override = "remap_program"
-    ))]
+    #[configurable(
+        required_one_of = "program",
+        metadata(
+            docs::examples = ". = parse_json!(.message)\n.new_field = \"new value\"\n.status = to_int!(.status)\n.duration = parse_duration!(.duration, \"s\")\n.new_name = del(.old_name)",
+            docs::syntax_override = "vrl_program"
+        )
+    )]
     pub source: Option<String>,
 
     /// File path to the [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
     /// If a relative path is provided, its root is the current working directory.
     ///
-    /// Required if `source` is missing.
-    ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
-    #[configurable(metadata(docs::examples = "./my/program.vrl"))]
+    #[configurable(required_one_of = "program")]
     pub file: Option<PathBuf>,
 
     /// File paths to the [Vector Remap Language][vrl] (VRL) programs to execute for each event.
     ///
     /// If a relative path is provided, its root is the current working directory.
     ///
-    /// Required if `source` or `file` are missing.
-    ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
-    #[configurable(metadata(docs::examples = "['./my/program.vrl', './my/program2.vrl']"))]
+    #[configurable(required_one_of = "program")]
     pub files: Option<Vec<PathBuf>>,
 
     /// When set to `single`, metric tag values are exposed as single strings, the
@@ -97,6 +94,11 @@ pub struct RemapConfig {
     ///
     /// When set to `full`, all metric tags are exposed as arrays of either string or null
     /// values.
+    ///
+    /// When set to `auto`, single-value tags are exposed as strings and multi-value tags as
+    /// arrays. Writes follow the same convention -- assigning a string or null produces a
+    /// single tag, assigning an array produces a multi-value tag. This preserves the
+    /// underlying shape of metrics that mix single- and multi-value tags.
     #[serde(default)]
     pub metric_tag_values: MetricTagValues,
 
@@ -109,7 +111,6 @@ pub struct RemapConfig {
     /// [global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     pub timezone: Option<TimeZone>,
 
     /// Drops any event that encounters an error during processing.
@@ -153,11 +154,11 @@ pub struct RemapConfig {
     #[configurable(metadata(docs::human_name = "Reroute Dropped Events"))]
     pub reroute_dropped: bool,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub runtime: VrlRuntime,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(skip)]
     #[derivative(Debug = "ignore")]
     /// Cache can't be `BTreeMap` or `HashMap` because of `TableRegistry`, which doesn't allow us to inspect tables inside it.
@@ -280,7 +281,10 @@ impl TransformConfig for RemapConfig {
         Ok(transform)
     }
 
-    fn validate_env(&self, context: &TransformContext) -> std::result::Result<(), Vec<String>> {
+    fn validate_with_context(
+        &self,
+        context: &TransformContext,
+    ) -> std::result::Result<(), Vec<String>> {
         self.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.metrics_storage.clone(),
@@ -426,6 +430,8 @@ where
 }
 
 pub trait VrlRunner {
+    fn new() -> Self;
+
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -448,6 +454,12 @@ impl Clone for AstRunner {
 }
 
 impl VrlRunner for AstRunner {
+    fn new() -> Self {
+        Self {
+            runtime: Runtime::default(),
+        }
+    }
+
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -465,16 +477,7 @@ impl Remap<AstRunner> {
         config: RemapConfig,
         context: &TransformContext,
     ) -> crate::Result<(Self, String)> {
-        let (program, warnings, _) = config.compile_vrl_program(
-            context.enrichment_tables.clone(),
-            context.metrics_storage.clone(),
-            context.merged_schema_definition.clone(),
-        )?;
-
-        let runtime = Runtime::default();
-        let runner = AstRunner { runtime };
-
-        Self::new(config, context, program, runner).map(|remap| (remap, warnings))
+        Self::new(config, context)
     }
 }
 
@@ -482,24 +485,30 @@ impl<Runner> Remap<Runner>
 where
     Runner: VrlRunner,
 {
-    fn new(
-        config: RemapConfig,
-        context: &TransformContext,
-        program: Program,
-        runner: Runner,
-    ) -> crate::Result<Self> {
-        Ok(Remap {
-            component_key: context.key.clone(),
-            program,
-            timezone: config
-                .timezone
-                .unwrap_or_else(|| context.globals.timezone()),
-            drop_on_error: config.drop_on_error,
-            drop_on_abort: config.drop_on_abort,
-            reroute_dropped: config.reroute_dropped,
-            runner,
-            metric_tag_values: config.metric_tag_values,
-        })
+    pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<(Self, String)> {
+        let (program, warnings, _) = config.compile_vrl_program(
+            context.enrichment_tables.clone(),
+            context.metrics_storage.clone(),
+            context.merged_schema_definition.clone(),
+        )?;
+
+        let runner = Runner::new();
+
+        Ok((
+            Remap {
+                component_key: context.key.clone(),
+                program,
+                timezone: config
+                    .timezone
+                    .unwrap_or_else(|| context.globals.timezone()),
+                drop_on_error: config.drop_on_error,
+                drop_on_abort: config.drop_on_abort,
+                reroute_dropped: config.reroute_dropped,
+                runner,
+                metric_tag_values: config.metric_tag_values,
+            },
+            warnings,
+        ))
     }
 
     #[cfg(test)]
@@ -604,14 +613,7 @@ where
             .map(|log| log.namespace())
             .unwrap_or(LogNamespace::Legacy);
 
-        let mut target = VrlTarget::new(
-            event,
-            self.program.info(),
-            match self.metric_tag_values {
-                MetricTagValues::Single => false,
-                MetricTagValues::Full => true,
-            },
-        );
+        let mut target = VrlTarget::new(event, self.program.info(), self.metric_tag_values.into());
         let result = self.run_vrl(&mut target);
 
         match result {
@@ -778,7 +780,7 @@ mod tests {
     fn get_field_string(event: &Event, field: &str) -> String {
         event
             .as_log()
-            .get(field)
+            .get(&vrl::path::parse_target_path(field).unwrap())
             .unwrap()
             .to_string_lossy()
             .into_owned()
@@ -798,7 +800,7 @@ mod tests {
 
         let event1 = {
             let mut event1 = LogEvent::from("event1");
-            event1.insert("sentinel", "bar");
+            event1.insert(vrl::event_path!("sentinel"), "bar");
             Event::from(event1)
         };
         let result1 = transform_one(&mut tform, event1).unwrap();
@@ -812,7 +814,7 @@ mod tests {
         };
         let result2 = transform_one(&mut tform, event2).unwrap();
         assert_eq!(get_field_string(&result2, "message"), "event2");
-        assert_eq!(result2.as_log().get("foo"), Some(&Value::Null));
+        assert_eq!(result2.as_log().get(event_path!("foo")), Some(&Value::Null));
         assert!(tform.runner().runtime.is_empty());
     }
 
@@ -829,7 +831,7 @@ mod tests {
                 .insert(&owned_value_path!("vector"), BTreeMap::new());
 
             let mut event = LogEvent::new_with_metadata(metadata);
-            event.insert("copy_from", "buz");
+            event.insert(event_path!("copy_from"), "buz");
             Event::from(event)
         };
 
@@ -862,7 +864,7 @@ mod tests {
     fn check_remap_adds() {
         let event = {
             let mut event = LogEvent::from("augment me");
-            event.insert("copy_from", "buz");
+            event.insert(event_path!("copy_from"), "buz");
             Event::from(event)
         };
 
@@ -893,7 +895,7 @@ mod tests {
         let event = {
             let mut event = LogEvent::from("augment me");
             event.insert(
-                "events",
+                event_path!("events"),
                 vec![btreemap!("message" => "foo"), btreemap!("message" => "bar")],
             );
             Event::from(event)
@@ -927,7 +929,7 @@ mod tests {
     fn check_remap_error() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -946,16 +948,19 @@ mod tests {
 
         let event = transform_one(&mut tform, event).unwrap();
 
-        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
-        assert!(event.as_log().get("foo").is_none());
-        assert!(event.as_log().get("baz").is_none());
+        assert_eq!(
+            event.as_log().get(event_path!("bar")),
+            Some(&Value::from("is a string"))
+        );
+        assert!(event.as_log().get(event_path!("foo")).is_none());
+        assert!(event.as_log().get(event_path!("baz")).is_none());
     }
 
     #[test]
     fn check_remap_error_drop() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -979,7 +984,7 @@ mod tests {
     fn check_remap_error_infallible() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -997,16 +1002,25 @@ mod tests {
 
         let event = transform_one(&mut tform, event).unwrap();
 
-        assert_eq!(event.as_log().get("foo"), Some(&Value::from("foo")));
-        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
-        assert_eq!(event.as_log().get("baz"), Some(&Value::from(12)));
+        assert_eq!(
+            event.as_log().get(event_path!("foo")),
+            Some(&Value::from("foo"))
+        );
+        assert_eq!(
+            event.as_log().get(event_path!("bar")),
+            Some(&Value::from("is a string"))
+        );
+        assert_eq!(
+            event.as_log().get(event_path!("baz")),
+            Some(&Value::from(12))
+        );
     }
 
     #[test]
     fn check_remap_abort() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -1025,16 +1039,19 @@ mod tests {
 
         let event = transform_one(&mut tform, event).unwrap();
 
-        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
-        assert!(event.as_log().get("foo").is_none());
-        assert!(event.as_log().get("baz").is_none());
+        assert_eq!(
+            event.as_log().get(event_path!("bar")),
+            Some(&Value::from("is a string"))
+        );
+        assert!(event.as_log().get(event_path!("foo")).is_none());
+        assert!(event.as_log().get(event_path!("baz")).is_none());
     }
 
     #[test]
     fn check_remap_abort_drop() {
         let event = {
             let mut event = Event::Log(LogEvent::from("augment me"));
-            event.as_mut_log().insert("bar", "is a string");
+            event.as_mut_log().insert(event_path!("bar"), "is a string");
             event
         };
 
@@ -1970,7 +1987,7 @@ mod tests {
             event
                 .metadata_mut()
                 .value_mut()
-                .insert("vector", BTreeMap::new());
+                .insert(vrl::path!("vector"), BTreeMap::new());
             Event::from(event)
         };
 
@@ -1989,7 +2006,7 @@ mod tests {
         let result = transform_one(&mut tform, event).unwrap();
 
         // Legacy namespace nests this under "message", Vector should set it as the root
-        assert_eq!(result.as_log().get("."), Some(&Value::Null));
+        assert_eq!(result.as_log().get(event_path!()), Some(&Value::Null));
 
         let outputs1 = conf.outputs(
             &Default::default(),
