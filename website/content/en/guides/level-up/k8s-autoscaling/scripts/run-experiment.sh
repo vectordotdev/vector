@@ -290,12 +290,21 @@ run_hpa_phase() {
                -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' \
                2>/dev/null || echo "")
 
-    if [[ -n "$replicas" && "$replicas" != "$last_replicas" ]]; then
+    # A missing status field or a metrics-server hiccup yields empty values
+    # (jsonpath returns "" with exit 0). An empty reading is not data: don't
+    # let it count toward stability, and keep the maxReplicas fail-fast live.
+    if [[ -z "$replicas" || -z "$cpu_avg" ]]; then
+      log "[${elapsed}s] HPA metrics unavailable (replicas=${replicas:-?}, cpu=${cpu_avg:-?}); retrying..."
+      sleep 15
+      continue
+    fi
+
+    if [[ "$replicas" != "$last_replicas" ]]; then
       scale_events=$(( scale_events + 1 ))
       log "[${elapsed}s] SCALE ${last_replicas}→${replicas}  cpu=${cpu_avg}%"
       last_replicas=$replicas
     else
-      log "[${elapsed}s] replicas=${replicas:-?}  cpu=${cpu_avg:-?}%"
+      log "[${elapsed}s] replicas=${replicas}  cpu=${cpu_avg}%"
     fi
 
     if [[ "$replicas" == "$last_stable" ]]; then
