@@ -42,9 +42,8 @@ trap 'rm -rf "$TMPDIR_WORK"; pkill -f "kubectl port-forward.*vector-perf.*pod/" 
 # ── helpers ───────────────────────────────────────────────────────────────────
 log() { echo "==> $*" >&2; }
 
-# Helm owns every desired-state change. kubectl is used only to observe the
-# cluster and port-forward to Vector's observability API.
-kube() { kubectl "$@"; }
+# kubectl is used only to observe the cluster and port-forward to Vector's
+# observability API; Helm owns every desired-state change.
 
 helm_vector() {
   helm upgrade --install vector vectordotdev/vector \
@@ -67,11 +66,11 @@ wait_stable() {
   log "Waiting for Vector pods to stabilise under load..."
   while [[ "$elapsed" -lt "$max_wait" ]]; do
     local restarts all_ready
-    restarts=$(kube get pods -n "$NAMESPACE" -l app.kubernetes.io/name=vector \
+    restarts=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=vector \
       -o jsonpath='{range .items[*]}{.status.containerStatuses[0].restartCount}{"\n"}{end}' \
       2>/dev/null | paste -sd,)
     all_ready=false
-    kube wait --for=condition=Ready pod -l app.kubernetes.io/name=vector \
+    kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=vector \
       -n "$NAMESPACE" --timeout=15s >/dev/null 2>&1 && all_ready=true
 
     if [[ "$restarts" == "$last_restarts" && -n "$restarts" && "$all_ready" == true ]]; then
@@ -106,19 +105,19 @@ wait_stable() {
 reset_vector() {
   log "Resetting Vector to 0 replicas for a clean run..."
   helm_vector --set replicas=0 --set autoscaling.enabled=false
-  kube wait --for=delete pod -l app.kubernetes.io/name=vector \
+  kubectl wait --for=delete pod -l app.kubernetes.io/name=vector \
     -n "$NAMESPACE" --timeout=60s >/dev/null 2>&1 || true
 }
 
 pick_pods() {
-  kube get pods -n "$NAMESPACE" -l app.kubernetes.io/name=vector \
+  kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=vector \
     --field-selector=status.phase=Running \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
 }
 
 # Average CPU % across all Vector pods via kubectl top. Outputs e.g. "97%".
 avg_cpu_pct() {
-  kube top pods -n "$NAMESPACE" -l app.kubernetes.io/name=vector \
+  kubectl top pods -n "$NAMESPACE" -l app.kubernetes.io/name=vector \
     --no-headers 2>/dev/null \
     | awk '{gsub("m","",$2); sum+=$2; n++} END {
         if (n>0) printf "%d%%", int(sum/n/10)
@@ -131,7 +130,7 @@ avg_cpu_pct() {
 start_port_forward() {
   local pod=$1 port=$2 logfile=$3
 
-  kube port-forward -n "$NAMESPACE" "pod/$pod" "${port}:8686" > "$logfile" 2>&1 &
+  kubectl port-forward -n "$NAMESPACE" "pod/$pod" "${port}:8686" > "$logfile" 2>&1 &
   local pf_pid=$!
 
   # Wait up to 10 s for the gRPC health check to pass.
@@ -280,9 +279,9 @@ run_hpa_phase() {
       exit 1
     fi
 
-    replicas=$(kube get hpa vector -n "$NAMESPACE" \
+    replicas=$(kubectl get hpa vector -n "$NAMESPACE" \
                -o jsonpath='{.status.currentReplicas}' 2>/dev/null || echo "")
-    cpu_avg=$(kube get hpa vector -n "$NAMESPACE" \
+    cpu_avg=$(kubectl get hpa vector -n "$NAMESPACE" \
                -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' \
                2>/dev/null || echo "")
 
