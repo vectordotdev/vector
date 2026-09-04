@@ -2,22 +2,58 @@
 date: "2026-07-01"
 title: Load balancing and scaling Vector on Kubernetes
 short: K8s autoscaling
-description: Learn how to scale a CPU-bound Vector deployment on Kubernetes, first manually with an L7 load balancer and then automatically with the Horizontal Pod Autoscaler.
+description: Learn how to take a CPU-bound Vector deployment beyond one pod on Kubernetes by measuring capacity, distributing HTTP traffic, and configuring autoscaling.
 authors: ["thomasqueirozb"]
 domain: platforms
 weight: 7
 tags: ["level up", "guides", "guide", "kubernetes", "load balancing", "nginx"]
 ---
 
-Running a CPU-intensive Vector pipeline in Kubernetes without the right setup
-is likely to hit a ceiling and fail under load. Vector is a fast, focused data
-pipeline, not a platform that handles scaling or load balancing automatically.
+This guide is for engineers who already run a Vector pipeline on Kubernetes
+and need to scale a CPU-bound deployment beyond one pod. It walks through how
+to measure capacity, make additional replicas useful, and automate replica
+counts with the Kubernetes [Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/).
 
-In this guide, we'll show how a single Vector pod reaches its CPU ceiling while
-parsing [Apache Common Log Format](https://httpd.apache.org/docs/current/logs.html#common) data. We'll then eliminate that ceiling by manually
-scaling Vector horizontally behind the [NGINX](https://www.nginx.com/) Ingress Controller, an L7 load balancer. Finally, we'll set up automatic
-scaling by using the Kubernetes [Horizontal Pod Autoscaler (HPA)](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
-to reach a stable replica count that maintains a target average CPU utilization of 70%.
+We start by measuring a single pod and testing manual scaling to verify that
+additional pods increase throughput before handing replica management to the HPA.
+
+{{< requirement >}}
+This guide assumes you understand Vector sources, transforms, and sinks, and
+are comfortable with Kubernetes Deployments, Services, CPU requests and
+limits, and Helm releases. You do not need prior experience configuring an HPA.
+
+If you are new to Vector or Kubernetes, start with the
+[Vector quickstart](/docs/setup/quickstart/) and the
+[Kubernetes installation guide](/docs/setup/installation/platforms/kubernetes/).
+This guide builds on a working deployment rather than teaching those basics.
+{{< /requirement >}}
+
+## What you'll learn
+
+By the end of the walkthrough, you should be able to:
+
+1. **Measure a single pod's CPU-bound capacity** and use that baseline to
+   estimate replica requirements ([Phase 1](#phase-1-single-pod)).
+2. **Distribute HTTP requests to new replicas** with L7 load balancing, then
+   verify that manual scaling improves throughput ([Phases 2–3](#phase-2-3-pods)).
+3. **Configure CPU-based autoscaling with headroom** and interpret the replica
+   count it settles on ([Phase 4](#phase-4-hpa-finds-equilibrium)).
+4. **Recognize when autoscaling cannot protect against event loss** and choose
+   how to handle load while pods start ([Handling sudden bursts](#handling-sudden-bursts)).
+
+The experiment uses a stateless pipeline parsing
+[Apache Common Log Format](https://httpd.apache.org/docs/current/logs.html#common)
+data over HTTP behind the [NGINX](https://www.nginx.com/) Ingress Controller.
+It isolates Vector CPU capacity, not downstream sink limits or cluster node
+scaling. Treat the replica counts and 70% CPU target as results and settings
+for this workload, not production sizing recommendations.
+
+If you already operate autoscaled Vector deployments, you can skip the basic
+setup and scaling phases. The sections on
+[burst handling](#handling-sudden-bursts) and
+[HPA rounding and stabilization](#deep-dive-why-the-hpa-can-stabilize-at-six-pods)
+are useful when diagnosing slow scale-up or an unexpected steady-state replica
+count; the walkthrough is not a comprehensive production operations guide.
 
 All steps in this guide are reproducible. See [Replicating these results](#replicating-these-results)
 for the manifests and Helm values used.
@@ -109,6 +145,10 @@ This is why we installed an NGINX Ingress Controller in front of Vector instead 
 Vector through a ClusterIP Service.
 
 ## Prerequisites
+
+The following tools and cluster capacity are needed to reproduce the experiments,
+not just to read the guide. Use a test environment: the workload deliberately
+overloads Vector, and the consumer discards the output.
 
 - [`helm`](https://helm.sh/) version 3.0 or later, configured against a target cluster
 - [`kubectl`](https://kubernetes.io/docs/reference/kubectl/) for read-only cluster inspection and port-forwarding
@@ -431,6 +471,11 @@ If sudden bursts must not lose data, use one or more of the following:
    one minute or longer. That can exceed the NGINX Ingress Controller's
    60-second default proxy timeouts and cause in-flight events to be lost. Keep
    enough pods Ready to absorb the burst or put a durable queue before Vector.
+
+For your own deployment, the next step is to repeat the single-pod measurement
+with representative traffic in a test environment, then verify traffic reaches
+added replicas before enabling the HPA. Test burst behavior as well as steady-state
+throughput; a stable replica count alone does not establish reliable delivery.
 
 ## Replicating these results
 
