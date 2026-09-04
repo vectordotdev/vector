@@ -179,16 +179,16 @@ struct UsageInstrumentation {
 }
 
 impl UsageAccounting {
-    fn record(self, handle: &BufferUsageHandle, item_count: usize, item_size: usize) {
+    fn record(self, instrumentation: &BufferUsageHandle, item_count: usize, item_size: usize) {
         match self {
-            Self::Accepted => handle
+            Self::Accepted => instrumentation
                 .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64),
             Self::DroppedNewest => {
-                handle.increment_received_event_count_and_byte_size(
+                instrumentation.increment_received_event_count_and_byte_size(
                     item_count as u64,
                     item_size as u64,
                 );
-                handle.increment_dropped_event_count_and_byte_size(
+                instrumentation.increment_dropped_event_count_and_byte_size(
                     item_count as u64,
                     item_size as u64,
                     true,

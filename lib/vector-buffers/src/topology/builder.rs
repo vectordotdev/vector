@@ -166,7 +166,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
             if !provides_instrumentation {
                 receiver.with_usage_instrumentation(usage_handle.clone());
             }
-            sender.with_usage_instrumentation(usage_handle.clone(), provides_instrumentation);
+            sender.with_usage_instrumentation(usage_handle, provides_instrumentation);
 
             current_stage = Some((sender, receiver));
         }
