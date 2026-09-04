@@ -598,8 +598,7 @@ where
                 abandoned_tail_bytes,
                 "Data file tail was abandoned after bad read. Adjusting buffer size to compensate.",
             );
-            self.ledger
-                .decrement_total_buffer_size(abandoned_tail_bytes);
+            self.ledger.track_abandoned_tail_bytes(abandoned_tail_bytes);
         }
 
         Ok(())

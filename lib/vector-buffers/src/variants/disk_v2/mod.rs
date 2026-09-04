@@ -179,7 +179,7 @@ use std::{
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
-use tracing::debug;
+use tracing::{debug, info};
 use vector_common::finalization::Finalizable;
 
 mod backed_archive;
@@ -211,6 +211,15 @@ use crate::{
         channel::{ReceiverAdapter, SenderAdapter},
     },
 };
+
+/// An approximate view of unread records in a disk buffer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DiskBufferUsageSnapshot {
+    /// Number of unread events in the buffer.
+    pub event_count: u64,
+    /// Encoded size of unread records in the buffer.
+    pub byte_size: u64,
+}
 
 /// Error that occurred when creating/loading a disk buffer.
 #[derive(Debug, Snafu)]
@@ -396,7 +405,8 @@ where
     usage_handle.set_buffer_limits(Some(max_size.get()), None);
 
     let buffer_path = get_disk_v2_data_dir_path(data_dir, id);
-    let builder = DiskBufferConfigBuilder::from_path(buffer_path).max_buffer_size(max_size.get());
+    let builder =
+        DiskBufferConfigBuilder::from_path(buffer_path.clone()).max_buffer_size(max_size.get());
     // Shrink the data-file size (and the matching record size) so files fill and
     // rotate constantly. That is what reaches the rare recovery paths the bug hides
     // in: reopening a file whose last write was cut short, and reusing a file number
@@ -412,9 +422,21 @@ where
         None => builder,
     };
     let config = builder.build()?;
-    Buffer::from_config(config, usage_handle)
+    let (writer, reader) = Buffer::from_config(config, usage_handle)
         .await
-        .map_err(Into::into)
+        .map_err(Box::<dyn Error + Send + Sync>::from)?;
+    let usage = writer.usage_snapshot();
+    if usage.event_count > 0 || usage.byte_size > 0 {
+        info!(
+            buffer_id = id,
+            buffer_dir = buffer_path.to_string_lossy().as_ref(),
+            accounted_events = usage.event_count,
+            accounted_bytes = usage.byte_size,
+            message = "Opened disk buffer with remaining accounted data; resuming processing.",
+        );
+    }
+
+    Ok((writer, reader))
 }
 
 pub(crate) fn get_disk_v2_data_dir_path(base_dir: &Path, buffer_id: &str) -> PathBuf {
