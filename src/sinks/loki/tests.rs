@@ -166,8 +166,10 @@ async fn healthcheck_uses_configured_uri_with_uri_auth_precedence() {
     tokio::spawn(server);
 
     // Credentials embedded in the configured healthcheck URI take precedence
-    // over the sink auth ("user:pass", not "username:some_password").
-    let healthcheck_uri: UriSerde = format!("http://user:pass@{addr}/ready")
+    // over the sink auth ("user:pass", not "username:some_password"). The path
+    // `/health` shares no segment with the default `/ready` append path, so the
+    // assertions below prove the configured URI is used verbatim.
+    let healthcheck_uri: UriSerde = format!("http://user:pass@{addr}/health")
         .parse()
         .expect("could not create healthcheck URI");
 
@@ -192,8 +194,10 @@ async fn healthcheck_uses_configured_uri_with_uri_auth_precedence() {
         .into_iter()
         .next()
         .expect("healthcheck made no request");
-    // The configured URI is probed directly, not `endpoint` + `ready`.
-    assert_eq!(parts.uri.path(), "/ready");
+    // The configured URI is probed verbatim...
+    assert_eq!(parts.uri.path(), "/health");
+    // ...and the default `ready` append path is not used.
+    assert_ne!(parts.uri.path(), "/ready");
     assert_eq!(
         parts.headers.get("authorization"),
         Some(&http::header::HeaderValue::from_static(
