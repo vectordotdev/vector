@@ -1,7 +1,7 @@
 use super::{AggregateConfig, AggregationMode};
 
 use std::{
-    collections::{HashMap, hash_map::Entry},
+    collections::{BTreeMap, HashMap, hash_map::Entry},
     pin::Pin,
     time::Duration,
 };
@@ -78,26 +78,80 @@ impl From<AggregationMode> for InnerMode {
     }
 }
 
-type MetricEntry = (MetricData, EventMetadata);
+pub(crate) type MetricEntry = (MetricData, EventMetadata);
+
+pub(crate) type BucketKey = i64;
 
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
     map: HashMap<MetricSeries, MetricEntry>,
     mode: InnerMode,
+    pub(crate) event_time_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, MetricEntry>>,
+    /// Previous bucket *data* only (no `EventMetadata`) so Diff can subtract
+    /// without retaining acknowledgement finalizers after emission.
+    pub(crate) event_time_prev_buckets: BTreeMap<BucketKey, HashMap<MetricSeries, MetricData>>,
+    pub(crate) event_time_multi_buckets:
+        BTreeMap<BucketKey, HashMap<MetricSeries, Vec<MetricEntry>>>,
+    pub(crate) watermark: Option<BucketKey>,
+    pub(crate) config: AggregateConfig,
 }
+
+/// Upper bound for any millisecond-valued duration field that is later cast
+/// to `i64` for use with `chrono::Duration` and bucket arithmetic. Values
+/// above this would wrap when cast and silently produce negative durations,
+/// which corrupts watermark and future-skew checks.
+const MAX_DURATION_MS: u64 = i64::MAX as u64;
 
 impl Aggregate {
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
+        if config.interval_ms == 0 {
+            return Err("`interval_ms` must be greater than 0".into());
+        }
+        if config.interval_ms > MAX_DURATION_MS {
+            return Err(format!(
+                "`interval_ms` ({}) exceeds the maximum supported value of {} ms",
+                config.interval_ms, MAX_DURATION_MS
+            )
+            .into());
+        }
+        if let Some(event_time) = &config.event_time {
+            if event_time.max_future_ms > MAX_DURATION_MS {
+                return Err(format!(
+                    "`event_time.max_future_ms` ({}) exceeds the maximum supported value of {} ms",
+                    event_time.max_future_ms, MAX_DURATION_MS
+                )
+                .into());
+            }
+            if event_time.allowed_lateness_ms > MAX_DURATION_MS {
+                return Err(format!(
+                    "`event_time.allowed_lateness_ms` ({}) exceeds the maximum supported value of {} ms",
+                    event_time.allowed_lateness_ms, MAX_DURATION_MS
+                )
+                .into());
+            }
+        }
+
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
             map: Default::default(),
             mode: config.mode.into(),
+            event_time_buckets: Default::default(),
+            event_time_prev_buckets: Default::default(),
+            event_time_multi_buckets: Default::default(),
+            watermark: None,
+            config: *config,
         })
     }
 
     pub fn record(&mut self, event: Event) -> Option<Event> {
-        let (series, data, metadata) = event.into_metric().into_parts();
+        let metric = event.into_metric();
+        let timestamp = metric.timestamp();
+        let (series, data, metadata) = metric.into_parts();
+
+        if self.config.is_event_time() {
+            return self.record_event_time(series, data, metadata, timestamp);
+        }
 
         match (&mut self.mode, data.kind) {
             (InnerMode::Sum, MetricKind::Absolute)
@@ -133,26 +187,67 @@ impl Aggregate {
                 }
             }
         }
+
         emit!(AggregateEventRecorded);
         None
     }
 
-    fn record_count(
-        &mut self,
-        series: MetricSeries,
-        mut data: MetricData,
-        metadata: EventMetadata,
-    ) {
-        let mut count_data = data.clone();
-        let existing = self.map.entry(series).or_insert_with(|| {
-            *data.value_mut() = MetricValue::Counter { value: 0f64 };
-            (data.clone(), metadata.clone())
-        });
-        *count_data.value_mut() = MetricValue::Counter { value: 1f64 };
-        if existing.0.kind == data.kind && existing.0.update(&count_data) {
-            existing.1.merge(metadata);
-        } else {
-            emit!(AggregateUpdateFailed);
+    /// Returns `true` for the system-time passthrough arms in `record()` — metrics
+    /// that are forwarded downstream immediately without being aggregated.
+    pub(crate) const fn passes_through_unchanged(mode: AggregationMode, data: &MetricData) -> bool {
+        matches!(
+            (mode, data.kind),
+            (AggregationMode::Sum, MetricKind::Absolute)
+                | (AggregationMode::Latest, MetricKind::Incremental)
+                | (AggregationMode::Diff, MetricKind::Incremental)
+                | (AggregationMode::Max, MetricKind::Incremental)
+                | (AggregationMode::Min, MetricKind::Incremental)
+                | (AggregationMode::Mean, MetricKind::Incremental)
+                | (AggregationMode::Stdev, MetricKind::Incremental)
+        )
+    }
+
+    /// Returns `true` for metrics that system-time accepts but does not store or
+    /// pass through — currently absolute non-gauge values in `Mean`/`Stdev`.
+    pub(crate) const fn is_silently_ignored(mode: AggregationMode, data: &MetricData) -> bool {
+        matches!(mode, AggregationMode::Mean | AggregationMode::Stdev)
+            && matches!(data.kind, MetricKind::Absolute)
+            && !matches!(data.value, MetricValue::Gauge { value: _ })
+    }
+
+    /// Returns `true` iff a record with the given `kind`/`value` would be
+    /// stored under `mode`. Mirrors the per-mode filters in `record_sum`,
+    /// `record_comparison`, the `Latest`/`Diff` Absolute-only path, and the
+    /// `Mean`/`Stdev` Gauge check, so the (mode, kind, value) compatibility
+    /// can be decided *before* a bucket entry is created.
+    ///
+    /// This matters because in event-time mode an empty bucket is still
+    /// considered eligible to flush and would *advance the watermark*; we
+    /// must therefore avoid materialising buckets for events that the mode
+    /// would silently no-op on, otherwise a stray incompatible event could
+    /// reject valid in-order events for earlier buckets.
+    ///
+    /// Passthrough and silently-ignored metrics are handled in `record()` before
+    /// this is relevant; callers that reach `record_into_bucket` must already
+    /// be storable (`debug_assert!` in tests).
+    pub(crate) const fn will_be_stored(mode: AggregationMode, data: &MetricData) -> bool {
+        match mode {
+            // `Auto` stores both kinds (sum incremental, latest absolute).
+            // `Count` stores both kinds; per-series kind mismatches surface
+            // later via `AggregateUpdateFailed`, but the first event for a
+            // series always lands so a bucket is never created spuriously.
+            AggregationMode::Auto | AggregationMode::Count => true,
+            AggregationMode::Sum => matches!(data.kind, MetricKind::Incremental),
+            // `Latest`/`Diff` and `Max`/`Min` only act on absolute metrics.
+            AggregationMode::Latest
+            | AggregationMode::Diff
+            | AggregationMode::Max
+            | AggregationMode::Min => matches!(data.kind, MetricKind::Absolute),
+            // `Mean`/`Stdev` only record absolute Gauges.
+            AggregationMode::Mean | AggregationMode::Stdev => {
+                matches!(data.kind, MetricKind::Absolute)
+                    && matches!(data.value, MetricValue::Gauge { value: _ })
+            }
         }
     }
 
@@ -171,6 +266,27 @@ impl Aggregate {
             Entry::Vacant(entry) => {
                 entry.insert((data, metadata));
             }
+        }
+    }
+
+    fn record_count(
+        &mut self,
+        series: MetricSeries,
+        mut data: MetricData,
+        metadata: EventMetadata,
+    ) {
+        let mut count_data = data.clone();
+        let existing = self.map.entry(series).or_insert_with(|| {
+            *data.value_mut() = MetricValue::Counter { value: 0f64 };
+            (data.clone(), metadata.clone())
+        });
+        *count_data.value_mut() = MetricValue::Counter { value: 1f64 };
+        // Count mode counts every sample regardless of kind (a series may mix
+        // Absolute and Incremental metrics), so — unlike Sum/Latest/Max/Min —
+        // kind must not gate the update or mixed-kind series get undercounted.
+        existing.1.merge(metadata);
+        if !existing.0.update(&count_data) {
+            emit!(AggregateUpdateFailed);
         }
     }
 
@@ -209,8 +325,28 @@ impl Aggregate {
             }
         }
     }
-
     pub fn flush_into(&mut self, output: &mut Vec<Event>) {
+        if self.config.is_event_time() {
+            self.flush_event_time_buckets(output, false);
+        } else {
+            self.flush_system_time(output);
+        }
+    }
+
+    /// Final flush invoked when the input stream closes. In event-time mode
+    /// this drains every remaining bucket regardless of the wall-clock
+    /// predicate so that metrics in still-open windows are emitted on
+    /// shutdown or topology reload, matching system-time semantics where
+    /// `flush_system_time` always empties `self.map`.
+    pub(crate) fn flush_final(&mut self, output: &mut Vec<Event>) {
+        if self.config.is_event_time() {
+            self.flush_event_time_buckets(output, true);
+        } else {
+            self.flush_system_time(output);
+        }
+    }
+
+    fn flush_system_time(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
             let mut metric = Metric::from_parts(series, entry.0, entry.1);
@@ -312,7 +448,10 @@ impl TaskTransform<Event> for Aggregate {
                     maybe_event = input_rx.next() => {
                         match maybe_event {
                             None => {
-                                self.flush_into(&mut output);
+                                // Drain any remaining event-time buckets on
+                                // shutdown so in-flight metrics still flow
+                                // downstream.
+                                self.flush_final(&mut output);
                                 done = true;
                             }
                             Some(event) => {

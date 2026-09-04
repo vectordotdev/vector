@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, sync::Arc, task::Poll, time::Duration};
 
+use chrono::{DateTime, TimeZone, Utc};
 use futures::{StreamExt, stream};
 use indoc::indoc;
 use tokio::sync::mpsc;
@@ -7,11 +8,14 @@ use tokio_stream::wrappers::ReceiverStream;
 use vector_lib::config::{ComponentKey, LogNamespace};
 use vrl::value::Kind;
 
-use super::*;
+use super::{
+    Aggregate, AggregateConfig, AggregationMode, EventTimeConfig, MissingTimestamp,
+    config::default_max_future_ms,
+};
 use crate::{
     config::{OutputId, TransformConfig, TransformContext},
     event::{
-        Event, Metric,
+        BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventStatus, Metric,
         metric::{MetricKind, MetricValue},
     },
     schema::Definition,
@@ -24,8 +28,79 @@ fn generate_config() {
     crate::test_util::test_generate_config::<AggregateConfig>();
 }
 
+#[test]
+fn rejects_zero_interval_ms() {
+    let result = Aggregate::new(&event_time_config(0, AggregationMode::Auto));
+
+    let err = result.expect_err("zero interval_ms must not be accepted");
+    assert!(
+        err.to_string().contains("interval_ms"),
+        "error should mention interval_ms",
+    );
+}
+
+#[test]
+fn validates_millisecond_fields_fit_i64() {
+    let invalid_configs = [
+        (
+            event_time_config(u64::MAX, AggregationMode::Auto),
+            "interval_ms",
+        ),
+        (
+            event_time_config_with(1000, AggregationMode::Auto, |et| {
+                et.max_future_ms = u64::MAX;
+            }),
+            "max_future_ms",
+        ),
+        (
+            event_time_config_with(1000, AggregationMode::Auto, |et| {
+                et.allowed_lateness_ms = u64::MAX;
+            }),
+            "allowed_lateness_ms",
+        ),
+    ];
+
+    for (config, field) in invalid_configs {
+        let error = Aggregate::new(&config).expect_err("u64::MAX must not be accepted");
+        assert!(
+            error.to_string().contains(field),
+            "error should mention {field}, got: {error}"
+        );
+    }
+
+    Aggregate::new(&event_time_config(i64::MAX as u64, AggregationMode::Auto))
+        .expect("i64::MAX is the largest accepted interval");
+    Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.max_future_ms = i64::MAX as u64;
+        et.allowed_lateness_ms = i64::MAX as u64;
+    }))
+    .expect("i64::MAX is accepted for event-time millisecond fields");
+}
+
 fn make_metric(name: &'static str, kind: MetricKind, value: MetricValue) -> Event {
-    let mut event = Event::Metric(Metric::new(name, kind, value))
+    make_metric_inner(name, kind, value, None)
+}
+
+fn make_metric_with_timestamp(
+    name: &'static str,
+    kind: MetricKind,
+    value: MetricValue,
+    timestamp: DateTime<Utc>,
+) -> Event {
+    make_metric_inner(name, kind, value, Some(timestamp))
+}
+
+fn make_metric_inner(
+    name: &'static str,
+    kind: MetricKind,
+    value: MetricValue,
+    timestamp: Option<DateTime<Utc>>,
+) -> Event {
+    let metric = match timestamp {
+        Some(ts) => Metric::new(name, kind, value).with_timestamp(Some(ts)),
+        None => Metric::new(name, kind, value),
+    };
+    let mut event = Event::Metric(metric)
         .with_source_id(Arc::new(ComponentKey::from("in")))
         .with_upstream_id(Arc::new(OutputId::from("transform")));
     event
@@ -34,19 +109,116 @@ fn make_metric(name: &'static str, kind: MetricKind, value: MetricValue) -> Even
             Kind::any_object(),
             [LogNamespace::Legacy],
         )));
-
     event.metadata_mut().set_source_type("unit_test_stream");
-
     event
+}
+
+fn flush_final(agg: &mut Aggregate) -> Vec<Event> {
+    let mut out = vec![];
+    agg.flush_final(&mut out);
+    out
+}
+
+fn assert_counter(event: &Event, expected: f64) {
+    match event.as_metric().value() {
+        MetricValue::Counter { value } => assert_eq!(*value, expected),
+        other => panic!("expected Counter {expected}, got {other:?}"),
+    }
+}
+
+fn assert_gauge(event: &Event, expected: f64) {
+    match event.as_metric().value() {
+        MetricValue::Gauge { value } => assert_eq!(*value, expected),
+        other => panic!("expected Gauge {expected}, got {other:?}"),
+    }
+}
+
+/// Deliver output events and assert every batch receiver resolves to Delivered.
+fn deliver_and_assert_batches(out: Vec<Event>, receivers: &mut [&mut BatchStatusReceiver]) {
+    for receiver in receivers.iter_mut() {
+        assert!(
+            receiver.try_recv().is_err(),
+            "finalizer resolved before delivery"
+        );
+    }
+    for event in &out {
+        event.metadata().update_status(EventStatus::Delivered);
+    }
+    drop(out);
+    for receiver in receivers {
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+}
+
+/// Event-time fixture with a distinct `source_type` (and optional batch notifier)
+/// so attribution/finalizer assertions can tell winner vs loser samples apart.
+fn metric_with_source(
+    name: &'static str,
+    kind: MetricKind,
+    value: MetricValue,
+    timestamp: DateTime<Utc>,
+    source_type: &'static str,
+    batch: Option<&BatchNotifier>,
+) -> Event {
+    let mut event = make_metric_with_timestamp(name, kind, value, timestamp);
+    if let Some(batch) = batch {
+        event = event.with_batch_notifier(batch);
+    }
+    event.metadata_mut().set_source_type(source_type);
+    event
+}
+
+/// Timestamp in the middle of the event-time bucket that is still open
+/// for recording (`now` is before `bucket_end + allowed_lateness_ms`).
+fn open_bucket_timestamp(interval_ms: u64) -> DateTime<Utc> {
+    event_time_bucket_timestamp(interval_ms, 0)
+}
+
+/// Timestamp in the bucket `bucket_offset` intervals ahead of the current
+/// open bucket (`0` = current, `1` = next, `-1` = previous, and so on).
+fn event_time_bucket_timestamp(interval_ms: u64, bucket_offset: i64) -> DateTime<Utc> {
+    let now_ms = Utc::now().timestamp_millis();
+    let interval_i64 = i64::try_from(interval_ms).expect("test interval fits in i64");
+    let current_key = now_ms.div_euclid(interval_i64).saturating_mul(interval_i64);
+    let bucket_key = current_key.saturating_add(bucket_offset.saturating_mul(interval_i64));
+    Utc.timestamp_millis_opt(bucket_key + interval_i64 / 2)
+        .single()
+        .expect("bucket midpoint is a valid timestamp")
+}
+
+fn system_time_config(mode: AggregationMode) -> AggregateConfig {
+    AggregateConfig {
+        interval_ms: 1000,
+        mode,
+        event_time: None,
+    }
+}
+
+fn event_time_config(interval_ms: u64, mode: AggregationMode) -> AggregateConfig {
+    AggregateConfig {
+        interval_ms,
+        mode,
+        event_time: Some(EventTimeConfig::default()),
+    }
+}
+
+fn event_time_config_with(
+    interval_ms: u64,
+    mode: AggregationMode,
+    f: impl FnOnce(&mut EventTimeConfig),
+) -> AggregateConfig {
+    let mut event_time = EventTimeConfig::default();
+    f(&mut event_time);
+    AggregateConfig {
+        interval_ms,
+        mode,
+        event_time: Some(event_time),
+    }
 }
 
 #[test]
 fn incremental_auto() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Auto,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
     let counter_a_1 = make_metric(
         "counter_a",
@@ -65,7 +237,7 @@ fn incremental_auto() {
     );
 
     // Single item, just stored regardless of kind
-    assert_eq!(agg.record(counter_a_1.clone()), None);
+    agg.record(counter_a_1.clone());
     let mut out = vec![];
     // We should flush 1 item counter_a_1
     agg.flush_into(&mut out);
@@ -83,8 +255,8 @@ fn incremental_auto() {
     assert_eq!(0, out.len());
 
     // Two increments with the same series, should sum into 1
-    assert_eq!(agg.record(counter_a_1.clone()), None);
-    assert_eq!(agg.record(counter_a_2), None);
+    agg.record(counter_a_1.clone());
+    agg.record(counter_a_2);
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -96,8 +268,8 @@ fn incremental_auto() {
         MetricValue::Counter { value: 44.0 },
     );
     // Two increments with the different series, should get each back as-is
-    assert_eq!(agg.record(counter_a_1.clone()), None);
-    assert_eq!(agg.record(counter_b_1.clone()), None);
+    agg.record(counter_a_1.clone());
+    agg.record(counter_b_1.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(2, out.len());
@@ -112,12 +284,54 @@ fn incremental_auto() {
 }
 
 #[test]
+fn passes_through_ignored_kind() {
+    // Sum mode aggregates incremental, passes through absolute without collapsing.
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Sum)).unwrap();
+
+    let counter_1 = make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 10.0 },
+    );
+    let counter_2 = make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 5.0 },
+    );
+    let counter_summed = make_metric(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 15.0 },
+    );
+    let gauge_1 = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 42.0 },
+    );
+    let gauge_2 = make_metric(
+        "gauge_a",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 99.0 },
+    );
+
+    // Absolute metrics pass through immediately (not held until flush).
+    assert_eq!(agg.record(gauge_1.clone()), Some(gauge_1));
+    assert_eq!(agg.record(gauge_2.clone()), Some(gauge_2));
+
+    // Each is returned individually — no collapsing to latest.
+    assert_eq!(agg.record(counter_1), None);
+    assert_eq!(agg.record(counter_2), None);
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    // Only the summed incremental counter appears at flush; the gauges already passed through.
+    assert_eq!(1, out.len());
+    assert_eq!(&counter_summed, &out[0]);
+}
+
+#[test]
 fn absolute_auto() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Auto,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
     let gauge_a_1 = make_metric(
         "gauge_a",
@@ -131,7 +345,7 @@ fn absolute_auto() {
     );
 
     // Single item, just stored regardless of kind
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
+    agg.record(gauge_a_1.clone());
     let mut out = vec![];
     // We should flush 1 item gauge_a_1
     agg.flush_into(&mut out);
@@ -149,8 +363,8 @@ fn absolute_auto() {
     assert_eq!(0, out.len());
 
     // Two absolutes with the same series, should get the 2nd (last) back.
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_1.clone());
+    agg.record(gauge_a_2.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -162,8 +376,8 @@ fn absolute_auto() {
         MetricValue::Gauge { value: 44.0 },
     );
     // Two increments with the different series, should get each back as-is
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
-    assert_eq!(agg.record(gauge_b_1.clone()), None);
+    agg.record(gauge_a_1.clone());
+    agg.record(gauge_b_1.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(2, out.len());
@@ -179,11 +393,7 @@ fn absolute_auto() {
 
 #[test]
 fn count_agg() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Count,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Count)).unwrap();
 
     let gauge_a_1 = make_metric(
         "gauge_a",
@@ -207,7 +417,7 @@ fn count_agg() {
     );
 
     // Single item, counter should be 1
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
+    agg.record(gauge_a_1.clone());
     let mut out = vec![];
     // We should flush 1 item gauge_a_1
     agg.flush_into(&mut out);
@@ -225,21 +435,34 @@ fn count_agg() {
     assert_eq!(0, out.len());
 
     // Two absolutes with the same series, counter should be 2
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_1.clone());
+    agg.record(gauge_a_2.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
     assert_eq!(&result_count_2, &out[0]);
+
+    // Count is documented to count both Absolute and Incremental metrics, so
+    // a mismatched kind for the same series must not be dropped — it must
+    // still count toward the total, not just emit `AggregateUpdateFailed`.
+    agg.record(gauge_a_1);
+    agg.record(make_metric(
+        "gauge_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    ));
+    out.clear();
+    agg.flush_into(&mut out);
+    assert_eq!(1, out.len());
+    assert_eq!(
+        &result_count_2, &out[0],
+        "mixed-kind series must count both samples"
+    );
 }
 
 #[test]
 fn absolute_max() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Max,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Max)).unwrap();
 
     let gauge_a_1 = make_metric(
         "gauge_a",
@@ -253,7 +476,7 @@ fn absolute_max() {
     );
 
     // Single item, it should be returned as is
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_2.clone());
     let mut out = vec![];
     // We should flush 1 item gauge_a_2
     agg.flush_into(&mut out);
@@ -271,8 +494,8 @@ fn absolute_max() {
     assert_eq!(0, out.len());
 
     // Two absolutes, result should be higher of the 2
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_1.clone());
+    agg.record(gauge_a_2.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -281,11 +504,7 @@ fn absolute_max() {
 
 #[test]
 fn absolute_min() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Min,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Min)).unwrap();
 
     let gauge_a_1 = make_metric(
         "gauge_a",
@@ -299,7 +518,7 @@ fn absolute_min() {
     );
 
     // Single item, it should be returned as is
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_2.clone());
     let mut out = vec![];
     // We should flush 1 item gauge_a_2
     agg.flush_into(&mut out);
@@ -317,8 +536,8 @@ fn absolute_min() {
     assert_eq!(0, out.len());
 
     // Two absolutes, result should be lower of the 2
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_1.clone());
+    agg.record(gauge_a_2.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -327,11 +546,7 @@ fn absolute_min() {
 
 #[test]
 fn absolute_diff() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Diff,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Diff)).unwrap();
 
     let gauge_a_1 = make_metric(
         "gauge_a",
@@ -350,7 +565,7 @@ fn absolute_diff() {
     );
 
     // Single item, it should be returned as is
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_2.clone());
     let mut out = vec![];
     // We should flush 1 item gauge_a_2
     agg.flush_into(&mut out);
@@ -368,13 +583,13 @@ fn absolute_diff() {
     assert_eq!(0, out.len());
 
     // Two absolutes in 2 separate flushes, result should be diff between the 2
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
+    agg.record(gauge_a_1.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
     assert_eq!(&gauge_a_1, &out[0]);
 
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_2.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -383,11 +598,7 @@ fn absolute_diff() {
 
 #[test]
 fn absolute_diff_conflicting_type() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Diff,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Diff)).unwrap();
 
     let gauge_a_1 = make_metric(
         "gauge_a",
@@ -402,13 +613,13 @@ fn absolute_diff_conflicting_type() {
 
     let mut out = vec![];
     // Two absolutes in 2 separate flushes, result should be second one due to different types
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
+    agg.record(gauge_a_1.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
     assert_eq!(&gauge_a_1, &out[0]);
 
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_2.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -418,11 +629,7 @@ fn absolute_diff_conflicting_type() {
 
 #[test]
 fn absolute_mean() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Mean,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Mean)).unwrap();
 
     let gauge_a_1 = make_metric(
         "gauge_a",
@@ -446,7 +653,7 @@ fn absolute_mean() {
     );
 
     // Single item, it should be returned as is
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
+    agg.record(gauge_a_2.clone());
     let mut out = vec![];
     // We should flush 1 item gauge_a_2
     agg.flush_into(&mut out);
@@ -464,9 +671,9 @@ fn absolute_mean() {
     assert_eq!(0, out.len());
 
     // Three absolutes, result should be mean
-    assert_eq!(agg.record(gauge_a_1.clone()), None);
-    assert_eq!(agg.record(gauge_a_2.clone()), None);
-    assert_eq!(agg.record(gauge_a_3.clone()), None);
+    agg.record(gauge_a_1.clone());
+    agg.record(gauge_a_2.clone());
+    agg.record(gauge_a_3.clone());
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -475,11 +682,7 @@ fn absolute_mean() {
 
 #[test]
 fn absolute_stdev() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Stdev,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Stdev)).unwrap();
 
     let gauges = vec![
         make_metric(
@@ -525,7 +728,7 @@ fn absolute_stdev() {
     );
 
     for gauge in gauges {
-        assert_eq!(agg.record(gauge), None);
+        agg.record(gauge);
     }
     let mut out = vec![];
     agg.flush_into(&mut out);
@@ -534,62 +737,8 @@ fn absolute_stdev() {
 }
 
 #[test]
-fn passes_through_ignored_kind() {
-    // Sum mode aggregates incremental, passes through absolute without collapsing.
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Sum,
-    })
-    .unwrap();
-
-    let counter_1 = make_metric(
-        "counter_a",
-        MetricKind::Incremental,
-        MetricValue::Counter { value: 10.0 },
-    );
-    let counter_2 = make_metric(
-        "counter_a",
-        MetricKind::Incremental,
-        MetricValue::Counter { value: 5.0 },
-    );
-    let counter_summed = make_metric(
-        "counter_a",
-        MetricKind::Incremental,
-        MetricValue::Counter { value: 15.0 },
-    );
-    let gauge_1 = make_metric(
-        "gauge_a",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: 42.0 },
-    );
-    let gauge_2 = make_metric(
-        "gauge_a",
-        MetricKind::Absolute,
-        MetricValue::Gauge { value: 99.0 },
-    );
-
-    // Absolute metrics pass through immediately (not held until flush).
-    assert_eq!(agg.record(gauge_1.clone()), Some(gauge_1));
-    assert_eq!(agg.record(gauge_2.clone()), Some(gauge_2));
-
-    // Each is returned individually — no collapsing to latest.
-    assert_eq!(agg.record(counter_1), None);
-    assert_eq!(agg.record(counter_2), None);
-
-    let mut out = vec![];
-    agg.flush_into(&mut out);
-    // Only the summed incremental counter appears at flush; the gauges already passed through.
-    assert_eq!(1, out.len());
-    assert_eq!(&counter_summed, &out[0]);
-}
-
-#[test]
 fn conflicting_value_type() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Auto,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
     let counter = make_metric(
         "the-thing",
@@ -613,13 +762,13 @@ fn conflicting_value_type() {
     // when types conflict the new values replaces whatever is there
 
     // Start with an counter
-    assert_eq!(agg.record(counter.clone()), None);
+    agg.record(counter.clone());
     // Another will "add" to it
-    assert_eq!(agg.record(counter.clone()), None);
+    agg.record(counter.clone());
     // Then an set will replace it due to a failed update
-    assert_eq!(agg.record(set.clone()), None);
+    agg.record(set.clone());
     // Then a set union would be a noop
-    assert_eq!(agg.record(set.clone()), None);
+    agg.record(set.clone());
     let mut out = vec![];
     // We should flush 1 item counter
     agg.flush_into(&mut out);
@@ -627,13 +776,13 @@ fn conflicting_value_type() {
     assert_eq!(&set, &out[0]);
 
     // Start out with an set
-    assert_eq!(agg.record(set.clone()), None);
+    agg.record(set.clone());
     // Union with itself, a noop
-    assert_eq!(agg.record(set), None);
+    agg.record(set);
     // Send an counter with the same name, will replace due to a failed update
-    assert_eq!(agg.record(counter.clone()), None);
+    agg.record(counter.clone());
     // Send another counter will "add"
-    assert_eq!(agg.record(counter), None);
+    agg.record(counter);
     let mut out = vec![];
     // We should flush 1 item counter
     agg.flush_into(&mut out);
@@ -643,11 +792,7 @@ fn conflicting_value_type() {
 
 #[test]
 fn conflicting_kinds() {
-    let mut agg = Aggregate::new(&AggregateConfig {
-        interval_ms: 1000_u64,
-        mode: AggregationMode::Auto,
-    })
-    .unwrap();
+    let mut agg = Aggregate::new(&system_time_config(AggregationMode::Auto)).unwrap();
 
     let incremental = make_metric(
         "the-thing",
@@ -668,13 +813,13 @@ fn conflicting_kinds() {
     // when types conflict the new values replaces whatever is there
 
     // Start with an incremental
-    assert_eq!(agg.record(incremental.clone()), None);
+    agg.record(incremental.clone());
     // Another will "add" to it
-    assert_eq!(agg.record(incremental.clone()), None);
+    agg.record(incremental.clone());
     // Then an absolute will replace it with a failed update
-    assert_eq!(agg.record(absolute.clone()), None);
+    agg.record(absolute.clone());
     // Then another absolute will replace it normally
-    assert_eq!(agg.record(absolute.clone()), None);
+    agg.record(absolute.clone());
     let mut out = vec![];
     // We should flush 1 item incremental
     agg.flush_into(&mut out);
@@ -682,13 +827,13 @@ fn conflicting_kinds() {
     assert_eq!(&absolute, &out[0]);
 
     // Start out with an absolute
-    assert_eq!(agg.record(absolute.clone()), None);
+    agg.record(absolute.clone());
     // Replace it normally
-    assert_eq!(agg.record(absolute), None);
+    agg.record(absolute);
     // Send an incremental with the same name, will replace due to a failed update
-    assert_eq!(agg.record(incremental.clone()), None);
+    agg.record(incremental.clone());
     // Send another incremental will "add"
-    assert_eq!(agg.record(incremental), None);
+    agg.record(incremental);
     let mut out = vec![];
     // We should flush 1 item incremental
     agg.flush_into(&mut out);
@@ -832,4 +977,725 @@ async fn transform_interval() {
         assert_eq!(out.next().await, None);
     })
     .await;
+}
+
+/// Rust truncating `/` rounds toward zero, so `-1 / 10000 == 0` and the
+/// bucket anchor would wrongly be `0`. Euclidean alignment places
+/// `-1ms` in `[-interval_ms, 0)` anchored at `-interval_ms`.
+#[test]
+fn event_time_pre_epoch_buckets_use_floor_division() {
+    let agg = Aggregate::new(&event_time_config(10_000_u64, AggregationMode::Auto)).unwrap();
+
+    let ts = Utc
+        .timestamp_millis_opt(-1)
+        .latest()
+        .expect("valid millis near epoch");
+
+    assert_eq!(
+        agg.bucket_key(ts),
+        -10_000,
+        "-1 ms must bucket to [-10000, 0), not [0, 10000)"
+    );
+}
+
+/// Adjacent event-time windows must aggregate independently (10+20 in bucket 0,
+/// 30 in bucket 1), not collapse across bucket keys.
+#[test]
+fn event_time_different_buckets() {
+    let mut agg = Aggregate::new(&event_time_config_with(
+        10000_u64,
+        AggregationMode::Auto,
+        |et| {
+            et.max_future_ms = 600_000;
+        },
+    ))
+    .unwrap();
+
+    let base_time = open_bucket_timestamp(10_000);
+
+    // Events in first bucket (11:00:20 - 11:00:30)
+    let event1_bucket1 = make_metric_with_timestamp(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 10.0 },
+        base_time,
+    );
+    let event2_bucket1 = make_metric_with_timestamp(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 20.0 },
+        base_time + chrono::Duration::milliseconds(500),
+    );
+
+    let event1_bucket2 = make_metric_with_timestamp(
+        "counter_a",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 30.0 },
+        event_time_bucket_timestamp(10_000, 1),
+    );
+
+    // Record events from first bucket
+    agg.record(event1_bucket1);
+    agg.record(event2_bucket1);
+    let out = flush_final(&mut agg);
+    assert_eq!(1, out.len());
+    assert_counter(&out[0], 30.0);
+
+    // Record event from second bucket
+    agg.record(event1_bucket2);
+    let out = flush_final(&mut agg);
+    assert_eq!(1, out.len());
+    assert_counter(&out[0], 30.0);
+}
+
+/// Diff: first closed bucket emits the raw value (10); the next emits the delta (15).
+#[test]
+fn event_time_diff_uses_previous_bucket() {
+    let mut agg = Aggregate::new(&event_time_config_with(
+        10000_u64,
+        AggregationMode::Diff,
+        |et| {
+            et.max_future_ms = 600_000;
+        },
+    ))
+    .unwrap();
+
+    let ts1 = event_time_bucket_timestamp(10_000, 0);
+    let ts2 = event_time_bucket_timestamp(10_000, 1);
+
+    let g1 = make_metric_with_timestamp(
+        "diff_gauge",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 10.0 },
+        ts1,
+    );
+    let g2 = make_metric_with_timestamp(
+        "diff_gauge",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 25.0 },
+        ts2,
+    );
+
+    agg.record(g1);
+    agg.record(g2);
+
+    let out = flush_final(&mut agg);
+    assert_eq!(2, out.len());
+
+    let mut values: Vec<f64> = out
+        .iter()
+        .map(|event| match event.as_metric().value() {
+            MetricValue::Gauge { value } => *value,
+            other => panic!("Expected Gauge metric value, got {other:?}"),
+        })
+        .collect();
+
+    values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    assert!((values[0] - 10.0).abs() < 1e-9);
+    assert!((values[1] - 15.0).abs() < 1e-9);
+}
+
+/// Late events are rejected both by wall-clock cutoff (before any flush) and
+/// by watermark after a bucket has already been emitted — even when
+/// `allowed_lateness_ms` would still allow recording into an unflushed bucket.
+#[test]
+fn event_time_late_events_are_rejected_by_cutoff_and_watermark() {
+    let interval_ms = 10_000_u64;
+    let interval_i64 = interval_ms as i64;
+
+    // Wall-clock cutoff rejects ended windows before the periodic flush tick.
+    let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+    let now_ms = Utc::now().timestamp_millis();
+    let ended_bucket_key = (now_ms / interval_i64) * interval_i64 - interval_i64 * 2;
+    assert!(agg.is_past_bucket_cutoff(ended_bucket_key, now_ms));
+    let ts = Utc
+        .timestamp_millis_opt(ended_bucket_key + interval_i64 / 2)
+        .latest()
+        .unwrap();
+    assert!(
+        agg.record(make_metric_with_timestamp(
+            "late_before_flush",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+            ts,
+        ))
+        .is_none()
+    );
+    assert!(agg.event_time_buckets.is_empty());
+
+    // After emit, watermark rejects the closed bucket (and earlier ones).
+    let mut agg = Aggregate::new(&event_time_config_with(
+        interval_ms,
+        AggregationMode::Auto,
+        |et| {
+            et.allowed_lateness_ms = 10_000;
+            et.max_future_ms = 600_000;
+        },
+    ))
+    .unwrap();
+
+    let bucket0 = open_bucket_timestamp(interval_ms);
+    let bucket0_key = bucket0.timestamp_millis().div_euclid(interval_i64) * interval_i64;
+    let bucket_end = bucket0_key + interval_i64;
+
+    agg.record(make_metric_with_timestamp(
+        "gauge_closed_bucket_rejection",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 1.0 },
+        bucket0,
+    ));
+    let out = flush_final(&mut agg);
+    assert_eq!(1, out.len());
+    assert_eq!(agg.watermark, Some(bucket_end));
+
+    agg.record(make_metric_with_timestamp(
+        "gauge_closed_bucket_rejection",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 99.0 },
+        bucket0 + chrono::Duration::milliseconds(500),
+    ));
+    agg.record(make_metric_with_timestamp(
+        "gauge_closed_bucket_rejection",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 99.0 },
+        event_time_bucket_timestamp(interval_ms, -1),
+    ));
+    assert!(
+        flush_final(&mut agg).is_empty(),
+        "events for already-closed buckets must not produce a duplicate aggregate"
+    );
+
+    agg.record(make_metric_with_timestamp(
+        "gauge_closed_bucket_rejection",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 7.0 },
+        event_time_bucket_timestamp(interval_ms, 1),
+    ));
+    let out = flush_final(&mut agg);
+    assert_eq!(1, out.len(), "next open bucket must still flush");
+    assert_gauge(&out[0], 7.0);
+}
+
+/// Diff keeps a bounded previous-bucket map for deltas; Auto must not retain any.
+#[test]
+fn event_time_previous_bucket_retention_is_mode_specific_and_bounded() {
+    let interval_ms = 10_000_u64;
+
+    for mode in [AggregationMode::Auto, AggregationMode::Diff] {
+        let mut agg = Aggregate::new(&event_time_config_with(interval_ms, mode, |et| {
+            et.max_future_ms = 600_000;
+        }))
+        .unwrap();
+
+        for offset in 0..50_i64 {
+            agg.record(make_metric_with_timestamp(
+                "retention_probe",
+                if mode == AggregationMode::Diff {
+                    MetricKind::Absolute
+                } else {
+                    MetricKind::Incremental
+                },
+                if mode == AggregationMode::Diff {
+                    MetricValue::Gauge { value: 1.0 }
+                } else {
+                    MetricValue::Counter { value: 1.0 }
+                },
+                event_time_bucket_timestamp(interval_ms, offset),
+            ));
+            let mut out = vec![];
+            agg.flush_final(&mut out);
+            assert_eq!(out.len(), 1);
+        }
+
+        let retained = agg.event_time_prev_buckets.len();
+        if mode == AggregationMode::Diff {
+            assert!(
+                retained <= 2,
+                "Diff retention must stay bounded, got {retained}"
+            );
+        } else {
+            assert_eq!(retained, 0, "non-Diff modes must retain no prior buckets");
+        }
+    }
+}
+
+/// `event_time.missing_timestamp` parses the snake_case literals shown in docs.
+#[test]
+fn event_time_block_parses_documented_literals() {
+    use crate::config::GenerateConfig;
+
+    let generated = AggregateConfig::generate_config();
+    assert!(
+        generated.get("event_time").is_none(),
+        "system-time default must not emit an event_time block"
+    );
+    assert_eq!(
+        EventTimeConfig::default().max_future_ms,
+        default_max_future_ms()
+    );
+
+    let cfg: AggregateConfig = toml::from_str(
+        r#"
+        [event_time]
+        missing_timestamp = "use_system_time"
+        allowed_lateness_ms = 5000
+        max_future_ms = 60000
+    "#,
+    )
+    .unwrap();
+    let event_time = cfg.event_time.expect("event_time block present");
+    assert_eq!(
+        event_time.missing_timestamp,
+        MissingTimestamp::UseSystemTime
+    );
+    assert_eq!(event_time.allowed_lateness_ms, 5000);
+    assert_eq!(event_time.max_future_ms, 60000);
+
+    let cfg: AggregateConfig = toml::from_str(
+        r#"
+        [event_time]
+        missing_timestamp = "drop"
+    "#,
+    )
+    .unwrap();
+    assert_eq!(
+        cfg.event_time.unwrap().missing_timestamp,
+        MissingTimestamp::Drop
+    );
+}
+
+#[tokio::test]
+async fn event_time_drains_open_buckets_on_shutdown() {
+    // Long interval/grace so only the final-flush path can emit.
+    let agg = toml::from_str::<AggregateConfig>(
+        r#"
+interval_ms = 600000
+[event_time]
+allowed_lateness_ms = 600000
+"#,
+    )
+    .unwrap()
+    .build(&TransformContext::default())
+    .await
+    .unwrap()
+    .into_task();
+
+    let event = make_metric_with_timestamp(
+        "shutdown_drain_probe",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 41.0 },
+        Utc::now(),
+    );
+
+    let in_stream = Box::pin(stream::iter(vec![event]));
+    let mut out_stream = agg.transform_events(in_stream);
+
+    let mut count = 0_u8;
+    while let Some(ev) = out_stream.next().await {
+        count += 1;
+        assert_eq!(
+            ev.as_metric().series().name.name.as_str(),
+            "shutdown_drain_probe"
+        );
+        assert_counter(&ev, 41.0);
+    }
+    assert_eq!(count, 1, "open event-time bucket must drain on input close");
+}
+
+/// Future skew uses saturating millis math: events beyond `max_future_ms` drop,
+/// and `max_future_ms = i64::MAX` must not panic at record time.
+#[test]
+fn event_time_future_skew_gating_and_boundary() {
+    let mut strict = Aggregate::new(&event_time_config_with(
+        10_000,
+        AggregationMode::Auto,
+        |et| et.max_future_ms = 5_000,
+    ))
+    .unwrap();
+    // 60s ahead is well past max_future_ms = 5s.
+    strict.record(make_metric_with_timestamp(
+        "counter_future",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 99.0 },
+        Utc::now() + chrono::Duration::seconds(60),
+    ));
+    let mut out = vec![];
+    strict.flush_into(&mut out);
+    assert!(out.is_empty(), "far-future event must be dropped");
+
+    // Boundary config must not panic in `now + max_future_ms` (saturating millis).
+    let mut boundary = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.max_future_ms = i64::MAX as u64;
+    }))
+    .unwrap();
+    boundary.record(make_metric_with_timestamp(
+        "counter_now",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+        Utc::now(),
+    ));
+    out.clear();
+    boundary.flush_event_time_buckets(&mut out, true);
+    assert_eq!(out.len(), 1);
+}
+
+/// Far-future buckets must use saturating cutoff math so non-forced flush
+/// does not wrap, emit early, or advance the watermark to ~i64::MAX.
+#[test]
+fn event_time_far_future_bucket_does_not_overflow_flush_cutoff() {
+    let mut agg = Aggregate::new(&event_time_config_with(1000, AggregationMode::Auto, |et| {
+        et.allowed_lateness_ms = i64::MAX as u64;
+        et.max_future_ms = 0;
+    }))
+    .unwrap();
+
+    let far_future = DateTime::<Utc>::MAX_UTC;
+    let event = make_metric_with_timestamp(
+        "far_future_counter",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+        far_future,
+    );
+    agg.record(event);
+
+    let mut out = vec![];
+    agg.flush_event_time_buckets(&mut out, false);
+    assert!(
+        out.is_empty(),
+        "saturated cutoff must stay ineligible until force"
+    );
+    assert_eq!(agg.event_time_buckets.len(), 1);
+    assert!(
+        agg.watermark.is_none(),
+        "must not advance watermark to i64::MAX (would drop every later event)"
+    );
+
+    agg.flush_event_time_buckets(&mut out, true);
+    assert_eq!(
+        out.len(),
+        1,
+        "shutdown/force flush must still drain the bucket"
+    );
+}
+
+/// Missing-timestamp drop vs use_system_time, plus same-instant cutoff reuse.
+#[test]
+fn event_time_missing_timestamp_fallback_reuses_now_for_cutoff() {
+    let interval_ms = 1_000_u64;
+    let interval_i64 = interval_ms as i64;
+
+    // Default missing_timestamp = drop.
+    let mut drop_agg =
+        Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+    assert!(
+        drop_agg
+            .record(make_metric(
+                "missing_timestamp_drop",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            ))
+            .is_none()
+    );
+    assert!(drop_agg.event_time_buckets.is_empty());
+
+    let agg = Aggregate::new(&event_time_config_with(
+        interval_ms,
+        AggregationMode::Auto,
+        |et| {
+            et.missing_timestamp = MissingTimestamp::UseSystemTime;
+        },
+    ))
+    .unwrap();
+
+    let now_ms = Utc::now().timestamp_millis();
+    let bucket_key = now_ms.div_euclid(interval_i64).saturating_mul(interval_i64);
+    let last_ms_in_bucket = bucket_key + interval_i64 - 1;
+
+    // Same-instant cutoff is still inside the bucket; a 1ms-later clock is not.
+    // Record must reuse one `now` for synthesis + cutoff, or this race drops the event.
+    assert!(!agg.is_past_bucket_cutoff(bucket_key, last_ms_in_bucket));
+    assert!(agg.is_past_bucket_cutoff(bucket_key, last_ms_in_bucket + 1));
+
+    let mut agg = agg;
+    assert!(
+        agg.record(make_metric(
+            "counter_no_ts",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        ))
+        .is_none()
+    );
+    assert_eq!(agg.event_time_buckets.len(), 1);
+}
+
+/// Mean ignores Incremental: passthrough must skip watermark/gating and not bucket.
+#[test]
+fn event_time_passthrough_skips_timestamp_gating_and_watermark_updates() {
+    let interval_ms = 10_000;
+    let mut agg = Aggregate::new(&event_time_config_with(
+        interval_ms,
+        AggregationMode::Mean,
+        |et| et.max_future_ms = 600_000,
+    ))
+    .unwrap();
+
+    let passthrough = make_metric(
+        "passthrough",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+    );
+    assert!(agg.record(passthrough).is_some());
+    assert!(agg.event_time_buckets.is_empty());
+    assert!(agg.event_time_multi_buckets.is_empty());
+
+    let mut out = vec![];
+    agg.flush_into(&mut out);
+    assert!(out.is_empty());
+    assert!(agg.watermark.is_none());
+
+    agg.record(make_metric_with_timestamp(
+        "aggregated",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 42.0 },
+        event_time_bucket_timestamp(interval_ms, 1),
+    ));
+    agg.flush_final(&mut out);
+    assert_eq!(out.len(), 1);
+}
+
+/// EventMetadata::merge keeps finalizers/secrets but not attribution (`source_type`).
+/// Every replacement path must use the winner as the metadata base, then merge losers.
+#[test]
+fn event_time_metadata_is_merged_and_diff_finalizers_are_released() {
+    let interval_ms = 10_000;
+    let base_time = open_bucket_timestamp(interval_ms);
+    let later = base_time + chrono::Duration::milliseconds(100);
+    let latest_ts = base_time + chrono::Duration::milliseconds(200);
+
+    // Latest: event timestamp wins value + source_type; both samples' finalizers merge.
+    {
+        let mut agg =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+        let (newer_batch, mut newer_rx) = BatchNotifier::new_with_receiver();
+        let (older_batch, mut older_rx) = BatchNotifier::new_with_receiver();
+        let newer = metric_with_source(
+            "latest",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 2.0 },
+            latest_ts,
+            "winner_source",
+            Some(&newer_batch),
+        );
+        let older = metric_with_source(
+            "latest",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+            later,
+            "loser_source",
+            Some(&older_batch),
+        );
+        drop((newer_batch, older_batch));
+        agg.record(older); // stored loser, then incoming winner replaces
+        agg.record(newer);
+        let out = flush_final(&mut agg);
+        assert_eq!(out[0].metadata().source_type(), Some("winner_source"));
+        assert_gauge(&out[0], 2.0);
+        deliver_and_assert_batches(out, &mut [&mut newer_rx, &mut older_rx]);
+    }
+
+    {
+        let mut agg =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+        // Reverse arrival: newer already stored; older must not overwrite.
+        agg.record(metric_with_source(
+            "latest",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 2.0 },
+            latest_ts,
+            "winner_source",
+            None,
+        ));
+        agg.record(metric_with_source(
+            "latest",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+            later,
+            "loser_source",
+            None,
+        ));
+        let out = flush_final(&mut agg);
+        assert_eq!(out[0].metadata().source_type(), Some("winner_source"));
+        assert_gauge(&out[0], 2.0);
+    }
+
+    // Auto kind switch: retained sample's data and source_type must stay paired.
+    // Inc→Abs: Absolute wins even if older. Abs→Inc: newer Incremental replaces.
+    for (first_kind, first_value, first_src, second_kind, second_value, second_src, expect_kind) in [
+        (
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+            "superseded_incremental",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 99.0 },
+            "retained_absolute",
+            MetricKind::Absolute,
+        ),
+        (
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 42.0 },
+            "superseded_absolute",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+            "retained_incremental",
+            MetricKind::Incremental,
+        ),
+    ] {
+        let mut agg =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+        let (first_batch, mut first_rx) = BatchNotifier::new_with_receiver();
+        let (second_batch, mut second_rx) = BatchNotifier::new_with_receiver();
+        let (first_ts, second_ts) = if expect_kind == MetricKind::Absolute {
+            (latest_ts, later)
+        } else {
+            (base_time, later)
+        };
+        let first = metric_with_source(
+            "the-thing",
+            first_kind,
+            first_value,
+            first_ts,
+            first_src,
+            Some(&first_batch),
+        );
+        let second = metric_with_source(
+            "the-thing",
+            second_kind,
+            second_value.clone(),
+            second_ts,
+            second_src,
+            Some(&second_batch),
+        );
+        drop((first_batch, second_batch));
+        agg.record(first);
+        agg.record(second);
+        let out = flush_final(&mut agg);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].as_metric().kind(), expect_kind);
+        assert_eq!(out[0].metadata().source_type(), Some(second_src));
+        match &second_value {
+            MetricValue::Counter { value } => assert_counter(&out[0], *value),
+            MetricValue::Gauge { value } => assert_gauge(&out[0], *value),
+            other => panic!("unexpected fixture value {other:?}"),
+        }
+        deliver_and_assert_batches(out, &mut [&mut first_rx, &mut second_rx]);
+    }
+
+    // Failed same-kind value-type update replaces data + attribution.
+    {
+        let mut agg =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Auto)).unwrap();
+        agg.record(metric_with_source(
+            "the-thing",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+            base_time,
+            "superseded_counter",
+            None,
+        ));
+        agg.record(metric_with_source(
+            "the-thing",
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: 2.0 },
+            later,
+            "retained_gauge",
+            None,
+        ));
+        let out = flush_final(&mut agg);
+        assert_eq!(out[0].metadata().source_type(), Some("retained_gauge"));
+        assert_gauge(&out[0], 2.0);
+    }
+
+    // Diff retains prior data only — finalizers must release on flush.
+    {
+        let mut diff =
+            Aggregate::new(&event_time_config(interval_ms, AggregationMode::Diff)).unwrap();
+        let (diff_batch, mut diff_rx) = BatchNotifier::new_with_receiver();
+        diff.record(
+            make_metric_with_timestamp(
+                "diff",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+                base_time,
+            )
+            .with_batch_notifier(&diff_batch),
+        );
+        drop(diff_batch);
+        let out = flush_final(&mut diff);
+        deliver_and_assert_batches(out, &mut [&mut diff_rx]);
+        assert_eq!(diff.event_time_prev_buckets.len(), 1);
+    }
+
+    // Max/Min: winner metadata is the base; loser finalizers still merge.
+    for mode in [AggregationMode::Max, AggregationMode::Min] {
+        let mut agg = Aggregate::new(&event_time_config(interval_ms, mode)).unwrap();
+        let (winner_batch, mut winner_rx) = BatchNotifier::new_with_receiver();
+        let (loser_batch, mut loser_rx) = BatchNotifier::new_with_receiver();
+        let (winning_value, losing_value) = if mode == AggregationMode::Max {
+            (99.0, 2.0)
+        } else {
+            (1.0, 50.0)
+        };
+        let winner = metric_with_source(
+            "extremum",
+            MetricKind::Absolute,
+            MetricValue::Gauge {
+                value: winning_value,
+            },
+            base_time,
+            "winner_source",
+            Some(&winner_batch),
+        );
+        let loser = metric_with_source(
+            "extremum",
+            MetricKind::Absolute,
+            MetricValue::Gauge {
+                value: losing_value,
+            },
+            later,
+            "loser_source",
+            Some(&loser_batch),
+        );
+        drop((winner_batch, loser_batch));
+        agg.record(loser); // incoming winner must replace data and metadata base
+        agg.record(winner);
+        let out = flush_final(&mut agg);
+        assert_eq!(out[0].metadata().source_type(), Some("winner_source"));
+        assert_gauge(&out[0], winning_value);
+        deliver_and_assert_batches(out, &mut [&mut winner_rx, &mut loser_rx]);
+    }
+}
+
+/// Count is documented to include both Absolute and Incremental in the same series.
+#[test]
+fn event_time_count_counts_mixed_kinds_in_same_bucket() {
+    let interval_ms = 10_000;
+    let mut agg = Aggregate::new(&event_time_config(interval_ms, AggregationMode::Count)).unwrap();
+    let base_time = open_bucket_timestamp(interval_ms);
+
+    agg.record(make_metric_with_timestamp(
+        "the-thing",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 42.0 },
+        base_time,
+    ));
+    agg.record(make_metric_with_timestamp(
+        "the-thing",
+        MetricKind::Incremental,
+        MetricValue::Counter { value: 1.0 },
+        base_time + chrono::Duration::milliseconds(100),
+    ));
+
+    let out = flush_final(&mut agg);
+    assert_eq!(out.len(), 1);
+    assert_counter(&out[0], 2.0);
 }
