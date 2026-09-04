@@ -2,13 +2,14 @@ use vector_lib::opentelemetry::proto::TRACES_REQUEST_MESSAGE_TYPE;
 use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
 use crate::opentelemetry::{
-    assert_service_name_with, parse_line_to_export_type_request, read_file_helper,
+    assert_service_name_with, parse_value_to_export_type_request, read_file_helper,
 };
-use base64::prelude::*;
+use vrl::value::Value as VrlValue;
 
 // telemetrygen generates 100 traces, each trace contains exactly 2 spans (parent + child)
 // Collector forwards via both gRPC and HTTP to Vector, so: 100 traces * 2 spans * 2 protocols = 400 spans
 const EXPECTED_SPAN_COUNT: usize = 400;
+const EXPECTED_TRACE_COUNT: usize = 100;
 
 fn parse_export_traces_request(content: &str) -> Result<ExportTraceServiceRequest, String> {
     // The file may contain multiple lines, each with a JSON object containing an array of resourceSpans
@@ -22,14 +23,10 @@ fn parse_export_traces_request(content: &str) -> Result<ExportTraceServiceReques
             continue;
         }
 
-        // Merge resource_spans from this request into the accumulated result
         merged_request.resource_spans.extend(
-            parse_line_to_export_type_request::<ExportTraceServiceRequest>(
-                TRACES_REQUEST_MESSAGE_TYPE,
-                line,
-            )
-            .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
-            .resource_spans,
+            parse_collector_trace_line(line)
+                .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+                .resource_spans,
         );
     }
 
@@ -38,6 +35,57 @@ fn parse_export_traces_request(content: &str) -> Result<ExportTraceServiceReques
     }
 
     Ok(merged_request)
+}
+
+fn parse_collector_trace_line(line: &str) -> Result<ExportTraceServiceRequest, String> {
+    let mut value: VrlValue = serde_json::from_str::<serde_json::Value>(line)
+        .map_err(|e| format!("Failed to parse JSON: {e}"))?
+        .into();
+
+    decode_collector_ids(&mut value)?;
+    parse_value_to_export_type_request(TRACES_REQUEST_MESSAGE_TYPE, value)
+}
+
+fn decode_collector_ids(value: &mut VrlValue) -> Result<(), String> {
+    match value {
+        VrlValue::Object(fields) => {
+            for (name, value) in fields {
+                let valid_hex_lengths: &[usize] = match name.as_str() {
+                    "traceId" => &[32],
+                    "spanId" => &[16],
+                    "parentSpanId" => &[0, 16],
+                    _ => {
+                        decode_collector_ids(value)?;
+                        continue;
+                    }
+                };
+
+                let encoded = value
+                    .as_bytes()
+                    .ok_or_else(|| format!("{name} should be a hexadecimal string"))?;
+                if !valid_hex_lengths.contains(&encoded.len()) {
+                    return Err(format!(
+                        "{name} has invalid hexadecimal length {}",
+                        encoded.len()
+                    ));
+                }
+
+                *value = VrlValue::Bytes(
+                    hex::decode(encoded.as_ref())
+                        .map_err(|e| format!("Failed to decode {name}: {e}"))?
+                        .into(),
+                );
+            }
+        }
+        VrlValue::Array(values) => {
+            for value in values {
+                decode_collector_ids(value)?;
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
 }
 
 /// Asserts that all spans have expected static fields set:
@@ -64,73 +112,45 @@ fn assert_span_static_fields(request: &ExportTraceServiceRequest) {
     }
 }
 
-/// Converts a span/trace ID from encoded bytes to raw binary bytes.
-/// The collector outputs IDs as hex strings (e.g., "804ab72eed55cea1"),
-/// Vector outputs as base64 (standard JSON encoding for binary fields).
-/// Works for both span_id (8 bytes) and trace_id (16 bytes).
-fn decode_span_id(id: &[u8]) -> Vec<u8> {
-    // Check if it's hex-encoded (even length, all ASCII hex characters)
-    if id.len().is_multiple_of(2)
-        && id.len() >= 16
-        && id.iter().all(|&b| {
-            b.is_ascii_digit() || (b'a'..=b'f').contains(&b) || (b'A'..=b'F').contains(&b)
-        })
+fn assert_binary_span_ids(request: &ExportTraceServiceRequest) {
+    for span in request
+        .resource_spans
+        .iter()
+        .flat_map(|resource| &resource.scope_spans)
+        .flat_map(|scope| &scope.spans)
     {
-        // It's hex-encoded, decode it
-        return (0..id.len())
-            .step_by(2)
-            .map(|i| {
-                let high = char::from(id[i]).to_digit(16).unwrap() as u8;
-                let low = char::from(id[i + 1]).to_digit(16).unwrap() as u8;
-                (high << 4) | low
-            })
-            .collect();
+        assert_eq!(span.trace_id.len(), 16, "trace ID should contain 16 bytes");
+        assert_eq!(span.span_id.len(), 8, "span ID should contain 8 bytes");
+        assert!(
+            span.parent_span_id.is_empty() || span.parent_span_id.len() == 8,
+            "parent span ID should be empty or contain 8 bytes"
+        );
     }
-
-    // Check if it's base64-encoded (contains only base64 characters)
-    if id.iter().all(|&b| {
-        b.is_ascii_uppercase()
-            || b.is_ascii_lowercase()
-            || b.is_ascii_digit()
-            || b == b'+'
-            || b == b'/'
-            || b == b'='
-    }) {
-        // Try to decode as base64
-        if let Ok(decoded) = BASE64_STANDARD.decode(id) {
-            return decoded;
-        }
-    }
-
-    // Already binary or unrecognized format
-    id.to_vec()
 }
 
 /// Asserts that the span IDs and trace IDs from collector and vector match exactly.
 /// This verifies that Vector correctly preserves span identity through the pipeline.
-/// Note: Collector outputs IDs as hex strings, Vector outputs as binary.
+/// Both requests contain the protobuf binary representation of each ID.
 fn assert_span_ids_match(
     collector_request: &ExportTraceServiceRequest,
     vector_request: &ExportTraceServiceRequest,
 ) {
     use std::collections::HashSet;
 
-    // Collect all span IDs from collector output (decode from hex)
     let collector_span_ids: HashSet<_> = collector_request
         .resource_spans
         .iter()
         .flat_map(|rs| &rs.scope_spans)
         .flat_map(|ss| &ss.spans)
-        .map(|span| decode_span_id(&span.span_id))
+        .map(|span| span.span_id.as_slice())
         .collect();
 
-    // Collect all span IDs from vector output (decode from base64)
     let vector_span_ids: HashSet<_> = vector_request
         .resource_spans
         .iter()
         .flat_map(|rs| &rs.scope_spans)
         .flat_map(|ss| &ss.spans)
-        .map(|span| decode_span_id(&span.span_id))
+        .map(|span| span.span_id.as_slice())
         .collect();
 
     assert_eq!(
@@ -152,13 +172,12 @@ fn assert_span_ids_match(
         "Span IDs from collector and Vector should match exactly"
     );
 
-    // Also verify trace IDs match
     let collector_trace_ids: HashSet<_> = collector_request
         .resource_spans
         .iter()
         .flat_map(|rs| &rs.scope_spans)
         .flat_map(|ss| &ss.spans)
-        .map(|span| decode_span_id(&span.trace_id))
+        .map(|span| span.trace_id.as_slice())
         .collect();
 
     let vector_trace_ids: HashSet<_> = vector_request
@@ -166,12 +185,49 @@ fn assert_span_ids_match(
         .iter()
         .flat_map(|rs| &rs.scope_spans)
         .flat_map(|ss| &ss.spans)
-        .map(|span| decode_span_id(&span.trace_id))
+        .map(|span| span.trace_id.as_slice())
         .collect();
 
     assert_eq!(
+        collector_trace_ids.len(),
+        EXPECTED_TRACE_COUNT,
+        "Collector should have {EXPECTED_TRACE_COUNT} unique trace IDs"
+    );
+    assert_eq!(
+        vector_trace_ids.len(),
+        EXPECTED_TRACE_COUNT,
+        "Vector should have {EXPECTED_TRACE_COUNT} unique trace IDs"
+    );
+    assert_eq!(
         collector_trace_ids, vector_trace_ids,
         "Trace IDs from collector and Vector should match exactly"
+    );
+}
+
+#[test]
+fn collector_trace_ids_are_deserialized_as_binary() {
+    let request = parse_export_traces_request(
+        r#"{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"00112233445566778899aabbccddeeff","spanId":"fedcba9876543210","parentSpanId":"0123456789abcdef","links":[{"traceId":"ffeeddccbbaa99887766554433221100","spanId":"1032547698badcfe"}]}]}]}]}"#,
+    )
+    .expect("collector trace JSON should decode");
+    let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+    assert_eq!(
+        span.trace_id,
+        hex::decode("00112233445566778899aabbccddeeff").unwrap()
+    );
+    assert_eq!(span.span_id, hex::decode("fedcba9876543210").unwrap());
+    assert_eq!(
+        span.parent_span_id,
+        hex::decode("0123456789abcdef").unwrap()
+    );
+    assert_eq!(
+        span.links[0].trace_id,
+        hex::decode("ffeeddccbbaa99887766554433221100").unwrap()
+    );
+    assert_eq!(
+        span.links[0].span_id,
+        hex::decode("1032547698badcfe").unwrap()
     );
 }
 
@@ -235,6 +291,11 @@ fn vector_sink_otel_sink_traces_match() {
     assert_span_static_fields(&collector_source_request);
     assert_span_static_fields(&collector_sink_request);
 
+    // Protobuf IDs are bytes. Parsing the collector's hex JSON back to bytes makes the full
+    // request comparison validate Vector's OTLP decode/encode round trip.
+    assert_binary_span_ids(&collector_source_request);
+    assert_binary_span_ids(&collector_sink_request);
+
     // Verify span IDs match exactly between source and sink
     // Both use the collector's file exporter with hex encoding, so they should match perfectly
     assert_span_ids_match(&collector_source_request, &collector_sink_request);
@@ -255,7 +316,7 @@ fn vector_sink_otel_sink_traces_match() {
             deduped_ss.spans.clear();
 
             for span in &ss.spans {
-                let span_id = decode_span_id(&span.span_id);
+                let span_id = span.span_id.as_slice();
                 if seen_span_ids.insert(span_id) {
                     deduped_ss.spans.push(span.clone());
                 }

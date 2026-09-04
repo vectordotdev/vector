@@ -6,7 +6,7 @@ receivers:
       grpc:
 
 processors:
-  batch: { }
+  batch: {}
 
 exporters:
   otlp/grpc:
@@ -17,7 +17,7 @@ exporters:
     endpoint: http://vector:4318
     tls:
       insecure: true
-  debug: { }
+  debug: {}
   file:
     path: /output/opentelemetry-traces/collector-source-file-exporter.log
     rotation:
@@ -27,6 +27,6 @@ exporters:
 service:
   pipelines:
     traces:
-      receivers: [ otlp ]
-      processors: [ batch ]
-      exporters: [ debug, otlp/grpc, otlphttp/vector, file ]
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, otlp/grpc, otlphttp/vector, file]
