@@ -37,7 +37,11 @@ VECTOR_VALUES="$GUIDE_DIR/values.yaml"
 VECTOR_CHART_VERSION=0.58.0
 TMPDIR_WORK=/tmp/vec-experiment-$$
 mkdir -p "$TMPDIR_WORK"
-trap 'rm -rf "$TMPDIR_WORK"; pkill -f "kubectl port-forward.*vector-perf.*pod/" 2>/dev/null || true' EXIT
+# PIDs of port-forwards started by this run; the EXIT trap kills only these
+# instead of pattern-matching, so it doesn't disturb port-forwards started
+# by the operator or other local sessions.
+PORT_FORWARD_PIDS=()
+trap 'rm -rf "$TMPDIR_WORK"; [[ ${#PORT_FORWARD_PIDS[@]} -gt 0 ]] && kill "${PORT_FORWARD_PIDS[@]}" 2>/dev/null || true' EXIT
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 log() { echo "==> $*" >&2; }
@@ -132,6 +136,7 @@ start_port_forward() {
 
   kubectl port-forward -n "$NAMESPACE" "pod/$pod" "${port}:8686" > "$logfile" 2>&1 &
   local pf_pid=$!
+  PORT_FORWARD_PIDS+=("$pf_pid")
 
   # Wait up to 10 s for the gRPC health check to pass.
   local i=0
