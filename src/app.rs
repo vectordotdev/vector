@@ -81,6 +81,12 @@ impl ApplicationConfig {
             None
         };
 
+        // Subscribe to shutdown signals before loading the config and starting the topology so
+        // that a signal arriving during startup -- which can block on network I/O, e.g. sink
+        // healthchecks or build-time API probes -- can interrupt it, instead of being queued
+        // and ignored until startup completes.
+        let mut signal_rx = signal_handler.subscribe();
+
         let config = load_configs(
             &config_paths,
             watcher_conf,
@@ -90,12 +96,6 @@ impl ApplicationConfig {
             signal_handler,
         )
         .await?;
-
-        // Subscribe to shutdown signals before starting the topology so that a signal arriving
-        // during startup -- which can block on network I/O, e.g. sink healthchecks or build-time
-        // API probes -- can interrupt it, instead of being queued and ignored until startup
-        // completes.
-        let mut signal_rx = signal_handler.subscribe();
 
         Self::from_config(config_paths, config, extra_context, &mut signal_rx).await
     }

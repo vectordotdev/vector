@@ -179,6 +179,12 @@ pub async fn validate(
 ) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
+    // Subscribe to shutdown signals before validation begins so that a signal arriving at any
+    // point -- including during config loading, transform/sink validation, or the environment
+    // checks, which can block on network I/O, e.g. sink healthchecks or build-time API probes
+    // -- can interrupt it, instead of being queued and ignored until validation finishes.
+    let mut signal_rx = signal_handler.subscribe();
+
     let mut validated = true;
 
     let mut config = match validate_config(opts, signal_handler, &mut fmt).await {
@@ -189,21 +195,16 @@ pub async fn validate(
     validated &= validate_transforms(&config, &mut fmt).await;
     validated &= validate_sinks_with_context(&config, &mut fmt);
 
-    // Subscribe to shutdown signals before the environment checks so that a signal arriving
-    // while they are in progress -- which can block on network I/O, e.g. sink healthchecks or
-    // build-time API probes -- can interrupt them, instead of being queued and ignored until
-    // they finish.
-    let mut signal_rx = signal_handler.subscribe();
-
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
-            match validate_environment(opts, &config, &mut fmt, &mut signal_rx).await {
+            let outcome = validate_environment(opts, &config, &mut fmt, &mut signal_rx).await;
+            remove_tmp_directory(tmp_directory);
+            match outcome {
                 Ok(valid) => validated &= valid,
                 // An interrupted validation is not a successful one; report a distinct
                 // non-zero code so scripts don't mistake it for a valid configuration.
                 Err(Interrupted) => return exitcode::UNAVAILABLE,
             }
-            remove_tmp_directory(tmp_directory);
         } else {
             validated = false;
         }
