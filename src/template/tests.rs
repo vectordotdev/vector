@@ -931,14 +931,18 @@ fn uri_template_confine_enforces_uri_semantics() {
 }
 
 #[rstest]
-// URIs — dynamic or static — must be absolute http(s) URIs with a fully
-// static authority. Reject at build time otherwise.
+// URIs — dynamic, static, or strftime-only — must be absolute http(s) URIs
+// with a fully static authority. Reject at build time otherwise. For
+// strftime-only templates the literal prefix before the first `%` carries
+// the scheme and authority, so they validate the same way.
 #[case::relative_uri("/api/{{ tenant }}", "authority")]
 #[case::schemeless("//api.example.com/{{ tenant }}", "authority")]
 #[case::static_relative_uri("/api/endpoint", "authority")]
 #[case::static_schemeless("//api.example.com/path", "authority")]
+#[case::strftime_only_relative_uri("/relative/%Y", "authority")]
 #[case::unsupported_scheme("ftp://files.example.com/{{ path }}", "ftp")]
 #[case::static_unsupported_scheme("ftp://files.example.com/path", "ftp")]
+#[case::strftime_only_unsupported_scheme("ftp://files.example.com/%Y", "ftp")]
 fn uri_template_confine_rejects_invalid_scheme_or_authority(
     #[case] template: &str,
     #[case] err_fragment: &str,
