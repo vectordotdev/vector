@@ -170,14 +170,31 @@ async fn topology_shutdown_while_active() {
 async fn dropping_shutdown_future_aborts_component_tasks() {
     trace_init();
 
-    let (input, source) = basic_source();
+    let (mut input, source) = basic_source();
     let (mut output, sink) = basic_sink(1);
+    let entered = Arc::new(Barrier::new(2));
+    let release = Arc::new(Semaphore::new(0));
 
     let mut config = Config::builder();
     config.add_source("in", source);
-    config.add_sink("out", &["in"], sink);
+    config.add_sink(
+        "out",
+        &["in"],
+        sink.with_event_gate(Arc::clone(&entered), Arc::clone(&release)),
+    );
 
     let (topology, _) = start_topology(config.build().unwrap(), false).await;
+    tokio::time::timeout(
+        ASYNC_TEST_TIMEOUT,
+        input.send_event(Event::Log(LogEvent::from("event"))),
+    )
+    .await
+    .expect("sending event to gated sink timed out")
+    .unwrap();
+    tokio::time::timeout(ASYNC_TEST_TIMEOUT, entered.wait())
+        .await
+        .expect("sink did not reach event gate");
+
     let shutdown = topology.stop();
     drop(shutdown);
     drop(input);
