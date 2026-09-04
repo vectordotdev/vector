@@ -360,26 +360,77 @@ The HPA scales to five pods, matching the prediction
 and keeping CPU at its 70% target instead of
 leaving each pod with roughly 53% of unused CPU capacity.
 
+### Handling sudden bursts
+
+The HPA is a reactive controller. It can adjust capacity for sustained changes,
+but it cannot make new pods Ready immediately when a burst begins. It only
+reconciles and issues a scaling decision every [15 seconds by
+default](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/),
+and each new pod still needs to start and pass its readiness probe. The
+binding deadline for an in-flight request is the [NGINX Ingress Controller's
+proxy read and send
+timeouts](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/):
+**60 seconds by default**, and left unchanged in this guide.
+
+Consider a sudden burst that requires nine pods when only two are Ready. With
+the pods limited to 1 vCPU, observed CPU cannot exceed 100%. At the 70% target,
+the HPA formula therefore increases the recommendation through approximately
+2→3→5→8→9 instead of detecting the full nine-pod demand immediately, and each
+decision depends on another reconciliation cycle and fresh metrics. Even if
+`maxReplicas` is raised to nine, scaling takes about one minute or longer after
+pod startup and readiness are included. With this guide's `maxReplicas: 8`,
+the deployment can never reach nine pods.
+
+During that interval, Vector applies backpressure and HTTP requests stall. If
+NGINX goes 60 seconds without progress while reading from or writing to the
+Vector upstream, it closes the connection. The events in that request are then
+lost. New replicas can accept later requests, but they cannot recover a request
+that has already timed out.
+
+Even when running these experiments with a constant log stream of 55 MiB/s some
+logs were inevitably lost. Phase 4 took over 100 seconds to scale to 5 pods and
+the CPU was bottlenecked before scaling. A single pod receiving a large influx
+of data is essentially a burst — even if the throughput is constant it still
+overwhelms the single pod.
+
+If sudden bursts must not lose data, use one or more of the following:
+
+- **Put a durable queue before Vector:** Send events to [Kafka](/docs/reference/configuration/sources/kafka/),
+  [Google Cloud Pub/Sub](/docs/reference/configuration/sources/gcp_pubsub/), or
+  another durable broker, then let Vector consume the backlog. Queue depth or
+  consumer lag is also a better scaling signal than CPU for burst demand.
+- **Pre-provision capacity:** Set `minReplicas` high enough to absorb the burst,
+  or scale up on a schedule before a predictable burst.
+- **Scale from backlog:** Use external metrics to scale on queue depth or
+  consumer lag. The queue provides durability while the new pods start; the
+  autoscaler reduces the time needed to drain it.
+- **Make producers retry safely:** Producers can retain unacknowledged events
+  and retry failed requests. Account for possible duplicates when retrying.
+- **Increase proxy timeouts:** Set the read and send timeouts above the expected
+  scale-up and backlog-drain time. This keeps requests open longer but does not
+  provide durable storage, so it is not sufficient by itself.
+
+
 ## Key takeaways
 
-1. **A CPU-bound workload eventually reaches the processing capacity of a
-   single Vector pod**. When that happens, backpressure prevents any event
-   loss\*.
+1. **Avoid the connection-pinning trap.** With long-lived connections behind
+   L4 load balancing, adding pods does not move existing traffic from overloaded
+   pods. Use L7 per-request routing so new replicas receive load immediately.
 
-2. **L7 per-request routing distributes load uniformly.**  Because the NGINX Ingress Controller
-   routes each HTTP request independently, every pod (old or newly
-   Ready) receives a share of traffic proportional to the current replica
-   count, with no idle pods.
+2. **Measure one pod before sizing the deployment.** Saturate one pod, record
+   its throughput and CPU utilization, and use that baseline to calculate how
+   many replicas the workload requires.
 
-3. **Adding pods beyond the saturation point removes the CPU bottleneck entirely.** Once the workload is no longer CPU-bound, throughput increases while CPU utilization per pod decreases.
+3. **Configure the HPA for headroom, not saturation.** Set CPU requests, then
+   choose a target below 100%. For this workload, a 70% target reduced the
+   required deployment from eight manually provisioned pods to five
+   automatically managed pods.
 
-4. **The HPA determines the right pod count automatically.**  With HTTP and L7 routing,
-   each new pod starts receiving traffic immediately after becoming Ready.
-
-\* This holds only as long as the stalled connection stays open. If the NGINX
-Ingress Controller or the load generator times out and closes a stalled
-connection first, the in-flight request's events are lost along with it.
-
+4. **Do not rely on the HPA alone for sudden bursts.** Repeated 15-second HPA
+   reconciliations plus pod startup and readiness can make scale-up take about
+   one minute or longer. That can exceed the NGINX Ingress Controller's
+   60-second default proxy timeouts and cause in-flight events to be lost. Keep
+   enough pods Ready to absorb the burst or put a durable queue before Vector.
 
 ## Replicating these results
 
