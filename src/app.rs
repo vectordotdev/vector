@@ -103,9 +103,6 @@ impl ApplicationConfig {
         let config = loop {
             tokio::select! {
                 biased;
-                result = &mut load => {
-                    break result?;
-                }
                 signal = signal_rx.recv() => {
                     match signal {
                         // A shutdown signal (or a closed signal channel) arrived while config
@@ -117,6 +114,9 @@ impl ApplicationConfig {
                         // Reload signals have no effect during startup; ignore them.
                         _ => continue,
                     }
+                }
+                result = &mut load => {
+                    break result?;
                 }
             }
         };
@@ -147,12 +147,6 @@ impl ApplicationConfig {
         let (topology, graceful_crash_receiver) = loop {
             tokio::select! {
                 biased;
-                result = &mut start => {
-                    break match result {
-                        Some(topology) => topology,
-                        None => return Err(exitcode::CONFIG),
-                    };
-                }
                 signal = signal_rx.recv() => {
                     match signal {
                         // A shutdown signal (or a closed signal channel) arrived while startup was
@@ -164,6 +158,12 @@ impl ApplicationConfig {
                         // Reload signals have no effect during startup; ignore them.
                         _ => continue,
                     }
+                }
+                result = &mut start => {
+                    break match result {
+                        Some(topology) => topology,
+                        None => return Err(exitcode::CONFIG),
+                    };
                 }
             }
         };

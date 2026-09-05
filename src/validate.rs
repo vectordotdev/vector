@@ -193,12 +193,6 @@ pub async fn validate(
     let mut config = loop {
         tokio::select! {
             biased;
-            result = &mut load => {
-                break match result {
-                    Some(config) => config,
-                    None => return exitcode::CONFIG,
-                };
-            }
             signal = signal_rx.recv() => {
                 match signal {
                     Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
@@ -209,6 +203,12 @@ pub async fn validate(
                     // Reload signals have no effect during validation; ignore them.
                     _ => continue,
                 }
+            }
+            result = &mut load => {
+                break match result {
+                    Some(config) => config,
+                    None => return exitcode::CONFIG,
+                };
             }
         }
     };
@@ -434,6 +434,15 @@ async fn validate_components(
     loop {
         tokio::select! {
             biased;
+            signal = signal_rx.recv() => {
+                match signal {
+                    Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
+                        return Err(Interrupted);
+                    }
+                    // Reload signals have no effect during validation; ignore them.
+                    _ => continue,
+                }
+            }
             result = &mut build => {
                 return Ok(match result {
                     Ok(pieces) => {
@@ -446,15 +455,6 @@ async fn validate_components(
                         None
                     }
                 });
-            }
-            signal = signal_rx.recv() => {
-                match signal {
-                    Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
-                        return Err(Interrupted);
-                    }
-                    // Reload signals have no effect during validation; ignore them.
-                    _ => continue,
-                }
             }
         }
     }
@@ -490,7 +490,6 @@ async fn validate_healthchecks(
         let result = loop {
             tokio::select! {
                 biased;
-                result = &mut handle => break result,
                 signal = signal_rx.recv() => {
                     match signal {
                         Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
@@ -504,6 +503,7 @@ async fn validate_healthchecks(
                         _ => continue,
                     }
                 }
+                result = &mut handle => break result,
             }
         };
         match result {
