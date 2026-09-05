@@ -316,6 +316,7 @@ impl ValidatedSink for HttpSinkConfig {
     type Validated = ValidatedHttp;
 
     fn validate(&self) -> crate::Result<ValidatedHttp> {
+        self.encoding.validate()?;
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
         let serializer_config = self.encoding.config().1;
@@ -707,6 +708,50 @@ mod tests {
             config.validate().is_err(),
             "relative static uri should fail validation"
         );
+    }
+
+    #[test]
+    fn validate_rejects_unbuildable_encoding() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: avro
+              avro:
+                schema: "not a valid avro schema"
+            "#,
+        )
+        .unwrap();
+        let error = config.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn validate_assumes_protobuf_encoding_valid_without_disk_access() {
+        use crate::config::ValidatedSink;
+        // The protobuf codec reads its descriptor set from `desc_file` on
+        // disk; pure validation must stay filesystem-free, so an unbuildable
+        // protobuf encoding is caught in the build phase instead.
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: protobuf
+              protobuf:
+                desc_file: "/nonexistent/protobuf.desc"
+                message_type: "package.Message"
+            "#,
+        )
+        .unwrap();
+        config
+            .validate()
+            .expect("protobuf encoding assumed valid without disk access");
     }
 
     #[test]

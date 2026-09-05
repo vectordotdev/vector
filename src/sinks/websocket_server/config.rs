@@ -157,6 +157,7 @@ impl ValidatedSink for WebSocketListenerSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedWebSocketListenerSink> {
         let transformer = self.encoding.transformer();
+        self.encoding.validate()?;
         // Custom-auth VRL compilation is deferred to `validate_with_context`, which
         // has the enrichment tables needed to resolve `get_enrichment_table_record!`.
         Ok(ValidatedWebSocketListenerSink { transformer })
