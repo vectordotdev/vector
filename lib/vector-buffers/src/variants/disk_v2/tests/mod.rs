@@ -1,7 +1,11 @@
 use std::{
     io::{self, Cursor},
     path::Path,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::{Duration, Instant},
 };
 
 use tokio::{
@@ -22,14 +26,63 @@ use crate::{
 
 type FilesystemUnderTest = ProductionFilesystem;
 
+struct WriteGateCleanup(Arc<super::io::TestWriteGate>);
+
+impl Drop for WriteGateCleanup {
+    fn drop(&mut self) {
+        self.0.release();
+    }
+}
+
+async fn open_production_ledger(
+    data_dir: &Path,
+    filesystem: ProductionFilesystem,
+) -> Result<Ledger<ProductionFilesystem>, super::ledger::LedgerLoadCreateError> {
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
+        .filesystem(filesystem)
+        .build()
+        .unwrap();
+    Ledger::load_or_create(config, BufferUsageHandle::noop()).await
+}
+
+async fn reopen_production_ledger(
+    data_dir: &Path,
+) -> Result<Ledger<ProductionFilesystem>, super::ledger::LedgerLoadCreateError> {
+    open_production_ledger(data_dir, ProductionFilesystem::default()).await
+}
+
+async fn assert_session_locked(data_dir: &Path) {
+    assert!(matches!(
+        reopen_production_ledger(data_dir).await,
+        Err(super::ledger::LedgerLoadCreateError::LedgerLockAlreadyHeld)
+    ));
+}
+
+async fn wait_for_session_unlock(data_dir: &Path) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            match reopen_production_ledger(data_dir).await {
+                Ok(_) => break,
+                Err(super::ledger::LedgerLoadCreateError::LedgerLockAlreadyHeld) => {
+                    tokio::task::yield_now().await;
+                }
+                Err(error) => panic!("buffer reopen failed: {error}"),
+            }
+        }
+    })
+    .await
+    .expect("session lock should be released after the detached write completes");
+}
+
 mod acknowledgements;
 mod basic;
 mod filter_metrics;
 mod initialization;
 mod invariants;
 mod known_errors;
-mod model;
+pub(crate) mod model;
 mod record;
+mod runtime_capacity;
 mod size_limits;
 
 impl AsyncFile for DuplexStream {
@@ -493,7 +546,7 @@ async fn production_filesystem_truncates_with_append_handle_open() {
         let path = dir.join("truncate-with-append-handle");
 
         async move {
-            let filesystem = ProductionFilesystem;
+            let filesystem = ProductionFilesystem::default();
             filesystem
                 .truncate_file(&path, 0)
                 .await
@@ -527,6 +580,156 @@ async fn production_filesystem_truncates_with_append_handle_open() {
                     .expect("reading truncated file should succeed")
                     .as_slice()
             );
+        }
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn production_write_completes() {
+    with_temp_dir(|dir| {
+        let path = dir.join("single-poll-write");
+
+        async move {
+            let filesystem = ProductionFilesystem::default();
+            let mut file = filesystem
+                .open_file_writable(&path)
+                .await
+                .expect("file should open");
+
+            assert_eq!(
+                file.write_resumable(b"test")
+                    .await
+                    .expect("write should succeed"),
+                4
+            );
+            assert_eq!(
+                file.metadata().await.expect("metadata should load").len(),
+                4
+            );
+        }
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn cancelled_stalled_write_does_not_block_runtime_and_retains_session_lock() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let super::io::StalledWrites { filesystem, gate } =
+                ProductionFilesystem::with_stalled_writes();
+            let ledger = open_production_ledger(&data_dir, filesystem.clone())
+                .await
+                .unwrap();
+            let _gate_cleanup = WriteGateCleanup(Arc::clone(&gate));
+            let path = data_dir.join("buffer-data-final");
+            let mut file = ledger.filesystem().open_file_writable(&path).await.unwrap();
+            let mut write = Box::pin(file.write_resumable(b"test"));
+
+            tokio::select! {
+                result = &mut write => panic!("gated write unexpectedly completed: {result:?}"),
+                () = gate.wait_until_started() => {}
+            }
+
+            let runtime_progressed = Arc::new(AtomicBool::new(false));
+            let watchdog_progress = Arc::clone(&runtime_progressed);
+            let watchdog_gate = Arc::clone(&gate);
+            let watchdog = std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(5);
+                while !watchdog_progress.load(Ordering::Acquire) && Instant::now() < deadline {
+                    std::thread::park_timeout(deadline.saturating_duration_since(Instant::now()));
+                }
+                let runtime_blocked = !watchdog_progress.load(Ordering::Acquire);
+                if runtime_blocked {
+                    watchdog_gate.release();
+                }
+                runtime_blocked
+            });
+
+            drop(write);
+            drop(file);
+            drop(ledger);
+            tokio::task::yield_now().await;
+            runtime_progressed.store(true, Ordering::Release);
+            watchdog.thread().unpark();
+
+            assert_session_locked(&data_dir).await;
+
+            gate.release();
+            assert!(
+                !watchdog.join().unwrap(),
+                "the watchdog had to release a write that parked the current-thread runtime"
+            );
+            wait_for_session_unlock(&data_dir).await;
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn readable_production_file_does_not_create_blocking_writer() {
+    with_temp_dir(|dir| {
+        let path = dir.join("readable-file");
+
+        async move {
+            tokio::fs::write(&path, b"test").await.unwrap();
+            let filesystem = ProductionFilesystem::default();
+            let file = filesystem.open_file_readable(&path).await.unwrap();
+
+            assert!(!file.has_blocking_writer());
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn cloned_production_filesystems_keep_session_locks_independent() {
+    with_temp_dir(|dir| {
+        let first_dir = dir.join("first");
+        let second_dir = dir.join("second");
+
+        async move {
+            let super::io::StalledWrites { filesystem, gate } =
+                ProductionFilesystem::with_stalled_writes();
+            let _gate_cleanup = WriteGateCleanup(Arc::clone(&gate));
+            let first = open_production_ledger(&first_dir, filesystem.clone())
+                .await
+                .unwrap();
+            let second = open_production_ledger(&second_dir, filesystem)
+                .await
+                .unwrap();
+
+            let mut first_file = first
+                .filesystem()
+                .open_file_writable(&first_dir.join("buffer-data-final"))
+                .await
+                .unwrap();
+            let mut write = Box::pin(first_file.write_resumable(b"test"));
+            tokio::select! {
+                result = &mut write => panic!("gated write unexpectedly completed: {result:?}"),
+                () = gate.wait_until_started() => {}
+            }
+            drop(write);
+            drop(first);
+
+            assert_session_locked(&first_dir).await;
+
+            gate.release();
+            assert_eq!(first_file.write_resumable(b"test").await.unwrap(), 4);
+            drop(first_file);
+
+            reopen_production_ledger(&first_dir)
+                .await
+                .expect("first session lock should be released independently");
+
+            assert_session_locked(&second_dir).await;
+            drop(second);
+
+            reopen_production_ledger(&second_dir)
+                .await
+                .expect("second session lock should be released independently");
         }
     })
     .await;
