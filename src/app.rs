@@ -87,15 +87,42 @@ impl ApplicationConfig {
         // and ignored until startup completes.
         let mut signal_rx = signal_handler.subscribe();
 
-        let config = load_configs(
+        // Loading the config can block on network I/O (e.g. provider or secret resolution).
+        // Race it against shutdown signals so that a signal received during config loading
+        // aborts startup immediately, instead of being queued and ignored until the topology
+        // build phase starts.
+        let mut load = Box::pin(load_configs(
             &config_paths,
             watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
             graceful_shutdown_duration,
             signal_handler,
-        )
-        .await?;
+        ));
+
+        let config = loop {
+            tokio::select! {
+                biased;
+                result = &mut load => {
+                    break result?;
+                }
+                signal = signal_rx.recv() => {
+                    match signal {
+                        // A shutdown signal (or a closed signal channel) arrived while config
+                        // loading was still in progress. Abort startup and exit the same way a
+                        // running Vector would on such a signal.
+                        Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
+                            return Err(exitcode::OK);
+                        }
+                        // Reload signals have no effect during startup; ignore them.
+                        _ => continue,
+                    }
+                }
+            }
+        };
+
+        // Release the borrows held by the pinned config-loading future before moving on.
+        drop(load);
 
         Self::from_config(config_paths, config, extra_context, &mut signal_rx).await
     }

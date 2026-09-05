@@ -187,10 +187,34 @@ pub async fn validate(
 
     let mut validated = true;
 
-    let mut config = match validate_config(opts, signal_handler, &mut fmt).await {
-        Some(config) => config,
-        None => return exitcode::CONFIG,
+    // Config loading can block (e.g. on secret/provider resolution), so race it against
+    // shutdown signals to abort validation immediately if one is received.
+    let mut load = Box::pin(validate_config(opts, signal_handler, &mut fmt));
+    let mut config = loop {
+        tokio::select! {
+            biased;
+            result = &mut load => {
+                break match result {
+                    Some(config) => config,
+                    None => return exitcode::CONFIG,
+                };
+            }
+            signal = signal_rx.recv() => {
+                match signal {
+                    Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
+                        // An interrupted validation is not a successful one; report a distinct
+                        // non-zero code so scripts don't mistake it for a valid configuration.
+                        return exitcode::UNAVAILABLE;
+                    }
+                    // Reload signals have no effect during validation; ignore them.
+                    _ => continue,
+                }
+            }
+        }
     };
+
+    // Release the borrows held by the pinned config-loading future before moving on.
+    drop(load);
 
     validated &= validate_transforms(&config, &mut fmt).await;
     validated &= validate_sinks_with_context(&config, &mut fmt);
@@ -470,6 +494,10 @@ async fn validate_healthchecks(
                 signal = signal_rx.recv() => {
                     match signal {
                         Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
+                            // Cancel the spawned healthcheck and wait for it to finish before
+                            // any cleanup runs, so it can't outlive this function.
+                            handle.abort();
+                            drop(handle.await);
                             return Err(Interrupted);
                         }
                         // Reload signals have no effect during validation; ignore them.
