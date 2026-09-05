@@ -1,0 +1,41 @@
+# Azure Data Explorer (streaming ingestion) example
+# ------------------------------------------------------------------------------
+# Prerequisites:
+# - Build Vector with feature: sinks-azure_data_explorer (included in default "sinks" logs set)
+# - Entra app registration: tenant ID, application (client) ID, client secret
+# - ADX: enable streaming ingestion on the cluster; run e.g.
+#     .alter table MyTable policy streamingingestion enable
+#   Grant the app's service principal ingestion rights (e.g. Database Ingestor) on the database.
+#
+# IMPORTANT: ingestion_endpoint must be the plain cluster URL (no "ingest-" prefix).
+#   Streaming ingestion POSTs directly to the cluster.
+#   The "ingest-" prefix is only for queued (blob) ingestion which this sink does not use.
+#
+# Export secrets before running:
+#   export AZURE_TENANT_ID="..."
+#   export AZURE_CLIENT_ID="..."
+#   export AZURE_CLIENT_SECRET="..."
+#
+# Run:
+#   vector --config config/examples/azure_data_explorer_streaming.yaml
+
+sources:
+  demo_in:
+    type: demo_logs
+    format: json
+    interval: 1.0
+
+sinks:
+  adx_out:
+    type: azure_data_explorer
+    inputs: [demo_in]
+    # Plain cluster URL — no "ingest-" prefix
+    ingestion_endpoint: "https://mycluster.eastus.kusto.windows.net"
+    database: "MyDatabase"
+    table: "MyTable"
+    tenant_id: "${AZURE_TENANT_ID}"
+    client_id: "${AZURE_CLIENT_ID}"
+    client_secret: "${AZURE_CLIENT_SECRET}"
+    # Optional: JSON mapping name on the table (often required for MultiJSON column mapping)
+    # mapping_reference: "MyJsonMapping"
+    compression: gzip
