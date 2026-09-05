@@ -378,8 +378,11 @@ async fn tap_handler(
                             // as a previous, and we are not getting involved in config diffing at
                             // this point.
                             let sink_id = Uuid::new_v4().to_string();
-                            match control_tx
-                                .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), tap_buffer_tx))
+                            match control_tx.send(fanout::ControlMessage::Add(
+                                ComponentKey::from(sink_id.as_str()),
+                                tap_buffer_tx,
+                                fanout::AcknowledgementRequirement::BestEffort,
+                            ))
                             {
                                 Ok(_) => {
                                     debug!(
