@@ -79,6 +79,7 @@ message DatadogOriginMetadata {
   optional uint32 origin_product = 1;
   optional uint32 origin_category = 2;
   optional uint32 origin_service = 3;
+  optional int32 metric_type = 4;
 }
 
 message Secrets {
@@ -98,6 +99,7 @@ message Metadata {
   OutputId upstream_id = 5;
   Secrets secrets = 6;
   bytes source_event_id = 7;
+  optional string datadog_metric_unit = 8;
 }
 
 message Metric {

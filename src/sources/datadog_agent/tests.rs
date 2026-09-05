@@ -50,7 +50,7 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
         DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto,
-        ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
+        ddmetric_v3_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
         addr::{PortGuard, next_addr},
@@ -66,6 +66,7 @@ const DD_API_LOGS_V1_PATH: &str = "/v1/input/";
 const DD_API_LOGS_V2_PATH: &str = "/api/v2/logs";
 const DD_API_SERIES_V1_PATH: &str = "/api/v1/series";
 const DD_API_SERIES_V2_PATH: &str = "/api/v2/series";
+const DD_API_SERIES_V3_PATH: &str = "/api/intake/metrics/v3/series";
 const DD_API_SKETCHES_PATH: &str = "/api/beta/sketches";
 const DD_API_TRACES_PATH: &str = "/api/v0.2/traces";
 const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
@@ -369,6 +370,35 @@ async fn send_and_collect(
     spawn_collect_n(
         async move {
             assert_eq!(200, send_with_path(address, &body, headers, path).await);
+        },
+        rx,
+        expected_count,
+    )
+    .await
+}
+
+async fn send_bytes_and_collect(
+    address: SocketAddr,
+    body: Vec<u8>,
+    headers: HeaderMap,
+    path: &'static str,
+    rx: impl Stream<Item = Event> + Unpin,
+    expected_count: usize,
+) -> Vec<Event> {
+    spawn_collect_n(
+        async move {
+            let response = timeout(
+                HTTP_REQUEST_TIMEOUT,
+                reqwest::Client::new()
+                    .post(format!("http://{address}{path}"))
+                    .headers(headers)
+                    .body(body)
+                    .send(),
+            )
+            .await
+            .expect("send_bytes_and_collect request timed out")
+            .unwrap();
+            assert_eq!(200, response.status().as_u16());
         },
         rx,
         expected_count,
@@ -927,6 +957,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
@@ -938,6 +969,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("another_random_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
@@ -949,6 +981,7 @@ async fn decode_series_endpoint_v1() {
                     host: Some("a_host".to_string()),
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
@@ -960,6 +993,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
                 DatadogSeriesMetric {
@@ -971,6 +1005,7 @@ async fn decode_series_endpoint_v1() {
                     host: None,
                     source_type_name: None,
                     device: None,
+                    unit: None,
                     metadata: None,
                 },
             ],
@@ -1139,6 +1174,7 @@ async fn decode_sketches() {
             }],
             metadata: Some(ddmetric_proto::Metadata {
                 origin: Some(ddmetric_proto::Origin {
+                    metric_type: 0,
                     origin_product: 10,
                     origin_category: 11,
                     origin_service: 9,
@@ -1496,6 +1532,7 @@ async fn split_outputs() {
                 host: Some("random_host".to_string()),
                 source_type_name: None,
                 device: None,
+                unit: None,
                 metadata: None,
             }],
         };
@@ -2180,6 +2217,7 @@ async fn decode_series_endpoint_v2() {
                 interval: 0,
                 metadata: Some(ddmetric_proto::Metadata {
                     origin: Some(ddmetric_proto::Origin {
+                        metric_type: 0,
                         origin_product: 10,
                         origin_category: 10,
                         origin_service: 42,
@@ -2361,6 +2399,437 @@ async fn decode_series_endpoint_v2() {
                 42
             );
         }
+    })
+    .await;
+}
+
+fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
+    values
+        .iter()
+        .flat_map(|value| {
+            let mut encoded = Vec::new();
+            encode_v3_varint(value.len() as u64, &mut encoded);
+            encoded.extend_from_slice(value.as_bytes());
+            encoded
+        })
+        .collect()
+}
+
+fn encode_v3_varint(mut value: u64, encoded: &mut Vec<u8>) {
+    while value >= 0x80 {
+        encoded.push((value as u8 & 0x7f) | 0x80);
+        value >>= 7;
+    }
+    encoded.push(value as u8);
+}
+
+fn encode_v3_length_delimited(field: u8, value: &[u8], encoded: &mut Vec<u8>) {
+    encode_v3_varint((u64::from(field) << 3) | 2, encoded);
+    encode_v3_varint(value.len() as u64, encoded);
+    encoded.extend_from_slice(value);
+}
+
+fn minimal_v3_metric_data() -> ddmetric_v3_proto::MetricData {
+    ddmetric_v3_proto::MetricData {
+        dict_name_str: v3_string_dictionary(&["metric"]),
+        dict_tag_str: Vec::new(),
+        dict_tagsets: Vec::new(),
+        dict_resource_str: Vec::new(),
+        dict_resource_len: Vec::new(),
+        dict_resource_type: Vec::new(),
+        dict_resource_name: Vec::new(),
+        dict_source_type_name: Vec::new(),
+        dict_origin_info: Vec::new(),
+        dict_unit_str: Vec::new(),
+        types: vec![3 | 0x30],
+        name_refs: vec![1],
+        tagset_refs: vec![0],
+        resources_refs: vec![0],
+        intervals: vec![0],
+        num_points: vec![1],
+        source_type_name_refs: vec![0],
+        origin_info_refs: vec![0],
+        unit_refs: Vec::new(),
+        timestamps: vec![1],
+        vals_sint64: Vec::new(),
+        vals_float32: Vec::new(),
+        vals_float64: vec![1.0],
+        sketch_num_bins: Vec::new(),
+        sketch_bin_keys: Vec::new(),
+        sketch_bin_cnts: Vec::new(),
+    }
+}
+
+#[test]
+fn decode_v3_rejects_point_count_larger_than_columns() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = u64::MAX;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_negative_origin_values() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_origin_info = vec![-1, 0, 0];
+    data.origin_info_refs[0] = 1;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_timestamp_outside_chrono_range() {
+    let mut data = minimal_v3_metric_data();
+    data.timestamps[0] = i64::MAX;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_interval_millisecond_overflow() {
+    let mut data = minimal_v3_metric_data();
+    data.intervals[0] = u64::from(u32::MAX / 1000 + 1);
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_tagset_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tag_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_tagsets = vec![1, 1];
+    for previous_tagset in 1..=5 {
+        data.dict_tagsets
+            .extend([2, -i64::from(previous_tagset), 0]);
+    }
+    data.tagset_refs[0] = 6;
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_series_tag_cloning() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tag_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_tagsets = vec![1, 1];
+    data.types = vec![3 | 0x30; 17];
+    data.name_refs = std::iter::once(1)
+        .chain(std::iter::repeat_n(0, 16))
+        .collect();
+    data.tagset_refs = std::iter::once(1)
+        .chain(std::iter::repeat_n(0, 16))
+        .collect();
+    data.resources_refs = vec![0; 17];
+    data.intervals = vec![0; 17];
+    data.num_points = vec![0; 17];
+    data.source_type_name_refs = vec![0; 17];
+    data.origin_info_refs = vec![0; 17];
+    data.timestamps.clear();
+    data.vals_float64.clear();
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_point_tag_cloning() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tag_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_tagsets = vec![1, 1];
+    data.tagset_refs[0] = 1;
+    data.num_points[0] = 17;
+    data.timestamps = vec![1; 17];
+    data.vals_float64 = vec![1.0; 17];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_event_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.num_points[0] = 1_000_000;
+    data.timestamps = vec![0; 1_000_000];
+    data.vals_float64 = vec![0.0; 1_000_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_source_type_event_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_source_type_name = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.source_type_name_refs[0] = 1;
+    data.num_points[0] = 17;
+    data.timestamps = vec![1; 17];
+    data.vals_float64 = vec![1.0; 17];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_dictionary_string_cloning() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_name_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.types = vec![3 | 0x30; 17];
+    data.name_refs = std::iter::once(1)
+        .chain(std::iter::repeat_n(0, 16))
+        .collect();
+    data.tagset_refs = vec![0; 17];
+    data.resources_refs = vec![0; 17];
+    data.intervals = vec![0; 17];
+    data.num_points = vec![0; 17];
+    data.source_type_name_refs = vec![0; 17];
+    data.origin_info_refs = vec![0; 17];
+    data.timestamps.clear();
+    data.vals_float64.clear();
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_empty_string_entries() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_name_str = vec![0; 700_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_empty_tagsets() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_tagsets = vec![0; 700_000];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_resource_expansion() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_resource_str = v3_string_dictionary(&[&"x".repeat(1024 * 1024)]);
+    data.dict_resource_len = vec![1; 17];
+    data.dict_resource_type = vec![1; 17];
+    data.dict_resource_name = vec![0; 17];
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_deduplicates_metadata_tags() {
+    let data = minimal_v3_metric_data();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: vec!["team:core".to_string(); 10_000],
+        resources: Vec::new(),
+    };
+
+    let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
+    assert_eq!(series[0].tags, ["team:core"]);
+}
+
+#[test]
+fn decode_v3_accepts_many_distinct_metadata_tags() {
+    let data = minimal_v3_metric_data();
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: (0..100_000).map(|index| format!("tag:{index}")).collect(),
+        resources: Vec::new(),
+    };
+
+    let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
+    assert_eq!(series[0].tags.len(), 100_000);
+}
+
+#[test]
+fn decode_v3_rejects_excessive_metadata_string_entries_before_decode() {
+    let metadata_entry_count = 16 * 1024 * 1024 / std::mem::size_of::<String>() + 1;
+    let mut metadata = Vec::with_capacity(metadata_entry_count * 2);
+    for _ in 0..metadata_entry_count {
+        metadata.extend([0x0a, 0x00]);
+    }
+    let mut payload = Vec::new();
+    encode_v3_length_delimited(2, &metadata, &mut payload);
+
+    assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
+}
+
+#[test]
+fn decode_v3_accumulates_metadata_allocations_across_fields() {
+    let metadata_entry_count = 16 * 1024 * 1024 / std::mem::size_of::<String>() / 2 + 1;
+    let mut metadata = Vec::with_capacity(metadata_entry_count * 2);
+    for _ in 0..metadata_entry_count {
+        metadata.extend([0x0a, 0x00]);
+    }
+    let mut payload = Vec::new();
+    encode_v3_length_delimited(2, &metadata, &mut payload);
+    encode_v3_length_delimited(2, &metadata, &mut payload);
+
+    assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_numeric_columns_before_decode() {
+    let entry_count = 16 * 1024 * 1024 / std::mem::size_of::<i64>() + 1;
+    let packed_timestamps = vec![0; entry_count];
+    let mut metric_data = Vec::new();
+    encode_v3_length_delimited(16, &packed_timestamps, &mut metric_data);
+    let mut payload = Vec::new();
+    encode_v3_length_delimited(3, &metric_data, &mut payload);
+
+    assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_lossy_tag_expansion_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    let invalid_utf8 = vec![0xff; 6 * 1024 * 1024];
+    encode_v3_varint(invalid_utf8.len() as u64, &mut data.dict_tag_str);
+    data.dict_tag_str.extend(invalid_utf8);
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_valid_string_expansion_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    let valid_utf8 = vec![b'x'; 16 * 1024 * 1024];
+    encode_v3_varint(valid_utf8.len() as u64, &mut data.dict_tag_str);
+    data.dict_tag_str.extend(valid_utf8);
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_reference_accumulator_overflow() {
+    let mut data = minimal_v3_metric_data();
+    data.types = vec![3 | 0x30; 2];
+    data.name_refs = vec![1, i64::MAX];
+    data.tagset_refs = vec![0; 2];
+    data.resources_refs = vec![0; 2];
+    data.intervals = vec![0; 2];
+    data.num_points = vec![0; 2];
+    data.source_type_name_refs = vec![0; 2];
+    data.origin_info_refs = vec![0; 2];
+    data.timestamps.clear();
+    data.vals_float64.clear();
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
+fn decode_v3_does_not_expand_unused_global_resources() {
+    let mut data = minimal_v3_metric_data();
+    data.dict_resource_len = vec![0; 100_000];
+    let metadata = ddmetric_v3_proto::Metadata {
+        tags: Vec::new(),
+        resources: vec!["container".to_string(), "x".repeat(1024)],
+    };
+
+    let series = super::metrics::decode_v3_metric_data(&data, Some(&metadata)).unwrap();
+    assert_eq!(series[0].resources.len(), 1);
+}
+
+#[tokio::test]
+async fn decode_series_endpoint_v3() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let payload = ddmetric_v3_proto::Payload {
+            metadata: Some(ddmetric_v3_proto::Metadata {
+                tags: vec!["team:core".to_string()],
+                resources: Vec::new(),
+            }),
+            metric_data: Some(ddmetric_v3_proto::MetricData {
+                dict_name_str: v3_string_dictionary(&["namespace.dd_gauge"]),
+                dict_tag_str: v3_string_dictionary(&["foo:bar"]),
+                dict_tagsets: vec![1, 1],
+                dict_resource_str: v3_string_dictionary(&[
+                    "host",
+                    "random_host",
+                    "container",
+                    "container_id",
+                ]),
+                dict_resource_len: vec![2, 1],
+                dict_resource_type: vec![1, 2, 3],
+                dict_resource_name: vec![2, 2, 4],
+                dict_source_type_name: v3_string_dictionary(&["system"]),
+                dict_origin_info: vec![10, 10, 42],
+                dict_unit_str: v3_string_dictionary(&["byte"]),
+                types: vec![3 | 0x30 | 0x100 | 0x200, 3 | 0x30],
+                name_refs: vec![1, 0],
+                tagset_refs: vec![1, 0],
+                resources_refs: vec![1, 1],
+                intervals: vec![10, 10],
+                num_points: vec![1, 1],
+                source_type_name_refs: vec![1, 0],
+                origin_info_refs: vec![1, 0],
+                unit_refs: vec![1],
+                timestamps: vec![1542182950, 1],
+                vals_sint64: Vec::new(),
+                vals_float32: Vec::new(),
+                vals_float64: vec![3.14, 3.1415],
+                sketch_num_bins: Vec::new(),
+                sketch_bin_keys: Vec::new(),
+                sketch_bin_cnts: Vec::new(),
+            }),
+        };
+        let mut body = Vec::new();
+        payload.encode(&mut body).unwrap();
+        let events = send_bytes_and_collect(
+            addr,
+            body,
+            dd_api_key_headers(),
+            DD_API_SERIES_V3_PATH,
+            rx,
+            2,
+        )
+        .await;
+
+        let metric = events[0].as_metric();
+        assert_eq!(metric.name(), "dd_gauge");
+        assert_eq!(metric.namespace(), Some("namespace"));
+        assert_eq!(metric.kind(), MetricKind::Absolute);
+        assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
+        assert_tags(
+            metric,
+            metric_tags!(
+                "foo" => "bar",
+                "team" => "core",
+                "host" => "random_host",
+                "resource.container" => "container_id",
+                "source_type_name" => "system"
+            ),
+        );
+        assert_eq!(
+            metric
+                .metadata()
+                .datadog_origin_metadata()
+                .unwrap()
+                .product(),
+            Some(10)
+        );
+        assert_eq!(
+            metric
+                .metadata()
+                .datadog_origin_metadata()
+                .unwrap()
+                .category(),
+            Some(10)
+        );
+        assert_eq!(
+            metric
+                .metadata()
+                .datadog_origin_metadata()
+                .unwrap()
+                .service(),
+            Some(42)
+        );
+        assert_eq!(
+            metric
+                .metadata()
+                .datadog_origin_metadata()
+                .unwrap()
+                .metric_type(),
+            Some(9)
+        );
+        assert_eq!(metric.metadata().datadog_metric_unit(), Some("byte"));
     })
     .await;
 }
@@ -2589,6 +3058,7 @@ async fn test_series_v1_split_metric_namespace_impl(
             host: Some("test_host".to_string()),
             source_type_name: None,
             device: None,
+            unit: None,
             metadata: None,
         }],
     };

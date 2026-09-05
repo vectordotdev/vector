@@ -14,7 +14,8 @@ message CommonMetadata {
 }
 
 message Origin {
-    reserved 1,2,3;
+    reserved 1,2;
+    int32 metric_type = 3;
     uint32 origin_product = 4;
     uint32 origin_category = 5;
     uint32 origin_service = 6;

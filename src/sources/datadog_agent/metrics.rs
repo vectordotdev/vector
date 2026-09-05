@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::{collections::HashSet, num::NonZeroU32, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -14,6 +14,7 @@ use vector_lib::{
 use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
 use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload};
+use super::ddmetric_v3_proto::Payload as MetricPayloadV3;
 use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
 use crate::{
     common::{
@@ -30,6 +31,12 @@ use crate::{
     sources::util::{extract_tag_key_and_value, http::capped_body},
 };
 
+const MAX_V3_EXPANDED_TAGSET_BYTES: usize = 16 * 1024 * 1024;
+const MAX_V3_EXPANDED_RESOURCE_BYTES: usize = 16 * 1024 * 1024;
+const MAX_V3_EXPANDED_SERIES_BYTES: usize = 16 * 1024 * 1024;
+const MAX_V3_EXPANDED_EVENT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_V3_DECODED_REPEATED_BYTES: usize = 16 * 1024 * 1024;
+
 #[derive(Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesRequest {
     pub(crate) series: Vec<DatadogSeriesMetric>,
@@ -41,11 +48,14 @@ pub(super) fn build_warp_filter(
 ) -> BoxedFilter<(Response,)> {
     let sketches_service = sketches_service(handler.clone(), source.clone());
     let series_v1_service = series_v1_service(handler.clone(), source.clone());
-    let series_v2_service = series_v2_service(handler, source);
+    let series_v2_service = series_v2_service(handler.clone(), source.clone());
+    let series_v3_service = series_v3_service(handler, source);
     sketches_service
         .or(series_v1_service)
         .unify()
         .or(series_v2_service)
+        .unify()
+        .or(series_v3_service)
         .unify()
         .boxed()
 }
@@ -164,6 +174,49 @@ fn series_v2_service(
         .boxed()
 }
 
+fn series_v3_service(
+    handler: RequestHandler,
+    source: DatadogAgentSource,
+) -> BoxedFilter<(Response,)> {
+    warp::post()
+        .and(
+            path!("api" / "intake" / "metrics" / "v3" / "series" / ..)
+                .or(path!(
+                    "api" / "intake" / "metrics" / "v3beta" / "series" / ..
+                ))
+                .unify()
+                .and(warp::path::full()),
+        )
+        .and(warp::header::optional::<String>("content-encoding"))
+        .and(warp::header::optional::<String>("dd-api-key"))
+        .and(warp::query::<ApiKeyQueryParams>())
+        .and(capped_body())
+        .and_then({
+            move |path: FullPath,
+                  encoding_header: Option<String>,
+                  api_token: Option<String>,
+                  query_params: ApiKeyQueryParams,
+                  body: Bytes| {
+                let events = source
+                    .decode(&encoding_header, body, path.as_str())
+                    .and_then(|body| {
+                        decode_datadog_series_v3(
+                            body,
+                            source.api_key_extractor.extract(
+                                path.as_str(),
+                                api_token,
+                                query_params.dd_api_key,
+                            ),
+                            source.split_metric_namespace,
+                            &source.events_received,
+                        )
+                    });
+                handler.clone().handle_request(events, super::METRICS)
+            }
+        })
+        .boxed()
+}
+
 fn decode_datadog_sketches(
     body: Bytes,
     api_key: Option<Arc<str>>,
@@ -218,6 +271,736 @@ fn decode_datadog_series_v2(
     Ok(metrics)
 }
 
+fn decode_datadog_series_v3(
+    body: Bytes,
+    api_key: Option<Arc<str>>,
+    split_metric_namespace: bool,
+    events_received: &Registered<EventsReceived>,
+) -> Result<Vec<Event>, ErrorMessage> {
+    if body.is_empty() {
+        debug!(message = "Empty payload ignored.");
+        return Ok(Vec::new());
+    }
+
+    let metrics = decode_ddseries_v3(body, &api_key, split_metric_namespace).map_err(|error| {
+        ErrorMessage::new(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("Error decoding Datadog v3 series: {error:?}"),
+        )
+    })?;
+
+    events_received.emit(CountByteSize(
+        metrics.len(),
+        metrics.estimated_json_encoded_size_of(),
+    ));
+
+    Ok(metrics)
+}
+
+pub(crate) fn decode_ddseries_v3(
+    frame: Bytes,
+    api_key: &Option<Arc<str>>,
+    split_metric_namespace: bool,
+) -> crate::Result<Vec<Event>> {
+    validate_v3_predecode_allocations(&frame)?;
+    let payload = MetricPayloadV3::decode(frame)?;
+    let series = payload.metric_data.map_or(Ok(Vec::new()), |metric_data| {
+        decode_v3_metric_data(&metric_data, payload.metadata.as_ref())
+    })?;
+    decode_ddseries(series, api_key, split_metric_namespace)
+}
+
+pub(super) fn decode_v3_metric_data(
+    data: &super::ddmetric_v3_proto::MetricData,
+    metadata: Option<&super::ddmetric_v3_proto::Metadata>,
+) -> crate::Result<Vec<super::ddmetric_proto::metric_payload::MetricSeries>> {
+    let names = decode_v3_strings(&data.dict_name_str, false)?;
+    let tag_strings = decode_v3_strings(&data.dict_tag_str, true)?;
+    let units = decode_v3_strings(&data.dict_unit_str, false)?;
+    let tagsets = decode_v3_tagsets(&data.dict_tagsets, &tag_strings, metadata)?;
+    let resources = decode_v3_resources(data)?;
+    let source_types = decode_v3_strings(&data.dict_source_type_name, false)?;
+    let origin_count = data.dict_origin_info.len() / 3 + 1;
+
+    if metadata.is_some_and(|metadata| metadata.resources.len() % 2 != 0) {
+        return Err("Datadog v3 metadata resources must be pairs".into());
+    }
+
+    if !data.dict_origin_info.len().is_multiple_of(3)
+        || data.name_refs.len() < data.types.len()
+        || data.tagset_refs.len() < data.types.len()
+        || data.resources_refs.len() < data.types.len()
+        || data.intervals.len() < data.types.len()
+        || data.num_points.len() < data.types.len()
+        || data.source_type_name_refs.len() < data.types.len()
+        || data.origin_info_refs.len() < data.types.len()
+    {
+        return Err("invalid Datadog v3 metric columns".into());
+    }
+
+    let mut name_ref: i64 = 0;
+    let mut tagset_ref: i64 = 0;
+    let mut resources_ref: i64 = 0;
+    let mut source_type_ref: i64 = 0;
+    let mut origin_ref: i64 = 0;
+    let mut unit_ref: i64 = 0;
+    let mut unit_idx = 0;
+    let mut timestamp: i64 = 0;
+    let mut timestamp_idx = 0;
+    let mut sint64_idx = 0;
+    let mut float32_idx = 0;
+    let mut float64_idx = 0;
+    let mut expanded_series_bytes: usize = 0;
+    let mut expanded_event_bytes: usize = 0;
+    let mut series = Vec::new();
+
+    for index in 0..data.types.len() {
+        name_ref = name_ref
+            .checked_add(data.name_refs[index])
+            .ok_or("Datadog v3 name reference overflow")?;
+        tagset_ref = tagset_ref
+            .checked_add(data.tagset_refs[index])
+            .ok_or("Datadog v3 tagset reference overflow")?;
+        resources_ref = resources_ref
+            .checked_add(data.resources_refs[index])
+            .ok_or("Datadog v3 resource reference overflow")?;
+        source_type_ref = source_type_ref
+            .checked_add(data.source_type_name_refs[index])
+            .ok_or("Datadog v3 source type reference overflow")?;
+        origin_ref = origin_ref
+            .checked_add(data.origin_info_refs[index])
+            .ok_or("Datadog v3 origin reference overflow")?;
+        if name_ref < 0
+            || name_ref as usize >= names.len()
+            || tagset_ref < 0
+            || tagset_ref as usize >= tagsets.len()
+            || resources_ref < 0
+            || resources_ref as usize >= resources.len()
+            || source_type_ref < 0
+            || source_type_ref as usize >= source_types.len()
+            || origin_ref < 0
+            || origin_ref as usize >= origin_count
+        {
+            return Err("invalid Datadog v3 dictionary reference".into());
+        }
+
+        let packed_type = data.types[index];
+        let metric_type = packed_type & 0x0f;
+        let value_type = packed_type & 0xf0;
+        if metric_type == 4 {
+            return Err("Datadog v3 series payload contains a sketch".into());
+        }
+        let unit = if packed_type & 0x200 != 0 {
+            if unit_idx >= data.unit_refs.len() {
+                return Err("invalid Datadog v3 unit column".into());
+            }
+            unit_ref = unit_ref
+                .checked_add(data.unit_refs[unit_idx])
+                .ok_or("Datadog v3 unit reference overflow")?;
+            unit_idx += 1;
+            if unit_ref < 0 || unit_ref as usize >= units.len() {
+                return Err("invalid Datadog v3 unit reference".into());
+            }
+            units[unit_ref as usize].clone()
+        } else {
+            String::new()
+        };
+
+        let point_count = usize::try_from(data.num_points[index])
+            .map_err(|_| "invalid Datadog v3 point count")?;
+        let remaining_timestamps = data.timestamps.len().saturating_sub(timestamp_idx);
+        let remaining_values = match value_type {
+            0 => remaining_timestamps,
+            0x10 => data.vals_sint64.len().saturating_sub(sint64_idx),
+            0x20 => data.vals_float32.len().saturating_sub(float32_idx),
+            0x30 => data.vals_float64.len().saturating_sub(float64_idx),
+            _ => return Err("invalid Datadog v3 value type".into()),
+        };
+        if point_count > remaining_timestamps || point_count > remaining_values {
+            return Err("invalid Datadog v3 point count".into());
+        }
+
+        let tag_bytes = tagsets[tagset_ref as usize]
+            .iter()
+            .try_fold(0usize, |total, tag| checked_v3_string_bytes(total, tag))?;
+        let resource_bytes = resources[resources_ref as usize].iter().try_fold(
+            0usize,
+            |total, (resource_type, name)| {
+                let total = checked_v3_string_bytes(total, resource_type)?;
+                checked_v3_string_bytes(total, name)
+            },
+        )?;
+        let resource_bytes = metadata
+            .map(|metadata| {
+                metadata
+                    .resources
+                    .chunks_exact(2)
+                    .try_fold(resource_bytes, |total, pair| {
+                        let total = checked_v3_string_bytes(total, &pair[0])?;
+                        checked_v3_string_bytes(total, &pair[1])
+                    })
+            })
+            .transpose()?
+            .unwrap_or(resource_bytes);
+        let name = &names[name_ref as usize];
+        let source_type = &source_types[source_type_ref as usize];
+        let point_tag_bytes = tag_bytes
+            .checked_add(source_type.len())
+            .ok_or("Datadog v3 expanded series size overflow")?;
+        let tag_resource_bytes = point_tag_bytes
+            .checked_add(resource_bytes)
+            .ok_or("Datadog v3 expanded series size overflow")?;
+        let tag_resource_copies = point_count
+            .checked_add(1)
+            .ok_or("Datadog v3 expanded series size overflow")?;
+        let expanded_tag_resource_bytes = tag_resource_bytes
+            .checked_mul(tag_resource_copies)
+            .ok_or("Datadog v3 expanded series size overflow")?;
+        let dictionary_string_bytes = checked_v3_string_bytes(0, name)?;
+        let dictionary_string_bytes = checked_v3_string_bytes(dictionary_string_bytes, &unit)?;
+        let dictionary_string_bytes =
+            checked_v3_string_bytes(dictionary_string_bytes, source_type)?;
+        let series_bytes =
+            std::mem::size_of::<super::ddmetric_proto::metric_payload::MetricSeries>()
+                .checked_add(
+                    point_count
+                        .checked_mul(std::mem::size_of::<
+                            super::ddmetric_proto::metric_payload::MetricPoint,
+                        >())
+                        .ok_or("Datadog v3 expanded series size overflow")?,
+                )
+                .and_then(|total| total.checked_add(expanded_tag_resource_bytes))
+                .and_then(|total| total.checked_add(dictionary_string_bytes))
+                .ok_or("Datadog v3 expanded series size overflow")?;
+        expanded_series_bytes = expanded_series_bytes
+            .checked_add(series_bytes)
+            .ok_or("Datadog v3 expanded series size overflow")?;
+        if expanded_series_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
+            return Err("Datadog v3 expanded series exceed size limit".into());
+        }
+        let event_bytes = std::mem::size_of::<Event>()
+            .checked_add(name.len())
+            .and_then(|total| total.checked_add(tag_bytes))
+            .and_then(|total| total.checked_add(resource_bytes))
+            .and_then(|total| total.checked_add(source_type.len()))
+            .and_then(|total| total.checked_add(unit.len()))
+            .ok_or("Datadog v3 expanded event size overflow")?;
+        expanded_event_bytes = expanded_event_bytes
+            .checked_add(
+                event_bytes
+                    .checked_mul(point_count)
+                    .ok_or("Datadog v3 expanded event size overflow")?,
+            )
+            .ok_or("Datadog v3 expanded event size overflow")?;
+        if expanded_event_bytes > MAX_V3_EXPANDED_EVENT_BYTES {
+            return Err("Datadog v3 expanded events exceed size limit".into());
+        }
+
+        let mut points = Vec::with_capacity(point_count);
+        for _ in 0..point_count {
+            if timestamp_idx >= data.timestamps.len() {
+                return Err("invalid Datadog v3 timestamp column".into());
+            }
+            timestamp = timestamp
+                .checked_add(data.timestamps[timestamp_idx])
+                .ok_or("Datadog v3 timestamp overflow")?;
+            if Utc.timestamp_opt(timestamp, 0).single().is_none() {
+                return Err("invalid Datadog v3 timestamp".into());
+            }
+            timestamp_idx += 1;
+            let value = match value_type {
+                0 => 0.0,
+                0x10 => {
+                    let value = data
+                        .vals_sint64
+                        .get(sint64_idx)
+                        .ok_or("invalid Datadog v3 value column")?;
+                    sint64_idx += 1;
+                    *value as f64
+                }
+                0x20 => {
+                    let value = data
+                        .vals_float32
+                        .get(float32_idx)
+                        .ok_or("invalid Datadog v3 value column")?;
+                    float32_idx += 1;
+                    *value as f64
+                }
+                0x30 => {
+                    let value = data
+                        .vals_float64
+                        .get(float64_idx)
+                        .ok_or("invalid Datadog v3 value column")?;
+                    float64_idx += 1;
+                    *value
+                }
+                _ => return Err("invalid Datadog v3 value type".into()),
+            };
+            points.push(super::ddmetric_proto::metric_payload::MetricPoint { value, timestamp });
+        }
+
+        let metric_type = match metric_type {
+            1 => metric_payload::MetricType::Count,
+            2 => metric_payload::MetricType::Rate,
+            3 => metric_payload::MetricType::Gauge,
+            _ => metric_payload::MetricType::Unspecified,
+        };
+        let no_index = packed_type & 0x100 != 0;
+        let series_metadata = if origin_ref == 0 && !no_index {
+            None
+        } else {
+            let (origin_product, origin_category, origin_service) = if origin_ref == 0 {
+                (0, 0, 0)
+            } else {
+                let offset = (origin_ref as usize - 1) * 3;
+                (
+                    u32::try_from(data.dict_origin_info[offset])
+                        .map_err(|_| "invalid Datadog v3 origin product")?,
+                    u32::try_from(data.dict_origin_info[offset + 1])
+                        .map_err(|_| "invalid Datadog v3 origin category")?,
+                    u32::try_from(data.dict_origin_info[offset + 2])
+                        .map_err(|_| "invalid Datadog v3 origin service")?,
+                )
+            };
+            Some(Metadata {
+                origin: Some(super::ddmetric_proto::Origin {
+                    metric_type: if no_index { 9 } else { 0 },
+                    origin_product,
+                    origin_category,
+                    origin_service,
+                }),
+            })
+        };
+        let mut decoded_resources: Vec<super::ddmetric_proto::metric_payload::Resource> = resources
+            [resources_ref as usize]
+            .iter()
+            .map(
+                |(resource_type, name)| super::ddmetric_proto::metric_payload::Resource {
+                    r#type: resource_type.clone(),
+                    name: name.clone(),
+                },
+            )
+            .collect();
+        if let Some(payload_metadata) = metadata {
+            decoded_resources.extend(payload_metadata.resources.chunks_exact(2).map(|pair| {
+                super::ddmetric_proto::metric_payload::Resource {
+                    r#type: pair[0].clone(),
+                    name: pair[1].clone(),
+                }
+            }));
+        }
+        let interval =
+            u32::try_from(data.intervals[index]).map_err(|_| "invalid Datadog v3 interval")?;
+        interval
+            .checked_mul(1000)
+            .ok_or("Datadog v3 interval milliseconds overflow")?;
+        series.push(super::ddmetric_proto::metric_payload::MetricSeries {
+            resources: decoded_resources,
+            metric: name.clone(),
+            tags: tagsets[tagset_ref as usize].clone(),
+            points,
+            r#type: metric_type as i32,
+            unit,
+            source_type_name: source_type.clone(),
+            interval: i64::from(interval),
+            metadata: series_metadata,
+        });
+    }
+    Ok(series)
+}
+
+fn decode_v3_strings(raw: &[u8], sanitize: bool) -> crate::Result<Vec<String>> {
+    let mut values = vec![String::new()];
+    let mut expanded_bytes = std::mem::size_of::<String>();
+    let mut offset = 0;
+    while offset < raw.len() {
+        let (length, consumed) = decode_v3_varint(&raw[offset..])?;
+        offset += consumed;
+        let length = usize::try_from(length).map_err(|_| "Datadog v3 string length overflow")?;
+        let end = offset
+            .checked_add(length)
+            .ok_or("Datadog v3 string length overflow")?;
+        if end > raw.len() {
+            return Err("truncated Datadog v3 string dictionary".into());
+        }
+        let bytes = &raw[offset..end];
+        let valid_string_bytes = expanded_bytes
+            .checked_add(std::mem::size_of::<String>())
+            .and_then(|total| total.checked_add(length))
+            .ok_or("Datadog v3 expanded string dictionary size overflow")?;
+        if valid_string_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
+            return Err("Datadog v3 expanded string dictionary exceeds size limit".into());
+        }
+        let value = match std::str::from_utf8(bytes) {
+            Ok(value) => value.to_owned(),
+            Err(_) if sanitize => {
+                let worst_case_length = length
+                    .checked_mul(3)
+                    .ok_or("Datadog v3 expanded string dictionary size overflow")?;
+                let worst_case_bytes = expanded_bytes
+                    .checked_add(std::mem::size_of::<String>())
+                    .and_then(|total| total.checked_add(worst_case_length))
+                    .ok_or("Datadog v3 expanded string dictionary size overflow")?;
+                if worst_case_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
+                    return Err("Datadog v3 expanded string dictionary exceeds size limit".into());
+                }
+                String::from_utf8_lossy(bytes).into_owned()
+            }
+            Err(error) => return Err(error.into()),
+        };
+        expanded_bytes = checked_v3_string_bytes(expanded_bytes, &value)?;
+        if expanded_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
+            return Err("Datadog v3 expanded string dictionary exceeds size limit".into());
+        }
+        values.push(value);
+        offset = end;
+    }
+    Ok(values)
+}
+
+fn decode_v3_varint(raw: &[u8]) -> crate::Result<(u64, usize)> {
+    let mut value = 0;
+    for (index, byte) in raw.iter().copied().enumerate() {
+        if index == 10 {
+            return Err("Datadog v3 varint overflow".into());
+        }
+        if index == 9 && byte > 1 {
+            return Err("Datadog v3 varint overflow".into());
+        }
+        value |= u64::from(byte & 0x7f) << (index * 7);
+        if byte & 0x80 == 0 {
+            return Ok((value, index + 1));
+        }
+    }
+    Err("truncated Datadog v3 varint".into())
+}
+
+fn validate_v3_predecode_allocations(raw: &[u8]) -> crate::Result<()> {
+    let mut offset = 0;
+    let mut metadata_bytes = 0usize;
+    let mut repeated_numeric_bytes = 0usize;
+    while offset < raw.len() {
+        let (key, consumed) = decode_v3_varint(&raw[offset..])?;
+        offset += consumed;
+        let field = key >> 3;
+        let wire_type = key & 0x07;
+        if matches!(field, 2 | 3) && wire_type == 2 {
+            let (message, end) = decode_v3_length_delimited(raw, offset)?;
+            if field == 2 {
+                validate_v3_metadata_allocations(message, &mut metadata_bytes)?;
+            } else {
+                validate_v3_metric_data_allocations(message, &mut repeated_numeric_bytes)?;
+            }
+            offset = end;
+        } else {
+            offset = skip_v3_field(raw, offset, wire_type)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_v3_metadata_allocations(raw: &[u8], decoded_bytes: &mut usize) -> crate::Result<()> {
+    let mut offset = 0;
+    while offset < raw.len() {
+        let (key, consumed) = decode_v3_varint(&raw[offset..])?;
+        offset += consumed;
+        let field = key >> 3;
+        let wire_type = key & 0x07;
+        if matches!(field, 1 | 2) && wire_type == 2 {
+            let (value, end) = decode_v3_length_delimited(raw, offset)?;
+            *decoded_bytes = decoded_bytes
+                .checked_add(std::mem::size_of::<String>())
+                .and_then(|total| total.checked_add(value.len()))
+                .ok_or("Datadog v3 metadata string allocation overflow")?;
+            if *decoded_bytes > MAX_V3_DECODED_REPEATED_BYTES {
+                return Err("Datadog v3 metadata strings exceed size limit".into());
+            }
+            offset = end;
+        } else {
+            offset = skip_v3_field(raw, offset, wire_type)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_v3_metric_data_allocations(raw: &[u8], decoded_bytes: &mut usize) -> crate::Result<()> {
+    let mut offset = 0;
+    while offset < raw.len() {
+        let (key, consumed) = decode_v3_varint(&raw[offset..])?;
+        offset += consumed;
+        let field = key >> 3;
+        let wire_type = key & 0x07;
+        let element_size = match field {
+            3 | 5..=7 | 10..=17 | 19 | 20 | 23 | 24 | 26 => 8,
+            9 | 18 | 21 | 22 => 4,
+            _ => {
+                offset = skip_v3_field(raw, offset, wire_type)?;
+                continue;
+            }
+        };
+        let fixed_width = match field {
+            18 => Some(4),
+            19 => Some(8),
+            _ => None,
+        };
+        let count = if wire_type == 2 {
+            let (packed, end) = decode_v3_length_delimited(raw, offset)?;
+            offset = end;
+            match fixed_width {
+                Some(width) => {
+                    if packed.len() % width != 0 {
+                        return Err("invalid packed Datadog v3 numeric column".into());
+                    }
+                    packed.len() / width
+                }
+                None => count_v3_packed_varints(packed)?,
+            }
+        } else if fixed_width.is_some_and(|width| wire_type == if width == 4 { 5 } else { 1 })
+            || fixed_width.is_none() && wire_type == 0
+        {
+            offset = skip_v3_field(raw, offset, wire_type)?;
+            1
+        } else {
+            offset = skip_v3_field(raw, offset, wire_type)?;
+            continue;
+        };
+        let allocation = count
+            .checked_mul(element_size)
+            .ok_or("Datadog v3 numeric column allocation overflow")?;
+        *decoded_bytes = decoded_bytes
+            .checked_add(allocation)
+            .ok_or("Datadog v3 numeric column allocation overflow")?;
+        if *decoded_bytes > MAX_V3_DECODED_REPEATED_BYTES {
+            return Err("Datadog v3 numeric columns exceed size limit".into());
+        }
+    }
+    Ok(())
+}
+
+fn count_v3_packed_varints(raw: &[u8]) -> crate::Result<usize> {
+    let mut offset = 0;
+    let mut count = 0usize;
+    while offset < raw.len() {
+        let (_, consumed) = decode_v3_varint(&raw[offset..])?;
+        offset = offset
+            .checked_add(consumed)
+            .ok_or("Datadog v3 packed numeric count overflow")?;
+        count = count
+            .checked_add(1)
+            .ok_or("Datadog v3 packed numeric count overflow")?;
+    }
+    Ok(count)
+}
+
+fn decode_v3_length_delimited(raw: &[u8], offset: usize) -> crate::Result<(&[u8], usize)> {
+    let (length, consumed) = decode_v3_varint(
+        raw.get(offset..)
+            .ok_or("truncated Datadog v3 protobuf field")?,
+    )?;
+    let length =
+        usize::try_from(length).map_err(|_| "Datadog v3 protobuf field length overflow")?;
+    let start = offset
+        .checked_add(consumed)
+        .ok_or("Datadog v3 protobuf field length overflow")?;
+    let end = start
+        .checked_add(length)
+        .ok_or("Datadog v3 protobuf field length overflow")?;
+    let value = raw
+        .get(start..end)
+        .ok_or("truncated Datadog v3 protobuf field")?;
+    Ok((value, end))
+}
+
+fn skip_v3_field(raw: &[u8], offset: usize, wire_type: u64) -> crate::Result<usize> {
+    match wire_type {
+        0 => {
+            let (_, consumed) = decode_v3_varint(
+                raw.get(offset..)
+                    .ok_or("truncated Datadog v3 protobuf field")?,
+            )?;
+            offset
+                .checked_add(consumed)
+                .ok_or_else(|| "Datadog v3 protobuf field length overflow".into())
+        }
+        1 => offset
+            .checked_add(8)
+            .filter(|&end| end <= raw.len())
+            .ok_or_else(|| "truncated Datadog v3 protobuf field".into()),
+        2 => {
+            let (length, consumed) = decode_v3_varint(
+                raw.get(offset..)
+                    .ok_or("truncated Datadog v3 protobuf field")?,
+            )?;
+            let length =
+                usize::try_from(length).map_err(|_| "Datadog v3 protobuf field length overflow")?;
+            offset
+                .checked_add(consumed)
+                .and_then(|start| start.checked_add(length))
+                .filter(|&end| end <= raw.len())
+                .ok_or_else(|| "truncated Datadog v3 protobuf field".into())
+        }
+        5 => offset
+            .checked_add(4)
+            .filter(|&end| end <= raw.len())
+            .ok_or_else(|| "truncated Datadog v3 protobuf field".into()),
+        _ => Err("invalid Datadog v3 protobuf wire type".into()),
+    }
+}
+
+fn decode_v3_tagsets(
+    packed: &[i64],
+    dictionary: &[String],
+    metadata: Option<&super::ddmetric_v3_proto::Metadata>,
+) -> crate::Result<Vec<Vec<String>>> {
+    let mut tagsets: Vec<Vec<String>> = vec![Vec::new()];
+    let mut expanded_bytes = std::mem::size_of::<Vec<String>>();
+    let mut offset = 0;
+    while offset < packed.len() {
+        expanded_bytes = expanded_bytes
+            .checked_add(std::mem::size_of::<Vec<String>>())
+            .ok_or("Datadog v3 expanded tagset size overflow")?;
+        if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
+            return Err("Datadog v3 expanded tagsets exceed size limit".into());
+        }
+        let size = usize::try_from(packed[offset]).map_err(|_| "invalid Datadog v3 tagset size")?;
+        offset += 1;
+        let end = offset
+            .checked_add(size)
+            .ok_or("Datadog v3 tagset length overflow")?;
+        if end > packed.len() {
+            return Err("truncated Datadog v3 tagset dictionary".into());
+        }
+        let mut tags = Vec::new();
+        let mut reference: i64 = 0;
+        for delta in &packed[offset..end] {
+            reference = reference
+                .checked_add(*delta)
+                .ok_or("Datadog v3 tagset reference overflow")?;
+            if reference < 0 {
+                let index = usize::try_from(
+                    reference
+                        .checked_neg()
+                        .ok_or("Datadog v3 tagset reference overflow")?,
+                )
+                .map_err(|_| "invalid Datadog v3 tagset reference")?;
+                let referenced = tagsets
+                    .get(index)
+                    .ok_or("invalid Datadog v3 tagset reference")?;
+                let referenced_bytes = referenced.iter().try_fold(0usize, |total, tag| {
+                    total
+                        .checked_add(std::mem::size_of::<String>())
+                        .and_then(|total| total.checked_add(tag.len()))
+                        .ok_or("Datadog v3 expanded tagset size overflow")
+                })?;
+                expanded_bytes = expanded_bytes
+                    .checked_add(referenced_bytes)
+                    .ok_or("Datadog v3 expanded tagset size overflow")?;
+                if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
+                    return Err("Datadog v3 expanded tagsets exceed size limit".into());
+                }
+                tags.extend(referenced.iter().cloned());
+            } else {
+                let tag = dictionary
+                    .get(reference as usize)
+                    .ok_or("invalid Datadog v3 tag reference")?;
+                expanded_bytes = expanded_bytes
+                    .checked_add(std::mem::size_of::<String>())
+                    .and_then(|total| total.checked_add(tag.len()))
+                    .ok_or("Datadog v3 expanded tagset size overflow")?;
+                if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
+                    return Err("Datadog v3 expanded tagsets exceed size limit".into());
+                }
+                tags.push(tag.clone());
+            }
+        }
+        tagsets.push(tags);
+        offset = end;
+    }
+    if let Some(metadata) = metadata {
+        let mut seen = HashSet::new();
+        let metadata_tags = metadata
+            .tags
+            .iter()
+            .filter(|tag| seen.insert(tag.as_str()))
+            .collect::<Vec<_>>();
+        for tagset in &mut tagsets {
+            let mut tagset_members = tagset.iter().map(String::as_str).collect::<HashSet<_>>();
+            let mut additional_tags = Vec::new();
+            for &tag in &metadata_tags {
+                if tagset_members.insert(tag) {
+                    expanded_bytes = checked_v3_string_bytes(expanded_bytes, tag)?;
+                    if expanded_bytes > MAX_V3_EXPANDED_TAGSET_BYTES {
+                        return Err("Datadog v3 expanded tagsets exceed size limit".into());
+                    }
+                    additional_tags.push(tag.clone());
+                }
+            }
+            tagset.extend(additional_tags);
+        }
+    }
+    Ok(tagsets)
+}
+
+fn decode_v3_resources(
+    data: &super::ddmetric_v3_proto::MetricData,
+) -> crate::Result<Vec<Vec<(String, String)>>> {
+    let dictionary = decode_v3_strings(&data.dict_resource_str, false)?;
+    let mut resources = vec![Vec::new()];
+    let mut expanded_bytes = std::mem::size_of::<Vec<(String, String)>>();
+    let mut entry_offset: usize = 0;
+    for &resource_len in &data.dict_resource_len {
+        expanded_bytes = expanded_bytes
+            .checked_add(std::mem::size_of::<Vec<(String, String)>>())
+            .ok_or("Datadog v3 expanded resource size overflow")?;
+        if expanded_bytes > MAX_V3_EXPANDED_RESOURCE_BYTES {
+            return Err("Datadog v3 expanded resources exceed size limit".into());
+        }
+        let size = usize::try_from(resource_len).map_err(|_| "invalid Datadog v3 resource size")?;
+        let end = entry_offset
+            .checked_add(size)
+            .ok_or("Datadog v3 resource length overflow")?;
+        if end > data.dict_resource_type.len() || end > data.dict_resource_name.len() {
+            return Err("truncated Datadog v3 resource dictionary".into());
+        }
+        let mut set = Vec::new();
+        let mut type_ref: i64 = 0;
+        let mut name_ref: i64 = 0;
+        for index in entry_offset..end {
+            type_ref = type_ref
+                .checked_add(data.dict_resource_type[index])
+                .ok_or("Datadog v3 resource reference overflow")?;
+            name_ref = name_ref
+                .checked_add(data.dict_resource_name[index])
+                .ok_or("Datadog v3 resource reference overflow")?;
+            if type_ref < 0 || name_ref < 0 {
+                return Err("invalid Datadog v3 resource reference".into());
+            }
+            let resource_type = dictionary
+                .get(type_ref as usize)
+                .ok_or("invalid Datadog v3 resource reference")?;
+            let resource_name = dictionary
+                .get(name_ref as usize)
+                .ok_or("invalid Datadog v3 resource reference")?;
+            expanded_bytes = checked_v3_string_bytes(expanded_bytes, resource_type)?;
+            expanded_bytes = checked_v3_string_bytes(expanded_bytes, resource_name)?;
+            if expanded_bytes > MAX_V3_EXPANDED_RESOURCE_BYTES {
+                return Err("Datadog v3 expanded resources exceed size limit".into());
+            }
+            set.push((resource_type.clone(), resource_name.clone()));
+        }
+        resources.push(set);
+        entry_offset = end;
+    }
+    Ok(resources)
+}
+
+fn checked_v3_string_bytes(total: usize, value: &str) -> crate::Result<usize> {
+    total
+        .checked_add(std::mem::size_of::<String>())
+        .and_then(|total| total.checked_add(value.len()))
+        .ok_or_else(|| "Datadog v3 expanded string size overflow".into())
+}
+
 /// Builds Vector's `EventMetadata` from the received metadata. Currently this is only
 /// utilized for passing through origin metadata set by the Agent.
 fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
@@ -228,11 +1011,14 @@ fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
                 "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
                 origin.origin_product, origin.origin_category, origin.origin_service,
             );
-            EventMetadata::default().with_origin_metadata(DatadogMetricOriginMetadata::new(
-                Some(origin.origin_product),
-                Some(origin.origin_category),
-                Some(origin.origin_service),
-            ))
+            EventMetadata::default().with_origin_metadata(
+                DatadogMetricOriginMetadata::new(
+                    Some(origin.origin_product),
+                    Some(origin.origin_category),
+                    Some(origin.origin_service),
+                )
+                .with_metric_type((origin.metric_type != 0).then_some(origin.metric_type)),
+            )
         })
 }
 
@@ -242,8 +1028,15 @@ pub(crate) fn decode_ddseries_v2(
     split_metric_namespace: bool,
 ) -> crate::Result<Vec<Event>> {
     let payload = MetricPayload::decode(frame)?;
-    let decoded_metrics: Vec<Event> = payload
-        .series
+    decode_ddseries(payload.series, api_key, split_metric_namespace)
+}
+
+fn decode_ddseries(
+    series: Vec<metric_payload::MetricSeries>,
+    api_key: &Option<Arc<str>>,
+    split_metric_namespace: bool,
+) -> crate::Result<Vec<Event>> {
+    let decoded_metrics: Vec<Event> = series
         .into_iter()
         .flat_map(|serie| {
             let (namespace, name) = if split_metric_namespace {
@@ -253,7 +1046,10 @@ pub(crate) fn decode_ddseries_v2(
             };
             let mut tags = into_metric_tags(serie.tags);
 
-            let event_metadata = get_event_metadata(serie.metadata.as_ref());
+            let mut event_metadata = get_event_metadata(serie.metadata.as_ref());
+            if !serie.unit.is_empty() {
+                event_metadata.set_datadog_metric_unit(serie.unit.clone());
+            }
 
             // It is possible to receive non-rate metrics from the Agent with an interval set.
             // That interval can be applied with the `as_rate` function in the Datadog UI.
@@ -303,8 +1099,6 @@ pub(crate) fn decode_ddseries_v2(
             });
             (!serie.source_type_name.is_empty())
                 .then(|| tags.replace("source_type_name".into(), serie.source_type_name));
-            // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
-            // serie.unit is omitted
             match metric_payload::MetricType::try_from(serie.r#type) {
                 Ok(metric_payload::MetricType::Count) => serie
                     .points
@@ -445,6 +1239,16 @@ fn into_vector_metric(
     split_metric_namespace: bool,
 ) -> Vec<Event> {
     let mut tags = into_metric_tags(dd_metric.tags.unwrap_or_default());
+    let mut event_metadata = dd_metric
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.origin.as_ref())
+        .map_or_else(EventMetadata::default, |origin| {
+            EventMetadata::default().with_origin_metadata(origin.clone())
+        });
+    if let Some(unit) = dd_metric.unit.filter(|unit| !unit.is_empty()) {
+        event_metadata.set_datadog_metric_unit(unit);
+    }
 
     if let Some(key) = log_schema().host_key() {
         dd_metric
@@ -470,10 +1274,11 @@ fn into_vector_metric(
             .points
             .iter()
             .map(|dd_point| {
-                Metric::new(
+                Metric::new_with_metadata(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter { value: dd_point.1 },
+                    event_metadata.clone(),
                 )
                 .with_timestamp(Some(
                     Utc.timestamp_opt(dd_point.0, 0)
@@ -488,10 +1293,11 @@ fn into_vector_metric(
             .points
             .iter()
             .map(|dd_point| {
-                Metric::new(
+                Metric::new_with_metadata(
                     name.to_string(),
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: dd_point.1 },
+                    event_metadata.clone(),
                 )
                 .with_timestamp(Some(
                     Utc.timestamp_opt(dd_point.0, 0)
@@ -509,12 +1315,13 @@ fn into_vector_metric(
             .iter()
             .map(|dd_point| {
                 let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1);
-                Metric::new(
+                Metric::new_with_metadata(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter {
                         value: dd_point.1 * (i as f64),
                     },
+                    event_metadata.clone(),
                 )
                 .with_timestamp(Some(
                     Utc.timestamp_opt(dd_point.0, 0)

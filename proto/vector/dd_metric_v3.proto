@@ -1,0 +1,74 @@
+// Extracted from https://github.com/DataDog/agent-payload/blob/master/proto/metrics/intake_v3.proto
+
+syntax = "proto3";
+
+package datadoghq.api.metrics.v3;
+
+message Payload {
+  reserved 1;
+  Metadata metadata = 2;
+  MetricData metricData = 3;
+}
+
+message Metadata {
+  repeated string tags = 1;
+  repeated string resources = 2;
+}
+
+message MetricData {
+  bytes dictNameStr = 1;
+  bytes dictTagStr = 2;
+  repeated sint64 dictTagsets = 3;
+
+  bytes dictResourceStr = 4;
+  repeated int64 dictResourceLen = 5;
+  repeated sint64 dictResourceType = 6;
+  repeated sint64 dictResourceName = 7;
+
+  bytes dictSourceTypeName = 8;
+  repeated int32 dictOriginInfo = 9;
+  bytes dictUnitStr = 25;
+
+  repeated uint64 types = 10;
+  repeated sint64 nameRefs = 11;
+  repeated sint64 tagsetRefs = 12;
+  repeated sint64 resourcesRefs = 13;
+  repeated uint64 intervals = 14;
+  repeated uint64 numPoints = 15;
+  repeated sint64 sourceTypeNameRefs = 23;
+  repeated sint64 originInfoRefs = 24;
+  repeated sint64 unitRefs = 26;
+
+  repeated sint64 timestamps = 16;
+  repeated sint64 valsSint64 = 17;
+  repeated float valsFloat32 = 18;
+  repeated double valsFloat64 = 19;
+  repeated uint64 sketchNumBins = 20;
+  repeated sint32 sketchBinKeys = 21;
+  repeated uint32 sketchBinCnts = 22;
+}
+
+enum metricType {
+  UNUSED = 0;
+  Count = 1;
+  Rate = 2;
+  Gauge = 3;
+  Sketch = 4;
+}
+
+enum valueType {
+  Zero = 0x00;
+  Sint64 = 0x10;
+  Float32 = 0x20;
+  Float64 = 0x30;
+}
+
+enum metricFlags {
+  flagNone = 0;
+  flagNoIndex = 0x100;
+  flagHasUnit = 0x200;
+}
+
+message Response {
+  string error = 1;
+}
