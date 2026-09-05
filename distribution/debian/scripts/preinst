@@ -1,6 +1,30 @@
 #!/bin/sh
 set -e
 
+# /etc/vector/examples/*.yaml were conffiles through v0.57.0; they moved to
+# /usr/share/doc/vector/examples/. Remove unmodified copies on upgrade.
+for _example_conffile in \
+  docs_example.yaml \
+  environment_variables.yaml \
+  es_s3_hybrid.yaml \
+  file_to_cloudwatch_metrics.yaml \
+  file_to_prometheus.yaml \
+  http_sink_custom_retry.yaml \
+  prometheus_to_console.yaml \
+  stdio.yaml \
+  varint_framing_protobuf.yaml \
+  wrapped_json.yaml \
+  namespacing/sinks/es_cluster.yaml \
+  namespacing/sinks/s3_archives.yaml \
+  namespacing/sources/apache_logs.yaml \
+  namespacing/transforms/apache_parser.yaml \
+  namespacing/transforms/apache_sample.yaml \
+  namespacing/vector.yaml
+do
+  dpkg-maintscript-helper rm_conffile \
+    "/etc/vector/examples/$_example_conffile" 0.57.0-1 vector -- "$@"
+done
+
 # Add vector:vector user & group
 id --user vector >/dev/null 2>&1 || \
   useradd --system --shell /sbin/nologin --home-dir /var/lib/vector --user-group \
@@ -11,5 +35,22 @@ mkdir -p /var/lib/vector
 
 # Make vector:vector the owner of the Vector data directory
 chown -R vector:vector /var/lib/vector
+
+# /etc/vector/vector.yaml was not a dpkg conffile before this version. If a
+# file already exists at that path, dpkg has no record of it and will treat
+# it as "created by you", prompting interactively (or failing outright on
+# unattended upgrades) before it will unpack the new conffile over it. Move
+# any such untracked file out of the way so dpkg can install the conffile
+# cleanly; postinst restores it afterwards so the user's content is kept
+# byte-for-byte, without ever prompting.
+case "$1" in
+  install|upgrade)
+    if [ -e /etc/vector/vector.yaml ] && [ ! -L /etc/vector/vector.yaml ]; then
+      if ! dpkg-query -W -f='${Conffiles}' vector 2>/dev/null | grep -qE ' /etc/vector/vector\.yaml [0-9a-f]'; then
+        mv /etc/vector/vector.yaml /etc/vector/vector.yaml.vector-preserve
+      fi
+    fi
+    ;;
+esac
 
 #DEBHELPER#
