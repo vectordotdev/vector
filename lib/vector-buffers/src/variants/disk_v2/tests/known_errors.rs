@@ -42,6 +42,21 @@ impl AsMetadata for u32 {
     }
 }
 
+/// Byte length of the record length delimiter that a torn write leaves behind.
+const TORN_TAIL_LEN: u64 = size_of::<u64>() as u64;
+
+async fn data_file_size(data_file_path: &PathBuf) -> u64 {
+    OpenOptions::new()
+        .read(true)
+        .open(data_file_path)
+        .await
+        .expect("open should not fail")
+        .metadata()
+        .await
+        .expect("metadata should not fail")
+        .len()
+}
+
 async fn corrupt_record_checksum(data_file_path: &PathBuf, record_start: usize, record_end: usize) {
     let data_file = OpenOptions::new()
         .read(true)
@@ -1837,4 +1852,146 @@ async fn writer_and_reader_handle_when_last_record_has_scrambled_archive_data() 
     let parent =
         trace_span!("writer_and_reader_handle_when_last_record_has_scrambled_archive_data");
     fut.instrument(parent.or_current()).await;
+}
+
+/// Regression test for <https://github.com/vectordotdev/vector/issues/18336>
+///
+/// # Bug Description
+///
+/// When a Vector process is killed mid-write (e.g., by OOM killer), it may leave a partial write
+/// at the end of a disk buffer data file. A "partial write" here means the 8-byte length delimiter
+/// was flushed to disk but the actual record data was not (because it was still in the OS page
+/// cache or the writer's internal buffer when the process died).
+///
+/// Historically, on restart `validate_last_write()` detected the corrupted tail and marked the
+/// writer to lazily skip to the next data file, without advancing the ledger's writer file ID. A
+/// reader that had valid but unacknowledged records before the partial write would deliver those
+/// records, reach the torn tail while still on the writer's current (unfinalized) file, and
+/// busy-spin forever inside `try_next_record` waiting for bytes that would never arrive -- pinning
+/// a core at 100% and wedging the sink so it stopped forwarding data entirely.
+///
+/// # Recovery Behavior Under Test
+///
+/// Startup recovery (see `checkpoint_recovery.rs`, added in #25845) now reconciles data files
+/// against the durable ledger checkpoints before normal reads begin: `validate_last_write()`
+/// detects the undecodable tail, and `reconcile_current_data_file_with_checkpoint()` truncates it
+/// at the last complete record boundary. The torn tail is therefore gone before the reader can
+/// ever observe it, and the writer continues appending to the same data file.
+///
+/// This test asserts both halves of that behavior:
+///
+/// 1. The data file shrinks back to the last complete record boundary across the restart. This
+///    pins the mechanism directly -- before the fix the torn tail survived recovery and the file
+///    stayed oversized.
+/// 2. The end-to-end symptom from the issue report is gone: after restarting on a buffer with
+///    valid-but-unread records followed by a torn tail, the reader delivers the existing records
+///    and then resumes delivering newly written records, instead of wedging forever.
+#[tokio::test]
+async fn reader_resumes_after_restart_with_torn_tail_beyond_unread_records() {
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            // Create a buffer and write two records (A and B), flushing both to disk. Neither is
+            // acknowledged, so both remain unread after restart.
+            let (mut writer, reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+
+            let bytes_a = writer
+                .write_record(SizedRecord::new(64))
+                .await
+                .expect("write A should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let bytes_b = writer
+                .write_record(SizedRecord::new(64))
+                .await
+                .expect("write B should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            // The size the data file must return to once recovery truncates the torn tail.
+            let clean_data_file_size = (bytes_a + bytes_b) as u64;
+
+            // Flush the ledger so both records are covered by the durable writer checkpoint.
+            ledger.flush().expect("should not fail to flush ledger");
+
+            let data_file_path = ledger.get_current_writer_data_file_path();
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+
+            // Simulate a process crash: append only the 8-byte length delimiter of a new record,
+            // with no record data following. The value 1024 claims "1024 bytes of data follow",
+            // but nothing does. This mimics what happens when the OS flushes the write buffer
+            // partially before the process is killed.
+            {
+                let mut data_file = OpenOptions::new()
+                    .append(true)
+                    .open(&data_file_path)
+                    .await
+                    .expect("should not fail to open data file for appending");
+                let fake_record_length: u64 = 1024;
+                data_file
+                    .write_all(&fake_record_length.to_be_bytes())
+                    .await
+                    .expect("should not fail to write fake length delimiter");
+                data_file.flush().await.expect("flush should not fail");
+                data_file.sync_all().await.expect("sync should not fail");
+            }
+
+            // Both complete records must be on disk before the torn tail, otherwise the rest of
+            // this test is not exercising the scenario it describes.
+            assert_eq!(
+                clean_data_file_size + TORN_TAIL_LEN,
+                data_file_size(&data_file_path).await,
+                "data file should hold both complete records plus the torn tail"
+            );
+
+            // Reopen the buffer, simulating a process restart. Startup recovery truncates the torn
+            // tail at the last complete record boundary and leaves the writer positioned to append
+            // new records to the same data file.
+            let (mut writer, mut reader, _) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+
+            // Startup recovery must have truncated the torn tail back to the last complete record
+            // boundary. This is the mechanism that prevents the original hang: with the tail gone,
+            // the reader can never observe a length delimiter promising bytes that never arrive.
+            // Before the upstream fix, the tail survived recovery and the file stayed oversized.
+            assert_eq!(
+                clean_data_file_size,
+                data_file_size(&data_file_path).await,
+                "startup recovery should truncate the torn tail from the data file"
+            );
+
+            // The valid-but-unread records A and B must be delivered normally.
+            let read_a = await_timeout!(reader.next(), 2)
+                .expect("reading record A should not fail")
+                .expect("record A should be present");
+            assert_eq!(read_a, SizedRecord::new(64));
+
+            let read_b = await_timeout!(reader.next(), 2)
+                .expect("reading record B should not fail")
+                .expect("record B should be present");
+            assert_eq!(read_b, SizedRecord::new(64));
+
+            // Write a new record after the restart. With the original bug, the reader was busy-
+            // spinning at the torn tail and would never observe this write: the sink wedged and
+            // stopped forwarding data (the symptom reported in #18336). Recovery must instead let
+            // the reader pick up new records promptly.
+            writer
+                .write_record(SizedRecord::new(96))
+                .await
+                .expect("write C should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let read_c = await_timeout!(reader.next(), 2)
+                .expect("reader must resume delivering records after restart with a torn tail")
+                .expect("record C should be present");
+            assert_eq!(read_c, SizedRecord::new(96));
+
+            drop(reader);
+            drop(writer);
+        }
+    });
+
+    fut.await;
 }
