@@ -45,19 +45,35 @@ impl RetryLogic for PostgresRetryLogic {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum PostgresAction {
+    Insert,
+    Upsert {
+        primary_keys: String,
+        update_columns: String,
+    },
+}
+
 #[derive(Clone)]
 pub struct PostgresService {
     connection_pool: Pool<Postgres>,
     table: String,
     endpoint: String,
+    action: PostgresAction,
 }
 
 impl PostgresService {
-    pub const fn new(connection_pool: Pool<Postgres>, table: String, endpoint: String) -> Self {
+    pub const fn new(
+        connection_pool: Pool<Postgres>,
+        table: String,
+        endpoint: String,
+        action: PostgresAction,
+    ) -> Self {
         Self {
             connection_pool,
             table,
             endpoint,
+            action,
         }
     }
 }
@@ -151,13 +167,28 @@ impl Service<PostgresRequest> for PostgresService {
                 .collect::<Result<Vec<_>, _>>()
                 .context(VectorCommonSnafu)?;
 
-            sqlx::query(&format!(
-                "INSERT INTO {table} SELECT * FROM jsonb_populate_recordset(NULL::{table}, $1)"
-            ))
-            .bind(Json(serialized_values))
-            .execute(&service.connection_pool)
-            .await
-            .context(PostgresSnafu)?;
+            match service.action {
+                PostgresAction::Insert => {
+                    sqlx::query(&format!("INSERT INTO {table} SELECT * FROM jsonb_populate_recordset(NULL::{table}, $1)"))
+                        .bind(Json(serialized_values))
+                        .execute(&service.connection_pool)
+                        .await
+                        .context(PostgresSnafu)?;
+                }
+                PostgresAction::Upsert {
+                    primary_keys,
+                    update_columns,
+                } => {
+                    sqlx::query(&format!(
+                        "INSERT INTO {table}
+                            SELECT DISTINCT ON ({primary_keys}) * FROM jsonb_populate_recordset(NULL::{table}, $1)
+                            ON CONFLICT ({primary_keys}) DO UPDATE SET {update_columns}"))
+                        .bind(Json(serialized_values))
+                        .execute(&service.connection_pool)
+                        .await
+                        .context(PostgresSnafu)?;
+                }
+            }
 
             emit!(EndpointBytesSent {
                 byte_size: metadata.request_encoded_size(),
