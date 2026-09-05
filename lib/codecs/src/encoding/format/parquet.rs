@@ -27,9 +27,9 @@ use vector_common::internal_event::{
     ComponentEventsDropped, Count, InternalEventHandle, Registered, UNINTENTIONAL, emit, register,
 };
 use vector_config::configurable_component;
-use vector_core::event::Event;
+use vector_core::event::{Event, LogEvent};
 
-use super::arrow::{ArrowEncodingError, build_record_batch};
+use super::arrow::{ArrowEncodingError, build_record_batch, decode_rows_to_record_batch};
 use crate::encoding::format::arrow::vector_log_events_to_json_values;
 use crate::internal_events::{ArrowWriterError, JsonSerializationError, SchemaGenerationError};
 
@@ -317,15 +317,9 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Ok(());
         }
 
-        let json_values = match vector_log_events_to_json_values(&events) {
-            Ok(values) => values,
-            Err(e) => {
-                emit(JsonSerializationError { error: &e });
-                return Err(Box::new(e));
-            }
-        };
+        let logs: Vec<&LogEvent> = events.iter().filter_map(Event::maybe_as_log).collect();
 
-        let non_log_count = events.len() - json_values.len();
+        let non_log_count = events.len() - logs.len();
 
         if non_log_count > 0 {
             warn!(
@@ -336,17 +330,15 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             self.events_dropped_handle.emit(Count(non_log_count))
         }
 
-        if json_values.is_empty() {
+        if logs.is_empty() {
             return Ok(());
         }
 
-        match self.schema_mode {
+        let record_batch = match self.schema_mode {
             // In strict mode, check for extra top-level fields not in the schema.
             ParquetSchemaMode::Strict => {
-                for event in &events {
-                    if let Some(log) = event.maybe_as_log()
-                        && let Some(object_map) = log.as_map()
-                    {
+                for log in &logs {
+                    if let Some(object_map) = log.as_map() {
                         for top_level in object_map.keys() {
                             if !self.schema_field_names.contains(top_level.as_str()) {
                                 return Err(Box::new(ArrowEncodingError::SchemaFetchError {
@@ -358,18 +350,29 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                         }
                     }
                 }
+                build_record_batch(Arc::clone(&self.schema), &logs).map_err(Box::new)?
             }
             ParquetSchemaMode::AutoInfer => {
+                // Schema inference is driven by Arrow's JSON schema inference, which still
+                // requires `serde_json::Value`s.
+                let json_values = match vector_log_events_to_json_values(&events) {
+                    Ok(values) => values,
+                    Err(e) => {
+                        emit(JsonSerializationError { error: &e });
+                        return Err(Box::new(e));
+                    }
+                };
                 let schema = ParquetSchemaGenerator::infer_schema(&json_values)?;
                 self.schema = Arc::new(ParquetSchemaGenerator::try_normalize_schema(
                     &events, schema,
                 ));
+                decode_rows_to_record_batch(Arc::clone(&self.schema), &json_values)
+                    .map_err(Box::new)?
             }
-            ParquetSchemaMode::Relaxed => {}
-        }
-
-        let record_batch =
-            build_record_batch(Arc::clone(&self.schema), &json_values).map_err(Box::new)?;
+            ParquetSchemaMode::Relaxed => {
+                build_record_batch(Arc::clone(&self.schema), &logs).map_err(Box::new)?
+            }
+        };
 
         Self::write_record_batch(&record_batch, buffer, &self.writer_props).map_err(Box::new)?;
 
@@ -624,6 +627,16 @@ mod tests {
                 .unwrap_or_else(|_| panic!("field '{field_name}' should exist in schema"));
             assert_eq!(field.data_type(), &DataType::Utf8);
         }
+    }
+
+    #[test]
+    fn autoinfer_encodes_non_finite_floats() {
+        let events = vec![
+            create_event(vec![("ratio", f64::INFINITY)]),
+            create_event(vec![("ratio", f64::NEG_INFINITY)]),
+        ];
+        let (_schema, num_rows) = encode_autoinfer_and_read_schema(events);
+        assert_eq!(num_rows, 2);
     }
 
     #[test]
