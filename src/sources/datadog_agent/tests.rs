@@ -2374,17 +2374,26 @@ fn v3_string_dictionary(values: &[&str]) -> Vec<u8> {
     values
         .iter()
         .flat_map(|value| {
-            let mut length = value.len() as u64;
             let mut encoded = Vec::new();
-            while length >= 0x80 {
-                encoded.push((length as u8 & 0x7f) | 0x80);
-                length >>= 7;
-            }
-            encoded.push(length as u8);
+            encode_v3_varint(value.len() as u64, &mut encoded);
             encoded.extend_from_slice(value.as_bytes());
             encoded
         })
         .collect()
+}
+
+fn encode_v3_varint(mut value: u64, encoded: &mut Vec<u8>) {
+    while value >= 0x80 {
+        encoded.push((value as u8 & 0x7f) | 0x80);
+        value >>= 7;
+    }
+    encoded.push(value as u8);
+}
+
+fn encode_v3_length_delimited(field: u8, value: &[u8], encoded: &mut Vec<u8>) {
+    encode_v3_varint((u64::from(field) << 3) | 2, encoded);
+    encode_v3_varint(value.len() as u64, encoded);
+    encoded.extend_from_slice(value);
 }
 
 fn minimal_v3_metric_data() -> ddmetric_v3_proto::MetricData {
@@ -2602,16 +2611,45 @@ fn decode_v3_rejects_excessive_metadata_string_entries_before_decode() {
         metadata.extend([0x0a, 0x00]);
     }
     let mut payload = Vec::new();
-    payload.push(0x12);
-    let mut length = metadata.len() as u64;
-    while length >= 0x80 {
-        payload.push((length as u8 & 0x7f) | 0x80);
-        length >>= 7;
-    }
-    payload.push(length as u8);
-    payload.extend(metadata);
+    encode_v3_length_delimited(2, &metadata, &mut payload);
 
     assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
+}
+
+#[test]
+fn decode_v3_accumulates_metadata_allocations_across_fields() {
+    let metadata_entry_count = 16 * 1024 * 1024 / std::mem::size_of::<String>() / 2 + 1;
+    let mut metadata = Vec::with_capacity(metadata_entry_count * 2);
+    for _ in 0..metadata_entry_count {
+        metadata.extend([0x0a, 0x00]);
+    }
+    let mut payload = Vec::new();
+    encode_v3_length_delimited(2, &metadata, &mut payload);
+    encode_v3_length_delimited(2, &metadata, &mut payload);
+
+    assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_excessive_numeric_columns_before_decode() {
+    let entry_count = 16 * 1024 * 1024 / std::mem::size_of::<i64>() + 1;
+    let packed_timestamps = vec![0; entry_count];
+    let mut metric_data = Vec::new();
+    encode_v3_length_delimited(16, &packed_timestamps, &mut metric_data);
+    let mut payload = Vec::new();
+    encode_v3_length_delimited(3, &metric_data, &mut payload);
+
+    assert!(super::metrics::decode_ddseries_v3(Bytes::from(payload), &None, false).is_err());
+}
+
+#[test]
+fn decode_v3_rejects_lossy_tag_expansion_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    let invalid_utf8 = vec![0xff; 6 * 1024 * 1024];
+    encode_v3_varint(invalid_utf8.len() as u64, &mut data.dict_tag_str);
+    data.dict_tag_str.extend(invalid_utf8);
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
 }
 
 #[test]

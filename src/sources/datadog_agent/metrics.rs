@@ -35,8 +35,7 @@ const MAX_V3_EXPANDED_TAGSET_BYTES: usize = 16 * 1024 * 1024;
 const MAX_V3_EXPANDED_RESOURCE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_V3_EXPANDED_SERIES_BYTES: usize = 16 * 1024 * 1024;
 const MAX_V3_EXPANDED_EVENT_BYTES: usize = 16 * 1024 * 1024;
-const MAX_V3_METADATA_STRING_ENTRIES: usize =
-    MAX_V3_EXPANDED_TAGSET_BYTES / std::mem::size_of::<String>();
+const MAX_V3_DECODED_REPEATED_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 pub(crate) struct DatadogSeriesRequest {
@@ -303,7 +302,7 @@ pub(crate) fn decode_ddseries_v3(
     api_key: &Option<Arc<str>>,
     split_metric_namespace: bool,
 ) -> crate::Result<Vec<Event>> {
-    validate_v3_metadata_string_entries(&frame)?;
+    validate_v3_predecode_allocations(&frame)?;
     let payload = MetricPayloadV3::decode(frame)?;
     let series = payload.metric_data.map_or(Ok(Vec::new()), |metric_data| {
         decode_v3_metric_data(&metric_data, payload.metadata.as_ref())
@@ -443,7 +442,12 @@ pub(super) fn decode_v3_metric_data(
             })
             .transpose()?
             .unwrap_or(resource_bytes);
-        let tag_resource_bytes = tag_bytes
+        let name = &names[name_ref as usize];
+        let source_type = &source_types[source_type_ref as usize];
+        let point_tag_bytes = tag_bytes
+            .checked_add(source_type.len())
+            .ok_or("Datadog v3 expanded series size overflow")?;
+        let tag_resource_bytes = point_tag_bytes
             .checked_add(resource_bytes)
             .ok_or("Datadog v3 expanded series size overflow")?;
         let tag_resource_copies = point_count
@@ -452,8 +456,6 @@ pub(super) fn decode_v3_metric_data(
         let expanded_tag_resource_bytes = tag_resource_bytes
             .checked_mul(tag_resource_copies)
             .ok_or("Datadog v3 expanded series size overflow")?;
-        let name = &names[name_ref as usize];
-        let source_type = &source_types[source_type_ref as usize];
         let dictionary_string_bytes = checked_v3_string_bytes(0, name)?;
         let dictionary_string_bytes = checked_v3_string_bytes(dictionary_string_bytes, &unit)?;
         let dictionary_string_bytes =
@@ -624,7 +626,19 @@ fn decode_v3_strings(raw: &[u8], sanitize: bool) -> crate::Result<Vec<String>> {
         let bytes = &raw[offset..end];
         let value = match std::str::from_utf8(bytes) {
             Ok(value) => value.to_owned(),
-            Err(_) if sanitize => String::from_utf8_lossy(bytes).into_owned(),
+            Err(_) if sanitize => {
+                let worst_case_length = length
+                    .checked_mul(3)
+                    .ok_or("Datadog v3 expanded string dictionary size overflow")?;
+                let worst_case_bytes = expanded_bytes
+                    .checked_add(std::mem::size_of::<String>())
+                    .and_then(|total| total.checked_add(worst_case_length))
+                    .ok_or("Datadog v3 expanded string dictionary size overflow")?;
+                if worst_case_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
+                    return Err("Datadog v3 expanded string dictionary exceeds size limit".into());
+                }
+                String::from_utf8_lossy(bytes).into_owned()
+            }
             Err(error) => return Err(error.into()),
         };
         expanded_bytes = checked_v3_string_bytes(expanded_bytes, &value)?;
@@ -654,24 +668,22 @@ fn decode_v3_varint(raw: &[u8]) -> crate::Result<(u64, usize)> {
     Err("truncated Datadog v3 varint".into())
 }
 
-fn validate_v3_metadata_string_entries(raw: &[u8]) -> crate::Result<()> {
+fn validate_v3_predecode_allocations(raw: &[u8]) -> crate::Result<()> {
     let mut offset = 0;
+    let mut metadata_bytes = 0usize;
+    let mut repeated_numeric_bytes = 0usize;
     while offset < raw.len() {
         let (key, consumed) = decode_v3_varint(&raw[offset..])?;
         offset += consumed;
+        let field = key >> 3;
         let wire_type = key & 0x07;
-        if key >> 3 == 2 && wire_type == 2 {
-            let (length, consumed) = decode_v3_varint(&raw[offset..])?;
-            offset += consumed;
-            let length =
-                usize::try_from(length).map_err(|_| "Datadog v3 metadata length overflow")?;
-            let end = offset
-                .checked_add(length)
-                .ok_or("Datadog v3 metadata length overflow")?;
-            let metadata = raw
-                .get(offset..end)
-                .ok_or("truncated Datadog v3 metadata")?;
-            validate_v3_repeated_string_entries(metadata)?;
+        if matches!(field, 2 | 3) && wire_type == 2 {
+            let (message, end) = decode_v3_length_delimited(raw, offset)?;
+            if field == 2 {
+                validate_v3_metadata_allocations(message, &mut metadata_bytes)?;
+            } else {
+                validate_v3_metric_data_allocations(message, &mut repeated_numeric_bytes)?;
+            }
             offset = end;
         } else {
             offset = skip_v3_field(raw, offset, wire_type)?;
@@ -680,25 +692,116 @@ fn validate_v3_metadata_string_entries(raw: &[u8]) -> crate::Result<()> {
     Ok(())
 }
 
-fn validate_v3_repeated_string_entries(raw: &[u8]) -> crate::Result<()> {
+fn validate_v3_metadata_allocations(raw: &[u8], decoded_bytes: &mut usize) -> crate::Result<()> {
     let mut offset = 0;
-    let mut entries = 0usize;
     while offset < raw.len() {
         let (key, consumed) = decode_v3_varint(&raw[offset..])?;
         offset += consumed;
         let field = key >> 3;
         let wire_type = key & 0x07;
         if matches!(field, 1 | 2) && wire_type == 2 {
-            entries = entries
-                .checked_add(1)
-                .ok_or("Datadog v3 metadata string count overflow")?;
-            if entries > MAX_V3_METADATA_STRING_ENTRIES {
-                return Err("Datadog v3 metadata contains too many strings".into());
+            let (value, end) = decode_v3_length_delimited(raw, offset)?;
+            *decoded_bytes = decoded_bytes
+                .checked_add(std::mem::size_of::<String>())
+                .and_then(|total| total.checked_add(value.len()))
+                .ok_or("Datadog v3 metadata string allocation overflow")?;
+            if *decoded_bytes > MAX_V3_DECODED_REPEATED_BYTES {
+                return Err("Datadog v3 metadata strings exceed size limit".into());
             }
+            offset = end;
+        } else {
+            offset = skip_v3_field(raw, offset, wire_type)?;
         }
-        offset = skip_v3_field(raw, offset, wire_type)?;
     }
     Ok(())
+}
+
+fn validate_v3_metric_data_allocations(raw: &[u8], decoded_bytes: &mut usize) -> crate::Result<()> {
+    let mut offset = 0;
+    while offset < raw.len() {
+        let (key, consumed) = decode_v3_varint(&raw[offset..])?;
+        offset += consumed;
+        let field = key >> 3;
+        let wire_type = key & 0x07;
+        let element_size = match field {
+            3 | 5..=7 | 10..=17 | 19 | 20 | 23 | 24 | 26 => 8,
+            9 | 18 | 21 | 22 => 4,
+            _ => {
+                offset = skip_v3_field(raw, offset, wire_type)?;
+                continue;
+            }
+        };
+        let fixed_width = match field {
+            18 => Some(4),
+            19 => Some(8),
+            _ => None,
+        };
+        let count = if wire_type == 2 {
+            let (packed, end) = decode_v3_length_delimited(raw, offset)?;
+            offset = end;
+            match fixed_width {
+                Some(width) => {
+                    if packed.len() % width != 0 {
+                        return Err("invalid packed Datadog v3 numeric column".into());
+                    }
+                    packed.len() / width
+                }
+                None => count_v3_packed_varints(packed)?,
+            }
+        } else if fixed_width.is_some_and(|width| wire_type == if width == 4 { 5 } else { 1 })
+            || fixed_width.is_none() && wire_type == 0
+        {
+            offset = skip_v3_field(raw, offset, wire_type)?;
+            1
+        } else {
+            offset = skip_v3_field(raw, offset, wire_type)?;
+            continue;
+        };
+        let allocation = count
+            .checked_mul(element_size)
+            .ok_or("Datadog v3 numeric column allocation overflow")?;
+        *decoded_bytes = decoded_bytes
+            .checked_add(allocation)
+            .ok_or("Datadog v3 numeric column allocation overflow")?;
+        if *decoded_bytes > MAX_V3_DECODED_REPEATED_BYTES {
+            return Err("Datadog v3 numeric columns exceed size limit".into());
+        }
+    }
+    Ok(())
+}
+
+fn count_v3_packed_varints(raw: &[u8]) -> crate::Result<usize> {
+    let mut offset = 0;
+    let mut count = 0usize;
+    while offset < raw.len() {
+        let (_, consumed) = decode_v3_varint(&raw[offset..])?;
+        offset = offset
+            .checked_add(consumed)
+            .ok_or("Datadog v3 packed numeric count overflow")?;
+        count = count
+            .checked_add(1)
+            .ok_or("Datadog v3 packed numeric count overflow")?;
+    }
+    Ok(count)
+}
+
+fn decode_v3_length_delimited(raw: &[u8], offset: usize) -> crate::Result<(&[u8], usize)> {
+    let (length, consumed) = decode_v3_varint(
+        raw.get(offset..)
+            .ok_or("truncated Datadog v3 protobuf field")?,
+    )?;
+    let length =
+        usize::try_from(length).map_err(|_| "Datadog v3 protobuf field length overflow")?;
+    let start = offset
+        .checked_add(consumed)
+        .ok_or("Datadog v3 protobuf field length overflow")?;
+    let end = start
+        .checked_add(length)
+        .ok_or("Datadog v3 protobuf field length overflow")?;
+    let value = raw
+        .get(start..end)
+        .ok_or("truncated Datadog v3 protobuf field")?;
+    Ok((value, end))
 }
 
 fn skip_v3_field(raw: &[u8], offset: usize, wire_type: u64) -> crate::Result<usize> {
