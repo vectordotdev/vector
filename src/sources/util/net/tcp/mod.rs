@@ -400,8 +400,7 @@ async fn handle_stream<T>(
 
 
                         if let Some(certificate_metadata) = &certificate_metadata {
-                            let mut metadata = ObjectMap::new();
-                            metadata.insert("subject".into(), certificate_metadata.subject().into());
+                            let metadata = build_tls_client_metadata(certificate_metadata);
                             for event in &mut events {
                                 let log = event.as_mut_log();
 
@@ -492,5 +491,64 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
         // Connection hasn't yet been established so we are done here.
         debug!("Closing connection that hasn't yet been fully established.");
         true
+    }
+}
+
+const TLS_CLIENT_METADATA_SUBJECT_KEY: &str = "subject";
+const TLS_CLIENT_METADATA_SUBJECT_ALTNAMES_KEY: &str = "subject_altnames";
+
+pub fn build_tls_client_metadata(certificate_metadata: &CertificateMetadata) -> ObjectMap {
+    let mut metadata = ObjectMap::new();
+    metadata.insert(
+        TLS_CLIENT_METADATA_SUBJECT_KEY.into(),
+        certificate_metadata.subject().into(),
+    );
+    let subject_altnames = certificate_metadata.subject_altnames();
+    if !subject_altnames.is_empty() {
+        metadata.insert(
+            TLS_CLIENT_METADATA_SUBJECT_ALTNAMES_KEY.into(),
+            subject_altnames.into(),
+        );
+    }
+    metadata
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use vrl::value::Value;
+
+    fn metadata_with_subject_altnames(subject_altnames: Vec<String>) -> CertificateMetadata {
+        CertificateMetadata {
+            country_name: None,
+            state_or_province_name: None,
+            locality_name: None,
+            organization_name: None,
+            organizational_unit_name: None,
+            common_name: Some("common".to_owned()),
+            subject_altnames,
+        }
+    }
+
+    #[test]
+    fn tls_client_metadata_with_subject_altnames() {
+        let metadata = build_tls_client_metadata(&metadata_with_subject_altnames(vec![
+            "DNS:example.com".to_owned(),
+            "IP Address:1.2.3.4".to_owned(),
+        ]));
+
+        assert_eq!(metadata.get("subject"), Some(&Value::from("CN=common")));
+        assert_eq!(
+            metadata.get("subject_altnames"),
+            Some(&Value::from("DNS:example.com,IP Address:1.2.3.4"))
+        );
+    }
+
+    #[test]
+    fn tls_client_metadata_without_subject_altnames() {
+        let metadata = build_tls_client_metadata(&metadata_with_subject_altnames(vec![]));
+
+        assert_eq!(metadata.get("subject"), Some(&Value::from("CN=common")));
+        assert!(!metadata.contains_key("subject_altnames"));
     }
 }

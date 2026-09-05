@@ -855,6 +855,7 @@ components: sources: dnstap: {
 					}
 				}
 			}
+			client_metadata: fields._client_metadata
 		}
 	}
 
