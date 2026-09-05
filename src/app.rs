@@ -4,6 +4,7 @@ use std::os::unix::process::ExitStatusExt;
 #[cfg(windows)]
 use std::os::windows::process::ExitStatusExt;
 use std::{
+    collections::HashSet,
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
     process::ExitStatus,
@@ -25,7 +26,9 @@ use crate::api;
 use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
-    config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
+    config::{
+        self, ComponentConfig, ComponentKey, ComponentType, Config, ConfigBuilder, ConfigPath,
+    },
     extra_context::ExtraContext,
     heartbeat,
     internal_events::{
@@ -40,6 +43,50 @@ use crate::{
 };
 
 static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
+
+/// Coalesced reload signals received while startup is blocked, so a burst of reloads during a
+/// long outage is bounded (only the latest state per kind is retained) and replayed in a stable
+/// order.
+#[derive(Default)]
+struct PendingReloads {
+    from_disk: bool,
+    components: Option<HashSet<ComponentKey>>,
+    from_builder: Option<ConfigBuilder>,
+    enrichment_tables: bool,
+}
+
+impl PendingReloads {
+    fn push(&mut self, signal: SignalTo) {
+        match signal {
+            SignalTo::ReloadFromDisk => self.from_disk = true,
+            SignalTo::ReloadComponents(components) => {
+                self.components
+                    .get_or_insert_with(HashSet::new)
+                    .extend(components);
+            }
+            SignalTo::ReloadFromConfigBuilder(builder) => self.from_builder = Some(builder),
+            SignalTo::ReloadEnrichmentTables => self.enrichment_tables = true,
+            _ => {}
+        }
+    }
+
+    fn into_signals(self) -> Vec<SignalTo> {
+        let mut signals = Vec::new();
+        if self.from_disk {
+            signals.push(SignalTo::ReloadFromDisk);
+        }
+        if let Some(components) = self.components {
+            signals.push(SignalTo::ReloadComponents(components));
+        }
+        if let Some(builder) = self.from_builder {
+            signals.push(SignalTo::ReloadFromConfigBuilder(builder));
+        }
+        if self.enrichment_tables {
+            signals.push(SignalTo::ReloadEnrichmentTables);
+        }
+        signals
+    }
+}
 
 pub fn worker_threads() -> Option<NonZeroUsize> {
     NonZeroUsize::new(WORKER_THREADS.load(Ordering::Relaxed))
@@ -84,9 +131,11 @@ impl ApplicationConfig {
 
         // Reload signals received while config loading is in progress are collected here and
         // re-broadcast after loading completes, so that a one-shot reload during startup is
-        // applied once the topology is running instead of being lost.
+        // applied once the topology is running instead of being lost. They are coalesced so a
+        // burst of reloads during a long outage is bounded (only the latest state per kind is
+        // retained) and replayed in a stable order.
         let signal_tx = signal_handler.clone_tx();
-        let mut pending_reloads: Vec<SignalTo> = Vec::new();
+        let mut pending_reloads = PendingReloads::default();
 
         // Loading the config can block on network I/O (e.g. provider or secret resolution).
         // Race it against shutdown signals so that a signal received during config loading
@@ -136,8 +185,8 @@ impl ApplicationConfig {
         drop(load);
 
         // Re-broadcast any reload signals received during config loading so they are applied
-        // once startup completes.
-        for reload in pending_reloads {
+        // once startup completes, in a stable order (disk, components, builder, enrichment).
+        for reload in pending_reloads.into_signals() {
             drop(signal_tx.send(reload));
         }
 
@@ -164,8 +213,10 @@ impl ApplicationConfig {
 
         // Reload signals received while the topology is starting are collected here and
         // re-broadcast after startup completes, so that a one-shot reload during startup is
-        // applied once the topology is running instead of being lost.
-        let mut pending_reloads: Vec<SignalTo> = Vec::new();
+        // applied once the topology is running instead of being lost. They are coalesced so a
+        // burst of reloads during a long outage is bounded (only the latest state per kind is
+        // retained) and replayed in a stable order.
+        let mut pending_reloads = PendingReloads::default();
 
         let (topology, graceful_crash_receiver) = loop {
             tokio::select! {
@@ -202,8 +253,9 @@ impl ApplicationConfig {
         };
 
         // Re-broadcast any reload signals received while the topology was starting so they are
-        // applied once startup completes.
-        for reload in pending_reloads {
+        // applied once startup completes, in a stable order (disk, components, builder,
+        // enrichment).
+        for reload in pending_reloads.into_signals() {
             drop(signal_tx.send(reload));
         }
 
