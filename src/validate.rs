@@ -5,7 +5,7 @@ use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 use clap::Parser;
 use colored::*;
 use exitcode::ExitCode;
-use tokio::sync::broadcast::error::RecvError;
+use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use vector_lib::enrichment::{Case, IndexHandle, TableRegistry};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::value::ObjectMap;
@@ -175,15 +175,10 @@ impl Opts {
 pub async fn validate(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
+    signal_rx: &mut SignalRx,
     color: bool,
 ) -> ExitCode {
     let mut fmt = Formatter::new(color);
-
-    // Subscribe to shutdown signals before validation begins so that a signal arriving at any
-    // point -- including during config loading, transform/sink validation, or the environment
-    // checks, which can block on network I/O, e.g. sink healthchecks or build-time API probes
-    // -- can interrupt it, instead of being queued and ignored until validation finishes.
-    let mut signal_rx = signal_handler.subscribe();
 
     let mut validated = true;
 
@@ -221,7 +216,7 @@ pub async fn validate(
 
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
-            let outcome = validate_environment(opts, &config, &mut fmt, &mut signal_rx).await;
+            let outcome = validate_environment(opts, &config, &mut fmt, signal_rx).await;
             remove_tmp_directory(tmp_directory);
             match outcome {
                 Ok(valid) => validated &= valid,
@@ -231,6 +226,22 @@ pub async fn validate(
             }
         } else {
             validated = false;
+        }
+    }
+
+    // The receiver is not polled after the config-loading race on the `--no-environment` path,
+    // and only until the environment phase completes otherwise. A shutdown signal arriving in
+    // between (e.g. while transforms or sinks are being validated) would otherwise be silently
+    // dropped, so drain the receiver once more before reporting the result.
+    loop {
+        match signal_rx.try_recv() {
+            Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(TryRecvError::Closed) => {
+                return exitcode::UNAVAILABLE;
+            }
+            // Reload signals and lagged receivers don't affect the result; keep draining in
+            // case a shutdown is queued behind them.
+            Ok(_) | Err(TryRecvError::Lagged(_)) => continue,
+            Err(TryRecvError::Empty) => break,
         }
     }
 

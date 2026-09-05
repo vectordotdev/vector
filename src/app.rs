@@ -65,6 +65,7 @@ impl ApplicationConfig {
     pub async fn from_opts(
         opts: &RootOpts,
         signal_handler: &mut SignalHandler,
+        signal_rx: &mut SignalRx,
         extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
@@ -80,12 +81,6 @@ impl ApplicationConfig {
         } else {
             None
         };
-
-        // Subscribe to shutdown signals before loading the config and starting the topology so
-        // that a signal arriving during startup -- which can block on network I/O, e.g. sink
-        // healthchecks or build-time API probes -- can interrupt it, instead of being queued
-        // and ignored until startup completes.
-        let mut signal_rx = signal_handler.subscribe();
 
         // Loading the config can block on network I/O (e.g. provider or secret resolution).
         // Race it against shutdown signals so that a signal received during config loading
@@ -124,7 +119,7 @@ impl ApplicationConfig {
         // Release the borrows held by the pinned config-loading future before moving on.
         drop(load);
 
-        Self::from_config(config_paths, config, extra_context, &mut signal_rx).await
+        Self::from_config(config_paths, config, extra_context, signal_rx).await
     }
 
     pub async fn from_config(
@@ -317,6 +312,7 @@ impl Application {
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
             &mut signals.handler,
+            &mut signals.receiver,
             extra_context,
         ))?;
 
