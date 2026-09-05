@@ -18,7 +18,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::{
     fs,
     io::AsyncWriteExt,
-    sync::{Mutex, MutexGuard, Notify},
+    sync::{Mutex, MutexGuard, watch},
 };
 use vector_common::finalizer::OrderedFinalizer;
 
@@ -35,6 +35,47 @@ use super::{
 use crate::buffer_usage_data::BufferUsageHandle;
 
 pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
+
+/// Latest writer position that is safe for the runtime reader to consume.
+///
+/// This state is deliberately not persisted. Startup recovery derives it again from the durable
+/// ledger and reconciled data files before the reader and writer are returned to the topology.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct WriterProgress {
+    revision: u64,
+    published_position: Option<(u16, u64)>,
+    next_record_id: u64,
+    done: bool,
+    failed: bool,
+}
+
+impl WriterProgress {
+    fn initial(next_record_id: u64) -> Self {
+        Self {
+            revision: 0,
+            published_position: None,
+            next_record_id,
+            done: false,
+            failed: false,
+        }
+    }
+
+    pub(super) fn published_position(self) -> Option<(u16, u64)> {
+        self.published_position
+    }
+
+    pub(super) fn next_record_id(self) -> u64 {
+        self.next_record_id
+    }
+
+    pub(super) fn is_done(self) -> bool {
+        self.done
+    }
+
+    pub(super) fn is_failed(self) -> bool {
+        self.failed
+    }
+}
 
 /// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]
@@ -241,10 +282,10 @@ where
     state: BackedArchive<FS::MutableMemoryMap, LedgerState>,
     // The total size, in bytes, of all unread records in the buffer.
     total_buffer_size: AtomicU64,
-    // Notifier for reader-related progress.
-    reader_notify: Notify,
-    // Notifier for writer-related progress.
-    writer_notify: Notify,
+    // Coalesced runtime reader progress observed by the writer.
+    reader_progress: watch::Sender<u64>,
+    // Coalesced runtime writer publication boundary observed by the reader.
+    writer_progress: watch::Sender<WriterProgress>,
     // Tracks when writer has fully shutdown.
     writer_done: AtomicBool,
     // Number of pending record acknowledgements that have yeet to be consumed by the reader.
@@ -491,29 +532,19 @@ where
         Ok(deleted_files)
     }
 
-    /// Waits for a signal from the reader that progress has been made.
-    ///
-    /// This will only occur when a record is read, which may allow enough space (below the maximum
-    /// configured buffer size) for a write to occur, or similarly, when a data file is deleted.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub async fn wait_for_reader(&self) {
-        self.reader_notify.notified().await;
+    pub(super) fn subscribe_reader_progress(&self) -> watch::Receiver<u64> {
+        self.reader_progress.subscribe()
     }
 
-    /// Waits for a signal from the writer that progress has been made.
-    ///
-    /// This will occur when a record is written, or when a new data file is created.
-    ///
-    /// Writer progress is published before this notification is sent.
-    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
-    pub async fn wait_for_writer(&self) {
-        self.writer_notify.notified().await;
+    pub(super) fn subscribe_writer_progress(&self) -> watch::Receiver<WriterProgress> {
+        self.writer_progress.subscribe()
     }
 
     /// Notifies all tasks waiting on progress by the reader.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn notify_reader_waiters(&self) {
-        self.reader_notify.notify_one();
+        self.reader_progress
+            .send_modify(|revision| *revision = revision.wrapping_add(1));
     }
 
     /// Notifies all tasks waiting on progress by the writer.
@@ -521,17 +552,41 @@ where
     /// Callers must publish their shared state before notifying.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn notify_writer_waiters(&self) {
-        self.writer_notify.notify_one();
+        self.writer_progress
+            .send_modify(|progress| progress.revision = progress.revision.wrapping_add(1));
     }
 
-    /// Publishes flushed writer progress and then wakes the reader.
-    pub fn publish_writer_progress(&self, event_count: u64, record_size: u64) -> u64 {
-        let next_record_id = self.state().increment_next_writer_record_id(event_count);
+    /// Publishes completed writer progress and then wakes the reader.
+    pub fn publish_writer_progress(
+        &self,
+        event_count: u64,
+        record_size: u64,
+        file_id: u16,
+        byte_offset: u64,
+    ) -> u64 {
+        // The next writer record ID is the reader's publication gate. Publish every other piece of
+        // shared state first so an acquire load that observes the new ID also observes the matching
+        // occupancy and usage accounting.
         self.increment_total_buffer_size(record_size);
         self.usage_handle
             .increment_received_event_count_and_byte_size(event_count, record_size);
-        self.notify_writer_waiters();
+        let next_record_id = self.state().increment_next_writer_record_id(event_count);
+        self.writer_progress.send_modify(|progress| {
+            progress.revision = progress.revision.wrapping_add(1);
+            progress.published_position = Some((file_id, byte_offset));
+            progress.next_record_id = next_record_id;
+        });
         next_record_id
+    }
+
+    /// Publishes a writer file/offset boundary without changing record or occupancy accounting.
+    pub(super) fn publish_writer_position(&self, position: Option<(u16, u64)>) {
+        let next_record_id = self.state().get_next_writer_record_id();
+        self.writer_progress.send_modify(|progress| {
+            progress.revision = progress.revision.wrapping_add(1);
+            progress.published_position = position;
+            progress.next_record_id = next_record_id;
+        });
     }
 
     /// Tracks events that arrived at the buffer but were rejected before being
@@ -569,14 +624,24 @@ where
     /// If the writer was not yet marked done, `false` is returned.  Otherwise, `true` is returned,
     /// and the caller should handle any necessary logic for closing the writer.
     pub fn mark_writer_done(&self) -> bool {
-        self.writer_done
-            .compare_exchange_weak(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
+        let marked = self
+            .writer_done
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok();
+        if marked {
+            self.writer_progress.send_modify(|progress| {
+                progress.revision = progress.revision.wrapping_add(1);
+                progress.done = true;
+            });
+        }
+        marked
     }
 
-    /// Returns `true` if the writer was marked as done.
-    pub fn is_writer_done(&self) -> bool {
-        self.writer_done.load(Ordering::Acquire)
+    pub(super) fn mark_writer_failed(&self) {
+        self.writer_progress.send_modify(|progress| {
+            progress.revision = progress.revision.wrapping_add(1);
+            progress.failed = true;
+        });
     }
 
     /// Increments the pending acknowledgement counter by the given amount.
@@ -810,14 +875,19 @@ where
         // Create the ledger object, and synchronize the buffer statistics with the buffer usage
         // handle.  This handles making sure we account for the starting size of the buffer, and
         // what not.
-        let cleanup_reader_file_id = ledger_state.get_archive_ref().get_current_reader_file_id();
+        let archived_state = ledger_state.get_archive_ref();
+        let cleanup_reader_file_id = archived_state.get_current_reader_file_id();
+        let initial_writer_progress =
+            WriterProgress::initial(archived_state.get_next_writer_record_id());
+        let (reader_progress, _) = watch::channel(0);
+        let (writer_progress, _) = watch::channel(initial_writer_progress);
         let ledger = Ledger {
             config,
             lock,
             state: ledger_state,
             total_buffer_size: AtomicU64::new(0),
-            reader_notify: Notify::new(),
-            writer_notify: Notify::new(),
+            reader_progress,
+            writer_progress,
             writer_done: AtomicBool::new(false),
             pending_acks: AtomicU64::new(0),
             unacked_reader_file_id_offset: AtomicU16::new(0),
