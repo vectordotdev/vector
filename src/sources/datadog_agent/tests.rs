@@ -2686,6 +2686,16 @@ fn decode_v3_rejects_lossy_tag_expansion_before_allocation() {
 }
 
 #[test]
+fn decode_v3_rejects_valid_string_expansion_before_allocation() {
+    let mut data = minimal_v3_metric_data();
+    let valid_utf8 = vec![b'x'; 16 * 1024 * 1024];
+    encode_v3_varint(valid_utf8.len() as u64, &mut data.dict_tag_str);
+    data.dict_tag_str.extend(valid_utf8);
+
+    assert!(super::metrics::decode_v3_metric_data(&data, None).is_err());
+}
+
+#[test]
 fn decode_v3_rejects_reference_accumulator_overflow() {
     let mut data = minimal_v3_metric_data();
     data.types = vec![3 | 0x30; 2];

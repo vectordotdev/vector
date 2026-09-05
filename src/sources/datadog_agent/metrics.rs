@@ -624,6 +624,13 @@ fn decode_v3_strings(raw: &[u8], sanitize: bool) -> crate::Result<Vec<String>> {
             return Err("truncated Datadog v3 string dictionary".into());
         }
         let bytes = &raw[offset..end];
+        let valid_string_bytes = expanded_bytes
+            .checked_add(std::mem::size_of::<String>())
+            .and_then(|total| total.checked_add(length))
+            .ok_or("Datadog v3 expanded string dictionary size overflow")?;
+        if valid_string_bytes > MAX_V3_EXPANDED_SERIES_BYTES {
+            return Err("Datadog v3 expanded string dictionary exceeds size limit".into());
+        }
         let value = match std::str::from_utf8(bytes) {
             Ok(value) => value.to_owned(),
             Err(_) if sanitize => {
