@@ -1,0 +1,46 @@
+name: Validate release PR
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - ".github/release-state.json"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "changelog.d/**"
+      - "distribution/install.sh"
+      - "website/content/en/highlights/**"
+      - "website/content/en/releases/**"
+      - "website/cue/reference/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release state transition
+    if: >-
+      startsWith(github.event.pull_request.head.ref, 'release/prepare-v') ||
+      startsWith(github.event.pull_request.head.ref, 'release/housekeeping-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          rust: true
+          vdev: false
+
+      - name: Validate files, state, and versions
+        run: >-
+          cargo vdev release workflow pr-check
+          --base-sha "${{ github.event.pull_request.base.sha }}"
+          --head-ref "${{ github.event.pull_request.head.ref }}"

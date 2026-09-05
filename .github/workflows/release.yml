@@ -10,7 +10,42 @@ on:
       - v1.*
 
 jobs:
+  preflight:
+    name: Validate release tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      version: ${{ steps.state.outputs.version }}
+      next_version: ${{ steps.state.outputs.next_version }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          rust: true
+          vdev: false
+
+      - name: Validate release state
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          cargo vdev release workflow publication-check
+          --tag "$GITHUB_REF_NAME"
+          --sha "$GITHUB_SHA"
+          --repository "$GITHUB_REPOSITORY"
+
   Release:
+    needs: preflight
     permissions:
       contents: write # Required to create/update releases and tags
       packages: write # Required to push container images to GHCR
@@ -20,3 +55,95 @@ jobs:
       git_ref: ${{ github.ref }}
       channel: release
     secrets: inherit
+
+  housekeeping:
+    name: Open post-release housekeeping PR
+    needs: [preflight, Release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Create Vector bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Checkout master
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          rust: true
+          vdev: false
+
+      - name: Validate housekeeping state
+        id: preflight
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: >-
+          cargo vdev release workflow housekeeping-check
+          --version "${{ needs.preflight.outputs.version }}"
+          --release-commit "$GITHUB_SHA"
+          --bot-app "${{ steps.app-token.outputs.app-slug }}"
+          --repository "$GITHUB_REPOSITORY"
+
+      - name: Create housekeeping branch
+        if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.skip_change != 'true'
+        run: git switch -c "release/housekeeping-v${{ needs.preflight.outputs.version }}"
+
+      - name: Generate housekeeping change
+        if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.skip_change != 'true'
+        run: >-
+          cargo vdev release workflow housekeeping-prepare
+          --version "${{ needs.preflight.outputs.version }}"
+          --release-commit "$GITHUB_SHA"
+
+      - name: Commit housekeeping change
+        if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.skip_change != 'true'
+        env:
+          NEXT_VERSION: ${{ needs.preflight.outputs.next_version }}
+        run: |
+          git config user.name "vectordotdev-bot[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock .github/release-state.json
+          git commit -m "chore(releasing): begin ${NEXT_VERSION}"
+
+      - name: Push housekeeping branch
+        if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.skip_change != 'true'
+        run: git push --set-upstream origin "release/housekeeping-v${{ needs.preflight.outputs.version }}"
+
+      - name: Open and enable auto-merge for housekeeping PR
+        if: steps.preflight.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          EXISTING_PR: ${{ steps.preflight.outputs.pr_url }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+          NEXT_VERSION: ${{ needs.preflight.outputs.next_version }}
+        run: |
+          set -euo pipefail
+
+          url="$EXISTING_PR"
+          if [[ -z "$url" ]]; then
+            url=$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base master \
+              --head "release/housekeeping-v${VERSION}" \
+              --title "chore(releasing): begin ${NEXT_VERSION}" \
+              --label no-changelog \
+              --body "Automated housekeeping after v${VERSION}: move master to ${NEXT_VERSION}.")
+          fi
+
+          auto_merge=$(gh pr view "$url" --repo "$GITHUB_REPOSITORY" --json autoMergeRequest --jq '.autoMergeRequest != null')
+          if [[ "$auto_merge" != "true" ]]; then
+            gh pr merge "$url" --repo "$GITHUB_REPOSITORY" --auto --squash
+          fi
+          echo "Housekeeping PR $url has auto-merge enabled." >> "$GITHUB_STEP_SUMMARY"

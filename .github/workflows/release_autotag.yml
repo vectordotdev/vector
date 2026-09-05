@@ -1,0 +1,66 @@
+name: Tag approved release
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "Cargo.toml"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: release-autotag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Validate merge and create release tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Create Vector bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Checkout pushed commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          rust: true
+          vdev: false
+
+      - name: Validate release transition
+        id: validation
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: >-
+          cargo vdev release workflow autotag-check
+          --before-sha "${{ github.event.before }}"
+          --sha "$GITHUB_SHA"
+          --repository "$GITHUB_REPOSITORY"
+
+      - name: Create tag with Vector bot token
+        if: steps.validation.outputs.tag_required == 'true'
+        env:
+          TAG: ${{ steps.validation.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify --quiet "refs/tags/${TAG}"; then
+            echo "$TAG already points at $GITHUB_SHA"
+            exit 0
+          fi
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"
