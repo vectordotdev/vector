@@ -13,9 +13,13 @@ pub(crate) mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
-#[allow(warnings)]
+#[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddtrace_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
+    #[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
+    pub mod idx {
+        include!(concat!(env!("OUT_DIR"), "/datadog.trace.idx.rs"));
+    }
+    include!(concat!(env!("OUT_DIR"), "/datadog.trace.rs"));
 }
 
 use std::{convert::Infallible, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
