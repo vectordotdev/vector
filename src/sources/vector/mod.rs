@@ -20,7 +20,7 @@ use crate::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
         SourceContext, SourceOutput,
     },
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, GrpcEventDecodeError, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
     sources::{
@@ -55,12 +55,17 @@ impl proto::Service for Service {
         &self,
         request: Request<proto::PushEventsRequest>,
     ) -> Result<Response<proto::PushEventsResponse>, Status> {
-        let mut events: Vec<Event> = request
-            .into_inner()
-            .events
-            .into_iter()
-            .map(Event::from)
-            .collect();
+        let request = request.into_inner();
+        let mut events = Vec::with_capacity(request.events.len());
+        for wrapper in request.events {
+            match Event::try_from(wrapper) {
+                Ok(event) => events.push(event),
+                Err(error) => emit!(GrpcEventDecodeError { error }),
+            }
+        }
+        if events.is_empty() {
+            return Ok(Response::new(proto::PushEventsResponse {}));
+        }
 
         let now = Utc::now();
         for event in &mut events {
