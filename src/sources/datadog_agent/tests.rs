@@ -42,7 +42,7 @@ use crate::{
     components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
-        Event, EventStatus, Metric, Value, into_event_stream,
+        Event, EventStatus, Metric, TRACE_LAYOUT_DATADOG, Value, into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
     },
     schema,
@@ -57,6 +57,14 @@ use crate::{
         components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
         spawn_collect_n, trace_init, wait_for_tcp,
     },
+};
+
+#[cfg(all(feature = "sinks-vector", feature = "sources-vector"))]
+use crate::{
+    config::Config,
+    sinks::vector::VectorConfig as VectorSinkConfig,
+    sources::vector::VectorConfig as VectorSourceConfig,
+    test_util::{mock::basic_sink, start_topology},
 };
 
 use crate::sources::datadog_agent::llmobs::decode_llmobs_body;
@@ -374,6 +382,24 @@ async fn send_and_collect(
         expected_count,
     )
     .await
+}
+
+/// Smallest v2 payload the `datadog_agent` traces decoder accepts.
+fn minimal_v2_trace_body() -> Vec<u8> {
+    let mut buf = Vec::new();
+    ddtrace_proto::TracePayload {
+        tracer_payloads: vec![ddtrace_proto::TracerPayload {
+            chunks: vec![ddtrace_proto::TraceChunk {
+                spans: vec![ddtrace_proto::Span::default()],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    }
+    .encode(&mut buf)
+    .unwrap();
+    buf
 }
 
 fn dd_api_key_headers() -> HeaderMap {
@@ -1328,6 +1354,10 @@ async fn decode_traces() {
 
         {
             let trace_v1 = events[0].as_trace();
+            assert_eq!(
+                events[0].metadata().trace_layout(),
+                Some(vector_lib::event::TRACE_LAYOUT_DATADOG)
+            );
             assert_eq!(trace_v1.as_map()["host"], "a_hostname".into());
             assert_eq!(trace_v1.as_map()["env"], "an_environment".into());
             assert_eq!(trace_v1.as_map()["language_name"], "ada".into());
@@ -1367,6 +1397,10 @@ async fn decode_traces() {
             );
 
             let apm_event = events[1].as_trace();
+            assert_eq!(
+                events[1].metadata().trace_layout(),
+                Some(vector_lib::event::TRACE_LAYOUT_DATADOG)
+            );
             assert!(apm_event.contains(event_path!("spans")));
             assert_eq!(apm_event.as_map()["host"], "a_hostname".into());
             assert_eq!(apm_event.as_map()["env"], "an_environment".into());
@@ -1385,6 +1419,10 @@ async fn decode_traces() {
             );
 
             let trace_v2 = events[2].as_trace();
+            assert_eq!(
+                events[2].metadata().trace_layout(),
+                Some(vector_lib::event::TRACE_LAYOUT_DATADOG)
+            );
             assert_eq!(trace_v2.as_map()["host"], "a_hostname".into());
             assert_eq!(trace_v2.as_map()["env"], "env".into());
 
@@ -1448,6 +1486,77 @@ async fn decode_traces() {
         }
     })
     .await;
+}
+
+#[cfg(all(feature = "sinks-vector", feature = "sources-vector"))]
+#[tokio::test]
+async fn trace_layout_survives_vector_hop_unlike_source_type() {
+    trace_init();
+
+    let (_dd_guard, dd_addr) = next_addr();
+    let (_relay_guard, relay_addr) = next_addr();
+    let (out_rx, out_sink) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source(
+        "dd",
+        serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            r#"
+                address: "{dd_addr}"
+                disable_logs: true
+                disable_metrics: true
+                disable_llmobs: true
+                multiple_outputs: true
+            "#
+        ))
+        .unwrap(),
+    );
+    config.add_source(
+        "relay",
+        serde_yaml::from_str::<VectorSourceConfig>(&format!("address: \"{relay_addr}\"")).unwrap(),
+    );
+    config.add_sink(
+        "to_relay",
+        &["dd.traces"],
+        serde_yaml::from_str::<VectorSinkConfig>(&format!(
+            r#"
+                address: "{relay_addr}"
+                batch:
+                  max_events: 1
+            "#
+        ))
+        .unwrap(),
+    );
+    config.add_sink("out", &["relay"], out_sink);
+
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    wait_for_tcp(dd_addr).await;
+    wait_for_tcp(relay_addr).await;
+
+    let body = minimal_v2_trace_body();
+    assert_eq!(
+        200,
+        send_with_path(
+            dd_addr,
+            unsafe { str::from_utf8_unchecked(&body) },
+            HeaderMap::new(),
+            DD_API_TRACES_PATH
+        )
+        .await
+    );
+
+    let event = timeout(
+        Duration::from_secs(10),
+        out_rx.flat_map(into_event_stream).next(),
+    )
+    .await
+    .expect("timed out waiting for relayed trace")
+    .expect("relay produced no event");
+
+    assert_eq!(event.metadata().trace_layout(), Some(TRACE_LAYOUT_DATADOG));
+    assert_eq!(event.metadata().source_type(), Some("vector"));
+
+    topology.stop().await;
 }
 
 #[tokio::test]
