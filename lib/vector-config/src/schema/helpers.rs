@@ -421,6 +421,101 @@ pub(crate) fn generate_optional_schema(
     Ok(schema)
 }
 
+/// Generates the schema for a `#[serde(flatten)] Option<T>` field.
+///
+/// `generate_optional_schema` encodes optionality as `oneOf: [null, T]`, which is correct for a
+/// nullable *property*. Flattened fields are merged into the parent object via `allOf`, where the
+/// value being validated is never JSON `null`.
+///
+/// When `T` is an internally (or adjacently) tagged enum, this wraps `T` as
+/// `anyOf: [ { not: { required: [<tag>] } }, T ]` so omission matches serde. The wrapper is `anyOf`
+/// rather than `oneOf` because a trailing `#[serde(untagged)]` object or map variant also has no
+/// tag field; both alternatives then match a serialized `Some(fallback)` value.
+///
+/// A sibling property that serializes under the same name as the tag is rejected: the absence
+/// encoding would treat that sibling as a present variant. That layout is unused and is not modeled.
+///
+/// When `T` is not tagged that way, this falls back to `Option<T>`'s normal (nullable property)
+/// schema so flatten-of-struct and similar shapes stay unchanged.
+///
+/// The wrapper is built from `T` rather than from a shared `Option<T>` definition, so a normal
+/// `Option<T>` property keeps its null branch and field-specific metadata stays on this site.
+pub fn generate_flattened_optional_schema(
+    inner: &ConfigurableRef,
+    optional: &ConfigurableRef,
+    generator: &RefCell<SchemaGenerator>,
+    overrides: Option<Metadata>,
+    sibling_field_names: &[&str],
+) -> Result<SchemaObject, GenerateError> {
+    let Some(tag_field) = enum_tag_field_from_metadata(&inner.make_metadata()) else {
+        return get_or_generate_schema(optional, generator, overrides);
+    };
+
+    if let Some(sibling_field) = sibling_field_names
+        .iter()
+        .copied()
+        .find(|name| *name == tag_field)
+    {
+        return Err(GenerateError::FlattenedOptionalEnumTagCollision {
+            enum_type: inner.type_name(),
+            tag_field,
+            sibling_field: sibling_field.to_owned(),
+        });
+    }
+
+    let inner_schema = get_or_generate_schema(inner, generator, None)?;
+    let mut schema = SchemaObject {
+        subschemas: Some(Box::new(SubschemaValidation {
+            any_of: Some(vec![
+                Schema::Object(absent_tag_schema(tag_field)),
+                Schema::Object(inner_schema),
+            ]),
+            ..Default::default()
+        })),
+        ..Default::default()
+    };
+
+    // Match `generate_optional_schema`: mark the wrapper optional for docs, and apply field
+    // metadata to this site. `optional` is transparent, so a flatten field without its own
+    // description does not inherit the inner enum's docs.
+    let mut metadata = overrides.unwrap_or_default();
+    metadata.add_custom_attribute(CustomAttribute::flag(constants::DOCS_META_OPTIONAL));
+    optional.validate_metadata(&metadata)?;
+    apply_configurable_metadata(optional, &mut schema, metadata);
+
+    Ok(schema)
+}
+
+fn enum_tag_field_from_metadata(metadata: &Metadata) -> Option<String> {
+    metadata
+        .custom_attributes()
+        .iter()
+        .find_map(|attribute| match attribute {
+            CustomAttribute::KeyValue { key, value }
+                if key == constants::DOCS_META_ENUM_TAG_FIELD =>
+            {
+                value.as_str().map(str::to_owned)
+            }
+            _ => None,
+        })
+}
+
+fn absent_tag_schema(tag_field: String) -> SchemaObject {
+    SchemaObject {
+        subschemas: Some(Box::new(SubschemaValidation {
+            not: Some(Box::new(Schema::Object(SchemaObject {
+                object: Some(Box::new(ObjectValidation {
+                    required: [tag_field].into_iter().collect(),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
 pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
