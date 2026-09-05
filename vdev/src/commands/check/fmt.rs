@@ -1,6 +1,10 @@
 use anyhow::Result;
 
-use crate::{app, commands::fmt::PRETTIER_EXTENSIONS, utils::git::git_ls_files};
+use crate::{
+    app,
+    commands::{fmt::PRETTIER_EXTENSIONS, style},
+    utils::git::git_ls_files,
+};
 
 /// Check that all files are formatted properly
 #[derive(clap::Args, Debug)]
@@ -9,8 +13,8 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        info!("Checking style (trailing spaces, line endings)...");
-        app::exec("scripts/check-style.sh", ["--all"], true)?;
+        app::set_repo_dir()?;
+        style::check_all()?;
 
         info!("Checking Rust formatting...");
         app::exec("cargo", ["fmt", "--", "--check"], true)?;

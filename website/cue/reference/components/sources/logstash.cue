@@ -43,7 +43,6 @@ components: sources: logstash: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

@@ -69,12 +69,6 @@ impl From<UnconfinedTemplate> for String {
     }
 }
 
-impl fmt::Display for UnconfinedTemplate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.src.fmt(f)
-    }
-}
-
 // This is safe because we literally defer to `String` for the schema of `UnconfinedTemplate`.
 impl ConfigurableString for UnconfinedTemplate {}
 

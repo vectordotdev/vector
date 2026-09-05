@@ -408,7 +408,7 @@ fn timely_shutdown_demo_logs() {
 fn timely_shutdown_http() {
     test_timely_shutdown(source_vector(
         r#"
-    type = "http"
+    type = "http_server"
     address = "${VECTOR_TEST_ADDRESS}"
     decoding.codec = "bytes""#,
     ));

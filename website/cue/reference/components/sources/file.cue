@@ -40,7 +40,6 @@ components: sources: file: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	installation: {

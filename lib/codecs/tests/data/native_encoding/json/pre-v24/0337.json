@@ -1,1 +1,0 @@
-{"metric":{"name":"a","timestamp":"1969-12-31T18:37:52.000008275Z","kind":"absolute","distribution":{"samples":[{"value":-147.3485,"rate":1699831323},{"value":-221888.0,"rate":246681767},{"value":767424.0,"rate":4062958590},{"value":146944.0,"rate":2304717044},{"value":546194.582,"rate":2394369130}],"statistic":"summary"}}}

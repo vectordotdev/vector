@@ -10,8 +10,8 @@ use vector_lib::{
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     http::Auth as HttpAuthConfig,
     sinks::{
@@ -22,7 +22,7 @@ use crate::{
             http::{RequestConfig, RetryStrategy},
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, UriTemplate},
     tls::TlsConfig,
 };
 
@@ -100,31 +100,25 @@ pub struct AxiomConfig {
 
     /// Configuration for the URL or regional edge endpoint.
     #[serde(flatten)]
-    #[configurable(derived)]
     pub endpoint: UrlOrRegion,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
 
     /// The compression algorithm to use.
-    #[configurable(derived)]
     #[serde(default = "Compression::zstd_default")]
     pub compression: Compression,
 
     /// The TLS settings for the connection.
     ///
     /// Optional, constrains TLS settings for this sink.
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The batch settings for the sink.
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
     /// Controls how acknowledgements are handled for this sink.
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -132,7 +126,6 @@ pub struct AxiomConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 
@@ -166,15 +159,11 @@ impl SinkConfig for AxiomConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone, Debug)]
 pub struct ValidatedAxiom {
-    uri: Template,
+    uri: UriTemplate,
     http: ValidatedHttp,
 }
 
@@ -187,7 +176,7 @@ impl ValidatedSink for AxiomConfig {
         self.endpoint.validate()?;
 
         // Resolve and parse the ingest endpoint up front (pure, no I/O).
-        let uri: Template = self.build_endpoint().try_into()?;
+        let uri: UriTemplate = self.build_endpoint().try_into()?;
 
         // Construct and validate the derived HTTP config up front so
         // `vector validate --no-environment` catches pure HTTP sink errors
@@ -219,7 +208,7 @@ impl AxiomConfig {
     /// Build the derived HTTP sink configuration. The org-id header is added
     /// here so the derived config (including the header value) is validated
     /// during `validate`.
-    fn http_sink_config(&self, uri: Template) -> crate::Result<HttpSinkConfig> {
+    fn http_sink_config(&self, uri: UriTemplate) -> crate::Result<HttpSinkConfig> {
         let mut request = self.request.clone();
         if let Some(org_id) = &self.org_id {
             // NOTE: Only add the org id header if an org id is provided

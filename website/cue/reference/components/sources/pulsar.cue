@@ -25,7 +25,6 @@ components: sources: pulsar: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
