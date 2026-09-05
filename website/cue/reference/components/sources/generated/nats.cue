@@ -326,8 +326,14 @@ generated: components: sources: nats: configuration: {
 				}
 			}
 			consumer: {
-				description: "The name of the durable consumer to pull from."
-				required:    true
+				description: """
+					The name of the durable consumer to pull from.
+
+					When end-to-end acknowledgements are enabled, this consumer must use the `explicit`
+					acknowledgement policy. Messages remain unacknowledged until all connected sinks confirm
+					delivery and can be redelivered after the consumer's acknowledgement wait expires.
+					"""
+				required: true
 				type: string: {}
 			}
 			stream: {

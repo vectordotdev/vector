@@ -1,12 +1,14 @@
 #![allow(clippy::print_stdout)]
 use async_nats::jetstream::stream::StorageType;
 use bytes::Bytes;
+use futures::StreamExt;
 use vector_lib::config::log_schema;
 
 use crate::{
     SourceSender,
     codecs::DecodingConfig,
     config::{LogNamespace, SourceConfig, SourceContext},
+    event::EventStatus,
     nats::{
         NatsAuthConfig, NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword,
     },
@@ -19,7 +21,7 @@ use crate::{
     test_util::{
         collect_n,
         components::{SOURCE_TAGS, assert_source_compliance},
-        random_string,
+        random_string, wait_for,
     },
     tls::{TlsConfig, TlsEnableableConfig},
 };
@@ -450,6 +452,125 @@ async fn nats_jetstream_valid() {
 
     let result = run_jetstream_test(conf).await;
     assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn nats_jetstream_waits_for_downstream_acknowledgement() {
+    let subject = format!("test-js-ack-{}", random_string(10));
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+    let stream_name = format!("S_{}", subject.replace('.', "_"));
+    let consumer_name = format!("C_{}", subject.replace('.', "_"));
+
+    let client = async_nats::connect(&url).await.unwrap();
+    let js = async_nats::jetstream::new(client);
+    let stream = js
+        .get_or_create_stream(async_nats::jetstream::stream::Config {
+            name: stream_name.clone(),
+            subjects: vec![subject.clone()],
+            storage: StorageType::Memory,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let consumer = stream
+        .create_consumer(async_nats::jetstream::consumer::pull::Config {
+            durable_name: Some(consumer_name.clone()),
+            ack_policy: async_nats::jetstream::consumer::AckPolicy::Explicit,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    js.publish(subject.clone(), Bytes::from_static(b"ack me"))
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.jetstream = Some(JetStreamConfig {
+        stream: stream_name,
+        consumer: consumer_name,
+        ..Default::default()
+    });
+
+    let (tx, mut rx) = SourceSender::new_test();
+    let mut cx = SourceContext::new_test(tx, None);
+    cx.acknowledgements = true;
+    let source = conf.build(cx).await.unwrap();
+    let source_handle = tokio::spawn(source);
+
+    let rejected = rx.next().await.unwrap();
+    assert_eq!(consumer.get_info().await.unwrap().num_ack_pending, 1);
+
+    rejected.metadata().update_status(EventStatus::Rejected);
+    drop(rejected);
+
+    let delivered = rx.next().await.unwrap();
+    delivered.metadata().update_status(EventStatus::Delivered);
+    drop(delivered);
+
+    wait_for({
+        let consumer = consumer.clone();
+        move || {
+            let consumer = consumer.clone();
+            async move { consumer.get_info().await.unwrap().num_ack_pending == 0 }
+        }
+    })
+    .await;
+
+    source_handle.abort();
+}
+
+#[tokio::test]
+async fn nats_jetstream_end_to_end_acknowledgements_require_explicit_policy() {
+    let subject = format!("test-js-ack-policy-{}", random_string(10));
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+    let stream_name = format!("S_{}", subject.replace('.', "_"));
+    let consumer_name = format!("C_{}", subject.replace('.', "_"));
+
+    let client = async_nats::connect(&url).await.unwrap();
+    let js = async_nats::jetstream::new(client);
+    let stream = js
+        .get_or_create_stream(async_nats::jetstream::stream::Config {
+            name: stream_name.clone(),
+            subjects: vec![subject.clone()],
+            storage: StorageType::Memory,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    stream
+        .create_consumer(async_nats::jetstream::consumer::pull::Config {
+            durable_name: Some(consumer_name.clone()),
+            ack_policy: async_nats::jetstream::consumer::AckPolicy::All,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.jetstream = Some(JetStreamConfig {
+        stream: stream_name,
+        consumer: consumer_name,
+        ..Default::default()
+    });
+
+    let (tx, _rx) = SourceSender::new_test();
+    let mut cx = SourceContext::new_test(tx, None);
+    cx.acknowledgements = true;
+    let error = match conf.build(cx).await {
+        Ok(_) => panic!("expected an invalid consumer acknowledgement policy"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.downcast_ref::<BuildError>(),
+        Some(BuildError::ConsumerAckPolicy {
+            policy: async_nats::jetstream::consumer::AckPolicy::All
+        })
+    ));
 }
 
 #[tokio::test]

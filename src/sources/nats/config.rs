@@ -1,11 +1,11 @@
 use async_nats::jetstream::{
-    consumer::{PullConsumer, StreamError as ConsumerStreamError},
+    consumer::{AckPolicy, PullConsumer, StreamError as ConsumerStreamError},
     context::GetStreamError,
 };
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
     codecs::decoding::{DeserializerConfig, FramingConfig},
-    config::{LegacyKey, LogNamespace},
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     configurable::configurable_component,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path},
 };
@@ -38,6 +38,10 @@ pub enum BuildError {
     Consumer { source: async_nats::Error },
     #[snafu(display("Failed to retrieve messages from NATS consumer: {}", source))]
     Messages { source: ConsumerStreamError },
+    #[snafu(display(
+        "NATS consumer uses {policy:?} acknowledgement policy; end-to-end acknowledgements require Explicit"
+    ))]
+    ConsumerAckPolicy { policy: AckPolicy },
 }
 
 /// Batch settings for a JetStream pull consumer.
@@ -84,6 +88,10 @@ pub struct JetStreamConfig {
     /// The name of the stream to bind to.
     pub stream: String,
     /// The name of the durable consumer to pull from.
+    ///
+    /// When end-to-end acknowledgements are enabled, this consumer must use the `explicit`
+    /// acknowledgement policy. Messages remain unacknowledged until all connected sinks confirm
+    /// delivery and can be redelivered after the consumer's acknowledgement wait expires.
     pub consumer: String,
 
     #[serde(default)]
@@ -198,6 +206,8 @@ impl SourceConfig for NatsSourceConfig {
 
         match self.mode() {
             NatsMode::JetStream(js_config) => {
+                let acknowledgements =
+                    cx.do_acknowledgements(SourceAcknowledgementsConfig::DEFAULT);
                 let connection = self.connect().await?;
                 let js = async_nats::jetstream::new(connection.clone());
                 let stream = js
@@ -208,6 +218,11 @@ impl SourceConfig for NatsSourceConfig {
                     .get_consumer(&js_config.consumer)
                     .await
                     .context(ConsumerSnafu)?;
+
+                let ack_policy = consumer.cached_info().config.ack_policy;
+                if acknowledgements && ack_policy != AckPolicy::Explicit {
+                    return Err(BuildError::ConsumerAckPolicy { policy: ack_policy }.into());
+                }
 
                 let batch_config = js_config.batch_config.clone();
 
@@ -227,6 +242,7 @@ impl SourceConfig for NatsSourceConfig {
                     log_namespace,
                     cx.shutdown,
                     cx.out,
+                    acknowledgements,
                 )))
             }
             NatsMode::Core => {
@@ -270,9 +286,8 @@ impl SourceConfig for NatsSourceConfig {
         )]
     }
 
-    // Acknowledgment is only possible with Jetstream.
     fn can_acknowledge(&self) -> bool {
-        true
+        self.jetstream.is_some()
     }
 }
 
@@ -334,6 +349,15 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<NatsSourceConfig>();
+    }
+
+    #[test]
+    fn only_jetstream_can_acknowledge() {
+        let mut config = NatsSourceConfig::default();
+        assert!(!config.can_acknowledge());
+
+        config.jetstream = Some(JetStreamConfig::default());
+        assert!(config.can_acknowledge());
     }
 
     #[test]
