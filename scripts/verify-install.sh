@@ -9,6 +9,28 @@ set -euo pipefail
 
 package="${1:?must pass package as argument}"
 
+# Resolve shared-library deps that plain `dpkg -i` / `rpm -i` do not install
+# (glibc ODBC builds need libodbc / unixODBC for `vector --version`).
+ensure_odbc_runtime () {
+  case "$1" in
+    *.deb)
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -qq
+      apt-get install -y libodbc2 || apt-get install -y libodbc1
+      ;;
+    *.rpm)
+      if command -v dnf >/dev/null 2>&1; then
+        dnf install -y unixODBC
+      elif command -v yum >/dev/null 2>&1; then
+        yum install -y unixODBC
+      else
+        echo "No dnf/yum available to install unixODBC" >&2
+        exit 1
+      fi
+      ;;
+  esac
+}
+
 install_package () {
   case "$1" in
     *.deb)
@@ -20,6 +42,7 @@ install_package () {
   esac
 }
 
+ensure_odbc_runtime "$package"
 install_package "$package"
 
 getent passwd vector || (echo "vector user missing" && exit 1)
