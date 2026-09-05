@@ -1465,8 +1465,7 @@ where
     /// reaching disk (e.g. `Bufferable::filter_unencodable` rejecting events
     /// the protobuf decoder cannot handle). Delegates to the ledger's usage
     /// handle so the rejection shows up under the disk-v2 stage's
-    /// `received` / `dropped` metrics in production, where the
-    /// `BufferSender` does not carry its own usage instrumentation.
+    /// `received` / `dropped` metrics in production.
     pub(crate) fn track_dropped(&self, event_count: u64, byte_size: u64) {
         self.ledger.track_dropped(event_count, byte_size);
     }
