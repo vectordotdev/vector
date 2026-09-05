@@ -450,7 +450,7 @@ mod test {
                     MetricKind::Incremental,
                     MetricValue::AggregatedHistogram {
                         buckets: vector_lib::buckets![
-                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
+                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1, f64::INFINITY => 0
                         ],
                         count: 1,
                         sum: 8.0,
