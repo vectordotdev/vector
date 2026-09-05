@@ -22,6 +22,9 @@ parquet = { version = "59.2.0", default-features = false, features = [
     "lz4",
     "flate2-rust_backened",
 ], optional = true }
+parquet-variant = { version = "59.2.0", optional = true }
+parquet-variant-json = { version = "59.2.0", optional = true }
+hex = { version = "0.4.3", default-features = false, features = ["std"], optional = true }
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
@@ -78,7 +81,7 @@ vrl.workspace = true
 zstd = { workspace = true, features = ["zdict_builder"] }
 
 [features]
-arrow = ["dep:arrow", "arrow/chrono-tz"]
+arrow = ["dep:arrow", "arrow/chrono-tz", "dep:parquet-variant", "dep:parquet-variant-json", "dep:hex"]
 parquet = ["dep:parquet", "arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:toml"]

@@ -779,6 +779,10 @@ name = "arrow-schema"
 version = "59.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6fed2ca0d1eade57e811cbe73b98ad50cc08a1183e13b2d2aa43a7df593f40e"
+dependencies = [
+ "serde_core",
+ "serde_json",
+]
 
 [[package]]
 name = "arrow-select"
@@ -2863,6 +2867,7 @@ dependencies = [
  "dyn-clone",
  "flate2",
  "futures",
+ "hex",
  "indoc",
  "influxdb-line-protocol",
  "memchr",
@@ -2870,6 +2875,8 @@ dependencies = [
  "opentelemetry-proto",
  "ordered-float 5.3.0",
  "parquet",
+ "parquet-variant",
+ "parquet-variant-json",
  "pin-project",
  "proptest",
  "prost 0.12.6",
@@ -8380,6 +8387,36 @@ dependencies = [
  "snap",
  "twox-hash",
  "zstd 0.13.2",
+]
+
+[[package]]
+name = "parquet-variant"
+version = "59.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f7e5fff3ed0c07514a7fb8bee3f2ea5a53f36939410ecac4a466620213539a8"
+dependencies = [
+ "arrow 59.2.0",
+ "arrow-schema 59.2.0",
+ "chrono",
+ "half",
+ "indexmap 2.12.0",
+ "num-traits",
+ "simdutf8",
+ "uuid",
+]
+
+[[package]]
+name = "parquet-variant-json"
+version = "59.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb19dfe1bd24c17addd761ba4f7000f615e2fa12525871c7baa835dbb3d7f147"
+dependencies = [
+ "arrow-schema 59.2.0",
+ "base64 0.23.0",
+ "chrono",
+ "parquet-variant",
+ "serde_json",
+ "uuid",
 ]
 
 [[package]]
