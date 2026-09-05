@@ -4,6 +4,7 @@ use std::os::unix::process::ExitStatusExt;
 #[cfg(windows)]
 use std::os::windows::process::ExitStatusExt;
 use std::{
+    collections::HashSet,
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
     process::ExitStatus,
@@ -25,13 +26,15 @@ use crate::api;
 use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
-    config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
+    config::{
+        self, ComponentConfig, ComponentKey, ComponentType, Config, ConfigBuilder, ConfigPath,
+    },
     extra_context::ExtraContext,
     heartbeat,
     internal_events::{
         VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
     },
-    signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
+    signal::{SignalHandler, SignalPair, SignalRx, SignalTo, SignalTx},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
         TopologyController,
@@ -40,6 +43,50 @@ use crate::{
 };
 
 static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
+
+/// Coalesced reload signals received while startup is blocked, so a burst of reloads during a
+/// long outage is bounded (only the latest state per kind is retained) and replayed in a stable
+/// order.
+#[derive(Default)]
+struct PendingReloads {
+    from_disk: bool,
+    components: Option<HashSet<ComponentKey>>,
+    from_builder: Option<ConfigBuilder>,
+    enrichment_tables: bool,
+}
+
+impl PendingReloads {
+    fn push(&mut self, signal: SignalTo) {
+        match signal {
+            SignalTo::ReloadFromDisk => self.from_disk = true,
+            SignalTo::ReloadComponents(components) => {
+                self.components
+                    .get_or_insert_with(HashSet::new)
+                    .extend(components);
+            }
+            SignalTo::ReloadFromConfigBuilder(builder) => self.from_builder = Some(builder),
+            SignalTo::ReloadEnrichmentTables => self.enrichment_tables = true,
+            _ => {}
+        }
+    }
+
+    fn into_signals(self) -> Vec<SignalTo> {
+        let mut signals = Vec::new();
+        if self.from_disk {
+            signals.push(SignalTo::ReloadFromDisk);
+        }
+        if let Some(components) = self.components {
+            signals.push(SignalTo::ReloadComponents(components));
+        }
+        if let Some(builder) = self.from_builder {
+            signals.push(SignalTo::ReloadFromConfigBuilder(builder));
+        }
+        if self.enrichment_tables {
+            signals.push(SignalTo::ReloadEnrichmentTables);
+        }
+        signals
+    }
+}
 
 pub fn worker_threads() -> Option<NonZeroUsize> {
     NonZeroUsize::new(WORKER_THREADS.load(Ordering::Relaxed))
@@ -65,6 +112,7 @@ impl ApplicationConfig {
     pub async fn from_opts(
         opts: &RootOpts,
         signal_handler: &mut SignalHandler,
+        signal_rx: &mut SignalRx,
         extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
@@ -81,31 +129,135 @@ impl ApplicationConfig {
             None
         };
 
-        let config = load_configs(
+        // Reload signals received while config loading is in progress are collected here and
+        // re-broadcast after loading completes, so that a one-shot reload during startup is
+        // applied once the topology is running instead of being lost. They are coalesced so a
+        // burst of reloads during a long outage is bounded (only the latest state per kind is
+        // retained) and replayed in a stable order.
+        let signal_tx = signal_handler.clone_tx();
+        let mut pending_reloads = PendingReloads::default();
+
+        // Loading the config can block on network I/O (e.g. provider or secret resolution).
+        // Race it against shutdown signals so that a signal received during config loading
+        // aborts startup immediately, instead of being queued and ignored until the topology
+        // build phase starts.
+        let mut load = Box::pin(load_configs(
             &config_paths,
             watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
             graceful_shutdown_duration,
             signal_handler,
-        )
-        .await?;
+        ));
 
-        Self::from_config(config_paths, config, extra_context).await
+        let config = loop {
+            tokio::select! {
+                biased;
+                signal = signal_rx.recv() => {
+                    match signal {
+                        // A shutdown signal (or a closed signal channel) arrived while config
+                        // loading was still in progress. Abort startup and exit the same way a
+                        // running Vector would on such a signal.
+                        Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
+                            return Err(exitcode::OK);
+                        }
+                        // Reload signals have no effect during startup; retain them so they can
+                        // be re-broadcast after config loading completes.
+                        Ok(reload @ (SignalTo::ReloadFromDisk
+                            | SignalTo::ReloadComponents(_)
+                            | SignalTo::ReloadFromConfigBuilder(_)
+                            | SignalTo::ReloadEnrichmentTables)) => {
+                            pending_reloads.push(reload);
+                            continue;
+                        }
+                        // Anything else (e.g. Err(RecvError::Lagged)) has no effect during
+                        // startup; ignore it.
+                        _ => continue,
+                    }
+                }
+                result = &mut load => {
+                    break result?;
+                }
+            }
+        };
+
+        // Release the borrows held by the pinned config-loading future before moving on.
+        drop(load);
+
+        // Re-broadcast any reload signals received during config loading so they are applied
+        // once startup completes, in a stable order (disk, components, builder, enrichment).
+        for reload in pending_reloads.into_signals() {
+            drop(signal_tx.send(reload));
+        }
+
+        Self::from_config(config_paths, config, extra_context, signal_rx, &signal_tx).await
     }
 
     pub async fn from_config(
         config_paths: Vec<ConfigPath>,
         config: Config,
         extra_context: ExtraContext,
+        signal_rx: &mut SignalRx,
+        signal_tx: &SignalTx,
     ) -> Result<Self, ExitCode> {
         #[cfg(feature = "api")]
         let api = config.api;
 
-        let (topology, graceful_crash_receiver) =
-            RunningTopology::start_init_validated(config, extra_context.clone())
-                .await
-                .ok_or(exitcode::CONFIG)?;
+        // Starting the topology can block on network I/O (e.g. sink healthchecks or build-time
+        // API probes). Race it against shutdown signals so that a signal received during startup
+        // aborts it immediately, instead of being queued and ignored until startup completes.
+        let mut start = Box::pin(RunningTopology::start_init_validated(
+            config,
+            extra_context.clone(),
+        ));
+
+        // Reload signals received while the topology is starting are collected here and
+        // re-broadcast after startup completes, so that a one-shot reload during startup is
+        // applied once the topology is running instead of being lost. They are coalesced so a
+        // burst of reloads during a long outage is bounded (only the latest state per kind is
+        // retained) and replayed in a stable order.
+        let mut pending_reloads = PendingReloads::default();
+
+        let (topology, graceful_crash_receiver) = loop {
+            tokio::select! {
+                biased;
+                signal = signal_rx.recv() => {
+                    match signal {
+                        // A shutdown signal (or a closed signal channel) arrived while startup was
+                        // still in progress. There is no running topology to drain, so abort
+                        // startup and exit the same way a running Vector would on such a signal.
+                        Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
+                            return Err(exitcode::OK);
+                        }
+                        // Reload signals have no effect during startup; retain them so they can
+                        // be re-broadcast after the topology finishes starting.
+                        Ok(reload @ (SignalTo::ReloadFromDisk
+                            | SignalTo::ReloadComponents(_)
+                            | SignalTo::ReloadFromConfigBuilder(_)
+                            | SignalTo::ReloadEnrichmentTables)) => {
+                            pending_reloads.push(reload);
+                            continue;
+                        }
+                        // Anything else (e.g. Err(RecvError::Lagged)) has no effect during
+                        // startup; ignore it.
+                        _ => continue,
+                    }
+                }
+                result = &mut start => {
+                    break match result {
+                        Some(topology) => topology,
+                        None => return Err(exitcode::CONFIG),
+                    };
+                }
+            }
+        };
+
+        // Re-broadcast any reload signals received while the topology was starting so they are
+        // applied once startup completes, in a stable order (disk, components, builder,
+        // enrichment).
+        for reload in pending_reloads.into_signals() {
+            drop(signal_tx.send(reload));
+        }
 
         Ok(Self {
             config_paths,
@@ -256,6 +408,7 @@ impl Application {
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
             &mut signals.handler,
+            &mut signals.receiver,
             extra_context,
         ))?;
 
