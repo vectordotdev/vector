@@ -31,7 +31,7 @@ use crate::{
     internal_events::{
         VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
     },
-    signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
+    signal::{SignalHandler, SignalPair, SignalRx, SignalTo, SignalTx},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
         TopologyController,
@@ -82,6 +82,12 @@ impl ApplicationConfig {
             None
         };
 
+        // Reload signals received while config loading is in progress are collected here and
+        // re-broadcast after loading completes, so that a one-shot reload during startup is
+        // applied once the topology is running instead of being lost.
+        let signal_tx = signal_handler.clone_tx();
+        let mut pending_reloads: Vec<SignalTo> = Vec::new();
+
         // Loading the config can block on network I/O (e.g. provider or secret resolution).
         // Race it against shutdown signals so that a signal received during config loading
         // aborts startup immediately, instead of being queued and ignored until the topology
@@ -106,7 +112,17 @@ impl ApplicationConfig {
                         Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
                             return Err(exitcode::OK);
                         }
-                        // Reload signals have no effect during startup; ignore them.
+                        // Reload signals have no effect during startup; retain them so they can
+                        // be re-broadcast after config loading completes.
+                        Ok(reload @ (SignalTo::ReloadFromDisk
+                            | SignalTo::ReloadComponents(_)
+                            | SignalTo::ReloadFromConfigBuilder(_)
+                            | SignalTo::ReloadEnrichmentTables)) => {
+                            pending_reloads.push(reload);
+                            continue;
+                        }
+                        // Anything else (e.g. Err(RecvError::Lagged)) has no effect during
+                        // startup; ignore it.
                         _ => continue,
                     }
                 }
@@ -119,7 +135,13 @@ impl ApplicationConfig {
         // Release the borrows held by the pinned config-loading future before moving on.
         drop(load);
 
-        Self::from_config(config_paths, config, extra_context, signal_rx).await
+        // Re-broadcast any reload signals received during config loading so they are applied
+        // once startup completes.
+        for reload in pending_reloads {
+            drop(signal_tx.send(reload));
+        }
+
+        Self::from_config(config_paths, config, extra_context, signal_rx, &signal_tx).await
     }
 
     pub async fn from_config(
@@ -127,6 +149,7 @@ impl ApplicationConfig {
         config: Config,
         extra_context: ExtraContext,
         signal_rx: &mut SignalRx,
+        signal_tx: &SignalTx,
     ) -> Result<Self, ExitCode> {
         #[cfg(feature = "api")]
         let api = config.api;
@@ -139,6 +162,11 @@ impl ApplicationConfig {
             extra_context.clone(),
         ));
 
+        // Reload signals received while the topology is starting are collected here and
+        // re-broadcast after startup completes, so that a one-shot reload during startup is
+        // applied once the topology is running instead of being lost.
+        let mut pending_reloads: Vec<SignalTo> = Vec::new();
+
         let (topology, graceful_crash_receiver) = loop {
             tokio::select! {
                 biased;
@@ -150,7 +178,17 @@ impl ApplicationConfig {
                         Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
                             return Err(exitcode::OK);
                         }
-                        // Reload signals have no effect during startup; ignore them.
+                        // Reload signals have no effect during startup; retain them so they can
+                        // be re-broadcast after the topology finishes starting.
+                        Ok(reload @ (SignalTo::ReloadFromDisk
+                            | SignalTo::ReloadComponents(_)
+                            | SignalTo::ReloadFromConfigBuilder(_)
+                            | SignalTo::ReloadEnrichmentTables)) => {
+                            pending_reloads.push(reload);
+                            continue;
+                        }
+                        // Anything else (e.g. Err(RecvError::Lagged)) has no effect during
+                        // startup; ignore it.
                         _ => continue,
                     }
                 }
@@ -162,6 +200,12 @@ impl ApplicationConfig {
                 }
             }
         };
+
+        // Re-broadcast any reload signals received while the topology was starting so they are
+        // applied once startup completes.
+        for reload in pending_reloads {
+            drop(signal_tx.send(reload));
+        }
 
         Ok(Self {
             config_paths,

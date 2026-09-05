@@ -504,10 +504,10 @@ async fn validate_healthchecks(
                 signal = signal_rx.recv() => {
                     match signal {
                         Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
-                            // Cancel the spawned healthcheck and wait for it to finish before
-                            // any cleanup runs, so it can't outlive this function.
+                            // Cancel the spawned healthcheck. The process exits immediately on
+                            // this path, so any detached blocking work dies with it; awaiting
+                            // the handle could hang on a spawn_blocking healthcheck.
                             handle.abort();
-                            drop(handle.await);
                             return Err(Interrupted);
                         }
                         // Reload signals have no effect during validation; ignore them.
