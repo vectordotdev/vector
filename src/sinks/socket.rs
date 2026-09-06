@@ -23,7 +23,6 @@ pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -72,7 +71,6 @@ pub struct UdpMode {
     #[serde(flatten)]
     config: UdpSinkConfig,
 
-    #[configurable(derived)]
     encoding: EncodingConfig,
 }
 

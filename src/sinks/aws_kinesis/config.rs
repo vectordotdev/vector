@@ -30,24 +30,18 @@ pub struct KinesisSinkBaseConfig {
     pub stream_name: String,
 
     #[serde(flatten)]
-    #[configurable(derived)]
     pub region: RegionOrEndpoint,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
@@ -55,7 +49,6 @@ pub struct KinesisSinkBaseConfig {
     #[serde(default)]
     pub request_retry_partial: bool,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

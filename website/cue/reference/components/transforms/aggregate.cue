@@ -21,7 +21,6 @@ components: transforms: aggregate: {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

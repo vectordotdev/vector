@@ -87,29 +87,22 @@ pub struct NewRelicConfig {
     #[configurable(metadata(docs::examples = "${NEW_RELIC_ACCOUNT_KEY}"))]
     pub account_id: SensitiveString,
 
-    #[configurable(derived)]
     pub region: Option<NewRelicRegion>,
 
-    #[configurable(derived)]
     pub api: NewRelicApi,
 
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

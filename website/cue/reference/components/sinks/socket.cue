@@ -55,7 +55,6 @@ components: sinks: socket: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.socket.configuration

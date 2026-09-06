@@ -32,7 +32,6 @@ components: sources: stdin: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

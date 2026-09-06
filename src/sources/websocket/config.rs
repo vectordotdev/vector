@@ -82,12 +82,10 @@ pub struct WebSocketConfig {
     pub common: WebSocketCommonConfig,
 
     /// Decoder to use on each received message.
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
     /// Framing to use in the decoding.
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 

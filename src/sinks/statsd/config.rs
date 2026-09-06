@@ -48,11 +48,9 @@ pub struct StatsdSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<StatsdDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

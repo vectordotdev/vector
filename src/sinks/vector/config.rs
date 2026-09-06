@@ -80,26 +80,21 @@ pub struct VectorConfig {
     /// This option is mutually exclusive with `address`. Set exactly one of
     /// `address` or `routing`.
     #[serde(default)]
-    #[configurable(derived)]
     #[configurable(required_one_of = "address_or_routing")]
     routing: Option<RoutingConfig>,
 
     /// Compression algorithm for requests.
     ///
     /// Supports `"none"`, `"gzip"`, or `"zstd"`.
-    #[configurable(derived)]
     #[serde(default)]
     compression: VectorCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
@@ -109,11 +104,9 @@ pub struct VectorConfig {
     /// frames on idle connections so that a pooled connection to a downstream Vector instance that
     /// has gone away (crashed, restarted, or cut off by a network partition) is detected and evicted
     /// before it is reused, ensuring retries always go to a live connection.
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     keepalive: Option<VectorKeepaliveConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -187,7 +180,6 @@ struct RoutingConfig {
     ///
     /// This option is only used when `strategy` is set to `load_balance`.
     #[serde(default)]
-    #[configurable(derived)]
     health: Option<HealthConfig>,
 }
 

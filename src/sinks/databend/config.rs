@@ -62,34 +62,27 @@ pub struct DatabendConfig {
     pub database: Option<String>,
 
     /// The username and password to authenticate with. Overrides the username and password in DSN.
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub missing_field_as: DatabendMissingFieldAS,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub encoding: DatabendEncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: DatabendCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
