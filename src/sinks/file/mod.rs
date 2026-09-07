@@ -812,17 +812,13 @@ impl FileSink {
                     // `written` bytes made it to the file / compression stream.
                     // Events whose end offset lies at or before `written` were
                     // fully persisted; everything beyond that must be retried.
-                    let mut dropped_events = n_events;
-                    for (i, (buf, finalizers, event_size)) in encoded.into_iter().enumerate() {
+                    let dropped_events = boundaries.iter().filter(|&&b| b > written).count();
+                    for (i, (_buf, finalizers, event_size)) in encoded.into_iter().enumerate() {
                         if boundaries[i] <= written {
                             finalizers.update_status(EventStatus::Delivered);
                             self.events_sent.emit(CountByteSize(1, event_size));
-                            dropped_events -= 1;
                         } else {
                             finalizers.update_status(EventStatus::Errored);
-                            if dropped_events == n_events {
-                                dropped_events = n_events - i;
-                            }
                         }
                     }
                     emit!(FileIoError {
