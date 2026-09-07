@@ -231,8 +231,12 @@ where
     /// returned.
     ///
     /// Otherwise, we return one of the following variants:
-    /// - if we have no pending markers, `MarkerOffset::Gap` is returned, and contains the delta
-    ///   between the given ID and the next expected marker ID
+    /// - if we have no pending markers, and the given ID is behind the acknowledged marker ID,
+    ///   `MarkerOffset::MonotonicityViolation` is returned, as record IDs are monotonic and such an
+    ///   ID can only belong to a stale record
+    /// - if we have no pending markers, and the given ID is ahead of the acknowledged marker ID,
+    ///   `MarkerOffset::Gap` is returned, and contains the delta between the given ID and the
+    ///   acknowledged marker ID
     /// - if we have pending markers, and the given ID is logically behind the next expected marker
     ///   ID, `MarkerOffset::MonotonicityViolation` is returned, indicating that the monotonicity
     ///   invariant has been violated
@@ -325,8 +329,10 @@ where
     ///
     /// ## Errors
     ///
-    /// When other pending markers are present, and the given ID is logically behind the next
-    /// expected marker ID, `Err(MarkerError::MonotonicityViolation)` is returned.
+    /// When the given ID is logically behind the next expected marker ID,
+    /// `Err(MarkerError::MonotonicityViolation)` is returned. With no pending markers, the next
+    /// expected marker ID is the acknowledged marker ID; with a fixed-size pending marker at the
+    /// back, it is that marker's ID plus its length.
     ///
     /// # Panics
     ///
