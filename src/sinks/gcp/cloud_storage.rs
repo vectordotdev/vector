@@ -153,7 +153,6 @@ pub struct GcsSinkConfig {
     ///
     /// Some cloud storage API clients and browsers handle decompression transparently, so
     /// depending on how they are accessed, files may not always appear to be compressed.
-    #[configurable(derived)]
     #[serde(default)]
     compression: Compression,
 
@@ -182,7 +181,6 @@ pub struct GcsSinkConfig {
     #[configurable(metadata(docs::examples = "no-transform"))]
     cache_control: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
 
@@ -192,17 +190,14 @@ pub struct GcsSinkConfig {
     #[serde(default = "default_endpoint")]
     endpoint: HttpEndpoint,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig<GcsTowerRequestConfigDefaults>,
 
     #[serde(flatten)]
     auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -210,7 +205,6 @@ pub struct GcsSinkConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
 

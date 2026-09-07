@@ -155,11 +155,9 @@ pub struct InfluxDbConfig {
     #[configurable(metadata(docs::minimal = true))]
     pub token: Option<SensitiveString>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
@@ -168,14 +166,12 @@ pub struct InfluxDbConfig {
     #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<HashMap<String, String>>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The list of quantiles to calculate when sending distribution metrics.
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

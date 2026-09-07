@@ -59,15 +59,12 @@ pub struct GreptimeDBMetricsConfig {
     #[serde(default)]
     pub grpc_compression: GrpcCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(crate) batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -75,7 +72,6 @@ pub struct GreptimeDBMetricsConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// Use Greptime's prefixed naming for time index and value columns.

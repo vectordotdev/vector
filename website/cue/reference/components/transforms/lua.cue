@@ -34,7 +34,6 @@ components: transforms: lua: {
 			us know.
 			""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.transforms.lua.configuration & {

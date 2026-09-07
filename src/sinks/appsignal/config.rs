@@ -52,26 +52,20 @@ pub(super) struct AppsignalConfig {
     #[configurable(metadata(docs::examples = "${APPSIGNAL_PUSH_API_KEY}"))]
     push_api_key: SensitiveString,
 
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<AppsignalDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -79,7 +73,6 @@ pub(super) struct AppsignalConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     retry_strategy: RetryStrategy,
 }

@@ -129,26 +129,20 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default = "crate::serde::default_true")]
     pub create_missing_stream: bool,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retention: Retention,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The ARN of an [IAM role][iam_role] to assume at startup.
@@ -158,11 +152,9 @@ pub struct CloudwatchLogsSinkConfig {
     #[configurable(metadata(docs::hidden))]
     pub assume_role: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -174,21 +166,18 @@ pub struct CloudwatchLogsSinkConfig {
     ///
     /// [arn]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html
     /// [kms_key]: https://docs.aws.amazon.com/kms/latest/developerguide/overview.html
-    #[configurable(derived)]
     #[serde(default)]
     pub kms_key: Option<String>,
 
     /// The Key-value pairs to be applied as [tags][tags] to the log group and stream.
     ///
     /// [tags]: https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/what-are-tags.html
-    #[configurable(derived)]
     #[serde(default)]
     #[configurable(metadata(
         docs::additional_props_description = "A tag represented as a key-value pair"
     ))]
     pub tags: Option<HashMap<String, String>>,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }

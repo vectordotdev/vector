@@ -66,11 +66,9 @@ pub struct SinkOuter<T>
 where
     T: Configurable + Serialize + 'static,
 {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 
-    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     /// The full URI to make HTTP healthcheck requests to.
@@ -80,15 +78,12 @@ where
     #[configurable(deprecated, metadata(docs::hidden), validation(format = "uri"))]
     pub healthcheck_uri: Option<UriSerde>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub healthcheck: SinkHealthcheckOptions,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub buffer: BufferConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 

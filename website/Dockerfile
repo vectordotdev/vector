@@ -39,4 +39,4 @@ ENTRYPOINT ["/bin/bash", "-lc", \
    cd /app/website && \
    yarn && \
    cp -f ../Cargo.lock data/cargo-lock.toml && \
-   hugo server --bind 0.0.0.0 --port 1313 --buildDrafts --buildFuture --environment development"]
+   make serve-development SERVER_BIND=0.0.0.0 SERVER_PORT=1313"]

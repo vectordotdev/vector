@@ -80,16 +80,12 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
-        #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
 
-        #[configurable(derived)]
         permit_origin: Option<IpAllowlistConfig>,
 
-        #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
 
         /// The size of the receive buffer used for each connection.
@@ -112,7 +108,6 @@ pub enum Mode {
 
     /// Listen on UDP.
     Udp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
         /// The size of the receive buffer used for the listening socket.

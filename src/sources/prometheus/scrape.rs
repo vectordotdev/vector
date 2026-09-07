@@ -102,10 +102,8 @@ pub struct PrometheusScrapeConfig {
     #[configurable(metadata(docs::examples = "headers_example()"))]
     headers: HashMap<String, Vec<String>>,
 
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     auth: Option<Auth>,
 }
 

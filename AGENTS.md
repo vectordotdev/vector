@@ -51,7 +51,7 @@ reduction and improved data quality for observability infrastructure.
 When working on Vector's Rust codebase, follow this iterative development cycle:
 
 1. Make code changes
-2. Run `make check-clippy` to check for linting issues
+2. Run the appropriate Clippy command described under Rust Development below.
 3. Fix any issues found (use `make clippy-fix` for auto-fixes)
 4. Continue to next task or mark current task complete
 
@@ -76,6 +76,11 @@ automatically selects the minimum set of features required by the configuration,
 times.
 
 If `cargo vdev run <config>` fails, fall back to `cargo run -- --config <config>`.
+
+Run `FEATURES="<features>" make check-clippy` to narrow down the feature list and disable default
+features. If a representative configuration exists, derive its features with
+`cargo vdev features <config>`. Do not infer features from file names; use `make check-clippy`
+without `FEATURES` for full-feature validation.
 
 #### Running tests
 

@@ -36,11 +36,9 @@ pub struct DatadogEventsConfig {
     #[serde(flatten)]
     pub dd_common: LocalDatadogCommonConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 }

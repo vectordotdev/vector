@@ -43,7 +43,6 @@ components: sources: aws_ecs_metrics: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

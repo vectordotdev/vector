@@ -61,11 +61,9 @@ pub struct TransformOuter<T>
 where
     T: Configurable + Serialize + 'static,
 {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 
-    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     /// Enable CPU usage metrics for this transform.
