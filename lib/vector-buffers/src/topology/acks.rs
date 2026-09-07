@@ -254,6 +254,14 @@ where
             //
             // Basically, it's up to the caller to figure this out.  We're just trying to give them
             // as much information as we can.
+            // Record IDs are monotonic (wraparound is unsupported since #25824), so a marker ID
+            // behind the acknowledged ID can only be a stale/re-read record. Report it as a
+            // monotonicity violation instead of synthesising a gap of `2^64 - delta` events,
+            // which the disk_v2 reader would otherwise "skip" (logged as
+            // `Events dropped. count=1844674407370946xxxx reason=unprocessable_events`).
+            if id < self.acked_marker_id {
+                return MarkerOffset::MonotonicityViolation;
+            }
             if self.acked_marker_id != id {
                 return MarkerOffset::Gap(
                     self.acked_marker_id,
@@ -647,6 +655,25 @@ mod tests {
             ],
         );
 
+        // Observed in production on 0.58.0: no pending markers (everything acked), and the next
+        // record ID is BEHIND the acked marker ID by 85_956. Record IDs are monotonic (wraparound
+        // removed in #25824), so this must be a monotonicity violation. Previously it was accepted
+        // as a "gap" of 2^64 - 85_956 events, which the disk_v2 reader then reported as
+        // `Events dropped. count=18446744073709465660` and wedged the buffer.
+        run_test_case(
+            "detect_monotonicity_violation_no_pending",
+            vec![
+                step!(AddMarker, input => (0, Some(1_000_010)), result => Ok(())),
+                step!(Acknowledge, input => 1_000_010, result => 1_000_010),
+                step!(GetNextEligibleMarker, result => Some(
+                    EligibleMarker { id: 0, len: EligibleMarkerLength::Known(1_000_010), data: None }
+                )),
+                // pending is now empty, acked_marker_id == 1_000_010; a stale record ID arrives:
+                step!(AddMarker, input => (1_000_010 - 85_956, Some(1)), result => Err(MarkerError::MonotonicityViolation)),
+                step!(GetNextEligibleMarker, result => None),
+            ],
+        );
+
         // When another marker exists, and is fixed size, we correctly detect when trying to add
         // another marker whose ID comes after the last pending marker we have, including the
         // length of the last pending marker, by updating the marker's unknown length to an
@@ -767,14 +794,20 @@ mod tests {
                         let expected_result = if marker_stack.is_empty() {
                             // Our only comparison is the acked marker ID, which, if it doesn't
                             // match, we generate a gap marker for.
-                            if id != acked_marker_id {
-                                assert!(marker_state.insert(acked_marker_id), "should not be able to add marker that is already in-flight");
+                            if id < acked_marker_id {
+                                // Record IDs are monotonic: an ID behind the acknowledged ID is a
+                                // monotonicity violation, not a wrapped-around gap.
+                                Err(MarkerError::MonotonicityViolation)
+                            } else {
+                                if id != acked_marker_id {
+                                    assert!(marker_state.insert(acked_marker_id), "should not be able to add marker that is already in-flight");
 
-                                let len = PendingMarkerLength::Assumed(id.wrapping_sub(acked_marker_id));
-                                marker_stack.push_back((acked_marker_id, len));
+                                    let len = PendingMarkerLength::Assumed(id.wrapping_sub(acked_marker_id));
+                                    marker_stack.push_back((acked_marker_id, len));
+                                }
+
+                                Ok(())
                             }
-
-                            Ok(())
                         } else {
                             let (back_id, back_len) = marker_stack.back().copied().expect("must exist");
                             match back_len {
