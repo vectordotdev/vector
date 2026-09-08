@@ -65,7 +65,8 @@ pub enum GenerateError {
     /// A flattened `Option` of a tagged enum shares its tag name with another property.
     ///
     /// Absence of the flattened block is encoded as a missing tag. A sibling that serializes under
-    /// the same name makes that encoding incorrect, so this layout is rejected.
+    /// the same name - including an enclosing internally-tagged enum's tag, which is injected after
+    /// the variant's own fields - makes that encoding incorrect, so this layout is rejected.
     FlattenedOptionalEnumTagCollision {
         /// The flattened enum type.
         enum_type: &'static str,

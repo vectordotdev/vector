@@ -885,6 +885,14 @@ fn unflattened_serialized_names(fields: &[Field<'_>]) -> Vec<String> {
         .collect()
 }
 
+fn collision_sibling_keys(fields: &[Field<'_>], enclosing_tag: Option<&str>) -> Vec<String> {
+    let mut names = unflattened_serialized_names(fields);
+    if let Some(tag) = enclosing_tag {
+        names.push(tag.to_owned());
+    }
+    names
+}
+
 fn generate_named_enum_field(
     field: &Field<'_>,
     sibling_keys: &[String],
@@ -948,9 +956,10 @@ fn generate_named_enum_field(
 fn generate_enum_struct_named_variant_schema(
     variant: &Variant<'_>,
     post_fields: Option<proc_macro2::TokenStream>,
+    enclosing_tag: Option<&str>,
     is_potentially_ambiguous: bool,
 ) -> proc_macro2::TokenStream {
-    let sibling_keys = unflattened_serialized_names(variant.fields());
+    let sibling_keys = collision_sibling_keys(variant.fields(), enclosing_tag);
     let mapped_fields = variant
         .fields()
         .iter()
@@ -1072,7 +1081,7 @@ fn generate_enum_variant_schema(
             let (wrapped, variant_schema) = match variant.style() {
                 Style::Struct => (
                     true,
-                    generate_enum_struct_named_variant_schema(variant, None, false),
+                    generate_enum_struct_named_variant_schema(variant, None, None, false),
                 ),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => (
@@ -1125,7 +1134,12 @@ fn generate_enum_variant_schema(
                         }
                     }
                 };
-                generate_enum_struct_named_variant_schema(variant, Some(tag_field), false)
+                generate_enum_struct_named_variant_schema(
+                    variant,
+                    Some(tag_field),
+                    Some(tag),
+                    false,
+                )
             }
             Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
             Style::Newtype => {
@@ -1180,7 +1194,7 @@ fn generate_enum_variant_schema(
             let tag_schema = generate_enum_variant_tag_schema(variant);
             let maybe_content_schema = match variant.style() {
                 Style::Struct => Some(generate_enum_struct_named_variant_schema(
-                    variant, None, false,
+                    variant, None, None, false,
                 )),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => Some(generate_enum_newtype_struct_variant_schema(variant, false)),
@@ -1236,6 +1250,7 @@ fn generate_enum_variant_schema(
             match variant.style() {
                 Style::Struct => generate_enum_struct_named_variant_schema(
                     variant,
+                    None,
                     None,
                     is_potentially_ambiguous,
                 ),

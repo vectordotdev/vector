@@ -73,6 +73,23 @@ struct FlattenedOptionalEnumWithSiblingTag {
     mode: Option<InternallyTaggedMode>,
 }
 
+/// Internally tagged outer enum whose struct variant flattens the same inner
+/// enum. The outer tag is injected after the variant fields, so it must still
+/// count as a colliding sibling of the flattened optional tag.
+#[derive(Clone, Debug)]
+#[configurable_component]
+#[serde(tag = "type")]
+enum InternallyTaggedOuterWithFlattenedOptional {
+    /// Widget variant.
+    Widget {
+        /// A required sibling so the variant is not entirely flattened.
+        name: String,
+
+        #[serde(flatten)]
+        mode: Option<InternallyTaggedMode>,
+    },
+}
+
 /// Internally tagged enum with a trailing untagged object fallback.
 #[derive(Arbitrary, Clone, Debug)]
 #[configurable_component]
@@ -168,6 +185,20 @@ fn flattened_optional_enum_omitted_block_validates() {
 fn flattened_optional_enum_sibling_tag_is_rejected() {
     let error = generate_root_schema::<FlattenedOptionalEnumWithSiblingTag>()
         .expect_err("sibling tag collision should fail schema generation");
+    assert!(matches!(
+        error,
+        GenerateError::FlattenedOptionalEnumTagCollision {
+            tag_field,
+            sibling_field,
+            ..
+        } if tag_field == "type" && sibling_field == "type"
+    ));
+}
+
+#[test]
+fn flattened_optional_enum_enclosing_internal_tag_is_rejected() {
+    let error = generate_root_schema::<InternallyTaggedOuterWithFlattenedOptional>()
+        .expect_err("enclosing internal tag collision should fail schema generation");
     assert!(matches!(
         error,
         GenerateError::FlattenedOptionalEnumTagCollision {

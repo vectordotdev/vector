@@ -433,7 +433,9 @@ pub(crate) fn generate_optional_schema(
 /// tag field; both alternatives then match a serialized `Some(fallback)` value.
 ///
 /// A sibling property that serializes under the same name as the tag is rejected: the absence
-/// encoding would treat that sibling as a present variant. That layout is unused and is not modeled.
+/// encoding would treat that sibling as a present variant. That includes an enclosing
+/// internally-tagged enum's tag field, which is not a variant field of its own. That layout is
+/// unused and is not modeled.
 ///
 /// When `T` is not tagged that way, this falls back to `Option<T>`'s normal (nullable property)
 /// schema so flatten-of-struct and similar shapes stay unchanged.
