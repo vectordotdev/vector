@@ -66,8 +66,6 @@ pub struct ChunkedGelfDecoderOptions {
     ///
     /// Chunks belonging to messages that are already pending are still accepted once the limit is
     /// reached, so in-flight messages can complete.
-    ///
-    /// **Note**: The decoder caps this at 4096 internally. Higher values do not raise it.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub pending_messages_limit: Option<usize>,
 
@@ -323,9 +321,7 @@ impl ChunkedGelfDecoder {
             decompression_config,
             state: Arc::new(Mutex::new(HashMap::new())),
             timeout: Duration::from_secs_f64(timeout_secs),
-            pending_messages_limit: pending_messages_limit
-                .unwrap_or(MAX_PENDING_MESSAGES)
-                .min(MAX_PENDING_MESSAGES),
+            pending_messages_limit: pending_messages_limit.unwrap_or(MAX_PENDING_MESSAGES),
             max_length,
         }
     }
@@ -976,7 +972,7 @@ mod tests {
     }
 
     #[test]
-    fn pending_messages_limit_is_clamped_to_the_hard_ceiling() {
+    fn pending_messages_limit_defaults_and_allows_overrides() {
         let default = ChunkedGelfDecoder::default();
         assert_eq!(default.pending_messages_limit, MAX_PENDING_MESSAGES);
 
@@ -986,7 +982,7 @@ mod tests {
             None,
             ChunkedGelfDecompressionConfig::Auto,
         );
-        assert_eq!(raised.pending_messages_limit, MAX_PENDING_MESSAGES);
+        assert_eq!(raised.pending_messages_limit, MAX_PENDING_MESSAGES + 1);
 
         let lowered = ChunkedGelfDecoder::new(
             DEFAULT_TIMEOUT_SECS,
