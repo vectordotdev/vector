@@ -67,9 +67,6 @@ pub struct GrpcError<E> {
     pub error: E,
 }
 
-#[cfg(feature = "sources-vector")]
-const EVENT_PROTO_DECODE_REASON: &str = "Failed to decode Vector protobuf event.";
-
 /// A structurally valid gRPC event protobuf could not be converted into a Vector event.
 #[cfg(feature = "sources-vector")]
 #[derive(Debug, NamedInternalEvent)]
@@ -84,7 +81,7 @@ where
 {
     fn emit(self) {
         error!(
-            message = EVENT_PROTO_DECODE_REASON,
+            message = "Failed to decode Vector protobuf event.",
             error = %self.error,
             error_code = "event_proto_decode",
             error_type = error_type::PARSER_FAILED,

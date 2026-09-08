@@ -60,7 +60,10 @@ impl proto::Service for Service {
         for wrapper in request.events {
             match Event::try_from(wrapper) {
                 Ok(event) => events.push(event),
-                Err(error) => emit!(GrpcEventDecodeError { error }),
+                Err(error) => {
+                    emit!(GrpcEventDecodeError { error });
+                    return Err(Status::invalid_argument(error.to_string()));
+                }
             }
         }
         if events.is_empty() {
