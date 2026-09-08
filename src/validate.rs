@@ -10,20 +10,18 @@ use vector_vrl_metrics::MetricsStorage;
 use vrl::value::ObjectMap;
 
 use crate::{
+    bootstrap::{Bootstrap, Interrupted},
     config::{
         self, Config, ConfigDiff, DynValidatedSink, SinkContext, TransformContext,
         loading::ConfigBuilderLoader,
     },
     schema::Definition,
-    signal::{SignalRx, recv_shutdown, try_recv_shutdown},
+    signal::SignalRx,
     topology::{
         self,
         builder::{TopologyPieces, TopologyPiecesBuilder},
     },
 };
-
-/// Marker for environment validation being interrupted by a shutdown signal.
-struct Interrupted;
 
 /// Stub enrichment table used during config validation so VRL can resolve
 /// table name references without loading actual table data.
@@ -179,39 +177,37 @@ pub async fn validate(
 ) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
+    let signal_tx = signal_handler.clone_tx();
+    let mut bootstrap = Bootstrap::new(signal_rx, signal_tx);
+
     let mut validated = true;
 
     // Config loading can block (e.g. on secret/provider resolution), so race it against
     // shutdown signals to abort validation immediately if one is received.
-    let mut load = Box::pin(validate_config(opts, signal_handler, &mut fmt));
-    let mut config = tokio::select! {
-        biased;
+    let mut config = match bootstrap
+        .phase(validate_config(opts, signal_handler, &mut fmt))
+        .await
+    {
         // A shutdown signal (or a closed signal channel) arrived while config loading was
         // still in progress. Reload signals received along the way are dropped; there is
         // nothing to reload during validation.
-        _ = recv_shutdown(signal_rx, |_| {}) => {
+        Err(Interrupted) => {
             // An interrupted validation is not a successful one; report a distinct
             // non-zero code so scripts don't mistake it for a valid configuration.
             return exitcode::UNAVAILABLE;
         }
-        result = &mut load => {
-            match result {
-                Some(config) => config,
-                None => return exitcode::CONFIG,
-            }
-        }
+        Ok(Some(config)) => config,
+        Ok(None) => return exitcode::CONFIG,
     };
-
-    // Release the borrows held by the pinned config-loading future before moving on.
-    drop(load);
 
     validated &= validate_transforms(&config, &mut fmt).await;
     validated &= validate_sinks_with_context(&config, &mut fmt);
 
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
-            let outcome = validate_environment(opts, &config, &mut fmt, signal_rx).await;
-            remove_tmp_directory(tmp_directory);
+            bootstrap.guard(move || remove_tmp_directory(tmp_directory));
+            let outcome = validate_environment(opts, &config, &mut fmt, &mut bootstrap).await;
+            bootstrap.run_guards();
             match outcome {
                 Ok(valid) => validated &= valid,
                 // An interrupted validation is not a successful one; report a distinct
@@ -228,7 +224,7 @@ pub async fn validate(
     // between (e.g. while transforms or sinks are being validated) would otherwise be silently
     // dropped, so drain the receiver once more before reporting the result. Reload signals and
     // lagged receivers don't affect the result and are consumed along the way.
-    if try_recv_shutdown(signal_rx, |_| {}).is_some() {
+    if bootstrap.pending_shutdown() {
         // An interrupted validation is not a successful one; report a distinct non-zero code so
         // scripts don't mistake it for a valid configuration.
         return exitcode::UNAVAILABLE;
@@ -405,11 +401,11 @@ async fn validate_environment(
     opts: &Opts,
     config: &Config,
     fmt: &mut Formatter,
-    signal_rx: &mut SignalRx,
+    bootstrap: &mut Bootstrap<'_>,
 ) -> Result<bool, Interrupted> {
     let diff = ConfigDiff::initial(config);
 
-    let mut pieces = match validate_components(config, &diff, fmt, signal_rx).await {
+    let mut pieces = match validate_components(config, &diff, fmt, bootstrap).await {
         Ok(Some(pieces)) => pieces,
         Ok(None) => return Ok(false),
         Err(interrupted) => return Err(interrupted),
@@ -417,40 +413,35 @@ async fn validate_environment(
     if opts.skip_healthchecks {
         return Ok(true);
     }
-    validate_healthchecks(opts, config, &diff, &mut pieces, fmt, signal_rx).await
+    validate_healthchecks(opts, config, &diff, &mut pieces, fmt, bootstrap).await
 }
 
 async fn validate_components(
     config: &Config,
     diff: &ConfigDiff,
     fmt: &mut Formatter,
-    signal_rx: &mut SignalRx,
+    bootstrap: &mut Bootstrap<'_>,
 ) -> Result<Option<TopologyPieces>, Interrupted> {
     // Building the components can block on network I/O (e.g. a sink's build-time API probe).
     // Race it against shutdown signals so that a signal received during the build aborts it
     // immediately, instead of being queued and ignored until the build completes.
-    let mut build = Box::pin(TopologyPiecesBuilder::new(config, diff).build());
+    let build = TopologyPiecesBuilder::new(config, diff).build();
 
-    tokio::select! {
-        biased;
-        // A shutdown signal (or a closed signal channel) arrived while the build was in
-        // progress. Reload signals received along the way are dropped; there is nothing to
-        // reload during validation.
-        _ = recv_shutdown(signal_rx, |_| {}) => Err(Interrupted),
-        result = &mut build => {
-            Ok(match result {
-                Ok(pieces) => {
-                    fmt.success("Component configuration");
-                    Some(pieces)
-                }
-                Err(errors) => {
-                    fmt.title("Component errors");
-                    fmt.sub_error(errors);
-                    None
-                }
-            })
+    // A shutdown signal (or a closed signal channel) arriving while the build is in progress
+    // interrupts it; reload signals received along the way are dropped, as there is nothing to
+    // reload during validation.
+    let result = bootstrap.phase(build).await?;
+    Ok(match result {
+        Ok(pieces) => {
+            fmt.success("Component configuration");
+            Some(pieces)
         }
-    }
+        Err(errors) => {
+            fmt.title("Component errors");
+            fmt.sub_error(errors);
+            None
+        }
+    })
 }
 
 async fn validate_healthchecks(
@@ -459,7 +450,7 @@ async fn validate_healthchecks(
     diff: &ConfigDiff,
     pieces: &mut TopologyPieces,
     fmt: &mut Formatter,
-    signal_rx: &mut SignalRx,
+    bootstrap: &mut Bootstrap<'_>,
 ) -> Result<bool, Interrupted> {
     if !config.healthchecks.enabled {
         fmt.warning("Health checks are disabled");
@@ -478,21 +469,17 @@ async fn validate_healthchecks(
 
         trace!("Healthcheck for {id} starting.");
         // A healthcheck can block on network I/O, so race it against shutdown signals to
-        // abort validation immediately if one is received.
+        // abort validation immediately if one is received. On interrupt the spawned
+        // healthcheck is cancelled rather than awaited: the process exits immediately on this
+        // path, so any detached blocking work dies with it, and awaiting the handle could hang
+        // on a spawn_blocking healthcheck.
         let mut handle = tokio::spawn(healthcheck);
-        let result = tokio::select! {
-            biased;
+        let result = match bootstrap.phase_join(&mut handle).await {
             // A shutdown signal (or a closed signal channel) arrived while the healthcheck
             // was running. Reload signals received along the way are dropped; there is
             // nothing to reload during validation.
-            _ = recv_shutdown(signal_rx, |_| {}) => {
-                // Cancel the spawned healthcheck. The process exits immediately on
-                // this path, so any detached blocking work dies with it; awaiting
-                // the handle could hang on a spawn_blocking healthcheck.
-                handle.abort();
-                return Err(Interrupted);
-            }
-            result = &mut handle => result,
+            Err(Interrupted) => return Err(Interrupted),
+            Ok(result) => result,
         };
         match result {
             Ok(Ok(_)) => {
