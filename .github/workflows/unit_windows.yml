@@ -26,3 +26,8 @@ jobs:
           python-version: "3.10"
       - run: .\scripts\environment\bootstrap-windows-2025.ps1
       - run: make test
+
+      - name: Upload test results to Datadog
+        if: always()
+        run: scripts/upload-test-results.sh
+        shell: bash
