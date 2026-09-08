@@ -11,6 +11,7 @@ use tokio::{
     },
 };
 use tokio_stream::{Stream, StreamExt};
+use tracing::warn;
 
 use super::config::{ComponentKey, ConfigBuilder};
 
@@ -209,7 +210,7 @@ fn classify_signal(signal: SignalTo, on_reload: &mut impl FnMut(SignalTo)) -> Op
 
 /// Resolves when a shutdown signal (or a closed signal channel) is received from the signal
 /// receiver. Reload signals received along the way are forwarded to `on_reload` (e.g. so startup
-/// can re-broadcast them once it completes); lagged receivers are consumed and ignored.
+/// can re-broadcast them once it completes); lagged receivers are consumed and logged.
 pub async fn recv_shutdown(rx: &mut SignalRx, mut on_reload: impl FnMut(SignalTo)) -> SignalTo {
     loop {
         match rx.recv().await {
@@ -219,14 +220,16 @@ pub async fn recv_shutdown(rx: &mut SignalRx, mut on_reload: impl FnMut(SignalTo
                 }
             }
             Err(RecvError::Closed) => return SignalTo::Shutdown(None),
-            Err(RecvError::Lagged(_)) => {}
+            Err(RecvError::Lagged(amt)) => {
+                warn!(message = "Overflow, dropped {} signals.", amt);
+            }
         }
     }
 }
 
 /// Non-blocking counterpart of [`recv_shutdown`]: drains the signal receiver, returning the
-/// shutdown signal if one is queued (consuming reload and lagged signals along the way), or
-/// `None` once the queue is empty.
+/// shutdown signal if one is queued (consuming reload signals and logging lagged ones along the
+/// way), or `None` once the queue is empty.
 pub fn try_recv_shutdown(
     rx: &mut SignalRx,
     mut on_reload: impl FnMut(SignalTo),
@@ -239,7 +242,9 @@ pub fn try_recv_shutdown(
                 }
             }
             Err(TryRecvError::Closed) => return Some(SignalTo::Shutdown(None)),
-            Err(TryRecvError::Lagged(_)) => {}
+            Err(TryRecvError::Lagged(amt)) => {
+                warn!(message = "Overflow, dropped {} signals.", amt);
+            }
             Err(TryRecvError::Empty) => return None,
         }
     }
