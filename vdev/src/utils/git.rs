@@ -37,15 +37,11 @@ pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
 pub fn changed_files() -> Result<Vec<String>> {
     let mut files = HashSet::new();
 
-    // Committed e.g.:
-    // A   relative/path/to/file.added
-    // M   relative/path/to/file.modified
-    let output = run_and_check_output(&["diff", "--name-status", "origin/master..."])?;
+    // Use name-only output so renames and copies yield their destination path.
+    let output = run_and_check_output(&["diff", "--name-only", "origin/master..."])?;
     for line in output.lines() {
-        if !is_warning_line(line)
-            && let Some((_, path)) = line.split_once('\t')
-        {
-            files.insert(path.to_string());
+        if !is_warning_line(line) {
+            files.insert(line.to_string());
         }
     }
 

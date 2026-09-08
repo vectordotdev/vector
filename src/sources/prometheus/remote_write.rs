@@ -56,21 +56,17 @@ pub struct PrometheusRemoteWriteConfig {
     #[configurable(metadata(docs::examples = "/remote-write"))]
     path: String,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
     /// Defines the behavior for handling conflicting metric metadata.
     #[serde(default)]
     metadata_conflict_strategy: MetadataConflictStrategy,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -220,7 +216,7 @@ mod test {
     use crate::{
         SourceSender,
         config::{SinkConfig, SinkContext},
-        sinks::prometheus::remote_write::RemoteWriteConfig,
+        sinks::{prometheus::remote_write::RemoteWriteConfig, util::HttpEndpoint},
         test_util::{self, wait_for_tcp},
         tls::MaybeTlsSettings,
     };
@@ -265,7 +261,8 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("{}://localhost:{}/", proto, address.port()),
+            endpoint: HttpEndpoint::parse(&format!("{}://localhost:{}/", proto, address.port()))
+                .unwrap(),
             tls: tls.map(|tls| tls.options),
             ..Default::default()
         };
@@ -461,7 +458,8 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("http://localhost:{}/", address.port()),
+            endpoint: HttpEndpoint::parse(&format!("http://localhost:{}/", address.port()))
+                .unwrap(),
             ..Default::default()
         };
         let (sink, _) = sink
@@ -689,7 +687,11 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("http://localhost:{}/api/v1/write", address.port()),
+            endpoint: HttpEndpoint::parse(&format!(
+                "http://localhost:{}/api/v1/write",
+                address.port()
+            ))
+            .unwrap(),
             ..Default::default()
         };
         let (sink, _) = sink

@@ -485,6 +485,9 @@ jobs:
     if: ${{ !inputs.skip_publish }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
     needs:
       - generate-publish-metadata
       - build-linux-gnu-native
@@ -506,6 +509,11 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           vdev: true
+      - name: Configure credentials for COSE release artifacts
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: arn:aws:iam::486234852809:role/vector-release-publisher-github-actions
+          aws-region: us-east-1
       - name: Download all package artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -514,8 +522,8 @@ jobs:
           merge-multiple: true
       - name: Publish artifacts to S3
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
+          LEGACY_AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
+          LEGACY_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
         run: make release-s3
 
   publish-github:

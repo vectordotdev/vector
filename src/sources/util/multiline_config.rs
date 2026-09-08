@@ -32,7 +32,6 @@ pub struct MultilineConfig {
     /// Aggregation mode.
     ///
     /// This setting must be configured in conjunction with `condition_pattern`.
-    #[configurable(derived)]
     pub mode: line_agg::Mode,
 
     /// The maximum amount of time to wait for the next additional line, in milliseconds.

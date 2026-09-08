@@ -13,7 +13,7 @@
 @source inline("search-input search-results-list search-result code-sample-filename type block border-gray-200 border-gray-300 border-r border-t font-medium h-2 h-3 h-full inline leading-relaxed mb-1 ml-1 mr-1 p-2 p-4 pl-2 py-4 text-gray-600 text-gray-800 text-sm w-2 w-3");
 
 /* Render-time colors must be available before Hugo writes stats. */
-@source inline("border-blue-400 text-blue-400 border-green-400 text-green-400 border-red-400 text-red-400 border-yellow-400 text-yellow-400 border-violet-400 text-violet-400 border-gray-400 text-gray-400 bg-red-500 bg-yellow-500 bg-green-500 border-blue-500 border-fuchsia-500 border-green-500 border-orange-500 border-red-500 border-violet-500 border-yellow-500");
+@source inline("border-blue-400 text-blue-400 border-green-400 text-green-400 border-red-400 text-red-400 border-yellow-400 text-yellow-400 border-violet-400 text-violet-400 border-gray-400 text-gray-400 bg-red-500 bg-yellow-500 bg-green-500 border-blue-500 border-fuchsia-500 border-green-500 border-orange-500 border-red-500 border-violet-500 border-yellow-500 border-primary border-secondary border-dark hover:border-primary hover:border-secondary hover:border-dark dark:hover:border-primary dark:hover:border-secondary");
 
 /* Social-link colors are assembled from menu data at render time. */
 @source inline("text-black text-gray-300 text-discord-purple text-rss-orange dark:text-white hover:text-black hover:text-discord-purple hover:text-gray-500 hover:text-rss-orange dark:hover:text-black dark:hover:text-gray-500");
@@ -55,12 +55,31 @@
   --grid-template-columns-16: repeat(16, minmax(0, 1fr));
 }
 
+@layer base {
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
 /* --------------------------------------------------------------------------
    Custom typography overrides migrated from the v3 configuration.
-   Keep them in the components layer so explicit utility classes still win.
+
    -------------------------------------------------------------------------- */
 
-@layer components {
+@layer prose;
+
+@layer prose {
 
 .prose a {
   color: var(--color-primary-dark);
@@ -95,10 +114,10 @@
 .dark .prose code.badge-code {
   background-color: rgba(255, 255, 255, 0.2) !important;
 }
-.prose ul > li::before {
-  background-color: var(--color-gray-700);
+.prose ul > li::marker {
+  color: var(--color-gray-700);
 }
-.prose ol > li::before {
+.prose ol > li::marker {
   color: var(--color-gray-700);
 }
 .prose ul > li > :first-child,
@@ -136,6 +155,26 @@
   margin: 0;
 }
 
+/* VRL release entries end with a paragraph linking both the author and PR. */
+.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
+  @apply mb-0 mt-4 min-w-0 list-none rounded-t-lg border border-b-0 border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm md:px-5;
+}
+.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])) > li,
+.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) > li {
+  @apply m-0;
+}
+.vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
+  @apply mt-0 rounded-b-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm italic shadow-sm md:px-5;
+}
+.dark .vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.dark .vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]),
+.dark .vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.dark .vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
+  @apply border-gray-700 bg-gray-800/40;
+}
+
 /* Dark mode prose overrides */
 .dark .prose table th,
 .dark .prose table td {
@@ -167,10 +206,10 @@
 .dark .prose li {
   color: var(--color-gray-100);
 }
-.dark .prose ul > li::before {
-  background-color: var(--color-gray-100);
+.dark .prose ul > li::marker {
+  color: var(--color-gray-100);
 }
-.dark .prose ol > li::before {
+.dark .prose ol > li::marker {
   color: var(--color-gray-100);
 }
 .dark .prose a,

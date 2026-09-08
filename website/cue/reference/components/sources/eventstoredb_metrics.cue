@@ -36,7 +36,6 @@ components: sources: eventstoredb_metrics: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

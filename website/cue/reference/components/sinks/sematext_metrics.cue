@@ -43,7 +43,6 @@ components: sinks: sematext_metrics: {
 				with the `sematext_logs` sink.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.sematext_metrics.configuration

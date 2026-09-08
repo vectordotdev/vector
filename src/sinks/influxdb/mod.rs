@@ -7,7 +7,6 @@ use bytes::{BufMut, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
-use snafu::ResultExt;
 use tower::Service;
 use vector_lib::{
     configurable::configurable_component,
@@ -16,6 +15,7 @@ use vector_lib::{
 };
 
 use crate::http::HttpClient;
+use crate::sinks::util::HttpEndpoint;
 
 pub(in crate::sinks) enum Field {
     /// string
@@ -137,14 +137,14 @@ pub enum InfluxDbSettings {
 }
 
 trait InfluxDbConnection: std::fmt::Debug {
-    fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
-    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
+    fn write_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri>;
+    fn healthcheck_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri>;
     fn token(&self) -> SensitiveString;
     fn protocol_version(&self) -> ProtocolVersion;
 }
 
 impl InfluxDbConnection for InfluxDb1Settings {
-    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
+    fn write_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "write",
@@ -159,7 +159,7 @@ impl InfluxDbConnection for InfluxDb1Settings {
         )
     }
 
-    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri> {
         encode_uri(&endpoint, "ping", &[])
     }
 
@@ -173,7 +173,7 @@ impl InfluxDbConnection for InfluxDb1Settings {
 }
 
 impl InfluxDbConnection for InfluxDb2Settings {
-    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
+    fn write_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "api/v2/write",
@@ -185,7 +185,7 @@ impl InfluxDbConnection for InfluxDb2Settings {
         )
     }
 
-    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: HttpEndpoint) -> crate::Result<Uri> {
         encode_uri(&endpoint, "ping", &[])
     }
 
@@ -208,7 +208,7 @@ fn influxdb_settings(settings: InfluxDbSettings) -> Box<dyn InfluxDbConnection> 
 // V1: https://docs.influxdata.com/influxdb/v1.7/tools/api/#ping-http-endpoint
 // V2: https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
 fn healthcheck(
-    endpoint: String,
+    endpoint: HttpEndpoint,
     settings: InfluxDbSettings,
     mut client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
@@ -354,7 +354,7 @@ pub(in crate::sinks) fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i6
 }
 
 pub(in crate::sinks) fn encode_uri(
-    endpoint: &str,
+    endpoint: &HttpEndpoint,
     path: &str,
     pairs: &[(&str, Option<String>)],
 ) -> crate::Result<Uri> {
@@ -366,17 +366,13 @@ pub(in crate::sinks) fn encode_uri(
         }
     }
 
-    let mut url = if endpoint.ends_with('/') {
-        format!("{}{}?{}", endpoint, path, serializer.finish())
+    let query = serializer.finish();
+    let path_and_query = if query.is_empty() {
+        path.to_string()
     } else {
-        format!("{}/{}?{}", endpoint, path, serializer.finish())
+        format!("{path}?{query}")
     };
-
-    if url.ends_with('?') {
-        url.pop();
-    }
-
-    Ok(url.parse::<Uri>().context(super::UriParseSnafu)?)
+    Ok(endpoint.append_path(&path_and_query)?.into_uri())
 }
 
 #[cfg(test)]
@@ -609,7 +605,7 @@ mod tests {
         };
 
         let uri = settings
-            .write_uri("http://localhost:8086".to_owned())
+            .write_uri(HttpEndpoint::parse("http://localhost:8086").unwrap())
             .unwrap();
         assert_eq!(
             "http://localhost:8086/write?consistency=quorum&db=vector_db&rp=autogen&p=secret&u=writer&precision=ns",
@@ -626,7 +622,7 @@ mod tests {
         };
 
         let uri = settings
-            .write_uri("http://localhost:9999".to_owned())
+            .write_uri(HttpEndpoint::parse("http://localhost:9999").unwrap())
             .unwrap();
         assert_eq!(
             "http://localhost:9999/api/v2/write?org=my-org&bucket=my-bucket&precision=ns",
@@ -645,7 +641,7 @@ mod tests {
         };
 
         let uri = settings
-            .healthcheck_uri("http://localhost:8086".to_owned())
+            .healthcheck_uri(HttpEndpoint::parse("http://localhost:8086").unwrap())
             .unwrap();
         assert_eq!("http://localhost:8086/ping", uri.to_string())
     }
@@ -659,7 +655,7 @@ mod tests {
         };
 
         let uri = settings
-            .healthcheck_uri("http://localhost:9999".to_owned())
+            .healthcheck_uri(HttpEndpoint::parse("http://localhost:9999").unwrap())
             .unwrap();
         assert_eq!("http://localhost:9999/ping", uri.to_string())
     }
@@ -812,7 +808,7 @@ mod tests {
     #[test]
     fn test_encode_uri_valid() {
         let uri = encode_uri(
-            "http://localhost:9999",
+            &HttpEndpoint::parse("http://localhost:9999").unwrap(),
             "api/v2/write",
             &[
                 ("org", Some("my-org".to_owned())),
@@ -827,7 +823,7 @@ mod tests {
         );
 
         let uri = encode_uri(
-            "http://localhost:9999/",
+            &HttpEndpoint::parse("http://localhost:9999/").unwrap(),
             "api/v2/write",
             &[
                 ("org", Some("my-org".to_owned())),
@@ -841,7 +837,7 @@ mod tests {
         );
 
         let uri = encode_uri(
-            "http://localhost:9999",
+            &HttpEndpoint::parse("http://localhost:9999").unwrap(),
             "api/v2/write",
             &[
                 ("org", Some("Organization name".to_owned())),
@@ -855,19 +851,6 @@ mod tests {
             "http://localhost:9999/api/v2/write?org=Organization+name&bucket=Bucket%3Dname"
         );
     }
-
-    #[test]
-    fn test_encode_uri_invalid() {
-        encode_uri(
-            "localhost:9999",
-            "api/v2/write",
-            &[
-                ("org", Some("my-org".to_owned())),
-                ("bucket", Some("my-bucket".to_owned())),
-            ],
-        )
-        .unwrap_err();
-    }
 }
 
 #[cfg(feature = "influxdb-integration-tests")]
@@ -880,6 +863,7 @@ mod integration_tests {
             InfluxDb1Settings, InfluxDb2Settings, InfluxDbSettings, healthcheck,
             test_util::{BUCKET, ORG, TOKEN, address_v1, address_v2, next_database, onboarding_v2},
         },
+        sinks::util::HttpEndpoint,
     };
 
     #[tokio::test]
@@ -896,7 +880,7 @@ mod integration_tests {
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, settings, client)
+        healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
             .await
             .unwrap()
@@ -916,7 +900,7 @@ mod integration_tests {
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, settings, client)
+        healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
             .await
             .unwrap();
@@ -936,7 +920,7 @@ mod integration_tests {
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, settings, client)
+        healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
             .await
             .unwrap();
@@ -956,7 +940,7 @@ mod integration_tests {
         let proxy = ProxyConfig::default();
         let client = HttpClient::new(None, &proxy).unwrap();
 
-        healthcheck(endpoint, settings, client)
+        healthcheck(HttpEndpoint::parse(&endpoint).unwrap(), settings, client)
             .unwrap()
             .await
             .unwrap();

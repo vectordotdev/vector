@@ -122,10 +122,8 @@ pub struct SplunkConfig {
     /// event metadata and preferentially used if the event is sent to a Splunk HEC sink.
     store_hec_token: bool,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
 
@@ -134,7 +132,6 @@ pub struct SplunkConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -148,7 +145,6 @@ pub struct SplunkConfig {
     /// The VRL codec can access HEC envelope metadata, such as host, sourcetype, and,
     /// channel, and the authentication token via `%splunk_hec.*` paths and
     /// `get_secret!("splunk_hec_token")` before the program executes.
-    #[configurable(derived)]
     #[serde(default)]
     pub event: CodecConfig,
 
@@ -158,7 +154,6 @@ pub struct SplunkConfig {
     /// codec instead of being emitted as a single event. Decode failures are
     /// swallowed and do not return an error to the Splunk client. When unset, the
     /// endpoint preserves its existing behavior of one event per request body.
-    #[configurable(derived)]
     #[serde(default)]
     pub raw: CodecConfig,
 }
@@ -172,7 +167,6 @@ pub struct CodecConfig {
     ///
     /// Only used when `decoding` is also set. Defaults to a per-codec choice
     /// (typically `bytes`) that produces one event per payload.
-    #[configurable(derived)]
     #[serde(default)]
     pub framing: Option<FramingConfig>,
 
@@ -182,7 +176,6 @@ pub struct CodecConfig {
     /// behavior. When set, the endpoint-selected payload is processed through
     /// `framing` and `decoding`, and a single payload can fan out to multiple
     /// events.
-    #[configurable(derived)]
     #[serde(default)]
     pub decoding: Option<DeserializerConfig>,
 }
@@ -274,7 +267,10 @@ impl SplunkConfig {
             )
             .or_else(finish_err);
 
-        let listener = tls.bind_reloadable(&self.address, tls_reloader).await?;
+        let listener = tls
+            .bind_reloadable(&self.address, tls_reloader)
+            .await?
+            .with_keepalive(self.keepalive.tcp_keepalive);
 
         let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
@@ -2081,7 +2077,7 @@ mod tests {
         sinks::{
             Healthcheck, VectorSink,
             splunk_hec::logs::config::HecLogsSinkConfig,
-            util::{BatchConfig, Compression, TowerRequestConfig},
+            util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
@@ -2171,7 +2167,7 @@ mod tests {
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
-            endpoint: format!("http://{address}"),
+            endpoint: HttpEndpoint::parse(&format!("http://{address}")).unwrap(),
             host_key: None,
             indexed_fields: vec![],
             index: None,

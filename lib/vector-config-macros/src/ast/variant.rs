@@ -23,7 +23,6 @@ impl<'a> Variant<'a> {
     pub fn from_ast(
         serde: &serde_ast::Variant<'a>,
         tagging: Tagging,
-        is_virtual_newtype: bool,
     ) -> darling::Result<Variant<'a>> {
         let original = serde.original;
         let name = serde.attrs.name().deserialize_name().to_string();
@@ -37,7 +36,7 @@ impl<'a> Variant<'a> {
         let fields = serde
             .fields
             .iter()
-            .map(|field| Field::from_ast(field, is_virtual_newtype, is_newtype_wrapper_field))
+            .map(|field| Field::from_ast(field, is_newtype_wrapper_field))
             .collect_darling_results(&mut accumulator);
 
         // If the enum overall is tagged (internal/adjacent) serde still allows one or more

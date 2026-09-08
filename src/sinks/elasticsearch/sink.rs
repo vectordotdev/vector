@@ -39,9 +39,8 @@ impl<S> ElasticsearchSink<S> {
         common: &ElasticsearchCommon,
         config: &ElasticsearchConfig,
         service: S,
+        batch_settings: BatcherSettings,
     ) -> crate::Result<Self> {
-        let batch_settings = config.batch.into_batcher_settings()?;
-
         Ok(ElasticsearchSink {
             batch_settings,
             request_builder: common.request_builder.clone(),

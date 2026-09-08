@@ -5,7 +5,7 @@ use futures::{
     future,
     future::{BoxFuture, Ready},
 };
-use http::{Request, StatusCode, Uri, header::AUTHORIZATION};
+use http::{Request, StatusCode, header::AUTHORIZATION};
 use hyper::Body;
 use tower::{Service, ServiceExt};
 use vector_lib::{
@@ -18,7 +18,7 @@ use vector_lib::{
 use super::request_builder::AppsignalRequest;
 use crate::{
     http::HttpClient,
-    sinks::util::{Compression, http::HttpBatchService, sink::Response},
+    sinks::util::{Compression, HttpEndpoint, http::HttpBatchService, sink::Response},
 };
 
 #[derive(Clone)]
@@ -33,14 +33,14 @@ pub(super) struct AppsignalService {
 impl AppsignalService {
     pub fn new(
         http_client: HttpClient<Body>,
-        endpoint: Uri,
+        endpoint: HttpEndpoint,
         push_api_key: SensitiveString,
         compression: Compression,
     ) -> Self {
         let batch_service = HttpBatchService::new(http_client, move |req| {
             let req: AppsignalRequest = req;
 
-            let mut request = Request::post(&endpoint)
+            let mut request = Request::post(endpoint.as_uri())
                 .header("Content-Type", "application/json")
                 .header(AUTHORIZATION, format!("Bearer {}", push_api_key.inner()))
                 .header("Content-Length", req.payload.len());

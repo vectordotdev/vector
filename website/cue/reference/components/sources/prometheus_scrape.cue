@@ -44,7 +44,6 @@ components: sources: prometheus_scrape: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

@@ -38,7 +38,8 @@ async fn cloudwatch_metrics_put_data() {
     let cx = SinkContext::default();
     let config = config();
     let client = config.create_client(&cx.globals.proxy).await.unwrap();
-    let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = CloudWatchMetricsSvc::new(config, client, &validated).unwrap();
 
     let mut events = Vec::new();
 
@@ -97,7 +98,8 @@ async fn cloudwatch_metrics_namespace_partitioning() {
     let cx = SinkContext::default();
     let config = config();
     let client = config.create_client(&cx.globals.proxy).await.unwrap();
-    let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = CloudWatchMetricsSvc::new(config, client, &validated).unwrap();
 
     let mut events = Vec::new();
 
