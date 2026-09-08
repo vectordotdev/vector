@@ -1,67 +1,22 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
+use super::{
+    ConnectorType, NetError, NetworkConnector, UnixConnectorConfig, UnixMode, net_error::*,
+};
+use crate::{net, sinks::util::unix::UnixEither};
 use snafu::ResultExt;
 use tokio::net::{UnixDatagram, UnixStream};
-use vector_lib::configurable::configurable_component;
-
-use super::{ConnectorType, NetError, NetworkConnector, net_error::*};
-use crate::{net, sinks::util::unix::UnixEither};
-
-/// Unix socket modes.
-#[configurable_component]
-#[derive(Clone, Copy, Debug)]
-pub enum UnixMode {
-    /// Datagram-oriented (`SOCK_DGRAM`).
-    Datagram,
-
-    /// Stream-oriented (`SOCK_STREAM`).
-    Stream,
-}
-
-/// Unix Domain Socket configuration.
-#[configurable_component]
-#[derive(Clone, Debug)]
-pub struct UnixConnectorConfig {
-    /// The Unix socket path.
-    ///
-    /// This should be an absolute path.
-    #[configurable(metadata(docs::examples = "/path/to/socket"))]
-    path: PathBuf,
-
-    /// The Unix socket mode to use.
-    #[serde(default = "default_unix_mode")]
-    unix_mode: UnixMode,
-
-    /// The size of the socket's send buffer.
-    ///
-    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    #[configurable(metadata(docs::examples = 65536))]
-    send_buffer_size: Option<usize>,
-}
-
-const fn default_unix_mode() -> UnixMode {
-    UnixMode::Stream
-}
 
 impl UnixConnectorConfig {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
-        Self {
-            path: path.as_ref().to_path_buf(),
-            unix_mode: UnixMode::Stream,
-            send_buffer_size: None,
-        }
-    }
-
     /// Creates a [`NetworkConnector`] from this Unix Domain Socket connector configuration.
-    pub fn as_connector(&self) -> NetworkConnector {
-        NetworkConnector {
+    pub fn as_connector(&self) -> Result<NetworkConnector, NetError> {
+        Ok(NetworkConnector {
             inner: ConnectorType::Unix(UnixConnector {
                 path: self.path.clone(),
                 mode: self.unix_mode,
                 send_buffer_size: self.send_buffer_size,
             }),
-        }
+        })
     }
 }
 
