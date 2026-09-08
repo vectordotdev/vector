@@ -19,8 +19,8 @@ use crate::{
         ConfigurationError, ConfigurationSnafu, MqttCommonConfig, MqttConnector, MqttError,
         TlsSnafu,
     },
-    config::{SourceConfig, SourceContext, SourceOutput},
-    serde::{OneOrMany, default_decoding, default_framing_message_based},
+    config::{SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
+    serde::{OneOrMany, bool_or_struct, default_decoding, default_framing_message_based},
 };
 
 /// Configuration for the `mqtt` source.
@@ -58,6 +58,26 @@ pub struct MqttSourceConfig {
     #[serde(default = "default_topic_key")]
     #[configurable(metadata(docs::examples = "topic"))]
     pub topic_key: OptionalValuePath,
+
+    /// Controls how acknowledgements are handled for this source.
+    ///
+    /// Prefer enabling `acknowledgements` at the [global][global_acks] or
+    /// sink level instead of here: this setting takes precedence over both
+    /// when explicitly set, which can silently disable acknowledgements a
+    /// connected sink otherwise requires.
+    ///
+    /// When enabled (through this setting, the global setting, or because a
+    /// connected sink requires it), the QoS 1/2 acknowledgement for an
+    /// incoming publish is deferred until the resulting events have been
+    /// delivered to all connected sinks, giving at-least-once delivery. A
+    /// stable `client_id` must also be configured, however acknowledgements
+    /// end up enabled, so the MQTT session (and its unacknowledged messages)
+    /// can be resumed after a restart.
+    ///
+    /// [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
 fn default_topic() -> OneOrMany<String> {
@@ -74,14 +94,22 @@ impl SourceConfig for MqttSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let connector = self.build_connector()?;
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+
+        let connector = self.build_connector(acknowledgements)?;
 
         let decoder =
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let sink = MqttSource::new(connector.clone(), decoder, log_namespace, self.clone())?;
-        Ok(Box::pin(sink.run(cx.out, cx.shutdown)))
+        let source = MqttSource::new(
+            connector.clone(),
+            decoder,
+            log_namespace,
+            self.clone(),
+            acknowledgements,
+        )?;
+        Ok(Box::pin(source.run(cx.out, cx.shutdown)))
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -104,12 +132,46 @@ impl SourceConfig for MqttSourceConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
 impl MqttSourceConfig {
-    fn build_connector(&self) -> Result<MqttConnector, MqttError> {
+    fn build_connector(&self, acknowledgements: bool) -> Result<MqttConnector, MqttError> {
+        // End-to-end acknowledgements rely on resuming the MQTT session (and its
+        // unacknowledged in-flight messages) after a restart, which is keyed by the
+        // client ID. A generated/random client ID would start a fresh session and
+        // orphan those messages, silently breaking at-least-once — so require an
+        // explicit, stable client ID when acknowledgements are enabled.
+        if acknowledgements && self.common.client_id.is_none() {
+            return Err(ConfigurationError::AcknowledgementsRequireClientId)
+                .context(ConfigurationSnafu);
+        }
+
+        // The ack machinery's liveness (detecting dead connections so unacked
+        // messages get redelivered, and its retry timers making progress on a
+        // quiet topic) depends on keep-alive traffic; `keep_alive = 0`
+        // disables it entirely in rumqttc.
+        if acknowledgements && self.common.keep_alive == 0 {
+            return Err(ConfigurationError::AcknowledgementsRequireKeepAlive)
+                .context(ConfigurationSnafu);
+        }
+
+        // An invalid filter is a permanent configuration error: rumqttc
+        // queues the SUBSCRIBE without validating it, so it would otherwise
+        // only surface at runtime as the broker rejecting (or dropping) the
+        // subscription over and over -- a running source that receives
+        // nothing. Fail here instead.
+        if let Some(topic) = self
+            .topic
+            .clone()
+            .to_vec()
+            .into_iter()
+            .find(|topic| !rumqttc::valid_filter(topic))
+        {
+            return Err(ConfigurationError::InvalidTopicFilter { topic }).context(ConfigurationSnafu);
+        }
+
         let client_id = self.common.client_id.clone().unwrap_or_else(|| {
             let hash = rand::rng()
                 .sample_iter(&rand_distr::Alphanumeric)
@@ -130,6 +192,16 @@ impl MqttSourceConfig {
         options.set_max_packet_size(self.common.max_packet_size, self.common.max_packet_size);
 
         options.set_clean_session(false);
+
+        // With end-to-end acknowledgements enabled, defer the QoS-1 PUBACK until
+        // the event has been delivered to all sinks. rumqttc then requires every
+        // incoming publish to be acked explicitly via `client.ack(&publish)`.
+        // Combined with `clean_session(false)` and QoS `AtLeastOnce`, an unacked
+        // message is redelivered by the broker after a crash/reconnect.
+        if acknowledgements {
+            options.set_manual_acks(true);
+        }
+
         match (&self.common.user, &self.common.password) {
             (Some(user), Some(password)) => {
                 options.set_credentials(user, password);
@@ -176,5 +248,81 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MqttSourceConfig>();
+    }
+
+    #[test]
+    fn acknowledgements_require_a_stable_client_id() {
+        // Without acks, a client ID is auto-generated — fine.
+        let default_config = MqttSourceConfig::default();
+        assert!(default_config.build_connector(false).is_ok());
+
+        // With acks and no explicit client ID, building must fail (a generated ID
+        // would orphan the session's unacknowledged messages after a restart).
+        assert!(default_config.build_connector(true).is_err());
+
+        // With acks and an explicit client ID, building succeeds.
+        let with_client_id = MqttSourceConfig {
+            common: MqttCommonConfig {
+                client_id: Some("stable-id".to_owned()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(with_client_id.build_connector(true).is_ok());
+    }
+
+    // With keep-alive disabled a silently dead connection is never detected
+    // on a quiet topic, so unacknowledged messages would never be redelivered
+    // and the ack machinery's retry timers would never make progress.
+    #[test]
+    fn acknowledgements_require_keep_alive() {
+        let config = MqttSourceConfig {
+            common: MqttCommonConfig {
+                client_id: Some("stable-id".to_owned()),
+                keep_alive: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert!(config.build_connector(true).is_err());
+        // Without acknowledgements, disabling keep-alive stays allowed.
+        assert!(config.build_connector(false).is_ok());
+    }
+
+    // An invalid topic filter is a permanent configuration error and must
+    // fail at build time: rumqttc queues the SUBSCRIBE without validating it,
+    // so it would otherwise only surface as a running source that receives
+    // nothing while the broker rejects the subscription over and over.
+    #[test]
+    fn invalid_topic_filters_fail_at_build() {
+        let config_with_topic = |topic: OneOrMany<String>| MqttSourceConfig {
+            topic,
+            ..Default::default()
+        };
+
+        for invalid in ["foo/#/bar", "foo/bar#", "foo/b+r", ""] {
+            assert!(
+                config_with_topic(OneOrMany::One(invalid.into()))
+                    .build_connector(false)
+                    .is_err(),
+                "{invalid:?} must be rejected"
+            );
+        }
+
+        // One invalid filter among valid ones still fails.
+        assert!(
+            config_with_topic(OneOrMany::Many(vec!["ok/#".into(), "foo/#/bar".into()]))
+                .build_connector(false)
+                .is_err()
+        );
+
+        for valid in ["foo/#", "foo/+/bar", "+/tele/#", "plain/topic"] {
+            assert!(
+                config_with_topic(OneOrMany::One(valid.into()))
+                    .build_connector(false)
+                    .is_ok(),
+                "{valid:?} must be accepted"
+            );
+        }
     }
 }
