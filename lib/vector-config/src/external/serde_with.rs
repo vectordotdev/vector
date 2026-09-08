@@ -143,3 +143,12 @@ impl Configurable for Option<serde_with::DurationMilliSeconds<u64, serde_with::f
         generate_optional_schema(&u64::as_configurable_ref(), generator)
     }
 }
+
+impl Configurable for Option<serde_with::DurationSecondsWithFrac<f64, serde_with::formats::Strict>> {
+    fn generate_schema(generator: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError>
+    where
+        Self: Sized,
+    {
+        generate_optional_schema(&f64::as_configurable_ref(), generator)
+    }
+}
