@@ -29,6 +29,10 @@ const fn default_timeout_secs() -> f64 {
     DEFAULT_TIMEOUT_SECS
 }
 
+const fn default_pending_messages_limit() -> usize {
+    MAX_PENDING_MESSAGES
+}
+
 /// Config used to build a `ChunkedGelfDecoder`.
 #[configurable_component]
 #[derive(Debug, Clone, Default)]
@@ -66,8 +70,9 @@ pub struct ChunkedGelfDecoderOptions {
     ///
     /// Chunks belonging to messages that are already pending are still accepted once the limit is
     /// reached, so in-flight messages can complete.
-    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
-    pub pending_messages_limit: Option<usize>,
+    #[serde(default = "default_pending_messages_limit")]
+    #[derivative(Default(value = "default_pending_messages_limit()"))]
+    pub pending_messages_limit: usize,
 
     /// The maximum length of a single GELF message, in bytes. Messages longer than this length are
     /// dropped. If this option is not set, the decoder does not limit the length of messages and
@@ -312,7 +317,7 @@ impl ChunkedGelfDecoder {
     /// Creates a new `ChunkedGelfDecoder`.
     pub fn new(
         timeout_secs: f64,
-        pending_messages_limit: Option<usize>,
+        pending_messages_limit: usize,
         max_length: Option<usize>,
         decompression_config: ChunkedGelfDecompressionConfig,
     ) -> Self {
@@ -321,7 +326,7 @@ impl ChunkedGelfDecoder {
             decompression_config,
             state: Arc::new(Mutex::new(HashMap::new())),
             timeout: Duration::from_secs_f64(timeout_secs),
-            pending_messages_limit: pending_messages_limit.unwrap_or(MAX_PENDING_MESSAGES),
+            pending_messages_limit,
             max_length,
         }
     }
@@ -544,7 +549,7 @@ impl Default for ChunkedGelfDecoder {
     fn default() -> Self {
         Self::new(
             DEFAULT_TIMEOUT_SECS,
-            None,
+            default_pending_messages_limit(),
             None,
             ChunkedGelfDecompressionConfig::Auto,
         )
@@ -978,7 +983,7 @@ mod tests {
 
         let raised = ChunkedGelfDecoder::new(
             DEFAULT_TIMEOUT_SECS,
-            Some(MAX_PENDING_MESSAGES + 1),
+            MAX_PENDING_MESSAGES + 1,
             None,
             ChunkedGelfDecompressionConfig::Auto,
         );
@@ -986,7 +991,7 @@ mod tests {
 
         let lowered = ChunkedGelfDecoder::new(
             DEFAULT_TIMEOUT_SECS,
-            Some(1),
+            1,
             None,
             ChunkedGelfDecompressionConfig::Auto,
         );
