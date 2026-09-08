@@ -22,14 +22,22 @@ impl MetricNormalize for DatadogMetricsNormalizer {
             MetricValue::Distribution { .. } => state
                 .make_incremental(metric)
                 .filter(|metric| !metric.value().is_empty())
-                .and_then(|metric| AgentDDSketch::transform_to_sketch(metric).ok()),
+                .and_then(|metric| AgentDDSketch::transform_to_sketch(metric).ok())
+                .filter(|metric| !metric.value().is_empty()),
             MetricValue::AggregatedHistogram { .. } => state
                 .make_incremental(metric)
                 .filter(|metric| !metric.value().is_empty())
-                .and_then(|metric| AgentDDSketch::transform_to_sketch(metric).ok()),
+                .and_then(|metric| AgentDDSketch::transform_to_sketch(metric).ok())
+                .filter(|metric| !metric.value().is_empty()),
             // Sketches cannot be subtracted from one another, so we treat them as implicitly
             // incremental, and just update the metric type.
-            MetricValue::Sketch { .. } => Some(metric.into_incremental()),
+            MetricValue::Sketch { .. } => {
+                if metric.value().is_empty() {
+                    None
+                } else {
+                    Some(metric.into_incremental())
+                }
+            }
             // Otherwise, ensure that it's incremental.
             _ => state.make_incremental(metric),
         }
@@ -323,5 +331,75 @@ mod tests {
         ];
 
         assert_normalize(DatadogMetricsNormalizer, agg_histograms, expected_sketches);
+    }
+
+    #[test]
+    fn empty_sketch_filtered() {
+        let empty_sketch = AgentDDSketch::with_agent_defaults();
+        let metric = Metric::new(
+            "empty_sketch",
+            MetricKind::Incremental,
+            MetricValue::Sketch {
+                sketch: MetricSketch::AgentDDSketch(empty_sketch),
+            },
+        );
+
+        assert_normalize(
+            DatadogMetricsNormalizer,
+            vec![metric],
+            vec![None],
+        );
+    }
+
+    #[test]
+    fn empty_aggregated_histogram_filtered() {
+        let metric = Metric::new(
+            "empty_histogram",
+            MetricKind::Incremental,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![vector_lib::event::metric::Bucket {
+                    upper_limit: 1.0,
+                    count: 0,
+                }],
+                count: 0,
+                sum: 0.0,
+            },
+        );
+
+        assert_normalize(
+            DatadogMetricsNormalizer,
+            vec![metric],
+            vec![None],
+        );
+    }
+
+    #[test]
+    fn aggregated_histogram_with_inf_bucket_normalized() {
+        let metric = Metric::new(
+            "test_overflow",
+            MetricKind::Incremental,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![
+                    vector_lib::event::metric::Bucket {
+                        upper_limit: 1.0,
+                        count: 0,
+                    },
+                    vector_lib::event::metric::Bucket {
+                        upper_limit: f64::INFINITY,
+                        count: 4,
+                    },
+                ],
+                count: 4,
+                sum: 20000.0,
+            },
+        );
+
+        let expected_sketch = AgentDDSketch::transform_to_sketch(metric.clone()).unwrap();
+
+        assert_normalize(
+            DatadogMetricsNormalizer,
+            vec![metric],
+            vec![Some(expected_sketch)],
+        );
     }
 }

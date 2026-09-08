@@ -625,16 +625,19 @@ impl AgentDDSketch {
 
         let mut lower = f64::NEG_INFINITY;
 
-        if buckets
+        let total_count: u64 = buckets
             .iter()
-            .any(|bucket| bucket.count > u64::from(u32::MAX))
-        {
+            .fold(0u64, |acc, bucket| acc.saturating_add(bucket.count));
+        if total_count > u64::from(u32::MAX.saturating_sub(self.count)) {
             return Err("bucket size greater than u32::MAX");
         }
 
         for bucket in buckets {
             let mut upper = bucket.upper_limit;
             if upper.is_sign_positive() && upper.is_infinite() {
+                if lower.is_infinite() {
+                    lower = 0.0;
+                }
                 upper = lower;
             } else if lower.is_sign_negative() && lower.is_infinite() {
                 lower = upper;
@@ -1235,6 +1238,94 @@ mod tests {
 
         // Assert the sketch remains unchanged.
         assert_eq!(sketch, AgentDDSketch::with_agent_defaults());
+    }
+
+    #[test]
+    fn test_insert_interpolate_buckets_aggregate_overflow() {
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+        let buckets = vec![
+            Bucket {
+                upper_limit: 1.0,
+                count: 3_000_000_000,
+            },
+            Bucket {
+                upper_limit: f64::INFINITY,
+                count: 2_000_000_000,
+            },
+        ];
+
+        assert_eq!(
+            Err("bucket size greater than u32::MAX"),
+            sketch.insert_interpolate_buckets(buckets)
+        );
+        assert_eq!(sketch, AgentDDSketch::with_agent_defaults());
+    }
+
+    #[test]
+    fn test_insert_interpolate_buckets_infinity() {
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+        let buckets = vec![
+            Bucket {
+                upper_limit: 1.0,
+                count: 0,
+            },
+            Bucket {
+                upper_limit: f64::INFINITY,
+                count: 4,
+            },
+        ];
+
+        assert_eq!(Ok(()), sketch.insert_interpolate_buckets(buckets));
+        assert_eq!(sketch.count(), 4);
+        assert!(!sketch.is_empty());
+
+        let mut sketch_only_inf = AgentDDSketch::with_agent_defaults();
+        let buckets_only_inf = vec![Bucket {
+            upper_limit: f64::INFINITY,
+            count: 3,
+        }];
+
+        assert_eq!(
+            Ok(()),
+            sketch_only_inf.insert_interpolate_buckets(buckets_only_inf)
+        );
+        assert_eq!(sketch_only_inf.count(), 3);
+        assert!(!sketch_only_inf.is_empty());
+    }
+
+    #[test]
+    fn test_transform_aggregated_histogram_with_inf_to_sketch() {
+        let metric = Metric::new(
+            "test_hist",
+            MetricKind::Incremental,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 0,
+                    },
+                    Bucket {
+                        upper_limit: f64::INFINITY,
+                        count: 4,
+                    },
+                ],
+                count: 4,
+                sum: 20000.0,
+            },
+        );
+
+        let transformed = AgentDDSketch::transform_to_sketch(metric).expect("should convert");
+        match transformed.value() {
+            MetricValue::Sketch { sketch } => {
+                assert!(!sketch.is_empty());
+                match sketch {
+                    MetricSketch::AgentDDSketch(ddsketch) => {
+                        assert_eq!(ddsketch.count(), 4);
+                    }
+                }
+            }
+            other => panic!("expected Sketch, got {other:?}"),
+        }
     }
 
     #[test]

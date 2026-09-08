@@ -130,12 +130,6 @@ fn reparse_groups(
                     for i in (1..buckets.len()).rev() {
                         buckets[i].count = buckets[i].count.saturating_sub(buckets[i - 1].count);
                     }
-                    let drop_last = buckets
-                        .last()
-                        .is_some_and(|bucket| bucket.bucket == f64::INFINITY);
-                    if drop_last {
-                        buckets.pop();
-                    }
 
                     result.push(
                         Metric::new(
@@ -777,7 +771,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::AggregatedHistogram {
                         buckets: vector_lib::buckets![
-                            0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
+                            0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599, f64::INFINITY => 10332
                         ],
                         count: 144320,
                         sum: 53423.0,
@@ -797,10 +791,9 @@ mod test {
         .to_string();
 
         let to_float = |v: i32| -> f64 { v as f64 };
-        exp += &(0..=15)
+        exp += &(0..=20)
             .map(to_float)
             .chain(std::iter::once(f64::NAN))
-            .chain((16..=20).map(to_float))
             .rev()
             .map(|f| format!("http_request_duration_seconds_bucket{{le=\"{f}\"}} 0 1612411506789"))
             .join("\n");
@@ -849,7 +842,7 @@ mod test {
                     "duration",
                     MetricKind::Absolute,
                     MetricValue::AggregatedHistogram {
-                        buckets: vector_lib::buckets![1.0 => 133988],
+                        buckets: vector_lib::buckets![1.0 => 133988, f64::INFINITY => 10332],
                         count: 144320,
                         sum: 53423.0,
                     },
@@ -878,7 +871,7 @@ mod test {
                     "duration",
                     MetricKind::Absolute,
                     MetricValue::AggregatedHistogram {
-                        buckets: vector_lib::buckets![1.0 => 2000, 10.0 => 0],
+                        buckets: vector_lib::buckets![1.0 => 2000, 10.0 => 0, f64::INFINITY => 0],
                         count: 2000,
                         sum: 2000.0,
                     },
@@ -949,7 +942,8 @@ mod test {
                             7200.0 => 0,
                             10800.0 => 0,
                             18000.0 => 0,
-                            36000.0 => 0
+                            36000.0 => 0,
+                            f64::INFINITY => 0
                         ],
                         count: 536,
                         sum: 19690.129384881966,
@@ -969,7 +963,8 @@ mod test {
                             7200.0 => 0,
                             10800.0 => 0,
                             18000.0 => 0,
-                            36000.0 => 0
+                            36000.0 => 0,
+                            f64::INFINITY => 0
                         ],
                         count: 1,
                         sum: 28.975436316,
@@ -981,7 +976,7 @@ mod test {
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
                         buckets: vector_lib::buckets![
                             30.0 => 285, 60.0 => 880, 300.0 => 1906, 600.0 => 80, 1800.0 => 101, 3600.0 => 3,
-                            7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
+                            7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0, f64::INFINITY => 0
                         ],
                         count: 3255,
                         sum: 381111.7498891335,
@@ -989,6 +984,34 @@ mod test {
                 )
                     .with_tags(Some(metric_tags!("runner" => "y")))
                     .with_timestamp(Some(*TIMESTAMP))
+            ]),
+        );
+    }
+
+    #[test]
+    fn test_histogram_overflow_infinity_only() {
+        let exp = r#"
+            # HELP test_overflow demo
+            # TYPE test_overflow histogram
+            test_overflow_bucket{le="1"} 0
+            test_overflow_bucket{le="+Inf"} 4
+            test_overflow_sum 20000
+            test_overflow_count 4
+            "#;
+
+        assert_event_data_eq!(
+            events_to_metrics(parse_text(exp)),
+            Ok(vec![
+                Metric::new(
+                    "test_overflow",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedHistogram {
+                        buckets: vector_lib::buckets![1.0 => 0, f64::INFINITY => 4],
+                        count: 4,
+                        sum: 20000.0,
+                    },
+                )
+                .with_timestamp(Some(*TIMESTAMP))
             ]),
         );
     }
@@ -1311,7 +1334,7 @@ mod test {
                     MetricKind::Incremental,
                     MetricValue::AggregatedHistogram {
                         buckets: vector_lib::buckets![
-                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
+                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1, f64::INFINITY => 0
                         ],
                         count: 1,
                         sum: 8.0,
@@ -1380,7 +1403,7 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::AggregatedHistogram {
                         buckets: vector_lib::buckets![
-                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1
+                            1.0 => 0, 2.5 => 0, 5.0 => 0, 10.0 => 1, f64::INFINITY => 0
                         ],
                         count: 1,
                         sum: 8.0,
