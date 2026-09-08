@@ -2,6 +2,9 @@ pub mod tcp;
 pub mod udp;
 #[cfg(unix)]
 mod unix;
+mod unix_config;
+
+use unix_config::UnixConfig;
 
 use vector_lib::{
     codecs::decoding::DeserializerConfig,
@@ -40,13 +43,11 @@ pub enum Mode {
     Udp(udp::UdpConfig),
 
     /// Listen on a Unix domain socket (UDS), in datagram mode.
-    #[cfg(unix)]
-    UnixDatagram(unix::UnixConfig),
+    UnixDatagram(UnixConfig),
 
     /// Listen on a Unix domain socket (UDS), in stream mode.
-    #[cfg(unix)]
     #[serde(alias = "unix")]
-    UnixStream(unix::UnixConfig),
+    UnixStream(UnixConfig),
 }
 
 impl SocketConfig {
@@ -62,9 +63,7 @@ impl SocketConfig {
         match &self.mode {
             Mode::Tcp(config) => config.decoding().clone(),
             Mode::Udp(config) => config.decoding().clone(),
-            #[cfg(unix)]
             Mode::UnixDatagram(config) => config.decoding().clone(),
-            #[cfg(unix)]
             Mode::UnixStream(config) => config.decoding().clone(),
         }
     }
@@ -73,9 +72,7 @@ impl SocketConfig {
         match &self.mode {
             Mode::Tcp(config) => global_log_namespace.merge(config.log_namespace),
             Mode::Udp(config) => global_log_namespace.merge(config.log_namespace),
-            #[cfg(unix)]
             Mode::UnixDatagram(config) => global_log_namespace.merge(config.log_namespace),
-            #[cfg(unix)]
             Mode::UnixStream(config) => global_log_namespace.merge(config.log_namespace),
         }
     }
@@ -168,34 +165,50 @@ impl SourceConfig for SocketConfig {
                     log_namespace,
                 ))
             }
-            #[cfg(unix)]
             Mode::UnixDatagram(config) => {
-                let log_namespace = cx.log_namespace(config.log_namespace);
-                let decoding = config.decoding.clone();
-                let framing = config
-                    .framing
-                    .clone()
-                    .unwrap_or_else(|| decoding.default_message_based_framing());
-                let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
+                #[cfg(not(unix))]
+                {
+                    let _ = (config, cx);
+                    return Err(unsupported_unix_socket_error());
+                }
 
-                unix::unix_datagram(config, decoder, cx.shutdown, cx.out, log_namespace)
-            }
-            #[cfg(unix)]
-            Mode::UnixStream(config) => {
-                let log_namespace = cx.log_namespace(config.log_namespace);
-
-                let decoding = config.decoding().clone();
-                let decoder = DecodingConfig::new(
-                    config
+                #[cfg(unix)]
+                {
+                    let log_namespace = cx.log_namespace(config.log_namespace);
+                    let decoding = config.decoding.clone();
+                    let framing = config
                         .framing
                         .clone()
-                        .unwrap_or_else(|| decoding.default_stream_framing()),
-                    decoding,
-                    log_namespace,
-                )
-                .build()?;
+                        .unwrap_or_else(|| decoding.default_message_based_framing());
+                    let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
-                unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
+                    unix::unix_datagram(config, decoder, cx.shutdown, cx.out, log_namespace)
+                }
+            }
+            Mode::UnixStream(config) => {
+                #[cfg(not(unix))]
+                {
+                    let _ = (config, cx);
+                    return Err(unsupported_unix_socket_error());
+                }
+
+                #[cfg(unix)]
+                {
+                    let log_namespace = cx.log_namespace(config.log_namespace);
+
+                    let decoding = config.decoding().clone();
+                    let decoder = DecodingConfig::new(
+                        config
+                            .framing
+                            .clone()
+                            .unwrap_or_else(|| decoding.default_stream_framing()),
+                        decoding,
+                        log_namespace,
+                    )
+                    .build()?;
+
+                    unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
+                }
             }
         }
     }
@@ -266,7 +279,6 @@ impl SourceConfig for SocketConfig {
                         None,
                     )
             }
-            #[cfg(unix)]
             Mode::UnixDatagram(config) => {
                 let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
@@ -278,7 +290,6 @@ impl SourceConfig for SocketConfig {
                     None,
                 )
             }
-            #[cfg(unix)]
             Mode::UnixStream(config) => {
                 let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
 
@@ -302,9 +313,7 @@ impl SourceConfig for SocketConfig {
         match self.mode.clone() {
             Mode::Tcp(tcp) => vec![tcp.address().as_tcp_resource()],
             Mode::Udp(udp) => vec![udp.address().as_udp_resource()],
-            #[cfg(unix)]
             Mode::UnixDatagram(_) => vec![],
-            #[cfg(unix)]
             Mode::UnixStream(_) => vec![],
         }
     }
@@ -316,6 +325,15 @@ impl SourceConfig for SocketConfig {
 
 pub(crate) fn default_host_key() -> OptionalValuePath {
     log_schema().host_key().cloned().into()
+}
+
+#[cfg(not(unix))]
+fn unsupported_unix_socket_error() -> crate::Error {
+    format!(
+        "Unix Domain Socket sources are not supported on {}.",
+        std::env::consts::OS
+    )
+    .into()
 }
 
 #[cfg(test)]
@@ -354,7 +372,7 @@ mod test {
     use vrl::{btreemap, value, value::ObjectMap};
     #[cfg(unix)]
     use {
-        super::{Mode, unix::UnixConfig},
+        super::UnixConfig,
         crate::sources::util::unix::UNNAMED_SOCKET_HOST,
         crate::test_util::wait_for,
         futures::{SinkExt, Stream},
@@ -369,7 +387,7 @@ mod test {
         tokio_util::codec::{FramedWrite, LinesCodec},
     };
 
-    use super::{SocketConfig, tcp::TcpConfig, udp::UdpConfig};
+    use super::{Mode, SocketConfig, tcp::TcpConfig, udp::UdpConfig};
     use crate::{
         SourceSender,
         config::{ComponentKey, GlobalOptions, SourceConfig, SourceContext, log_schema},
@@ -462,6 +480,27 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SocketConfig>();
+    }
+
+    #[test]
+    fn unix_modes_deserialize_on_all_platforms() {
+        for input in [
+            indoc::indoc! {r#"
+                mode: unix_datagram
+                path: /tmp/vector-socket.sock
+            "#},
+            indoc::indoc! {r#"
+                mode: unix_stream
+                path: /tmp/vector-socket.sock
+            "#},
+        ] {
+            let config: SocketConfig = serde_yaml::from_str(input).unwrap();
+
+            assert!(matches!(
+                config.mode,
+                Mode::UnixDatagram(_) | Mode::UnixStream(_)
+            ));
+        }
     }
 
     //////// TCP TESTS ////////

@@ -58,7 +58,6 @@ pub enum FluentMode {
     Tcp(FluentTcpConfig),
 
     /// Listen on unix stream socket
-    #[cfg(unix)]
     Unix(FluentUnixConfig),
 }
 
@@ -77,7 +76,6 @@ mod deser {
         #[serde(rename = "tcp")]
         Tcp(FluentTcpConfig),
 
-        #[cfg(unix)]
         #[serde(rename = "unix")]
         Unix(FluentUnixConfig),
     }
@@ -98,7 +96,6 @@ mod deser {
         {
             Ok(match FluentModeDe::deserialize(deserializer)? {
                 FluentModeDe::Tagged(FluentModeTagged::Tcp(config)) => FluentMode::Tcp(config),
-                #[cfg(unix)]
                 FluentModeDe::Tagged(FluentModeTagged::Unix(config)) => FluentMode::Unix(config),
                 FluentModeDe::Untagged(config) => FluentMode::Tcp(config),
             })
@@ -132,18 +129,6 @@ mod deser {
             assert!(matches!(parsed.mode, FluentMode::Tcp(c) if c.connection_limit.unwrap() == 2));
         }
 
-        #[test]
-        fn test_invalid_unix_mode() {
-            let json_data = serde_json::json!({
-                "mode": "unix",
-                "address": "0.0.0.0:2020",
-                "connection_limit": 2
-            });
-
-            assert!(serde_json::from_value::<FluentConfig>(json_data).is_err());
-        }
-
-        #[cfg(unix)]
         #[test]
         fn test_valid_unix_mode() {
             let json_data = serde_json::json!({
@@ -234,7 +219,6 @@ impl FluentTcpConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-#[cfg(unix)]
 pub struct FluentUnixConfig {
     /// The Unix socket path.
     ///
@@ -252,24 +236,41 @@ pub struct FluentUnixConfig {
     pub socket_file_mode: Option<u32>,
 }
 
-#[cfg(unix)]
 impl FluentUnixConfig {
     fn build(
         &self,
         cx: SourceContext,
         log_namespace: LogNamespace,
     ) -> crate::Result<super::Source> {
-        let source = FluentSource::new(log_namespace);
+        #[cfg(not(unix))]
+        {
+            let _ = (cx, log_namespace);
+            return Err(unsupported_unix_socket_error());
+        }
 
-        crate::sources::util::build_unix_stream_source(
-            self.path.clone(),
-            self.socket_file_mode,
-            source.decoder(),
-            move |events, host| source.handle_events_impl(events, host.into()),
-            cx.shutdown,
-            cx.out,
-        )
+        #[cfg(unix)]
+        {
+            let source = FluentSource::new(log_namespace);
+
+            crate::sources::util::build_unix_stream_source(
+                self.path.clone(),
+                self.socket_file_mode,
+                source.decoder(),
+                move |events, host| source.handle_events_impl(events, host.into()),
+                cx.shutdown,
+                cx.out,
+            )
+        }
     }
+}
+
+#[cfg(not(unix))]
+fn unsupported_unix_socket_error() -> crate::Error {
+    format!(
+        "Unix Domain Socket sources are not supported on {}.",
+        std::env::consts::OS
+    )
+    .into()
 }
 
 impl GenerateConfig for FluentConfig {
@@ -298,7 +299,6 @@ impl SourceConfig for FluentConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
         match &self.mode {
             FluentMode::Tcp(t) => t.build(cx, log_namespace),
-            #[cfg(unix)]
             FluentMode::Unix(u) => u.build(cx, log_namespace),
         }
     }
@@ -316,7 +316,6 @@ impl SourceConfig for FluentConfig {
     fn resources(&self) -> Vec<Resource> {
         match &self.mode {
             FluentMode::Tcp(tcp) => vec![tcp.address.as_tcp_resource()],
-            #[cfg(unix)]
             FluentMode::Unix(_) => vec![],
         }
     }
@@ -344,7 +343,6 @@ impl FluentConfig {
                 .and_then(|tls| tls.client_metadata_key.as_ref())
                 .and_then(|k| k.path.clone())
                 .map(LegacyKey::Overwrite),
-            #[cfg(unix)]
             FluentMode::Unix(_) => None,
         };
 

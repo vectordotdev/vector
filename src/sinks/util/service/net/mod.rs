@@ -7,9 +7,12 @@ mod unix;
 use std::{
     io,
     net::SocketAddr,
+    path::{Path, PathBuf},
     task::{Context, Poll, ready},
 };
 
+#[cfg(unix)]
+use crate::sinks::util::unix::UnixEither;
 use futures_util::{FutureExt, future::BoxFuture};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -23,13 +26,9 @@ use vector_lib::{
     configurable::configurable_component,
     tls::{MaybeTlsStream, TlsError},
 };
-#[cfg(unix)]
-use {crate::sinks::util::unix::UnixEither, std::path::PathBuf};
 
 #[cfg(unix)]
 use self::unix::UnixConnector;
-#[cfg(unix)]
-pub use self::unix::{UnixConnectorConfig, UnixMode};
 use self::{tcp::TcpConnector, udp::UdpConnector};
 pub use self::{tcp::TcpConnectorConfig, udp::UdpConnectorConfig};
 #[cfg(unix)]
@@ -114,6 +113,69 @@ pub enum NetError {
 
     #[snafu(display("Failed to get socket back after send as channel closed unexpectedly."))]
     ServiceSocketChannelClosed,
+
+    #[snafu(display("{} is not supported on {}.", feature, platform))]
+    UnsupportedPlatform {
+        feature: &'static str,
+        platform: &'static str,
+    },
+}
+
+/// Unix socket modes.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
+pub enum UnixMode {
+    /// Datagram-oriented (`SOCK_DGRAM`).
+    Datagram,
+
+    /// Stream-oriented (`SOCK_STREAM`).
+    Stream,
+}
+
+/// Unix Domain Socket configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixConnectorConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    path: PathBuf,
+
+    /// The Unix socket mode to use.
+    #[serde(default = "default_unix_mode")]
+    unix_mode: UnixMode,
+
+    /// The size of the socket's send buffer.
+    ///
+    /// If set, the value of the setting is passed via the `SO_SNDBUF` option.
+    #[configurable(metadata(docs::type_unit = "bytes"))]
+    #[configurable(metadata(docs::examples = 65536))]
+    send_buffer_size: Option<usize>,
+}
+
+const fn default_unix_mode() -> UnixMode {
+    UnixMode::Stream
+}
+
+impl UnixConnectorConfig {
+    /// Creates a Unix Domain Socket configuration for the given path.
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            path: path.as_ref().to_path_buf(),
+            unix_mode: UnixMode::Stream,
+            send_buffer_size: None,
+        }
+    }
+
+    #[cfg(not(unix))]
+    /// Attempts to create a network connector for this configuration.
+    pub fn as_connector(&self) -> Result<NetworkConnector, NetError> {
+        Err(NetError::UnsupportedPlatform {
+            feature: "Unix Domain Sockets",
+            platform: std::env::consts::OS,
+        })
+    }
 }
 
 enum NetworkServiceState {
