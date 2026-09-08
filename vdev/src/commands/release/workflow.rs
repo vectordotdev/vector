@@ -215,7 +215,8 @@ impl PrCheck {
         ensure_sha(&self.base_sha, "base SHA")?;
         let base_version = cargo_version_at(&self.base_sha)?;
         let head_version = current_cargo_version()?;
-        let changed_files = changed_files(&self.base_sha, "HEAD")?;
+        let merge_base = merge_base(&self.base_sha, "HEAD")?;
+        let changed_files = changed_files(&merge_base, "HEAD")?;
 
         if let Some(version) = self.head_ref.strip_prefix("release/prepare-v") {
             let version = parse_stable_version(version, "preparation branch version")?;
@@ -233,7 +234,7 @@ impl PrCheck {
             let base_metadata = metadata_at(&self.base_sha)?;
             validate_development_metadata(&base_metadata, &expected_base)?;
             let metadata = read_metadata(Path::new(STATE_PATH))?;
-            validate_prepared_metadata(&metadata, &version, &self.base_sha)?;
+            validate_prepared_metadata(&metadata, &version, &merge_base)?;
 
             let release_file = format!("website/cue/reference/releases/{version}.cue");
             ensure!(
@@ -295,10 +296,20 @@ impl AutotagCheck {
             "release merge",
         )?;
         let metadata = read_metadata(Path::new(STATE_PATH))?;
-        validate_prepared_metadata(&metadata, &current, &self.before_sha)?;
+        let prepared_from = metadata
+            .prepared_from
+            .as_deref()
+            .context("prepared release state is missing prepared_from")?;
+        validate_prepared_metadata(&metadata, &current, prepared_from)?;
+        ensure!(
+            is_ancestor(prepared_from, &self.before_sha)?,
+            "prepared release base {prepared_from} is not an ancestor of {}",
+            self.before_sha
+        );
         validate_associated_preparation_pr(&self.repository, &self.sha, &current)?;
 
         let tag = format!("v{current}");
+        let release_branch = release_branch(&current);
         if let Some(existing) = resolve_ref(&format!("refs/tags/{tag}^{{commit}}"))? {
             ensure!(
                 existing == self.sha,
@@ -306,7 +317,8 @@ impl AutotagCheck {
             );
         }
         set_output("tag_required", "true")?;
-        set_output("tag", &tag)
+        set_output("tag", &tag)?;
+        set_output("release_branch", &release_branch)
     }
 }
 
@@ -325,6 +337,16 @@ impl PublicationCheck {
             self.tag
         );
 
+        set_output("version", &version.to_string())?;
+        if is_patch_release(&version) {
+            println!(
+                "Patch release tag {} uses the existing release-branch process.",
+                self.tag
+            );
+            set_output("housekeeping_required", "false")?;
+            return Ok(());
+        }
+
         let metadata = read_metadata(Path::new(STATE_PATH))?;
         let prepared_from = metadata
             .prepared_from
@@ -338,7 +360,7 @@ impl PublicationCheck {
         );
         validate_associated_preparation_pr(&self.repository, &self.sha, &version)?;
 
-        set_output("version", &version.to_string())?;
+        set_output("housekeeping_required", "true")?;
         set_output(
             "next_version",
             &next_minor_development_version(&version)?.to_string(),
@@ -504,6 +526,14 @@ fn next_minor_development_version(version: &Version) -> Result<Version> {
     let mut next = Version::new(version.major, minor, 0);
     next.pre = Prerelease::new("dev")?;
     Ok(next)
+}
+
+fn is_patch_release(version: &Version) -> bool {
+    version.patch > 0
+}
+
+fn release_branch(version: &Version) -> String {
+    format!("v{}.{}", version.major, version.minor)
 }
 
 fn current_cargo_version() -> Result<Version> {
@@ -674,6 +704,12 @@ fn changed_files(before: &str, after: &str) -> Result<Vec<String>> {
     )
 }
 
+fn merge_base(left: &str, right: &str) -> Result<String> {
+    Ok(git::run_and_check_output(&["merge-base", left, right])?
+        .trim()
+        .to_owned())
+}
+
 fn resolve_ref(reference: &str) -> Result<Option<String>> {
     let output = Command::new("git")
         .args(["rev-parse", "--verify", "--quiet", reference])
@@ -832,8 +868,9 @@ fn update_vrl_to_main(cargo_toml_contents: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        next_minor_development_version, parse_cargo_version, parse_metadata, release_file_allowed,
-        update_vrl_to_main, validate_housekeeping_files, validate_prepared_metadata,
+        is_patch_release, next_minor_development_version, parse_cargo_version, parse_metadata,
+        release_branch, release_file_allowed, update_vrl_to_main, validate_housekeeping_files,
+        validate_prepared_metadata,
     };
     use indoc::indoc;
 
@@ -868,6 +905,17 @@ mod tests {
             next_minor_development_version(&release).expect("next version"),
             "0.60.0-dev".parse().expect("valid version")
         );
+    }
+
+    #[test]
+    fn classifies_patch_releases_and_derives_the_release_branch() {
+        let minor = "0.59.0".parse().expect("valid version");
+        let patch = "0.59.1".parse().expect("valid version");
+
+        assert!(!is_patch_release(&minor));
+        assert!(is_patch_release(&patch));
+        assert_eq!(release_branch(&minor), "v0.59");
+        assert_eq!(release_branch(&patch), "v0.59");
     }
 
     #[test]

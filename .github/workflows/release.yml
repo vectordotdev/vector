@@ -20,6 +20,7 @@ jobs:
     outputs:
       version: ${{ steps.state.outputs.version }}
       next_version: ${{ steps.state.outputs.next_version }}
+      housekeeping_required: ${{ steps.state.outputs.housekeeping_required }}
     steps:
       - name: Checkout release tag
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -59,6 +60,7 @@ jobs:
   housekeeping:
     name: Open post-release housekeeping PR
     needs: [preflight, Release]
+    if: needs.preflight.outputs.housekeeping_required == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

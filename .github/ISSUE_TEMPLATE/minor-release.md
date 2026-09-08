@@ -26,5 +26,9 @@ tag or rebuild its artifacts.
 
 - [ ] Publish the website from the release tag and confirm the release page is live.
 - [ ] Release Linux packages. Refer to the internal releasing document.
+- [ ] Release the updated Helm chart. See the
+      [Helm chart release instructions](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md).
+- [ ] After the Helm chart release completes, run `cargo vdev build manifests` and open a Vector PR
+      with the generated manifest updates.
 - [ ] Release Homebrew. Refer to the internal releasing document.
 - [ ] Update the GitHub release description and send the release announcement.

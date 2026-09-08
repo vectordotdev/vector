@@ -52,15 +52,16 @@ jobs:
           --sha "$GITHUB_SHA"
           --repository "$GITHUB_REPOSITORY"
 
-      - name: Create tag with Vector bot token
+      - name: Create tag and release branch with Vector bot token
         if: steps.validation.outputs.tag_required == 'true'
         env:
           TAG: ${{ steps.validation.outputs.tag }}
+          RELEASE_BRANCH: ${{ steps.validation.outputs.release_branch }}
         run: |
           set -euo pipefail
           if git rev-parse --verify --quiet "refs/tags/${TAG}"; then
             echo "$TAG already points at $GITHUB_SHA"
-            exit 0
+          else
+            git tag "$TAG" "$GITHUB_SHA"
           fi
-          git tag "$TAG" "$GITHUB_SHA"
-          git push origin "$TAG"
+          git push --atomic origin "$TAG" "HEAD:refs/heads/${RELEASE_BRANCH}"
