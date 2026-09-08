@@ -32,7 +32,7 @@ use crate::{
     internal_events::{
         VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
     },
-    signal::{SignalHandler, SignalPair, SignalRx, SignalTo, SignalTx},
+    signal::{SignalHandler, SignalPair, SignalRx, SignalTo, SignalTx, recv_shutdown},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
         TopologyController,
@@ -582,7 +582,10 @@ impl FinishedApplication {
                     exitcode::OK
                 })
             }, // Graceful shutdown finished
-            _ = signal_rx.recv() => Self::quit(),
+            // A second shutdown signal forces an immediate exit; reload signals received during
+            // the drain must not terminate it, so route through `recv_shutdown` rather than a
+            // raw `recv`.
+            _ = recv_shutdown(&mut signal_rx, |_| {}) => Self::quit(),
         }
     }
 
