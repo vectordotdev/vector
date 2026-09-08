@@ -91,6 +91,11 @@ pub struct SummaryMetric {
     pub quantiles: Vec<SummaryQuantile>,
     pub sum: f64,
     pub count: u64,
+    /// Set when a NaN sample belonging to this series was skipped.
+    ///
+    /// The remaining fields then describe only part of the series, so emitting it would
+    /// report a count the sender never sent. Consumers must drop the whole metric.
+    pub has_skipped_nan: bool,
 }
 
 #[derive(Debug, Default, PartialEq, PartialOrd)]
@@ -104,6 +109,11 @@ pub struct HistogramMetric {
     pub buckets: Vec<HistogramBucket>,
     pub sum: f64,
     pub count: u64,
+    /// Set when a NaN sample belonging to this series was skipped.
+    ///
+    /// The remaining fields then describe only part of the series, so emitting it would
+    /// report a count the sender never sent. Consumers must drop the whole metric.
+    pub has_skipped_nan: bool,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -183,12 +193,14 @@ impl GroupKind {
             }
             Self::Histogram(metrics) => match suffix {
                 "_bucket" => {
-                    // Stale markers (and other NaN samples) carry no usable bucket
-                    // count. Drop the sample rather than failing the whole request.
+                    let bucket = key.labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
+                    // A NaN bucket count is unusable. Skip the sample rather than failing
+                    // the whole request, but mark the series so it is not emitted with the
+                    // buckets that did parse.
                     if skip_nan_values && value.is_nan() {
+                        matching_group(metrics, key).has_skipped_nan = true;
                         return Ok(None);
                     }
-                    let bucket = key.labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
                     let (_, bucket) = line::Metric::parse_value(&bucket)
                         .map_err(Into::into)
                         .context(ParseLabelValueSnafu)?;
@@ -202,9 +214,11 @@ impl GroupKind {
                     matching_group(metrics, key).sum = sum;
                 }
                 "_count" => {
-                    // Stale markers (and other NaN samples) carry no usable count.
-                    // Drop the sample rather than failing the whole request.
+                    // A NaN count is unusable. Skip the sample rather than failing the
+                    // whole request, but mark the series: leaving `count` at its default
+                    // would report a zero the sender never sent.
                     if skip_nan_values && value.is_nan() {
+                        matching_group(metrics, key).has_skipped_nan = true;
                         return Ok(None);
                     }
                     let count = try_f64_to_u64(metric.value)?;
@@ -238,9 +252,11 @@ impl GroupKind {
                     matching_group(metrics, key).sum = sum;
                 }
                 "_count" => {
-                    // Stale markers (and other NaN samples) carry no usable count.
-                    // Drop the sample rather than failing the whole request.
+                    // A NaN count is unusable. Skip the sample rather than failing the
+                    // whole request, but mark the series: leaving `count` at its default
+                    // would report a zero the sender never sent.
                     if skip_nan_values && value.is_nan() {
+                        matching_group(metrics, key).has_skipped_nan = true;
                         return Ok(None);
                     }
                     let count = try_f64_to_u64(metric.value)?;
@@ -616,6 +632,7 @@ mod test {
                     ],
                     count: 144320,
                     sum: 53423.0,
+                    has_skipped_nan: false,
                 },
             ));
         });
@@ -632,6 +649,7 @@ mod test {
                     ],
                     count: 10,
                     sum: 5.0,
+                    has_skipped_nan: false,
                 },
             ));
         });
@@ -652,6 +670,7 @@ mod test {
                     ],
                     count: 4588206224,
                     sum: 1.7560473e+07,
+                    has_skipped_nan: false,
                 },
             ));
         });
@@ -911,6 +930,7 @@ mod test {
                         ],
                         count: 19,
                         sum: 12.0,
+                        has_skipped_nan: false,
                     })
             );
         });
@@ -954,6 +974,7 @@ mod test {
                         ],
                         count: 21,
                         sum: 12.0,
+                        has_skipped_nan: false,
                     })
             );
         });
@@ -961,6 +982,27 @@ mod test {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
         });
+    }
+
+    /// One timeseries carrying a single sample, optionally with one extra label.
+    fn series(name: &str, extra: Option<(&str, &str)>, value: f64) -> proto::TimeSeries {
+        let mut labels = vec![proto::Label {
+            name: METRIC_NAME_LABEL.into(),
+            value: name.into(),
+        }];
+        if let Some((label_name, label_value)) = extra {
+            labels.push(proto::Label {
+                name: label_name.into(),
+                value: label_value.into(),
+            });
+        }
+        proto::TimeSeries {
+            labels,
+            samples: vec![proto::Sample {
+                value,
+                timestamp: 1395066367700,
+            }],
+        }
     }
 
     /// Build a `WriteRequest` for a single metric family whose samples are all
@@ -1037,6 +1079,39 @@ mod test {
             let (_, metric) = metrics.get_index(0).unwrap();
             assert_eq!(metric.count, 0);
             assert!(metric.sum.is_nan());
+        });
+    }
+
+    /// A NaN count alongside finite buckets and sum must not leave the series looking
+    /// complete: `count` would keep its default of zero and report a total the sender
+    /// never sent.
+    #[test]
+    fn parse_request_marks_partially_nan_histogram() {
+        let request = proto::WriteRequest {
+            metadata: vec![proto::MetricMetadata {
+                r#type: proto::MetricType::Histogram as i32,
+                metric_family_name: "one".into(),
+                help: String::default(),
+                unit: String::default(),
+            }],
+            timeseries: vec![
+                series("one_bucket", Some(("le", "1")), 3.0),
+                series("one_sum", None, 7.5),
+                series("one_count", None, f64::NAN),
+            ],
+        };
+
+        let parsed = parse_request(request, MetadataConflictStrategy::Ignore, true).unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "one", Histogram => |metrics: &MetricMap<HistogramMetric>| {
+            let (_, metric) = metrics.get_index(0).unwrap();
+            assert!(
+                metric.has_skipped_nan,
+                "series must be marked so the source drops it instead of reporting count 0"
+            );
+            assert_eq!(metric.count, 0);
+            assert_eq!(metric.sum, 7.5);
         });
     }
 
