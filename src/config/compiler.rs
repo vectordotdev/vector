@@ -138,6 +138,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             sources,
             sinks,
             transforms,
+            acknowledgement_required: Default::default(),
+            acknowledgement_best_effort: Default::default(),
             tests,
             secret,
             graceful_shutdown_duration,

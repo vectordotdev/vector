@@ -146,6 +146,86 @@ uri = "http://{address2}/"
 }
 
 #[tokio::test]
+async fn best_effort_sink_does_not_delay_source_acknowledgement() {
+    test_util::trace_init();
+
+    let (_source_guard, source_address) = test_util::addr::next_addr();
+    let (_required_guard, required_address) = test_util::addr::next_addr();
+    let (_best_effort_guard, best_effort_address) = test_util::addr::next_addr();
+    let config = config::load_from_str(
+        &format!(
+            r#"
+[sources.in]
+type = "http"
+address = "{source_address}"
+
+[sinks.required]
+type = "http"
+inputs = ["in"]
+encoding.codec = "json"
+uri = "http://{required_address}/"
+acknowledgements.enabled = true
+
+[sinks.best_effort]
+type = "http"
+inputs = ["in"]
+encoding.codec = "json"
+uri = "http://{best_effort_address}/"
+acknowledgements.enabled = false
+"#,
+        ),
+        Format::Toml,
+    )
+    .unwrap();
+    let diff = ConfigDiff::initial(&config);
+    let pieces = TopologyPiecesBuilder::new(&config, &diff)
+        .build_or_log_errors()
+        .await
+        .unwrap();
+    let (_topology, _) = RunningTopology::start_validated(config, diff, pieces)
+        .await
+        .unwrap();
+
+    test_util::wait_for_tcp(source_address).await;
+
+    let required_mutex = Arc::new(Mutex::new(()));
+    let required_pause = required_mutex.lock().await;
+    let mut required_rx = http_server(
+        required_address,
+        Arc::clone(&required_mutex),
+        StatusCode::OK,
+    )
+    .await;
+    let best_effort_mutex = Arc::new(Mutex::new(()));
+    let best_effort_pause = best_effort_mutex.lock().await;
+    let mut best_effort_rx = http_server(
+        best_effort_address,
+        Arc::clone(&best_effort_mutex),
+        StatusCode::INTERNAL_SERVER_ERROR,
+    )
+    .await;
+
+    let (_response_ready, sender) = http_client(source_address, "test");
+    timeout(Duration::from_secs(4), required_rx.recv())
+        .await
+        .expect("Timed out waiting for required sink")
+        .expect("Required sink did not receive event");
+    timeout(Duration::from_secs(4), best_effort_rx.recv())
+        .await
+        .expect("Timed out waiting for best-effort sink")
+        .expect("Best-effort sink did not receive event");
+
+    drop(required_pause);
+    let result = timeout(Duration::from_secs(1), sender)
+        .await
+        .expect("Best-effort sink delayed source acknowledgement")
+        .expect("Error receiving result from tokio task");
+    assert_eq!(result.status(), StatusCode::OK);
+
+    drop(best_effort_pause);
+}
+
+#[tokio::test]
 async fn http_to_http_delivered() {
     http_to_http(StatusCode::OK, StatusCode::OK).await;
 }

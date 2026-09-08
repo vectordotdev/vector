@@ -190,8 +190,25 @@ impl<'a> Builder<'a> {
             // readonly.
             enrichment_tables.finish_load();
 
+            let acknowledgement_requirements = self
+                .config
+                .transforms()
+                .map(|(key, _)| key)
+                .chain(self.config.sinks().map(|(key, _)| key))
+                .chain(self.config.enrichment_tables().map(|(key, _)| key))
+                .map(|key| {
+                    let requirement = if self.config.acknowledgement_best_effort(key) {
+                        fanout::AcknowledgementRequirement::BestEffort
+                    } else {
+                        fanout::AcknowledgementRequirement::Required
+                    };
+                    (key.clone(), requirement)
+                })
+                .collect();
+
             Ok(TopologyPieces {
                 inputs: self.inputs,
+                acknowledgement_requirements,
                 outputs: Self::finalize_outputs(self.outputs),
                 tasks: self.tasks,
                 source_tasks,
@@ -1110,6 +1127,8 @@ pub async fn reload_enrichment_tables(config: &Config) {
 
 pub struct TopologyPieces {
     pub(super) inputs: HashMap<ComponentKey, (BufferSender<EventArray>, Inputs<OutputId>)>,
+    pub(super) acknowledgement_requirements:
+        HashMap<ComponentKey, fanout::AcknowledgementRequirement>,
     pub(crate) outputs: HashMap<ComponentKey, HashMap<Option<String>, fanout::ControlChannel>>,
     pub(super) tasks: HashMap<ComponentKey, Task>,
     pub(crate) source_tasks: HashMap<ComponentKey, Task>,

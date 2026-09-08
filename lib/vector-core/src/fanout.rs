@@ -9,12 +9,22 @@ use vector_buffers::topology::channel::BufferSender;
 
 use crate::{
     config::ComponentKey,
-    event::{EventArray, EventContainer},
+    event::{EventArray, EventContainer, Finalizable},
 };
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AcknowledgementRequirement {
+    Required,
+    BestEffort,
+}
 
 pub enum ControlMessage {
     /// Adds a new sink to the fanout.
-    Add(ComponentKey, BufferSender<EventArray>),
+    Add(
+        ComponentKey,
+        BufferSender<EventArray>,
+        AcknowledgementRequirement,
+    ),
 
     /// Removes a sink from the fanout.
     Remove(ComponentKey),
@@ -26,17 +36,23 @@ pub enum ControlMessage {
     Pause(ComponentKey),
 
     /// Replaces a paused sink with its new sender.
-    Replace(ComponentKey, BufferSender<EventArray>),
+    Replace(
+        ComponentKey,
+        BufferSender<EventArray>,
+        AcknowledgementRequirement,
+    ),
 }
 
 impl fmt::Debug for ControlMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ControlMessage::")?;
         match self {
-            Self::Add(id, _) => write!(f, "Add({id:?})"),
+            Self::Add(id, _, requirement) => write!(f, "Add({id:?}, {requirement:?})"),
             Self::Remove(id) => write!(f, "Remove({id:?})"),
             Self::Pause(id) => write!(f, "Pause({id:?})"),
-            Self::Replace(id, _) => write!(f, "Replace({id:?})"),
+            Self::Replace(id, _, requirement) => {
+                write!(f, "Replace({id:?}, {requirement:?})")
+            }
         }
     }
 }
@@ -70,11 +86,26 @@ impl Fanout {
     ///
     /// Function will panic if a sink with the same ID is already present.
     pub fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>) {
+        self.add_with_requirement(id, sink, AcknowledgementRequirement::Required);
+    }
+
+    /// Add a new output with its acknowledgement requirement.
+    ///
+    /// # Panics
+    ///
+    /// Function will panic if an output with the same ID is already present.
+    pub fn add_with_requirement(
+        &mut self,
+        id: ComponentKey,
+        sink: BufferSender<EventArray>,
+        requirement: AcknowledgementRequirement,
+    ) {
         assert!(
             !self.senders.contains_key(&id),
             "Adding duplicate output id to fanout: {id}"
         );
-        self.senders.insert(id, Some(Sender::new(sink)));
+        self.senders
+            .insert(id, Some(Sender::new(sink, requirement)));
     }
 
     fn remove(&mut self, id: &ComponentKey) {
@@ -84,14 +115,19 @@ impl Fanout {
         );
     }
 
-    fn replace(&mut self, id: &ComponentKey, sink: BufferSender<EventArray>) {
+    fn replace(
+        &mut self,
+        id: &ComponentKey,
+        sink: BufferSender<EventArray>,
+        requirement: AcknowledgementRequirement,
+    ) {
         match self.senders.get_mut(id) {
             Some(sender) => {
                 // While a sink must be _known_ to be replaced, it must also be empty (previously
                 // paused or consumed when the `SendGroup` was created), otherwise an invalid
                 // sequence of control operations has been applied.
                 assert!(
-                    sender.replace(Sender::new(sink)).is_none(),
+                    sender.replace(Sender::new(sink, requirement)).is_none(),
                     "Replacing existing sink is not valid: {id}"
                 );
             }
@@ -134,10 +170,14 @@ impl Fanout {
         trace!("Processing control message outside of send: {:?}", message);
 
         match message {
-            ControlMessage::Add(id, sink) => self.add(id, sink),
+            ControlMessage::Add(id, sink, requirement) => {
+                self.add_with_requirement(id, sink, requirement);
+            }
             ControlMessage::Remove(id) => self.remove(&id),
             ControlMessage::Pause(id) => self.pause(&id),
-            ControlMessage::Replace(id, sink) => self.replace(&id, sink),
+            ControlMessage::Replace(id, sink, requirement) => {
+                self.replace(&id, sink, requirement);
+            }
         }
     }
 
@@ -277,8 +317,8 @@ impl Fanout {
                     // During a send operation, control messages must be applied via the
                     // `SendGroup`, since it has exclusive access to the senders.
                     match maybe_msg {
-                        Some(ControlMessage::Add(id, sink)) => {
-                            send_group.add(id, sink);
+                        Some(ControlMessage::Add(id, sink, requirement)) => {
+                            send_group.add(id, sink, requirement);
                         },
                         Some(ControlMessage::Remove(id)) => {
                             send_group.remove(&id);
@@ -286,8 +326,8 @@ impl Fanout {
                         Some(ControlMessage::Pause(id)) => {
                             send_group.pause(&id);
                         },
-                        Some(ControlMessage::Replace(id, sink)) => {
-                            send_group.replace(&id, Sender::new(sink));
+                        Some(ControlMessage::Replace(id, sink, requirement)) => {
+                            send_group.replace(&id, Sender::new(sink, requirement));
                         },
                         None => {
                             // Control channel is closed, which means Vector is shutting down.
@@ -337,11 +377,20 @@ impl<'a> SendGroup<'a> {
                 .expect("sender must be present to initialize SendGroup");
 
             // First, arm each sender with the item to actually send.
-            if i == last_sender_idx {
-                sender.input = events.take();
+            let mut input = if i == last_sender_idx {
+                events
+                    .take()
+                    .expect("events must be present for last sender")
             } else {
-                sender.input.clone_from(&events);
+                events
+                    .as_ref()
+                    .expect("events must be present before last sender")
+                    .clone()
+            };
+            if sender.requirement == AcknowledgementRequirement::BestEffort {
+                drop(input.take_finalizers());
             }
+            sender.input = Some(input);
             sender.send_reference = send_reference;
 
             // Now generate a send for that sender which we'll drive to completion.
@@ -377,12 +426,17 @@ impl<'a> SendGroup<'a> {
     }
 
     #[allow(clippy::needless_pass_by_value)]
-    fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>) {
+    fn add(
+        &mut self,
+        id: ComponentKey,
+        sink: BufferSender<EventArray>,
+        requirement: AcknowledgementRequirement,
+    ) {
         // When we're in the middle of a send, we can only keep track of the new sink, but can't
         // actually send to it, as we don't have the item to send... so only add it to `senders`.
         assert!(
             self.senders
-                .insert(id.clone(), Some(Sender::new(sink)))
+                .insert(id.clone(), Some(Sender::new(sink, requirement)))
                 .is_none(),
             "Adding duplicate output id to fanout: {id}"
         );
@@ -478,14 +532,16 @@ impl<'a> SendGroup<'a> {
 
 struct Sender {
     inner: BufferSender<EventArray>,
+    requirement: AcknowledgementRequirement,
     input: Option<EventArray>,
     send_reference: Option<Instant>,
 }
 
 impl Sender {
-    fn new(inner: BufferSender<EventArray>) -> Self {
+    fn new(inner: BufferSender<EventArray>, requirement: AcknowledgementRequirement) -> Self {
         Self {
             inner,
+            requirement,
             input: None,
             send_reference: None,
         }
@@ -508,6 +564,7 @@ mod tests {
 
     use futures::poll;
     use tokio::sync::mpsc::UnboundedSender;
+    use tokio::sync::oneshot::error::TryRecvError;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use tracing::Span;
     use vector_buffers::{
@@ -519,10 +576,13 @@ mod tests {
     };
     use vrl::{event_path, value::Value};
 
-    use super::{ControlMessage, Fanout};
+    use super::{AcknowledgementRequirement, ControlMessage, Fanout};
     use crate::{
         config::ComponentKey,
-        event::{Event, EventArray, EventContainer, LogEvent},
+        event::{
+            BatchNotifier, BatchStatus, Event, EventArray, EventContainer, EventFinalizer,
+            EventStatus, Finalizable, LogEvent,
+        },
         test_util::{collect_ready, collect_ready_events},
     };
 
@@ -606,6 +666,7 @@ mod tests {
             .send(ControlMessage::Replace(
                 ComponentKey::from(sender_id.to_string()),
                 sender,
+                AcknowledgementRequirement::Required,
             ))
             .expect("sending control message should not fail");
 
@@ -639,6 +700,7 @@ mod tests {
             .send(ControlMessage::Replace(
                 ComponentKey::from(sender_id.to_string()),
                 sender,
+                AcknowledgementRequirement::Required,
             ))
             .expect("sending control message should not fail");
     }
@@ -673,6 +735,50 @@ mod tests {
                 std::slice::from_ref(&events)
             );
         }
+    }
+
+    #[tokio::test]
+    async fn best_effort_branch_does_not_participate_in_acknowledgements() {
+        let (mut fanout, _) = Fanout::new(ComponentKey::from("test_upstream"));
+        let (required_sender, mut required_receiver) = build_sender_pair(1);
+        let (best_effort_sender, mut best_effort_receiver) = build_sender_pair(1);
+        fanout.add_with_requirement(
+            ComponentKey::from("required"),
+            required_sender,
+            AcknowledgementRequirement::Required,
+        );
+        fanout.add_with_requirement(
+            ComponentKey::from("best_effort"),
+            best_effort_sender,
+            AcknowledgementRequirement::BestEffort,
+        );
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let mut events = make_event_array(1);
+        let EventArray::Logs(logs) = &mut events else {
+            panic!("test events must be logs");
+        };
+        logs[0].add_finalizer(EventFinalizer::new(batch.clone()));
+        drop(batch);
+
+        fanout.send(events, None).await.expect("send must succeed");
+
+        let mut best_effort = best_effort_receiver
+            .next()
+            .await
+            .expect("best-effort branch must receive events");
+        assert!(best_effort.take_finalizers().is_empty());
+        drop(best_effort);
+        assert!(matches!(receiver.try_recv(), Err(TryRecvError::Empty)));
+
+        let mut required = required_receiver
+            .next()
+            .await
+            .expect("required branch must receive events");
+        let finalizers = required.take_finalizers();
+        finalizers.update_status(EventStatus::Delivered);
+        drop(finalizers);
+        assert_eq!(receiver.await, BatchStatus::Delivered);
     }
 
     #[tokio::test]

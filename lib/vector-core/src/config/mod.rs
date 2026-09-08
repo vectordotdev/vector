@@ -379,6 +379,10 @@ impl AcknowledgementsConfig {
     pub fn enabled(&self) -> bool {
         self.enabled.unwrap_or(false)
     }
+
+    pub fn explicitly_disabled(&self) -> bool {
+        self.enabled == Some(false)
+    }
 }
 
 impl From<Option<bool>> for AcknowledgementsConfig {
