@@ -245,7 +245,7 @@ where
 
                 let remove_file_tasks: HashMap<Id, PathBuf> = known_small_files
                     .iter()
-                    .filter(|&(_path, last_time_open)| last_time_open.elapsed() >= grace_period)
+                    .filter(|&(_path, state)| state.first_seen.elapsed() >= grace_period)
                     .map(|(path, _last_time_open)| path.clone())
                     .map(|path| {
                         let path_ = path.clone();
