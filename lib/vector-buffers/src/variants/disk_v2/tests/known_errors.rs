@@ -343,6 +343,75 @@ async fn restart_advances_past_acknowledged_file_ending_in_complete_corrupt_reco
 }
 
 #[tokio::test]
+async fn restart_stops_before_unread_trailing_corrupt_record_on_current_reader_file() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, reader, ledger) =
+                create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
+
+            writer
+                .write_record(SizedRecord::new(32))
+                .await
+                .expect("first write should not fail");
+            writer
+                .write_record(SizedRecord::new(33))
+                .await
+                .expect("second write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            let corrupt_bytes = writer
+                .write_record(SizedRecord::new(34))
+                .await
+                .expect("corrupt write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            assert_reader_writer_v2_file_positions!(ledger, 0, 1);
+            let corrupt_data_file_path = ledger.get_current_writer_data_file_path();
+
+            // Model the durable state after the reader has acknowledged and retired the first
+            // data file without reading the current writer file. On restart the reader record ID
+            // is therefore ahead of its fresh in-memory cursor, but the first physical frame in
+            // the current reader file is still unread.
+            ledger.state().increment_last_reader_record_id(2);
+            ledger.increment_acked_reader_file_id();
+            ledger
+                .flush_reader_file_checkpoint()
+                .expect("reader checkpoint flush should not fail");
+            assert_reader_writer_v2_file_positions!(ledger, 1, 1);
+
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+
+            corrupt_record_checksum(&corrupt_data_file_path, 0, corrupt_bytes).await;
+
+            let (mut writer, mut reader, ledger) =
+                create_buffer_v2_with_max_data_file_size::<_, SizedRecord>(data_dir, 172).await;
+            assert_eq!(
+                corrupt_bytes as u64,
+                ledger.get_total_buffer_size(),
+                "recovery must count the unread corrupt frame"
+            );
+
+            let corrupt_read = timeout(Duration::from_millis(500), reader.next())
+                .await
+                .expect("runtime reader should encounter the unread corrupt frame")
+                .expect_err("corrupt read should fail");
+            assert!(matches!(corrupt_read, ReaderError::Checksum { .. }));
+            assert_eq!(0, ledger.get_total_buffer_size());
+
+            writer.close();
+            assert_eq!(
+                None,
+                reader.next().await.expect("final read should not fail")
+            );
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
 async fn restart_counts_unread_leading_corrupt_record_in_reader_boundary_file() {
     with_temp_dir(|dir| {
         let data_dir = dir.to_path_buf();

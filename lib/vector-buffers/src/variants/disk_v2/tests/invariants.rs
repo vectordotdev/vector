@@ -14,6 +14,7 @@ use crate::{
             create_buffer_v2_with_write_buffer_size, create_default_buffer_v2,
             get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload,
         },
+        writer::RecordWriter,
     },
 };
 
@@ -90,21 +91,214 @@ async fn publishing_writer_progress_updates_ledger_before_waking_reader() {
             let (_writer, _reader, ledger) =
                 create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
 
-            let mut wait_for_writer = spawn(ledger.wait_for_writer());
+            let mut writer_progress = ledger.subscribe_writer_progress();
+            let mut wait_for_writer = spawn(writer_progress.changed());
             assert_pending!(wait_for_writer.poll());
             assert!(!wait_for_writer.is_woken());
 
-            let next_record_id = ledger.publish_writer_progress(1, 128);
+            let next_record_id =
+                ledger.publish_writer_progress(1, 128, ledger.get_current_writer_file_id(), 128);
 
             assert_eq!(next_record_id, 2);
             assert_eq!(ledger.state().get_next_writer_record_id(), 2);
             assert_eq!(ledger.get_total_buffer_size(), 128);
             assert!(wait_for_writer.is_woken());
-            assert_ready!(wait_for_writer.poll());
+            assert_ready!(wait_for_writer.poll())
+                .expect("writer progress channel should remain open");
+            drop(wait_for_writer);
+            let published = *writer_progress.borrow();
+            assert_eq!(
+                published.published_position(),
+                Some((ledger.get_current_writer_file_id(), 128))
+            );
+            assert_eq!(published.next_record_id(), 2);
         }
     });
 
     let parent = trace_span!("publishing_writer_progress_updates_ledger_before_waking_reader");
+    fut.instrument(parent.or_current()).await;
+}
+
+#[tokio::test]
+async fn writer_progress_published_before_wait_is_not_missed() {
+    let _a = install_tracing_helpers();
+
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (_writer, _reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            let mut writer_progress = ledger.subscribe_writer_progress();
+
+            ledger.publish_writer_progress(1, 128, ledger.get_current_writer_file_id(), 128);
+
+            writer_progress
+                .changed()
+                .await
+                .expect("writer progress channel should remain open");
+            let published = *writer_progress.borrow_and_update();
+            assert_eq!(
+                published.published_position(),
+                Some((ledger.get_current_writer_file_id(), 128))
+            );
+            assert_eq!(published.next_record_id(), 2);
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn reader_progress_published_before_wait_is_not_missed() {
+    let _a = install_tracing_helpers();
+
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (_writer, _reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            let mut reader_progress = ledger.subscribe_reader_progress();
+
+            ledger.notify_reader_waiters();
+
+            reader_progress
+                .changed()
+                .await
+                .expect("reader progress channel should remain open");
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn reader_uses_record_gate_when_writer_position_is_unavailable() {
+    let _a = install_tracing_helpers();
+
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (mut writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            let record = SizedRecord::new(64);
+
+            writer
+                .write_record(record.clone())
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+
+            // Recovery can temporarily have no open writer file while retaining readable,
+            // checkpointed records. In that state, the record-ID boundary remains authoritative.
+            ledger.publish_writer_position(None);
+
+            assert_eq!(read_next(&mut reader).await, Some(record));
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn writer_failure_terminates_reader_wait() {
+    let _a = install_tracing_helpers();
+
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (_writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            ledger.mark_writer_failed();
+
+            let error = reader
+                .next()
+                .await
+                .expect_err("writer failure should terminate the reader");
+            assert!(matches!(
+                error,
+                crate::variants::disk_v2::ReaderError::Io { .. }
+            ));
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn reader_waits_for_visible_record_to_be_published() {
+    let assertion_registry = install_tracing_helpers();
+
+    let fut = with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (_writer, mut reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            let config = ledger.config().clone();
+            let data_file = OpenOptions::new()
+                .append(true)
+                .open(ledger.get_current_writer_data_file_path())
+                .await
+                .expect("data file should open");
+            let mut physical_writer = RecordWriter::new(
+                data_file,
+                0,
+                config.write_buffer_size,
+                config.max_data_file_size,
+                config.max_record_size,
+            );
+            let record = SizedRecord::new(64);
+            let (record_bytes, _) = physical_writer
+                .write_record(1, record.clone())
+                .await
+                .expect("physical write should succeed");
+            physical_writer
+                .flush()
+                .await
+                .expect("physical flush should succeed");
+
+            assert_eq!(ledger.state().get_next_writer_record_id(), 1);
+            assert_buffer_is_empty!(ledger);
+
+            let waiting_for_publication = assertion_registry
+                .build()
+                .with_name("wait_for_writer")
+                .with_parent_name("reader_waits_for_visible_record_to_be_published")
+                .was_entered()
+                .finalize();
+            let mut blocked_read = spawn(read_next(&mut reader));
+            while !waiting_for_publication.try_assert() {
+                assert_pending!(blocked_read.poll());
+            }
+            assert_pending!(blocked_read.poll());
+            assert!(!blocked_read.is_woken());
+
+            ledger.notify_writer_waiters();
+
+            assert!(blocked_read.is_woken());
+            assert_pending!(blocked_read.poll());
+
+            ledger.publish_writer_progress(
+                1,
+                record_bytes as u64,
+                ledger.get_current_writer_file_id(),
+                record_bytes as u64,
+            );
+
+            assert!(blocked_read.is_woken());
+            let mut read_result = None;
+            for _ in 0..100 {
+                if let std::task::Poll::Ready(result) = blocked_read.poll() {
+                    read_result = Some(result);
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            assert_eq!(read_result, Some(Some(record)));
+        }
+    });
+
+    let parent = trace_span!("reader_waits_for_visible_record_to_be_published");
     fut.instrument(parent.or_current()).await;
 }
 

@@ -9,13 +9,16 @@ use std::{
 use crc32fast::Hasher;
 use rkyv::{AlignedVec, archived_root};
 use snafu::{ResultExt, Snafu};
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncRead, BufReader},
+    sync::watch,
+};
 use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 
 use super::{
     Filesystem,
     common::create_crc32c_hasher,
-    ledger::Ledger,
+    ledger::{Ledger, WriterProgress},
     record::{ArchivedRecord, Record, RecordStatus, validate_record_archive},
 };
 use crate::{
@@ -225,6 +228,26 @@ pub(super) struct RecordReader<R, T> {
     _t: PhantomData<T>,
 }
 
+/// Physical byte boundary where normal unread records begin after startup recovery.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct ReadBoundary {
+    data_file_id: u16,
+    byte_offset: u64,
+}
+
+impl ReadBoundary {
+    pub(super) const fn new(data_file_id: u16, byte_offset: u64) -> Self {
+        Self {
+            data_file_id,
+            byte_offset,
+        }
+    }
+
+    fn is_reached(self, data_file_id: u16, byte_offset: u64) -> bool {
+        self.data_file_id == data_file_id && byte_offset >= self.byte_offset
+    }
+}
+
 impl<R, T> RecordReader<R, T>
 where
     R: AsyncRead + Unpin,
@@ -426,6 +449,7 @@ where
     FS: Filesystem,
 {
     ledger: Arc<Ledger<FS>>,
+    writer_progress: watch::Receiver<WriterProgress>,
     reader: Option<RecordReader<FS::File, T>>,
     pending_read_token: Option<ReadToken>,
     bytes_read: u64,
@@ -433,6 +457,7 @@ where
     data_file_start_record_id: Option<u64>,
     data_file_record_count: u64,
     data_file_marked_record_count: u64,
+    startup_read_boundary: Option<ReadBoundary>,
     ready_to_read: bool,
     record_acks: OrderedAcknowledgements<u64, u64>,
     data_file_acks: OrderedAcknowledgements<u64, ()>,
@@ -450,9 +475,11 @@ where
     pub(crate) fn new(ledger: Arc<Ledger<FS>>, finalizer: OrderedFinalizer<u64>) -> Self {
         let ledger_last_reader_record_id = ledger.state().get_last_reader_record_id();
         let next_expected_record_id = ledger_last_reader_record_id + 1;
+        let writer_progress = ledger.subscribe_writer_progress();
 
         Self {
             ledger,
+            writer_progress,
             reader: None,
             pending_read_token: None,
             bytes_read: 0,
@@ -460,6 +487,7 @@ where
             data_file_start_record_id: None,
             data_file_record_count: 0,
             data_file_marked_record_count: 0,
+            startup_read_boundary: None,
             ready_to_read: false,
             record_acks: OrderedAcknowledgements::from_acked(next_expected_record_id),
             data_file_acks: OrderedAcknowledgements::from_acked(0),
@@ -480,6 +508,17 @@ where
         self.reader = None;
         self.bytes_read = 0;
         self.data_file_start_record_id = None;
+    }
+
+    fn is_record_published(&self, token: &ReadToken) -> bool {
+        token.record_id() < self.writer_progress.borrow().next_record_id()
+    }
+
+    #[cfg_attr(test, instrument(skip(self), level = "trace"))]
+    async fn wait_for_writer(&mut self) {
+        match self.writer_progress.changed().await {
+            Ok(()) | Err(_) => {}
+        }
     }
 
     fn track_read(&mut self, record_id: u64, record_bytes: u64, event_count: NonZeroU64) {
@@ -819,7 +858,7 @@ where
                                 data_file_path = data_file_path.to_string_lossy().as_ref(),
                                 "Data file does not yet exist. Waiting for writer to create."
                             );
-                            self.ledger.wait_for_writer().await;
+                            self.wait_for_writer().await;
                         } else {
                             self.ledger.increment_acked_reader_file_id();
                         }
@@ -854,12 +893,16 @@ where
     /// If an error occurs during seeking to the next record, an error variant will be returned
     /// describing the error.
     #[cfg_attr(test, instrument(skip(self), level = "debug"))]
-    pub(super) async fn seek_to_next_record(&mut self) -> Result<(), ReaderError<T>> {
+    pub(super) async fn seek_to_next_record(
+        &mut self,
+        read_boundary: ReadBoundary,
+    ) -> Result<(), ReaderError<T>> {
         // We don't try seeking again once we're all caught up.
         if self.ready_to_read {
             warn!("Reader already initialized.");
             return Ok(());
         }
+        self.startup_read_boundary = Some(read_boundary);
 
         // We rely on `next` to close out the data file if we've actually reached the end, and we
         // also rely on it to reset the data file before trying to read, and we _also_ rely on it to
@@ -989,6 +1032,7 @@ where
             "Synchronized with ledger. Reader ready."
         );
 
+        self.startup_read_boundary = None;
         self.ready_to_read = true;
 
         Ok(())
@@ -1011,18 +1055,17 @@ where
         let mut force_check_pending_data_files = false;
 
         let token = loop {
+            // Mark the latest writer/acknowledgement notification as observed immediately before
+            // processing the state it may represent. Any notification published after this
+            // snapshot remains unseen, so a later `changed()` call returns immediately and drives
+            // another loop iteration instead of losing an acknowledgement wake at the published
+            // byte boundary.
+            let writer_progress = *self.writer_progress.borrow_and_update();
+
             // Handle any pending acknowledgements first.
             self.handle_pending_acknowledgements(force_check_pending_data_files)
                 .context(IoSnafu)?;
             force_check_pending_data_files = false;
-
-            // Startup can read one valid frame beyond the durable reader checkpoint while using
-            // its ID to bound a preceding corrupt frame. The underlying file cursor has already
-            // advanced, but the frame itself remains in `RecordReader::aligned_buf`, so retain its
-            // token and deliver it through the normal read path once initialization is complete.
-            if let Some(token) = self.pending_read_token.take() {
-                break token;
-            }
 
             // If the writer has marked themselves as done, and the buffer has been emptied, then
             // we're done and can return.  We have to look at something besides simply the writer
@@ -1034,16 +1077,63 @@ where
             // corrupted records, but hadn't yet had a "good" record that we could read, since the
             // "we skipped records due to corruption" logic requires performing valid read to
             // detect, and calculate a valid delta from.
-            if self.ledger.is_writer_done() {
+            if writer_progress.is_failed() {
+                return Err(ReaderError::Io {
+                    source: io::Error::other("disk buffer writer failed"),
+                });
+            }
+            if writer_progress.is_done() {
                 let total_buffer_size = self.ledger.get_total_buffer_size();
                 if total_buffer_size == 0 {
                     return Ok(None);
                 }
             }
 
+            // Startup can read one valid frame beyond the durable reader checkpoint while using
+            // its ID to bound a preceding corrupt frame. Runtime reads can likewise observe a
+            // physically flushed record in the short interval before the writer publishes it to
+            // the ledger. The underlying file cursor has already advanced in either case, so keep
+            // the token until it is safe to deliver. An unrelated notification only causes this
+            // predicate to be checked again.
+            if let Some(token) = self.pending_read_token.take() {
+                if self.ready_to_read && !self.is_record_published(&token) {
+                    self.pending_read_token = Some(token);
+                    self.wait_for_writer().await;
+                    continue;
+                }
+                break token;
+            }
+
+            // Checkpoint recovery has already classified the bytes before this boundary as
+            // acknowledged and the bytes at or after it as unread. Stop startup replay before
+            // consuming the first unread frame. This matters for a corrupt frame, whose record ID
+            // cannot be decoded and therefore cannot trigger the token-based unread check below.
+            let reader_file_id = self.ledger.get_current_reader_file_id();
+            if !self.ready_to_read
+                && self
+                    .startup_read_boundary
+                    .is_some_and(|boundary| boundary.is_reached(reader_file_id, self.bytes_read))
+            {
+                return Ok(None);
+            }
+
             self.ensure_ready_for_read().await.context(IoSnafu)?;
 
             let (reader_file_id, writer_file_id) = self.ledger.get_current_reader_writer_file_id();
+
+            // The snapshot is the completed writer boundary observed before acknowledgement
+            // processing. A concurrent publication remains unseen and makes `changed()` return
+            // immediately. The buffered file reader may have prefetched later physical bytes, but
+            // record delivery remains bounded by both this byte position and the record-ID gate.
+            if self.ready_to_read
+                && let Some((published_file_id, published_byte_offset)) =
+                    writer_progress.published_position()
+                && reader_file_id == published_file_id
+                && self.bytes_read >= published_byte_offset
+            {
+                self.wait_for_writer().await;
+                continue;
+            }
 
             // Essentially: is the writer still writing to this data file or not, and are we
             // actually ready to read (aka initialized)?
@@ -1076,6 +1166,14 @@ where
                 {
                     self.pending_read_token = Some(token);
                     return Ok(None);
+                }
+                // The file write becomes visible before the writer can synchronously publish its
+                // record and byte counters. Do not let a reader already draining the file consume
+                // and acknowledge that record against the old counters.
+                Ok(Some(token)) if !self.is_record_published(&token) => {
+                    self.pending_read_token = Some(token);
+                    self.wait_for_writer().await;
+                    continue;
                 }
                 // We got a valid record within the startup replay window, or a normal runtime
                 // record, so keep the token.
@@ -1149,7 +1247,7 @@ where
                     continue;
                 }
 
-                self.ledger.wait_for_writer().await;
+                self.wait_for_writer().await;
             } else {
                 debug!(
                     bytes_read = self.bytes_read,

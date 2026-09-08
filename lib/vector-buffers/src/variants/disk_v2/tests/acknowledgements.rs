@@ -68,7 +68,8 @@ async fn ack_wakes_reader() {
             let ledger = Arc::new(ledger);
             let finalizer = Arc::clone(&ledger).spawn_finalizer();
 
-            let mut wait_for_writer = spawn(ledger.wait_for_writer());
+            let mut writer_progress = ledger.subscribe_writer_progress();
+            let mut wait_for_writer = spawn(writer_progress.changed());
             assert_pending!(wait_for_writer.poll());
             assert!(!wait_for_writer.is_woken());
 
@@ -78,7 +79,8 @@ async fn ack_wakes_reader() {
             acknowledge(batch).await;
 
             assert!(wait_for_writer.is_woken());
-            assert_ready!(wait_for_writer.poll());
+            assert_ready!(wait_for_writer.poll())
+                .expect("writer progress channel should remain open");
         }
     })
     .await;

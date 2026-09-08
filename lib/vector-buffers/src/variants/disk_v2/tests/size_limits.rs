@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use tokio::time::timeout;
+use tokio::{sync::watch, time::timeout};
 use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 
@@ -15,7 +15,7 @@ use crate::{
     assert_reader_writer_v2_file_positions,
     test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{
-        TryWriteOutcome,
+        TryWriteOutcome, WriterError,
         common::align16,
         tests::{get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload},
     },
@@ -465,6 +465,44 @@ async fn writer_try_write_returns_when_buffer_is_full() {
                 .await
                 .expect("write should not fail");
             assert!(matches!(second_write_result, TryWriteOutcome::Full(_)));
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn writer_marks_full_record_errored_when_shutting_down() {
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let write_size = 96;
+            let first_record = SizedRecord::new(write_size);
+            let mut second_record = SizedRecord::new(write_size);
+            let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+            second_record.add_batch_notifier(batch);
+
+            let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
+            let (mut writer, _, _) =
+                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
+
+            writer
+                .write_record(first_record)
+                .await
+                .expect("first write should fill the buffer");
+            writer.flush().await.expect("flush should not fail");
+
+            let (shutdown, shutdown_rx) = watch::channel(());
+            writer.set_shutdown(shutdown_rx);
+            shutdown.send(()).expect("writer should observe shutdown");
+
+            let result = writer.write_record(second_record).await;
+            assert!(matches!(result, Err(WriterError::Shutdown)));
+            assert_eq!(
+                receiver.try_recv(),
+                Ok(BatchStatus::Errored),
+                "a record rejected by shutdown must not resolve as Delivered",
+            );
         }
     })
     .await;
