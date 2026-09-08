@@ -664,7 +664,7 @@ mod test {
         // Before the fix this returned 400 and the valid sample was lost with it.
         send_request_and_assert(address.port(), request_body).await;
 
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();

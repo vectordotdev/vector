@@ -131,8 +131,11 @@ fn reparse_groups(
             }
             GroupKind::Histogram(metrics) => {
                 for (key, metric) in metrics {
+                    // `has_skipped_nan` means part of this series was dropped upstream,
+                    // so the remaining buckets and count no longer describe it.
                     if skip_nan_values
-                        && (metric.sum.is_some_and(f64::is_nan)
+                        && (metric.has_skipped_nan
+                            || metric.sum.is_some_and(f64::is_nan)
                             || metric.buckets.iter().any(|b| b.bucket.is_nan()))
                     {
                         continue;
@@ -178,8 +181,11 @@ fn reparse_groups(
             }
             GroupKind::Summary(metrics) => {
                 for (key, metric) in metrics {
+                    // `has_skipped_nan` means part of this series was dropped upstream,
+                    // so the remaining quantiles and count no longer describe it.
                     if skip_nan_values
-                        && (metric.sum.is_nan()
+                        && (metric.has_skipped_nan
+                            || metric.sum.is_nan()
                             || metric
                                 .quantiles
                                 .iter()
