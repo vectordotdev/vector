@@ -70,9 +70,10 @@ pub struct ChunkedGelfDecoderOptions {
     ///
     /// Chunks belonging to messages that are already pending are still accepted once the limit is
     /// reached, so in-flight messages can complete.
-    #[serde(default = "default_pending_messages_limit")]
-    #[derivative(Default(value = "default_pending_messages_limit()"))]
-    pub pending_messages_limit: usize,
+    ///
+    /// If unset or `null`, this defaults to 4096.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    pub pending_messages_limit: Option<usize>,
 
     /// The maximum length of a single GELF message, in bytes. Messages longer than this length are
     /// dropped. If this option is not set, the decoder does not limit the length of messages and
@@ -317,7 +318,7 @@ impl ChunkedGelfDecoder {
     /// Creates a new `ChunkedGelfDecoder`.
     pub fn new(
         timeout_secs: f64,
-        pending_messages_limit: usize,
+        pending_messages_limit: Option<usize>,
         max_length: Option<usize>,
         decompression_config: ChunkedGelfDecompressionConfig,
     ) -> Self {
@@ -326,7 +327,8 @@ impl ChunkedGelfDecoder {
             decompression_config,
             state: Arc::new(Mutex::new(HashMap::new())),
             timeout: Duration::from_secs_f64(timeout_secs),
-            pending_messages_limit,
+            pending_messages_limit: pending_messages_limit
+                .unwrap_or_else(default_pending_messages_limit),
             max_length,
         }
     }
@@ -549,7 +551,7 @@ impl Default for ChunkedGelfDecoder {
     fn default() -> Self {
         Self::new(
             DEFAULT_TIMEOUT_SECS,
-            default_pending_messages_limit(),
+            None,
             None,
             ChunkedGelfDecompressionConfig::Auto,
         )
@@ -981,9 +983,17 @@ mod tests {
         let default = ChunkedGelfDecoder::default();
         assert_eq!(default.pending_messages_limit, MAX_PENDING_MESSAGES);
 
+        let explicit_null: ChunkedGelfDecoderOptions =
+            serde_json::from_value(serde_json::json!({ "pending_messages_limit": null })).unwrap();
+        let decoder = ChunkedGelfDecoderConfig {
+            chunked_gelf: explicit_null,
+        }
+        .build();
+        assert_eq!(decoder.pending_messages_limit, MAX_PENDING_MESSAGES);
+
         let raised = ChunkedGelfDecoder::new(
             DEFAULT_TIMEOUT_SECS,
-            MAX_PENDING_MESSAGES + 1,
+            Some(MAX_PENDING_MESSAGES + 1),
             None,
             ChunkedGelfDecompressionConfig::Auto,
         );
@@ -991,7 +1001,7 @@ mod tests {
 
         let lowered = ChunkedGelfDecoder::new(
             DEFAULT_TIMEOUT_SECS,
-            1,
+            Some(1),
             None,
             ChunkedGelfDecompressionConfig::Auto,
         );

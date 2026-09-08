@@ -420,9 +420,11 @@ _schemaDefinitions: {
 
 						Chunks belonging to messages that are already pending are still accepted once the limit is
 						reached, so in-flight messages can complete.
+
+						If unset or `null`, this defaults to 4096.
 						"""
 					required: false
-					type: uint: default: 4096
+					type: uint: {}
 				}
 				timeout_secs: {
 					description: """
@@ -718,9 +720,11 @@ _schemaDefinitions: {
 
 				Chunks belonging to messages that are already pending are still accepted once the limit is
 				reached, so in-flight messages can complete.
+
+				If unset or `null`, this defaults to 4096.
 				"""
 			required: false
-			type: uint: default: 4096
+			type: uint: {}
 		}
 		timeout_secs: {
 			description: """
@@ -3514,9 +3518,11 @@ _schemaDefinitions: {
 
 															Chunks belonging to messages that are already pending are still accepted once the limit is
 															reached, so in-flight messages can complete.
+
+															If unset or `null`, this defaults to 4096.
 															"""
 							required: false
-							type: uint: default: 4096
+							type: uint: {}
 						}
 						timeout_secs: {
 							description: """
