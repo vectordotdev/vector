@@ -289,9 +289,12 @@ impl AwsS3Config {
 
         match self.sqs {
             Some(ref sqs) => {
+                // Use SQS-specific auth if provided, otherwise fall back to main auth
+                let sqs_auth = sqs.auth.as_ref().unwrap_or(&self.auth);
+
                 let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
                     &SqsClientBuilder {},
-                    &self.auth,
+                    sqs_auth,
                     region.clone(),
                     endpoint,
                     proxy,
@@ -833,6 +836,92 @@ mod integration_tests {
             false,
             DeserializerConfig::Bytes,
             Some(custom_options),
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_message_different_sqs_auth() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        let s3 = s3_client().await;
+        let sqs = sqs_client().await;
+        let queue = create_queue(&sqs).await;
+        let bucket = create_bucket(&s3).await;
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let mut config = config(&queue, None, false, DeserializerConfig::Bytes);
+
+        // Add custom SQS auth (LocalStack accepts any credentials)
+        config.sqs.as_mut().unwrap().auth = Some(AwsAuthentication::AccessKey {
+            access_key_id: "DIFFERENT_KEY_ID".to_string().into(),
+            secret_access_key: "DIFFERENT_SECRET_KEY".to_string().into(),
+            session_token: None,
+            assume_role: None,
+            external_id: None,
+            region: None,
+            session_name: None,
+        });
+
+        let key = uuid::Uuid::new_v4().to_string();
+        let payload = logs.join("\n").into_bytes();
+
+        s3.put_object()
+            .bucket(bucket.clone())
+            .key(key.clone())
+            .body(ByteStream::from(payload))
+            .send()
+            .await
+            .expect("Could not put payload");
+
+        let mut s3_event: S3Event = serde_json::from_str(
+            r#"{"Records":[{"eventVersion":"2.1","eventSource":"aws:s3","awsRegion":"us-east-1","eventTime":"2022-03-24T19:43:00.548Z","eventName":"ObjectCreated:Put","userIdentity":{"principalId":"AWS:ARNOTAREALIDD4:user.name"},"requestParameters":{"sourceIPAddress":"136.56.73.213"},"responseElements":{"x-amz-request-id":"ZX6X98Q6NM9NQTP3","x-amz-id-2":"ESLLtyT4N5cAPW+C9EXwtaeEWz6nq7eCA6txjZKlG2Q7xp2nHXQI69Od2B0PiYIbhUiX26NrpIQPV0lLI6js3nVNmYo2SWBs"},"s3":{"s3SchemaVersion":"1.0","configurationId":"asdfasdf","bucket":{"name":"bucket-name","ownerIdentity":{"principalId":"A3PEG170DF9VNQ"},"arn":"arn:aws:s3:::nfox-testing-vector"},"object":{"key":"test-log.txt","size":33,"eTag":"c981ce6672c4251048b0b834e334007f","sequencer":"00623CC9C47AB5634C"}}}]}"#,
+        )
+        .unwrap();
+
+        s3_event.records[0].s3.bucket.name.clone_from(&bucket);
+        s3_event.records[0].s3.object.key.clone_from(&key);
+
+        sqs.send_message()
+            .queue_url(queue.clone())
+            .message_body(serde_json::to_string(&s3_event).unwrap())
+            .send()
+            .await
+            .unwrap();
+
+        let (tx, rx) = SourceSender::new_test_finalize(Delivered);
+        let cx = SourceContext::new_test(tx, None);
+        let source = config.build(cx).await.unwrap();
+        tokio::spawn(async move { source.await.unwrap() });
+
+        let events = collect_n(rx, logs.len()).await;
+        assert_eq!(logs.len(), events.len());
+
+        tokio::time::sleep(Duration::from_secs(10)).await;
+        assert_eq!(count_messages(&sqs, &queue, 0).await, 0);
+    }
+
+    #[tokio::test]
+    async fn s3_process_message_without_sqs_auth_uses_default() {
+        trace_init();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        // Test backwards compatibility - config without sqs.auth should work
+        test_event(
+            None,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+            false,
+            DeserializerConfig::Bytes,
+            None,
         )
         .await;
     }

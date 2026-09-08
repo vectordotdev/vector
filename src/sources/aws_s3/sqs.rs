@@ -42,7 +42,7 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    aws::AwsTimeout,
+    aws::{AwsAuthentication, AwsTimeout},
     codecs::Decoder,
     common::backoff::ExponentialBackoff,
     config::{SourceAcknowledgementsConfig, SourceContext},
@@ -176,6 +176,14 @@ pub(super) struct Config {
     #[serde(default)]
     #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
+
+    /// Authentication configuration for SQS.
+    ///
+    /// If not specified, the main `auth` configuration will be used.
+    ///
+    /// This allows SQS to use different credentials than S3, enabling cross-account scenarios
+    /// where the S3 bucket and SQS queue are accessible via different AWS accounts.
+    pub(super) auth: Option<AwsAuthentication>,
 
     /// Configuration for deferring events to another queue based on their age.
     pub(super) deferred: Option<DeferredConfig>,
@@ -1293,4 +1301,85 @@ fn parse_sqs_config() {
           queue_url: "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
     "#});
     assert!(test.is_err());
+}
+
+#[test]
+fn parse_sqs_config_with_custom_auth() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [auth]
+            access_key_id = "AKIAIOSFODNN7EXAMPLE"
+            secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    assert!(config.auth.is_some());
+
+    // Verify the auth was parsed correctly
+    match config.auth.unwrap() {
+        AwsAuthentication::AccessKey {
+            access_key_id,
+            secret_access_key,
+            ..
+        } => {
+            assert_eq!(access_key_id.inner(), "AKIAIOSFODNN7EXAMPLE");
+            assert_eq!(
+                secret_access_key.inner(),
+                "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+            );
+        }
+        _ => panic!("Expected AccessKey auth variant"),
+    }
+}
+
+#[test]
+fn parse_sqs_config_with_assume_role() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [auth]
+            assume_role = "arn:aws:iam::123456789012:role/SQSRole"
+            external_id = "external123"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    assert!(config.auth.is_some());
+
+    // Verify role assumption was parsed correctly
+    match config.auth.unwrap() {
+        AwsAuthentication::Role {
+            assume_role,
+            external_id,
+            ..
+        } => {
+            assert_eq!(assume_role, "arn:aws:iam::123456789012:role/SQSRole");
+            assert_eq!(external_id, Some("external123".to_string()));
+        }
+        _ => panic!("Expected Role auth variant"),
+    }
+}
+
+#[test]
+fn parse_sqs_config_without_auth_uses_default() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    // Auth should be None, allowing fallback to main auth
+    assert!(config.auth.is_none());
 }
