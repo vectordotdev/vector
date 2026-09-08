@@ -1,6 +1,37 @@
 #!/bin/sh
 set -e
 
+# Complete the rm_conffile transition started in preinst; see preinst for context.
+for _example_conffile in \
+  docs_example.yaml \
+  environment_variables.yaml \
+  es_s3_hybrid.yaml \
+  file_to_cloudwatch_metrics.yaml \
+  file_to_prometheus.yaml \
+  http_sink_custom_retry.yaml \
+  prometheus_to_console.yaml \
+  stdio.yaml \
+  varint_framing_protobuf.yaml \
+  wrapped_json.yaml \
+  namespacing/sinks/es_cluster.yaml \
+  namespacing/sinks/s3_archives.yaml \
+  namespacing/sources/apache_logs.yaml \
+  namespacing/transforms/apache_parser.yaml \
+  namespacing/transforms/apache_sample.yaml \
+  namespacing/vector.yaml
+do
+  dpkg-maintscript-helper rm_conffile \
+    "/etc/vector/examples/$_example_conffile" 0.57.0-1 vector -- "$@"
+done
+
+# Restore a pre-existing /etc/vector/vector.yaml that preinst moved aside
+# (see preinst for why). This puts the user's original content back in
+# place of the stub conffile dpkg just unpacked, so nothing is lost and no
+# conffile prompt was ever shown.
+if [ -e /etc/vector/vector.yaml.vector-preserve ]; then
+  mv -f /etc/vector/vector.yaml.vector-preserve /etc/vector/vector.yaml
+fi
+
 # Add Vector to adm group to read /var/logs
 usermod --append --groups adm vector || true
 

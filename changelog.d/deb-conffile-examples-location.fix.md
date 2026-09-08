@@ -1,0 +1,4 @@
+Fixed two Debian packaging issues: `/etc/vector/vector.yaml` is now shipped as a proper Debian conffile (a stub with no active sources/sinks) so local modifications are preserved across upgrades; example configurations have been moved from `/etc/vector/examples/` to `/usr/share/doc/vector/examples/` where they belong as documentation rather than administrator-managed configuration.
+
+Since `/etc/vector/vector.yaml` was not previously a dpkg conffile, a pre-existing file at that path (created by a user, or by a Vector version prior to this fix) would otherwise make `dpkg` stop with an interactive "file created by you" conffile prompt, breaking unattended upgrades. Maintainer scripts now move any such untracked file aside before install and restore it afterwards, so upgrades complete without prompting and existing content is preserved byte-for-byte.
+authors: koenserry
