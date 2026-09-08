@@ -49,8 +49,12 @@ pub(super) fn parse_request(
     metadata_conflict_strategy: MetadataConflictStrategy,
     skip_nan_values: bool,
 ) -> Result<Vec<Event>, ParserError> {
-    vector_lib::prometheus::parser::parse_request(request, metadata_conflict_strategy.into())
-        .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
+    vector_lib::prometheus::parser::parse_request(
+        request,
+        metadata_conflict_strategy.into(),
+        skip_nan_values,
+    )
+    .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
 }
 
 fn reparse_groups(
