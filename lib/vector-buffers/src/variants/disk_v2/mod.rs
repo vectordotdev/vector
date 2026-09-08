@@ -204,7 +204,7 @@ pub use self::{
     writer::{BufferWriter, TryWriteOutcome, WriterError},
 };
 use crate::{
-    Bufferable,
+    Bufferable, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     topology::{
         builder::IntoBuffer,
@@ -341,14 +341,16 @@ pub struct DiskV2Buffer {
     id: String,
     data_dir: PathBuf,
     max_size: NonZeroU64,
+    when_full: WhenFull,
 }
 
 impl DiskV2Buffer {
-    pub fn new(id: String, data_dir: PathBuf, max_size: NonZeroU64) -> Self {
+    pub fn new(id: String, data_dir: PathBuf, max_size: NonZeroU64, when_full: WhenFull) -> Self {
         Self {
             id,
             data_dir,
             max_size,
+            when_full,
         }
     }
 }
@@ -371,6 +373,7 @@ where
             &self.data_dir,
             self.id.as_str(),
             self.max_size,
+            self.when_full,
         )
         .await?;
 
@@ -383,6 +386,7 @@ async fn build_disk_v2_buffer<T>(
     data_dir: &Path,
     id: &str,
     max_size: NonZeroU64,
+    when_full: WhenFull,
 ) -> Result<
     (
         BufferWriter<T, ProductionFilesystem>,
@@ -396,7 +400,10 @@ where
     usage_handle.set_buffer_limits(Some(max_size.get()), None);
 
     let buffer_path = get_disk_v2_data_dir_path(data_dir, id);
-    let builder = DiskBufferConfigBuilder::from_path(buffer_path).max_buffer_size(max_size.get());
+    // `reject` buffers acknowledge shed records as errored rather than silently dropped.
+    let builder = DiskBufferConfigBuilder::from_path(buffer_path)
+        .max_buffer_size(max_size.get())
+        .error_on_full(matches!(when_full, WhenFull::Reject));
     // Shrink the data-file size (and the matching record size) so files fill and
     // rotate constantly. That is what reaches the rare recovery paths the bug hides
     // in: reopening a file whose last write was cut short, and reusing a file number
