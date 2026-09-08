@@ -409,8 +409,8 @@ _schemaDefinitions: {
 						This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
 						The message payload is the concatenation of all chunk payloads.
 
-						**Note**: The decoder also caps the payload buffered across *all* incomplete messages
-						at 128 MiB, so no chunked message can exceed that whatever this is set to.
+						The decoder also limits the payload buffered across *all* incomplete messages to 128 MiB by
+						default. Setting this above 128 MiB raises that aggregate limit to the same value.
 
 						An unchunked message is never buffered, so neither limit applies to it; its size is
 						bounded by whatever the source accepts as one frame.
@@ -712,8 +712,8 @@ _schemaDefinitions: {
 				This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
 				The message payload is the concatenation of all chunk payloads.
 
-				**Note**: The decoder also caps the payload buffered across *all* incomplete messages
-				at 128 MiB, so no chunked message can exceed that whatever this is set to.
+				The decoder also limits the payload buffered across *all* incomplete messages to 128 MiB by
+				default. Setting this above 128 MiB raises that aggregate limit to the same value.
 
 				An unchunked message is never buffered, so neither limit applies to it; its size is
 				bounded by whatever the source accepts as one frame.
@@ -3513,8 +3513,8 @@ _schemaDefinitions: {
 															This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
 															The message payload is the concatenation of all chunk payloads.
 
-															**Note**: The decoder also caps the payload buffered across *all* incomplete messages
-															at 128 MiB, so no chunked message can exceed that whatever this is set to.
+															The decoder also limits the payload buffered across *all* incomplete messages to 128 MiB by
+															default. Setting this above 128 MiB raises that aggregate limit to the same value.
 
 															An unchunked message is never buffered, so neither limit applies to it; its size is
 															bounded by whatever the source accepts as one frame.
