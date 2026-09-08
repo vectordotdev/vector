@@ -1,5 +1,6 @@
 use http::StatusCode;
 use serde::Deserialize;
+use vrl::prelude::value::simdutf_bytes_utf8_lossy;
 use vector_lib::{EstimatedJsonEncodedSizeOf, json_size::JsonSize};
 
 use crate::{
@@ -119,16 +120,16 @@ impl RetryLogic for ElasticsearchRetryLogic {
                 format!(
                     "{}: {}",
                     status,
-                    String::from_utf8_lossy(response.http_response.body())
+                    simdutf_bytes_utf8_lossy(response.http_response.body())
                 )
                 .into(),
             ),
             _ if status.is_client_error() => {
-                let body = String::from_utf8_lossy(response.http_response.body());
+                let body = simdutf_bytes_utf8_lossy(response.http_response.body());
                 RetryAction::DontRetry(format!("client-side error, {status}: {body}").into())
             }
             _ if status.is_success() => {
-                let body = String::from_utf8_lossy(response.http_response.body());
+                let body = simdutf_bytes_utf8_lossy(response.http_response.body());
 
                 if body.contains("\"errors\":true") {
                     match EsResultResponse::parse(&body) {
