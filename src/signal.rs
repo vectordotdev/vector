@@ -3,7 +3,13 @@
 use std::collections::HashSet;
 
 use snafu::Snafu;
-use tokio::{runtime::Runtime, sync::broadcast};
+use tokio::{
+    runtime::Runtime,
+    sync::broadcast::{
+        self,
+        error::{RecvError, TryRecvError},
+    },
+};
 use tokio_stream::{Stream, StreamExt};
 
 use super::config::{ComponentKey, ConfigBuilder};
@@ -182,6 +188,59 @@ impl SignalHandler {
         for shutdown_tx in self.shutdown_txs.drain(..) {
             // An error just means the channel was already shut down; safe to ignore.
             _ = shutdown_tx.send(());
+        }
+    }
+}
+
+/// Routes a received signal: shutdown signals are returned, reload signals are forwarded to the
+/// reload sink. Shared by the shutdown receive helpers below.
+fn classify_signal(signal: SignalTo, on_reload: &mut impl FnMut(SignalTo)) -> Option<SignalTo> {
+    match signal {
+        SignalTo::Shutdown(_) | SignalTo::Quit => Some(signal),
+        reload @ (SignalTo::ReloadFromDisk
+        | SignalTo::ReloadComponents(_)
+        | SignalTo::ReloadFromConfigBuilder(_)
+        | SignalTo::ReloadEnrichmentTables) => {
+            on_reload(reload);
+            None
+        }
+    }
+}
+
+/// Resolves when a shutdown signal (or a closed signal channel) is received from the signal
+/// receiver. Reload signals received along the way are forwarded to `on_reload` (e.g. so startup
+/// can re-broadcast them once it completes); lagged receivers are consumed and ignored.
+pub async fn recv_shutdown(rx: &mut SignalRx, mut on_reload: impl FnMut(SignalTo)) -> SignalTo {
+    loop {
+        match rx.recv().await {
+            Ok(signal) => {
+                if let Some(shutdown) = classify_signal(signal, &mut on_reload) {
+                    return shutdown;
+                }
+            }
+            Err(RecvError::Closed) => return SignalTo::Shutdown(None),
+            Err(RecvError::Lagged(_)) => {}
+        }
+    }
+}
+
+/// Non-blocking counterpart of [`recv_shutdown`]: drains the signal receiver, returning the
+/// shutdown signal if one is queued (consuming reload and lagged signals along the way), or
+/// `None` once the queue is empty.
+pub fn try_recv_shutdown(
+    rx: &mut SignalRx,
+    mut on_reload: impl FnMut(SignalTo),
+) -> Option<SignalTo> {
+    loop {
+        match rx.try_recv() {
+            Ok(signal) => {
+                if let Some(shutdown) = classify_signal(signal, &mut on_reload) {
+                    return Some(shutdown);
+                }
+            }
+            Err(TryRecvError::Closed) => return Some(SignalTo::Shutdown(None)),
+            Err(TryRecvError::Lagged(_)) => {}
+            Err(TryRecvError::Empty) => return None,
         }
     }
 }

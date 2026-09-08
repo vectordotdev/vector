@@ -5,7 +5,6 @@ use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
 use clap::Parser;
 use colored::*;
 use exitcode::ExitCode;
-use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use vector_lib::enrichment::{Case, IndexHandle, TableRegistry};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::value::ObjectMap;
@@ -16,7 +15,7 @@ use crate::{
         loading::ConfigBuilderLoader,
     },
     schema::Definition,
-    signal::{SignalRx, SignalTo},
+    signal::{SignalRx, recv_shutdown, try_recv_shutdown},
     topology::{
         self,
         builder::{TopologyPieces, TopologyPiecesBuilder},
@@ -185,25 +184,20 @@ pub async fn validate(
     // Config loading can block (e.g. on secret/provider resolution), so race it against
     // shutdown signals to abort validation immediately if one is received.
     let mut load = Box::pin(validate_config(opts, signal_handler, &mut fmt));
-    let mut config = loop {
-        tokio::select! {
-            biased;
-            signal = signal_rx.recv() => {
-                match signal {
-                    Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
-                        // An interrupted validation is not a successful one; report a distinct
-                        // non-zero code so scripts don't mistake it for a valid configuration.
-                        return exitcode::UNAVAILABLE;
-                    }
-                    // Reload signals have no effect during validation; ignore them.
-                    _ => continue,
-                }
-            }
-            result = &mut load => {
-                break match result {
-                    Some(config) => config,
-                    None => return exitcode::CONFIG,
-                };
+    let mut config = tokio::select! {
+        biased;
+        // A shutdown signal (or a closed signal channel) arrived while config loading was
+        // still in progress. Reload signals received along the way are dropped; there is
+        // nothing to reload during validation.
+        _ = recv_shutdown(signal_rx, |_| {}) => {
+            // An interrupted validation is not a successful one; report a distinct
+            // non-zero code so scripts don't mistake it for a valid configuration.
+            return exitcode::UNAVAILABLE;
+        }
+        result = &mut load => {
+            match result {
+                Some(config) => config,
+                None => return exitcode::CONFIG,
             }
         }
     };
@@ -232,17 +226,12 @@ pub async fn validate(
     // The receiver is not polled after the config-loading race on the `--no-environment` path,
     // and only until the environment phase completes otherwise. A shutdown signal arriving in
     // between (e.g. while transforms or sinks are being validated) would otherwise be silently
-    // dropped, so drain the receiver once more before reporting the result.
-    loop {
-        match signal_rx.try_recv() {
-            Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(TryRecvError::Closed) => {
-                return exitcode::UNAVAILABLE;
-            }
-            // Reload signals and lagged receivers don't affect the result; keep draining in
-            // case a shutdown is queued behind them.
-            Ok(_) | Err(TryRecvError::Lagged(_)) => continue,
-            Err(TryRecvError::Empty) => break,
-        }
+    // dropped, so drain the receiver once more before reporting the result. Reload signals and
+    // lagged receivers don't affect the result and are consumed along the way.
+    if try_recv_shutdown(signal_rx, |_| {}).is_some() {
+        // An interrupted validation is not a successful one; report a distinct non-zero code so
+        // scripts don't mistake it for a valid configuration.
+        return exitcode::UNAVAILABLE;
     }
 
     if validated {
@@ -442,31 +431,24 @@ async fn validate_components(
     // immediately, instead of being queued and ignored until the build completes.
     let mut build = Box::pin(TopologyPiecesBuilder::new(config, diff).build());
 
-    loop {
-        tokio::select! {
-            biased;
-            signal = signal_rx.recv() => {
-                match signal {
-                    Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
-                        return Err(Interrupted);
-                    }
-                    // Reload signals have no effect during validation; ignore them.
-                    _ => continue,
+    tokio::select! {
+        biased;
+        // A shutdown signal (or a closed signal channel) arrived while the build was in
+        // progress. Reload signals received along the way are dropped; there is nothing to
+        // reload during validation.
+        _ = recv_shutdown(signal_rx, |_| {}) => Err(Interrupted),
+        result = &mut build => {
+            Ok(match result {
+                Ok(pieces) => {
+                    fmt.success("Component configuration");
+                    Some(pieces)
                 }
-            }
-            result = &mut build => {
-                return Ok(match result {
-                    Ok(pieces) => {
-                        fmt.success("Component configuration");
-                        Some(pieces)
-                    }
-                    Err(errors) => {
-                        fmt.title("Component errors");
-                        fmt.sub_error(errors);
-                        None
-                    }
-                });
-            }
+                Err(errors) => {
+                    fmt.title("Component errors");
+                    fmt.sub_error(errors);
+                    None
+                }
+            })
         }
     }
 }
@@ -498,24 +480,19 @@ async fn validate_healthchecks(
         // A healthcheck can block on network I/O, so race it against shutdown signals to
         // abort validation immediately if one is received.
         let mut handle = tokio::spawn(healthcheck);
-        let result = loop {
-            tokio::select! {
-                biased;
-                signal = signal_rx.recv() => {
-                    match signal {
-                        Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
-                            // Cancel the spawned healthcheck. The process exits immediately on
-                            // this path, so any detached blocking work dies with it; awaiting
-                            // the handle could hang on a spawn_blocking healthcheck.
-                            handle.abort();
-                            return Err(Interrupted);
-                        }
-                        // Reload signals have no effect during validation; ignore them.
-                        _ => continue,
-                    }
-                }
-                result = &mut handle => break result,
+        let result = tokio::select! {
+            biased;
+            // A shutdown signal (or a closed signal channel) arrived while the healthcheck
+            // was running. Reload signals received along the way are dropped; there is
+            // nothing to reload during validation.
+            _ = recv_shutdown(signal_rx, |_| {}) => {
+                // Cancel the spawned healthcheck. The process exits immediately on
+                // this path, so any detached blocking work dies with it; awaiting
+                // the handle could hang on a spawn_blocking healthcheck.
+                handle.abort();
+                return Err(Interrupted);
             }
+            result = &mut handle => result,
         };
         match result {
             Ok(Ok(_)) => {

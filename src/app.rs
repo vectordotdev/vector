@@ -34,7 +34,7 @@ use crate::{
     internal_events::{
         VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
     },
-    signal::{SignalHandler, SignalPair, SignalRx, SignalTo, SignalTx},
+    signal::{SignalHandler, SignalPair, SignalRx, SignalTo, SignalTx, recv_shutdown},
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
         TopologyController,
@@ -150,34 +150,17 @@ impl ApplicationConfig {
             signal_handler,
         ));
 
-        let config = loop {
-            tokio::select! {
-                biased;
-                signal = signal_rx.recv() => {
-                    match signal {
-                        // A shutdown signal (or a closed signal channel) arrived while config
-                        // loading was still in progress. Abort startup and exit the same way a
-                        // running Vector would on such a signal.
-                        Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
-                            return Err(exitcode::OK);
-                        }
-                        // Reload signals have no effect during startup; retain them so they can
-                        // be re-broadcast after config loading completes.
-                        Ok(reload @ (SignalTo::ReloadFromDisk
-                            | SignalTo::ReloadComponents(_)
-                            | SignalTo::ReloadFromConfigBuilder(_)
-                            | SignalTo::ReloadEnrichmentTables)) => {
-                            pending_reloads.push(reload);
-                            continue;
-                        }
-                        // Anything else (e.g. Err(RecvError::Lagged)) has no effect during
-                        // startup; ignore it.
-                        _ => continue,
-                    }
-                }
-                result = &mut load => {
-                    break result?;
-                }
+        let config = tokio::select! {
+            biased;
+            // A shutdown signal (or a closed signal channel) arrived while config loading was
+            // still in progress. Abort startup and exit the same way a running Vector would on
+            // such a signal. Reload signals received along the way are retained by the sink so
+            // they can be re-broadcast after config loading completes.
+            _ = recv_shutdown(signal_rx, |reload| pending_reloads.push(reload)) => {
+                return Err(exitcode::OK);
+            }
+            result = &mut load => {
+                result?
             }
         };
 
@@ -218,36 +201,20 @@ impl ApplicationConfig {
         // retained) and replayed in a stable order.
         let mut pending_reloads = PendingReloads::default();
 
-        let (topology, graceful_crash_receiver) = loop {
-            tokio::select! {
-                biased;
-                signal = signal_rx.recv() => {
-                    match signal {
-                        // A shutdown signal (or a closed signal channel) arrived while startup was
-                        // still in progress. There is no running topology to drain, so abort
-                        // startup and exit the same way a running Vector would on such a signal.
-                        Ok(SignalTo::Shutdown(_)) | Ok(SignalTo::Quit) | Err(RecvError::Closed) => {
-                            return Err(exitcode::OK);
-                        }
-                        // Reload signals have no effect during startup; retain them so they can
-                        // be re-broadcast after the topology finishes starting.
-                        Ok(reload @ (SignalTo::ReloadFromDisk
-                            | SignalTo::ReloadComponents(_)
-                            | SignalTo::ReloadFromConfigBuilder(_)
-                            | SignalTo::ReloadEnrichmentTables)) => {
-                            pending_reloads.push(reload);
-                            continue;
-                        }
-                        // Anything else (e.g. Err(RecvError::Lagged)) has no effect during
-                        // startup; ignore it.
-                        _ => continue,
-                    }
-                }
-                result = &mut start => {
-                    break match result {
-                        Some(topology) => topology,
-                        None => return Err(exitcode::CONFIG),
-                    };
+        let (topology, graceful_crash_receiver) = tokio::select! {
+            biased;
+            // A shutdown signal (or a closed signal channel) arrived while startup was still in
+            // progress. There is no running topology to drain, so abort startup and exit the
+            // same way a running Vector would on such a signal. Reload signals received along
+            // the way are retained by the sink so they can be re-broadcast after the topology
+            // finishes starting.
+            _ = recv_shutdown(signal_rx, |reload| pending_reloads.push(reload)) => {
+                return Err(exitcode::OK);
+            }
+            result = &mut start => {
+                match result {
+                    Some(topology) => topology,
+                    None => return Err(exitcode::CONFIG),
                 }
             }
         };
