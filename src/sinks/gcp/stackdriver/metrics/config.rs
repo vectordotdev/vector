@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use goauth::scopes::Scope;
 use http::{Request, Uri, header::CONTENT_TYPE};
 use snafu::ResultExt;
 
@@ -9,10 +8,11 @@ use super::{
 };
 use crate::{
     config::ValidatedSink,
-    gcp::{GcpAuthConfig, GcpAuthenticator},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     sinks::{
         HTTPRequestBuilderSnafu, gcp,
+        gcs_common::config::gcp_http_response_retry_logic,
         prelude::*,
         util::{
             HttpEndpoint,
@@ -133,7 +133,7 @@ impl ValidatedSink for StackdriverConfig {
             uri,
         } = validated.clone();
 
-        let auth = self.auth.build(Scope::MonitoringWrite).await?;
+        let auth = self.auth.build(Scope::MONITORING_WRITE).await?;
 
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
@@ -150,11 +150,11 @@ impl ValidatedSink for StackdriverConfig {
 
         let request_limits = self.request.into_settings();
 
-        auth.spawn_regenerate_token();
+        auth.start_background_refresh();
 
         let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
             uri: uri.into_uri(),
-            auth,
+            auth: auth.clone(),
         };
 
         let service = HttpService::new(client, stackdriver_metrics_service_request_builder);
@@ -162,7 +162,7 @@ impl ValidatedSink for StackdriverConfig {
         let service = ServiceBuilder::new()
             .settings(
                 request_limits,
-                http_response_retry_logic(self.retry_strategy.clone()),
+                gcp_http_response_retry_logic(self.retry_strategy.clone(), auth),
             )
             .service(service);
 

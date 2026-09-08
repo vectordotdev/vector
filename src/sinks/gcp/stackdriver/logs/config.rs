@@ -23,7 +23,7 @@ use crate::{
     http::HttpClient,
     schema,
     sinks::{
-        gcs_common::config::healthcheck_response,
+        gcs_common::config::{gcp_http_response_retry_logic, healthcheck_response},
         prelude::*,
         util::{
             BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
@@ -250,6 +250,87 @@ impl_generate_config_from_default!(StackdriverConfig);
 impl SinkConfig for StackdriverConfig {
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
+    }
+
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let log_id = self
+            .log_id
+            .clone()
+            .confine(&self.confinement, Self::NAME, "log_id")?;
+
+        // Confine every label value template. Stackdriver identifies
+        // destinations by `resource.type + resource.labels`, so an event-
+        // controlled label like `resource.labels.zone: "{{ zone }}"` is as
+        // steerable as `log_id` unless we confine it too. Same for arbitrary
+        // log-entry labels in `label_config.labels`.
+        let mut resource = self.resource.clone();
+        resource.labels = resource
+            .labels
+            .into_iter()
+            .map(|(k, v)| {
+                v.confine(&self.confinement, Self::NAME, "resource.labels")
+                    .map(|v| (k, v))
+            })
+            .collect::<crate::Result<_>>()?;
+
+        let mut label_config = self.label_config.clone();
+        label_config.labels = label_config
+            .labels
+            .into_iter()
+            .map(|(k, v)| {
+                v.confine(&self.confinement, Self::NAME, "label_config.labels")
+                    .map(|v| (k, v))
+            })
+            .collect::<crate::Result<_>>()?;
+
+        let auth = self.auth.build(Scope::LOGGING_WRITE).await?;
+
+        let request_builder = StackdriverLogsRequestBuilder {
+            encoder: StackdriverLogsEncoder::new(
+                self.encoding.clone(),
+                log_id,
+                self.log_name.clone(),
+                label_config,
+                resource,
+                self.severity_key.clone(),
+            ),
+        };
+
+        let batch_settings = self
+            .batch
+            .validate()?
+            .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
+            .into_batcher_settings()?;
+
+        let request_limits = self.request.into_settings();
+
+        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
+        let client = HttpClient::new(tls_settings, cx.proxy())?;
+
+        let uri: Uri = self.endpoint.parse()?;
+
+        let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
+            uri: uri.clone(),
+            auth: auth.clone(),
+        };
+
+        let service = HttpService::new(client.clone(), stackdriver_logs_service_request_builder);
+
+        let service = ServiceBuilder::new()
+            .settings(
+                request_limits,
+                gcp_http_response_retry_logic(self.retry_strategy.clone(), auth.clone()),
+            )
+            .service(service);
+
+        let sink = StackdriverLogsSink::new(service, batch_settings, request_builder);
+
+        let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
+
+        auth.start_background_refresh();
+
+        self.confinement.set_confinement_gauge("sink", Self::NAME);
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {
