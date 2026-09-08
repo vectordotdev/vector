@@ -1,4 +1,9 @@
-use futures::StreamExt;
+use std::{
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+};
+
+use futures::{StreamExt, stream};
 use heim::units::information::byte;
 #[cfg(not(windows))]
 use heim::units::ratio::ratio;
@@ -6,7 +11,9 @@ use heim::units::ratio::ratio;
 use nix::sys::statvfs::statvfs;
 use vector_lib::{configurable::configurable_component, metric_tags};
 
-use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
+use super::{
+    FilterList, HostMetrics, default_all_devices, example_devices, filter_result, rootfs_root,
+};
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
 /// Options for the filesystem metrics collector.
@@ -46,58 +53,141 @@ fn example_mountpoints() -> FilterList {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct FilesystemMount {
+    source_mountpoint: PathBuf,
+    logical_mountpoint: PathBuf,
+    lookup_path: PathBuf,
+}
+
+fn resolve_filesystem_mount(rootfs_root: Option<&Path>, mount_point: &Path) -> FilesystemMount {
+    let source_mountpoint = mount_point.to_path_buf();
+    let Some(rootfs_root) = rootfs_root.filter(|root| !root.as_os_str().is_empty()) else {
+        return FilesystemMount {
+            logical_mountpoint: source_mountpoint.clone(),
+            lookup_path: source_mountpoint.clone(),
+            source_mountpoint,
+        };
+    };
+
+    let logical_mountpoint = mount_point
+        .strip_prefix(rootfs_root)
+        .ok()
+        .filter(|path| !path.as_os_str().is_empty())
+        .map_or_else(
+            || {
+                if mount_point == rootfs_root {
+                    PathBuf::from("/")
+                } else {
+                    mount_point.to_path_buf()
+                }
+            },
+            |path| Path::new("/").join(path),
+        );
+    let lookup_path = rootfs_root.join(
+        logical_mountpoint
+            .strip_prefix("/")
+            .unwrap_or(&logical_mountpoint),
+    );
+
+    FilesystemMount {
+        source_mountpoint,
+        logical_mountpoint,
+        lookup_path,
+    }
+}
+
+fn deduplicate_filesystem_mounts<T, F>(
+    mut mounts: Vec<(T, FilesystemMount)>,
+    tie_breaker: F,
+) -> Vec<(T, FilesystemMount)>
+where
+    F: Fn(&T, &T) -> std::cmp::Ordering,
+{
+    mounts.sort_by(|left, right| {
+        (left.1.source_mountpoint != left.1.lookup_path)
+            .cmp(&(right.1.source_mountpoint != right.1.lookup_path))
+            .then_with(|| left.1.source_mountpoint.cmp(&right.1.source_mountpoint))
+            .then_with(|| tie_breaker(&left.0, &right.0))
+    });
+
+    let mut logical_mountpoints = BTreeSet::new();
+    mounts
+        .into_iter()
+        .filter(|(_, mount)| logical_mountpoints.insert(mount.logical_mountpoint.clone()))
+        .collect()
+}
+
 impl HostMetrics {
     pub async fn filesystem_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "filesystem";
         match heim::disk::partitions().await {
             Ok(partitions) => {
-                for (partition, usage) in partitions
+                let rootfs_root = rootfs_root();
+                let partitions = partitions
                     .filter_map(|result| {
                         filter_result(result, "Failed to load/parse partition data.")
                     })
-                    // Filter on configured mountpoints
                     .map(|partition| {
-                        self.config
-                            .filesystem
-                            .mountpoints
-                            .contains_path(Some(partition.mount_point()))
-                            .then_some(partition)
+                        let mount = resolve_filesystem_mount(
+                            rootfs_root.as_deref(),
+                            partition.mount_point(),
+                        );
+                        (partition, mount)
                     })
-                    .filter_map(|partition| async { partition })
-                    // Filter on configured devices
-                    .map(|partition| {
-                        self.config
-                            .filesystem
-                            .devices
-                            .contains_path(partition.device().map(|d| d.as_ref()))
-                            .then_some(partition)
+                    .collect::<Vec<_>>()
+                    .await;
+                let partitions = deduplicate_filesystem_mounts(partitions, |left, right| {
+                    left.device().cmp(&right.device()).then_with(|| {
+                        left.file_system()
+                            .as_str()
+                            .cmp(right.file_system().as_str())
                     })
-                    .filter_map(|partition| async { partition })
-                    // Filter on configured filesystems
-                    .map(|partition| {
-                        self.config
-                            .filesystem
-                            .filesystems
-                            .contains_str(Some(partition.file_system().as_str()))
-                            .then_some(partition)
-                    })
-                    .filter_map(|partition| async { partition })
-                    // Load usage from the partition mount point
-                    .filter_map(|partition| async {
-                        heim::disk::usage(partition.mount_point())
+                })
+                .into_iter()
+                // Filter on configured logical mountpoints.
+                .filter(|(_, mount)| {
+                    self.config
+                        .filesystem
+                        .mountpoints
+                        .contains_path(Some(&mount.logical_mountpoint))
+                })
+                // Filter on configured devices.
+                .filter(|(partition, _)| {
+                    self.config
+                        .filesystem
+                        .devices
+                        .contains_path(partition.device().map(|device| device.as_ref()))
+                })
+                // Filter on configured filesystems.
+                .filter(|(partition, _)| {
+                    self.config
+                        .filesystem
+                        .filesystems
+                        .contains_str(Some(partition.file_system().as_str()))
+                })
+                .collect::<Vec<_>>();
+
+                for (partition, mount, usage) in stream::iter(partitions)
+                    // Load usage from the partition mount point.
+                    .filter_map(|(partition, mount)| async {
+                        heim::disk::usage(&mount.lookup_path)
                             .await
                             .map_err(|error| {
                                 emit!(HostMetricsScrapeFilesystemError {
                                     message: "Failed to load partitions info.",
-                                    mount_point: partition
-                                        .mount_point()
-                                        .to_str()
-                                        .unwrap_or("unknown")
+                                    mount_point: mount
+                                        .logical_mountpoint
+                                        .to_string_lossy()
+                                        .to_string(),
+                                    resolved_mount_point: mount
+                                        .lookup_path
+                                        .to_string_lossy()
                                         .to_string(),
                                     error,
                                 })
                             })
-                            .map(|usage| (partition, usage))
+                            .map(|usage| (partition, mount, usage))
                             .ok()
                     })
                     .collect::<Vec<_>>()
@@ -106,7 +196,7 @@ impl HostMetrics {
                     let fs = partition.file_system();
                     let mut tags = metric_tags! {
                         "filesystem" => fs.as_str(),
-                        "mountpoint" => partition.mount_point().to_string_lossy()
+                        "mountpoint" => mount.logical_mountpoint.to_string_lossy()
                     };
                     if let Some(device) = partition.device() {
                         tags.replace("device".into(), device.to_string_lossy().to_string());
@@ -139,7 +229,7 @@ impl HostMetrics {
                     // filesystems so the overhead is negligible, but network mounts
                     // may pay a small extra cost.
                     #[cfg(unix)]
-                    if let Ok(stat) = statvfs(partition.mount_point()) {
+                    if let Ok(stat) = statvfs(&mount.lookup_path) {
                         let inodes_total = stat.files() as f64;
                         let inodes_free = stat.files_free() as f64;
                         let inodes_used = (inodes_total - inodes_free).max(0.0);
@@ -175,8 +265,101 @@ mod tests {
             HostMetrics, HostMetricsConfig, MetricsBuffer,
             tests::{all_gauges, assert_filtered_metrics, count_name, count_tag},
         },
-        FilesystemConfig,
+        FilesystemConfig, FilesystemMount, deduplicate_filesystem_mounts, resolve_filesystem_mount,
     };
+    use std::path::Path;
+
+    fn assert_mount(
+        rootfs_root: Option<&Path>,
+        source_mountpoint: &str,
+        logical_mountpoint: &str,
+        lookup_path: &str,
+    ) {
+        assert_eq!(
+            resolve_filesystem_mount(rootfs_root, Path::new(source_mountpoint)),
+            FilesystemMount {
+                source_mountpoint: source_mountpoint.into(),
+                logical_mountpoint: logical_mountpoint.into(),
+                lookup_path: lookup_path.into(),
+            }
+        );
+    }
+
+    #[test]
+    fn resolves_filesystem_mounts() {
+        assert_mount(None, "/srv", "/srv", "/srv");
+        assert_mount(Some(Path::new("")), "/srv", "/srv", "/srv");
+        assert_mount(Some(Path::new("/")), "/", "/", "/");
+        assert_mount(Some(Path::new("/")), "/srv", "/srv", "/srv");
+        assert_mount(Some(Path::new("/host")), "/", "/", "/host");
+        assert_mount(Some(Path::new("/host")), "/host", "/", "/host");
+        assert_mount(Some(Path::new("/host/")), "/host/", "/", "/host/");
+        assert_mount(Some(Path::new("/host")), "/host/srv", "/srv", "/host/srv");
+        assert_mount(
+            Some(Path::new("/host")),
+            "/host/srv/vector",
+            "/srv/vector",
+            "/host/srv/vector",
+        );
+        assert_mount(Some(Path::new("/host")), "/srv", "/srv", "/host/srv");
+        assert_mount(
+            Some(Path::new("/host")),
+            "/hosted",
+            "/hosted",
+            "/host/hosted",
+        );
+    }
+
+    #[test]
+    fn deduplicates_equivalent_logical_mounts() {
+        let mounts = deduplicate_filesystem_mounts(
+            vec![
+                (
+                    "container-root",
+                    resolve_filesystem_mount(Some(Path::new("/host")), Path::new("/")),
+                ),
+                (
+                    "host-root",
+                    resolve_filesystem_mount(Some(Path::new("/host")), Path::new("/host")),
+                ),
+                (
+                    "host-srv",
+                    resolve_filesystem_mount(Some(Path::new("/host")), Path::new("/host/srv")),
+                ),
+                (
+                    "container-srv",
+                    resolve_filesystem_mount(Some(Path::new("/host")), Path::new("/srv")),
+                ),
+            ],
+            Ord::cmp,
+        );
+
+        assert_eq!(mounts.len(), 2);
+        assert_eq!(mounts[0].0, "host-root");
+        assert_eq!(mounts[0].1.logical_mountpoint, Path::new("/"));
+        assert_eq!(mounts[0].1.source_mountpoint, Path::new("/host"));
+        assert_eq!(mounts[0].1.lookup_path, Path::new("/host"));
+        assert_eq!(mounts[1].0, "host-srv");
+        assert_eq!(mounts[1].1.logical_mountpoint, Path::new("/srv"));
+        assert_eq!(mounts[1].1.source_mountpoint, Path::new("/host/srv"));
+        assert_eq!(mounts[1].1.lookup_path, Path::new("/host/srv"));
+
+        let stacked_mounts = deduplicate_filesystem_mounts(
+            vec![
+                (
+                    "z-device",
+                    resolve_filesystem_mount(Some(Path::new("/host")), Path::new("/host/tmp")),
+                ),
+                (
+                    "a-device",
+                    resolve_filesystem_mount(Some(Path::new("/host")), Path::new("/host/tmp")),
+                ),
+            ],
+            Ord::cmp,
+        );
+        assert_eq!(stacked_mounts.len(), 1);
+        assert_eq!(stacked_mounts[0].0, "a-device");
+    }
 
     #[cfg(not(windows))]
     #[tokio::test]

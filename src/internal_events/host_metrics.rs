@@ -54,6 +54,7 @@ pub struct HostMetricsScrapeFilesystemError {
     pub message: &'static str,
     pub error: heim::Error,
     pub mount_point: String,
+    pub resolved_mount_point: String,
 }
 
 impl InternalEvent for HostMetricsScrapeFilesystemError {
@@ -61,6 +62,7 @@ impl InternalEvent for HostMetricsScrapeFilesystemError {
         error!(
             message = self.message,
             mount_point = self.mount_point,
+            resolved_mount_point = self.resolved_mount_point,
             error = %self.error,
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
