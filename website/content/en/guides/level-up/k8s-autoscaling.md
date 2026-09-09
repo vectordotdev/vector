@@ -37,7 +37,7 @@ By the end of the walkthrough, you should be able to:
 2. **Distribute HTTP requests to new replicas** with L7 load balancing, then
    verify that manual scaling improves throughput ([Manual scaling](#manual-scaling)).
 3. **Configure CPU-based autoscaling with headroom** and interpret the replica
-   count it settles on ([HPA finds equilibrium](#hpa-finds-equilibrium)).
+   count it settles on ([Automatic scaling with HPA](#automatic-scaling-with-hpa)).
 4. **Recognize when autoscaling cannot protect against event loss** and choose
    how to handle load while pods start ([Handling sudden bursts](#handling-sudden-bursts)).
 
@@ -290,15 +290,18 @@ unused at 47% average CPU utilization. Each pod handles approximately 7.8 MiB/s,
 with load distributed evenly across all eight pods. Three pods are too few;
 eight provide more capacity than this workload needs.
 
-## HPA finds equilibrium
+## Automatic scaling with HPA
 
-Based on the single-pod results, we can estimate how many pods we would need
-to spin up to stay under CPU saturation while keeping some headroom. The
-saturation crossover is 55 / 16.93 ≈ **3.25 pods** at 100% CPU. At a 70%
-utilization target, the expected equilibrium is ⌈3.25 / 0.70⌉ = ⌈4.64⌉ = **5 pods**.
+Manual scaling confirmed that additional pods increase throughput, but choosing
+a fixed replica count means trading spare capacity for the risk of CPU saturation.
+As traffic changes, we would need to keep monitoring utilization and adjusting
+that count ourselves. For CPU-bound workloads like this one, the HPA automates
+those adjustments, adding pods when CPU utilization rises and removing them
+when demand falls. This makes it a better fit for most deployments with varying
+traffic than a fixed, manually managed replica count.
 
-We can now configure the HPA to find the minimum pod count that keeps CPU
-utilization around the 70% target:
+We can now configure the HPA to keep average CPU utilization around a 70%
+target, leaving headroom without keeping all eight pods running:
 
 ```bash
 # Reset to 1 pod and keep autoscaling disabled until the scale-down completes.
@@ -315,6 +318,11 @@ helm upgrade vector vectordotdev/vector --namespace vector-perf --version 0.58.0
   --set autoscaling.behavior.scaleDown.stabilizationWindowSeconds=60 \
   --wait --timeout=3m
 ```
+
+Based on the single-pod results, we can estimate how many pods we would need
+to spin up to stay under CPU saturation while keeping some headroom. The
+saturation crossover is 55 / 16.93 ≈ **3.25 pods** at 100% CPU. At a 70%
+utilization target, the expected equilibrium is ⌈3.25 / 0.70⌉ = ⌈4.64⌉ = **5 pods**.
 
 The following timeline shows how the HPA scales the deployment from one replica to five replicas:
 <!-- RESULTS-HPA-START -->
