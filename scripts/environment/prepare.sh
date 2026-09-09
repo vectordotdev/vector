@@ -184,10 +184,10 @@ maybe_install_cargo_tool() {
   # code of an unmerged checkout. If no prebuilt binary exists, build the
   # current checkout instead.
   if [[ "$tool" == "vdev" ]]; then
-    local installer=("${install[@]}")
-    if [[ "${installer[0]}" == "binstall" ]]; then
-      installer+=(--force --disable-strategies compile)
-      if ! cargo "${installer[@]}" --manifest-path vdev/Cargo.toml vdev; then
+    local vdev_installer=("${cargo_tool_installer[@]}")
+    if [[ "${vdev_installer[0]}" == "binstall" ]]; then
+      vdev_installer+=(--force --disable-strategies compile)
+      if ! cargo "${vdev_installer[@]}" --manifest-path vdev/Cargo.toml vdev; then
         echo "binstall failed; building vdev from the working tree..."
         cargo install -f --path vdev --locked
       fi
@@ -217,7 +217,7 @@ maybe_install_cargo_tool() {
       fi
     fi
     if [[ "$should_install" == "true" ]]; then
-      cargo "${install[@]}" "$tool" --version "$version" --force --locked
+      cargo "${cargo_tool_installer[@]}" "$tool" --version "$version" --force --locked
     fi
   fi
 
@@ -455,7 +455,7 @@ maybe_install_npm_tools() {
 REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
 REQUIRES_BINSTALL=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
 require_binstall=false
-install=(install)
+cargo_tool_installer=(install)
 
 resolve_rust_dependencies() {
   local tool
@@ -483,7 +483,7 @@ prepare_rust_installer() {
   ensure_active_toolchain_is_installed
   if [[ "$require_binstall" == "true" ]]; then
     if cargo binstall -V &>/dev/null || "${SCRIPT_DIR}"/binstall.sh; then
-      install=(binstall -y)
+      cargo_tool_installer=(binstall -y)
     else
       echo "Failed to install cargo binstall, defaulting to cargo install"
     fi
