@@ -5,7 +5,7 @@
 //! the HTTP fetching that the sink needs.
 
 use bytes::Buf;
-use databricks_zerobus_ingest_sdk::schema::arrow_schema_from_uc_schema;
+use databricks_zerobus_ingest_sdk::schema::arrow_schema_from_uc_schema_with_options;
 use http::{Request, StatusCode, Uri};
 use http_body::Body as HttpBody;
 use hyper::Body;
@@ -218,10 +218,16 @@ async fn get_oauth_token(
 pub fn generate_arrow_schema_from_schema(
     schema: &UnityCatalogTableSchema,
 ) -> Result<arrow::datatypes::Schema, ZerobusSinkError> {
-    let arrow_schema =
-        arrow_schema_from_uc_schema(schema).map_err(|e| ZerobusSinkError::ConfigError {
+    // Mark VARIANT columns with `arrow.parquet.variant` so the Arrow batch
+    // encoder can detect them; without the marker they'd be indistinguishable
+    // from a plain `Struct<metadata, value>` and encode as all-null.
+    let mut options = databricks_zerobus_ingest_sdk::schema::ArrowSchemaOptions::default();
+    options.annotate_variant_extension = true;
+    let arrow_schema = arrow_schema_from_uc_schema_with_options(schema, &options).map_err(|e| {
+        ZerobusSinkError::ConfigError {
             message: format!("Failed to convert Unity Catalog schema to Arrow: {}", e),
-        })?;
+        }
+    })?;
 
     if tracing::enabled!(tracing::Level::INFO) {
         info!(

@@ -14,6 +14,7 @@ use arrow::{
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use snafu::{ResultExt, Snafu, ensure};
+use std::sync::Arc;
 use vector_config::configurable_component;
 use vector_core::event::Event;
 
@@ -88,6 +89,10 @@ impl ArrowStreamSerializerConfig {
 #[derive(Clone, Debug)]
 pub struct ArrowStreamSerializer {
     schema: SchemaRef,
+    /// Variant-encoding plan for `schema`, built once at construction and reused
+    /// for every batch (the schema is fixed for this serializer's lifetime).
+    /// `Arc` keeps the derived `Clone` cheap.
+    variant_plan: Arc<super::variant::VariantPlan>,
 }
 
 impl ArrowStreamSerializer {
@@ -101,7 +106,7 @@ impl ArrowStreamSerializer {
                 source: arrow::error::ArrowError::JsonError(e.to_string()),
             }
         })?;
-        build_record_batch(self.schema.clone(), &values)
+        build_record_batch(self.schema.clone(), &self.variant_plan, values)
     }
 
     /// Create a new ArrowStreamSerializer with the given configuration
@@ -122,8 +127,11 @@ impl ArrowStreamSerializer {
             schema
         };
 
+        let schema = SchemaRef::new(schema);
+        let variant_plan = Arc::new(super::variant::VariantPlan::build(&schema));
         Ok(Self {
-            schema: SchemaRef::new(schema),
+            schema,
+            variant_plan,
         })
     }
 }
@@ -136,7 +144,8 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ArrowStreamSerializer {
             return Err(ArrowEncodingError::NoEvents);
         }
 
-        let bytes = encode_events_to_arrow_ipc_stream(&events, self.schema.clone())?;
+        let bytes =
+            encode_events_to_arrow_ipc_stream(&events, self.schema.clone(), &self.variant_plan)?;
 
         buffer.extend_from_slice(&bytes);
         Ok(())
@@ -210,6 +219,7 @@ pub enum ArrowEncodingError {
 pub fn encode_events_to_arrow_ipc_stream(
     events: &[Event],
     schema: SchemaRef,
+    variant_plan: &super::variant::VariantPlan,
 ) -> Result<Bytes, ArrowEncodingError> {
     if events.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
@@ -221,7 +231,7 @@ pub fn encode_events_to_arrow_ipc_stream(
         }
     })?;
 
-    let record_batch = build_record_batch(schema, &json_values)?;
+    let record_batch = build_record_batch(schema, variant_plan, json_values)?;
 
     let mut buffer = BytesMut::new().writer();
     let mut writer =
@@ -320,13 +330,25 @@ pub(crate) fn vector_log_events_to_json_values(
 /// Build an Arrow RecordBatch from a slice of events using the provided schema.
 pub(crate) fn build_record_batch(
     schema: SchemaRef,
-    values: &[serde_json::Value],
+    variant_plan: &super::variant::VariantPlan,
+    mut values: Vec<serde_json::Value>,
 ) -> Result<RecordBatch, ArrowEncodingError> {
     if values.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    let missing = find_null_non_nullable_fields(&schema, values);
+    // VARIANT columns (marked `arrow.parquet.variant`) can't be built from a
+    // JSON object by the arrow-json decoder, so pre-encode them into the
+    // `{"metadata": hex, "value": hex}` shape it can decode as `LargeBinary`.
+    // `variant_plan` is built once from the schema (by the caller) and applied
+    // in place; it is empty (no work) when the schema carries no variant field.
+    if !variant_plan.is_empty() {
+        variant_plan
+            .apply(&mut values)
+            .context(RecordBatchCreationSnafu)?;
+    }
+
+    let missing = find_null_non_nullable_fields(&schema, &values);
     if !missing.is_empty() {
         let error: vector_common::Error = Box::new(ArrowEncodingError::NullConstraint {
             field_name: missing.join(", "),
@@ -350,7 +372,7 @@ pub(crate) fn build_record_batch(
         .context(RecordBatchCreationSnafu)?;
 
     decoder
-        .serialize(values)
+        .serialize(&values)
         .inspect_err(|e| {
             vector_common::internal_event::emit(crate::internal_events::EncoderRecordBatchError {
                 error: e,
@@ -389,7 +411,8 @@ mod tests {
         events: Vec<Event>,
         schema: SchemaRef,
     ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
-        let bytes = encode_events_to_arrow_ipc_stream(&events, schema.clone())?;
+        let variant_plan = crate::encoding::format::variant::VariantPlan::build(&schema);
+        let bytes = encode_events_to_arrow_ipc_stream(&events, schema.clone(), &variant_plan)?;
         let cursor = Cursor::new(bytes);
         let mut reader = StreamReader::try_new(cursor, None)?;
         Ok(reader.next().unwrap()?)
@@ -405,6 +428,129 @@ mod tests {
             log.insert(&vrl::path::parse_target_path(key).unwrap(), value.into());
         }
         Event::Log(log)
+    }
+
+    mod variant {
+        use super::*;
+        use arrow::array::{ArrayRef, LargeBinaryArray};
+        use arrow::datatypes::Fields;
+        use std::sync::Arc;
+        use vrl::value::ObjectMap;
+
+        /// A Parquet Variant field: `Struct<metadata, value>` (both non-nullable
+        /// LargeBinary) carrying the `arrow.parquet.variant` extension marker.
+        fn variant_field(name: &str, nullable: bool) -> Field {
+            let children = Fields::from(vec![
+                Field::new("metadata", DataType::LargeBinary, false),
+                Field::new("value", DataType::LargeBinary, false),
+            ]);
+            Field::new(name, DataType::Struct(children), nullable).with_metadata(
+                std::collections::HashMap::from([(
+                    "ARROW:extension:name".to_string(),
+                    "arrow.parquet.variant".to_string(),
+                )]),
+            )
+        }
+
+        fn obj(pairs: Vec<(&str, Value)>) -> Value {
+            let mut m = ObjectMap::new();
+            for (k, v) in pairs {
+                m.insert(k.into(), v);
+            }
+            Value::Object(m)
+        }
+
+        /// Decode a variant cell back to a `serde_json::Value`.
+        fn decode(col: &ArrayRef, row: usize) -> serde_json::Value {
+            use parquet_variant::Variant;
+            use parquet_variant_json::VariantToJson;
+
+            let s = col.as_struct();
+            let metadata = s
+                .column(0)
+                .as_any()
+                .downcast_ref::<LargeBinaryArray>()
+                .unwrap();
+            let value = s
+                .column(1)
+                .as_any()
+                .downcast_ref::<LargeBinaryArray>()
+                .unwrap();
+            let variant = Variant::new(metadata.value(row), value.value(row));
+            serde_json::from_str(&variant.to_json_string().unwrap()).unwrap()
+        }
+
+        #[test]
+        fn top_level_object_scalar_and_null() {
+            let schema = SchemaRef::new(Schema::new(vec![variant_field("v", true)]));
+            let events = vec![
+                create_event(vec![("v", obj(vec![("a", Value::Integer(1))]))]),
+                create_event(vec![("v", Value::from("hi"))]),
+                create_event(vec![("v", Value::Null)]),
+            ];
+            let batch = encode_and_decode(events, schema).unwrap();
+            let col = batch.column(0);
+            assert_eq!(decode(col, 0), serde_json::json!({"a": 1}));
+            assert_eq!(decode(col, 1), serde_json::json!("hi"));
+            assert!(col.is_null(2), "null value -> null variant row");
+        }
+
+        #[test]
+        fn nested_in_struct() {
+            let schema = SchemaRef::new(Schema::new(vec![Field::new(
+                "payload",
+                DataType::Struct(Fields::from(vec![variant_field("attrs", true)])),
+                true,
+            )]));
+            let events = vec![create_event(vec![(
+                "payload",
+                obj(vec![("attrs", obj(vec![("k", Value::Integer(7))]))]),
+            )])];
+            let batch = encode_and_decode(events, schema).unwrap();
+            let payload = batch.column(0).as_struct();
+            assert_eq!(decode(payload.column(0), 0), serde_json::json!({"k": 7}));
+        }
+
+        #[test]
+        fn nested_in_list() {
+            let schema = SchemaRef::new(Schema::new(vec![Field::new(
+                "tags",
+                DataType::List(Arc::new(variant_field("item", true))),
+                true,
+            )]));
+            let events = vec![create_event(vec![(
+                "tags",
+                Value::Array(vec![obj(vec![("a", Value::Integer(1))]), Value::from("hi")]),
+            )])];
+            let batch = encode_and_decode(events, schema).unwrap();
+            let items = batch.column(0).as_list::<i32>().values();
+            assert_eq!(decode(items, 0), serde_json::json!({"a": 1}));
+            assert_eq!(decode(items, 1), serde_json::json!("hi"));
+        }
+
+        #[test]
+        fn nested_in_map() {
+            let entries = Field::new(
+                "entries",
+                DataType::Struct(Fields::from(vec![
+                    Field::new("keys", DataType::LargeUtf8, false),
+                    variant_field("values", true),
+                ])),
+                false,
+            );
+            let schema = SchemaRef::new(Schema::new(vec![Field::new(
+                "props",
+                DataType::Map(Arc::new(entries), false),
+                true,
+            )]));
+            let events = vec![create_event(vec![(
+                "props",
+                obj(vec![("k1", obj(vec![("x", Value::Integer(1))]))]),
+            )])];
+            let batch = encode_and_decode(events, schema).unwrap();
+            let values = batch.column(0).as_map().values();
+            assert_eq!(decode(values, 0), serde_json::json!({"x": 1}));
+        }
     }
 
     mod comprehensive {
@@ -608,9 +754,11 @@ mod tests {
 
         #[test]
         fn test_encode_empty_events() {
-            let schema = Schema::new(vec![Field::new("message", DataType::Utf8, true)]).into();
+            let schema: SchemaRef =
+                Schema::new(vec![Field::new("message", DataType::Utf8, true)]).into();
             let events: Vec<Event> = vec![];
-            let result = encode_events_to_arrow_ipc_stream(&events, schema);
+            let variant_plan = crate::encoding::format::variant::VariantPlan::build(&schema);
+            let result = encode_events_to_arrow_ipc_stream(&events, schema, &variant_plan);
             assert!(matches!(result.unwrap_err(), ArrowEncodingError::NoEvents));
         }
 
@@ -618,14 +766,15 @@ mod tests {
         fn test_missing_non_nullable_field_errors() {
             let events = vec![create_event(vec![("other_field", "value")])];
 
-            let schema = Schema::new(vec![Field::new(
+            let schema: SchemaRef = Schema::new(vec![Field::new(
                 "required_field",
                 DataType::Utf8,
                 false, // non-nullable
             )])
             .into();
 
-            let result = encode_events_to_arrow_ipc_stream(&events, schema);
+            let variant_plan = crate::encoding::format::variant::VariantPlan::build(&schema);
+            let result = encode_events_to_arrow_ipc_stream(&events, schema, &variant_plan);
             assert!(result.is_err());
         }
     }
@@ -887,7 +1036,8 @@ mod tests {
             // Event is missing "required_field" entirely
             let event = create_event(vec![("optional_field", "hello")]);
 
-            let result = encode_events_to_arrow_ipc_stream(&[event], schema);
+            let variant_plan = crate::encoding::format::variant::VariantPlan::build(&schema);
+            let result = encode_events_to_arrow_ipc_stream(&[event], schema, &variant_plan);
             let err = result.unwrap_err().to_string();
             assert!(
                 err.contains("required_field"),
@@ -910,7 +1060,8 @@ mod tests {
             // Event has "id" but "name" is null
             let event = create_event(vec![("id", Value::Integer(1))]);
 
-            let result = encode_events_to_arrow_ipc_stream(&[event], schema);
+            let variant_plan = crate::encoding::format::variant::VariantPlan::build(&schema);
+            let result = encode_events_to_arrow_ipc_stream(&[event], schema, &variant_plan);
             let err = result.unwrap_err().to_string();
             assert!(
                 err.contains("name"),
