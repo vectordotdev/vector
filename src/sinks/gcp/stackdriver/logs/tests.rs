@@ -202,18 +202,15 @@ fn encode_with_insert_id_key() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
             labels: HashMap::new(),
         },
-        StackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
+            labels: HashMap::from([("namespace".to_owned(), unconfined("office"))]),
         },
         None,
         Some(ConfigValuePath::try_from("insert_id".to_owned()).unwrap()),
@@ -259,18 +256,15 @@ fn encode_without_insert_id_key() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
             labels: HashMap::new(),
         },
-        StackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
+            labels: HashMap::from([("namespace".to_owned(), unconfined("office"))]),
         },
         None,
         None,
@@ -302,26 +296,23 @@ fn encode_insert_id_type_coercion() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
             labels: HashMap::new(),
         },
-        StackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
+            labels: HashMap::from([("namespace".to_owned(), unconfined("office"))]),
         },
         None,
         Some(ConfigValuePath::try_from("insert_id".to_owned()).unwrap()),
     );
 
     let mut log = LogEvent::default();
-    log.insert("message", Value::Bytes("hello".into()));
-    log.insert("insert_id", Value::Integer(12345));
+    log.insert(event_path!("message"), Value::Bytes("hello".into()));
+    log.insert(event_path!("insert_id"), Value::Integer(12345));
 
     let json = encoder.encode_event(Event::from(log)).unwrap();
 
@@ -334,18 +325,15 @@ fn encode_insert_id_field_missing() {
 
     let encoder = StackdriverLogsEncoder::new(
         transformer,
-        Template::try_from("testlogs").unwrap(),
+        confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        StackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
             labels: HashMap::new(),
         },
-        StackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([(
-                "namespace".to_owned(),
-                Template::try_from("office").unwrap(),
-            )]),
+            labels: HashMap::from([("namespace".to_owned(), unconfined("office"))]),
         },
         None,
         Some(ConfigValuePath::try_from("insert_id".to_owned()).unwrap()),
