@@ -341,6 +341,14 @@ mod tests {
         }
     }
 
+    fn build_auth(config: &HttpServerAuthConfig) -> crate::Result<HttpServerAuthMatcher> {
+        config.build(
+            &Default::default(),
+            &Default::default(),
+            TimeZone::default(),
+        )
+    }
+
     #[test]
     fn config_should_default_to_basic() {
         let config: HttpServerAuthConfig = serde_yaml::from_str(indoc! { r#"
@@ -400,11 +408,7 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(
-            &Default::default(),
-            &Default::default(),
-            TimeZone::default(),
-        );
+        let matcher = build_auth(&basic_auth);
 
         assert!(matcher.is_ok());
         assert!(matches!(
@@ -420,14 +424,7 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let (_, error_message) = basic_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap()
-            .auth_header();
+        let (_, error_message) = build_auth(&basic_auth).unwrap().auth_header();
         assert_eq!("Invalid username/password", error_message);
     }
 
@@ -440,14 +437,7 @@ mod tests {
             password: password.clone().into(),
         };
 
-        let (header, _) = basic_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap()
-            .auth_header();
+        let (header, _) = build_auth(&basic_auth).unwrap().auth_header();
         assert_eq!(
             Authorization::basic(&username, &password).0.encode(),
             header
@@ -460,15 +450,7 @@ mod tests {
             source: "invalid VRL source".to_string(),
         };
 
-        assert!(
-            custom_auth
-                .build(
-                    &Default::default(),
-                    &Default::default(),
-                    TimeZone::default(),
-                )
-                .is_err()
-        );
+        assert!(build_auth(&custom_auth).is_err());
     }
 
     #[test]
@@ -481,15 +463,7 @@ mod tests {
             .to_string(),
         };
 
-        assert!(
-            custom_auth
-                .build(
-                    &Default::default(),
-                    &Default::default(),
-                    TimeZone::default(),
-                )
-                .is_err()
-        );
+        assert!(build_auth(&custom_auth).is_err());
     }
 
     #[test]
@@ -501,15 +475,7 @@ mod tests {
             .to_string(),
         };
 
-        assert!(
-            custom_auth
-                .build(
-                    &Default::default(),
-                    &Default::default(),
-                    TimeZone::default(),
-                )
-                .is_ok()
-        );
+        assert!(build_auth(&custom_auth).is_ok());
     }
 
     #[test]
@@ -519,13 +485,7 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&basic_auth).unwrap();
 
         let (_guard, addr) = next_addr();
         let result = matcher.handle_auth(Some(&addr), &HeaderMap::new(), "/");
@@ -543,13 +503,7 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&basic_auth).unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("Basic wrong"));
@@ -571,13 +525,7 @@ mod tests {
             password: password.clone().into(),
         };
 
-        let matcher = basic_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&basic_auth).unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -596,13 +544,7 @@ mod tests {
             source: r#".headers.authorization == "test""#.to_string(),
         };
 
-        let matcher = custom_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&custom_auth).unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
@@ -620,13 +562,7 @@ mod tests {
             source: format!(".address == \"{addr_string}\""),
         };
 
-        let matcher = custom_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&custom_auth).unwrap();
 
         let headers = HeaderMap::new();
         let result = matcher.handle_auth(Some(&addr), &headers, "/");
@@ -642,13 +578,7 @@ mod tests {
             source: format!(".address == \"{addr_string}\""),
         };
 
-        let matcher = custom_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&custom_auth).unwrap();
 
         let headers = HeaderMap::new();
         let result = matcher.handle_auth(None, &headers, "/");
@@ -662,13 +592,7 @@ mod tests {
             source: r#".path == "/ok""#.to_string(),
         };
 
-        let matcher = custom_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&custom_auth).unwrap();
 
         let headers = HeaderMap::new();
         let (_guard, addr) = next_addr();
@@ -683,13 +607,7 @@ mod tests {
             source: r#".path == "/ok""#.to_string(),
         };
 
-        let matcher = custom_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&custom_auth).unwrap();
 
         let headers = HeaderMap::new();
         let (_guard, addr) = next_addr();
@@ -704,13 +622,7 @@ mod tests {
             source: r#".headers.authorization == "test""#.to_string(),
         };
 
-        let matcher = custom_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&custom_auth).unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("wrong value"));
@@ -729,13 +641,7 @@ mod tests {
             source: "abort".to_string(),
         };
 
-        let matcher = custom_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&custom_auth).unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
@@ -756,13 +662,7 @@ mod tests {
             source: r#".headers.authorization == "Bearer token""#.to_string(),
         };
 
-        let matcher = custom_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&custom_auth).unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer token"));
@@ -788,13 +688,7 @@ mod tests {
             .to_string(),
         };
 
-        let matcher = custom_auth
-            .build(
-                &Default::default(),
-                &Default::default(),
-                TimeZone::default(),
-            )
-            .unwrap();
+        let matcher = build_auth(&custom_auth).unwrap();
 
         let headers = HeaderMap::new();
         let (_guard, addr) = next_addr();
@@ -820,13 +714,7 @@ mod tests {
         };
 
         assert!(
-            custom_auth
-                .build(
-                    &Default::default(),
-                    &Default::default(),
-                    TimeZone::default(),
-                )
-                .is_err(),
+            build_auth(&custom_auth).is_err(),
             "writing to event body (.field) must be rejected at compile time"
         );
     }
