@@ -279,6 +279,7 @@ impl SinkConfig for FileSinkConfig {
 #[derive(Clone, Debug)]
 pub struct ValidatedFileSink {
     transformer: Transformer,
+    batch_settings: BatcherSettings,
 }
 
 #[async_trait::async_trait]
@@ -310,7 +311,12 @@ impl ValidatedSink for FileSinkConfig {
                 .map_err(Box::new)?;
         }
 
-        Ok(ValidatedFileSink { transformer })
+        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
+
+        Ok(ValidatedFileSink {
+            transformer,
+            batch_settings,
+        })
     }
 
     async fn build(
@@ -384,14 +390,13 @@ impl FileSink {
 
         let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
-        let batch_settings = config.batch.validate()?.into_batcher_settings()?;
 
         Ok(Self {
             path: config.path.clone().with_tz_offset(offset),
             transformer: validated.transformer.clone(),
             encoder,
             idle_timeout: config.idle_timeout,
-            batch_settings,
+            batch_settings: validated.batch_settings,
             files: ExpiringHashMap::default(),
             compression: config.compression,
             events_sent: register!(EventsSent::from(Output(None))),
@@ -779,6 +784,13 @@ impl FileSink {
         }
 
         let len = batch_buffer.len();
+        if len == 0 {
+            for (_, finalizers, event_size) in encoded {
+                finalizers.update_status(EventStatus::Delivered);
+                self.events_sent.emit(CountByteSize(1, event_size));
+            }
+            return;
+        }
         let mut written = 0usize;
         let write_result: Result<(), std::io::Error> = loop {
             match file.write(&batch_buffer[written..]).await {
