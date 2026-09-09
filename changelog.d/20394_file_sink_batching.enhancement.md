@@ -14,8 +14,8 @@ sinks:
     type: file
     path: /data/topics/{{ _topic }}/events.log
     batch:
-      max_bytes: 10485760   # 10 MiB (default)
-      timeout_secs: 1       # flush after 1 second of inactivity (default)
+      max_bytes: 10000000   # 10 MB (default)
+      timeout_secs: 1       # maximum batch age in seconds (default)
 ```
 
 Issue: https://github.com/vectordotdev/vector/issues/20394

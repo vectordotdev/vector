@@ -248,6 +248,16 @@ impl OutFile {
         }
     }
 
+    async fn truncate(&mut self, size: u64) -> Result<(), std::io::Error> {
+        match &mut self.inner {
+            OutFileInner::Regular(file) => file.set_len(size).await,
+            OutFileInner::Gzip(_) | OutFileInner::Zstd(_) => Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "truncate not supported for compressed files",
+            )),
+        }
+    }
+
     const fn created_at(&self) -> Instant {
         self.created_at
     }
@@ -789,6 +799,11 @@ impl FileSink {
                 finalizers.update_status(EventStatus::Delivered);
                 self.events_sent.emit(CountByteSize(1, event_size));
             }
+            emit!(FileBytesSent {
+                byte_size: 0,
+                file: String::from_utf8_lossy(&path),
+                include_file_metric_tag: self.include_file_metric_tag,
+            });
             return;
         }
         let mut written = 0usize;
@@ -824,9 +839,24 @@ impl FileSink {
                     // `written` bytes made it to the file / compression stream.
                     // Events whose end offset lies at or before `written` were
                     // fully persisted; everything beyond that must be retried.
-                    let dropped_events = boundaries.iter().filter(|&&b| b > written).count();
+                    //
+                    // If the write ended inside an event boundary the partially
+                    // appended record would corrupt framed output on retry, so
+                    // truncate the file back to the last complete boundary.
+                    let last_complete = boundaries
+                        .iter()
+                        .filter(|&&b| b <= written)
+                        .last()
+                        .copied()
+                        .unwrap_or(0);
+                    if last_complete < written {
+                        if let Err(e) = file.truncate(last_complete as u64).await {
+                            warn!(message = "Failed to truncate file after partial write.", error = ?e);
+                        }
+                    }
+                    let dropped_events = boundaries.iter().filter(|&&b| b > last_complete).count();
                     for (i, (_buf, finalizers, event_size)) in encoded.into_iter().enumerate() {
-                        if boundaries[i] <= written {
+                        if boundaries[i] <= last_complete {
                             finalizers.update_status(EventStatus::Delivered);
                             self.events_sent.emit(CountByteSize(1, event_size));
                         } else {
@@ -840,9 +870,9 @@ impl FileSink {
                         path: &path,
                         dropped_events,
                     });
-                    if written > 0 {
+                    if last_complete > 0 {
                         emit!(FileBytesSent {
-                            byte_size: written,
+                            byte_size: last_complete,
                             file: String::from_utf8_lossy(&path),
                             include_file_metric_tag: self.include_file_metric_tag,
                         });
