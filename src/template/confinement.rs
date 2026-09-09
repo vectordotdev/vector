@@ -259,35 +259,31 @@ impl ConfinementChecker {
                 UriChecker::from_prefix(&prefix).map(|c| Some(Self::Uri(Box::new(c))))
             }
             None => {
-                // Template with no event-field references. Fully static ones
-                // (no strftime either) are validated for URI structure to
-                // enforce the HTTP/HTTPS + authority requirement uniformly.
-                // Strftime-only templates (e.g. `https://logs.example.com/%Y/%m`)
-                // are not: their source is not a literal URI — the strftime
-                // directives render to time-derived text, never event input —
-                // and `http::Uri` would reject the raw `%` directives as
-                // invalid percent escapes.
+                // No event-field references. Static templates are validated
+                // in full; strftime-only ones can't be (raw `%` directives
+                // are invalid percent escapes), so their literal prefix —
+                // scheme and authority before the first `%` — is validated
+                // instead.
                 if !tpl.inner.is_dynamic() {
                     Self::validate_static_uri(tpl).map(|()| None)
                 } else {
-                    Ok(None)
+                    Self::validate_static_uri_prefix(tpl.inner.literal_prefix()).map(|()| None)
                 }
             }
         }
     }
 
-    /// Validate a static URI template for structure and scheme.
-    ///
-    /// Static templates don't need a runtime checker, but we still enforce:
-    /// - Must be HTTP or HTTPS scheme
-    /// - Must have valid URI structure with non-empty authority
-    ///
-    /// This prevents `UriTemplate::confine` from accepting `ftp://`, relative `/path`,
-    /// or schemeless `//host` URIs even when static.
+    /// Validate a fully static URI template: HTTP/HTTPS scheme and a
+    /// non-empty authority, so `ftp://` or relative URIs fail at build time.
     fn validate_static_uri(tpl: &Template) -> Result<(), BuildError> {
-        // Static templates don't need a runtime checker, but we still enforce
-        // HTTP/HTTPS scheme and a non-empty authority (host) uniformly.
         UriChecker::parse_http_uri(tpl.get_ref()).map(|_| ())
+    }
+
+    /// Validate the literal prefix of a strftime-only URI template. The raw
+    /// `%` directives can't be parsed as a URI, so check the operator-authored
+    /// scheme and authority before the first `%` the same way.
+    fn validate_static_uri_prefix(prefix: &str) -> Result<(), BuildError> {
+        UriChecker::parse_http_uri(prefix).map(|_| ())
     }
 
     pub(crate) fn confine(&self, rendered: &str) -> Result<(), ConfineError> {

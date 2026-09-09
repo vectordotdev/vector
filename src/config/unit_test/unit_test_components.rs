@@ -1,6 +1,3 @@
-// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::sync::Arc;
 
 use futures::{Sink, Stream, stream};
@@ -142,8 +139,7 @@ pub struct UnitTestSinkResult {
 
 /// Configuration for the `unit_test` sink.
 #[configurable_component(sink("unit_test", "Unit test."))]
-#[derive(Clone, Default, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, Default, derive_more::Debug)]
 pub struct UnitTestSinkConfig {
     /// Name of the test that this sink is being used for.
     pub test_name: String,
@@ -157,7 +153,7 @@ pub struct UnitTestSinkConfig {
 
     /// Predicate applied to each event that reaches the sink.
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     pub check: UnitTestSinkCheck,
 }
 

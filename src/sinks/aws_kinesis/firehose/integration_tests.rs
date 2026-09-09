@@ -119,7 +119,6 @@ async fn firehose_put_records_without_partition_key() {
     let hits = response["hits"]["hits"]
         .as_array()
         .expect("Elasticsearch response does not include hits->hits");
-    #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
     let input = input
         .into_iter()
         .map(|rec| serde_json::to_value(rec.into_log()).unwrap())
@@ -232,7 +231,6 @@ async fn firehose_put_records_with_partition_key() {
     let hits = response["hits"]["hits"]
         .as_array()
         .expect("Elasticsearch response does not include hits->hits");
-    #[allow(clippy::needless_collect)] // https://github.com/rust-lang/rust-clippy/issues/6909
     let input = input
         .into_iter()
         .map(|rec| serde_json::to_value(rec.into_log()).unwrap())

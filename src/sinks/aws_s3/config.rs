@@ -254,6 +254,7 @@ impl ValidatedSink for S3SinkConfig {
     type Validated = ValidatedAwsS3;
 
     fn validate(&self) -> crate::Result<ValidatedAwsS3> {
+        self.encoding.validate()?;
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let key_prefix = Template::try_from(self.key_prefix.clone())?.confine(
