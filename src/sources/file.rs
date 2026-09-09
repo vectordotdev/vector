@@ -2116,6 +2116,166 @@ mod tests {
         assert_eq!(lines, vec!["INFO goodbye"]);
     }
 
+    /// Write a `checkpoints.json` containing a single `dev_inode` entry for `file`,
+    /// letting tests forge stale checkpoints deterministically instead of relying
+    /// on the filesystem actually recycling an inode.
+    #[cfg(unix)]
+    fn write_dev_inode_checkpoint(
+        data_dir: &std::path::Path,
+        file: &std::path::Path,
+        position: u64,
+        modified: chrono::DateTime<chrono::Utc>,
+    ) {
+        use std::os::unix::fs::MetadataExt;
+        let metadata = fs::metadata(file).unwrap();
+        let json = format!(
+            r#"{{"version":"1","checkpoints":[{{"fingerprint":{{"dev_inode":[{},{}]}},"position":{},"modified":"{}"}}]}}"#,
+            metadata.dev(),
+            metadata.ino(),
+            position,
+            modified.to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+        );
+        fs::write(data_dir.join("checkpoints.json"), json).unwrap();
+    }
+
+    // A checkpoint pointing beyond the end of the file (stale entry from a recycled
+    // inode, or a truncated file) must not be trusted: the file should be read from
+    // the beginning instead of silently waiting for it to grow past the stale offset.
+    // Regression test for https://github.com/vectordotdev/vector/issues/23076.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn checkpoint_beyond_file_size_is_discarded() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            fingerprint: FingerprintConfig::DevInode,
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+        for i in 0..10 {
+            writeln!(&mut file, "line {i}").unwrap();
+        }
+        file.sync_all().unwrap();
+
+        write_dev_inode_checkpoint(
+            config.data_dir.as_ref().unwrap(),
+            &path,
+            1_000_000,
+            chrono::Utc::now(),
+        );
+
+        let received = run_file_source(
+            &config,
+            false,
+            Acks,
+            LogNamespace::Legacy,
+            None,
+            sleep_500_millis(),
+        )
+        .await;
+        let lines = extract_messages_string(received);
+        assert_eq!(
+            lines,
+            (0..10).map(|i| format!("line {i}")).collect::<Vec<_>>()
+        );
+    }
+
+    // A `dev_inode` checkpoint recorded before the file was even created belongs to
+    // a previous file whose inode was recycled; it must be discarded even when its
+    // position falls within the new file's size, or the head of the file is lost.
+    // Regression test for https://github.com/vectordotdev/vector/issues/23076.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn dev_inode_checkpoint_predating_file_creation_is_discarded() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            fingerprint: FingerprintConfig::DevInode,
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+        for i in 0..10 {
+            writeln!(&mut file, "line {i}").unwrap();
+        }
+        file.sync_all().unwrap();
+
+        if fs::metadata(&path).unwrap().created().is_err() {
+            // The filesystem does not report creation times; the check under test
+            // cannot run here (it falls back to trusting the checkpoint).
+            return;
+        }
+
+        let offset: usize = (0..5).map(|i| format!("line {i}\n").len()).sum();
+        write_dev_inode_checkpoint(
+            config.data_dir.as_ref().unwrap(),
+            &path,
+            offset as u64,
+            chrono::Utc::now() - chrono::Duration::hours(1),
+        );
+
+        let received = run_file_source(
+            &config,
+            false,
+            Acks,
+            LogNamespace::Legacy,
+            None,
+            sleep_500_millis(),
+        )
+        .await;
+        let lines = extract_messages_string(received);
+        assert_eq!(
+            lines,
+            (0..10).map(|i| format!("line {i}")).collect::<Vec<_>>()
+        );
+    }
+
+    // Control for the two tests above: a plausible checkpoint (recorded after the
+    // file's creation, position within its size) must still be honored.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn dev_inode_checkpoint_newer_than_file_creation_is_honored() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            fingerprint: FingerprintConfig::DevInode,
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+        for i in 0..10 {
+            writeln!(&mut file, "line {i}").unwrap();
+        }
+        file.sync_all().unwrap();
+
+        let offset: usize = (0..5).map(|i| format!("line {i}\n").len()).sum();
+        write_dev_inode_checkpoint(
+            config.data_dir.as_ref().unwrap(),
+            &path,
+            offset as u64,
+            chrono::Utc::now() + chrono::Duration::seconds(5),
+        );
+
+        let received = run_file_source(
+            &config,
+            false,
+            Acks,
+            LogNamespace::Legacy,
+            None,
+            sleep_500_millis(),
+        )
+        .await;
+        let lines = extract_messages_string(received);
+        assert_eq!(
+            lines,
+            (5..10).map(|i| format!("line {i}")).collect::<Vec<_>>()
+        );
+    }
+
     #[tokio::test]
     async fn test_fair_reads() {
         let dir = tempdir().unwrap();

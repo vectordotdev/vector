@@ -24,7 +24,7 @@ use tokio::{
     time::sleep,
 };
 
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     file_watcher::{FileWatcher, RawLineResult},
@@ -457,7 +457,7 @@ where
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
         // https://github.com/vectordotdev/vector/issues/7139
-        let read_from = if !self.ignore_checkpoints {
+        let mut read_from = if !self.ignore_checkpoints {
             checkpoints
                 .get(file_id)
                 .map(ReadFrom::Checkpoint)
@@ -465,6 +465,26 @@ where
         } else {
             fallback
         };
+
+        // A `DevInode` checkpoint recorded before this file was created cannot hold
+        // this file's progress: the inode has been recycled by a new file (common
+        // after rotated logs are pruned). Trusting it would silently skip the head
+        // of the file, or all of it while it is smaller than the stale position.
+        // Content-based (checksum) fingerprints are exempt: for those, a recreated
+        // file with a matching fingerprint legitimately carries the same identity.
+        if let ReadFrom::Checkpoint(position) = read_from
+            && matches!(file_id, FileFingerprint::DevInode(..))
+            && let Some(checkpoint_modified) = checkpoints.modified_time(file_id)
+            && let Ok(created) = fs::metadata(&path).await.and_then(|m| m.created())
+            && DateTime::<Utc>::from(created) > checkpoint_modified
+        {
+            warn!(
+                message = "Checkpoint predates the file's creation; assuming the inode was reused by a new file and discarding the checkpoint.",
+                ?path,
+                checkpoint = position,
+            );
+            read_from = fallback;
+        }
 
         match FileWatcher::new(
             path.clone(),

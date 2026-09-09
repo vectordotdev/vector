@@ -68,6 +68,10 @@ impl CheckpointsView {
         self.checkpoints.get(&fng).map(|r| *r.value())
     }
 
+    pub fn modified_time(&self, fng: FileFingerprint) -> Option<DateTime<Utc>> {
+        self.modified_times.get(&fng).map(|r| *r.value())
+    }
+
     pub fn set_dead(&self, fng: FileFingerprint) {
         self.removed_times.insert(fng, Utc::now());
     }
