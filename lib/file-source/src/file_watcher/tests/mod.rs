@@ -237,6 +237,7 @@ fn watcher_for_timing() -> FileWatcher {
         max_line_bytes: 1024,
         line_delimiter: Bytes::from_static(b"\n"),
         buf: BytesMut::new(),
+        generation: 0,
     }
 }
 

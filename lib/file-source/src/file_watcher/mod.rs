@@ -152,6 +152,7 @@ pub struct FileWatcher {
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
+    generation: u64,
 }
 
 impl FileWatcher {
@@ -285,7 +286,19 @@ impl FileWatcher {
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
+            generation: 0,
         })
+    }
+
+    /// The watcher generation under which this watcher records checkpoint
+    /// progress; set by the file server when the watcher takes ownership of a
+    /// fingerprint.
+    pub const fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    pub fn set_generation(&mut self, generation: u64) {
+        self.generation = generation;
     }
 
     /// Update the path being watched.
