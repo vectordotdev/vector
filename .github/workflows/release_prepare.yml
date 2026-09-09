@@ -47,16 +47,20 @@ jobs:
           cargo-cache: true
           cue: true
           rust: true
+          protoc: true
+          dd-rust-license-tool: true
           vdev: false
 
       - name: Validate requested release
         id: preflight
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ inputs.version }}
+          VRL_VERSION: ${{ inputs.vrl_version }}
         run: >-
           cargo vdev release workflow prepare-check
-          --version "${{ inputs.version }}"
-          --vrl-version "${{ inputs.vrl_version }}"
+          --version "$VERSION"
+          --vrl-version "$VRL_VERSION"
           --bot-app "${{ steps.app-token.outputs.app-slug }}"
           --repository "$GITHUB_REPOSITORY"
 
@@ -70,11 +74,25 @@ jobs:
         if: steps.preflight.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ inputs.version }}
+          VRL_VERSION: ${{ inputs.vrl_version }}
         run: >-
           cargo vdev release prepare
-          --version "${{ inputs.version }}"
-          --vrl-version "${{ inputs.vrl_version }}"
+          --version "$VERSION"
+          --vrl-version "$VRL_VERSION"
           --dry-run
+
+      - name: Refresh dependency files
+        if: steps.preflight.outputs.skip != 'true'
+        uses: ./.github/actions/release-dependencies
+
+      - name: Commit dependency files
+        if: steps.preflight.outputs.skip != 'true'
+        run: |
+          git add LICENSE-3rdparty.csv docs/generated/
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(releasing): refresh dependency files"
+          fi
 
       - name: Push preparation branch
         if: steps.preflight.outputs.skip != 'true'

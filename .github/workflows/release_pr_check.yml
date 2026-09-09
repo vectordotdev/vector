@@ -3,15 +3,8 @@ name: Validate release PR
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-    paths:
-      - ".github/release-state.json"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "changelog.d/**"
-      - "distribution/install.sh"
-      - "website/content/en/highlights/**"
-      - "website/content/en/releases/**"
-      - "website/cue/reference/**"
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -19,9 +12,10 @@ permissions:
 jobs:
   validate:
     name: Validate release state transition
+    # No path filter: even skipped jobs emit the required check for ordinary PRs.
     if: >-
-      startsWith(github.event.pull_request.head.ref, 'release/prepare-v') ||
-      startsWith(github.event.pull_request.head.ref, 'release/housekeeping-v')
+      startsWith(github.head_ref, 'release/prepare-v') ||
+      startsWith(github.head_ref, 'release/housekeeping-v')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -40,7 +34,10 @@ jobs:
           vdev: false
 
       - name: Validate files, state, and versions
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
         run: >-
           cargo vdev release workflow pr-check
-          --base-sha "${{ github.event.pull_request.base.sha }}"
-          --head-ref "${{ github.event.pull_request.head.ref }}"
+          --base-sha "$BASE_SHA"
+          --head-ref "$HEAD_REF"

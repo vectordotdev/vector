@@ -90,10 +90,6 @@ struct HousekeepingCheck {
     version: Version,
     #[arg(long)]
     release_commit: String,
-    #[arg(long)]
-    bot_app: String,
-    #[arg(long)]
-    repository: String,
 }
 
 #[derive(clap::Args, Debug)]
@@ -234,7 +230,15 @@ impl PrCheck {
             let base_metadata = metadata_at(&self.base_sha)?;
             validate_development_metadata(&base_metadata, &expected_base)?;
             let metadata = read_metadata(Path::new(STATE_PATH))?;
-            validate_prepared_metadata(&metadata, &version, &merge_base)?;
+            let prepared_from = metadata
+                .prepared_from
+                .as_deref()
+                .context("prepared release state is missing prepared_from")?;
+            validate_prepared_metadata(&metadata, &version, prepared_from)?;
+            ensure!(
+                is_ancestor(prepared_from, &merge_base)?,
+                "prepared release base {prepared_from} is not an ancestor of {merge_base}"
+            );
 
             let release_file = format!("website/cue/reference/releases/{version}.cue");
             ensure!(
@@ -429,21 +433,16 @@ impl HousekeepingCheck {
             .context("prepared release state is missing prepared_from")?;
         validate_prepared_metadata(&metadata, &self.version, prepared_from)?;
 
-        let branch = format!("release/housekeeping-v{}", self.version);
-        set_output("skip", "false")?;
-        if let Some(url) = find_existing_pr(&self.repository, &branch, &self.bot_app)? {
-            println!("Housekeeping PR already exists: {url}");
-            set_output("skip_change", "true")?;
-            set_output("pr_url", &url)?;
-            append_step_summary(&format!("Existing housekeeping PR: {url}"))?;
-        } else {
-            ensure!(
-                !remote_branch_exists(&branch)?,
-                "branch {branch} exists without an open PR"
-            );
-            set_output("skip_change", "false")?;
-        }
-        Ok(())
+        ensure!(
+            resolve_ref(&format!("refs/tags/v{}^{{commit}}", self.version))?.as_deref()
+                == Some(self.release_commit.as_str()),
+            "release commit does not match the published tag"
+        );
+        ensure!(
+            is_ancestor(&self.release_commit, "HEAD")?,
+            "release commit is not an ancestor of master"
+        );
+        set_output("skip", "false")
     }
 }
 
@@ -656,15 +655,15 @@ fn validate_release_files(files: &[String], transition: &str) -> Result<()> {
 }
 
 fn release_file_allowed(file: &str) -> bool {
-    matches!(
-        file,
-        ".github/release-state.json"
-            | "Cargo.lock"
-            | "Cargo.toml"
-            | "distribution/install.sh"
-            | "website/cue/reference/administration/interfaces/kubectl.cue"
-            | "website/cue/reference/versions.cue"
-    ) || prefixed_file(file, "changelog.d/", ".md")
+    dependency_file_allowed(file)
+        || matches!(
+            file,
+            ".github/release-state.json"
+                | "distribution/install.sh"
+                | "website/cue/reference/administration/interfaces/kubectl.cue"
+                | "website/cue/reference/versions.cue"
+        )
+        || prefixed_file(file, "changelog.d/", ".md")
         || prefixed_file(file, "website/content/en/highlights/", ".md")
         || prefixed_file(file, "website/content/en/releases/", ".md")
         || prefixed_file(file, "website/cue/reference/releases/", ".cue")
@@ -675,18 +674,21 @@ fn prefixed_file(file: &str, prefix: &str, suffix: &str) -> bool {
         .is_some_and(|name| !name.is_empty() && name.ends_with(suffix))
 }
 
+fn dependency_file_allowed(file: &str) -> bool {
+    matches!(file, "Cargo.toml" | "Cargo.lock" | "LICENSE-3rdparty.csv")
+        || file.starts_with("docs/generated/")
+}
+
 fn validate_housekeeping_files(files: &[String]) -> Result<()> {
-    let mut actual = files.to_vec();
-    actual.sort();
-    let expected = vec![
-        STATE_PATH.to_string(),
-        "Cargo.lock".to_string(),
-        "Cargo.toml".to_string(),
-    ];
     ensure!(
-        actual == expected,
+        [STATE_PATH, "Cargo.lock", "Cargo.toml"]
+            .iter()
+            .all(|required| files.iter().any(|file| file == required))
+            && files
+                .iter()
+                .all(|file| file == STATE_PATH || dependency_file_allowed(file)),
         "unexpected housekeeping files: {}",
-        actual.join(", ")
+        files.join(", ")
     );
     Ok(())
 }
@@ -938,7 +940,7 @@ mod tests {
     }
 
     #[test]
-    fn housekeeping_requires_exact_file_set() {
+    fn housekeeping_requires_version_files_and_allows_generated_dependency_files() {
         assert!(
             validate_housekeeping_files(&[
                 "Cargo.toml".to_owned(),
@@ -948,6 +950,20 @@ mod tests {
             .is_ok()
         );
         assert!(validate_housekeeping_files(&["Cargo.toml".to_owned()]).is_err());
+
+        let mut files = vec![
+            "Cargo.toml".to_owned(),
+            "Cargo.lock".to_owned(),
+            ".github/release-state.json".to_owned(),
+            "LICENSE-3rdparty.csv".to_owned(),
+            "docs/generated/vrl-functions.json".to_owned(),
+        ];
+        assert!(validate_housekeeping_files(&files).is_ok());
+        for file in &files {
+            assert!(release_file_allowed(file));
+        }
+        files.push(".github/workflows/release.yml".to_owned());
+        assert!(validate_housekeeping_files(&files).is_err());
     }
 
     #[test]
