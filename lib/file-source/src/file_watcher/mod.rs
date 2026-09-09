@@ -13,7 +13,7 @@ use tokio::{
     io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncSeekExt, BufReader, ReadBuf},
     time::Instant,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
@@ -231,6 +231,23 @@ impl FileWatcher {
                     FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader)))),
                     0,
                 ),
+                (false, false, ReadFrom::Checkpoint(file_position))
+                    if file_position > metadata.len() =>
+                {
+                    // The checkpoint lies beyond the end of the file: either the file
+                    // was truncated, or the checkpoint was recorded against a different
+                    // file whose fingerprint this one now matches (e.g. a recycled
+                    // inode). Seeking to it would silently discard everything written
+                    // until the file grows past the stale offset.
+                    warn!(
+                        message = "Checkpoint position is beyond the end of the file; starting from the beginning. Was the file truncated, or its fingerprint reused?",
+                        ?path,
+                        checkpoint = file_position,
+                        file_size = metadata.len(),
+                    );
+                    let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
+                    (FileReader::Plain(reader), pos)
+                }
                 (false, false, ReadFrom::Checkpoint(file_position)) => {
                     let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
                     (FileReader::Plain(reader), pos)
