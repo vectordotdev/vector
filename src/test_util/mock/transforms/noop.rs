@@ -17,7 +17,6 @@ use crate::config::{GenerateConfig, OutputId, TransformConfig, TransformContext}
 #[configurable_component(transform("test_noop", "Test (no-op)"))]
 #[derive(Clone, Debug)]
 pub struct NoopTransformConfig {
-    #[configurable(derived)]
     transform_type: TransformType,
 
     /// Optional per-event/array delay, in milliseconds.

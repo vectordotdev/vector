@@ -21,7 +21,6 @@ pub(crate) struct AmqpConfig {
     ))]
     pub(crate) connection_string: String,
 
-    #[configurable(derived)]
     pub(crate) tls: Option<crate::tls::TlsConfig>,
 }
 

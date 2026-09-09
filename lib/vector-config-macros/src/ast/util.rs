@@ -6,9 +6,8 @@ use syn::{
     spanned::Spanned, token::Comma,
 };
 
-const ERR_FIELD_MISSING_DESCRIPTION: &str = "field must have a description -- i.e. `/// This is a widget...` or `#[configurable(description = \"...\")] -- or derive it from the underlying type of the field by specifying `#[configurable(derived)]`";
 const ERR_FIELD_IMPLICIT_TRANSPARENT: &str =
-    "field in a newtype wrapper should not be manually marked as `derived`/`transparent`";
+    "field in a newtype wrapper should not be manually marked as `transparent`";
 
 pub fn try_extract_doc_title_description(
     attributes: &[Attribute],
@@ -139,10 +138,6 @@ fn group_doc_lines(ungrouped: &[String]) -> Vec<String> {
 
 fn none_if_empty(s: String) -> Option<String> {
     if s.is_empty() { None } else { Some(s) }
-}
-
-pub fn err_field_missing_description<T: Spanned>(field: &T) -> darling::Error {
-    darling::Error::custom(ERR_FIELD_MISSING_DESCRIPTION).with_span(field)
 }
 
 pub fn err_field_implicit_transparent<T: Spanned>(field: &T) -> darling::Error {

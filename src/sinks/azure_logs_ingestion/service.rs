@@ -79,22 +79,30 @@ pub struct AzureLogsIngestionService {
     default_headers: HeaderMap,
 }
 
+/// Builds the request path (including the query string) for the Log Ingestion
+/// API, from the Data collection rule immutable ID and stream name.
+pub(super) fn request_path(
+    dcr_immutable_id: &str,
+    stream_name: &str,
+) -> crate::Result<http::uri::PathAndQuery> {
+    format!(
+        "/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}"
+    )
+    .parse()
+    .map_err(Into::into)
+}
+
 impl AzureLogsIngestionService {
     /// Creates a new `AzureLogsIngestionService`.
     pub fn new(
         client: HttpClient,
         endpoint: Uri,
-        dcr_immutable_id: String,
-        stream_name: String,
+        path_and_query: http::uri::PathAndQuery,
         credential: Arc<dyn TokenCredential>,
         token_scope: String,
     ) -> crate::Result<Self> {
         let mut parts = endpoint.into_parts();
-        parts.path_and_query = Some(
-            format!("/dataCollectionRules/{dcr_immutable_id}/streams/{stream_name}?api-version={API_VERSION}")
-                .parse()
-                .expect("path and query should never fail to parse"),
-        );
+        parts.path_and_query = Some(path_and_query);
         let endpoint = Uri::from_parts(parts)?;
 
         let default_headers = {

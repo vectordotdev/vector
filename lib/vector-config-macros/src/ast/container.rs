@@ -146,13 +146,7 @@ impl<'a> Container<'a> {
                                 !variant.attrs.skip_deserializing()
                                     && !variant.attrs.skip_serializing()
                             })
-                            .map(|variant| {
-                                Variant::from_ast(
-                                    variant,
-                                    tagging.clone(),
-                                    virtual_newtype.is_some(),
-                                )
-                            })
+                            .map(|variant| Variant::from_ast(variant, tagging.clone()))
                             .collect_darling_results(&mut accumulator);
 
                         // Check the generated variants for conformance. We do this at a per-variant and per-enum level.
@@ -211,13 +205,7 @@ impl<'a> Container<'a> {
                                 matches!(style, serde_ast::Style::Newtype);
                             let fields = fields
                                 .iter()
-                                .map(|field| {
-                                    Field::from_ast(
-                                        field,
-                                        virtual_newtype.is_some(),
-                                        is_newtype_wrapper_field,
-                                    )
-                                })
+                                .map(|field| Field::from_ast(field, is_newtype_wrapper_field))
                                 .collect_darling_results(&mut accumulator);
 
                             (Data::Struct(style.into(), fields), false)

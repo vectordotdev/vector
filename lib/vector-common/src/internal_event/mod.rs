@@ -190,7 +190,7 @@ macro_rules! registered_event {
         $(fn register($fixed_name:ident: $fixed_tags:ty, $tags_name:ident: $tags:ty)
             $register_body:block)?
     ) => {
-        pastey::paste!{
+        $crate::pastey::paste! {
             #[derive(Clone)]
             pub struct [<$event Handle>] {
                 $( $field: $type, )*

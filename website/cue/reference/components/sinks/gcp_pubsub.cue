@@ -63,7 +63,6 @@ components: sinks: gcp_pubsub: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.gcp_pubsub.configuration

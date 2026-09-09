@@ -24,10 +24,8 @@ where
 {
     #[serde(flatten)]
     pub inner: EnrichmentTables,
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
-    #[configurable(derived)]
     #[serde(
         default = "Inputs::<T>::default",
         skip_serializing_if = "Inputs::is_empty"

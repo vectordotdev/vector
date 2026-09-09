@@ -216,7 +216,10 @@ impl Prepare {
     // Step 6
     fn generate_release_cue(&self) -> Result<()> {
         debug!("generate_release_cue");
-        generate_cue::run(&self.new_vector_version)?;
+        generate_cue::run(
+            &self.new_vector_version,
+            generate_cue::PullRequestMetadata::Required,
+        )?;
         generate_cue::retire_all_fragments()?;
 
         self.append_vrl_changelog_to_release_cue()?;

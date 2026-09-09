@@ -21,7 +21,6 @@ components: transforms: metric_to_log: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.metric_to_log.configuration

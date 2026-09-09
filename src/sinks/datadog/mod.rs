@@ -38,8 +38,8 @@ pub mod traces;
 pub struct LocalDatadogCommonConfig {
     /// The endpoint to send observability data to.
     ///
-    /// The endpoint must contain an HTTP scheme, and may specify a hostname or IP
-    /// address and port. The API path should NOT be specified as this is handled by
+    /// The endpoint must be an absolute HTTP(S) URL. A missing scheme defaults
+    /// to `https`. The API path should NOT be specified as this is handled by
     /// the sink.
     ///
     /// If set, overrides the `site` option.
@@ -75,11 +75,9 @@ pub struct LocalDatadogCommonConfig {
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: Option<SensitiveString>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

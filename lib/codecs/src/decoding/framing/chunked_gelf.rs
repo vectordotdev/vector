@@ -22,8 +22,15 @@ const GELF_MAGIC: &[u8] = &[0x1e, 0x0f];
 const GELF_MAX_TOTAL_CHUNKS: u8 = 128;
 const DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
+/// Most messages that may await completion at once.
+const MAX_PENDING_MESSAGES: usize = 4096;
+
 const fn default_timeout_secs() -> f64 {
     DEFAULT_TIMEOUT_SECS
+}
+
+const fn default_pending_messages_limit() -> usize {
+    MAX_PENDING_MESSAGES
 }
 
 /// Config used to build a `ChunkedGelfDecoder`.
@@ -60,8 +67,11 @@ pub struct ChunkedGelfDecoderOptions {
 
     /// The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
     /// dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
-    /// If this option is not set, the decoder does not limit the number of pending messages and the memory usage
-    /// of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
+    ///
+    /// Chunks belonging to messages that are already pending are still accepted once the limit is
+    /// reached, so in-flight messages can complete.
+    ///
+    /// If unset or `null`, this defaults to 4096.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub pending_messages_limit: Option<usize>,
 
@@ -137,29 +147,32 @@ impl MessageState {
         let chunk_bitmap_id = 1 << sequence_number;
         self.chunks_bitmap |= chunk_bitmap_id;
         self.current_length += chunk.remaining();
-        self.chunks[sequence_number as usize] = chunk;
+        self.chunks[sequence_number as usize] = Bytes::copy_from_slice(&chunk);
     }
 
-    fn is_complete(&self) -> bool {
-        self.chunks_bitmap.count_ones() == self.total_chunks as u32
+    /// Callers must have ruled out a duplicate, which would not raise the count.
+    fn is_final_missing_chunk(&self) -> bool {
+        self.chunks_bitmap.count_ones() + 1 == self.total_chunks as u32
     }
 
     fn current_length(&self) -> usize {
         self.current_length
     }
 
-    fn retrieve_message(&self) -> Option<Bytes> {
-        if self.is_complete() {
-            self.timeout_task.abort();
-            let chunks = &self.chunks[0..self.total_chunks as usize];
-            let mut message = BytesMut::new();
-            for chunk in chunks {
+    fn finish(mut self: Box<Self>, sequence_number: u8, final_chunk: Bytes) -> Bytes {
+        let mut message = BytesMut::with_capacity(self.current_length + final_chunk.len());
+        for (index, chunk) in self.chunks[0..self.total_chunks as usize]
+            .iter_mut()
+            .enumerate()
+        {
+            if index == sequence_number as usize {
+                message.extend_from_slice(&final_chunk);
+            } else {
                 message.extend_from_slice(chunk);
+                *chunk = Bytes::new();
             }
-            Some(message.freeze())
-        } else {
-            None
         }
+        message.freeze()
     }
 }
 
@@ -295,9 +308,9 @@ pub struct ChunkedGelfDecoder {
     // message, so we have to read all the bytes from the message (datagram)
     bytes_decoder: BytesDecoder,
     decompression_config: ChunkedGelfDecompressionConfig,
-    state: Arc<Mutex<HashMap<u64, MessageState>>>,
+    state: Arc<Mutex<HashMap<u64, Box<MessageState>>>>,
     timeout: Duration,
-    pending_messages_limit: Option<usize>,
+    pending_messages_limit: usize,
     max_length: Option<usize>,
 }
 
@@ -314,7 +327,8 @@ impl ChunkedGelfDecoder {
             decompression_config,
             state: Arc::new(Mutex::new(HashMap::new())),
             timeout: Duration::from_secs_f64(timeout_secs),
-            pending_messages_limit,
+            pending_messages_limit: pending_messages_limit
+                .unwrap_or_else(default_pending_messages_limit),
             max_length,
         }
     }
@@ -365,15 +379,46 @@ impl ChunkedGelfDecoder {
             }
         );
 
+        // A lone chunk is already complete, but it cannot reuse the ID of a pending message.
+        if total_chunks == 1 {
+            if let Some(max_length) = self.max_length
+                && chunk.len() > max_length
+            {
+                return Err(ChunkedGelfDecoderError::MaxLengthExceed {
+                    message_id,
+                    sequence_number,
+                    length: chunk.len(),
+                    max_length,
+                });
+            }
+
+            // Copy before taking the shared-state lock, then keep the lock from the ID check
+            // through return so another decoder clone cannot insert this ID between them.
+            let chunk = Bytes::copy_from_slice(&chunk);
+            let state_lock = self.state.lock().expect("poisoned lock");
+            if let Some(message_state) = state_lock.get(&message_id) {
+                return Err(ChunkedGelfDecoderError::TotalChunksMismatch {
+                    message_id,
+                    sequence_number,
+                    original_total_chunks: message_state.total_chunks,
+                    received_total_chunks: total_chunks,
+                });
+            }
+            return Ok(Some(chunk));
+        }
+
         let mut state_lock = self.state.lock().expect("poisoned lock");
 
-        if let Some(pending_messages_limit) = self.pending_messages_limit {
+        // Only a new message grows the table, so the limit applies on insert. Checking it
+        // before the lookup rejected chunks of messages already pending, which could then
+        // never complete and expired instead.
+        if !state_lock.contains_key(&message_id) {
             ensure!(
-                state_lock.len() < pending_messages_limit,
+                state_lock.len() < self.pending_messages_limit,
                 PendingMessagesLimitReachedSnafu {
                     message_id,
                     sequence_number,
-                    pending_messages_limit
+                    pending_messages_limit: self.pending_messages_limit
                 }
             );
         }
@@ -385,8 +430,12 @@ impl ChunkedGelfDecoder {
             let timeout = self.timeout;
             let timeout_handle = tokio::spawn(async move {
                 tokio::time::sleep(timeout).await;
+                let timeout_task_id = tokio::task::id();
                 let mut state_lock = state.lock().expect("poisoned lock");
-                if state_lock.remove(&message_id).is_some() {
+                let owns_message = state_lock
+                    .get(&message_id)
+                    .is_some_and(|message| message.timeout_task.id() == timeout_task_id);
+                if owns_message && state_lock.remove(&message_id).is_some() {
                     warn!(
                         message_id = message_id,
                         timeout_secs = timeout.as_secs_f64(),
@@ -394,7 +443,7 @@ impl ChunkedGelfDecoder {
                     );
                 }
             });
-            MessageState::new(total_chunks, timeout_handle)
+            Box::new(MessageState::new(total_chunks, timeout_handle))
         });
 
         ensure!(
@@ -416,12 +465,43 @@ impl ChunkedGelfDecoder {
             return Ok(None);
         }
 
+        // Remove a complete message before assembling it. The final chunk goes straight into
+        // the output, so it needs neither an intermediate copy nor shared state during assembly.
+        if message_state.is_final_missing_chunk() {
+            let length = message_state.current_length().saturating_add(chunk.len());
+            if let Some(max_length) = self.max_length
+                && length > max_length
+            {
+                if let Some(dropped) = state_lock.remove(&message_id) {
+                    dropped.timeout_task.abort();
+                }
+                return Err(ChunkedGelfDecoderError::MaxLengthExceed {
+                    message_id,
+                    sequence_number,
+                    length,
+                    max_length,
+                });
+            }
+
+            let message_state = state_lock.remove(&message_id).expect("entry must exist");
+            // Abort while the message ID is still protected. Otherwise another decoder clone
+            // can reuse the ID before the old timeout is canceled, and that callback can remove
+            // the new message.
+            message_state.timeout_task.abort();
+            drop(state_lock);
+            return Ok(Some(message_state.finish(sequence_number, chunk)));
+        }
+
         message_state.add_chunk(sequence_number, chunk);
 
         if let Some(max_length) = self.max_length {
             let length = message_state.current_length();
             if length > max_length {
-                state_lock.remove(&message_id);
+                // Abort on removal, or the task outlives its entry and the live-task count is
+                // no longer bounded by `pending_messages_limit`.
+                if let Some(dropped) = state_lock.remove(&message_id) {
+                    dropped.timeout_task.abort();
+                }
                 return Err(ChunkedGelfDecoderError::MaxLengthExceed {
                     message_id,
                     sequence_number,
@@ -431,12 +511,7 @@ impl ChunkedGelfDecoder {
             }
         }
 
-        if let Some(message) = message_state.retrieve_message() {
-            state_lock.remove(&message_id);
-            Ok(Some(message))
-        } else {
-            Ok(None)
-        }
+        Ok(None)
     }
 
     /// Decode a GELF message that may be chunked or not. The source bytes are expected to be
@@ -451,9 +526,11 @@ impl ChunkedGelfDecoder {
             src.advance(2);
             self.decode_chunk(src)?
         } else {
+            // Slice defensively: a frame here is only known to be non-empty, and one shorter
+            // than the magic is reachable from an unauthenticated sender.
             trace!(
-                "Received an unchunked GELF message. First two bytes of message: {:?}",
-                &src[0..2]
+                "Received an unchunked GELF message. First bytes of message: {:?}",
+                &src[..src.len().min(GELF_MAGIC.len())]
             );
             Some(src)
         };
@@ -815,6 +892,21 @@ mod tests {
         ));
     }
 
+    #[rstest]
+    #[case::one_byte(&b"x"[..])]
+    #[case::two_bytes(&b"xy"[..])]
+    #[tokio::test]
+    #[traced_test]
+    async fn decode_short_unchunked_frame_does_not_panic(#[case] payload: &[u8]) {
+        // The trace log on that branch formats two bytes. `traced_test` enables the level.
+        let mut src = BytesMut::from(payload);
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        let frame = decoder.decode_eof(&mut src).expect("must not fail");
+
+        assert_eq!(frame, Some(Bytes::copy_from_slice(payload)));
+    }
+
     #[tokio::test]
     async fn decode_empty_input() {
         let mut src = BytesMut::new();
@@ -886,6 +978,36 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn pending_messages_limit_defaults_and_allows_overrides() {
+        let default = ChunkedGelfDecoder::default();
+        assert_eq!(default.pending_messages_limit, MAX_PENDING_MESSAGES);
+
+        let explicit_null: ChunkedGelfDecoderOptions =
+            serde_json::from_value(serde_json::json!({ "pending_messages_limit": null })).unwrap();
+        let decoder = ChunkedGelfDecoderConfig {
+            chunked_gelf: explicit_null,
+        }
+        .build();
+        assert_eq!(decoder.pending_messages_limit, MAX_PENDING_MESSAGES);
+
+        let raised = ChunkedGelfDecoder::new(
+            DEFAULT_TIMEOUT_SECS,
+            Some(MAX_PENDING_MESSAGES + 1),
+            None,
+            ChunkedGelfDecompressionConfig::Auto,
+        );
+        assert_eq!(raised.pending_messages_limit, MAX_PENDING_MESSAGES + 1);
+
+        let lowered = ChunkedGelfDecoder::new(
+            DEFAULT_TIMEOUT_SECS,
+            Some(1),
+            None,
+            ChunkedGelfDecompressionConfig::Auto,
+        );
+        assert_eq!(lowered.pending_messages_limit, 1);
+    }
+
     #[rstest]
     #[tokio::test]
     async fn decode_reached_pending_messages_limit(
@@ -895,7 +1017,7 @@ mod tests {
         let (mut two_chunks, _) = two_chunks_message;
         let (mut three_chunks, _) = three_chunks_message;
         let mut decoder = ChunkedGelfDecoder {
-            pending_messages_limit: Some(1),
+            pending_messages_limit: 1,
             ..Default::default()
         };
 
@@ -915,6 +1037,113 @@ mod tests {
             }
         ));
         assert!(decoder.state.lock().unwrap().len() == 1);
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn decode_accepts_chunks_of_pending_messages_at_the_limit(
+        two_chunks_message: ([BytesMut; 2], String),
+        three_chunks_message: ([BytesMut; 3], String),
+    ) {
+        // The limit bounds how many messages may be pending, not which chunks are accepted.
+        let (mut two_chunks, two_chunks_expected) = two_chunks_message;
+        let (mut three_chunks, _) = three_chunks_message;
+        let mut decoder = ChunkedGelfDecoder {
+            pending_messages_limit: 1,
+            ..Default::default()
+        };
+
+        let frame = decoder.decode_eof(&mut two_chunks[0]).unwrap();
+        assert!(frame.is_none());
+        assert_eq!(decoder.state.lock().unwrap().len(), 1);
+
+        // The table is full, so a new message id is rejected.
+        assert!(decoder.decode_eof(&mut three_chunks[0]).is_err());
+
+        // ...but the pending message still completes.
+        let frame = decoder.decode_eof(&mut two_chunks[1]).unwrap();
+        assert_eq!(frame, Some(Bytes::from(two_chunks_expected)));
+        assert_eq!(decoder.state.lock().unwrap().len(), 0);
+    }
+
+    #[rstest]
+    #[tokio::test(start_paused = true)]
+    async fn decode_max_length_exceeded_does_not_leak_timeout_task(
+        two_chunks_message: ([BytesMut; 2], String),
+    ) {
+        // An unaborted task outlives its entry, unbounding the live-task count.
+        let (mut chunks, _) = two_chunks_message;
+        let mut decoder = ChunkedGelfDecoder {
+            max_length: Some(5),
+            ..Default::default()
+        };
+
+        assert!(decoder.decode_eof(&mut chunks[0]).unwrap().is_none());
+        let timeout_task = {
+            let state = decoder.state.lock().unwrap();
+            state
+                .values()
+                .next()
+                .map(|message_state| message_state.timeout_task.abort_handle())
+                .expect("a message should be pending")
+        };
+        assert!(!timeout_task.is_finished());
+
+        assert!(decoder.decode_eof(&mut chunks[1]).is_err());
+        assert_eq!(decoder.state.lock().unwrap().len(), 0);
+
+        tokio::task::yield_now().await;
+        assert!(
+            timeout_task.is_finished(),
+            "the timeout task must be aborted when the message is dropped",
+        );
+    }
+
+    #[tokio::test]
+    async fn add_chunk_does_not_retain_the_source_buffer() {
+        // `BytesDecoder` slices the read buffer without copying, so retaining it would pin
+        // the whole buffer (>= 8 KiB) per chunk.
+        let mut chunk = create_chunk(1u64, 0u8, 2u8, &"foo");
+        let source_range = chunk.as_ptr_range();
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        assert!(decoder.decode_eof(&mut chunk).unwrap().is_none());
+
+        let state = decoder.state.lock().unwrap();
+        let message_state = state.values().next().expect("message pending");
+        let stored = message_state.chunks[0].as_ptr();
+        assert!(
+            !source_range.contains(&stored),
+            "the stored chunk must not alias the decoder's input buffer"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_lone_chunk_does_not_retain_the_source_buffer() {
+        let mut chunk = create_chunk(1u64, 0u8, 1u8, &"foo");
+        let source_range = chunk.as_ptr_range();
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        let frame = decoder
+            .decode_eof(&mut chunk)
+            .unwrap()
+            .expect("the lone chunk must complete");
+
+        assert!(
+            !source_range.contains(&frame.as_ptr()),
+            "the returned frame must not alias the decoder's input buffer"
+        );
+    }
+
+    #[tokio::test]
+    async fn finish_assembles_the_final_chunk_in_sequence() {
+        let mut state = Box::new(MessageState::new(3, tokio::spawn(async {})));
+        state.add_chunk(0, Bytes::from_static(b"foo"));
+        state.add_chunk(2, Bytes::from_static(b"baz"));
+
+        let message = state.finish(1, Bytes::from_static(b"bar"));
+
+        assert_eq!(message, Bytes::from_static(b"foobarbaz"));
     }
 
     #[rstest]
@@ -944,6 +1173,34 @@ mod tests {
                 received_total_chunks: 3,
             }
         ));
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn a_lone_chunk_cannot_reuse_a_pending_message_id(
+        two_chunks_message: ([BytesMut; 2], String),
+    ) {
+        let (mut chunks, expected) = two_chunks_message;
+        let mut decoder = ChunkedGelfDecoder::default();
+
+        assert!(decoder.decode_eof(&mut chunks[0]).unwrap().is_none());
+
+        let mut lone_chunk = create_chunk(1u64, 0u8, 1u8, &"other");
+        let error = decoder
+            .decode_eof(&mut lone_chunk)
+            .expect_err("a pending message already owns this ID");
+        assert!(matches!(
+            downcast_framing_error(&error),
+            ChunkedGelfDecoderError::TotalChunksMismatch {
+                message_id: 1,
+                sequence_number: 0,
+                original_total_chunks: 2,
+                received_total_chunks: 1,
+            }
+        ));
+
+        let frame = decoder.decode_eof(&mut chunks[1]).unwrap();
+        assert_eq!(frame, Some(Bytes::from(expected)));
     }
 
     #[rstest]

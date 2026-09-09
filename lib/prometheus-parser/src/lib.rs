@@ -104,10 +104,14 @@ pub struct HistogramMetric {
     pub buckets: Vec<HistogramBucket>,
     /// `None` when the exposition carried no `_sum` series.
     ///
-    /// OpenMetrics only recommends that series for histograms, and forbids it outright once
-    /// negative bucket thresholds are in play, so its absence is legitimate and must stay
-    /// distinguishable from a reported sum of zero. Summaries are the opposite case: a missing
-    /// `_sum` there is specified to mean zero, which is why [`SummaryMetric::sum`] is not optional.
+    /// The [OpenMetrics histogram specification][spec] only recommends that series ("SHOULD contain
+    /// Sum"), and forbids it outright once negative bucket thresholds are in play, so its absence is
+    /// legitimate and must stay distinguishable from a reported sum of zero. Summaries are the
+    /// opposite case: a missing `_sum` there is [specified to mean zero][otel-compat], which is why
+    /// [`SummaryMetric::sum`] is not optional.
+    ///
+    /// [spec]: https://prometheus.io/docs/specs/om/open_metrics_spec/#histogram
+    /// [otel-compat]: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/compatibility/prometheus_and_openmetrics.md#summaries
     pub sum: Option<f64>,
     pub count: u64,
 }

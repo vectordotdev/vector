@@ -17,7 +17,10 @@ use crate::{
     sinks::{
         HTTPRequestBuilderSnafu, HealthcheckError,
         prelude::*,
-        util::http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+        util::{
+            HttpEndpoint,
+            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+        },
     },
 };
 
@@ -113,7 +116,7 @@ impl Partitioner for KeyPartitioner {
 /// GreptimeDB logs HTTP request builder.
 #[derive(Debug, Clone)]
 pub(super) struct GreptimeDBLogsHttpRequestBuilder {
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
     pub(super) auth: Option<Auth>,
     pub(super) encoder: (Transformer, Encoder<Framer>),
     pub(super) compression: Compression,
@@ -122,13 +125,16 @@ pub(super) struct GreptimeDBLogsHttpRequestBuilder {
 }
 
 fn prepare_log_ingester_url(
-    endpoint: &str,
+    endpoint: &HttpEndpoint,
     db: &str,
     table: &str,
     metadata: &PartitionKey,
     extra_params: &Option<HashMap<String, String>>,
 ) -> String {
-    let path = format!("{endpoint}/v1/events/logs");
+    let path = endpoint
+        .append_path("/v1/events/logs")
+        .expect("static log ingester path should be a valid URL")
+        .to_string();
     let mut url = url::Url::parse(&path).unwrap();
     let mut url_builder = url.query_pairs_mut();
     url_builder
@@ -156,13 +162,8 @@ impl HttpServiceRequestBuilder<PartitionKey> for GreptimeDBLogsHttpRequestBuilde
         let db = metadata.dbname.clone();
 
         // prepare url
-        let url = prepare_log_ingester_url(
-            self.endpoint.as_str(),
-            &db,
-            &table,
-            metadata,
-            &self.extra_params,
-        );
+        let url =
+            prepare_log_ingester_url(&self.endpoint, &db, &table, metadata, &self.extra_params);
 
         // prepare body
         let payload = request.take_payload();
@@ -242,10 +243,13 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for GreptimeDBLogsHttpRequestBui
 
 pub(super) async fn http_healthcheck(
     client: HttpClient,
-    endpoint: String,
+    endpoint: HttpEndpoint,
     auth: Option<Auth>,
 ) -> crate::Result<()> {
-    let uri = format!("{endpoint}/health");
+    let uri = endpoint
+        .append_path("/health")
+        .expect("static health path should be a valid URL")
+        .to_string();
     let mut request = Request::get(uri).body(Body::empty())?;
 
     if let Some(auth) = auth {
@@ -286,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_prepare_url() {
-        let endpoint = "http://localhost:8080";
+        let endpoint = HttpEndpoint::parse("http://localhost:8080").unwrap();
         let db = "test_db";
         let table = "test_table";
         let metadata = PartitionKey {
@@ -303,8 +307,13 @@ mod tests {
                 .collect(),
         );
 
-        let url = prepare_log_ingester_url(endpoint, db, table, &metadata, &extra_params);
+        let url = prepare_log_ingester_url(&endpoint, db, table, &metadata, &extra_params);
         let url = url::Url::parse(&url).unwrap();
+        assert_eq!(
+            url.path(),
+            "/v1/events/logs",
+            "log ingester path must not gain a double slash from the endpoint"
+        );
         let check = url.query_pairs().all(|(k, v)| match k.as_ref() {
             "db" => v == "test_db",
             "table" => v == "test_table",
