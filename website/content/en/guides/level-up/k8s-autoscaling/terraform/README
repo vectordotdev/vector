@@ -40,6 +40,25 @@ Usage
     helm list --all-namespaces
     ansible-playbook -i localhost, ../scripts/run-experiment.yaml -e experiment=hpa
 
+   The playbook only installs the producer and Vector releases: it expects the
+   consumer, ingress-nginx, Vector ingress, and the vectordotdev Helm repo
+   from the [Setup](../../k8s-autoscaling.md#setup) and
+   [Manual scaling](../../k8s-autoscaling.md#manual-scaling) steps of the
+   guide to already be deployed (helm installs run from the guide directory):
+
+    helm upgrade --install consumer manifests/consumer-chart \
+      -n vector-perf --create-namespace --wait --timeout=3m
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+    helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+      -n ingress-nginx --create-namespace \
+      --version 4.15.1 \
+      --set controller.service.type=ClusterIP \
+      --set controller.replicaCount=1 \
+      --wait --timeout=3m
+    helm repo add vectordotdev https://helm.vector.dev && helm repo update
+    helm upgrade --install vector-ingress manifests/ingress-chart \
+      -n vector-perf --wait --timeout=3m
+
 4. When finished, tear the cluster down (pass the same `-var` flags you
    applied with):
 
