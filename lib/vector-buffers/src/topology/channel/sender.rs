@@ -214,6 +214,10 @@ impl UsageAccounting {
 #[derive(Clone, derive_more::Debug)]
 pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
+    // `overflow` is self-referential, so formatting it via a plain placeholder would make
+    // derive_more infer `Option<Box<BufferSender<T>>>: Debug`, overflowing (E0275). A method-call
+    // expression skips bound inference while formatting the same value.
+    #[debug("{:?}", overflow.as_ref())]
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
     usage_instrumentation: Option<BufferUsageHandle>,
