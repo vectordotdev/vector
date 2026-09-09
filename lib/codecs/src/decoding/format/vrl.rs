@@ -45,7 +45,6 @@ pub struct VrlDeserializerOptions {
     ///
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     pub timezone: Option<TimeZone>,
 }
 

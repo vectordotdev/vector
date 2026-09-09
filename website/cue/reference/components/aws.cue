@@ -6,7 +6,6 @@ components: _aws: {
 
 		if _aws_include {
 			auth: {
-				common:      false
 				description: "Options for the authentication strategy."
 				required:    false
 				type: object: {
@@ -14,7 +13,6 @@ components: _aws: {
 					options: {
 						access_key_id: {
 							category:    "Auth"
-							common:      false
 							description: "The AWS access key id. Used for AWS authentication when communicating with AWS services."
 							required:    false
 							type: string: {
@@ -24,7 +22,6 @@ components: _aws: {
 						}
 						secret_access_key: {
 							category:    "Auth"
-							common:      false
 							description: "The AWS secret access key. Used for AWS authentication when communicating with AWS services."
 							required:    false
 							type: string: {
@@ -34,7 +31,6 @@ components: _aws: {
 						}
 						assume_role: {
 							category:    "Auth"
-							common:      false
 							description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
 							required:    false
 							type: string: {
@@ -44,7 +40,6 @@ components: _aws: {
 						}
 						region: {
 							category:    "Auth"
-							common:      false
 							description: "The [AWS region](\(urls.aws_regions)) to send STS requests to. If not set, this will default to the configured region for the service itself."
 							required:    false
 							type: string: {
@@ -54,7 +49,6 @@ components: _aws: {
 						}
 						load_timeout_secs: {
 							category:    "Auth"
-							common:      false
 							description: "The timeout for loading credentials. Relevant when the default credentials chain is used or `assume_role`."
 							required:    false
 							type: uint: {
@@ -94,7 +88,6 @@ components: _aws: {
 						}
 						profile: {
 							category:    "Auth"
-							common:      false
 							description: "The AWS profile name. Used to select AWS credentials from a provided credentials file."
 							required:    false
 							type: string: {
@@ -107,7 +100,6 @@ components: _aws: {
 			}
 
 			endpoint: {
-				common:      false
 				description: "Custom endpoint for use with AWS-compatible services."
 				required:    false
 				type: string: {

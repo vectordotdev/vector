@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: mezmo
+    inputs:
+      - my-source-or-transform-id
+    api_key: ${LOGDNA_API_KEY}
+    hostname: ${HOSTNAME}

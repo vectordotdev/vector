@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rand::Rng;
+use rand::RngExt;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_lib::{
@@ -33,17 +33,14 @@ pub struct MqttSourceConfig {
     pub common: MqttCommonConfig,
 
     /// MQTT topic or topics from which messages are to be read.
-    #[configurable(derived)]
     #[serde(default = "default_topic")]
     #[derivative(Default(value = "default_topic()"))]
     pub topic: OneOrMany<String>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,

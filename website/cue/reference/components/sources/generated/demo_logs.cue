@@ -21,26 +21,7 @@ generated: components: sources: demo_logs: configuration: {
 				description:   "Apache Avro-specific encoder options."
 				relevant_when: "codec = \"avro\""
 				required:      true
-				type: object: options: {
-					schema: {
-						description: """
-																The Avro schema definition.
-																**Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
-																* `Date`
-																* `Decimal`
-																* `Duration`
-																* `Fixed`
-																* `TimeMillis`
-																"""
-						required: true
-						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
-					}
-					strip_schema_id_prefix: {
-						description: "For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix, as described in [Confluent Kafka's documentation](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format)."
-						required:    true
-						type: bool: {}
-					}
-				}
+				type:          _schemaDefinitions["codecs::decoding::format::avro::AvroDeserializerOptions"]
 			}
 			codec: {
 				description: "The codec to use for decoding events."
@@ -136,83 +117,25 @@ generated: components: sources: demo_logs: configuration: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
 				required:      false
-				type: object: options: {
-					lossy: {
-						description: """
-																Determines whether to replace invalid UTF-8 sequences instead of failing.
-
-																When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
-
-																[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-																"""
-						required: false
-						type: bool: default: true
-					}
-					validation: {
-						description: "Configures the decoding validation mode."
-						required:    false
-						type: string: {
-							default: "strict"
-							enum: {
-								relaxed: """
-																			Uses more relaxed validation that skips strict GELF specification checks.
-
-																			This mode does not treat specification violations as errors, allowing the decoder
-																			to accept messages from sources that don't strictly follow the GELF spec.
-																			"""
-								strict: "Uses strict validation that closely follows the GELF spec."
-							}
-						}
-					}
-				}
+				type:          _schemaDefinitions["codecs::decoding::format::gelf::GelfDeserializerOptions"]
 			}
 			influxdb: {
 				description:   "Influxdb-specific decoding options."
 				relevant_when: "codec = \"influxdb\""
 				required:      false
-				type: object: options: lossy: {
-					description: """
-						Determines whether to replace invalid UTF-8 sequences instead of failing.
-
-						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
-
-						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-						"""
-					required: false
-					type: bool: default: true
-				}
+				type:          _schemaDefinitions["codecs::decoding::format::influxdb::InfluxdbDeserializerOptions"]
 			}
 			json: {
 				description:   "JSON-specific decoding options."
 				relevant_when: "codec = \"json\""
 				required:      false
-				type: object: options: lossy: {
-					description: """
-						Determines whether to replace invalid UTF-8 sequences instead of failing.
-
-						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
-
-						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-						"""
-					required: false
-					type: bool: default: true
-				}
+				type:          _schemaDefinitions["codecs::decoding::format::influxdb::InfluxdbDeserializerOptions"]
 			}
 			native_json: {
 				description:   "Vector's native JSON-specific decoding options."
 				relevant_when: "codec = \"native_json\""
 				required:      false
-				type: object: options: lossy: {
-					description: """
-						Determines whether to replace invalid UTF-8 sequences instead of failing.
-
-						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
-
-						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-						"""
-					required: false
-					type: bool: default: true
-				}
+				type:          _schemaDefinitions["codecs::decoding::format::influxdb::InfluxdbDeserializerOptions"]
 			}
 			protobuf: {
 				description:   "Protobuf-specific decoding options."
@@ -279,48 +202,13 @@ generated: components: sources: demo_logs: configuration: {
 				description:   "Syslog-specific decoding options."
 				relevant_when: "codec = \"syslog\""
 				required:      false
-				type: object: options: lossy: {
-					description: """
-						Determines whether to replace invalid UTF-8 sequences instead of failing.
-
-						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
-
-						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-						"""
-					required: false
-					type: bool: default: true
-				}
+				type:          _schemaDefinitions["codecs::decoding::format::influxdb::InfluxdbDeserializerOptions"]
 			}
 			vrl: {
 				description:   "VRL-specific decoding options."
 				relevant_when: "codec = \"vrl\""
 				required:      true
-				type: object: options: {
-					source: {
-						description: """
-																The [Vector Remap Language][vrl] (VRL) program to execute for each event.
-																The final contents of the `.` target are used as the decoding result.
-																Compilation errors or use of `abort` in the program result in a decoding error.
-
-																[vrl]: https://vector.dev/docs/reference/vrl
-																"""
-						required: true
-						type: string: {}
-					}
-					timezone: {
-						description: """
-																The name of the timezone to apply to timestamp conversions that do not contain an explicit
-																time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
-																to indicate system local time.
-
-																If not set, `local` is used.
-
-																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-																"""
-						required: false
-						type: string: examples: ["local", "America/New_York", "EST5EDT"]
-					}
-				}
+				type:          _schemaDefinitions["codecs::decoding::format::vrl::VrlDeserializerOptions"]
 			}
 		}
 	}
@@ -370,110 +258,19 @@ generated: components: sources: demo_logs: configuration: {
 				description:   "Options for the character delimited decoder."
 				relevant_when: "method = \"character_delimited\""
 				required:      true
-				type: object: options: {
-					delimiter: {
-						description: "The character that delimits byte sequences."
-						required:    true
-						type: ascii_char: {}
-					}
-					max_length: {
-						description: """
-																The maximum length of the byte buffer.
-
-																This length does *not* include the trailing delimiter.
-
-																By default, no maximum length is enforced. If events are malformed, this can lead to
-																additional resource usage as events continue to be buffered in memory, and can potentially
-																lead to memory exhaustion in extreme cases.
-
-																If there is a risk of processing malformed data, such as logs with user-controlled input,
-																consider setting the maximum length to a reasonably large value as a safety net. This
-																prevents processing from being unbounded.
-																"""
-						required: false
-						type: uint: {}
-					}
-				}
+				type:          _schemaDefinitions["codecs::decoding::framing::character_delimited::CharacterDelimitedDecoderOptions"]
 			}
 			chunked_gelf: {
 				description:   "Options for the chunked GELF decoder."
 				relevant_when: "method = \"chunked_gelf\""
 				required:      false
-				type: object: options: {
-					decompression: {
-						description: "Decompression configuration for GELF messages."
-						required:    false
-						type: string: {
-							default: "Auto"
-							enum: {
-								Auto: "Automatically detect the decompression method based on the magic bytes of the message."
-								Gzip: "Use Gzip decompression."
-								None: "Do not decompress the message."
-								Zlib: "Use Zlib decompression."
-							}
-						}
-					}
-					max_length: {
-						description: """
-																The maximum length of a single GELF message, in bytes. Messages longer than this length are
-																dropped. If this option is not set, the decoder does not limit the length of messages and
-																the per-message memory is unbounded.
-
-																**Note**: A message can be composed of multiple chunks, and this limit applies to the whole
-																message, not to individual chunks.
-
-																This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
-																The message payload is the concatenation of all chunk payloads.
-																"""
-						required: false
-						type: uint: {}
-					}
-					pending_messages_limit: {
-						description: """
-																The maximum number of pending incomplete messages. If this limit is reached, the decoder starts
-																dropping chunks of new messages, ensuring the memory usage of the decoder's state is bounded.
-																If this option is not set, the decoder does not limit the number of pending messages and the memory usage
-																of its messages buffer can grow unbounded. This matches Graylog Server's behavior.
-																"""
-						required: false
-						type: uint: {}
-					}
-					timeout_secs: {
-						description: """
-																The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
-																decoder drops all received chunks for the timed-out message.
-																"""
-						required: false
-						type: float: default: 5.0
-					}
-				}
+				type:          _schemaDefinitions["codecs::decoding::framing::chunked_gelf::ChunkedGelfDecoderOptions"]
 			}
 			length_delimited: {
 				description:   "Options for the length delimited decoder."
 				relevant_when: "method = \"length_delimited\""
 				required:      true
-				type: object: options: {
-					length_field_is_big_endian: {
-						description: "Length field byte order (little or big endian)"
-						required:    false
-						type: bool: default: true
-					}
-					length_field_length: {
-						description: "Number of bytes representing the field length"
-						required:    false
-						type: uint: default: 4
-					}
-					length_field_offset: {
-						description: "Number of bytes in the header before the length field"
-						required:    false
-						type: uint: default: 0
-					}
-					max_frame_length: {
-						description: "Maximum frame length"
-						required:    false
-						type: uint: default: 8388608
-					}
-				}
+				type:          _schemaDefinitions["codecs::common::length_delimited::LengthDelimitedCoderOptions"]
 			}
 			max_frame_length: {
 				description:   "Maximum frame length"
@@ -512,33 +309,13 @@ generated: components: sources: demo_logs: configuration: {
 				description:   "Options for the newline delimited decoder."
 				relevant_when: "method = \"newline_delimited\""
 				required:      false
-				type: object: options: max_length: {
-					description: """
-						The maximum length of the byte buffer.
-
-						This length does *not* include the trailing delimiter.
-
-						By default, no maximum length is enforced. If events are malformed, this can lead to
-						additional resource usage as events continue to be buffered in memory, and can potentially
-						lead to memory exhaustion in extreme cases.
-
-						If there is a risk of processing malformed data, such as logs with user-controlled input,
-						consider setting the maximum length to a reasonably large value as a safety net. This
-						prevents processing from being unbounded.
-						"""
-					required: false
-					type: uint: {}
-				}
+				type:          _schemaDefinitions["codecs::decoding::framing::newline_delimited::NewlineDelimitedDecoderOptions"]
 			}
 			octet_counting: {
 				description:   "Options for the octet counting decoder."
 				relevant_when: "method = \"octet_counting\""
 				required:      false
-				type: object: options: max_length: {
-					description: "The maximum length of the byte buffer."
-					required:    false
-					type: uint: {}
-				}
+				type:          _schemaDefinitions["codecs::decoding::framing::octet_counting::OctetCountingDecoderOptions"]
 			}
 		}
 	}

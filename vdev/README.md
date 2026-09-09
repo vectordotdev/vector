@@ -67,7 +67,7 @@ Integration tests require docker or podman to run.
 
 Integration tests are not run by default when running `make test`. Instead, they are accessible via the integration subcommand `cargo vdev int` (example: `cargo vdev int test aws` runs aws-related integration tests).
 
-You should use `./scripts/run-integration-test.sh`, which is the wrapper used by CI and which suits most development needs. Integration tests require a `cargo vdev int start`, `cargo vdev int test`, and `cargo vdev int stop`, which the script handles automatically. You can find the list of available integration tests using `cargo vdev int show`.
+For most development needs, use `cargo vdev integration run <test-name>`, which handles the full lifecycle (start, test, stop) automatically. You can find the list of available integration tests using `cargo vdev int show`.
 
 
 ## Developing vdev

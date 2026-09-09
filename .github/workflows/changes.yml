@@ -126,6 +126,8 @@ on:
         value: ${{ jobs.int_tests.outputs.nats }}
       nginx:
         value: ${{ jobs.int_tests.outputs.nginx }}
+      opensearch:
+        value: ${{ jobs.int_tests.outputs.opensearch }}
       opentelemetry:
         value: ${{ jobs.int_tests.outputs.opentelemetry }}
       postgres:
@@ -235,9 +237,19 @@ jobs:
             cue:
               - 'website/cue/**'
               - "vdev/Cargo.toml"
+              - 'vdev/src/commands/build/docs_json.rs'
               - ".github/workflows/changes.yml"
             component_docs:
+              - 'Makefile'
               - "vdev/Cargo.toml"
+              - 'website/Makefile'
+              - 'website/package.json'
+              - 'website/yarn.lock'
+              - 'website/generated/example-configs/**'
+              - 'vdev/src/commands/build/component_docs/**'
+              - 'vdev/src/commands/build/component_examples.rs'
+              - 'vdev/src/commands/build/docs_json.rs'
+              - 'vdev/src/commands/check/component_examples.rs'
               - 'website/cue/**/*.cue'
               - 'docs/generated/**'
               # If changes to the VRL sha is made the combined generated cue file will change which
@@ -354,6 +366,7 @@ jobs:
       mqtt: ${{ steps.filter.outputs.mqtt }}
       nats: ${{ steps.filter.outputs.nats }}
       nginx: ${{ steps.filter.outputs.nginx }}
+      opensearch: ${{ steps.filter.outputs.opensearch }}
       opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
       postgres: ${{ steps.filter.outputs.postgres }}
       prometheus: ${{ steps.filter.outputs.prometheus }}
@@ -419,6 +432,7 @@ jobs:
             "mqtt": ${{ steps.filter.outputs.mqtt }},
             "nats": ${{ steps.filter.outputs.nats }},
             "nginx": ${{ steps.filter.outputs.nginx }},
+            "opensearch": ${{ steps.filter.outputs.opensearch }},
             "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
             "postgres": ${{ steps.filter.outputs.postgres }},
             "prometheus": ${{ steps.filter.outputs.prometheus }},

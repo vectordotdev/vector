@@ -18,7 +18,6 @@ components: sinks: databricks_zerobus: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -58,7 +57,6 @@ components: sinks: databricks_zerobus: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.databricks_zerobus.configuration

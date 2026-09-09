@@ -12,12 +12,42 @@ updates:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
     groups:
+      # These dependencies share archive validation APIs and must be updated
+      # together, including consideration of disk buffer format compatibility.
+      rkyv-upgrade:
+        applies-to: version-updates
+        patterns:
+          - "bytecheck"
+          - "rkyv"
+
       patches:
         applies-to: version-updates
         patterns:
           - "*"
         update-types:
           - "patch"
+
+      # These dependencies must cross the http 0.2 / hyper 0.14 to
+      # http 1 / hyper 1 boundary together. Tracked in #19179.
+      http-upgrade:
+        applies-to: version-updates
+        patterns:
+          - "axum"
+          - "headers"
+          - "http"
+          - "http-*"
+          - "hyper"
+          - "hyper-*"
+          - "prost"
+          - "prost-*"
+          - "reqwest"
+          - "tokio-tungstenite"
+          - "tonic"
+          - "tonic-*"
+          - "tower-http"
+          - "warp"
+        update-types:
+          - "major"
 
       amq:
         patterns:
@@ -62,14 +92,13 @@ updates:
         update-types:
           - "patch"
           - "minor"
+      # These dependencies share metrics-util layer traits and must be updated
+      # together to avoid incompatible trait implementations across versions.
       metrics:
         patterns:
           - "metrics"
           - "metrics-tracing-context"
           - "metrics-util"
-        update-types:
-          - "patch"
-          - "minor"
       netlink:
         patterns:
           - "netlink-*"
@@ -150,6 +179,26 @@ updates:
         applies-to: version-updates
         patterns:
           - "*"
+        exclude-patterns:
+          - "axum"
+          - "bytecheck"
+          - "headers"
+          - "http"
+          - "http-*"
+          - "hyper"
+          - "hyper-*"
+          - "metrics"
+          - "metrics-tracing-context"
+          - "metrics-util"
+          - "prost"
+          - "prost-*"
+          - "reqwest"
+          - "rkyv"
+          - "tokio-tungstenite"
+          - "tonic"
+          - "tonic-*"
+          - "tower-http"
+          - "warp"
         update-types:
           - "major"
       cargo-security:

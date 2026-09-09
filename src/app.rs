@@ -492,7 +492,9 @@ impl FinishedApplication {
             .into_inner();
 
         let status = match signal {
-            SignalTo::Shutdown(_) => Self::stop(topology_controller, signal_rx).await,
+            SignalTo::Shutdown(triggering_error) => {
+                Self::stop(topology_controller, signal_rx, triggering_error.is_none()).await
+            }
             SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
         };
@@ -504,11 +506,18 @@ impl FinishedApplication {
         status
     }
 
-    async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
+    async fn stop(
+        topology_controller: TopologyController,
+        mut signal_rx: SignalRx,
+        clean_shutdown: bool,
+    ) -> ExitStatus {
         emit!(VectorStopping);
         tokio::select! {
-            _ = topology_controller.stop() => {
+            drained = topology_controller.stop() => {
                 emit!(VectorStopped);
+                if clean_shutdown && drained {
+                    info!("All components shut down gracefully.");
+                }
                 ExitStatus::from_raw({
                     #[cfg(windows)]
                     {

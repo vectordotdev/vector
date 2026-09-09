@@ -62,12 +62,10 @@ pub struct DemoLogsConfig {
     ))]
     pub format: OutputFormat,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_framing_message_based()"))]
     #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,

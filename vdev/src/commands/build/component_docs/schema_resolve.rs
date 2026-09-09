@@ -93,13 +93,6 @@ impl SchemaContext {
             }
         }
 
-        if let Some(common) = get_schema_metadata(&expanded, "docs::common") {
-            resolved
-                .as_object_mut()
-                .unwrap()
-                .insert("common".to_string(), common.clone());
-        }
-
         if let Some(req) = get_schema_metadata(&expanded, "docs::required") {
             resolved
                 .as_object_mut()

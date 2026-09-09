@@ -721,7 +721,7 @@ impl<'a> Builder<'a> {
             extra_context: self.extra_context.clone(),
         };
 
-        let (sink, healthcheck) = match sink.inner.build(cx).await {
+        let (sink, healthcheck) = match sink.build(cx).await {
             Err(error) => {
                 self.errors.push(format!("Sink \"{key}\": {error}"));
                 return;

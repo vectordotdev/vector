@@ -9,7 +9,7 @@ use crate::{
     signal,
 };
 
-#[cfg(feature = "secrets-aws-secrets-manager")]
+#[cfg(feature = "secrets-aws_secrets_manager")]
 mod aws_secrets_manager;
 mod directory;
 mod exec;
@@ -55,11 +55,7 @@ mod test;
 #[derive(Clone, Debug)]
 #[enum_dispatch(SecretBackend)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[configurable(metadata(
-    docs::enum_tag_description = "secret type",
-    docs::common = false,
-    docs::required = false,
-))]
+#[configurable(metadata(docs::enum_tag_description = "secret type", docs::required = false))]
 pub enum SecretBackends {
     /// File.
     File(file::FileBackend),
@@ -71,7 +67,7 @@ pub enum SecretBackends {
     Exec(exec::ExecBackend),
 
     /// AWS Secrets Manager.
-    #[cfg(feature = "secrets-aws-secrets-manager")]
+    #[cfg(feature = "secrets-aws_secrets_manager")]
     AwsSecretsManager(aws_secrets_manager::AwsSecretsManagerBackend),
 
     /// Test.
@@ -86,7 +82,7 @@ impl vector_lib::configurable::NamedComponent for SecretBackends {
             Self::File(config) => config.get_component_name(),
             Self::Directory(config) => config.get_component_name(),
             Self::Exec(config) => config.get_component_name(),
-            #[cfg(feature = "secrets-aws-secrets-manager")]
+            #[cfg(feature = "secrets-aws_secrets_manager")]
             Self::AwsSecretsManager(config) => config.get_component_name(),
             Self::Test(config) => config.get_component_name(),
         }

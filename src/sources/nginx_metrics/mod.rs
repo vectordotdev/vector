@@ -85,10 +85,8 @@ pub struct NginxMetricsConfig {
     #[serde(default = "default_namespace")]
     namespace: String,
 
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     auth: Option<Auth>,
 }
 

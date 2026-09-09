@@ -13,7 +13,8 @@ use vrl::{event_path, value};
 use super::{
     config::{StackdriverConfig, default_endpoint},
     encoder::{
-        ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder,
+        StackdriverLabelConfig as EncoderLabelConfig, StackdriverLogsEncoder,
+        StackdriverResource as EncoderResource,
     },
 };
 use crate::{
@@ -27,11 +28,12 @@ use crate::{
         },
         prelude::*,
         util::{
+            HttpEndpoint,
             encoding::Encoder as _,
             http::{HttpRequest, HttpServiceRequestBuilder},
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, Template, UnconfinedTemplate},
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
@@ -48,6 +50,10 @@ fn confined(s: &str) -> ConfinedTemplate {
             "template",
         )
         .unwrap()
+}
+
+fn unconfined(s: &str) -> UnconfinedTemplate {
+    UnconfinedTemplate::try_from(s).unwrap()
 }
 
 #[test]
@@ -67,7 +73,7 @@ async fn component_spec_compliance() {
     // Metadata API, which we clearly don't have in unit tests. :)
     config.auth.credentials_path = None;
     config.auth.api_key = Some("fake".to_string().into());
-    config.endpoint = mock_endpoint.to_string();
+    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -91,18 +97,18 @@ fn encode_valid() {
         transformer,
         confined("{{ log_id }}"),
         StackdriverLogName::Project("project".to_owned()),
-        ConfinedStackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
             labels: HashMap::from([(
                 "config_user_label_1".to_owned(),
-                confined("config_user_value_1"),
+                unconfined("config_user_value_1"),
             )]),
         },
-        ConfinedStackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
             labels: HashMap::from([
-                ("namespace".to_owned(), confined("office")),
-                ("node_id".to_owned(), confined("{{ node_id }}")),
+                ("namespace".to_owned(), unconfined("office")),
+                ("node_id".to_owned(), unconfined("{{ node_id }}")),
             ]),
         },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
@@ -149,13 +155,13 @@ fn encode_inserts_timestamp() {
         transformer,
         confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        ConfinedStackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
-            labels: HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
+            labels: HashMap::from([("config_user_label_1".to_owned(), unconfined("value_1"))]),
         },
-        ConfinedStackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([("namespace".to_owned(), confined("office"))]),
+            labels: HashMap::from([("namespace".to_owned(), unconfined("office"))]),
         },
         Some(ConfigValuePath::try_from("anumber".to_owned()).unwrap()),
     );
@@ -216,20 +222,20 @@ fn severity_remaps_strings() {
 
 #[tokio::test]
 async fn correct_request() {
-    let uri: Uri = default_endpoint().parse().unwrap();
+    let uri: Uri = default_endpoint().into_uri();
 
     let transformer = Transformer::default();
     let encoder = StackdriverLogsEncoder::new(
         transformer,
         confined("testlogs"),
         StackdriverLogName::Project("project".to_owned()),
-        ConfinedStackdriverLabelConfig {
+        EncoderLabelConfig {
             labels_key: None,
-            labels: HashMap::from([("config_user_label_1".to_owned(), confined("value_1"))]),
+            labels: HashMap::from([("config_user_label_1".to_owned(), unconfined("value_1"))]),
         },
-        ConfinedStackdriverResource {
+        EncoderResource {
             type_: "generic_node".to_owned(),
-            labels: HashMap::from([("namespace".to_owned(), confined("office"))]),
+            labels: HashMap::from([("namespace".to_owned(), unconfined("office"))]),
         },
         None,
     );

@@ -26,6 +26,7 @@ pub enum ExecVersion {
         /// The configuration to pass to the secrets executable. This is the `config` field in the
         /// backend request. Refer to the documentation of your `backend_type `to see which options
         /// are required to be set.
+        #[configurable(metadata(docs::required = true))]
         backend_config: Value,
     },
 }

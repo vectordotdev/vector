@@ -47,7 +47,6 @@ components: sources: dnstap: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sources.dnstap.configuration & {
@@ -76,7 +75,6 @@ components: sources: dnstap: {
 		description: "A single dnstap event."
 		fields: {
 			dataType: {
-				common:      true
 				description: "Dnstap event data type. Currently only 'Message' type is defined."
 				required:    false
 				type: string: {
@@ -96,7 +94,6 @@ components: sources: dnstap: {
 			}
 			messageType: {
 				relevant_when: "dataType = Message"
-				common:        true
 				description:   "Dnstap message type."
 				required:      false
 				type: string: {
@@ -227,7 +224,6 @@ components: sources: dnstap: {
 				}
 			}
 			serverId: {
-				common:      true
 				description: "DNS server identity."
 				required:    false
 				type: string: {
@@ -236,7 +232,6 @@ components: sources: dnstap: {
 				}
 			}
 			serverVersion: {
-				common:      true
 				description: "DNS server version."
 				required:    false
 				type: string: {
@@ -245,7 +240,6 @@ components: sources: dnstap: {
 				}
 			}
 			extraInfo: {
-				common:      false
 				description: "Extra data for this event."
 				required:    false
 				type: string: {
@@ -291,7 +285,6 @@ components: sources: dnstap: {
 			}
 			sourcePort: {
 				relevant_when: "dataType = Message"
-				common:        true
 				description:   "The transport port of the message initiator."
 				required:      false
 				type: uint: {
@@ -310,7 +303,6 @@ components: sources: dnstap: {
 			}
 			responsePort: {
 				relevant_when: "dataType = Message"
-				common:        true
 				description:   "The transport port of the message responder."
 				required:      false
 				type: uint: {
@@ -320,7 +312,6 @@ components: sources: dnstap: {
 				}
 			}
 			error: {
-				common:      false
 				description: "Error message upon failure while parsing dnstap data."
 				required:    false
 				type: string: {
@@ -329,7 +320,6 @@ components: sources: dnstap: {
 				}
 			}
 			rawData: {
-				common: false
 				description: """
 					Raw dnstap binary data encoded in Base64. Presents only upon
 					failures or option 'raw_data_only' is enabled.
@@ -342,7 +332,6 @@ components: sources: dnstap: {
 			}
 			requestData: {
 				relevant_when: "dataType = Message"
-				common:        true
 				description:   "Request message data for DNS query/update."
 				required:      false
 				type: object: {
@@ -372,7 +361,6 @@ components: sources: dnstap: {
 							}
 						}
 						fullRcode: {
-							common: true
 							description: """
 								The numeric rcode that is the sum of the 4bits header's
 								rcode + the 8bits opt's extendedRcode when present.
@@ -386,7 +374,6 @@ components: sources: dnstap: {
 							}
 						}
 						rcodeName: {
-							common: true
 							description: """
 								Textual response code corresponding to the 'fullRcode'.
 								Should be 'No Error' for request.
@@ -418,7 +405,6 @@ components: sources: dnstap: {
 							}
 						}
 						rawData: {
-							common: false
 							description: """
 								Raw binary request message data encoded in Base64.
 								Presents only upon failures.
@@ -430,7 +416,6 @@ components: sources: dnstap: {
 							}
 						}
 						header: {
-							common:      true
 							description: """
 								Header section of DNS query/update request message.
 								See DNS related RFCs (i.e. [RFC 1035](\(urls.rfc_1035)),
@@ -461,7 +446,6 @@ components: sources: dnstap: {
 							}
 						}
 						question: {
-							common:      true
 							description: """
 								Question section of DNS query request message. See
 								[RFC 1035](\(urls.rfc_1035)) for detailed information
@@ -481,7 +465,6 @@ components: sources: dnstap: {
 							}
 						}
 						additional: {
-							common:      true
 							description: """
 								Additional section of DNS query request message. See
 								[RFC 1035](\(urls.rfc_1035)) for detailed information
@@ -503,7 +486,6 @@ components: sources: dnstap: {
 							}
 						}
 						opt: {
-							common:      true
 							description: """
 								A pseudo section containing EDNS options of DNS query request
 								message. See [RFC 6891](\(urls.rfc_6891)) for detailed
@@ -530,7 +512,6 @@ components: sources: dnstap: {
 							}
 						}
 						zone: {
-							common:      true
 							description: """
 								Zone section of DNS update request message. See
 								[RFC 2136](\(urls.rfc_2136)) for detailed information
@@ -550,7 +531,6 @@ components: sources: dnstap: {
 							}
 						}
 						prerequisite: {
-							common:      true
 							description: """
 								Prerequisite section of DNS update request message. See
 								[RFC 2136](\(urls.rfc_2136)) for detailed information
@@ -571,7 +551,6 @@ components: sources: dnstap: {
 							}
 						}
 						update: {
-							common:      true
 							description: """
 								Update section of DNS update request message. See
 								[RFC 2136](\(urls.rfc_2136)) for detailed information
@@ -597,7 +576,6 @@ components: sources: dnstap: {
 			}
 			responseData: {
 				relevant_when: "dataType = Message"
-				common:        true
 				description:   "Response message data for DNS query/update."
 				required:      false
 				type: object: {
@@ -627,7 +605,6 @@ components: sources: dnstap: {
 							}
 						}
 						fullRcode: {
-							common: true
 							description: """
 								The numeric rcode that is the sum of the 4bits header's
 								rcode + the 8bits opt's extendedRcode when present.
@@ -640,7 +617,6 @@ components: sources: dnstap: {
 							}
 						}
 						rcodeName: {
-							common:      true
 							description: "Textual response code corresponding to the 'fullRcode'"
 							required:    false
 							type: string: {
@@ -670,7 +646,6 @@ components: sources: dnstap: {
 							}
 						}
 						rawData: {
-							common: false
 							description: """
 								Raw binary response message data encoded in Base64.
 								Presents only upon failures.
@@ -682,7 +657,6 @@ components: sources: dnstap: {
 							}
 						}
 						header: {
-							common:      true
 							description: """
 								Header section of DNS query/update response message.
 								See DNS related RFCs (i.e. [RFC 1035](\(urls.rfc_1035)),
@@ -713,7 +687,6 @@ components: sources: dnstap: {
 							}
 						}
 						question: {
-							common:      true
 							description: """
 								Question section of DNS query response message. See
 								[RFC 1035](\(urls.rfc_1035)) for detailed information
@@ -733,7 +706,6 @@ components: sources: dnstap: {
 							}
 						}
 						answers: {
-							common:      true
 							description: """
 								Answers section of DNS query response message. See
 								[RFC 1035](\(urls.rfc_1035)) for detailed information
@@ -755,7 +727,6 @@ components: sources: dnstap: {
 							}
 						}
 						authority: {
-							common:      true
 							description: """
 								Authority section of DNS query response message. See
 								[RFC 1035](\(urls.rfc_1035)) for detailed information
@@ -777,7 +748,6 @@ components: sources: dnstap: {
 							}
 						}
 						additional: {
-							common:      true
 							description: """
 								Additional section of DNS query response message. See
 								[RFC 1035](\(urls.rfc_1035)) for detailed information
@@ -799,7 +769,6 @@ components: sources: dnstap: {
 							}
 						}
 						opt: {
-							common:      true
 							description: """
 								A pseudo section containing EDNS options of DNS query response
 								message. See [RFC 6891](\(urls.rfc_6891)) for detailed
@@ -865,7 +834,6 @@ components: sources: dnstap: {
 							}
 						}
 						zone: {
-							common:      true
 							description: """
 								Zone section of DNS update response message. See
 								[RFC 2136](\(urls.rfc_2136)) for detailed information

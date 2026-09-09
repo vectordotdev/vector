@@ -73,10 +73,11 @@ pub enum LuaConfig {
 
 impl GenerateConfig for LuaConfig {
     fn generate_config() -> serde_json::Value {
-        toml::from_str(
-            r#"version = "2"
-            hooks.process = """#,
-        )
+        serde_yaml::from_str(indoc::indoc! {
+            r#"version: "2"
+            hooks:
+              process: """#,
+        })
         .unwrap()
     }
 }

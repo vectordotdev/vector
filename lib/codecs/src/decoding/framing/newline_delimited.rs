@@ -2,7 +2,7 @@ use bytes::{Bytes, BytesMut};
 use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 
-use super::{BoxedFramingError, CharacterDelimitedDecoder};
+use super::{BoxedFramingError, CharacterDelimitedDecoder, OversizedAction};
 
 /// Config used to build a `NewlineDelimitedDecoder`.
 #[configurable_component]
@@ -30,6 +30,16 @@ pub struct NewlineDelimitedDecoderOptions {
     /// prevents processing from being unbounded.
     #[serde(skip_serializing_if = "vector_core::serde::is_default")]
     pub max_length: Option<usize>,
+
+    /// The behavior when a line exceeds `max_length`.
+    ///
+    /// When set to `drop` (the default), the entire oversized line is discarded.
+    /// When set to `truncate`, the line is truncated to `max_length` bytes and the
+    /// remainder is discarded up to the next newline.
+    ///
+    /// This option has no effect if `max_length` is not set.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    pub oversized_action: OversizedAction,
 }
 
 impl NewlineDelimitedDecoderOptions {
@@ -37,6 +47,7 @@ impl NewlineDelimitedDecoderOptions {
     pub const fn new_with_max_length(max_length: usize) -> Self {
         Self {
             max_length: Some(max_length),
+            oversized_action: OversizedAction::Drop,
         }
     }
 }
@@ -56,8 +67,10 @@ impl NewlineDelimitedDecoderConfig {
 
     /// Build the `NewlineDelimitedDecoder` from this configuration.
     pub const fn build(&self) -> NewlineDelimitedDecoder {
+        let oversized_action = self.newline_delimited.oversized_action;
         if let Some(max_length) = self.newline_delimited.max_length {
             NewlineDelimitedDecoder::new_with_max_length(max_length)
+                .with_oversized_action(oversized_action)
         } else {
             NewlineDelimitedDecoder::new()
         }
@@ -81,6 +94,12 @@ impl NewlineDelimitedDecoder {
         Self(CharacterDelimitedDecoder::new_with_max_length(
             b'\n', max_length,
         ))
+    }
+
+    /// Sets the behavior when a line exceeds `max_length`.
+    pub const fn with_oversized_action(mut self, action: OversizedAction) -> Self {
+        self.0.oversized_action = action;
+        self
     }
 }
 

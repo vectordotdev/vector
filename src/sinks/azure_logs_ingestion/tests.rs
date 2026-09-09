@@ -13,8 +13,9 @@ use crate::sinks::azure_common::config::{AzureAuthentication, SpecificAzureCrede
 use super::config::AzureLogsIngestionConfig;
 
 use crate::{
+    config::ValidatedSink,
     event::LogEvent,
-    sinks::prelude::*,
+    sinks::{prelude::*, util::HttpEndpoint},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::spawn_blackhole_http_server,
@@ -24,6 +25,80 @@ use crate::{
 #[test]
 fn generate_config() {
     crate::test_util::test_generate_config::<AzureLogsIngestionConfig>();
+}
+
+#[test]
+fn validate_accepts_valid_config() {
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+    .unwrap();
+
+    config.validate().expect("validation should succeed");
+}
+
+#[test]
+fn validate_rejects_invalid_path_segments() {
+    // A space in either path segment makes the request path unparseable, so
+    // validation must fail rather than panicking at build time.
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id: "dcr-00000000000000000000000000000000 with space"
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+    .unwrap();
+
+    config
+        .validate()
+        .expect_err("validation should reject a dcr_immutable_id containing a space");
+
+    let config: AzureLogsIngestionConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: "Custom-Unit Test"
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#})
+    .unwrap();
+
+    config
+        .validate()
+        .expect_err("validation should reject a stream_name containing a space");
+}
+
+#[test]
+fn validate_rejects_non_http_endpoint() {
+    // The `HttpEndpoint` config field rejects a non-http(s) endpoint at load
+    // time, so deserialization fails.
+    let result: Result<AzureLogsIngestionConfig, _> = serde_yaml::from_str(indoc::indoc! {r#"
+            endpoint: "ftp://example.com"
+            dcr_immutable_id: dcr-00000000000000000000000000000000
+            stream_name: Custom-UnitTest
+            auth:
+              azure_credential_kind: client_secret_credential
+              azure_tenant_id: "00000000-0000-0000-0000-000000000000"
+              azure_client_id: mock-client-id
+              azure_client_secret: mock-client-secret
+        "#});
+    assert!(
+        result.is_err(),
+        "config load should reject a non-http endpoint"
+    );
 }
 
 #[tokio::test]
@@ -64,8 +139,8 @@ fn basic_config_with_client_credentials() {
         .expect("Config parsing failed");
 
     assert_eq!(
-        config.endpoint,
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+        config.endpoint.to_string(),
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/"
     );
     assert_eq!(
         config.dcr_immutable_id,
@@ -103,8 +178,8 @@ fn basic_config_with_managed_identity() {
         .expect("Config parsing failed");
 
     assert_eq!(
-        config.endpoint,
-        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+        config.endpoint.to_string(),
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com/"
     );
     assert_eq!(
         config.dcr_immutable_id,
@@ -173,12 +248,12 @@ async fn correct_request() {
 
     let context = SinkContext::default();
 
+    let validated = config.validate().unwrap();
     let (sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
-            config.dcr_immutable_id.clone(),
-            config.stream_name.clone(),
+            &validated,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
@@ -285,12 +360,12 @@ async fn mock_healthcheck_with_400_response() {
     let context = SinkContext::default();
     let credential = std::sync::Arc::new(create_mock_credential());
 
+    let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
-            config.dcr_immutable_id.clone(),
-            config.stream_name.clone(),
+            &validated,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),
@@ -352,12 +427,12 @@ async fn mock_healthcheck_with_403_response() {
     let context = SinkContext::default();
     let credential = std::sync::Arc::new(create_mock_credential());
 
+    let validated = config.validate().unwrap();
     let (_sink, healthcheck) = config
         .build_inner(
             context,
-            mock_endpoint.into(),
-            config.dcr_immutable_id.clone(),
-            config.stream_name.clone(),
+            &validated,
+            HttpEndpoint::new(mock_endpoint).unwrap(),
             credential,
             config.token_scope.clone(),
             config.timestamp_field.clone(),

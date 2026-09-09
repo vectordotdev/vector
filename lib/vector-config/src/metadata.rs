@@ -33,10 +33,6 @@ impl Metadata {
         self.title = Some(title);
     }
 
-    pub fn clear_title(&mut self) {
-        self.title = None;
-    }
-
     pub fn with_description(desc: &'static str) -> Self {
         Self {
             description: Some(desc),
@@ -50,10 +46,6 @@ impl Metadata {
 
     pub fn set_description(&mut self, desc: &'static str) {
         self.description = Some(desc);
-    }
-
-    pub fn clear_description(&mut self) {
-        self.description = None;
     }
 
     pub fn default_value(&self) -> Option<&dyn ToValue> {

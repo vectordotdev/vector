@@ -134,6 +134,7 @@ jobs:
             "mongodb",
             "nats",
             "nginx",
+            "opensearch",
             "opentelemetry",
             "postgres",
             "prometheus",
@@ -183,9 +184,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: |
-            bash scripts/environment/prepare.sh --modules=datadog-ci
-            bash scripts/run-integration-test.sh int ${{ matrix.service }}
+          command: vdev integration run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   e2e-tests:
     needs:
@@ -249,9 +248,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: |
-            bash scripts/environment/prepare.sh --modules=datadog-ci
-            bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+          command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   update-pr-status:
     name: Signal result to PR

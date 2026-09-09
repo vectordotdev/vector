@@ -13,7 +13,7 @@ use tokio_tungstenite::{
     tungstenite::{
         client::{IntoClientRequest, uri_mode},
         error::{Error as TungsteniteError, ProtocolError, UrlError},
-        handshake::client::Request,
+        http::Uri,
         protocol::WebSocketConfig,
         stream::Mode as UriMode,
     },
@@ -46,39 +46,45 @@ pub enum WebSocketError {
 
 #[derive(Clone)]
 pub(crate) struct WebSocketConnector {
-    uri: String,
-    host: String,
-    port: u16,
+    uri: Uri,
     tls: MaybeTlsSettings,
     auth: Option<Auth>,
 }
 
 impl WebSocketConnector {
-    pub(crate) fn new(
-        uri: String,
-        tls: MaybeTlsSettings,
-        auth: Option<Auth>,
-    ) -> Result<Self, WebSocketError> {
-        let request = (&uri).into_client_request().context(CreateFailedSnafu)?;
-        let (host, port) = Self::extract_host_and_port(&request).context(CreateFailedSnafu)?;
-
-        Ok(Self {
-            uri,
-            host,
-            port,
-            tls,
-            auth,
-        })
+    /// Parse the URI, without any TLS setup.
+    ///
+    /// This is pure parsing that can run during validation; TLS resolution
+    /// happens later when the connector is built.
+    pub(crate) fn parse_uri(uri: &str) -> Result<Uri, WebSocketError> {
+        let request = uri.into_client_request().context(CreateFailedSnafu)?;
+        let uri = request.uri().clone();
+        // Validate that the host and port can be extracted (including the scheme),
+        // so malformed URIs are rejected during validation rather than at connect time.
+        Self::extract_host_and_port(&uri).context(CreateFailedSnafu)?;
+        Ok(uri)
     }
 
-    fn extract_host_and_port(request: &Request) -> Result<(String, u16), TungsteniteError> {
-        let host = request
-            .uri()
+    /// Construct a connector from an already-parsed URI.
+    ///
+    /// Used by callers whose `validate` already parsed the URI, so the parsed
+    /// value is plumbed through the validated state rather than re-parsed
+    /// here. TLS resolution still happens in this method.
+    pub(crate) const fn from_validated(
+        uri: Uri,
+        tls: MaybeTlsSettings,
+        auth: Option<Auth>,
+    ) -> Self {
+        Self { uri, tls, auth }
+    }
+
+    fn extract_host_and_port(uri: &Uri) -> Result<(String, u16), TungsteniteError> {
+        let host = uri
             .host()
             .ok_or(TungsteniteError::Url(UrlError::NoHostName))?
             .to_string();
-        let mode = uri_mode(request.uri())?;
-        let port = request.uri().port_u16().unwrap_or(match mode {
+        let mode = uri_mode(uri)?;
+        let port = uri.port_u16().unwrap_or(match mode {
             UriMode::Tls => 443,
             UriMode::Plain => 80,
         });
@@ -87,18 +93,16 @@ impl WebSocketConnector {
     }
 
     async fn tls_connect(&self) -> Result<MaybeTlsStream<TcpStream>, WebSocketError> {
+        let (host, port) = Self::extract_host_and_port(&self.uri).context(CreateFailedSnafu)?;
         let ip = dns::Resolver
-            .lookup_ip(self.host.clone())
+            .lookup_ip(host.clone())
             .await
             .context(DnsSnafu)?
             .next()
             .ok_or(WebSocketError::NoAddresses)?;
 
-        let addr = SocketAddr::new(ip, self.port);
-        self.tls
-            .connect(&self.host, &addr)
-            .await
-            .context(ConnectSnafu)
+        let addr = SocketAddr::new(ip, port);
+        self.tls.connect(&host, &addr).await.context(ConnectSnafu)
     }
 
     async fn connect(&self) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
@@ -237,7 +241,6 @@ pub struct WebSocketCommonConfig {
     ///
     /// [ping]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.2
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = 30))]
     pub ping_interval: Option<NonZeroU64>,
 
@@ -248,16 +251,13 @@ pub struct WebSocketCommonConfig {
     /// [pong]: https://www.rfc-editor.org/rfc/rfc6455#section-5.5.3
     // NOTE: this option is not relevant if the `ping_interval` is not configured.
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = 5))]
     pub ping_timeout: Option<NonZeroU64>,
 
     /// TLS configuration.
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
     /// HTTP Authentication.
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 }
 

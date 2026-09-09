@@ -18,7 +18,6 @@ components: sinks: honeycomb: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    100_000
 				timeout_secs: 1.0
 			}
@@ -59,7 +58,6 @@ components: sinks: honeycomb: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.honeycomb.configuration

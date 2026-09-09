@@ -9,7 +9,7 @@ use vector_lib::configurable::{
     Configurable, GenerateError, Metadata, ToValue,
     attributes::CustomAttribute,
     schema::{
-        SchemaGenerator, SchemaObject, apply_base_metadata, generate_const_string_schema,
+        SchemaGenerator, SchemaObject, apply_metadata, generate_const_string_schema,
         generate_number_schema, generate_one_of_schema,
     },
 };
@@ -133,7 +133,7 @@ a fixed concurrency limit.",
         let mut none_metadata = Metadata::with_title("A fixed concurrency of 1.");
         none_metadata.set_description("Only one request can be outstanding at any given time.");
         none_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "None"));
-        apply_base_metadata(&mut none_schema, none_metadata);
+        apply_metadata(&mut none_schema, none_metadata);
 
         let mut adaptive_schema = generate_const_string_schema("adaptive".to_string());
         let mut adaptive_metadata = Metadata::with_title(
@@ -141,7 +141,7 @@ a fixed concurrency limit.",
         );
         adaptive_metadata.set_description("[arc]: https://vector.dev/docs/architecture/arc/");
         adaptive_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Adaptive"));
-        apply_base_metadata(&mut adaptive_schema, adaptive_metadata);
+        apply_metadata(&mut adaptive_schema, adaptive_metadata);
 
         let mut fixed_schema = generate_number_schema::<usize>();
         let mut fixed_metadata =
@@ -149,7 +149,7 @@ a fixed concurrency limit.",
         fixed_metadata.set_transparent();
         fixed_metadata.add_custom_attribute(CustomAttribute::kv("docs::numeric_type", "uint"));
         fixed_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Fixed"));
-        apply_base_metadata(&mut fixed_schema, fixed_metadata);
+        apply_metadata(&mut fixed_schema, fixed_metadata);
 
         Ok(generate_one_of_schema(&[
             none_schema,

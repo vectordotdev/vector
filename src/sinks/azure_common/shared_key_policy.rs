@@ -13,7 +13,7 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 
 /// Shared Key authorization policy for Azure Blob Storage requests.
 ///
-/// This policy injects the required x-ms-date header and adds the
+/// This policy injects x-ms-date and a missing content-length header, then adds the
 /// `Authorization: SharedKey {account}:{signature}` header. The x-ms-version header is supplied
 /// by the Azure SDK and signed without being changed. The signature is computed according to the
 /// "Authorize with Shared Key" rules for the Blob service:
@@ -64,10 +64,20 @@ impl SharedKeyAuthorizationPolicy {
         })
     }
 
-    fn ensure_ms_date_header(&self, request: &mut Request) {
+    fn ensure_signing_headers(&self, request: &mut Request) {
         let now = OffsetDateTime::now_utc();
         let ms_date = to_rfc7231(&now);
         request.insert_header("x-ms-date", ms_date);
+
+        // Set a known body length before signing so the signature and wire request use the
+        // same explicit value. Preserve a Content-Length supplied by the SDK.
+        let has_content_length = request
+            .headers()
+            .iter()
+            .any(|(name, _)| name.as_str().eq_ignore_ascii_case("content-length"));
+        if !has_content_length && let Some(content_length) = request.body().len() {
+            request.insert_header("content-length", content_length.to_string());
+        }
     }
 
     fn build_string_to_sign(&self, req: &Request) -> AzureResult<String> {
@@ -112,9 +122,11 @@ impl SharedKeyAuthorizationPolicy {
         }
         s.push('\n');
 
-        // Content-Length (include value if present; keep "0")
-        if let Some(v) = header("Content-Length") {
-            s.push_str(v);
+        // Content-Length
+        // Azure's Shared Key format represents zero length as an empty field.
+        let content_length = header("Content-Length").filter(|value| *value != "0");
+        if let Some(content_length) = content_length {
+            s.push_str(content_length);
         }
         s.push('\n');
 
@@ -225,9 +237,9 @@ impl Policy for SharedKeyAuthorizationPolicy {
         request: &mut Request,
         next: &[Arc<dyn Policy>],
     ) -> PolicyResult {
-        // The Azure SDK sets x-ms-version before running policies. Add x-ms-date, then sign the
-        // exact headers that will be sent.
-        self.ensure_ms_date_header(request);
+        // The Azure SDK sets x-ms-version before running policies. Add the remaining signing
+        // headers, then sign the exact headers that will be sent.
+        self.ensure_signing_headers(request);
         // Build string to sign
         let sts = self.build_string_to_sign(request)?;
         let signature = self.sign(&sts)?;
@@ -296,7 +308,7 @@ mod tests {
         );
         request.insert_header("x-ms-version", "2021-08-06");
 
-        policy.ensure_ms_date_header(&mut request);
+        policy.ensure_signing_headers(&mut request);
         let string_to_sign = policy.build_string_to_sign(&request).unwrap();
 
         assert!(string_to_sign.contains("x-ms-version:2021-08-06\n"));
@@ -309,7 +321,7 @@ mod tests {
             Url::parse("https://account.blob.core.windows.net/container/blob").unwrap(),
             Method::Put,
         );
-        policy.ensure_ms_date_header(&mut request);
+        policy.ensure_signing_headers(&mut request);
 
         let error = policy.build_string_to_sign(&request).unwrap_err();
         assert!(
@@ -317,5 +329,66 @@ mod tests {
                 .to_string()
                 .contains("missing required x-ms-version header")
         );
+    }
+
+    fn content_length_header(request: &Request) -> Option<&str> {
+        request.headers().iter().find_map(|(name, value)| {
+            name.as_str()
+                .eq_ignore_ascii_case("content-length")
+                .then_some(value.as_str())
+        })
+    }
+
+    fn content_length_field(request: &mut Request) -> String {
+        let policy = policy();
+        request.insert_header("x-ms-version", "2025-11-05");
+        policy.ensure_signing_headers(request);
+        policy
+            .build_string_to_sign(request)
+            .expect("request should be signed")
+            .lines()
+            .nth(3)
+            .expect("string to sign should contain content length")
+            .to_owned()
+    }
+
+    #[test]
+    fn sets_and_signs_the_body_length_when_content_length_is_missing() {
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob?comp=blocklist")
+                .expect("test URL should be valid"),
+            Method::Put,
+        );
+        request.set_body(vec![0_u8; 123]);
+
+        assert_eq!(content_length_field(&mut request), "123");
+        assert_eq!(content_length_header(&request), Some("123"));
+    }
+
+    #[test]
+    fn preserves_a_nonzero_content_length_header() {
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob")
+                .expect("test URL should be valid"),
+            Method::Put,
+        );
+        request.insert_header("content-length", "42");
+        request.set_body(vec![0_u8; 123]);
+
+        assert_eq!(content_length_field(&mut request), "42");
+        assert_eq!(content_length_header(&request), Some("42"));
+    }
+
+    #[test]
+    fn canonicalizes_zero_content_length_as_empty() {
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob")
+                .expect("test URL should be valid"),
+            Method::Put,
+        );
+        request.insert_header("content-length", "0");
+
+        assert_eq!(content_length_field(&mut request), "");
+        assert_eq!(content_length_header(&request), Some("0"));
     }
 }

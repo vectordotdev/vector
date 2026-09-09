@@ -43,6 +43,10 @@
   - changed-files:
       - any-glob-to-any-file: ["rfcs/**/*"]
 
+"meta: breaking change":
+  - changed-files:
+      - any-glob-to-any-file: ["changelog.d/*.breaking.md"]
+
 "domain: external docs":
   - changed-files:
       - any-glob-to-any-file: ["website/cue/**/*"]

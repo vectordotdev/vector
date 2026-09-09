@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use futures::StreamExt as _;
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},

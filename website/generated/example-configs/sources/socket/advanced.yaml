@@ -1,0 +1,9 @@
+sources:
+  my_source_id:
+    type: socket
+    address: 0.0.0.0:9000
+    mode: tcp
+    permit_origin:
+      - 192.168.0.0/16
+    port_key: port
+    shutdown_timeout_secs: 30

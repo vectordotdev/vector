@@ -1,5 +1,6 @@
 mod config_builder;
 mod loader;
+mod representation;
 mod secret;
 mod source;
 
@@ -20,8 +21,8 @@ pub use source::*;
 use vector_lib::configurable::NamedComponent;
 
 use super::{
-    Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, format,
-    validation, vars,
+    Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, validation,
+    vars,
 };
 use crate::signal;
 
@@ -159,16 +160,8 @@ pub async fn load_from_paths_with_provider_and_secrets(
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
 ) -> Result<Config, Vec<String>> {
-    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
-    let secrets = secrets_backends_loader
-        .retrieve_secrets(signal_handler)
-        .await
-        .map_err(|e| vec![e])?;
-
-    let mut builder = ConfigBuilderLoader::default()
-        .allow_empty(allow_empty)
-        .secrets(secrets)
-        .load_from_paths(config_paths)?;
+    let mut builder =
+        load_builder_from_paths_with_secrets(config_paths, signal_handler, allow_empty).await?;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -180,6 +173,25 @@ pub async fn load_from_paths_with_provider_and_secrets(
     }
 
     finalize_config(builder).await
+}
+
+/// Loads a `ConfigBuilder` from paths, resolving `SECRET[...]` placeholders
+/// from the configured backends first, like the run path does.
+pub(crate) async fn load_builder_from_paths_with_secrets(
+    config_paths: &[ConfigPath],
+    signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
+) -> Result<ConfigBuilder, Vec<String>> {
+    let secrets_backends_loader = loader_from_paths(SecretBackendLoader::default(), config_paths)?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
+
+    ConfigBuilderLoader::default()
+        .allow_empty(allow_empty)
+        .secrets(secrets)
+        .load_from_paths(config_paths)
 }
 
 pub async fn load_from_str_with_secrets(
@@ -269,10 +281,10 @@ where
     }
 }
 
-/// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
+/// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a JSON object.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
-) -> Result<toml::value::Table, Vec<String>> {
+) -> Result<serde_json::Map<String, serde_json::Value>, Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
 }
 
@@ -342,7 +354,7 @@ where
     // Via configurations that load from raw string, skip interpolation of env
     let with_vars = prepare_input(input, false)?;
 
-    format::deserialize(&with_vars, format)
+    representation::deserialize_config(&with_vars, format)
 }
 
 #[cfg(not(windows))]

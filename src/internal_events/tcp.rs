@@ -129,6 +129,40 @@ impl InternalEvent for TcpSocketTlsConnectionError {
     }
 }
 
+/// Emitted when a TLS handshake does not complete within the configured
+/// handshake timeout. Without this, a peer that opens a TCP connection but
+/// never completes (or never starts) the TLS handshake — a bare TCP
+/// healthcheck, a stalled client, or deliberate slow-handshake abuse — would
+/// hold its connection-limit slot indefinitely, since neither TCP keepalive
+/// nor `max_connection_duration_secs` are wired up until after the handshake
+/// succeeds.
+#[derive(Debug, NamedInternalEvent)]
+pub struct TcpSocketTlsHandshakeTimeout {
+    pub peer_addr: SocketAddr,
+    pub timeout: std::time::Duration,
+}
+
+impl InternalEvent for TcpSocketTlsHandshakeTimeout {
+    fn emit(self) {
+        warn!(
+            message = "TLS handshake timed out.",
+            peer_addr = %self.peer_addr,
+            timeout_secs = self.timeout.as_secs(),
+            error_code = "tls_handshake_timeout",
+            error_type = error_type::TIMED_OUT,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "tls_handshake_timeout",
+            "error_type" => error_type::TIMED_OUT,
+            "stage" => error_stage::RECEIVING,
+            "mode" => "tcp",
+        )
+        .increment(1);
+    }
+}
+
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpSendAckError {
     pub error: std::io::Error,

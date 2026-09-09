@@ -1,3 +1,5 @@
+use std::{any::Any, sync::Arc};
+
 use enum_dispatch::enum_dispatch;
 use serde::Serialize;
 use vector_lib::{
@@ -11,22 +13,29 @@ use crate::enrichment_tables::EnrichmentTables;
 
 /// Fully resolved enrichment table component.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct EnrichmentTableOuter<T>
 where
     T: Configurable + Serialize + 'static + ToValue + Clone,
 {
     #[serde(flatten)]
     pub inner: EnrichmentTables,
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
-    #[configurable(derived)]
     #[serde(
         default = "Inputs::<T>::default",
         skip_serializing_if = "Inputs::is_empty"
     )]
     pub inputs: Inputs<T>,
+
+    /// Validated sink state, filled in during config compilation.
+    ///
+    /// Mirrors `SinkOuter::validated` for enrichment tables that double as sinks. It is
+    /// never serialized or diffed, and is shared (via `Arc`) so `as_sink` can hand it to
+    /// the derived `SinkOuter` without cloning the underlying value.
+    #[serde(skip)]
+    #[debug(skip)]
+    pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl<T> EnrichmentTableOuter<T>
@@ -42,6 +51,7 @@ where
             inner: inner.into(),
             graph: Default::default(),
             inputs: Inputs::from_iter(inputs),
+            validated: None,
         }
     }
 
@@ -69,6 +79,7 @@ where
                     buffer: Default::default(),
                     proxy: Default::default(),
                     inner: sink,
+                    validated: self.validated.clone(),
                 },
             )
         })
@@ -105,6 +116,7 @@ where
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
             graph: self.graph,
+            validated: self.validated,
         }
     }
 }

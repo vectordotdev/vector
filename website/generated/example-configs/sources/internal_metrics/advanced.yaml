@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: internal_metrics
+    namespace: vector
+    scrape_interval_secs: 1.0

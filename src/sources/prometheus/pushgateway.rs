@@ -48,18 +48,13 @@ pub struct PrometheusPushgatewayConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:9091"))]
     address: SocketAddr,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     auth: Option<HttpServerAuthConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 

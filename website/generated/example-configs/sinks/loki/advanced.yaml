@@ -1,0 +1,24 @@
+sinks:
+  my_sink_id:
+    type: loki
+    inputs:
+      - my-source-or-transform-id
+    compression: snappy
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    endpoint: http://localhost:3100
+    labels:
+      event_{{ event_field }}: value_{{ some_other_event_field }}
+      pod_labels_*: "{{ kubernetes.pod_labels }}"
+      source: vector
+    out_of_order_action: accept
+    path: /loki/api/v1/push
+    remove_label_fields: false
+    remove_structured_metadata_fields: false
+    remove_timestamp: true
+    structured_metadata:
+      event_{{ event_field }}: value_{{ some_other_event_field }}
+      pod_labels_*: "{{ kubernetes.pod_labels }}"
+      source: vector
+    tenant_id: some_tenant_id

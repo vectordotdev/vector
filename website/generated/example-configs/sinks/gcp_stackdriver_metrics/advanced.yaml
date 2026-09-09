@@ -1,0 +1,12 @@
+sinks:
+  my_sink_id:
+    type: gcp_stackdriver_metrics
+    inputs:
+      - my-source-or-transform-id
+    default_namespace: namespace
+    project_id: my-project
+    resource:
+      instanceId: Twilight
+      projectId: vector-123456
+      type: global
+      zone: us-central1-a

@@ -1,0 +1,32 @@
+sinks:
+  my_sink_id:
+    type: aws_s3
+    inputs:
+      - my-source-or-transform-id
+    acl: authenticated-read
+    bucket: my-bucket
+    compression: gzip
+    content_encoding: gzip
+    content_type: application/gzip
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    endpoint: http://127.0.0.0:5000/path/to/service
+    filename_append_uuid: true
+    filename_extension: json
+    filename_time_format: "%s"
+    force_path_style: true
+    grant_full_control: 79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be
+    grant_read: 79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be
+    grant_read_acp: 79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be
+    grant_write_acp: 79a59df900b949e55d96a1e698fbacedfd6e09d98eacf8f8d5218e7cd47ef2be
+    key_prefix: date=%F
+    region: us-east-1
+    server_side_encryption: AES256
+    ssekms_key_id: abcd1234
+    storage_class: STANDARD
+    tags:
+      Classification: confidential
+      PHI: "True"
+      Project: Blue
+    timezone: local

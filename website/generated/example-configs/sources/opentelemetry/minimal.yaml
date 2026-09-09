@@ -1,0 +1,11 @@
+sources:
+  my_source_id:
+    type: opentelemetry
+    grpc:
+      address: 0.0.0.0:4317
+    http:
+      address: 0.0.0.0:4318
+      headers: []
+      keepalive:
+        max_connection_age_jitter_factor: 0.1
+        max_connection_age_secs: 300

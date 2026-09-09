@@ -11,7 +11,7 @@ description: >
 * For questions and help: [Create a Vector GitHub Discussions][vector_discussions]
 
 * For bug reports: [Create a Vector GitHub issue][vector_bug_report]
-* For feedback on pull requests, ping the Vector team directly on GitHub with `@vectordotdev/vector`
+* For information about how pull requests are prioritized, see [Community response expectations][response_expectations]
 
 ### VRL
 
@@ -20,27 +20,13 @@ description: >
 
 ## Discord
 
-Join our [Discord server][discord].
-
-The Discord server is meant for connecting with other Vector users and fostering community conversations.
-
-The Vector team does not actively monitor the Discord channels. The best way to reach out to the Vector team directly is through GitHub.
-
-## X
-
-Find us on [X][vector_x].
+Join our [Discord server][discord] for peer-to-peer conversations with other Vector users. Discord is not an official support channel and is not actively monitored by the Vector team. For questions and help, use [GitHub Discussions][vector_discussions].
 
 ## FAQ
 
 ### How do I contribute to Vector?
 
-Vector is [open source][oss] and welcomes contributions. A few guidelines to help you get started:
-
-1. Read our [contribution guide][contribution].
-
-2. Start with [good first issues][first_issues].
-
-3. Use [GitHub Discussions][vector_discussions] if you have any questions. We are happy to help!
+Vector is [open source][oss] and welcomes contributions. See our [contribution guide][contribution] or explore [good first issues][first_issues] to get started.
 
 ### What is Vector's governance model?
 
@@ -66,8 +52,6 @@ Vector has adopted the Rust community model and practices for engaging with peop
 
 2. [Rust community standards][rust_community]
 
-[vector_x]: https://x.com/vectordotdev
-
 [discord]: https://chat.vector.dev
 
 [cncf]: https://bestpractices.coreinfrastructure.org/en
@@ -83,6 +67,8 @@ Vector has adopted the Rust community model and practices for engaging with peop
 [linux]: https://www.kernel.org
 
 [oss]: https://github.com/vectordotdev/vector
+
+[response_expectations]: https://github.com/vectordotdev/vector/blob/master/COMMUNITY_RESPONSE_EXPECTATIONS.md
 
 [rust_community]: https://www.rust-lang.org/community
 
