@@ -67,18 +67,26 @@ impl CheckpointsView {
         // notably a recycled inode with `dev_inode` fingerprints), and
         // acknowledgements from a dead watcher's file can arrive arbitrarily
         // late. Each watcher records progress under the generation it was
-        // created with; anything older refers to a previous file's data and
+        // created with; anything else refers to a previous file's data and
         // must not touch the checkpoint, or a stale offset could masquerade as
-        // current progress for the file now bearing this fingerprint.
-        if let Some(current) = self.generations.get(&fng)
-            && *current.value() != generation
-        {
+        // current progress for the file now bearing this fingerprint. An
+        // absent entry means every watcher of this fingerprint is gone and its
+        // state has expired, so such updates are stale by definition.
+        //
+        // The entry guard is held for the duration of the writes so that a
+        // concurrent `begin_generation` cannot invalidate the check mid-update
+        // (it only touches this map, so no lock cycle is possible).
+        let Some(current) = self.generations.get(&fng) else {
+            return;
+        };
+        if *current.value() != generation {
             return;
         }
 
         self.checkpoints.insert(fng, pos);
         self.modified_times.insert(fng, Utc::now());
         self.removed_times.remove(&fng);
+        drop(current);
     }
 
     /// Start a new watcher generation for this fingerprint, invalidating
@@ -136,6 +144,11 @@ impl CheckpointsView {
             self.checkpoints.remove(&fng);
             self.modified_times.remove(&fng);
             self.removed_times.remove(&fng);
+            // Dropping the generation entry keeps this map bounded by the set
+            // of live and recently-dead fingerprints; any update still in
+            // flight for this fingerprint is rejected outright once the entry
+            // is gone (see `update`).
+            self.generations.remove(&fng);
         }
     }
 
@@ -203,8 +216,8 @@ impl Checkpointer {
 
     #[cfg(test)]
     pub fn update_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
-        // No active generation in these tests: updates are always accepted.
-        self.checkpoints.update(fng, pos, 0);
+        let generation = self.checkpoints.begin_generation(fng);
+        self.checkpoints.update(fng, pos, generation);
     }
 
     #[cfg(test)]
@@ -518,6 +531,12 @@ mod test {
 
         // The current watcher's updates apply normally.
         chkptr.checkpoints.update(fingerprint, 200, second);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(200));
+
+        // Once the fingerprint's state has expired (no generation entry left),
+        // any straggling update is rejected rather than resurrecting it.
+        chkptr.checkpoints.generations.remove(&fingerprint);
+        chkptr.checkpoints.update(fingerprint, 999_999, second);
         assert_eq!(chkptr.get_checkpoint(fingerprint), Some(200));
     }
 

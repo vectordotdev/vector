@@ -234,6 +234,9 @@ impl FileWatcher {
                         file_size = len,
                     );
                     self.file_position = 0;
+                    // A partial line buffered from the previous file must not
+                    // be glued onto the replacement's first line.
+                    self.buf.clear();
                 }
                 reader.seek(io::SeekFrom::Start(self.file_position)).await?;
                 Box::new(reader)
