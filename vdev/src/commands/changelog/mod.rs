@@ -1,10 +1,59 @@
 pub(crate) mod new;
+pub(crate) mod types;
 
 use anyhow::{Result, bail};
+
+/// A valid changelog fragment type and its user-facing description.
+pub struct FragmentType {
+    pub name: &'static str,
+    pub description: &'static str,
+    /// The type emitted for this fragment in the generated release CUE file.
+    pub cue_type: &'static str,
+    /// Whether fragments of this type use the structured breaking-fragment layout
+    /// (`## Summary` / `## Migration`).
+    pub breaking: bool,
+}
+
+/// Valid changelog fragment types and their descriptions. Single source of truth shared by
+/// the scaffolder (`vdev changelog new`), the CI checker (`vdev check changelog-fragments`),
+/// the release CUE generator, and `vdev changelog types`.
+pub const FRAGMENT_TYPES: &[FragmentType] = &[
+    FragmentType {
+        name: "breaking",
+        description: "A change that is incompatible with prior versions and requires users to make adjustments. If a change is also a fix or feature, breaking takes precedence.",
+        cue_type: "chore",
+        breaking: true,
+    },
+    FragmentType {
+        name: "security",
+        description: "A change that has security implications.",
+        cue_type: "security",
+        breaking: false,
+    },
+    FragmentType {
+        name: "feature",
+        description: "A change that introduces a new feature.",
+        cue_type: "feat",
+        breaking: false,
+    },
+    FragmentType {
+        name: "enhancement",
+        description: "A change that enhances existing functionality in a user perceivable way.",
+        cue_type: "enhancement",
+        breaking: false,
+    },
+    FragmentType {
+        name: "fix",
+        description: "A change that fixes a bug.",
+        cue_type: "fix",
+        breaking: false,
+    },
+];
 
 crate::cli_subcommands! {
     "Scaffold and inspect changelog fragments..."
     new,
+    types,
 }
 
 /// Structured view of a `*.breaking.md` fragment. Shared by the checker and the release

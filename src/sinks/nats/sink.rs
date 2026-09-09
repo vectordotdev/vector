@@ -44,8 +44,9 @@ impl NatsSink {
     pub(super) async fn new(
         config: NatsSinkConfig,
         subject: ConfinedTemplate,
+        server_addresses: Vec<async_nats::ServerAddr>,
     ) -> Result<Self, NatsError> {
-        let publisher = Arc::new(config.publisher().await?);
+        let publisher = Arc::new(config.publisher(server_addresses).await?);
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build().context(EncodingSnafu)?;
         let encoder = Encoder::<()>::new(serializer);

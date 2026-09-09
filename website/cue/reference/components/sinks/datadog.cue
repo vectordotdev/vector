@@ -12,7 +12,6 @@ components: sinks: _datadog: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: {

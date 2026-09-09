@@ -125,24 +125,19 @@ pub struct HostMetricsConfig {
     #[serde(default = "default_namespace")]
     pub namespace: Option<String>,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_cgroups_config()"))]
     #[serde(default = "default_cgroups_config")]
     pub cgroups: Option<CGroupsConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub disk: disk::DiskConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub filesystem: filesystem::FilesystemConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub network: network::NetworkConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub process: process::ProcessConfig,
 }

@@ -134,6 +134,7 @@ jobs:
             "mongodb",
             "nats",
             "nginx",
+            "opensearch",
             "opentelemetry",
             "postgres",
             "prometheus",
