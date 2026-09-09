@@ -55,21 +55,24 @@ pub struct CheckpointsView {
     checkpoints: DashMap<FileFingerprint, FilePosition>,
     modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
     removed_times: DashMap<FileFingerprint, DateTime<Utc>>,
+    /// Current watcher generation per fingerprint; `update` ignores positions
+    /// recorded under an older generation. Not persisted: generations only
+    /// disambiguate in-flight updates within a single process lifetime.
+    generations: DashMap<FileFingerprint, u64>,
 }
 
 impl CheckpointsView {
-    pub fn update(&self, fng: FileFingerprint, pos: FilePosition) {
-        // Once a `DevInode` watcher has died, further updates can only be late
-        // acknowledgements of data read before its file disappeared. Record the
-        // position (so a legitimate reappearance of the same file resumes
-        // correctly) but keep the entry marked dead and its modified time
-        // frozen: refreshing them would make a stale checkpoint look current to
-        // the inode-reuse detection in `FileServer::watch_new_file`, and keep
-        // the entry alive past its expiry for as long as acknowledgements
-        // trickle in. A new watcher claiming this fingerprint lifts the dead
-        // mark via `claim`.
-        if matches!(fng, FileFingerprint::DevInode(..)) && self.removed_times.contains_key(&fng) {
-            self.checkpoints.insert(fng, pos);
+    pub fn update(&self, fng: FileFingerprint, pos: FilePosition, generation: u64) {
+        // A fingerprint can be reused by a different file over time (most
+        // notably a recycled inode with `dev_inode` fingerprints), and
+        // acknowledgements from a dead watcher's file can arrive arbitrarily
+        // late. Each watcher records progress under the generation it was
+        // created with; anything older refers to a previous file's data and
+        // must not touch the checkpoint, or a stale offset could masquerade as
+        // current progress for the file now bearing this fingerprint.
+        if let Some(current) = self.generations.get(&fng)
+            && *current.value() != generation
+        {
             return;
         }
 
@@ -78,10 +81,12 @@ impl CheckpointsView {
         self.removed_times.remove(&fng);
     }
 
-    /// Mark a fingerprint as owned by a live watcher again, cancelling any
-    /// pending expiry without refreshing its modified time.
-    pub fn claim(&self, fng: FileFingerprint) {
-        self.removed_times.remove(&fng);
+    /// Start a new watcher generation for this fingerprint, invalidating
+    /// updates from any previous watcher that used it.
+    pub fn begin_generation(&self, fng: FileFingerprint) -> u64 {
+        let mut entry = self.generations.entry(fng).or_insert(0);
+        *entry += 1;
+        *entry
     }
 
     pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
@@ -198,7 +203,8 @@ impl Checkpointer {
 
     #[cfg(test)]
     pub fn update_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
-        self.checkpoints.update(fng, pos);
+        // No active generation in these tests: updates are always accepted.
+        self.checkpoints.update(fng, pos, 0);
     }
 
     #[cfg(test)]
@@ -484,43 +490,35 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_update_does_not_resurrect_dead_dev_inode_checkpoints() {
+    async fn test_update_ignores_stale_generations() {
         let data_dir = tempdir().unwrap();
-        let mut chkptr = Checkpointer::new(data_dir.path());
+        let chkptr = Checkpointer::new(data_dir.path());
 
-        let dev_inode = FileFingerprint::DevInode(1, 2);
-        let checksum = FileFingerprint::FirstLinesChecksum(78910);
+        let fingerprint = FileFingerprint::DevInode(1, 2);
 
-        chkptr.update_checkpoint(dev_inode, 100);
-        chkptr.update_checkpoint(checksum, 100);
-        let modified_before = chkptr.checkpoints.modified_time(dev_inode).unwrap();
-        chkptr.checkpoints.set_dead(dev_inode);
-        chkptr.checkpoints.set_dead(checksum);
+        let first = chkptr.checkpoints.begin_generation(fingerprint);
+        chkptr.checkpoints.update(fingerprint, 100, first);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(100));
+        let modified_before = chkptr.checkpoints.modified_time(fingerprint).unwrap();
 
-        // A late acknowledgement advances the position but must neither refresh
-        // the modified time nor lift the dead mark of a dev_inode fingerprint:
-        // its inode may already belong to a new file, and a refreshed modified
-        // time would defeat the inode-reuse detection at watcher creation.
-        chkptr.checkpoints.update(dev_inode, 200);
-        assert_eq!(chkptr.get_checkpoint(dev_inode), Some(200));
+        // A new watcher takes over the fingerprint (e.g. a recycled inode).
+        let second = chkptr.checkpoints.begin_generation(fingerprint);
+        assert!(second > first);
+
+        // A late acknowledgement from the previous watcher's file must not
+        // touch the checkpoint: its offset belongs to a different file, and a
+        // refreshed modified time would defeat the inode-reuse detection at
+        // watcher creation.
+        chkptr.checkpoints.update(fingerprint, 999_999, first);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(100));
         assert_eq!(
-            chkptr.checkpoints.modified_time(dev_inode),
+            chkptr.checkpoints.modified_time(fingerprint),
             Some(modified_before)
         );
-        assert!(chkptr.checkpoints.removed_times.contains_key(&dev_inode));
 
-        // Checksum fingerprints keep the resurrect-on-update semantics.
-        chkptr.checkpoints.update(checksum, 200);
-        assert!(!chkptr.checkpoints.removed_times.contains_key(&checksum));
-
-        // A new watcher claiming the fingerprint lifts the dead mark without
-        // touching the modified time.
-        chkptr.checkpoints.claim(dev_inode);
-        assert!(!chkptr.checkpoints.removed_times.contains_key(&dev_inode));
-        assert_eq!(
-            chkptr.checkpoints.modified_time(dev_inode),
-            Some(modified_before)
-        );
+        // The current watcher's updates apply normally.
+        chkptr.checkpoints.update(fingerprint, 200, second);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(200));
     }
 
     #[tokio::test]

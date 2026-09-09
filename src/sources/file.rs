@@ -346,6 +346,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 pub(crate) struct FinalizerEntry {
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
+    pub(crate) generation: u64,
 }
 
 impl Default for FileConfig {
@@ -577,7 +578,7 @@ pub fn file_source(
         crate::spawn_in_current_span(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
-                    checkpoints.update(entry.file_id, entry.offset);
+                    checkpoints.update(entry.file_id, entry.offset, entry.generation);
                 }
             }
             send_shutdown.send(())
@@ -652,11 +653,12 @@ pub fn file_source(
                 let entry = FinalizerEntry {
                     file_id: line.file_id,
                     offset: line.end_offset,
+                    generation: line.generation,
                 };
                 // checkpoints.update will be called from ack_stream's thread
                 finalizer.add(entry, receiver);
             } else {
-                checkpoints.update(line.file_id, line.end_offset);
+                checkpoints.update(line.file_id, line.end_offset, line.generation);
             }
             event
         });
@@ -729,20 +731,34 @@ fn wrap_with_line_agg(
                 (
                     line.filename,
                     line.text,
-                    (line.file_id, line.start_offset, line.end_offset),
+                    (
+                        line.file_id,
+                        line.generation,
+                        line.start_offset,
+                        line.end_offset,
+                    ),
                 )
             }),
             logic,
         )
         .map(
-            |(filename, text, (file_id, start_offset, initial_end), lastline_context)| Line {
-                text,
+            |(
                 filename,
-                file_id,
-                start_offset,
-                end_offset: lastline_context.map_or(initial_end, |(_, _, lastline_end_offset)| {
-                    lastline_end_offset
-                }),
+                text,
+                (file_id, generation, start_offset, initial_end),
+                lastline_context,
+            )| {
+                Line {
+                    text,
+                    filename,
+                    file_id,
+                    generation,
+                    start_offset,
+                    end_offset: lastline_context
+                        .map_or(initial_end, |(_, _, _, lastline_end_offset)| {
+                            lastline_end_offset
+                        }),
+                }
             },
         ),
     )

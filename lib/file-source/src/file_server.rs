@@ -316,6 +316,7 @@ where
                         text: line.bytes,
                         filename: watcher.path.to_str().expect("not a valid path").to_owned(),
                         file_id,
+                        generation: watcher.generation(),
                         start_offset: line.offset,
                         end_offset: watcher.get_file_position(),
                     });
@@ -481,9 +482,12 @@ where
             // A creation time in the future means the filesystem's clock cannot
             // be trusted (e.g. a skewed network filesystem); don't treat the
             // comparison as proof of inode reuse there, or a legitimate
-            // checkpoint would be discarded on every startup.
-            let plausible = created < Utc::now() + chrono::TimeDelta::seconds(1);
-            if plausible && created > checkpoint_modified {
+            // checkpoint would be discarded on every startup. The comparison
+            // itself also carries an allowance, so sub-second skew between the
+            // two clocks cannot invalidate a legitimate checkpoint.
+            let allowance = chrono::TimeDelta::seconds(1);
+            let plausible = created < Utc::now() + allowance;
+            if plausible && created > checkpoint_modified + allowance {
                 warn!(
                     message = "Checkpoint predates the file's creation; assuming the inode was reused by a new file and discarding the checkpoint.",
                     ?path,
@@ -513,7 +517,7 @@ where
                     }
                     _ => self.emitter.emit_file_added(&path),
                 }
-                checkpoints.claim(file_id);
+                watcher.set_generation(checkpoints.begin_generation(file_id));
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);
             }
@@ -629,6 +633,9 @@ pub struct Line {
     pub text: Bytes,
     pub filename: String,
     pub file_id: FileFingerprint,
+    /// Watcher generation this line was read under; see
+    /// [`CheckpointsView::update`](file_source_common::checkpointer::CheckpointsView::update).
+    pub generation: u64,
     pub start_offset: u64,
     pub end_offset: u64,
 }
