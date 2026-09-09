@@ -248,6 +248,14 @@ impl OutFile {
         }
     }
 
+    async fn len(&mut self) -> Result<u64, std::io::Error> {
+        match &mut self.inner {
+            OutFileInner::Regular(file) => file.metadata().await.map(|m| m.len()),
+            OutFileInner::Gzip(gzip) => gzip.get_mut().metadata().await.map(|m| m.len()),
+            OutFileInner::Zstd(zstd) => zstd.get_mut().metadata().await.map(|m| m.len()),
+        }
+    }
+
     async fn truncate(&mut self, size: u64) -> Result<(), std::io::Error> {
         match &mut self.inner {
             OutFileInner::Regular(file) => file.set_len(size).await,
@@ -794,6 +802,7 @@ impl FileSink {
         }
 
         let len = batch_buffer.len();
+        let file_start = file.len().await?;
         if len == 0 {
             for (_, finalizers, event_size) in encoded {
                 finalizers.update_status(EventStatus::Delivered);
@@ -850,7 +859,7 @@ impl FileSink {
                         .copied()
                         .unwrap_or(0);
                     if last_complete < written {
-                        if let Err(e) = file.truncate(last_complete as u64).await {
+                        if let Err(e) = file.truncate(file_start + last_complete as u64).await {
                             warn!(message = "Failed to truncate file after partial write.", error = ?e);
                         }
                     }
