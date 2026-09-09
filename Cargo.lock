@@ -13509,6 +13509,7 @@ dependencies = [
  "fslock",
  "futures",
  "hdrhistogram",
+ "libc",
  "memmap2",
  "metrics",
  "metrics-tracing-context",

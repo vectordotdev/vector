@@ -214,7 +214,7 @@ impl DiskBufferConfigBuilder {
             max_record_size: None,
             write_buffer_size: None,
             flush_interval: None,
-            filesystem: ProductionFilesystem,
+            filesystem: ProductionFilesystem::default(),
         }
     }
 }

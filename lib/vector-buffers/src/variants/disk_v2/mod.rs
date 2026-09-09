@@ -175,6 +175,7 @@ use std::{
     num::NonZeroU64,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -193,9 +194,12 @@ mod ser;
 mod writer;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
+#[cfg(test)]
+pub(crate) use self::io::{StalledWrites, TestWriteGate};
 
 use self::ledger::Ledger;
+pub(crate) use self::writer::CapacityProgress;
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
     io::{Filesystem, ProductionFilesystem},
@@ -211,6 +215,10 @@ use crate::{
         channel::{ReceiverAdapter, SenderAdapter},
     },
 };
+
+// Internal scheduling bounds for filesystem capacity retries. These are not user configuration.
+pub(crate) const FILESYSTEM_CAPACITY_RETRY_INITIAL: Duration = Duration::from_millis(100);
+pub(crate) const FILESYSTEM_CAPACITY_RETRY_MAX: Duration = Duration::from_secs(5);
 
 /// Error that occurred when creating/loading a disk buffer.
 #[derive(Debug, Snafu)]
