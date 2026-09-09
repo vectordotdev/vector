@@ -280,10 +280,10 @@ with Vector pods limited to **1 vCPU and 2 GiB of memory**.
 
 <!-- RESULTS-COMPARE-END -->
 
-Three pods remain CPU-bound: their combined throughput ceiling is
-3 × 16.93 MiB/s = 50.79 MiB/s, below the 55 MiB/s workload. The measured
-49.07 MiB/s is 2.90× the single-pod baseline, confirming that L7 routing makes
-the added replicas useful.
+Three pods remain CPU-bound: based on the single pod results, their combined
+throughput ceiling should be approximately 3 × 16.93 MiB/s = 50.79 MiB/s, below
+the 55 MiB/s workload. The measured 49.07 MiB/s is 2.90× the single-pod
+baseline, confirming that L7 routing makes the added replicas useful.
 
 Eight pods remove the CPU bottleneck, but leave over half of each pod's capacity
 unused at 47% average CPU utilization. Each pod handles approximately 7.8 MiB/s,
