@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# run-experiment.sh — run one or all Vector scaling phases and print results.
+# run-experiment.sh — run one or all Vector scaling experiments and print results.
 #
 # Usage:
-#   KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh [all|1|2|3|4]
+#   KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh [all|1|3|8|hpa]
 #
 # Requirements: kubectl, helm, grpcurl, python3, Bash >= 4
 # The script assumes namespace, consumer, ingress-nginx, and ingress are already deployed.
@@ -16,15 +16,15 @@ if (( BASH_VERSINFO[0] < 4 )); then
   exit 1
 fi
 
-PHASE=${1:-all}
+EXPERIMENT=${1:-all}
 if [[ "$#" -gt 1 ]]; then
-  echo "ERROR: expected at most one phase argument." >&2
+  echo "ERROR: expected at most one experiment argument." >&2
   exit 2
 fi
-case "$PHASE" in
-  all | 1 | 2 | 3 | 4) ;;
+case "$EXPERIMENT" in
+  all | 1 | 3 | 8 | hpa) ;;
   *)
-    echo "ERROR: phase must be one of: all, 1, 2, 3, 4." >&2
+    echo "ERROR: experiment must be one of: all, 1, 3, 8, hpa." >&2
     exit 2
     ;;
 esac
@@ -106,7 +106,7 @@ wait_stable() {
 }
 
 # Scale Vector to 0 and wait for its pods to terminate, so every run (including
-# reruns against a cluster left over from a previous Phase 4) starts from the
+# reruns against a cluster left over from an HPA experiment) starts from the
 # same clean state instead of measuring a transition from whatever replica
 # count the last run ended on.
 reset_vector() {
@@ -233,16 +233,16 @@ print(f"{mibps:.2f} {eps:.0f}")
 PYEOF
 }
 
-# ── phase runners ─────────────────────────────────────────────────────────────
-# Each function writes key=value lines to $TMPDIR_WORK/phaseN.txt
-run_static_phase() {
-  local phase=$1 replicas=$2 out="$TMPDIR_WORK/phase${1}.txt"
+# ── experiment runners ────────────────────────────────────────────────────────
+# Each function writes key=value lines to $TMPDIR_WORK/results-<experiment>.txt
+run_static() {
+  local replicas=$1 out="$TMPDIR_WORK/results-${1}.txt"
 
-  log "Phase $phase: scaling Vector to $replicas pod(s)..."
+  log "Scaling Vector to $replicas pod(s)..."
   helm_vector --set replicas="$replicas" --set autoscaling.enabled=false
   wait_stable
 
-  log "Phase $phase: measuring all $replicas pod(s) (20 s warmup + 30 s window)..."
+  log "Measuring all $replicas pod(s) (20 s warmup + 30 s window)..."
   sleep 20
 
   local -a pods
@@ -253,10 +253,10 @@ run_static_phase() {
   cpu=$(avg_cpu_pct)
 
   {
-    echo "PHASE${phase}_MIBPS=${total_mibps}"
-    echo "PHASE${phase}_EPS=${total_eps}"
-    echo "PHASE${phase}_CPU=${cpu}"
-    echo "PHASE${phase}_PODS=${replicas}"
+    echo "${replicas}_MIBPS=${total_mibps}"
+    echo "${replicas}_EPS=${total_eps}"
+    echo "${replicas}_CPU=${cpu}"
+    echo "${replicas}_PODS=${replicas}"
   } > "$out"
 }
 
@@ -271,10 +271,10 @@ hpa_rescale_events() {
     | awk '$0 == "SuccessfulRescale" { n++ } END { print n+0 }' || true
 }
 
-run_hpa_phase() {
-  local out="$TMPDIR_WORK/phase4.txt"
+run_hpa() {
+  local out="$TMPDIR_WORK/results-hpa.txt"
 
-  log "Phase 4: resetting to 1 pod and creating HPA (70% target, max 8)..."
+  log "HPA: resetting to 1 pod and creating HPA (70% target, max 8)..."
   helm_vector --set replicas=1 --set autoscaling.enabled=false
   wait_stable
   helm_vector \
@@ -296,7 +296,7 @@ run_hpa_phase() {
   # against a cluster with leftover events doesn't double-count.
   rescale_baseline=$(hpa_rescale_events)
 
-  log "Phase 4: watching HPA (timeout ${max_elapsed}s)..."
+  log "HPA: watching HPA (timeout ${max_elapsed}s)..."
   while true; do
     elapsed=$(( $(date +%s) - start ))
 
@@ -362,7 +362,7 @@ run_hpa_phase() {
     sleep 15
   done
 
-  log "Phase 4: measuring equilibrium throughput..."
+  log "HPA: measuring equilibrium throughput..."
   local -a pods
   mapfile -t pods < <(pick_pods)
   measure_pods "${pods[@]}" > "$TMPDIR_WORK/measure.txt"
@@ -375,12 +375,12 @@ run_hpa_phase() {
   scale_events=$(( $(hpa_rescale_events) - rescale_baseline ))
 
   {
-    echo "PHASE4_MIBPS=${total_mibps}"
-    echo "PHASE4_EPS=${total_eps}"
-    echo "PHASE4_PODS=${last_replicas}"
-    echo "PHASE4_CPU=${cpu_avg}%"
-    echo "PHASE4_SCALE_EVENTS=${scale_events}"
-    echo "PHASE4_ELAPSED=${elapsed}s"
+    echo "hpa_MIBPS=${total_mibps}"
+    echo "hpa_EPS=${total_eps}"
+    echo "hpa_PODS=${last_replicas}"
+    echo "hpa_CPU=${cpu_avg}%"
+    echo "hpa_SCALE_EVENTS=${scale_events}"
+    echo "hpa_ELAPSED=${elapsed}s"
   } > "$out"
 }
 
@@ -407,36 +407,33 @@ helm upgrade --install producer "$PRODUCER_CHART" \
 log "Waiting 20 s for lading to initialise..."
 sleep 20
 
-case "$PHASE" in
+case "$EXPERIMENT" in
   all)
-    run_static_phase 1 1
-    run_static_phase 2 3
-    run_static_phase 3 8
-    run_hpa_phase
+    run_static 1
+    run_static 3
+    run_static 8
+    run_hpa
     ;;
-  1) run_static_phase 1 1 ;;
-  2) run_static_phase 2 3 ;;
-  3) run_static_phase 3 8 ;;
-  4) run_hpa_phase ;;
+  1 | 3 | 8) run_static "$EXPERIMENT" ;;
+  hpa) run_hpa ;;
 esac
 
 # Load all results
 declare -A R
-for f in "$TMPDIR_WORK"/phase*.txt; do
+for f in "$TMPDIR_WORK"/results-*.txt; do
   while IFS='=' read -r k v; do R[$k]=$v; done < "$f"
 done
 
-if [[ "$PHASE" != all ]]; then
-  key="PHASE${PHASE}"
+if [[ "$EXPERIMENT" != all ]]; then
   echo ""
-  echo "Phase $PHASE results:"
-  echo "  Throughput: ${R[${key}_MIBPS]} MiB/s"
-  echo "  Events/s:   ${R[${key}_EPS]}"
-  echo "  Avg CPU:    ${R[${key}_CPU]}"
-  echo "  Pods:       ${R[${key}_PODS]}"
-  if [[ "$PHASE" == 4 ]]; then
-    echo "  Scale events: ${R[PHASE4_SCALE_EVENTS]}"
-    echo "  Equilibrium:  ${R[PHASE4_ELAPSED]}"
+  echo "Experiment $EXPERIMENT results:"
+  echo "  Throughput: ${R[${EXPERIMENT}_MIBPS]} MiB/s"
+  echo "  Events/s:   ${R[${EXPERIMENT}_EPS]}"
+  echo "  Avg CPU:    ${R[${EXPERIMENT}_CPU]}"
+  echo "  Pods:       ${R[${EXPERIMENT}_PODS]}"
+  if [[ "$EXPERIMENT" == hpa ]]; then
+    echo "  Scale events: ${R[hpa_SCALE_EVENTS]}"
+    echo "  Equilibrium:  ${R[hpa_ELAPSED]}"
   fi
   exit 0
 fi
@@ -445,39 +442,37 @@ fi
 echo ""
 echo "┌──────────────┬──────────────┬──────────────┬──────────────┬─────────────┐"
 printf "│ %-12s │ %-12s │ %-12s │ %-12s │ %-11s │\n" \
-  "" "Phase 1" "Phase 2" "Phase 3" "Phase 4"
-printf "│ %-12s │ %-12s │ %-12s │ %-12s │ %-11s │\n" \
   "" "1 pod" "3 pods" "8 pods" "HPA (auto)"
 echo "├──────────────┼──────────────┼──────────────┼──────────────┼─────────────┤"
 printf "│ %-12s │ %-12s │ %-12s │ %-12s │ %-11s │\n" \
   "Throughput" \
-  "${R[PHASE1_MIBPS]:-?} MiB/s" \
-  "${R[PHASE2_MIBPS]:-?} MiB/s" \
-  "${R[PHASE3_MIBPS]:-?} MiB/s" \
-  "${R[PHASE4_MIBPS]:-?} MiB/s"
+  "${R[1_MIBPS]:-?} MiB/s" \
+  "${R[3_MIBPS]:-?} MiB/s" \
+  "${R[8_MIBPS]:-?} MiB/s" \
+  "${R[hpa_MIBPS]:-?} MiB/s"
 printf "│ %-12s │ %-12s │ %-12s │ %-12s │ %-11s │\n" \
   "Events/s" \
-  "${R[PHASE1_EPS]:-?}" \
-  "${R[PHASE2_EPS]:-?}" \
-  "${R[PHASE3_EPS]:-?}" \
-  "${R[PHASE4_EPS]:-?}"
+  "${R[1_EPS]:-?}" \
+  "${R[3_EPS]:-?}" \
+  "${R[8_EPS]:-?}" \
+  "${R[hpa_EPS]:-?}"
 printf "│ %-12s │ %-12s │ %-12s │ %-12s │ %-11s │\n" \
   "Avg CPU/pod" \
-  "${R[PHASE1_CPU]:-?}" \
-  "${R[PHASE2_CPU]:-?}" \
-  "${R[PHASE3_CPU]:-?}" \
-  "${R[PHASE4_CPU]:-?}"
+  "${R[1_CPU]:-?}" \
+  "${R[3_CPU]:-?}" \
+  "${R[8_CPU]:-?}" \
+  "${R[hpa_CPU]:-?}"
 printf "│ %-12s │ %-12s │ %-12s │ %-12s │ %-11s │\n" \
   "Pods" \
-  "${R[PHASE1_PODS]:-?}" \
-  "${R[PHASE2_PODS]:-?}" \
-  "${R[PHASE3_PODS]:-?}" \
-  "${R[PHASE4_PODS]:-?}"
+  "${R[1_PODS]:-?}" \
+  "${R[3_PODS]:-?}" \
+  "${R[8_PODS]:-?}" \
+  "${R[hpa_PODS]:-?}"
 printf "│ %-12s │ %-12s │ %-12s │ %-12s │ %-11s │\n" \
   "Bottleneck" \
   "Vector CPU" "Vector CPU" "None" "N/A"
 echo "└──────────────┴──────────────┴──────────────┴──────────────┴─────────────┘"
 echo ""
-echo "Phase 4: ${R[PHASE4_SCALE_EVENTS]:-?} scale events," \
-     "equilibrium in ${R[PHASE4_ELAPSED]:-?}," \
+echo "HPA: ${R[hpa_SCALE_EVENTS]:-?} scale events," \
+     "equilibrium in ${R[hpa_ELAPSED]:-?}," \
      "0 manual producer restarts."

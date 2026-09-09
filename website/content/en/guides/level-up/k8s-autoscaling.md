@@ -463,8 +463,8 @@ measuring a transition from the replica count left by a previous run.
 # Run all experiments.
 KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh
 
-# Run one experiment (1: single pod, 2: three pods, 3: eight pods, 4: HPA).
-KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh 4
+# Run one experiment (1, 3, or 8 pods, or hpa).
+KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh hpa
 ```
 
 ## Deep dive: Why the HPA can stabilize at six pods
