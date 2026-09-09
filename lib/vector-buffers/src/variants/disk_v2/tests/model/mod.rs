@@ -30,10 +30,10 @@ use self::action::{Action, arb_actions};
 mod common;
 use self::common::{Progress, arb_buffer_config};
 
-mod filesystem;
+pub(crate) mod filesystem;
 use self::filesystem::TestFilesystem;
 
-mod record;
+pub(crate) mod record;
 use self::record::Record;
 
 mod sequencer;
@@ -140,7 +140,7 @@ impl FileModel {
         }
 
         if record_len >= self.write_buffer_size {
-            // The record is bigger the write buffer itself, so just write it immediately:
+            // Records at least as large as the write buffer bypass it.
             flushed_events += record.event_count();
             flushed_bytes += record_len;
 
