@@ -13651,7 +13651,6 @@ dependencies = [
  "headers 0.3.9",
  "http 0.2.12",
  "hyper-proxy",
- "iana-time-zone",
  "indexmap 2.12.0",
  "inventory",
  "ipnet",
