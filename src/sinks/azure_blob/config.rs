@@ -373,7 +373,7 @@ pub struct ValidatedAzureBlob {
     encoder: Encoder<Framer>,
     blob_time_format: String,
     blob_append_uuid: bool,
-    #[debug("{}", confined_blob_prefix.to_string())]
+    #[debug("{:?}", confined_blob_prefix.to_string())]
     confined_blob_prefix: ConfinedTemplate,
 }
 
