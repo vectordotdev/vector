@@ -1,0 +1,45 @@
+name: Refresh libsasl2 cache
+
+# Refreshes the cached libsasl2 .deb packages consumed by the setup action so
+# CI does not depend on a stale cache or a flaky `apt-get update`. Deletes the
+# cached packages and re-warms them via the setup action. Runs weekly and can
+# be triggered manually when a `dpkg` failure is reported in CI.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * 1" # 05:00 UTC every Monday
+
+permissions:
+  actions: write # Required to delete the stale libsasl2 cache
+  contents: read # Required to checkout code
+
+concurrency:
+  group: refresh-libsasl2-cache
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh libsasl2 cache
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Delete every cached libsasl2 entry so the setup action below misses the
+      # cache, downloads fresh packages, and saves them under the stable key.
+      # The list endpoint supports prefix filtering; delete each matching cache
+      # by ID rather than relying on the delete-by-key endpoint's match semantics.
+      - name: Delete stale libsasl2 cache
+        run: |
+          set -euo pipefail
+          ids=$(gh api --method GET "repos/${{ github.repository }}/actions/caches" -f key="Linux-libsasl2-" -f per_page=100 --jq '.actions_caches[].id')
+          for id in $ids; do
+            gh api --method DELETE "repos/${{ github.repository }}/actions/caches/$id"
+          done
+
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          vdev: false
+          libsasl2: true
