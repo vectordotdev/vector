@@ -1,12 +1,6 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
-use derivative::Derivative;
 use futures::{SinkExt, future::BoxFuture, stream};
 use indoc::indoc;
 use tower::Service;
@@ -297,15 +291,14 @@ impl SinkConfig for InfluxDbConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedInfluxDbMetrics {
     // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     uri: http::Uri,
     token: SensitiveString,
     protocol_version: ProtocolVersion,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     batch: BatchSettings<MetricsBuffer>,
 }
 

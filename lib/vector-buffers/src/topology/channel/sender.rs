@@ -1,10 +1,6 @@
-// Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{sync::Arc, time::Instant};
 
 use async_recursion::async_recursion;
-use derivative::Derivative;
 use tokio::sync::Mutex;
 use tracing::Span;
 use vector_common::internal_event::{InternalEventHandle, Registered, register};
@@ -215,16 +211,15 @@ impl UsageAccounting {
 /// linearize the nesting instead, so that `BufferSender` would only ever be calling the underlying
 /// `SenderAdapter` instances instead... which would let us get rid of the boxing and
 /// `#[async_recursion]` stuff.
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
     usage_instrumentation: Option<BufferUsageHandle>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     send_duration: Option<Registered<BufferSendDuration>>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     custom_instrumentation: Option<Arc<dyn BufferInstrumentation<T>>>,
 }
 
