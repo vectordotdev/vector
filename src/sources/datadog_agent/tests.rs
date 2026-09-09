@@ -42,7 +42,7 @@ use crate::{
     components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
-        Event, EventStatus, Metric, TRACE_LAYOUT_DATADOG, Value, into_event_stream,
+        Event, EventStatus, Metric, Value, into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
     },
     schema,
@@ -62,6 +62,7 @@ use crate::{
 #[cfg(all(feature = "sinks-vector", feature = "sources-vector"))]
 use crate::{
     config::Config,
+    event::TRACE_LAYOUT_DATADOG,
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::vector::VectorConfig as VectorSourceConfig,
     test_util::{mock::basic_sink, start_topology},
@@ -385,6 +386,7 @@ async fn send_and_collect(
 }
 
 /// Smallest v2 payload the `datadog_agent` traces decoder accepts.
+#[cfg(all(feature = "sinks-vector", feature = "sources-vector"))]
 fn minimal_v2_trace_body() -> Vec<u8> {
     let mut buf = Vec::new();
     ddtrace_proto::TracePayload {
