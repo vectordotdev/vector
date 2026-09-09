@@ -75,8 +75,7 @@ where
                     // The whole item was filtered out (e.g. every sub-item over the
                     // protobuf nesting budget). Report the drop directly via the
                     // ledger's usage handle so it shows up in the disk-v2 stage's
-                    // `received` / `dropped` metrics — `BufferSender` does not carry
-                    // its own handle for backends that `provides_instrumentation()`.
+                    // `received` / `dropped` metrics.
                     writer.track_dropped(pre_count, pre_size);
                     return Ok(TryWriteOutcome::Dropped);
                 };
@@ -172,6 +171,12 @@ enum UsageAccounting {
     NotAccepted,
 }
 
+#[derive(Clone, Debug)]
+struct UsageInstrumentation {
+    handle: BufferUsageHandle,
+    provides_instrumentation: bool,
+}
+
 impl UsageAccounting {
     fn record(self, instrumentation: &BufferUsageHandle, item_count: usize, item_size: usize) {
         match self {
@@ -221,7 +226,7 @@ pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
-    usage_instrumentation: Option<BufferUsageHandle>,
+    usage_instrumentation: Option<UsageInstrumentation>,
     #[derivative(Debug = "ignore")]
     send_duration: Option<Registered<BufferSendDuration>>,
     #[derivative(Debug = "ignore")]
@@ -264,8 +269,15 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     /// Configures this sender to instrument the items passing through it.
-    pub fn with_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
-        self.usage_instrumentation = Some(handle);
+    pub fn with_usage_instrumentation(
+        &mut self,
+        handle: BufferUsageHandle,
+        provides_instrumentation: bool,
+    ) {
+        self.usage_instrumentation = Some(UsageInstrumentation {
+            handle,
+            provides_instrumentation,
+        });
     }
 
     /// Configures this sender to instrument the send duration.
@@ -300,9 +312,10 @@ impl<T: Bufferable> BufferSender<T> {
         if let Some(instrumentation) = self.custom_instrumentation.as_ref() {
             instrumentation.on_send(&mut item);
         }
-        let item_sizing = self
+        let mut item_sizing = self
             .usage_instrumentation
             .as_ref()
+            .filter(|instrumentation| !instrumentation.provides_instrumentation)
             .map(|_| (item.event_count(), item.size_of()));
 
         let accounting = match self.when_full {
@@ -313,7 +326,12 @@ impl<T: Bufferable> BufferSender<T> {
             },
             WhenFull::DropNewest => match self.base.try_send(item).await? {
                 TryWriteOutcome::Written => UsageAccounting::Accepted,
-                TryWriteOutcome::Full(_) => UsageAccounting::DroppedNewest,
+                TryWriteOutcome::Full(item) => {
+                    if self.usage_instrumentation.is_some() && item_sizing.is_none() {
+                        item_sizing = Some((item.event_count(), item.size_of()));
+                    }
+                    UsageAccounting::DroppedNewest
+                }
                 TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
             },
             WhenFull::Overflow => {
@@ -356,11 +374,11 @@ impl<T: Bufferable> BufferSender<T> {
         // usage handle (e.g. disk-v2's ledger), so they show up in the buffer
         // stage's `received` / `dropped` metrics even when the `BufferSender`
         // does not carry instrumentation. This block only reports fullness-driven
-        // drops captured via `was_dropped`.
+        // drops captured via `UsageAccounting::DroppedNewest`.
         if let Some(instrumentation) = self.usage_instrumentation.as_ref()
             && let Some((item_count, item_size)) = item_sizing
         {
-            accounting.record(instrumentation, item_count, item_size);
+            accounting.record(&instrumentation.handle, item_count, item_size);
         }
         if let Some(send_duration) = self.send_duration.as_ref()
             && let Some(send_reference) = send_reference
