@@ -859,8 +859,14 @@ impl FileSink {
                         .copied()
                         .unwrap_or(0);
                     if last_complete < written {
-                        if let Err(e) = file.truncate(file_start + last_complete as u64).await {
-                            warn!(message = "Failed to truncate file after partial write.", error = ?e);
+                        if let Ok(current_len) = file.len().await
+                            && current_len == file_start + written as u64
+                        {
+                            if let Err(e) = file.truncate(file_start + last_complete as u64).await {
+                                warn!(message = "Failed to truncate file after partial write.", error = ?e);
+                            }
+                        } else {
+                            warn!(message = "File length changed since write started; cannot safely truncate after partial write.",);
                         }
                     }
                     let dropped_events = boundaries.iter().filter(|&&b| b > last_complete).count();
