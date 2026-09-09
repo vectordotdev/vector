@@ -160,7 +160,12 @@ pub(super) trait MetricCollector {
                         tags,
                         Some(("le", "+Inf".to_string())),
                     );
-                    self.emit_value(timestamp, name, "_sum", *sum, tags, None);
+                    // OpenMetrics only recommends the `_sum` series, and forbids it for histograms
+                    // with negative bucket thresholds, so omitting it is valid -- and truthful,
+                    // where emitting a zero would not be.
+                    if let Some(sum) = sum {
+                        self.emit_value(timestamp, name, "_sum", *sum, tags, None);
+                    }
                     self.emit_value(timestamp, name, "_count", *count as f64, tags, None);
                 }
                 MetricValue::AggregatedSummary {
@@ -749,6 +754,58 @@ mod tests {
         );
     }
 
+    /// OpenMetrics makes the `_sum` series recommended rather than required, and forbids it for
+    /// histograms with negative bucket thresholds, so a histogram that reports no sum must omit the
+    /// series rather than publish a zero that readers cannot tell from a measurement.
+    #[test]
+    fn encodes_histogram_without_sum_text() {
+        assert_eq!(
+            encode_histogram_without_sum::<StringCollector>(),
+            indoc! {r#"
+                # HELP vector_requests requests
+                # TYPE vector_requests histogram
+                vector_requests_bucket{le="1"} 1 1612325106789
+                vector_requests_bucket{le="2.1"} 3 1612325106789
+                vector_requests_bucket{le="3"} 6 1612325106789
+                vector_requests_bucket{le="+Inf"} 6 1612325106789
+                vector_requests_count 6 1612325106789
+            "#}
+        );
+    }
+
+    #[test]
+    fn encodes_histogram_without_sum_request() {
+        assert_eq!(
+            encode_histogram_without_sum::<TimeSeries>(),
+            write_request!(
+                "vector_requests", "requests", Histogram [
+                        "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
+                        "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
+                        "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
+                        "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
+                        "_count" @ 1612325106789 = 6.0 []
+                    ]
+            )
+        );
+    }
+
+    fn encode_histogram_without_sum<T: MetricCollector>() -> T::Output {
+        let mut histogram = VariableHistogram::new(&[1.0, 2.1, 3.0][..]);
+        histogram.record_many(&[0.4, 2.0, 1.75, 2.6, 2.25, 2.5][..]);
+
+        let metric = Metric::new(
+            "requests".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: histogram.buckets(),
+                count: histogram.count(),
+                sum: None,
+            },
+        )
+        .with_timestamp(Some(timestamp()));
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
+    }
+
     fn encode_histogram<T: MetricCollector>(add_inf_bound: bool) -> T::Output {
         let bounds = if add_inf_bound {
             &[1.0, 2.1, 3.0, f64::INFINITY][..]
@@ -765,7 +822,7 @@ mod tests {
             MetricValue::AggregatedHistogram {
                 buckets: histogram.buckets(),
                 count: histogram.count(),
-                sum: histogram.sum(),
+                sum: Some(histogram.sum()),
             },
         )
         .with_timestamp(Some(timestamp()));

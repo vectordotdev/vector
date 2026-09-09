@@ -195,7 +195,9 @@ impl Arbitrary for MetricValue {
             4 => MetricValue::AggregatedHistogram {
                 buckets: Vec::arbitrary(g),
                 count: u64::arbitrary(g),
-                sum: f64_for_arbitrary(g),
+                // Generate both the reported and unreported cases so round-trip tests cover the
+                // encodings of each.
+                sum: bool::arbitrary(g).then(|| f64_for_arbitrary(g)),
             },
             5 => MetricValue::AggregatedSummary {
                 quantiles: Vec::arbitrary(g),

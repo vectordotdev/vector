@@ -124,7 +124,8 @@ fn metric_value() -> BoxedStrategy<MetricValue> {
                 0..8,
             ),
             any::<u64>(),
-            metric_float(),
+            // A histogram may report no sum at all, which encodes differently, so cover both.
+            proptest::option::of(metric_float()),
         ).prop_map(|(buckets, count, sum)| MetricValue::AggregatedHistogram {
             buckets,
             count,
@@ -326,7 +327,7 @@ fn native_json_decodes_legacy_u32_metric_counts() {
                 count: u64::from(u32::MAX),
             }],
             count: u64::from(u32::MAX),
-            sum: 2.0,
+            sum: Some(2.0),
         }
     );
 }

@@ -21,7 +21,8 @@
 	{aggregated_histogram: {
 		buckets: [...{upper_limit: number, count: int}]
 		count: int
-		sum:   number
+		// Absent when the source reported no sum.
+		sum?: number
 	}} |
 	{aggregated_summary: {
 		quantiles: [...{quantile: number, value: number}]
