@@ -379,11 +379,25 @@ impl WatchMode {
 /// Walk up from `path` to find the nearest ancestor directory that currently exists on disk.
 /// Returns `None` only if no ancestor exists at all (e.g. even the filesystem root couldn't be
 /// stat-ed, which in practice shouldn't happen).
+///
+/// For a relative `path` with only one component (e.g. `logs` from an `include` pattern like
+/// `logs/*.log`), `Path::ancestors()` yields that component and then an empty path (`""`) --
+/// there is no further parent to walk up to for a relative path. `Path::is_dir()` on `""` is
+/// always `false` regardless of the actual current directory (unlike `"."`, which `is_dir()`
+/// correctly reports as the current directory), so without special-casing it, a relative
+/// top-level root that doesn't exist yet would find no existing ancestor at all -- silently
+/// forgoing the fallback-ancestor watch and leaving that `include` pattern's eventual root
+/// creation unnoticed until the next `reconcile_interval` backstop. Treat the empty ancestor as
+/// `.` (the current directory), which is what it actually denotes.
 fn find_existing_ancestor(path: &Path) -> Option<PathBuf> {
-    path.ancestors()
-        .skip(1)
-        .find(|ancestor| ancestor.is_dir())
-        .map(Path::to_path_buf)
+    path.ancestors().skip(1).find_map(|ancestor| {
+        let ancestor = if ancestor.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            ancestor
+        };
+        ancestor.is_dir().then(|| ancestor.to_path_buf())
+    })
 }
 
 /// A directory to `WatchMode` mapping. A `HashMap` keyed on the path alone -- not a set of
@@ -809,6 +823,26 @@ mod tests {
         assert!(
             !discovery.is_watched_dir(root.path()),
             "the fallback ancestor watch should be dropped once no longer needed"
+        );
+    }
+
+    #[test]
+    fn find_existing_ancestor_treats_relative_top_level_root_as_current_dir() {
+        // Regression test for a bug found in review: for a relative `include` pattern with a
+        // single-component root (e.g. `logs/*.log`, whose literal prefix is just `logs`),
+        // `Path::ancestors()` on a not-yet-existing `logs` yields `logs` then an empty path
+        // (`""`) -- there's no further parent for a relative path to walk up to. `Path::is_dir()`
+        // on `""` is always `false`, even though `""` denotes the current directory (same as
+        // `"."`, which `is_dir()` correctly reports as existing). Before this fix,
+        // `find_existing_ancestor` would therefore return `None` for a missing relative
+        // top-level root, silently skipping the fallback-ancestor watch entirely: creating
+        // `logs` could never be noticed via notify, only via the `reconcile_interval` backstop.
+        let missing_relative_root = PathBuf::from("logs");
+        let ancestor = find_existing_ancestor(&missing_relative_root)
+            .expect("the current directory must be found as an existing ancestor");
+        assert!(
+            ancestor.is_dir(),
+            "the returned ancestor must actually exist and be a directory"
         );
     }
 

@@ -43,6 +43,19 @@ use crate::{
 /// window and delay every single notify-driven discovery by that same large amount.
 const NOTIFY_EVENT_DEBOUNCE: Duration = Duration::from_millis(50);
 
+/// How often the background checkpoint-writer task persists checkpoints to disk. Kept independent
+/// of `glob_minimum_cooldown`, which is documented as ignored under `Notify` mode -- otherwise a
+/// large `glob_minimum_cooldown` would silently also throttle checkpoint persistence.
+const CHECKPOINT_WRITE_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Minimum time between two full glob+fingerprint reconciliation passes (`discover`) triggered by
+/// notify events. Without this, a file under sustained writes would trigger a full re-glob on
+/// every `NOTIFY_EVENT_DEBOUNCE` window indefinitely. Doesn't delay reads of already-tracked
+/// files (those run every main-loop iteration regardless), but does delay
+/// `FileWatcher::mark_ready_to_read`'s nudge by up to this much, since that only happens inside
+/// `discover`.
+const MIN_NOTIFY_DISCOVERY_INTERVAL: Duration = Duration::from_millis(500);
+
 /// Above this many distinct paths accumulated from notify events since the last reconciliation
 /// pass, stop tracking them individually and fall back to treating the wakeup as "something
 /// changed, go check everything" (`NotifyWakeup::All`). This bounds the memory a burst of events
@@ -169,6 +182,27 @@ fn should_reap_unfindable_watcher(
     (is_idle && unfindable_for > discovery_interval) || unfindable_for > rotate_wait
 }
 
+/// Salvage `watcher`'s final unterminated line, if any, into `lines`. Call this right before
+/// every `set_dead()` that doesn't already go through `read_line` first (which has its own flush
+/// for the `Active` case) -- otherwise a trailing record with no delimiter is lost for good.
+fn salvage_final_partial_line(
+    watcher: &mut FileWatcher,
+    file_id: FileFingerprint,
+    lines: &mut Vec<Line>,
+) {
+    let Some(line) = watcher.take_final_partial_line() else {
+        return;
+    };
+    let end_offset = line.offset + line.bytes.len() as u64;
+    lines.push(Line {
+        text: line.bytes,
+        filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+        file_id,
+        start_offset: line.offset,
+        end_offset,
+    });
+}
+
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures.
 ///
@@ -222,12 +256,17 @@ where
     /// How long an actively-open, EOF'd file must go without new writes before its file handle
     /// is closed and it is moved to the passive "Idle" watching state (still checkpointed, still
     /// polled for new data via cheap `fs::metadata` stats, but no open file descriptor). `None`
-    /// disables this behavior entirely, i.e. active files are never deactivated (the pre-existing
-    /// behavior). Applies under both `FileDiscoveryMode::PollingOnly` and
-    /// `FileDiscoveryMode::Notify`: notify-based discovery makes finding files fast, but doesn't
-    /// by itself stop already-discovered, `ignore_older`-excluded files from holding a handle
-    /// open for as long as they exist on disk -- this option is what does that, addressing the
-    /// other half of <https://github.com/vectordotdev/vector/issues/3567>.
+    /// disables this behavior entirely, i.e. files are never deactivated -- restoring the
+    /// pre-existing, always-open behavior -- both at runtime (the `deactivate()` transition
+    /// gated on this field directly) and at startup (`FileWatcher::new`'s fast path for
+    /// `ignore_older`-excluded files, gated via `idle_on_startup = self.idle_timeout.is_some()`,
+    /// since that path is a separate mechanism from `deactivate()` and would otherwise still
+    /// start such files `Idle` regardless of this setting). Applies under both
+    /// `FileDiscoveryMode::PollingOnly` and `FileDiscoveryMode::Notify`: notify-based discovery
+    /// makes finding files fast, but doesn't by itself stop already-discovered,
+    /// `ignore_older`-excluded files from holding a handle open for as long as they exist on
+    /// disk -- this option is what does that, addressing the other half of
+    /// <https://github.com/vectordotdev/vector/issues/3567>.
     pub idle_timeout: Option<Duration>,
 }
 
@@ -383,7 +422,7 @@ where
         // Spawn the checkpoint writer task
         let checkpoint_task_handle = vector_common::spawn_in_current_span(checkpoint_writer(
             checkpointer,
-            self.glob_minimum_cooldown,
+            CHECKPOINT_WRITE_INTERVAL,
             shutdown_checkpointer,
             self.emitter.clone(),
         ));
@@ -419,6 +458,12 @@ where
         // via `NotifyWakeup::All`/`Paths` on startup, and under `PollingOnly` a notify-triggered
         // pass should never happen at all), so `pending_notify_wakeup` starts at `None`.
         let mut pending_notify_wakeup = NotifyWakeup::None;
+        // Throttles notify-triggered full reconciliation passes independently of the backstop
+        // timer (`next_glob_time`/`discovery_interval`): see `MIN_NOTIFY_DISCOVERY_INTERVAL`'s
+        // doc comment for why. Starts at "now" so the very first notify event, whenever it
+        // arrives, is handled immediately rather than waiting out this interval from process
+        // start for no reason.
+        let mut next_notify_discovery_time = time::Instant::now();
         loop {
             // Use `reconcile_interval` whenever `Notify` mode was configured, even if the notify
             // watcher isn't currently live (it failed to initialize, or died mid-run and was set
@@ -433,13 +478,22 @@ where
                 self.glob_minimum_cooldown
             };
 
-            // Glob find files to follow, but not too often.
+            // Glob find files to follow, but not too often. A pending notify wakeup only
+            // triggers this early (ahead of `next_glob_time`) once `next_notify_discovery_time`
+            // has also elapsed -- see `MIN_NOTIFY_DISCOVERY_INTERVAL`.
             let now_time = time::Instant::now();
-            if next_glob_time <= now_time || pending_notify_wakeup.is_pending() {
-                // This reconciliation pass was triggered by an actual notify event (as opposed to
-                // the much-less-frequent backstop timer alone) if `pending_notify_wakeup` is what
-                // got us in here; take it (resetting to `None`) before running discovery.
-                let woken_by_notify_event = pending_notify_wakeup.take();
+            let notify_wakeup_ready =
+                pending_notify_wakeup.is_pending() && next_notify_discovery_time <= now_time;
+            if next_glob_time <= now_time || notify_wakeup_ready {
+                // Leave the wakeup queued (don't take it) if we're here only because the backstop
+                // timer fired while the notify throttle hasn't elapsed yet.
+                let woken_by_notify_event = if notify_wakeup_ready {
+                    next_notify_discovery_time =
+                        now_time.checked_add(MIN_NOTIFY_DISCOVERY_INTERVAL).unwrap();
+                    pending_notify_wakeup.take()
+                } else {
+                    NotifyWakeup::None
+                };
                 // Schedule the next backstop reconciliation time.
                 next_glob_time = now_time.checked_add(discovery_interval).unwrap();
 
@@ -463,7 +517,7 @@ where
                 stats.record("discovery", start.elapsed());
 
                 let start = time::Instant::now();
-                self.poll_idle_watchers(&mut fp_map).await;
+                self.poll_idle_watchers(&mut fp_map, &mut lines).await;
                 stats.record("idle-poll", start.elapsed());
             }
 
@@ -566,6 +620,7 @@ where
                         match remove_file(&watcher.path).await {
                             Ok(()) => {
                                 self.emitter.emit_file_deleted(&watcher.path);
+                                salvage_final_partial_line(watcher, file_id, &mut lines);
                                 watcher.set_dead();
                             }
                             Err(error) => {
@@ -598,7 +653,7 @@ where
                 }
             }
 
-            for (_, watcher) in &mut fp_map {
+            for (&file_id, watcher) in &mut fp_map {
                 if watcher.file_findable() {
                     continue;
                 }
@@ -610,6 +665,7 @@ where
                     discovery_interval,
                     self.rotate_wait,
                 ) {
+                    salvage_final_partial_line(watcher, file_id, &mut lines);
                     watcher.set_dead();
                 }
             }
@@ -826,11 +882,14 @@ where
     /// This is the same logic that used to run unconditionally on every `glob_minimum_cooldown`
     /// tick. It's now called either on a fixed interval (`PollingOnly` mode, or as the
     /// `Notify`-mode backstop via `reconcile_interval`), or on-demand when the OS-level notify
-    /// watcher reports a change. We deliberately keep this as one unified, full pass rather than
-    /// writing a separate "apply this one notify event incrementally" code path: a full pass is
-    /// cheap enough to run per-event (it's no longer gated behind a tiny fixed interval baked
-    /// into a hot loop), and reusing the already-correct logic avoids a second, potentially
-    /// divergent implementation of rename/duplicate-fingerprint handling.
+    /// watcher reports a change -- throttled to at most once per `MIN_NOTIFY_DISCOVERY_INTERVAL`
+    /// regardless of how often notify events arrive, since sustained writes to even a single file
+    /// would otherwise trigger this full pass on every `NOTIFY_EVENT_DEBOUNCE` window indefinitely
+    /// (see that constant's doc comment). We deliberately keep this as one unified, full pass
+    /// rather than writing a separate "apply this one notify event incrementally" code path:
+    /// reusing the already-correct logic avoids a second, potentially divergent implementation of
+    /// rename/duplicate-fingerprint handling, and the throttle above keeps its cost bounded
+    /// without needing that split.
     ///
     /// `notify_wakeup` distinguishes a pass triggered by an actual OS-level filesystem event from
     /// one triggered by the periodic timer alone (`glob_minimum_cooldown` in `PollingOnly` mode,
@@ -975,8 +1034,12 @@ where
     /// case would seek the new file to the old, unrelated checkpoint offset -- silently skipping
     /// or re-reading data. Findable watchers are exactly the ones `discover`'s fingerprint match
     /// confirmed still refer to the same file, so only those are safe to promote here.
-    async fn poll_idle_watchers(&self, fp_map: &mut IndexMap<FileFingerprint, FileWatcher>) {
-        for (_file_id, watcher) in &mut *fp_map {
+    async fn poll_idle_watchers(
+        &self,
+        fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
+        lines: &mut Vec<Line>,
+    ) {
+        for (&file_id, watcher) in &mut *fp_map {
             if !watcher.is_idle() || !watcher.file_findable() {
                 continue;
             }
@@ -1011,6 +1074,7 @@ where
                         match remove_file(&watcher.path).await {
                             Ok(()) => {
                                 self.emitter.emit_file_deleted(&watcher.path);
+                                salvage_final_partial_line(watcher, file_id, lines);
                                 watcher.set_dead();
                             }
                             Err(error) => {
@@ -1091,6 +1155,7 @@ where
             self.ignore_before,
             self.max_line_bytes,
             self.line_delimiter.clone(),
+            self.idle_timeout.is_some(),
         )
         .await
         {

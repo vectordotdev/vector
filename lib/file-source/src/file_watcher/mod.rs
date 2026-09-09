@@ -105,6 +105,12 @@ enum WatcherState {
         /// still correctly detect a real shrink on the very poll that also honors the forced
         /// retry, instead of having to choose between the two.
         force_recheck: bool,
+        /// A line that was buffered but never saw its delimiter before `deactivate` closed the
+        /// handle, kept (with its starting offset) so `take_final_partial_line` can salvage it if
+        /// this watcher is reaped while still `Idle`, without ever reactivating. Ignored by
+        /// `reactivate` itself: `deactivate` already rewinds `file_position` behind these bytes,
+        /// so a successful reactivation just re-reads them from disk.
+        pending_partial_line: Option<(FilePosition, Bytes)>,
     },
 }
 
@@ -160,18 +166,29 @@ impl FileWatcher {
     ///
     /// If the file is old enough to be excluded by `ignore_before` and its size
     /// on disk already matches the position we'd resume reading from (i.e.
-    /// there's no new data waiting), the file is *not* opened at all: the
-    /// watcher starts in the `Idle` state, holding no file handle. This is the
-    /// core of the fix for https://github.com/vectordotdev/vector/issues/3567,
-    /// where a large number of `ignore_older`-excluded files would otherwise
-    /// each hold open an unused file handle for as long as they existed on
-    /// disk.
+    /// there's no new data waiting), and `idle_on_startup` is `true`, the file
+    /// is *not* opened at all: the watcher starts in the `Idle` state, holding
+    /// no file handle. This is the core of the fix for
+    /// https://github.com/vectordotdev/vector/issues/3567, where a large
+    /// number of `ignore_older`-excluded files would otherwise each hold open
+    /// an unused file handle for as long as they existed on disk.
+    ///
+    /// `idle_on_startup` should be `false` whenever `FileServer::idle_timeout`
+    /// is `None` (the user has explicitly opted out of idle-handle-closing
+    /// entirely): without gating this fast path on it too, an
+    /// `ignore_older`-excluded file would still start `Idle` at discovery
+    /// time regardless of `idle_timeout`, since this startup path is a
+    /// separate mechanism from the runtime `deactivate()` transition that
+    /// `idle_timeout` alone controls -- silently defeating the documented
+    /// promise that `idle_timeout: null` restores the prior always-open
+    /// behavior.
     pub async fn new(
         path: PathBuf,
         read_from: ReadFrom,
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
+        idle_on_startup: bool,
     ) -> Result<FileWatcher, std::io::Error> {
         // Cheap stat-only pass first. This lets us avoid ever calling
         // `File::open` for files that are both old (per `ignore_before`) and
@@ -186,7 +203,7 @@ impl FileWatcher {
                 false
             };
 
-        if too_old {
+        if too_old && idle_on_startup {
             // For a *non-gzip* file that's too old, the read position ends up
             // being the same regardless of `read_from`: `(false, true, _)`
             // below always seeks straight to EOF unconditionally, ignoring
@@ -212,6 +229,7 @@ impl FileWatcher {
                         idle_since: Instant::now(),
                         truncated_while_idle: false,
                         force_recheck: false,
+                        pending_partial_line: None,
                     },
                     file_position: stat.len(),
                     // We haven't kept the file open, so we don't yet know its
@@ -458,6 +476,8 @@ impl FileWatcher {
             idle_since,
             truncated_while_idle,
             force_recheck,
+            pending_partial_line,
+            ..
         } = &mut self.state
         else {
             return Ok(false);
@@ -486,6 +506,8 @@ impl FileWatcher {
         // of whether `force_recheck` also happens to be set on this same poll.
         if new_size < *last_known_size {
             *truncated_while_idle = true;
+            // The pre-truncation offset/bytes no longer correspond to anything on disk.
+            *pending_partial_line = None;
         }
 
         // Always keep our idle bookkeeping current so that a subsequent
@@ -680,10 +702,17 @@ impl FileWatcher {
                 )
             }
         } else {
-            let pos = reader
-                .seek(SeekFrom::Start(self.file_position))
-                .await
-                .unwrap_or(self.file_position);
+            // Propagate a seek failure instead of pretending it succeeded: swallowing it (an
+            // earlier version of this used `.unwrap_or(self.file_position)`) would report the
+            // stale checkpoint offset as the new position while the reader's actual cursor stays
+            // wherever `is_gzipped`'s `fill_buf` peek left it -- typically near the start of the
+            // file, not `self.file_position` -- so the watcher would go `Active` and immediately
+            // start reading from the wrong place: duplicating old content under the wrong
+            // offsets, or skipping data, depending on which is larger. Letting this error surface
+            // instead leaves the watcher `Idle` (this function's caller, `poll_idle_watchers`,
+            // already retries via `invalidate_idle_bookkeeping` on any `Err`), which is a strictly
+            // safer outcome than silently reading from an unknown position.
+            let pos = reader.seek(SeekFrom::Start(self.file_position)).await?;
             (Box::new(reader), pos, false)
         };
         self.gzip_read_skipped = gzip_read_skipped;
@@ -748,8 +777,21 @@ impl FileWatcher {
         // is at least as safe as what an in-progress read would already be
         // dealing with (`read_until_with_max_size` doesn't special-case
         // mid-read truncation either).
+        //
+        // Also clone the buffered bytes themselves (not just their count) before rewinding:
+        // `pending_partial_line` retains them, paired with the offset they started at (i.e.
+        // `file_position` *before* the rewind below), purely so `FileServer` can salvage them as
+        // a final record if this watcher is later reaped while still `Idle` -- see that field's
+        // doc comment for why an `Idle` watcher has no other way to flush them, unlike an
+        // `Active` one. A no-op clone (empty `Bytes`) when there's nothing buffered.
         let unterminated_bytes = buf.len() as u64;
-        self.file_position = self.file_position.saturating_sub(unterminated_bytes);
+        let rewound_file_position = self.file_position.saturating_sub(unterminated_bytes);
+        let pending_partial_line = if buf.is_empty() {
+            None
+        } else {
+            Some((rewound_file_position, buf.clone().freeze()))
+        };
+        self.file_position = rewound_file_position;
 
         // Best-effort stat so our idle bookkeeping starts accurate; if this
         // fails (e.g. file was just deleted) fall back to what we already
@@ -778,6 +820,7 @@ impl FileWatcher {
             // yet for a subsequent `check_for_new_data` poll to have observed shrinking.
             truncated_while_idle: false,
             force_recheck: false,
+            pending_partial_line,
         };
     }
 
@@ -1030,6 +1073,29 @@ impl FileWatcher {
         match &self.state {
             WatcherState::Idle { idle_since, .. } => Some(idle_since.elapsed()),
             WatcherState::Active { .. } => None,
+        }
+    }
+
+    /// Take the unterminated line this watcher is holding onto, if any (buffered-but-undelimited
+    /// bytes, for either `Active` or `Idle`). Call this right before permanently reaping a watcher
+    /// via a path that doesn't already go through `read_line` (which has its own flush for the
+    /// `Active` case) -- otherwise these bytes are lost for good.
+    pub fn take_final_partial_line(&mut self) -> Option<RawLine> {
+        match &mut self.state {
+            WatcherState::Idle {
+                pending_partial_line,
+                ..
+            } => pending_partial_line
+                .take()
+                .map(|(offset, bytes)| RawLine { offset, bytes }),
+            WatcherState::Active { buf, .. } => {
+                if buf.is_empty() {
+                    return None;
+                }
+                let bytes = buf.split().freeze();
+                let offset = self.file_position - bytes.len() as u64;
+                Some(RawLine { offset, bytes })
+            }
         }
     }
 }

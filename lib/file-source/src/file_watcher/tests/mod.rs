@@ -201,6 +201,7 @@ async fn gzip_multi_stream_reads_all_members() {
         None,
         100_000,
         Bytes::from("\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -391,6 +392,7 @@ async fn new_old_fully_read_file_starts_idle_without_opening() {
         ignore_before,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -401,6 +403,41 @@ async fn new_old_fully_read_file_starts_idle_without_opening() {
     );
     assert!(!watcher.is_active());
     assert_eq!(watcher.get_file_position(), checkpoint);
+}
+
+#[tokio::test]
+async fn idle_on_startup_false_keeps_old_file_active() {
+    // Regression test for a bug found in review: `idle_timeout: null` is documented as
+    // restoring the prior always-open behavior entirely, but the startup fast path (this same
+    // scenario as `new_old_fully_read_file_starts_idle_without_opening` above) used to ignore
+    // that opt-out completely -- it's a separate mechanism from the runtime `deactivate()`
+    // transition that `idle_timeout` alone gates, so an `ignore_older`-excluded file would still
+    // start `Idle` at discovery time regardless of `idle_timeout` being disabled. Passing
+    // `idle_on_startup: false` (what `FileServer` does when `self.idle_timeout.is_none()`) must
+    // skip the fast path and open the file normally instead.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("old_but_idle_disabled.log");
+    let contents = b"line one\nline two\n";
+    let ignore_before = Some(write_file_and_ignore_before(&path, contents));
+    let checkpoint = contents.len() as u64;
+
+    let watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Checkpoint(checkpoint),
+        ignore_before,
+        1024,
+        Bytes::from_static(b"\n"),
+        false,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(
+        watcher.is_active(),
+        "idle_on_startup: false must keep even an ignore_older-excluded file Active, not \
+         silently start it Idle regardless of the opt-out"
+    );
+    assert!(!watcher.is_idle());
 }
 
 #[tokio::test]
@@ -430,6 +467,7 @@ async fn new_old_uncompressed_file_starts_idle_regardless_of_checkpoint() {
         ignore_before,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -460,6 +498,7 @@ async fn new_old_uncompressed_file_without_checkpoint_starts_idle() {
         ignore_before,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -532,6 +571,7 @@ async fn new_old_gzip_file_without_checkpoint_starts_active() {
         ignore_before,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -557,6 +597,7 @@ async fn new_file_without_ignore_before_starts_active() {
         None,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -576,6 +617,7 @@ async fn deactivate_closes_handle_and_retains_checkpoint() {
         None,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -627,6 +669,7 @@ async fn deactivate_rewinds_past_unterminated_partial_line() {
         None,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -683,6 +726,99 @@ async fn deactivate_rewinds_past_unterminated_partial_line() {
 }
 
 #[tokio::test]
+async fn take_final_partial_line_salvages_unterminated_bytes_when_idle_is_reaped() {
+    // Regression test for a bug found in review: unlike an `Active` watcher (whose `read_line`
+    // flushes a buffered-but-unterminated line the moment its file is found unfindable), an
+    // `Idle` watcher is never read at all while unfindable (`FileServer::poll_idle_watchers`
+    // skips it outright), so it has no path of its own to flush a trailing record with no final
+    // delimiter. Before this fix, such a record was silently dropped whenever the watcher was
+    // reaped (e.g. its file was rotated out of the include glob) while still `Idle`.
+    // `take_final_partial_line` gives `FileServer`'s reap path a way to recover it as a
+    // last-resort measure right before the watcher is discarded for good.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("partial_line_reaped_while_idle.log");
+    let partial = b"unterminated-line-lost-if-not-salvaged";
+    fs::write(&path, partial).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_active());
+
+    // Consume the unterminated bytes into the buffer, exactly as in
+    // `deactivate_rewinds_past_unterminated_partial_line` above.
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_none());
+
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // Simulate the file being rotated out of the include glob and the watcher being reaped,
+    // without ever getting a chance to reactivate: take the salvaged line instead.
+    let line = watcher
+        .take_final_partial_line()
+        .expect("the buffered-but-unterminated line must be salvageable after deactivate()");
+    assert_eq!(
+        &line.bytes[..],
+        &partial[..],
+        "the salvaged line must contain exactly the bytes that were buffered, unterminated"
+    );
+    assert_eq!(
+        line.offset, 0,
+        "the salvaged line's offset must be where it started in the file, not the rewound \
+         (post-deactivate) file_position"
+    );
+
+    assert!(
+        watcher.take_final_partial_line().is_none(),
+        "take_final_partial_line must not return the same line twice"
+    );
+}
+
+#[tokio::test]
+async fn take_final_partial_line_salvages_from_active_watcher_too() {
+    // Regression test for a bug found in review: `remove_after`-driven removal of an `Active`
+    // watcher that wasn't read this cycle (e.g. `should_read()` was false) can also discard a
+    // buffered-but-unterminated line without `read_line`'s own not-`file_findable` flush ever
+    // running. `take_final_partial_line` must salvage it for `Active` watchers too, not just
+    // `Idle` ones.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("partial_line_active.log");
+    let partial = b"unterminated-active-line";
+    fs::write(&path, partial).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_active());
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_none());
+
+    let line = watcher
+        .take_final_partial_line()
+        .expect("an Active watcher's buffered-but-unterminated bytes must be salvageable too");
+    assert_eq!(&line.bytes[..], &partial[..]);
+    assert_eq!(line.offset, 0);
+
+    assert!(watcher.take_final_partial_line().is_none());
+}
+
+#[tokio::test]
 async fn idle_watcher_detects_new_data_and_resumes_from_correct_offset() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("resumes.log");
@@ -694,6 +830,7 @@ async fn idle_watcher_detects_new_data_and_resumes_from_correct_offset() {
         None,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -780,6 +917,7 @@ async fn invalidate_idle_bookkeeping_forces_next_check_to_report_changed() {
         None,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -865,6 +1003,7 @@ async fn idle_watcher_detects_truncation() {
         None,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -888,6 +1027,50 @@ async fn idle_watcher_detects_truncation() {
 }
 
 #[tokio::test]
+async fn truncation_invalidates_pending_partial_line() {
+    // Regression test for a bug found in review: a partial line buffered by `deactivate` refers
+    // to an offset in the pre-truncation file. If the file is then truncated while idle,
+    // `check_for_new_data` must drop that stale buffer -- otherwise, if the watcher is later
+    // reaped without ever reactivating, `take_final_partial_line` would hand back bytes/offset
+    // that no longer correspond to anything on disk.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("truncated_with_partial_line.log");
+    // No trailing newline, so the bytes end up buffered as an unterminated partial line.
+    let partial = b"unterminated-before-truncate";
+    fs::write(&path, partial).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_none());
+
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // Truncate the file while idle.
+    fs::write(&path, b"").unwrap();
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(changed);
+
+    assert!(
+        watcher.take_final_partial_line().is_none(),
+        "check_for_new_data must invalidate the stale pre-truncation partial line"
+    );
+}
+
+#[tokio::test]
 async fn idle_watcher_reads_correctly_after_same_inode_truncation() {
     // Regression test for a bug found in review: check_for_new_data only reports a bare
     // "changed," not which direction the size moved, so reactivate() must independently notice a
@@ -907,6 +1090,7 @@ async fn idle_watcher_reads_correctly_after_same_inode_truncation() {
         None,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -992,6 +1176,7 @@ async fn idle_watcher_reads_correctly_after_truncate_then_refill_past_old_positi
         None,
         4096,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -1101,6 +1286,7 @@ async fn idle_watcher_detects_truncation_observed_on_the_forced_retry_poll() {
         None,
         4096,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -1192,6 +1378,7 @@ async fn idle_watcher_survives_rotation_without_reading_wrong_file() {
         None,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -1277,6 +1464,7 @@ async fn idle_gzip_file_detected_correctly_on_reactivation() {
         ignore_before,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
@@ -1332,6 +1520,7 @@ async fn idle_gzip_read_from_end_stays_skipped_on_reactivation() {
         None,
         1024,
         Bytes::from_static(b"\n"),
+        true,
     )
     .await
     .expect("FileWatcher::new failed");
