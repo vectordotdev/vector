@@ -8,6 +8,7 @@ use vector_lib::{
     configurable::configurable_component,
     conversion::Conversion,
     enrichment::{Case, Condition, Error, IndexHandle, Table},
+    validate_timezone,
 };
 use vrl::value::{ObjectMap, Value};
 
@@ -124,6 +125,15 @@ const fn default_delimiter() -> char {
 }
 
 impl FileConfig {
+    fn schema_uses_timezone(&self, timezone: TimeZone) -> bool {
+        self.schema.values().any(|conversion| {
+            matches!(
+                Conversion::parse(conversion, timezone),
+                Ok(Conversion::Timestamp(_) | Conversion::TimestampFmt(_, _))
+            )
+        })
+    }
+
     fn parse_column(
         &self,
         timezone: TimeZone,
@@ -239,10 +249,11 @@ impl EnrichmentTableConfig for FileConfig {
         globals: &crate::config::GlobalOptions,
         _prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
-        Ok(Box::new(File::new(
-            self.clone(),
-            self.load_file(globals.timezone())?,
-        )))
+        let timezone = globals.timezone();
+        if self.schema_uses_timezone(timezone) {
+            validate_timezone(timezone)?;
+        }
+        Ok(Box::new(File::new(self.clone(), self.load_file(timezone)?)))
     }
 }
 
@@ -748,6 +759,20 @@ mod tests {
             ],
             data.data
         );
+    }
+
+    #[test]
+    fn only_naive_timestamp_conversions_use_timezone() {
+        let mut config = FileConfig::default();
+        for conversion in ["string", "date", "timestamp|%+"] {
+            config.schema.insert("field".into(), conversion.into());
+            assert!(!config.schema_uses_timezone(vector_lib::TimeZone::Local));
+        }
+
+        for conversion in ["timestamp", "timestamp|%F %T"] {
+            config.schema.insert("field".into(), conversion.into());
+            assert!(config.schema_uses_timezone(vector_lib::TimeZone::Local));
+        }
     }
 
     #[test]

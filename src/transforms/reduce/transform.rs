@@ -176,6 +176,7 @@ impl Reduce {
         config: &ReduceConfig,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
         metrics_storage: &MetricsStorage,
+        timezone: vector_lib::TimeZone,
     ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
@@ -184,12 +185,12 @@ impl Reduce {
         let ends_when = config
             .ends_when
             .as_ref()
-            .map(|c| c.build(enrichment_tables, metrics_storage))
+            .map(|c| c.build(enrichment_tables, metrics_storage, timezone))
             .transpose()?;
         let starts_when = config
             .starts_when
             .as_ref()
-            .map(|c| c.build(enrichment_tables, metrics_storage))
+            .map(|c| c.build(enrichment_tables, metrics_storage, timezone))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
         let max_events = config.max_events.map(|max| max.into());
@@ -361,7 +362,7 @@ mod test {
     use serde_json::json;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::{enrichment::TableRegistry, lookup::owned_value_path};
+    use vector_lib::{TimeZone, enrichment::TableRegistry, lookup::owned_value_path};
     use vrl::event_path;
     use vrl::value::Kind;
 
@@ -930,6 +931,7 @@ mod test {
             &config,
             &TableRegistry::default(),
             &MetricsStorage::default(),
+            TimeZone::default(),
         )
         .unwrap_err();
         assert_eq!(

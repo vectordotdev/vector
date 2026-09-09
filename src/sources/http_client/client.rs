@@ -20,6 +20,7 @@ use vector_lib::{
     config::{LogNamespace, SourceOutput, log_schema},
     configurable::configurable_component,
     event::{Event, LogEvent, MetricTagMode, VrlTarget},
+    validate_timezone,
 };
 use vrl::{
     compiler::{CompileConfig, Function, Program, runtime::Runtime},
@@ -332,6 +333,11 @@ impl SourceConfig for HttpClientConfig {
             })
             .transpose()?;
 
+        let timezone = cx.globals.timezone();
+        if query.has_vrl || body.as_ref().is_some_and(|param| param.program.is_some()) {
+            validate_timezone(timezone)?;
+        }
+
         // Build the base URLs
         let endpoints = [self.endpoint.clone()];
         let urls: Vec<Uri> = endpoints
@@ -363,6 +369,7 @@ impl SourceConfig for HttpClientConfig {
             log_namespace,
             query,
             body,
+            timezone,
         };
 
         warn_if_interval_too_low(self.timeout, self.interval);
@@ -421,6 +428,7 @@ pub struct HttpClientContext {
     pub log_namespace: LogNamespace,
     query: Query,
     body: Option<CompiledParam>,
+    timezone: TimeZone,
 }
 
 impl HttpClientContext {
@@ -456,14 +464,12 @@ impl HttpClientBuilder for HttpClientContext {
     }
 }
 
-fn resolve_vrl(value: &str, program: &Program) -> Option<String> {
+fn resolve_vrl(value: &str, program: &Program, timezone: TimeZone) -> Option<String> {
     let mut target = VrlTarget::new(
         Event::Log(LogEvent::default()),
         program.info(),
         MetricTagMode::Single,
     );
-    let timezone = TimeZone::default();
-
     Runtime::default()
         .resolve(&mut target, program, &timezone)
         .map_err(|error| {
@@ -486,9 +492,9 @@ fn resolve_vrl(value: &str, program: &Program) -> Option<String> {
 }
 
 /// Resolve a compiled parameter, handling VRL evaluation if present
-fn resolve_compiled_param(compiled: &CompiledParam) -> Option<String> {
+fn resolve_compiled_param(compiled: &CompiledParam, timezone: TimeZone) -> Option<String> {
     match &compiled.program {
-        Some(program) => resolve_vrl(&compiled.value, program),
+        Some(program) => resolve_vrl(&compiled.value, program, timezone),
         None => Some(compiled.value.clone()),
     }
 }
@@ -507,7 +513,9 @@ impl http_client::HttpClientContext for HttpClientContext {
 
     /// Get the request body to send with the HTTP request
     fn get_request_body(&self) -> Option<String> {
-        self.body.as_ref().and_then(resolve_compiled_param)
+        self.body
+            .as_ref()
+            .and_then(|body| resolve_compiled_param(body, self.timezone))
     }
 
     /// Process the URL dynamically before each request
@@ -524,13 +532,15 @@ impl http_client::HttpClientContext for HttpClientContext {
             .map(|(name, value)| {
                 let resolved = match value {
                     CompiledQueryParameterValue::SingleParam(param) => {
-                        let result = resolve_compiled_param(param)?;
+                        let result = resolve_compiled_param(param, self.timezone)?;
                         QueryParameterValue::SingleParam(ParameterValue::String(result))
                     }
                     CompiledQueryParameterValue::MultiParams(params) => {
                         let results: Option<Vec<_>> = params
                             .iter()
-                            .map(|p| resolve_compiled_param(p).map(ParameterValue::String))
+                            .map(|p| {
+                                resolve_compiled_param(p, self.timezone).map(ParameterValue::String)
+                            })
                             .collect();
                         QueryParameterValue::MultiParams(results?)
                     }

@@ -194,7 +194,7 @@ impl ValidatedSink for HumioMetricsConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let transform = self
             .transform
-            .build_transform(&TransformContext::new_with_globals(cx.globals.clone()));
+            .build_transform(&TransformContext::new_with_globals(cx.globals.clone()))?;
 
         let humio_logs = self.build_humio_logs_config();
 

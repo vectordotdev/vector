@@ -333,7 +333,8 @@ impl FileSink {
         let offset = config
             .timezone
             .or(cx.globals.timezone)
-            .and_then(timezone_to_offset);
+            .map(timezone_to_offset)
+            .transpose()?;
 
         // Config validation runs regardless of the opt-out: a relative
         // `base_dir` is a syntactic error, not a confinement decision.

@@ -83,7 +83,13 @@ impl WebSocketListenerSink {
     ) -> crate::Result<Self> {
         let auth = config
             .auth
-            .map(|config| config.build(&cx.enrichment_tables, &cx.metrics_storage))
+            .map(|config| {
+                config.build(
+                    &cx.enrichment_tables,
+                    &cx.metrics_storage,
+                    cx.globals.timezone(),
+                )
+            })
             .transpose()?;
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);

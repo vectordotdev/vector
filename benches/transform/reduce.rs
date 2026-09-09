@@ -58,6 +58,7 @@ fn reduce(c: &mut Criterion) {
                                 &param.reduce_config,
                                 &Default::default(),
                                 &Default::default(),
+                                vector_lib::TimeZone::default(),
                             )
                             .unwrap(),
                         )

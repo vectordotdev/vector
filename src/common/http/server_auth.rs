@@ -15,6 +15,7 @@ use vector_lib::{
     event::{Event, LogEvent, MetricTagMode, VrlTarget},
     lookup::OwnedTargetPath,
     sensitive_string::SensitiveString,
+    validate_timezone,
 };
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
@@ -139,6 +140,20 @@ impl HttpServerAuthConfig {
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
         metrics_storage: &MetricsStorage,
+        timezone: TimeZone,
+    ) -> crate::Result<HttpServerAuthMatcher> {
+        let matcher = self.compile(enrichment_tables, metrics_storage)?;
+        if let HttpServerAuthMatcher::Vrl { program, .. } = matcher {
+            validate_timezone(timezone)?;
+            return Ok(HttpServerAuthMatcher::Vrl { program, timezone });
+        }
+        Ok(matcher)
+    }
+
+    fn compile(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<HttpServerAuthMatcher> {
         match self {
             HttpServerAuthConfig::Basic { username, password } => {
@@ -173,7 +188,10 @@ impl HttpServerAuthConfig {
                     warn!(message = "VRL compilation warning.", %warnings);
                 }
 
-                Ok(HttpServerAuthMatcher::Vrl { program })
+                Ok(HttpServerAuthMatcher::Vrl {
+                    program,
+                    timezone: TimeZone::default(),
+                })
             }
         }
     }
@@ -182,7 +200,7 @@ impl HttpServerAuthConfig {
     /// compiling any custom VRL program so `vector validate --no-environment`
     /// catches syntax/type errors while resolving enrichment table names.
     pub fn validate(&self, enrichment_tables: &TableRegistry) -> crate::Result<()> {
-        self.build(enrichment_tables, &MetricsStorage::default())
+        self.compile(enrichment_tables, &MetricsStorage::default())
             .map(|_| ())
     }
 }
@@ -200,6 +218,8 @@ pub enum HttpServerAuthMatcher {
     Vrl {
         /// Compiled VRL script
         program: Program,
+        /// Time zone used while executing the program.
+        timezone: TimeZone,
     },
 }
 
@@ -230,8 +250,8 @@ impl HttpServerAuthMatcher {
                     ))
                 }
             }
-            HttpServerAuthMatcher::Vrl { program } => {
-                self.handle_vrl_auth(address, headers, path, program)
+            HttpServerAuthMatcher::Vrl { program, timezone } => {
+                self.handle_vrl_auth(address, headers, path, program, *timezone)
             }
         }
     }
@@ -242,6 +262,7 @@ impl HttpServerAuthMatcher {
         headers: &HeaderMap<HeaderValue>,
         path: &str,
         program: &Program,
+        timezone: TimeZone,
     ) -> Result<Option<ObjectMap>, ErrorMessage> {
         let mut target = VrlTarget::new(
             Event::Log(LogEvent::from_map(
@@ -271,8 +292,6 @@ impl HttpServerAuthMatcher {
             program.info(),
             MetricTagMode::Single,
         );
-        let timezone = TimeZone::default();
-
         let result = Runtime::default().resolve(&mut target, program, &timezone);
         match result.map_err(|e| {
             warn!("Handling auth failed: {}", e);
@@ -381,7 +400,11 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(&Default::default(), &Default::default());
+        let matcher = basic_auth.build(
+            &Default::default(),
+            &Default::default(),
+            TimeZone::default(),
+        );
 
         assert!(matcher.is_ok());
         assert!(matches!(
@@ -398,7 +421,11 @@ mod tests {
         };
 
         let (_, error_message) = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap()
             .auth_header();
         assert_eq!("Invalid username/password", error_message);
@@ -414,7 +441,11 @@ mod tests {
         };
 
         let (header, _) = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap()
             .auth_header();
         assert_eq!(
@@ -431,7 +462,11 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(
+                    &Default::default(),
+                    &Default::default(),
+                    TimeZone::default(),
+                )
                 .is_err()
         );
     }
@@ -448,7 +483,11 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(
+                    &Default::default(),
+                    &Default::default(),
+                    TimeZone::default(),
+                )
                 .is_err()
         );
     }
@@ -464,7 +503,11 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(
+                    &Default::default(),
+                    &Default::default(),
+                    TimeZone::default(),
+                )
                 .is_ok()
         );
     }
@@ -477,7 +520,11 @@ mod tests {
         };
 
         let matcher = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let (_guard, addr) = next_addr();
@@ -497,7 +544,11 @@ mod tests {
         };
 
         let matcher = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -521,7 +572,11 @@ mod tests {
         };
 
         let matcher = basic_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -542,7 +597,11 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -562,7 +621,11 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -580,7 +643,11 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -596,7 +663,11 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -613,7 +684,11 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -630,7 +705,11 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -651,7 +730,11 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -674,7 +757,11 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let mut headers = HeaderMap::new();
@@ -702,7 +789,11 @@ mod tests {
         };
 
         let matcher = custom_auth
-            .build(&Default::default(), &Default::default())
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            )
             .unwrap();
 
         let headers = HeaderMap::new();
@@ -730,7 +821,11 @@ mod tests {
 
         assert!(
             custom_auth
-                .build(&Default::default(), &Default::default())
+                .build(
+                    &Default::default(),
+                    &Default::default(),
+                    TimeZone::default(),
+                )
                 .is_err(),
             "writing to event body (.field) must be rejected at compile time"
         );

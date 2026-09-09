@@ -64,11 +64,18 @@ impl TransformConfig for WindowConfig {
                 self.forward_when
                     .as_ref()
                     .map(|condition| {
-                        condition.build(&context.enrichment_tables, &context.metrics_storage)
+                        condition.build(
+                            &context.enrichment_tables,
+                            &context.metrics_storage,
+                            context.globals.timezone(),
+                        )
                     })
                     .transpose()?,
-                self.flush_when
-                    .build(&context.enrichment_tables, &context.metrics_storage)?,
+                self.flush_when.build(
+                    &context.enrichment_tables,
+                    &context.metrics_storage,
+                    context.globals.timezone(),
+                )?,
                 self.num_events_before,
                 self.num_events_after,
             )

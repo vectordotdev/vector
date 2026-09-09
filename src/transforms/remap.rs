@@ -19,6 +19,7 @@ use vector_lib::{
     enrichment::TableRegistry,
     lookup::{PathPrefix, metadata_path, owned_value_path},
     schema::Definition,
+    validate_timezone,
 };
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vector_vrl_metrics::MetricsStorage;
@@ -291,7 +292,7 @@ impl TransformConfig for RemapConfig {
             context.merged_schema_definition.clone(),
         )
         .map(|_| ())
-        .map_err(|e| vec![e.to_string()])
+        .map_err(|error| vec![error.to_string()])
     }
 
     fn input(&self) -> Input {
@@ -493,14 +494,16 @@ where
         )?;
 
         let runner = Runner::new();
+        let timezone = config
+            .timezone
+            .unwrap_or_else(|| context.globals.timezone());
+        validate_timezone(timezone)?;
 
         Ok((
             Remap {
                 component_key: context.key.clone(),
                 program,
-                timezone: config
-                    .timezone
-                    .unwrap_or_else(|| context.globals.timezone()),
+                timezone,
                 drop_on_error: config.drop_on_error,
                 drop_on_abort: config.drop_on_abort,
                 reroute_dropped: config.reroute_dropped,
