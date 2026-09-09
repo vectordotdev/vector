@@ -416,7 +416,7 @@ _schemaDefinitions: {
 						bounded by whatever the source accepts as one frame.
 						"""
 					required: false
-					type: uint: {}
+					type: uint: default: 134217728
 				}
 				pending_messages_limit: {
 					description: """
@@ -721,7 +721,7 @@ _schemaDefinitions: {
 				bounded by whatever the source accepts as one frame.
 				"""
 			required: false
-			type: uint: {}
+			type: uint: default: 134217728
 		}
 		pending_messages_limit: {
 			description: """
@@ -3524,7 +3524,7 @@ _schemaDefinitions: {
 															bounded by whatever the source accepts as one frame.
 															"""
 							required: false
-							type: uint: {}
+							type: uint: default: 134217728
 						}
 						pending_messages_limit: {
 							description: """

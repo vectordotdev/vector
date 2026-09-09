@@ -36,6 +36,10 @@ const fn default_pending_messages_limit() -> usize {
     MAX_PENDING_MESSAGES
 }
 
+const fn default_max_length() -> Option<usize> {
+    Some(DEFAULT_MAX_BUFFERED_PAYLOAD)
+}
+
 /// Config used to build a `ChunkedGelfDecoder`.
 #[configurable_component]
 #[derive(Debug, Clone, Default)]
@@ -92,7 +96,11 @@ pub struct ChunkedGelfDecoderOptions {
     ///
     /// An unchunked message is never buffered, so neither limit applies to it; its size is
     /// bounded by whatever the source accepts as one frame.
-    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    #[derivative(Default(value = "default_max_length()"))]
+    #[serde(
+        default = "default_max_length",
+        skip_serializing_if = "vector_core::serde::is_default"
+    )]
     pub max_length: Option<usize>,
 
     /// Decompression configuration for GELF messages.
@@ -1293,6 +1301,19 @@ mod tests {
 
     #[test]
     fn max_length_adjusts_the_per_message_and_aggregate_limits() {
+        let omitted: ChunkedGelfDecoderOptions = serde_json::from_value(serde_json::json!({}))
+            .expect("the default options must deserialize");
+        assert_eq!(omitted.max_length, default_max_length());
+
+        let explicit_null: ChunkedGelfDecoderOptions =
+            serde_json::from_value(serde_json::json!({ "max_length": null }))
+                .expect("an explicit null must deserialize");
+        let explicit_null = ChunkedGelfDecoderConfig {
+            chunked_gelf: explicit_null,
+        }
+        .build();
+        assert_eq!(explicit_null.max_length, DEFAULT_MAX_BUFFERED_PAYLOAD);
+
         let default = ChunkedGelfDecoder::default();
         assert_eq!(default.max_length, DEFAULT_MAX_BUFFERED_PAYLOAD);
         assert_eq!(default.max_buffered_payload, DEFAULT_MAX_BUFFERED_PAYLOAD);
