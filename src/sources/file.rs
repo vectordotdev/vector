@@ -36,7 +36,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileInternalMetricsConfig, FileOpen,
-        FileSourceInternalEventsEmitter, StreamClosedError,
+        FileSourceInternalEventsEmitter, FilesIdle, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
@@ -793,6 +793,7 @@ pub fn file_source(
             let result =
                 rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
             emit!(FileOpen { count: 0 });
+            emit!(FilesIdle { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.

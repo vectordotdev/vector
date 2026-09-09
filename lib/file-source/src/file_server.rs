@@ -1,7 +1,7 @@
 use std::{
     cmp,
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
+    collections::{BTreeMap, HashMap, HashSet},
+    path::{Path, PathBuf},
     sync::Arc,
     time::{self, Duration},
 };
@@ -42,6 +42,132 @@ use crate::{
 /// under `FileDiscoveryMode::Notify` must not have that same value silently become the debounce
 /// window and delay every single notify-driven discovery by that same large amount.
 const NOTIFY_EVENT_DEBOUNCE: Duration = Duration::from_millis(50);
+
+/// Above this many distinct paths accumulated from notify events since the last reconciliation
+/// pass, stop tracking them individually and fall back to treating the wakeup as "something
+/// changed, go check everything" (`NotifyWakeup::All`). This bounds the memory a burst of events
+/// across many different paths can make `NotifyWakeup::Paths` hold onto, and avoids the
+/// per-watcher `HashSet` lookups in `discover`'s hot loop becoming worse than just nudging every
+/// watcher once the set is large enough that "every watcher" and "every named path" are close in
+/// size anyway.
+const NOTIFY_WAKEUP_PATH_LIMIT: usize = 1024;
+
+/// Accumulates, between reconciliation passes, which specific paths (if known) notify events have
+/// named -- so that `discover`'s "nudge this watcher past its read-pacing timers" step (see
+/// `FileWatcher::mark_ready_to_read`) only touches watchers a concrete event actually named,
+/// instead of every currently-tracked watcher on every single notify event regardless of which
+/// path it was about. The latter is an O(N) cost (N = number of tracked files) per event, which
+/// under a large `include` glob turns "one file got appended to" into "redundantly reconsider
+/// every other file's read pacing too."
+#[derive(Debug, Default)]
+enum NotifyWakeup {
+    /// No notify event has arrived since the last reconciliation pass.
+    #[default]
+    None,
+    /// One or more notify events arrived, each naming specific paths (`PathsChanged`/
+    /// `PathsRemoved`), and the total distinct path count so far has stayed at or under
+    /// `NOTIFY_WAKEUP_PATH_LIMIT`.
+    Paths(HashSet<PathBuf>),
+    /// A notify event arrived that doesn't name specific paths at all (`Overflow`,
+    /// `BackendError`), or the accumulated path count exceeded `NOTIFY_WAKEUP_PATH_LIMIT`: treat
+    /// every currently-tracked watcher as possibly needing a nudge, same as the pre-existing
+    /// coarse "just rerun discovery" behavior.
+    All,
+}
+
+impl NotifyWakeup {
+    fn is_pending(&self) -> bool {
+        !matches!(self, NotifyWakeup::None)
+    }
+
+    fn add_paths(&mut self, paths: impl IntoIterator<Item = PathBuf>) {
+        match self {
+            NotifyWakeup::All => {}
+            NotifyWakeup::None => {
+                let set: HashSet<PathBuf> = paths.into_iter().collect();
+                *self = if set.len() > NOTIFY_WAKEUP_PATH_LIMIT {
+                    NotifyWakeup::All
+                } else {
+                    NotifyWakeup::Paths(set)
+                };
+            }
+            NotifyWakeup::Paths(existing) => {
+                existing.extend(paths);
+                if existing.len() > NOTIFY_WAKEUP_PATH_LIMIT {
+                    *self = NotifyWakeup::All;
+                }
+            }
+        }
+    }
+
+    fn mark_all(&mut self) {
+        *self = NotifyWakeup::All;
+    }
+
+    fn take(&mut self) -> NotifyWakeup {
+        std::mem::take(self)
+    }
+
+    /// Whether `path` should have its watcher nudged past its own read-pacing timers (see
+    /// `FileWatcher::mark_ready_to_read`) for this reconciliation pass.
+    fn names(&self, path: &Path) -> bool {
+        match self {
+            NotifyWakeup::None => false,
+            NotifyWakeup::All => true,
+            NotifyWakeup::Paths(paths) => paths.contains(path),
+        }
+    }
+}
+
+/// Absolutize `path` the same way the `notify` crate does internally before using a path passed
+/// to `watch()`: if it's already absolute, leave it as-is; otherwise join it onto `cwd`. This
+/// matters because `notify` always reports its events using the absolute form it resolved
+/// `watch()`'s argument to, but a glob-based `PathsProvider` can yield a relative path unchanged
+/// if the configured `include` pattern was itself relative -- without this, comparing such a path
+/// directly against a notify-reported path would never match. `cwd` is `None` only if
+/// `std::env::current_dir()` itself failed (e.g. the working directory was removed out from under
+/// the process); in that rare case `path` is returned unchanged, since there's no well-defined way
+/// to absolutize it, which merely reproduces the not-nudged-this-pass degradation this function
+/// exists to avoid rather than introducing a new failure mode.
+fn absolutize_for_notify_comparison(path: &Path, cwd: Option<&Path>) -> PathBuf {
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    match cwd {
+        Some(cwd) => cwd.join(path),
+        None => path.to_path_buf(),
+    }
+}
+
+/// Whether a watcher that `discover`'s glob/fingerprint pass just marked unfindable should be
+/// reaped (`set_dead`) on this cycle.
+///
+/// An `Active` watcher left unfindable keeps getting read (and, on EOF, marked dead) every cycle
+/// regardless of `rotate_wait`, so `rotate_wait` only matters there as a grace period against a
+/// premature `unwatch`; this function's `false` result for such a watcher (until `rotate_wait`
+/// elapses) preserves that pre-existing behavior unchanged.
+///
+/// An `Idle` watcher, by contrast, is never read while unfindable (`poll_idle_watchers` skips
+/// unfindable watchers outright, to avoid reactivating against a different file that's since
+/// appeared at the same path -- see that function's doc comment), so it has no other path to
+/// reaping at all. Waiting out the full `rotate_wait` (whose default is effectively unlimited)
+/// before reaping it would let every rotation past an `include` glob permanently add another
+/// watcher/checkpoint to `fp_map`. But reaping it the instant it's first seen unfindable is also
+/// wrong: a rename's target might not be fingerprint-matched back to this watcher in the exact
+/// same `discover()` pass that saw it disappear (a slow/partial rename, or -- under `Notify` mode
+/// -- the create/rename-to event simply hasn't been delivered/debounced through yet), in which
+/// case it would still be matched on a *later* pass if given the chance. This grants an `Idle`
+/// watcher at least one full `discovery_interval` -- the same cadence `discover()` itself already
+/// runs on -- to be rediscovered before reaping it: long enough to survive a rename spanning one
+/// discovery pass, but nowhere near `rotate_wait`'s effectively-unlimited default.
+fn should_reap_unfindable_watcher(
+    is_idle: bool,
+    unfindable_for: Duration,
+    discovery_interval: Duration,
+    rotate_wait: Duration,
+) -> bool {
+    (is_idle && unfindable_for > discovery_interval) || unfindable_for > rotate_wait
+}
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures.
@@ -211,7 +337,6 @@ where
             }
             FileDiscoveryMode::PollingOnly => None,
         };
-        let using_notify = notify_discovery.is_some();
 
         let mut existing_files = Vec::new();
         for path in self.paths_provider.paths().into_iter() {
@@ -286,9 +411,23 @@ where
         // (queue overflow, pre-watch-establishment changes, or platforms/paths where notify
         // can't watch for some reason).
         let mut next_glob_time = time::Instant::now();
-        let mut pending_notify_wakeup = !using_notify; // run one discovery pass unconditionally at loop start when polling
+        // The very first loop iteration always runs a discovery pass regardless of discovery
+        // mode: `next_glob_time` was just set to `Instant::now()` above, and `now_time` inside the
+        // loop is captured strictly later, so `next_glob_time <= now_time` is unconditionally true
+        // on that first check -- no separate "force the first pass" flag is needed. This pass must
+        // not be treated as notify-triggered (that would wrongly nudge every watcher's read pacing
+        // via `NotifyWakeup::All`/`Paths` on startup, and under `PollingOnly` a notify-triggered
+        // pass should never happen at all), so `pending_notify_wakeup` starts at `None`.
+        let mut pending_notify_wakeup = NotifyWakeup::None;
         loop {
-            let discovery_interval = if using_notify {
+            // Use `reconcile_interval` whenever `Notify` mode was configured, even if the notify
+            // watcher isn't currently live (it failed to initialize, or died mid-run and was set
+            // to `None`): `glob_minimum_cooldown` is documented as ignored in `Notify` mode, so a
+            // user relying on that must still get `reconcile_interval`'s cadence during a fallback
+            // rather than silently reverting to whatever `glob_minimum_cooldown` happens to be set
+            // to (which, precisely because it's documented as ignored, may be tuned very
+            // differently than the intended discovery cadence).
+            let discovery_interval = if self.discovery_mode == FileDiscoveryMode::Notify {
                 self.reconcile_interval
             } else {
                 self.glob_minimum_cooldown
@@ -296,10 +435,13 @@ where
 
             // Glob find files to follow, but not too often.
             let now_time = time::Instant::now();
-            if next_glob_time <= now_time || pending_notify_wakeup {
+            if next_glob_time <= now_time || pending_notify_wakeup.is_pending() {
+                // This reconciliation pass was triggered by an actual notify event (as opposed to
+                // the much-less-frequent backstop timer alone) if `pending_notify_wakeup` is what
+                // got us in here; take it (resetting to `None`) before running discovery.
+                let woken_by_notify_event = pending_notify_wakeup.take();
                 // Schedule the next backstop reconciliation time.
                 next_glob_time = now_time.checked_add(discovery_interval).unwrap();
-                pending_notify_wakeup = false;
 
                 if stats.started_at.elapsed() > Duration::from_secs(1) {
                     stats.report();
@@ -315,6 +457,7 @@ where
                     &mut known_small_files,
                     &checkpoints,
                     notify_discovery.as_mut(),
+                    &woken_by_notify_event,
                 )
                 .await;
                 stats.record("discovery", start.elapsed());
@@ -456,7 +599,17 @@ where
             }
 
             for (_, watcher) in &mut fp_map {
-                if !watcher.file_findable() && watcher.last_seen().elapsed() > self.rotate_wait {
+                if watcher.file_findable() {
+                    continue;
+                }
+                // See `should_reap_unfindable_watcher`'s doc comment for why `Idle` and `Active`
+                // watchers need different grace periods here.
+                if should_reap_unfindable_watcher(
+                    watcher.is_idle(),
+                    watcher.last_seen().elapsed(),
+                    discovery_interval,
+                    self.rotate_wait,
+                ) {
                     watcher.set_dead();
                 }
             }
@@ -519,59 +672,50 @@ where
             // mutable reference across loop iterations without re-pinning.
             if let Some(discovery) = notify_discovery.as_mut() {
                 let mut shutdown = false;
+                let mut channel_closed = false;
                 tokio::select! {
                     biased;
                     _ = &mut shutdown_data => {
                         shutdown = true;
                     }
                     msg = discovery.recv() => {
-                        match msg {
-                            Some(NotifyMessage::PathsChanged(paths)) => {
-                                trace!(message = "Received file change notification.", ?paths);
-                                pending_notify_wakeup = true;
-                            }
-                            Some(NotifyMessage::PathsRemoved(paths)) => {
-                                trace!(message = "Received file removal notification.", ?paths);
-                                pending_notify_wakeup = true;
-                            }
-                            Some(NotifyMessage::Overflow) => {
-                                self.emitter.emit_file_watch_events_overflowed();
-                                pending_notify_wakeup = true;
-                            }
-                            Some(NotifyMessage::BackendError(error)) => {
-                                self.emitter.emit_file_watch_backend_error(&std::io::Error::other(error));
-                                // A backend error can mean the watcher silently dropped a watch
-                                // (e.g. a watched directory was removed and recreated). Forget our
-                                // bookkeeping of which directories are watched so the upcoming
-                                // reconciliation pass's `resync_watches` call re-`watch`s
-                                // everything from scratch, rather than skipping paths it
-                                // incorrectly still believes are watched. See
-                                // `NotifyDiscovery::forget_watches` for why this is necessary.
-                                discovery.forget_watches();
-                                pending_notify_wakeup = true;
-                            }
-                            None => {
-                                // The notify watcher task/thread went away entirely (e.g. panicked).
-                                // Fall back to relying solely on the backstop reconcile interval
-                                // from here on; do not treat this as fatal to the file source.
-                                warn!("Notify event channel closed; relying on periodic reconciliation only.");
-                                notify_discovery = None;
-                            }
-                        }
+                        channel_closed = msg.is_none();
+                        self.handle_notify_message(msg, discovery, &mut pending_notify_wakeup);
                         // Briefly drain/debounce further events so a burst of writes collapses
-                        // into a single reconciliation pass.
-                        if let Some(discovery) = notify_discovery.as_mut() {
-                            let drain_result =
-                                tokio::time::timeout(NOTIFY_EVENT_DEBOUNCE, async {
-                                    while discovery.recv().await.is_some() {}
-                                })
-                                .await;
+                        // into a single reconciliation pass. Each drained message still goes
+                        // through the same handling as the message above (not just discarded):
+                        // a `BackendError`/`Overflow` arriving inside this window must still
+                        // trigger `forget_watches`/overflow telemetry, or those effects would be
+                        // silently dropped whenever they happen to land within
+                        // `NOTIFY_EVENT_DEBOUNCE` of another event, which -- for a backend error
+                        // specifically -- would leave `forget_watches` never called and the lost
+                        // watch registration never re-established.
+                        if !channel_closed {
+                            let drain_result = tokio::time::timeout(NOTIFY_EVENT_DEBOUNCE, async {
+                                loop {
+                                    let msg = discovery.recv().await;
+                                    let is_none = msg.is_none();
+                                    self.handle_notify_message(msg, discovery, &mut pending_notify_wakeup);
+                                    if is_none {
+                                        break;
+                                    }
+                                }
+                            })
+                            .await;
                             // A timeout just means the debounce window elapsed while events were
-                            // still arriving, which is the expected/common case; nothing to do.
-                            drop(drain_result);
+                            // still arriving, which is the expected/common case. If the drain loop
+                            // instead broke out on its own, the channel closed.
+                            channel_closed = drain_result.is_ok();
                         }
                     }
                     _ = &mut sleep_fut => {}
+                }
+                if channel_closed {
+                    // The notify watcher task/thread went away entirely (e.g. panicked). Fall
+                    // back to relying solely on the backstop reconcile interval from here on; do
+                    // not treat this as fatal to the file source.
+                    warn!("Notify event channel closed; relying on periodic reconciliation only.");
+                    notify_discovery = None;
                 }
                 stats.record("sleeping", start.elapsed());
                 if shutdown {
@@ -612,6 +756,69 @@ where
         }
     }
 
+    /// Handle a single message received from `discovery`, both for the initial message that woke
+    /// up the `tokio::select!` in `run` and for each message drained from the channel during the
+    /// subsequent debounce window. `None` (the channel having closed) is intentionally not
+    /// matched here: the caller is responsible for detecting that (it needs to stop the drain
+    /// loop and fall back off notify entirely), whereas every other variant is handled
+    /// identically regardless of whether it arrived as the "woke us up" message or as one drained
+    /// during debounce -- in particular, a `BackendError`'s `forget_watches()` call and an
+    /// `Overflow`'s telemetry must fire even when they land inside the debounce window, not just
+    /// on the message that started it.
+    fn handle_notify_message(
+        &self,
+        msg: Option<NotifyMessage>,
+        discovery: &mut NotifyDiscovery,
+        pending_notify_wakeup: &mut NotifyWakeup,
+    ) {
+        match msg {
+            Some(NotifyMessage::PathsChanged(paths)) => {
+                trace!(message = "Received file change notification.", ?paths);
+                // Named paths only: `discover`'s per-watcher nudge (`FileWatcher::mark_ready_to_read`)
+                // should only touch watchers this event actually concerns, not every tracked file --
+                // see `NotifyWakeup`'s docs for why nudging everything on every event doesn't scale.
+                pending_notify_wakeup.add_paths(paths);
+            }
+            Some(NotifyMessage::PathsRemoved(paths)) => {
+                trace!(message = "Received file removal notification.", ?paths);
+                // If one of the removed paths is itself a directory we're watching (as opposed to
+                // a file inside one), the watch on it may have been invalidated at the OS level
+                // (this is inotify's behavior on Linux: removing a watched directory invalidates
+                // the watch on that inode, even if a new directory is later created at the same
+                // path). Forget our bookkeeping for it so the reconciliation pass's
+                // `resync_watches` call re-`watch`es it once it exists again, rather than
+                // wrongly believing it's still watched and skipping it forever. See
+                // `NotifyDiscovery::forget_watch` for details.
+                for path in &paths {
+                    if discovery.is_watched_dir(path) {
+                        discovery.forget_watch(path);
+                    }
+                }
+                pending_notify_wakeup.add_paths(paths);
+            }
+            Some(NotifyMessage::Overflow) => {
+                self.emitter.emit_file_watch_events_overflowed();
+                // No specific paths are known to have changed; treat every tracked watcher as
+                // possibly needing a nudge, same as the pre-existing coarse behavior.
+                pending_notify_wakeup.mark_all();
+            }
+            Some(NotifyMessage::BackendError(error)) => {
+                self.emitter
+                    .emit_file_watch_backend_error(&std::io::Error::other(error));
+                // A backend error can mean the watcher silently dropped a watch (e.g. a watched
+                // directory was removed and recreated). Forget our bookkeeping of which
+                // directories are watched so the upcoming reconciliation pass's `resync_watches`
+                // call re-`watch`s everything from scratch, rather than skipping paths it
+                // incorrectly still believes are watched. See `NotifyDiscovery::forget_watches`
+                // for why this is necessary.
+                discovery.forget_watches();
+                // No specific paths are known to have changed here either.
+                pending_notify_wakeup.mark_all();
+            }
+            None => {}
+        }
+    }
+
     /// Perform a full glob+fingerprint reconciliation pass: re-glob the configured `include`
     /// patterns and detect new files, renames (a known fingerprint appearing at a new path), and
     /// duplicate-fingerprint conflicts (picking the most recently modified file).
@@ -624,12 +831,47 @@ where
     /// cheap enough to run per-event (it's no longer gated behind a tiny fixed interval baked
     /// into a hot loop), and reusing the already-correct logic avoids a second, potentially
     /// divergent implementation of rename/duplicate-fingerprint handling.
+    ///
+    /// `notify_wakeup` distinguishes a pass triggered by an actual OS-level filesystem event from
+    /// one triggered by the periodic timer alone (`glob_minimum_cooldown` in `PollingOnly` mode,
+    /// or the `reconcile_interval` backstop in `Notify` mode): only for a watcher whose path
+    /// `notify_wakeup` actually names (`NotifyWakeup::Paths`) or when it's `NotifyWakeup::All`
+    /// (an event that didn't name specific paths, e.g. `Overflow`/`BackendError`, or more distinct
+    /// paths than `NOTIFY_WAKEUP_PATH_LIMIT`) does an already-tracked, still-`Active` watcher get
+    /// nudged past its own independent read-pacing timers (see the "same path" branch below and
+    /// `FileWatcher::mark_ready_to_read`) -- a concrete "this path changed" signal justifies
+    /// reading it sooner than those timers would otherwise allow, but the periodic timer firing on
+    /// its own doesn't, and nudging every watcher on every pass regardless (the pre-fix behavior)
+    /// meant a single notify event under a large `include` glob cost an O(N) sweep of every other
+    /// tracked file's read pacing too, not just the one path that actually changed.
+    ///
+    /// `notify_wakeup.names(&path)` compares paths as reported by the OS notify backend against
+    /// `path` as yielded by `paths_provider.paths()`. The `notify` crate always resolves the path
+    /// it was asked to `watch()` to an absolute one internally (via the current working directory)
+    /// before using it, and reports its events using that same absolute form -- but a glob-based
+    /// `PathsProvider` can yield a relative path unchanged if the configured `include` pattern was
+    /// itself relative. Without accounting for this, `notify_wakeup.names(&path)` would compare a
+    /// relative `path` against an absolute event path and never match, silently defeating the
+    /// nudge for every file matched by a relative `include` pattern. `discover` absolutizes `path`
+    /// (via `absolutize_for_notify_comparison`) the same way `notify` would before comparing.
+    ///
+    /// **Known limitation**: this only accounts for relative-vs-absolute, not full
+    /// canonicalization (symlink resolution): canonicalizing every tracked file's path on every
+    /// pass, just to cover a much rarer case, would cost a `stat`-like syscall per file per pass
+    /// for a benefit that's purely about read-latency, not correctness. If an `include` pattern
+    /// traverses a symlink and the two sides resolve it differently even after absolutizing, the
+    /// nudge can still silently not fire for that watcher on that pass. This degrades gracefully:
+    /// `should_read`'s own timers still fire eventually, and the periodic
+    /// `reconcile_interval`/`glob_minimum_cooldown` backstop still runs regardless of this nudge,
+    /// so the affected file falls back to ordinary polling-like latency rather than losing data or
+    /// getting stuck.
     async fn discover(
         &mut self,
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
         checkpoints: &CheckpointsView,
         notify_discovery: Option<&mut NotifyDiscovery>,
+        notify_wakeup: &NotifyWakeup,
     ) {
         // Defensive resync: cheap to call, and covers the (rare) case where the set of
         // directories implied by `include` patterns needs to change -- e.g. a literal include
@@ -645,6 +887,16 @@ where
         for (_file_id, watcher) in &mut *fp_map {
             watcher.set_file_findable(false); // assume not findable until found
         }
+
+        // Computed once per pass (not once per file) and only when there's actually a pending
+        // notify wakeup to compare against -- the common case, a backstop-timer-only pass with
+        // `NotifyWakeup::None`, skips this (and every `.names()` call below) entirely, since
+        // `None` never matches regardless of what `path` is compared against.
+        let cwd_for_notify_comparison = notify_wakeup
+            .is_pending()
+            .then(|| std::env::current_dir().ok())
+            .flatten();
+
         for path in self.paths_provider.paths().into_iter() {
             if let Some(file_id) = self
                 .fingerprinter
@@ -660,6 +912,19 @@ where
                             message = "Continue watching file.",
                             path = ?path,
                         );
+                        let absolutized_path = absolutize_for_notify_comparison(
+                            &path,
+                            cwd_for_notify_comparison.as_deref(),
+                        );
+                        if notify_wakeup.names(&absolutized_path) {
+                            // A concrete filesystem event named this exact path (or we can't tell
+                            // which paths changed, e.g. `Overflow`), so this watcher may have new
+                            // data waiting even if it's currently mid-EOF-backoff or past the
+                            // quiet-file throttle window (both of which exist only to pace
+                            // *unprompted* polling, not to delay a read a real signal just
+                            // justified). See `FileWatcher::mark_ready_to_read`.
+                            watcher.mark_ready_to_read();
+                        }
                     } else if !was_found_this_cycle {
                         // matches a file with a different path
                         info!(
@@ -952,4 +1217,217 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: u64,
     pub end_offset: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn notify_wakeup_starts_none_and_reports_not_pending() {
+        let wakeup = NotifyWakeup::default();
+        assert!(!wakeup.is_pending());
+        assert!(!wakeup.names(&PathBuf::from("/var/log/a.log")));
+    }
+
+    #[test]
+    fn notify_wakeup_names_only_the_specific_paths_added() {
+        // Regression test for a bug found in review: a single notify event must not cause
+        // `discover` to nudge every tracked watcher's read pacing -- only the watcher(s) whose
+        // path the event actually named. Otherwise one changed file among many thousands turns
+        // into an O(N) sweep on every single event.
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([PathBuf::from("/var/log/a.log")]);
+
+        assert!(wakeup.is_pending());
+        assert!(wakeup.names(&PathBuf::from("/var/log/a.log")));
+        assert!(
+            !wakeup.names(&PathBuf::from("/var/log/b.log")),
+            "a path the event didn't name must not be reported as needing a nudge"
+        );
+    }
+
+    #[test]
+    fn notify_wakeup_accumulates_paths_across_multiple_add_calls() {
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([PathBuf::from("/var/log/a.log")]);
+        wakeup.add_paths([PathBuf::from("/var/log/b.log")]);
+
+        assert!(wakeup.names(&PathBuf::from("/var/log/a.log")));
+        assert!(wakeup.names(&PathBuf::from("/var/log/b.log")));
+        assert!(!wakeup.names(&PathBuf::from("/var/log/c.log")));
+    }
+
+    #[test]
+    fn notify_wakeup_mark_all_names_everything() {
+        // `Overflow`/`BackendError` don't carry specific paths, so every tracked watcher must be
+        // treated as possibly needing a nudge -- this is the pre-existing coarse behavior,
+        // preserved for the cases where no finer-grained information is available.
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.mark_all();
+
+        assert!(wakeup.is_pending());
+        assert!(wakeup.names(&PathBuf::from("/var/log/anything.log")));
+    }
+
+    #[test]
+    fn notify_wakeup_falls_back_to_all_past_the_path_limit() {
+        // Bounds the memory (and, in `discover`, the per-watcher `HashSet` lookup cost) a burst of
+        // events touching many distinct paths can accumulate: past `NOTIFY_WAKEUP_PATH_LIMIT`,
+        // tracking individual paths stops being worth it and `NotifyWakeup` falls back to `All`.
+        let mut wakeup = NotifyWakeup::default();
+        let many_paths =
+            (0..=NOTIFY_WAKEUP_PATH_LIMIT).map(|i| PathBuf::from(format!("/var/log/{i}.log")));
+        wakeup.add_paths(many_paths);
+
+        assert!(matches!(wakeup, NotifyWakeup::All));
+        assert!(wakeup.names(&PathBuf::from("/var/log/anything-else.log")));
+    }
+
+    #[test]
+    fn notify_wakeup_take_resets_to_none() {
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([PathBuf::from("/var/log/a.log")]);
+
+        let taken = wakeup.take();
+        assert!(taken.is_pending());
+        assert!(
+            !wakeup.is_pending(),
+            "take() must reset the original to None"
+        );
+    }
+
+    #[test]
+    fn idle_unfindable_watcher_survives_one_discovery_interval() {
+        // Regression test for a bug found in review: an `Idle` watcher whose file's rename target
+        // isn't fingerprint-matched back to it in the very same `discover()` pass that saw it
+        // disappear (a slow/partial rename, or a notify event that simply hasn't been delivered
+        // yet) must still get a chance to be rediscovered on a later pass, rather than having its
+        // checkpoint dropped on the very first pass that finds it unfindable.
+        let discovery_interval = Duration::from_secs(5);
+        let rotate_wait = Duration::from_secs(3600);
+
+        assert!(
+            !should_reap_unfindable_watcher(
+                true,
+                Duration::from_millis(1),
+                discovery_interval,
+                rotate_wait,
+            ),
+            "an idle watcher must not be reaped the instant it's first seen unfindable"
+        );
+        assert!(
+            !should_reap_unfindable_watcher(
+                true,
+                discovery_interval - Duration::from_millis(1),
+                discovery_interval,
+                rotate_wait,
+            ),
+            "an idle watcher must survive at least one full discovery interval unfindable"
+        );
+        assert!(
+            should_reap_unfindable_watcher(
+                true,
+                discovery_interval + Duration::from_millis(1),
+                discovery_interval,
+                rotate_wait,
+            ),
+            "an idle watcher must be reaped once it's been unfindable longer than a discovery \
+             interval, rather than waiting out the (possibly effectively-infinite) rotate_wait"
+        );
+    }
+
+    #[test]
+    fn active_unfindable_watcher_keeps_its_rotate_wait_grace_period() {
+        // The pre-existing behavior for `Active` watchers (which keep getting read, and on EOF
+        // marked dead, every cycle regardless of this check) must be unchanged: only `rotate_wait`
+        // governs reaping for them, not `discovery_interval`.
+        let discovery_interval = Duration::from_secs(5);
+        let rotate_wait = Duration::from_secs(3600);
+
+        assert!(
+            !should_reap_unfindable_watcher(
+                false,
+                discovery_interval + Duration::from_secs(1),
+                discovery_interval,
+                rotate_wait,
+            ),
+            "an active watcher must not be reaped just because a discovery interval elapsed"
+        );
+        assert!(
+            should_reap_unfindable_watcher(
+                false,
+                rotate_wait + Duration::from_millis(1),
+                discovery_interval,
+                rotate_wait,
+            ),
+            "an active watcher must still be reaped once rotate_wait elapses"
+        );
+    }
+
+    #[test]
+    fn absolutize_leaves_absolute_paths_unchanged() {
+        let cwd = PathBuf::from("/home/user/project");
+        let absolute = PathBuf::from("/var/log/app.log");
+        assert_eq!(
+            absolutize_for_notify_comparison(&absolute, Some(&cwd)),
+            absolute
+        );
+    }
+
+    #[test]
+    fn absolutize_joins_relative_paths_onto_cwd() {
+        // Regression test for a bug found in review: `notify` always resolves the path it's
+        // asked to `watch()` to an absolute one internally (via the current working directory)
+        // before using it in the events it reports, but `Glob::paths()` (paths_provider.rs) can
+        // yield a relative path unchanged when the configured `include` pattern is itself
+        // relative (e.g. `include: ["logs/*.log"]`). Comparing such a relative path directly
+        // against notify's absolute event path -- as `NotifyWakeup::names` used to do -- would
+        // never match, silently defeating `mark_ready_to_read`'s nudge for every file matched by
+        // a relative `include` pattern, delaying their reads until the next backoff/backstop tick
+        // instead of the promised prompt notify wakeup.
+        let cwd = PathBuf::from("/home/user/project");
+        let relative = PathBuf::from("logs/app.log");
+        assert_eq!(
+            absolutize_for_notify_comparison(&relative, Some(&cwd)),
+            PathBuf::from("/home/user/project/logs/app.log")
+        );
+    }
+
+    #[test]
+    fn absolutize_falls_back_to_the_relative_path_when_cwd_is_unknown() {
+        // If `std::env::current_dir()` itself failed, there's no well-defined way to absolutize;
+        // returning the path unchanged merely reproduces the pre-fix "doesn't match" degradation
+        // (nudge doesn't fire, `should_read`'s own timers and the periodic backstop still apply)
+        // rather than introducing a new failure mode (e.g. panicking).
+        let relative = PathBuf::from("logs/app.log");
+        assert_eq!(absolutize_for_notify_comparison(&relative, None), relative);
+    }
+
+    #[test]
+    fn notify_wakeup_matches_relative_include_path_once_absolutized() {
+        // End-to-end regression test for the same bug covered by `absolutize_joins_relative_paths_onto_cwd`,
+        // exercised through the exact `NotifyWakeup` API `discover` calls: a notify event names an
+        // absolute path (as `notify` always reports), while the glob-discovered path for the same
+        // file is relative (as `Glob::paths()` yields for a relative `include` pattern). Without
+        // absolutizing the glob path first, `names()` would report `false` even though both sides
+        // refer to the same file.
+        let cwd = PathBuf::from("/home/user/project");
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([PathBuf::from("/home/user/project/logs/app.log")]);
+
+        let glob_discovered_path = PathBuf::from("logs/app.log");
+        assert!(
+            !wakeup.names(&glob_discovered_path),
+            "sanity check: comparing the raw relative path against the absolute notify path \
+             must not match"
+        );
+
+        let absolutized = absolutize_for_notify_comparison(&glob_discovered_path, Some(&cwd));
+        assert!(
+            wakeup.names(&absolutized),
+            "after absolutizing the glob-discovered relative path the same way notify resolves \
+             its own watch paths, it must match the notify-reported absolute path"
+        );
+    }
 }

@@ -71,12 +71,13 @@ enum WatcherState {
         /// has been written to (or truncated) since we last looked, without
         /// opening it.
         last_known_mtime: Option<SystemTime>,
-        /// When this watcher most recently transitioned into (or was
-        /// confirmed to remain in, i.e. no change detected on a
-        /// `check_for_new_data` poll) the `Idle` state. Used by `FileServer`
-        /// to drive `remove_after`-style grace-period cleanup for idle files,
-        /// since idle watchers never perform reads and so can't rely on
-        /// "time since last successful read" the way `Active` watchers do.
+        /// The time from which this watcher's current idle streak should be measured: either the
+        /// last successful read before `deactivate` closed the handle (not the later moment
+        /// `deactivate` itself ran, which would double-count `idle_timeout`), or the time
+        /// `check_for_new_data` most recently observed a change while already `Idle`. Used by
+        /// `FileServer` to drive `remove_after`-style grace-period cleanup for idle files, since
+        /// idle watchers never perform reads and so can't rely on "time since last successful
+        /// read" the way `Active` watchers do.
         idle_since: Instant,
         /// Set once `check_for_new_data` ever observes the file shrink while `Idle`, and never
         /// cleared until the next `deactivate()` starts a fresh `Idle` period. `reactivate`'s own
@@ -129,6 +130,21 @@ pub struct FileWatcher {
     /// correct, safe behavior: it forces a fresh open rather than risking a
     /// stale-offset read against the wrong file.
     identity: Option<(u64, u64)>,
+    /// Whether the current gzip stream (if any) was deliberately left unread, rather than being
+    /// positioned wherever it is because we've actually decoded up to that point. Distinct from
+    /// "`file_position == 0`," which is ambiguous: `0` also means "haven't decoded anything yet
+    /// because we're about to start at the beginning," a completely different situation this flag
+    /// exists so `reactivate` can tell apart. Set whenever `FileWatcher::new`/`reactivate`/
+    /// `update_path` choose a null reader over the real gzip decoder (an already-compressed file
+    /// with `read_from: end`, or with `read_from: checkpoint` pointing at a non-zero -- and thus
+    /// unresumable -- gzip byte offset); cleared whenever they instead install a real decoder.
+    /// Without this, an idle gzip watcher skipped via `read_from: end` (file position ends up `0`,
+    /// same as "start of file") gets misread on reactivation as "never started decoding, so start
+    /// decoding from the beginning," installing a real decoder and emitting the entire backlog
+    /// that `read_from: end` was supposed to skip -- even though nothing about a mere mtime bump
+    /// means the file is safe to resume decoding (gzip streams can't be resumed from an arbitrary
+    /// point anyway, which is exactly why this was skipped in the first place).
+    gzip_read_skipped: bool,
     is_dead: bool,
     last_seen: Instant,
     max_line_bytes: usize,
@@ -203,6 +219,8 @@ impl FileWatcher {
                     // idle->active transition, or by `update_path` on a
                     // rename) will populate it.
                     identity: None,
+                    // Confirmed non-gzip by `gzip_check` above.
+                    gzip_read_skipped: false,
                     is_dead: false,
                     last_seen: Instant::now(),
                     max_line_bytes,
@@ -231,54 +249,59 @@ impl FileWatcher {
         let gzipped = is_gzipped(&mut reader).await?;
 
         // Determine the actual position at which we should start reading
-        let (reader, file_position): (Box<dyn AsyncBufRead + Send + Unpin>, FilePosition) =
-            match (gzipped, too_old, read_from) {
-                (true, true, _) => {
-                    debug!(
-                        message = "Not reading gzipped file older than `ignore_older`.",
-                        ?path,
-                    );
-                    (Box::new(null_reader()), 0)
-                }
-                (true, _, ReadFrom::Checkpoint(file_position)) => {
-                    debug!(
-                        message = "Not re-reading gzipped file with existing stored offset.",
-                        ?path,
-                        %file_position
-                    );
-                    (Box::new(null_reader()), file_position)
-                }
-                // TODO: This may become the default, leading us to stop reading gzipped files that
-                // we were reading before. Should we merge this and the next branch to read
-                // compressed file from the beginning even when `read_from = "end"` (implicitly via
-                // default or explicitly via config)?
-                (true, _, ReadFrom::End) => {
-                    debug!(
-                        message = "Can't read from the end of already-compressed file.",
-                        ?path,
-                    );
-                    (Box::new(null_reader()), 0)
-                }
-                (true, false, ReadFrom::Beginning) => {
-                    (Box::new(BufReader::new(gzip_multiple_decoder(reader))), 0)
-                }
-                (false, true, _) => {
-                    let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
-                    (Box::new(reader), pos)
-                }
-                (false, false, ReadFrom::Checkpoint(file_position)) => {
-                    let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
-                    (Box::new(reader), pos)
-                }
-                (false, false, ReadFrom::Beginning) => {
-                    let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
-                    (Box::new(reader), pos)
-                }
-                (false, false, ReadFrom::End) => {
-                    let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
-                    (Box::new(reader), pos)
-                }
-            };
+        let (reader, file_position, gzip_read_skipped): (
+            Box<dyn AsyncBufRead + Send + Unpin>,
+            FilePosition,
+            bool,
+        ) = match (gzipped, too_old, read_from) {
+            (true, true, _) => {
+                debug!(
+                    message = "Not reading gzipped file older than `ignore_older`.",
+                    ?path,
+                );
+                (Box::new(null_reader()), 0, true)
+            }
+            (true, _, ReadFrom::Checkpoint(file_position)) => {
+                debug!(
+                    message = "Not re-reading gzipped file with existing stored offset.",
+                    ?path,
+                    %file_position
+                );
+                (Box::new(null_reader()), file_position, true)
+            }
+            // TODO: This may become the default, leading us to stop reading gzipped files that
+            // we were reading before. Should we merge this and the next branch to read
+            // compressed file from the beginning even when `read_from = "end"` (implicitly via
+            // default or explicitly via config)?
+            (true, _, ReadFrom::End) => {
+                debug!(
+                    message = "Can't read from the end of already-compressed file.",
+                    ?path,
+                );
+                (Box::new(null_reader()), 0, true)
+            }
+            (true, false, ReadFrom::Beginning) => (
+                Box::new(BufReader::new(gzip_multiple_decoder(reader))),
+                0,
+                false,
+            ),
+            (false, true, _) => {
+                let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
+                (Box::new(reader), pos, false)
+            }
+            (false, false, ReadFrom::Checkpoint(file_position)) => {
+                let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
+                (Box::new(reader), pos, false)
+            }
+            (false, false, ReadFrom::Beginning) => {
+                let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
+                (Box::new(reader), pos, false)
+            }
+            (false, false, ReadFrom::End) => {
+                let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
+                (Box::new(reader), pos, false)
+            }
+        };
 
         let ts = metadata
             .modified()
@@ -300,6 +323,7 @@ impl FileWatcher {
             },
             file_position,
             identity: Some((devno, ino)),
+            gzip_read_skipped,
             is_dead: false,
             last_seen: ts,
             max_line_bytes,
@@ -336,11 +360,14 @@ impl FileWatcher {
             let gzipped = is_gzipped(&mut reader).await?;
             let new_reader: Box<dyn AsyncBufRead + Send + Unpin> = if gzipped {
                 if self.file_position != 0 {
+                    self.gzip_read_skipped = true;
                     Box::new(null_reader())
                 } else {
+                    self.gzip_read_skipped = false;
                     Box::new(BufReader::new(gzip_multiple_decoder(reader)))
                 }
             } else {
+                self.gzip_read_skipped = false;
                 reader.seek(io::SeekFrom::Start(self.file_position)).await?;
                 Box::new(reader)
             };
@@ -609,6 +636,11 @@ impl FileWatcher {
                 path = ?self.path,
             );
             self.file_position = 0;
+            // A different file is now at this path: whatever was true of the old file's gzip
+            // stream (skipped or not) says nothing about this one, which we haven't looked at
+            // yet. Clear the flag so the check below falls through to installing a real decoder,
+            // the same as `FileWatcher::new` would for a freshly-discovered gzip file.
+            self.gzip_read_skipped = false;
         } else if truncated_while_idle || truncated_at_reactivation {
             debug!(
                 message = "Idle watcher's file was truncated in place while idle (same \
@@ -617,28 +649,44 @@ impl FileWatcher {
                 path = ?self.path,
             );
             self.file_position = 0;
+            // Same reasoning as the identity-changed case above: the truncated content
+            // invalidates whatever "skipped" state applied to the pre-truncation stream.
+            self.gzip_read_skipped = false;
         }
 
         let mut reader = BufReader::new(f);
         let gzipped = is_gzipped(&mut reader).await?;
 
-        let (reader, file_position): (Box<dyn AsyncBufRead + Send + Unpin>, FilePosition) =
-            if gzipped {
-                if self.file_position != 0 {
-                    // We can't resume a gzip stream from an arbitrary byte
-                    // offset; behave like the "already read, ignore" case
-                    // that `FileWatcher::new` uses for gzip + checkpoint.
-                    (Box::new(null_reader()), self.file_position)
-                } else {
-                    (Box::new(BufReader::new(gzip_multiple_decoder(reader))), 0)
-                }
+        let (reader, file_position, gzip_read_skipped): (
+            Box<dyn AsyncBufRead + Send + Unpin>,
+            FilePosition,
+            bool,
+        ) = if gzipped {
+            if self.gzip_read_skipped || self.file_position != 0 {
+                // Either this gzip stream was deliberately left unread (e.g. `read_from: end`
+                // skipped it entirely, leaving `file_position` at `0`) rather than actually
+                // decoded up to `file_position` -- a mtime/size change alone doesn't make it safe
+                // to resume, since gzip streams can't be resumed from an arbitrary offset
+                // regardless, which is exactly why this was skipped in the first place -- or
+                // `file_position` is genuinely non-zero, which is the pre-existing "can't resume
+                // a gzip stream from an arbitrary byte offset" case. Either way, behave like the
+                // "already read, ignore" case `FileWatcher::new` uses for gzip + checkpoint.
+                (Box::new(null_reader()), self.file_position, true)
             } else {
-                let pos = reader
-                    .seek(SeekFrom::Start(self.file_position))
-                    .await
-                    .unwrap_or(self.file_position);
-                (Box::new(reader), pos)
-            };
+                (
+                    Box::new(BufReader::new(gzip_multiple_decoder(reader))),
+                    0,
+                    false,
+                )
+            }
+        } else {
+            let pos = reader
+                .seek(SeekFrom::Start(self.file_position))
+                .await
+                .unwrap_or(self.file_position);
+            (Box::new(reader), pos, false)
+        };
+        self.gzip_read_skipped = gzip_read_skipped;
 
         self.file_position = file_position;
         self.state = WatcherState::Active {
@@ -662,9 +710,22 @@ impl FileWatcher {
     /// Transition an `Active` watcher to `Idle`, closing its file handle.
     /// No-op if already `Idle`.
     pub async fn deactivate(&mut self) {
-        let WatcherState::Active { buf, .. } = &self.state else {
+        let WatcherState::Active {
+            buf,
+            last_read_success,
+            ..
+        } = &self.state
+        else {
             return;
         };
+        // Preserve the time of the last successful read (i.e. last-observed activity), not
+        // "now" (the moment of deactivation): `FileServer` only calls `deactivate` once a watcher
+        // has already been sitting EOF'd and quiet for `idle_timeout`, so by the time we get here
+        // `last_read_success` is already well in the past. Stamping `idle_since` with `Instant::now()`
+        // instead would silently add another `idle_timeout`'s worth of delay on top of the
+        // documented `remove_after`-since-EOF grace period every time `remove_after_secs` exceeds
+        // `idle_timeout_secs`.
+        let idle_since = *last_read_success;
 
         // `buf` holds bytes already consumed from the reader (and counted
         // into `file_position`) for a line that hasn't seen its delimiter
@@ -710,7 +771,7 @@ impl FileWatcher {
         self.state = WatcherState::Idle {
             last_known_size,
             last_known_mtime,
-            idle_since: Instant::now(),
+            idle_since,
             // A fresh Idle period starts here: `file_position` above already reflects the
             // buffered-but-unterminated-line rewind (if any), which is a correction to where we
             // resume reading, not evidence the file itself was truncated on disk. There's nothing
@@ -873,6 +934,37 @@ impl FileWatcher {
                 last_read_success, ..
             } => *last_read_success,
             WatcherState::Idle { .. } => Instant::now(),
+        }
+    }
+
+    /// Clear any backoff/throttle state so the very next `should_read` check returns `true`
+    /// (unless the watcher is `Idle`, which this is a no-op for). Call this when an external
+    /// signal (a notify filesystem event naming this watcher's path) indicates new data may be
+    /// available, so `should_read`'s EOF backoff and quiet-file throttle -- both of which exist to
+    /// pace *unprompted* polling -- don't delay a read that a concrete signal just justified.
+    ///
+    /// Without this, a notify event arriving for a watcher that: (a) is mid-EOF-backoff (up to
+    /// `EOF_READ_BACKOFF_MAX` = 250ms stale), or (b) has been quiet for over 10 seconds and was
+    /// merely polled (not necessarily successfully) within the last 10 seconds -- the "throttle
+    /// further attempts to once per 10s" branch of `should_read` -- would still have its read
+    /// suppressed until that independent timer elapsed on its own, defeating notify mode's promise
+    /// of prompt wakeups for however long is left on it.
+    #[inline]
+    pub fn mark_ready_to_read(&mut self) {
+        if let WatcherState::Active {
+            reached_eof,
+            last_read_attempt,
+            read_retry_delay,
+            ..
+        } = &mut self.state
+        {
+            *reached_eof = false;
+            *read_retry_delay = EOF_READ_BACKOFF_MIN;
+            // Back-date rather than leaving as-is: `should_read`'s quiet-file throttle requires
+            // `last_read_attempt.elapsed() > 10s` as one of its two ways to pass, so simply
+            // clearing `reached_eof` isn't sufficient on its own to guarantee the very next check
+            // passes.
+            *last_read_attempt = Instant::now() - Duration::from_secs(11);
         }
     }
 

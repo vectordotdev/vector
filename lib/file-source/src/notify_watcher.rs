@@ -34,6 +34,12 @@
 //! non-recursively. This mirrors, approximately, how far the glob can "reach" beneath the
 //! literal prefix.
 //!
+//! If that literal prefix doesn't exist on disk yet (e.g. `/var/log/newapp/*.log` before
+//! `newapp` has been created), it can't be `watch()`-ed directly; [`NotifyDiscovery`] instead
+//! watches the nearest existing ancestor recursively as a stand-in, so the prefix directory's
+//! eventual creation is still observed promptly. Once it exists, the next `resync_watches` call
+//! upgrades to watching it directly and drops the broader ancestor watch.
+//!
 //! # Bridging into async/tokio
 //!
 //! `notify`'s watcher delivers events via a synchronous callback, invoked on a thread owned by
@@ -88,6 +94,13 @@ pub enum NotifyMessage {
 pub struct NotifyDiscovery {
     watcher: RecommendedWatcher,
     watched_dirs: WantedDirs,
+    /// For a wanted directory that doesn't exist yet (so it can't be `watch()`-ed directly),
+    /// tracks the nearest existing ancestor we're watching recursively instead, keyed by the
+    /// *wanted* directory. `resync_watches` uses this to notice once the wanted directory has
+    /// been created and upgrade to watching it directly (dropping the broader, more expensive
+    /// ancestor watch) rather than watching the ancestor forever. See `resync_watches` for
+    /// details.
+    fallback_watches: HashMap<PathBuf, PathBuf>,
     receiver: mpsc::UnboundedReceiver<NotifyMessage>,
 }
 
@@ -133,6 +146,7 @@ impl NotifyDiscovery {
         let mut discovery = Self {
             watcher,
             watched_dirs: WantedDirs::new(),
+            fallback_watches: HashMap::new(),
             receiver,
         };
         discovery.resync_watches(include_patterns, emitter);
@@ -143,6 +157,14 @@ impl NotifyDiscovery {
     /// add/remove watches to match. Cheap to call repeatedly (e.g. from the periodic
     /// reconciliation pass), since it diffs against the currently-watched set rather than
     /// tearing everything down.
+    ///
+    /// If a wanted directory doesn't exist yet (e.g. an `include` pattern like
+    /// `/var/log/newapp/*.log` where `newapp` hasn't been created yet), `watch()`-ing it directly
+    /// fails; this falls back to recursively watching the nearest existing ancestor instead, so
+    /// that creating the wanted directory (and anything under it) is still noticed promptly
+    /// rather than only on the next `reconcile_interval` backstop. Once the wanted directory
+    /// exists, a later call upgrades to watching it directly and drops the broader ancestor watch
+    /// (unless some other wanted directory still needs that same ancestor as its own fallback).
     pub fn resync_watches<E: FileSourceInternalEvents>(
         &mut self,
         include_patterns: &[PathBuf],
@@ -156,7 +178,28 @@ impl NotifyDiscovery {
         // different mode replaces the previous registration in `notify`, it doesn't stack, so
         // there's no need to `unwatch` first.
         for (path, mode) in &wanted {
-            if self.watched_dirs.get(path) == Some(mode) {
+            // If some other not-yet-existing wanted directory already depends on `path` as its
+            // fallback ancestor (necessarily `Recursive`: see `watch_fallback_ancestor`), that
+            // requirement must be merged in here too. Without this, a directory that is *both* a
+            // directly-wanted `NonRecursive` directory *and* someone else's fallback ancestor
+            // could have its watch silently downgraded to `NonRecursive` below -- depending on
+            // this `HashMap`'s unspecified iteration order, `path` may be processed only after
+            // `watch_fallback_ancestor` already installed the `Recursive` watch it needs, and
+            // `self.watched_dirs.get(path) == Some(mode)` (comparing directly against the plain
+            // `NonRecursive` `wanted` for this path) would then be `false`, causing a re-`watch`
+            // that replaces the existing `Recursive` registration with a weaker `NonRecursive`
+            // one. That leaves creation of files nested under `path` unnoticed until the next
+            // `reconcile_interval` backstop, defeating the very purpose of the fallback watch.
+            let mode = if self
+                .fallback_watches
+                .values()
+                .any(|fallback_ancestor| fallback_ancestor == path)
+            {
+                mode.merge(WatchMode::Recursive)
+            } else {
+                *mode
+            };
+            if self.watched_dirs.get(path) == Some(&mode) {
                 continue;
             }
             match self.watcher.watch(path, mode.mode()) {
@@ -167,17 +210,51 @@ impl NotifyDiscovery {
                     // reconciliation pass) will see it as still "wanted but not yet watched" and
                     // retry, rather than wrongly concluding the watch is already in place and
                     // never trying again.
-                    self.watched_dirs.insert(path.clone(), *mode);
+                    self.watched_dirs.insert(path.clone(), mode);
+                    // The real directory is now watched directly; drop any record of it having
+                    // depended on a fallback ancestor. The ancestor's own watch, if now unused,
+                    // is cleaned up below.
+                    self.fallback_watches.remove(path);
                 }
                 Err(error) => {
-                    warn!(message = "Failed to watch directory.", path = ?path, %error);
-                    emitter
-                        .emit_file_watch_backend_error(&std::io::Error::other(error.to_string()));
+                    // Always try the ancestor fallback on any `watch` failure, rather than first
+                    // branching on `path.is_dir()` to decide whether the directory "doesn't exist
+                    // yet" (fallback) versus "exists but couldn't be watched" (no fallback, e.g. a
+                    // permissions problem or platform resource limit): checking `is_dir()` only
+                    // *after* `watch` has already failed is a TOCTOU race -- if the directory is
+                    // created in the gap between the two calls, `is_dir()` now reports `true` for
+                    // what was, at `watch`-time, a missing directory, wrongly skipping the fallback
+                    // that would otherwise have watched its (now-populated) parent. Attempting the
+                    // fallback unconditionally is safe either way: if the directory does exist and
+                    // the failure is permanent (permissions, resource limits), watching its parent
+                    // recursively still lets us notice changes to it (a recursive watch on a
+                    // directory observes events inside its children too, so this isn't a no-op),
+                    // it's simply broader/more expensive than directly watching `path`. That's a
+                    // strictly better outcome than reporting the error and doing nothing further
+                    // until the next `reconcile_interval` backstop.
+                    match find_existing_ancestor(path) {
+                        Some(ancestor) => self.watch_fallback_ancestor(path, ancestor, emitter),
+                        None => {
+                            warn!(message = "Failed to watch directory.", path = ?path, %error);
+                            emitter.emit_file_watch_backend_error(&std::io::Error::other(
+                                error.to_string(),
+                            ));
+                        }
+                    }
                 }
             }
         }
+
+        self.fallback_watches
+            .retain(|path, _ancestor| wanted.contains_key(path));
+        // A directory stays watched if it's directly wanted, or if some still-wanted directory
+        // depends on it as its fallback ancestor; anything else (no longer wanted, or a fallback
+        // ancestor whose dependent either got its own direct watch or was dropped above) is
+        // unwatched and forgotten.
+        let ancestors_in_use: std::collections::HashSet<&PathBuf> =
+            self.fallback_watches.values().collect();
         self.watched_dirs.retain(|path, _mode| {
-            if wanted.contains_key(path) {
+            if wanted.contains_key(path) || ancestors_in_use.contains(path) {
                 return true;
             }
             // Best-effort: if the directory is already gone, unwatch will simply error, which we
@@ -187,6 +264,41 @@ impl NotifyDiscovery {
         });
 
         emitter.emit_file_watch_directories(self.watched_dirs.len());
+    }
+
+    /// Watch `ancestor` (recursively, so creation of `wanted` underneath it is observed) as a
+    /// stand-in for the not-yet-existing `wanted` directory, recording the substitution in
+    /// `fallback_watches` so a later `resync_watches` call can detect once `wanted` exists and
+    /// upgrade to watching it directly.
+    fn watch_fallback_ancestor<E: FileSourceInternalEvents>(
+        &mut self,
+        wanted: &Path,
+        ancestor: PathBuf,
+        emitter: &E,
+    ) {
+        if self.watched_dirs.get(&ancestor) == Some(&WatchMode::Recursive) {
+            // Some other wanted directory already caused us to watch this same ancestor
+            // recursively; nothing more to do beyond recording that this wanted directory now
+            // also depends on it.
+            self.fallback_watches.insert(wanted.to_path_buf(), ancestor);
+            return;
+        }
+        match self.watcher.watch(&ancestor, RecursiveMode::Recursive) {
+            Ok(()) => {
+                debug!(
+                    message = "Configured directory does not exist yet; watching nearest existing ancestor instead.",
+                    wanted = ?wanted,
+                    ancestor = ?ancestor,
+                );
+                self.watched_dirs
+                    .insert(ancestor.clone(), WatchMode::Recursive);
+                self.fallback_watches.insert(wanted.to_path_buf(), ancestor);
+            }
+            Err(error) => {
+                warn!(message = "Failed to watch directory.", path = ?ancestor, %error);
+                emitter.emit_file_watch_backend_error(&std::io::Error::other(error.to_string()));
+            }
+        }
     }
 
     /// Await the next batch of filesystem events.
@@ -211,6 +323,30 @@ impl NotifyDiscovery {
     /// simple, safe choice here.
     pub fn forget_watches(&mut self) {
         self.watched_dirs.clear();
+    }
+
+    /// Forget bookkeeping for a single watched directory, without touching the underlying OS-level
+    /// watcher, so the next `resync_watches` call re-`watch`es it if it's still (or again) wanted.
+    ///
+    /// Call this when a [`NotifyMessage::PathsRemoved`] reports the removal of a path that is
+    /// itself one of our watched directories (as opposed to a file inside one). On Linux/inotify,
+    /// removing a watched directory invalidates the kernel-side watch on that inode; if the
+    /// directory is later recreated (e.g. an application that removes and recreates its log
+    /// directory, or `logrotate`-style directory rotation), `notify` has no watch left to fire
+    /// events from, but `resync_watches`'s "only `watch()` a path we don't already believe is
+    /// watched" check still sees this directory in `watched_dirs` (removal doesn't change
+    /// `include_patterns`, so the "wanted" set is unchanged) and skips re-`watch`-ing it forever.
+    /// Without this, such a directory falls back to being noticed only by the much-less-frequent
+    /// backstop reconciliation, same as a lost `BackendError`-reported watch.
+    pub fn forget_watch(&mut self, path: &Path) {
+        self.watched_dirs.remove(path);
+    }
+
+    /// Whether `path` is currently believed to be a watched directory (as opposed to, say, a file
+    /// inside one). Used to decide whether a [`NotifyMessage::PathsRemoved`] path warrants
+    /// `forget_watch`.
+    pub fn is_watched_dir(&self, path: &Path) -> bool {
+        self.watched_dirs.contains_key(path)
     }
 }
 
@@ -238,6 +374,16 @@ impl WatchMode {
             WatchMode::NonRecursive
         }
     }
+}
+
+/// Walk up from `path` to find the nearest ancestor directory that currently exists on disk.
+/// Returns `None` only if no ancestor exists at all (e.g. even the filesystem root couldn't be
+/// stat-ed, which in practice shouldn't happen).
+fn find_existing_ancestor(path: &Path) -> Option<PathBuf> {
+    path.ancestors()
+        .skip(1)
+        .find(|ancestor| ancestor.is_dir())
+        .map(Path::to_path_buf)
 }
 
 /// A directory to `WatchMode` mapping. A `HashMap` keyed on the path alone -- not a set of
@@ -595,6 +741,117 @@ mod tests {
         assert_eq!(
             discovery.watched_dirs.get(dir.path()),
             Some(&WatchMode::NonRecursive)
+        );
+    }
+
+    #[test]
+    fn forget_watch_makes_resync_re_watch_one_directory() {
+        // Regression test for a bug found in review: removing a watched *directory* on
+        // Linux/inotify invalidates the watch on that inode, but a `PathsRemoved` notification for
+        // it used to be handled the same as any other path event (just triggering a reconciliation
+        // pass), leaving the directory recorded in `watched_dirs`. `resync_watches`'s "only
+        // `watch()` a directory we don't already believe is watched" check would then skip
+        // re-`watch`-ing it even after it was recreated, permanently falling back to the
+        // much-less-frequent backstop reconciliation for that directory.
+        let dir = tempfile::tempdir().unwrap();
+        let pattern = dir.path().join("*.log");
+        let mut discovery =
+            NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter).unwrap();
+
+        assert!(discovery.is_watched_dir(dir.path()));
+
+        discovery.forget_watch(dir.path());
+        assert!(
+            !discovery.is_watched_dir(dir.path()),
+            "forget_watch must remove just this directory's bookkeeping"
+        );
+
+        discovery.resync_watches(&[pattern], &NoopEmitter);
+        assert!(
+            discovery.is_watched_dir(dir.path()),
+            "resync_watches must re-establish the watch after it was forgotten"
+        );
+    }
+
+    #[test]
+    fn missing_root_falls_back_to_watching_existing_ancestor() {
+        // Regression test for a bug found in review: if the literal prefix of an `include`
+        // pattern doesn't exist yet at startup (e.g. `/var/log/newapp/*.log` before `newapp` has
+        // been created), `watch()`-ing it directly fails and, prior to this fix, nothing was
+        // watched at all for that pattern -- its creation would only be noticed on the next
+        // `reconcile_interval` backstop tick (potentially minutes away), rather than promptly via
+        // a notify event.
+        let root = tempfile::tempdir().unwrap();
+        let missing_dir = root.path().join("newapp");
+        let pattern = missing_dir.join("*.log");
+        let mut discovery =
+            NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter).unwrap();
+
+        assert!(
+            !discovery.is_watched_dir(&missing_dir),
+            "the not-yet-existing directory itself should not be directly watched"
+        );
+        assert_eq!(
+            discovery.watched_dirs.get(root.path()),
+            Some(&WatchMode::Recursive),
+            "the nearest existing ancestor should be watched recursively as a stand-in"
+        );
+
+        // Once the directory is created, the next resync should upgrade to watching it directly
+        // and drop the broader ancestor watch.
+        std::fs::create_dir(&missing_dir).unwrap();
+        discovery.resync_watches(&[pattern], &NoopEmitter);
+        assert_eq!(
+            discovery.watched_dirs.get(&missing_dir),
+            Some(&WatchMode::NonRecursive),
+            "resync_watches must upgrade to watching the now-existing directory directly"
+        );
+        assert!(
+            !discovery.is_watched_dir(root.path()),
+            "the fallback ancestor watch should be dropped once no longer needed"
+        );
+    }
+
+    #[test]
+    fn fallback_ancestor_that_is_also_directly_wanted_stays_recursive() {
+        // Regression test for a bug found in review: `root` is both (a) a fallback ancestor for
+        // `missing_dir`, which doesn't exist yet and needs `root` watched `Recursive` so its
+        // eventual creation is noticed, and (b) itself a directly-wanted directory from a second,
+        // unrelated `include` pattern that on its own would only need `NonRecursive`.
+        // `HashMap`'s unspecified iteration order means the main loop in `resync_watches` could
+        // process `root` (as the plain `NonRecursive`-wanted directory) either before or after
+        // `missing_dir` triggers the `Recursive` fallback watch on it. Before this fix, whichever
+        // order put the direct `NonRecursive` `watch()` call *last* would silently downgrade
+        // `root`'s registration from `Recursive` to `NonRecursive`, since the "already watched
+        // under the wanted mode" skip-check compared only against the plain per-pattern mode, not
+        // the merged requirement. That leaves file creation nested under `root` (which is what the
+        // `missing_dir` fallback exists to observe) unnoticed until the next `reconcile_interval`
+        // backstop.
+        let root = tempfile::tempdir().unwrap();
+        let missing_dir = root.path().join("newapp");
+        let missing_pattern = missing_dir.join("*.log");
+        let direct_pattern = root.path().join("*.log");
+        let mut discovery = NotifyDiscovery::new(
+            &[missing_pattern.clone(), direct_pattern.clone()],
+            &NoopEmitter,
+        )
+        .unwrap();
+
+        assert_eq!(
+            discovery.watched_dirs.get(root.path()),
+            Some(&WatchMode::Recursive),
+            "root must stay Recursive: it's both directly wanted (NonRecursive on its own) and \
+             a fallback ancestor (Recursive) for the not-yet-existing missing_dir"
+        );
+
+        // Re-running resync_watches (e.g. the periodic backstop, with nothing on disk having
+        // changed) must not downgrade it either, regardless of `wanted`'s iteration order on this
+        // second pass.
+        discovery.resync_watches(&[missing_pattern, direct_pattern], &NoopEmitter);
+        assert_eq!(
+            discovery.watched_dirs.get(root.path()),
+            Some(&WatchMode::Recursive),
+            "root must remain Recursive across repeated resync_watches calls"
         );
     }
 }

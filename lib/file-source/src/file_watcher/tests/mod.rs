@@ -236,6 +236,7 @@ fn watcher_for_timing() -> FileWatcher {
         },
         file_position: 0,
         identity: None,
+        gzip_read_skipped: false,
         is_dead: false,
         last_seen: now,
         max_line_bytes: 1024,
@@ -290,6 +291,64 @@ fn caps_and_resets_eof_backoff() {
 
     assert_eq!(read_retry_delay(&watcher), EOF_READ_BACKOFF_MIN);
     assert!(!watcher.reached_eof());
+}
+
+#[test]
+fn mark_ready_to_read_overrides_eof_backoff() {
+    // Regression test for a bug found in review: a notify filesystem event naming an already-
+    // tracked, still-`Active` watcher's path should let it read promptly even if it's currently
+    // mid-EOF-backoff, rather than leaving it to wait out its own independent backoff timer (up
+    // to `EOF_READ_BACKOFF_MAX`) despite a concrete "something changed" signal having just
+    // arrived.
+    let mut watcher = watcher_for_timing();
+
+    watcher.track_read_attempt();
+    watcher.track_read_eof();
+    assert!(
+        !watcher.should_read(),
+        "sanity check: freshly backed off, should not read yet"
+    );
+
+    watcher.mark_ready_to_read();
+    assert!(
+        watcher.should_read(),
+        "mark_ready_to_read must override EOF backoff immediately"
+    );
+}
+
+#[test]
+fn mark_ready_to_read_overrides_quiet_file_throttle() {
+    // Regression test for a bug found in review: `should_read` throttles a *quiet* (long since
+    // successfully read) file to at most one attempt per 10 seconds, to avoid needlessly
+    // hammering `read_line` on files nobody is writing to. But that throttle is meant to pace
+    // *unprompted* polling -- it must not also delay a read that a genuine notify event, naming
+    // this exact path, just justified. Before this fix, notify mode's "prompt wakeup" promise
+    // could be defeated for up to 10 seconds by this throttle alone.
+    let mut watcher = watcher_for_timing();
+
+    // Simulate "quiet for a while, but an attempt was just made:" long past last_read_success,
+    // recent last_read_attempt -- the one combination `should_read` throttles.
+    if let WatcherState::Active {
+        last_read_success,
+        last_read_attempt,
+        ..
+    } = &mut watcher.state
+    {
+        *last_read_success = Instant::now() - std::time::Duration::from_secs(20);
+        *last_read_attempt = Instant::now();
+    } else {
+        unreachable!("watcher_for_timing() always returns an Active watcher");
+    }
+    assert!(
+        !watcher.should_read(),
+        "sanity check: quiet file, recent attempt, should be throttled"
+    );
+
+    watcher.mark_ready_to_read();
+    assert!(
+        watcher.should_read(),
+        "mark_ready_to_read must override the quiet-file throttle immediately"
+    );
 }
 
 // --- Idle-state tests -------------------------------------------------
@@ -1240,6 +1299,74 @@ async fn idle_gzip_file_detected_correctly_on_reactivation() {
             .map(|l| String::from_utf8(l.bytes.to_vec()).unwrap()),
         Some("compressed line".to_string()),
         "gzip must be transparently detected and decoded on reactivation"
+    );
+}
+
+#[tokio::test]
+async fn idle_gzip_read_from_end_stays_skipped_on_reactivation() {
+    // Regression test for a bug found in review: `read_from: end` on a gzip file installs a
+    // null reader and leaves `file_position` at `0` (the "already read, ignore" case in
+    // `FileWatcher::new`, since a gzip stream can't be resumed from an arbitrary offset and
+    // skipping to the actual end isn't possible without decoding it). If the watcher goes idle
+    // (EOF timeout) and is later reactivated by a bare mtime bump, `file_position == 0` alone is
+    // indistinguishable from "never started decoding, safe to start from the beginning" -- so
+    // without tracking that this stream was deliberately skipped, reactivation would install a
+    // real gzip decoder and emit the entire backlog `read_from: end` was supposed to skip.
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("skip_from_end.gz");
+    let gz = encode(b"backlog line that should stay skipped\n").await;
+    fs::write(&path, &gz).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::End,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_active());
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "read_from: end on a gzip file resolves to position 0 (can't seek into a gzip stream)"
+    );
+
+    // Nothing should be readable: the stream was deliberately skipped, not actually positioned
+    // at the (nonexistent, for gzip) "end".
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_none());
+
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // Simulate the file being touched (e.g. the log manager appending another compressed
+    // member, or just an mtime bump) without changing the fact that this stream was skipped.
+    let mut gz_touched = gz.clone();
+    gz_touched.extend_from_slice(&encode(b"appended after going idle\n").await);
+    fs::write(&path, &gz_touched).unwrap();
+
+    let changed = watcher.check_for_new_data().await.unwrap();
+    assert!(changed);
+    watcher.reactivate().await.expect("reactivate failed");
+    assert!(watcher.is_active());
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(
+        result.raw_line.is_none(),
+        "a gzip stream skipped via `read_from: end` must stay skipped after an idle \
+         reactivation triggered by a mere mtime/size change, not suddenly decode and emit \
+         the backlog it was supposed to skip"
     );
 }
 
