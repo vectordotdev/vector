@@ -453,6 +453,14 @@ where
             ReadFrom::Beginning
         };
 
+        // Invalidate any previous watcher's generation BEFORE reading the stored
+        // checkpoint, so a late acknowledgement from a previous file bearing this
+        // fingerprint cannot refresh the entry between here and the validation
+        // below. Acknowledgements arriving before this point are inherently
+        // indistinguishable from real progress (no new claimant exists yet); the
+        // beyond-EOF guard in `FileWatcher::new` remains the backstop for those.
+        let generation = checkpoints.begin_generation(file_id);
+
         // Always prefer the stored checkpoint unless the user has opted out.  Previously, the
         // checkpoint was only loaded for new files when Vector was started up, but the
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
@@ -517,7 +525,7 @@ where
                     }
                     _ => self.emitter.emit_file_added(&path),
                 }
-                watcher.set_generation(checkpoints.begin_generation(file_id));
+                watcher.set_generation(generation);
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);
             }
