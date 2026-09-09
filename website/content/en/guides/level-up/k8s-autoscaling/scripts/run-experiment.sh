@@ -41,6 +41,9 @@ mkdir -p "$TMPDIR_WORK"
 # instead of pattern-matching, so it doesn't disturb port-forwards started
 # by the operator or other local sessions.
 PORT_FORWARD_PIDS=()
+# Output variable for start_port_forward: the PID of the most recently
+# started port-forward, read by the caller (see measure_pods).
+PF_PID=
 trap 'rm -rf "$TMPDIR_WORK"; [[ ${#PORT_FORWARD_PIDS[@]} -gt 0 ]] && kill "${PORT_FORWARD_PIDS[@]}" 2>/dev/null || true' EXIT
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -130,12 +133,15 @@ avg_cpu_pct() {
 }
 
 # Port-forward to a single pod on a given port; blocks until the gRPC health
-# check passes. Prints the port-forward PID to stdout.
+# check passes. Records the port-forward PID in the global PF_PID variable and
+# appends it to PORT_FORWARD_PIDS so the EXIT trap can clean it up even if a
+# later step fails or is interrupted.
 start_port_forward() {
   local pod=$1 port=$2 logfile=$3
 
   kubectl port-forward -n "$NAMESPACE" "pod/$pod" "${port}:8686" > "$logfile" 2>&1 &
   local pf_pid=$!
+  PF_PID=$pf_pid
   PORT_FORWARD_PIDS+=("$pf_pid")
 
   # Wait up to 10 s for the gRPC health check to pass.
@@ -154,8 +160,6 @@ start_port_forward() {
     fi
     sleep 0.5
   done
-
-  echo "$pf_pid"
 }
 
 snapshot_pod() {
@@ -181,7 +185,8 @@ measure_pods() {
   for ((i = 0; i < n; i++)); do
     local port=$((18700 + i))
     ports+=("$port")
-    pids+=("$(start_port_forward "${pods[$i]}" "$port" "$TMPDIR_WORK/pf-${i}.log")")
+    start_port_forward "${pods[$i]}" "$port" "$TMPDIR_WORK/pf-${i}.log"
+    pids+=("$PF_PID")
   done
 
   for ((i = 0; i < n; i++)); do
@@ -255,6 +260,17 @@ run_static_phase() {
   } > "$out"
 }
 
+# Count SuccessfulRescale events for the Vector HPA. HPA reconciles roughly
+# every 15 s, so polling the replica count misses scale actions that happen
+# between samples (e.g. 1→3 in one reconcile); Kubernetes events record every
+# one. Prints the number of SuccessfulRescale events (0 if none or on error).
+hpa_rescale_events() {
+  kubectl get events -n "$NAMESPACE" \
+    --field-selector involvedObject.kind=HorizontalPodAutoscaler \
+    -o jsonpath='{range .items[*]}{.reason}{"\n"}{end}' 2>/dev/null \
+    | awk '$0 == "SuccessfulRescale" { n++ } END { print n+0 }' || true
+}
+
 run_hpa_phase() {
   local out="$TMPDIR_WORK/phase4.txt"
 
@@ -270,10 +286,15 @@ run_hpa_phase() {
     --set autoscaling.behavior.scaleDown.stabilizationWindowSeconds=60
 
   local start elapsed
-  local last_replicas=1 scale_events=0 stable_count=0 last_stable=0
+  local last_replicas=1 stable_count=0 last_stable=0
   local replicas="" cpu_avg=""
   local max_elapsed=900
+  local rescale_baseline scale_events
   start=$(date +%s)
+
+  # Baseline of HPA rescale events before we start watching, so a re-run
+  # against a cluster with leftover events doesn't double-count.
+  rescale_baseline=$(hpa_rescale_events)
 
   log "Phase 4: watching HPA (timeout ${max_elapsed}s)..."
   while true; do
@@ -300,7 +321,6 @@ run_hpa_phase() {
     fi
 
     if [[ "$replicas" != "$last_replicas" ]]; then
-      scale_events=$(( scale_events + 1 ))
       log "[${elapsed}s] SCALE ${last_replicas}→${replicas}  cpu=${cpu_avg}%"
       last_replicas=$replicas
     else
@@ -315,9 +335,18 @@ run_hpa_phase() {
     fi
 
     # Fail fast if HPA is blocked at maxReplicas with persistently high CPU.
+    # Only fire once all 8 replicas are actually Ready/available: the HPA's
+    # currentMetrics comes from healthy pods only, so newly created Pending
+    # pods would otherwise look like a stuck scale-out.
     if [[ -n "$replicas" && "$replicas" == "8" && -n "$cpu_avg" && "$cpu_avg" -gt 77 && "$stable_count" -ge 3 ]]; then
-      log "ERROR: HPA at maxReplicas=8 with ${cpu_avg}% CPU > 77% — cannot scale further; the cluster may be undersized."
-      exit 1
+      local available
+      available=$(kubectl get deployment vector -n "$NAMESPACE" \
+                   -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo 0)
+      if [[ "$available" == "8" ]]; then
+        log "ERROR: HPA at maxReplicas=8 with ${cpu_avg}% CPU > 77% — cannot scale further; the cluster may be undersized."
+        exit 1
+      fi
+      log "[${elapsed}s] HPA at maxReplicas=8 with ${cpu_avg}% CPU but only ${available:-0}/8 replicas Ready; waiting for scale-out to complete..."
     fi
 
     # Equilibrium: same replica count held for 60+ seconds. The achieved CPU
@@ -339,6 +368,11 @@ run_hpa_phase() {
   measure_pods "${pods[@]}" > "$TMPDIR_WORK/measure.txt"
   local total_mibps total_eps
   read -r total_mibps total_eps < "$TMPDIR_WORK/measure.txt"
+
+  # Count HPA rescale events (SuccessfulRescale) rather than snapshot deltas:
+  # HPA reconciles roughly every 15 s, so two reconciliations between our
+  # 15 s samples (e.g. 1→3) would otherwise be undercounted.
+  scale_events=$(( $(hpa_rescale_events) - rescale_baseline ))
 
   {
     echo "PHASE4_MIBPS=${total_mibps}"
