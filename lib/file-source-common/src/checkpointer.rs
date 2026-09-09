@@ -91,11 +91,15 @@ impl CheckpointsView {
     }
 
     /// Start a new watcher generation for this fingerprint, invalidating
-    /// updates from any previous watcher that used it.
+    /// updates from any previous watcher that used it. Taking ownership also
+    /// cancels any pending expiry: the fingerprint is live again.
     pub fn begin_generation(&self, fng: FileFingerprint) -> u64 {
         let mut entry = self.generations.entry(fng).or_insert(0);
         *entry += 1;
-        *entry
+        let generation = *entry;
+        drop(entry);
+        self.removed_times.remove(&fng);
+        generation
     }
 
     #[must_use]
