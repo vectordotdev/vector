@@ -4483,6 +4483,7 @@ dependencies = [
  "futures-util",
  "glob",
  "indexmap 2.12.0",
+ "notify",
  "quickcheck",
  "tempfile",
  "tokio",

@@ -188,6 +188,7 @@ metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
+notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
 ordered-float = { version = "5.3.0", default-features = false }
 pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
@@ -443,7 +444,7 @@ mongodb = { version = "3.7.0", default-features = false, optional = true, featur
 async-nats = { version = "0.49.0", default-features = false, optional = true, features = ["ring", "websockets", "jetstream", "nkeys"] }
 nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
-notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
+notify.workspace = true
 openssl = { version = "0.10.73", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.6", default-features = false }
 ordered-float.workspace = true

@@ -29,6 +29,17 @@ pub trait PathsProvider {
 
     /// Provides a set of paths.
     fn paths(&self) -> Self::IntoIter;
+
+    /// Provides the raw patterns (or literal roots) this provider globs/scans from, for use by
+    /// event-driven discovery (see [`crate::notify_watcher`]) to compute which directories to
+    /// watch for OS-level filesystem notifications.
+    ///
+    /// Defaults to an empty vec, meaning "no known roots" -- implementors that don't override
+    /// this simply won't participate in notify-based discovery (`FileServer` will fall back to
+    /// polling-only behavior for such providers, since it has nothing to watch).
+    fn watch_roots(&self) -> Vec<PathBuf> {
+        Vec::new()
+    }
 }
 
 /// A glob-based path provider.
@@ -73,6 +84,10 @@ impl<E: FileSourceInternalEvents> Glob<E> {
 
 impl<E: FileSourceInternalEvents> PathsProvider for Glob<E> {
     type IntoIter = Vec<PathBuf>;
+
+    fn watch_roots(&self) -> Vec<PathBuf> {
+        self.include_patterns.iter().map(PathBuf::from).collect()
+    }
 
     fn paths(&self) -> Self::IntoIter {
         self.include_patterns

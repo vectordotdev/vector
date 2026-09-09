@@ -7,7 +7,7 @@ use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
 use tokio::time::Instant;
 
-use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, null_reader};
+use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, WatcherState, null_reader};
 
 // Welcome.
 //
@@ -226,19 +226,29 @@ fn watcher_for_timing() -> FileWatcher {
     FileWatcher {
         path: PathBuf::new(),
         findable: true,
-        reader: Box::new(null_reader()),
+        state: WatcherState::Active {
+            reader: Box::new(null_reader()),
+            reached_eof: false,
+            last_read_attempt: now,
+            last_read_success: now,
+            read_retry_delay: EOF_READ_BACKOFF_MIN,
+            buf: BytesMut::new(),
+        },
         file_position: 0,
-        devno: 0,
-        inode: 0,
+        identity: None,
         is_dead: false,
-        reached_eof: false,
-        last_read_attempt: now,
-        last_read_success: now,
-        read_retry_delay: EOF_READ_BACKOFF_MIN,
         last_seen: now,
         max_line_bytes: 1024,
         line_delimiter: Bytes::from_static(b"\n"),
-        buf: BytesMut::new(),
+    }
+}
+
+fn read_retry_delay(watcher: &FileWatcher) -> std::time::Duration {
+    match &watcher.state {
+        WatcherState::Active {
+            read_retry_delay, ..
+        } => *read_retry_delay,
+        WatcherState::Idle { .. } => panic!("watcher is idle, expected active"),
     }
 }
 
@@ -249,7 +259,7 @@ fn backs_off_after_eof() {
     watcher.track_read_attempt();
     watcher.track_read_eof();
 
-    assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
+    assert_eq!(read_retry_delay(&watcher), EOF_READ_BACKOFF_MIN);
     assert!(!watcher.should_read());
 
     thread::sleep(EOF_READ_BACKOFF_MIN);
@@ -260,7 +270,7 @@ fn backs_off_after_eof() {
     watcher.track_read_eof();
 
     assert_eq!(
-        watcher.read_retry_delay,
+        read_retry_delay(&watcher),
         EOF_READ_BACKOFF_MIN.saturating_mul(2)
     );
 }
@@ -274,12 +284,963 @@ fn caps_and_resets_eof_backoff() {
         watcher.track_read_eof();
     }
 
-    assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MAX);
+    assert_eq!(read_retry_delay(&watcher), EOF_READ_BACKOFF_MAX);
 
     watcher.track_read_success();
 
-    assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
+    assert_eq!(read_retry_delay(&watcher), EOF_READ_BACKOFF_MIN);
     assert!(!watcher.reached_eof());
+}
+
+// --- Idle-state tests -------------------------------------------------
+//
+// These exercise the fix for https://github.com/vectordotdev/vector/issues/3567:
+// old, fully-read files should never get an open file handle, and
+// actively-open files that go quiet should have their handle closed and be
+// polled cheaply instead.
+
+use chrono::Utc;
+use file_source_common::ReadFrom;
+use std::fs;
+use tempfile::tempdir;
+
+/// Write a file and return an `ignore_before` timestamp that is guaranteed to
+/// postdate it -- i.e. this file counts as "too old" per `ignore_older`
+/// relative to the returned cutoff. We can't reliably backdate a freshly
+/// written file's mtime without a filesystem-timestamp-manipulation crate
+/// (not a dependency here), so instead we push `ignore_before` into the
+/// future relative to the write, which is equivalent for the purposes of the
+/// `too_old` comparison in `FileWatcher::new` (`modified_time < ignore_before`).
+fn write_file_and_ignore_before(path: &std::path::Path, contents: &[u8]) -> chrono::DateTime<Utc> {
+    fs::write(path, contents).unwrap();
+    Utc::now() + chrono::Duration::seconds(60)
+}
+
+#[tokio::test]
+async fn new_old_fully_read_file_starts_idle_without_opening() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("old.log");
+    let contents = b"line one\nline two\n";
+    let ignore_before = Some(write_file_and_ignore_before(&path, contents));
+
+    // Checkpoint position equal to the full file size: nothing new to read.
+    let checkpoint = contents.len() as u64;
+
+    let watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Checkpoint(checkpoint),
+        ignore_before,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(
+        watcher.is_idle(),
+        "old, fully-read file should start in the Idle state"
+    );
+    assert!(!watcher.is_active());
+    assert_eq!(watcher.get_file_position(), checkpoint);
+}
+
+#[tokio::test]
+async fn new_old_uncompressed_file_starts_idle_regardless_of_checkpoint() {
+    // For a *non-gzip* file, once it's deemed `too_old` (per `ignore_before`),
+    // the pre-existing open path always seeks straight to EOF regardless of
+    // any stored checkpoint -- old files are simply not read from, whether
+    // there's unread data behind a stale checkpoint or not. Because that
+    // outcome doesn't depend on the checkpoint at all, the fast (stat-only,
+    // no-open) idle path doesn't need to match against it either: it only
+    // needs to confirm the file isn't gzip (see the gzip-specific test
+    // below). So even with a checkpoint well behind the actual file size, an
+    // old non-gzip file should still start Idle without ever being opened,
+    // parked at the file's current size (== where an open would have left
+    // it).
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("old_with_new_data.log");
+    let contents = b"line one\nline two\n";
+    let ignore_before = Some(write_file_and_ignore_before(&path, contents));
+
+    // Checkpoint position well behind the actual file size.
+    let checkpoint = 5u64;
+
+    let watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Checkpoint(checkpoint),
+        ignore_before,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(
+        watcher.is_idle(),
+        "an old, non-gzip file should start idle even with a stale checkpoint, \
+         since a full open would end up at EOF regardless"
+    );
+    assert_eq!(watcher.get_file_position(), contents.len() as u64);
+}
+
+#[tokio::test]
+async fn new_old_uncompressed_file_without_checkpoint_starts_idle() {
+    // The "cold start" case: no stored checkpoint at all (e.g. first run, or
+    // `ignore_checkpoints`), just `ReadFrom::Beginning`. An old, non-gzip
+    // file should still start Idle without being opened -- this is what
+    // keeps a large `include` glob of old files cheap even when Vector has
+    // never seen them before, not just on restart with existing checkpoints.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("old_cold_start.log");
+    let contents = b"line one\nline two\n";
+    let ignore_before = Some(write_file_and_ignore_before(&path, contents));
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        ignore_before,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(
+        watcher.is_idle(),
+        "an old, non-gzip file with no checkpoint should still start idle"
+    );
+    assert_eq!(watcher.get_file_position(), contents.len() as u64);
+
+    // Regression coverage for a bug found in review: this watcher has never opened the file (it
+    // took the startup fast path, so `identity` is still `None`), which must not be confused with
+    // "the file was replaced" the first time it reactivates. Append new data and confirm
+    // reactivation resumes from where the old content ended, rather than resetting to 0 and
+    // re-sending the content `ignore_older` deliberately skipped in the first place.
+    let mut f = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .unwrap();
+    use std::io::Write as _;
+    writeln!(f, "line three").unwrap();
+    f.flush().unwrap();
+    drop(f);
+
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(changed, "growth should be detected via cheap stat");
+    watcher.reactivate().await.expect("reactivate failed");
+    assert!(watcher.is_active());
+    assert_eq!(
+        watcher.get_file_position(),
+        contents.len() as u64,
+        "the first reactivation of a never-opened idle watcher must resume from the \
+         position recorded at discovery, not reset to 0 and re-read the old, \
+         ignore_older-excluded content"
+    );
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert_eq!(
+        result
+            .raw_line
+            .map(|l| String::from_utf8(l.bytes.to_vec()).unwrap()),
+        Some("line three".to_string()),
+        "must read only the newly appended line, not re-send the old content"
+    );
+}
+
+#[tokio::test]
+async fn new_old_gzip_file_without_checkpoint_starts_active() {
+    // Gzip is the one case the fast path must not take: an old gzip file's
+    // "too old" handling starts back at position 0 (not EOF, unlike the
+    // uncompressed case), which requires actually decoding the gzip header,
+    // so it must go through the full open path.
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("old.log.gz");
+
+    let mut encoder = GzipEncoder::new(std::io::Cursor::new(b"line one\n".to_vec()));
+    let mut compressed = Vec::new();
+    encoder.read_to_end(&mut compressed).await.unwrap();
+    let ignore_before = Some(write_file_and_ignore_before(&path, &compressed));
+
+    let watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        ignore_before,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(
+        watcher.is_active(),
+        "gzip files must always go through the full open path, even when old"
+    );
+}
+
+#[tokio::test]
+async fn new_file_without_ignore_before_starts_active() {
+    // Sanity check: without `ignore_before` configured at all, nothing
+    // should ever start idle, regardless of checkpoint/size.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("recent.log");
+    let contents = b"only line\n";
+    fs::write(&path, contents).unwrap();
+
+    let watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Checkpoint(contents.len() as u64),
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(watcher.is_active());
+}
+
+#[tokio::test]
+async fn deactivate_closes_handle_and_retains_checkpoint() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("goes_idle.log");
+    fs::write(&path, b"hello\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_active());
+
+    // Read the one line so the watcher has a real position to preserve.
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_some());
+    let position_before = watcher.get_file_position();
+    assert!(position_before > 0);
+
+    watcher.deactivate().await;
+
+    assert!(
+        watcher.is_idle(),
+        "deactivate() should transition Active -> Idle"
+    );
+    assert_eq!(
+        watcher.get_file_position(),
+        position_before,
+        "checkpoint position must survive deactivation"
+    );
+}
+
+#[tokio::test]
+async fn deactivate_rewinds_past_unterminated_partial_line() {
+    // `read_until_with_max_size` advances `file_position` for every byte it
+    // reads into its buffer, delimiter or not: a partial line with no
+    // trailing delimiter yet is bytes-read-but-not-yet-emitted, tracked in
+    // the watcher's internal `buf`, waiting for a future call to complete it.
+    // If `deactivate` naively idle-izes on top of that -- discarding `buf`
+    // (it's part of the `Active` state being replaced) without rewinding
+    // `file_position` back behind those bytes -- the partial line is gone:
+    // `reactivate` would resume reading from *after* it, and since those
+    // bytes were already counted as read, they'd never be retried. The fix
+    // is for `deactivate` to rewind `file_position` by exactly `buf.len()`,
+    // so the unterminated bytes get read again from disk (along with
+    // whatever completes them) once the watcher reactivates.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("partial_line.log");
+    // No trailing newline: `partial` is the entire, unterminated content of
+    // the file at this point.
+    let partial = b"unterminated-line-no-newline-yet";
+    fs::write(&path, partial).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_active());
+
+    // Attempt a read: hits EOF with no delimiter, so nothing is emitted, but
+    // (per `read_until_with_max_size`'s contract) the bytes are still
+    // consumed from the reader and counted into `file_position`, buffered
+    // internally awaiting the delimiter.
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(
+        result.raw_line.is_none(),
+        "no delimiter yet, so nothing should be emitted"
+    );
+    assert_eq!(
+        watcher.get_file_position(),
+        partial.len() as u64,
+        "position should advance past the buffered-but-unterminated bytes"
+    );
+
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "deactivate must rewind position back behind the unterminated partial line"
+    );
+
+    // Complete the line and confirm reactivation reads the *whole* line back
+    // from disk, not just the newly-appended suffix.
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .unwrap();
+    use std::io::Write as _;
+    writeln!(file).unwrap(); // just the trailing newline
+    drop(file);
+
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("check_for_new_data error");
+    assert!(changed, "appending the delimiter should be detected");
+    watcher.reactivate().await.expect("reactivate failed");
+    assert!(watcher.is_active());
+
+    let result = watcher.read_line().await.expect("read_line error");
+    let line = result.raw_line.expect("expected a complete line now");
+    assert_eq!(
+        &line.bytes[..],
+        &partial[..],
+        "the full original line must be read back, not just the appended newline"
+    );
+}
+
+#[tokio::test]
+async fn idle_watcher_detects_new_data_and_resumes_from_correct_offset() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("resumes.log");
+    fs::write(&path, b"first\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    // Drain what's there, then go idle.
+    let result = watcher.read_line().await.expect("read_line error");
+    assert_eq!(
+        result
+            .raw_line
+            .map(|l| String::from_utf8(l.bytes.to_vec()).unwrap()),
+        Some("first".to_string())
+    );
+    let position_before = watcher.get_file_position();
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // No new data yet: check_for_new_data should report no change and the
+    // watcher should remain idle.
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(!changed);
+    assert!(watcher.is_idle());
+
+    // Now append new data while idle (no handle held).
+    use std::io::Write;
+    let mut f = fs::OpenOptions::new().append(true).open(&path).unwrap();
+    writeln!(f, "second").unwrap();
+    f.flush().unwrap();
+    drop(f);
+
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(changed, "growth should be detected via cheap stat");
+
+    watcher.reactivate().await.expect("reactivate failed");
+    assert!(watcher.is_active());
+    assert_eq!(
+        watcher.get_file_position(),
+        position_before,
+        "reactivation must seek back to the retained checkpoint"
+    );
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert_eq!(
+        result
+            .raw_line
+            .map(|l| String::from_utf8(l.bytes.to_vec()).unwrap()),
+        Some("second".to_string()),
+        "resumed read must pick up exactly the new content, not re-read old data"
+    );
+}
+
+#[tokio::test]
+async fn invalidate_idle_bookkeeping_forces_next_check_to_report_changed() {
+    // Regression test for a bug found in review: check_for_new_data unconditionally records
+    // whatever size/mtime it just observed, before the caller has decided what to do about a
+    // reported change. If the caller's subsequent reactivate() attempt then fails (e.g. a
+    // transient permission or I/O error) and the file doesn't change *again* in the meantime, a
+    // naive next poll would compare against the size/mtime already recorded from that failed
+    // attempt, see no difference, and never retry -- silently stranding the watcher Idle with
+    // unread data sitting on disk. invalidate_idle_bookkeeping exists to force the next poll to
+    // report a change (and thus retry) regardless of what it actually observes.
+    //
+    // Rather than trying to simulate a reactivate() failure via filesystem tricks (unreliable:
+    // filesystem timestamp granularity means a file swapped out and back can easily end up with a
+    // different mtime even with identical content, which would make check_for_new_data correctly
+    // report "changed" on its own, independent of whether invalidate_idle_bookkeeping does
+    // anything -- exactly the kind of test that would still pass with a no-op implementation),
+    // this tests the property directly: two consecutive check_for_new_data calls with genuinely
+    // nothing happening to the file in between. Without invalidate_idle_bookkeeping, the second
+    // call is guaranteed to report `false` (nothing changed, correctly). With it called in
+    // between, the second call must report `true` even though nothing on disk actually changed.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("flaky.log");
+    fs::write(&path, b"first\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    let _ = watcher.read_line().await.expect("read_line error");
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // Grow the file so check_for_new_data reports a change; this also records the file's current
+    // size/mtime as the watcher's new "last known" baseline -- the state that a failed
+    // reactivate() would otherwise leave stale and un-retried.
+    fs::write(&path, b"first\nsecond\n").unwrap();
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(changed, "growth should be detected via cheap stat");
+
+    // Sanity check the premise: with nothing touching the file in between, a second consecutive
+    // check must report no change (this is what a stranded-forever watcher would keep seeing).
+    let changed_again = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(
+        !changed_again,
+        "sanity check: with nothing touching the file, a second check must see no change"
+    );
+
+    // Now invalidate, still with nothing touching the file, and confirm the next check reports a
+    // change anyway -- this is the exact retry-after-a-failed-reactivate behavior being tested.
+    watcher.invalidate_idle_bookkeeping();
+    let changed_after_invalidate = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(
+        changed_after_invalidate,
+        "invalidate_idle_bookkeeping must force the next check to report a change and retry, \
+         even though nothing on disk actually changed"
+    );
+
+    // Regression coverage for a bug found in review: invalidate_idle_bookkeeping's forced retry
+    // must not be mistaken by check_for_new_data for "the file shrank." An earlier version of
+    // this achieved the forced retry by clobbering last_known_size with a u64::MAX sentinel,
+    // which any real size always compared as smaller than, wrongly latching
+    // truncated_while_idle on every retry and causing reactivate to discard the correct,
+    // still-at-the-end-of-"first" position and re-read the file from byte 0, re-emitting "first"
+    // as a duplicate (it was already read and emitted before this watcher went idle) instead of
+    // correctly resuming to pick up only "second", the genuinely new line.
+    let position_before_reactivate = watcher.get_file_position();
+    watcher
+        .reactivate()
+        .await
+        .expect("reactivate should succeed");
+    assert!(watcher.is_active());
+    assert_eq!(
+        watcher.get_file_position(),
+        position_before_reactivate,
+        "a retry after invalidate_idle_bookkeeping, with no real truncation involved, must \
+         resume from where it left off, not discard the position and re-read from the start"
+    );
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert_eq!(
+        result
+            .raw_line
+            .map(|l| String::from_utf8(l.bytes.to_vec()).unwrap()),
+        Some("second".to_string()),
+        "must read exactly the new line, not re-emit \"first\" (already read before this \
+         watcher went idle) as a duplicate"
+    );
+}
+
+#[tokio::test]
+async fn idle_watcher_detects_truncation() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("truncated.log");
+    fs::write(&path, b"0123456789\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let _ = watcher.read_line().await.expect("read_line error");
+    let position_before = watcher.get_file_position();
+    assert!(position_before > 0);
+    watcher.deactivate().await;
+
+    // Truncate the file down to nothing while idle.
+    fs::write(&path, b"").unwrap();
+
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(
+        changed,
+        "truncation (shrink) must be detected, not just growth"
+    );
+}
+
+#[tokio::test]
+async fn idle_watcher_reads_correctly_after_same_inode_truncation() {
+    // Regression test for a bug found in review: check_for_new_data only reports a bare
+    // "changed," not which direction the size moved, so reactivate() must independently notice a
+    // shrink and reset file_position -- identity alone isn't enough to catch this, since a
+    // truncate-in-place (e.g. `logrotate`'s `copytruncate`, or an application truncating and
+    // rewriting its own log file) keeps the same inode throughout. Without checking the size
+    // directly, reactivate() would seek to the old (now past-EOF) position; a seek past EOF
+    // doesn't error, it just means every read sees nothing until the file grows past the old
+    // position again, silently losing everything written to the truncated file in the meantime.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("truncated_rewrite.log");
+    fs::write(&path, b"0123456789\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let _ = watcher.read_line().await.expect("read_line error");
+    let position_before = watcher.get_file_position();
+    assert!(position_before > 0);
+    let identity_before = watcher_identity(&watcher);
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // Truncate the file in place (same inode on both Unix and Windows: this opens the existing
+    // file with O_TRUNC/equivalent rather than creating a new one) and write new, shorter
+    // content -- shorter than `position_before`, so a stale seek would land past this file's end.
+    fs::write(&path, b"short\n").unwrap();
+
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(changed, "truncation must be detected");
+
+    watcher.reactivate().await.expect("reactivate failed");
+    assert!(watcher.is_active());
+    assert_eq!(
+        watcher_identity(&watcher),
+        identity_before,
+        "sanity check: this must be a same-inode truncation, not a same-path replacement \
+         (which is covered by a separate test) -- otherwise this test wouldn't be exercising \
+         the code path it's meant to"
+    );
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "reactivating after a same-inode truncation must reset the read position, not seek \
+         to the old (now past-EOF) offset"
+    );
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert_eq!(
+        result
+            .raw_line
+            .map(|l| String::from_utf8(l.bytes.to_vec()).unwrap()),
+        Some("short".to_string()),
+        "must read the truncated file's new content from the start, not silently lose it"
+    );
+}
+
+#[tokio::test]
+async fn idle_watcher_reads_correctly_after_truncate_then_refill_past_old_position() {
+    // Regression test for a bug found in review: reactivate()'s previous fix only compared the
+    // file's size *at the moment of reactivation* against file_position. That misses a truncate
+    // that gets refilled *past* the old file_position again before reactivation, e.g.: read up
+    // to offset 1000, the file gets truncated to 0 (observed by one check_for_new_data poll),
+    // then rewritten with 1500 bytes of unrelated new content before the watcher reactivates. At
+    // reactivation time the file's current size (1500) is >= file_position (1000), which looks
+    // exactly like ordinary growth: nothing about a single point-in-time comparison reveals that
+    // a truncation happened at some point along the way. Without remembering that a poll *did*
+    // see a shrink at some point, reactivate would seek to byte 1000 of the *new* content and
+    // treat it as a continuation of the old file, silently fabricating a bogus resumption point.
+    //
+    // Note this specifically requires the shrink and the eventual regrowth to be observed by
+    // *separate* check_for_new_data polls: if both file writes happen between two polls with
+    // nothing in between ever observing the intermediate empty state, no polling-based approach
+    // (this one included, and this isn't specific to Vector) can tell that apart from ordinary
+    // growth -- there's no state on disk left behind to detect it from after the fact. That's a
+    // fundamental limitation of polling for changes rather than something reactivate could
+    // special-case around, and applies identically to `file_discovery_mode: polling`'s pre-existing
+    // handling of *active* (never-idle) files, not something this idle-handle-closing feature
+    // introduces. This test instead models the realistic case the fix actually addresses: a
+    // truncation slow enough to be independently observed by its own poll, followed by unrelated
+    // regrowth observed later, which is exactly what FileServer's own poll_idle_watchers does on
+    // every discovery cycle in production.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("truncate_then_refill.log");
+    // A single 999-byte line plus its newline: file_position after reading it lands at exactly
+    // 1000, a clean, known value to assert against once reactivated.
+    fs::write(&path, format!("{}\n", "a".repeat(999))).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        4096,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_some());
+    let position_before = watcher.get_file_position();
+    assert_eq!(
+        position_before, 1000,
+        "sanity check on the test's own setup"
+    );
+    let identity_before = watcher_identity(&watcher);
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // First poll: observe the truncation to nothing. This is what latches
+    // `truncated_while_idle`.
+    fs::write(&path, "").unwrap();
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(changed, "the truncation to empty must be detected");
+
+    // Refill with new content longer than `position_before`, observed by a second poll before
+    // reactivation -- by this point the file looks, size-wise, like it simply grew past its old
+    // position, exactly as ordinary (non-truncating) growth would.
+    fs::write(&path, format!("{}\n", "z".repeat(1499))).unwrap();
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(changed, "the regrowth must also be detected");
+
+    watcher.reactivate().await.expect("reactivate failed");
+    assert!(watcher.is_active());
+    assert_eq!(
+        watcher_identity(&watcher),
+        identity_before,
+        "sanity check: same inode throughout, exercising the same-identity truncation path"
+    );
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "must reset to 0 even though the file's *final* size is larger than the old \
+         file_position -- a truncate happened in between, which a single point-in-time \
+         size comparison at reactivation time can't see on its own"
+    );
+
+    let result = watcher.read_line().await.expect("read_line error");
+    let line = result.raw_line.expect("expected a line");
+    assert_eq!(
+        line.bytes.len(),
+        1499,
+        "must read the new content from its actual start (byte 0), not from the stale \
+         offset 1000 into what is now unrelated data"
+    );
+    assert!(
+        line.bytes.iter().all(|&b| b == b'z'),
+        "must not splice together old and new content: every byte of the line read back \
+         must be from the new content, none from the old"
+    );
+}
+
+#[tokio::test]
+async fn idle_watcher_detects_truncation_observed_on_the_forced_retry_poll() {
+    // Regression test for a bug found in review, one step further than the truncate-then-refill
+    // test above. An earlier fix for invalidate_idle_bookkeeping's forced retry worked by
+    // clobbering last_known_size with a u64::MAX sentinel so the next check_for_new_data would
+    // always report `changed`. That broke the shrink-detection this same function is responsible
+    // for: on the very next poll, `new_size < *last_known_size` compared the real (possibly
+    // already-refilled) size against u64::MAX, which is *always* true regardless of whether the
+    // file actually shrank -- so a guard (`had_valid_baseline`) was added to skip the
+    // shrink-check whenever the baseline was the sentinel. But that guard traded one bug for
+    // another: it went from "always false-positive" to "always skip," which means a *real*
+    // truncation observed on exactly that first post-invalidate poll would go completely
+    // undetected, not just misreported. Concretely:
+    //   1. watcher reads up to file_position 1000, then goes idle.
+    //   2. reactivate() fails for some transient reason (e.g. a permissions error), and the
+    //      caller calls invalidate_idle_bookkeeping() to force a retry on the next poll.
+    //   3. before that next poll runs, the file is truncated down to 200 bytes -- smaller than
+    //      the old file_position, and still observably smaller than it by the time the forced
+    //      retry poll actually samples the file.
+    //   4. the next check_for_new_data poll is the forced retry from step 2. With the buggy
+    //      guard, it would skip the shrink check entirely (because a retry was pending) and so
+    //      never latch `truncated_while_idle`, even though the shrink was plainly visible on this
+    //      exact poll.
+    //   5. the file is then refilled past the old file_position (to 1500 bytes) and observed by a
+    //      second, ordinary poll -- at which point, without the latch from step 4, nothing
+    //      remains to distinguish this from ordinary growth.
+    //   6. reactivate() must still resume from byte 0, not treat the final size (1500) as
+    //      ordinary growth past the old file_position (1000) and resume reading stale data.
+    //
+    // The current fix (a dedicated `force_recheck` flag, separate from `last_known_size`) keeps
+    // last_known_size holding the *real* last observed size (1000, from before going idle)
+    // through invalidate_idle_bookkeeping, so the forced-retry poll's shrink check compares the
+    // real new size (200) against the real old baseline (1000) like any other poll, correctly
+    // latching `truncated_while_idle` -- the forced-retry behavior comes entirely from the
+    // separate flag instead of from corrupting the baseline.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("truncate_observed_on_forced_retry.log");
+    fs::write(&path, format!("{}\n", "a".repeat(999))).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        4096,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_some());
+    assert_eq!(
+        watcher.get_file_position(),
+        1000,
+        "sanity check on the test's own setup"
+    );
+    let identity_before = watcher_identity(&watcher);
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // Simulate a failed reactivate() attempt forcing a retry, without needing to actually break
+    // the filesystem to trigger one.
+    watcher.invalidate_idle_bookkeeping();
+
+    // Truncate to a size still smaller than the old file_position (1000), and have this exact
+    // poll -- the forced retry from invalidate_idle_bookkeeping -- be the one that observes it.
+    fs::write(&path, "b".repeat(200)).unwrap();
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(
+        changed,
+        "must report changed, both because of the forced retry and because the size differs \
+         from the last known baseline"
+    );
+
+    // Refill past the old file_position, observed by a second, ordinary poll -- by itself this
+    // looks exactly like ordinary growth, the same as in the test above.
+    fs::write(&path, format!("{}\n", "z".repeat(1499))).unwrap();
+    let changed = watcher
+        .check_for_new_data()
+        .await
+        .expect("stat should succeed");
+    assert!(changed, "the regrowth must also be detected");
+
+    watcher.reactivate().await.expect("reactivate failed");
+    assert!(watcher.is_active());
+    assert_eq!(
+        watcher_identity(&watcher),
+        identity_before,
+        "sanity check: same inode throughout, exercising the same-identity truncation path"
+    );
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "must reset to 0: the file was truncated while idle and that truncation was observed on \
+         the very poll that also served as the forced retry from invalidate_idle_bookkeeping, \
+         even though the file's final size (1500) is larger than the old file_position (1000)"
+    );
+
+    let result = watcher.read_line().await.expect("read_line error");
+    let line = result.raw_line.expect("expected a line");
+    assert_eq!(
+        line.bytes.len(),
+        1499,
+        "must read the new content from its actual start (byte 0), not from the stale \
+         offset 1000 into what is now unrelated data"
+    );
+    assert!(
+        line.bytes.iter().all(|&b| b == b'z'),
+        "must not splice together old and new content: every byte of the line read back \
+         must be from the new content, none from the old"
+    );
+}
+
+#[tokio::test]
+async fn idle_watcher_survives_rotation_without_reading_wrong_file() {
+    // A rotation while idle: the original file is renamed away and a new,
+    // unrelated file is created at the same path. `FileServer`'s
+    // fingerprint-based identity tracking is what actually prevents
+    // misattributing content across this rename in production; here we
+    // verify the pieces `FileWatcher` itself is responsible for: identity
+    // (dev/inode) is checked on reactivation via `update_path`/`reactivate`,
+    // so a same-path-different-file swap cannot silently resume from a
+    // stale offset into unrelated content.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("rotated.log");
+    fs::write(&path, b"original content here\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    let original_identity = watcher_identity(&watcher);
+
+    let _ = watcher.read_line().await.expect("read_line error");
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // Simulate rotation: move the original file away, create a new one in
+    // its place with different (shorter) content.
+    let archived = dir.path().join("rotated.log.1");
+    fs::rename(&path, &archived).unwrap();
+    fs::write(&path, b"new\n").unwrap();
+
+    // A cheap stat-only poll will very likely see *some* difference (size
+    // and/or mtime), prompting reactivation.
+    let changed = watcher.check_for_new_data().await.unwrap_or(true);
+    if changed {
+        watcher.reactivate().await.expect("reactivate failed");
+        let new_identity = watcher_identity(&watcher);
+        assert_ne!(
+            original_identity, new_identity,
+            "reactivating onto a rotated path must pick up the new file's identity"
+        );
+        // Regression coverage for a bug found in review: identity alone isn't enough --
+        // reactivate() must also reset file_position to 0 when the identity changes,
+        // rather than seeking the new file to the old file's stale offset (which, for a
+        // file rotated at the same path, would skip the new file's opening bytes, or --
+        // if the new file happens to be shorter than the old offset -- read nothing at
+        // all until it grows past that point). Assert on the observable behavior (what
+        // gets read), not just the internal position field, since that's what would
+        // actually be lost in production.
+        assert_eq!(
+            watcher.get_file_position(),
+            0,
+            "reactivating onto a file with a different identity must reset the read \
+             position, not seek to the old file's stale offset"
+        );
+        let result = watcher.read_line().await.expect("read_line error");
+        assert_eq!(
+            result
+                .raw_line
+                .map(|l| String::from_utf8(l.bytes.to_vec()).unwrap()),
+            Some("new".to_string()),
+            "must read the rotated-in file's own content from the start, not skip past it"
+        );
+    }
+}
+
+/// Test-only accessor into the private dev/inode identity, used to assert
+/// that reactivation onto a rotated file picks up a genuinely different
+/// identity rather than silently continuing to treat it as the same file.
+fn watcher_identity(watcher: &FileWatcher) -> Option<(u64, u64)> {
+    watcher.identity
+}
+
+#[tokio::test]
+async fn idle_gzip_file_detected_correctly_on_reactivation() {
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("idle.gz");
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    // Start with an empty file (so the watcher, if it were to open it,
+    // wouldn't see gzip magic yet), matching a plausible "log rotated to a
+    // fresh, not-yet-compressed placeholder" scenario is overkill here --
+    // simpler: start idle via an old, checkpoint-complete plain file, then
+    // have the "new data" that appears actually be a gzip stream. This
+    // covers "gzip detection must be deferred until reopen" from an idle
+    // watcher that never inspected the file's content at all.
+    let ignore_before = Some(write_file_and_ignore_before(&path, b""));
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Checkpoint(0),
+        ignore_before,
+        1024,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_idle(), "empty, old, fully-read file starts idle");
+
+    // Now replace the empty file's content with a gzip stream (simulating
+    // a log manager compressing a rotated-in file in place).
+    let gz = encode(b"compressed line\n").await;
+    fs::write(&path, &gz).unwrap();
+
+    let changed = watcher.check_for_new_data().await.unwrap();
+    assert!(changed);
+    watcher.reactivate().await.expect("reactivate failed");
+    assert!(watcher.is_active());
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert_eq!(
+        result
+            .raw_line
+            .map(|l| String::from_utf8(l.bytes.to_vec()).unwrap()),
+        Some("compressed line".to_string()),
+        "gzip must be transparently detected and decoded on reactivation"
+    );
 }
 
 #[inline]

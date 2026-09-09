@@ -11,7 +11,7 @@ workspace = true
 
 [target.'cfg(windows)'.dependencies]
 libc.workspace = true
-winapi = { version = "0.3", features = ["winioctl"] }
+winapi = { version = "0.3", features = ["winioctl", "ioapiset"] }
 
 [dependencies]
 chrono.workspace = true

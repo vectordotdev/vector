@@ -3,4 +3,5 @@
 
 pub mod file_server;
 pub mod file_watcher;
+pub mod notify_watcher;
 pub mod paths_provider;

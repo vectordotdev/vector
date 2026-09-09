@@ -27,7 +27,8 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     file_source::file_server::{
-        FileServer, Line, Shutdown as FileServerShutdown, calculate_ignore_before,
+        FileDiscoveryMode, FileServer, Line, Shutdown as FileServerShutdown,
+        calculate_ignore_before,
     },
     file_source_common::{
         Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
@@ -898,6 +899,17 @@ impl Source {
             },
             // A handle to the current tokio runtime
             rotate_wait,
+            // Kubernetes log discovery goes through the k8s API (this source's own
+            // `paths_provider`), not glob-watched directories, so there's no directory-level
+            // OS-level watch to establish; keep the original polling-based discovery cadence.
+            discovery_mode: FileDiscoveryMode::PollingOnly,
+            reconcile_interval: glob_minimum_cooldown,
+            // Kubernetes' log file set is bounded and kubelet-managed rather than open-ended
+            // like an arbitrary `include` glob, so the handle-count pressure this option exists
+            // to relieve (see file_server::FileServer::idle_timeout's docs, and
+            // https://github.com/vectordotdev/vector/issues/3567) doesn't apply here; preserve
+            // this source's existing always-open behavior.
+            idle_timeout: None,
         };
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
