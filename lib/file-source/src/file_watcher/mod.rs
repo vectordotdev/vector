@@ -308,6 +308,7 @@ impl FileWatcher {
                 // Capture metrics from the old file before switching
                 let old_info = self.get_unwatch_info().await;
 
+                let len = new_file.metadata().await?.len();
                 let mut reader = BufReader::new(new_file);
                 let gzipped = is_gzipped(&mut reader).await?;
                 let new_reader = if gzipped {
@@ -317,6 +318,17 @@ impl FileWatcher {
                         FileReader::Gzipped(Box::new(BufReader::new(gzip_multiple_decoder(reader))))
                     }
                 } else {
+                    if self.file_position > len {
+                        // Same protection as in `new`: rebinding to a file shorter
+                        // than the current position would silently skip its head.
+                        warn!(
+                            message = "Position is beyond the end of the replacement file; reading it from the beginning.",
+                            ?path,
+                            position = self.file_position,
+                            file_size = len,
+                        );
+                        self.file_position = 0;
+                    }
                     reader.seek(io::SeekFrom::Start(self.file_position)).await?;
                     FileReader::Plain(reader)
                 };
