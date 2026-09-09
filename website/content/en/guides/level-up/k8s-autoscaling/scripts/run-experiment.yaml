@@ -1,0 +1,81 @@
+---
+# Run from k8s-autoscaling/ after completing the guide's setup:
+# ansible-playbook -i localhost, scripts/run-experiment.yaml [-e experiment=hpa]
+# Native modules and the probe inherit KUBECONFIG; Helm alone changes desired state.
+- name: Run Vector scaling experiments
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    experiment: all
+    chart_version: "0.58.0"
+    guide_dir: "{{ playbook_dir }}/.."
+    results: {}
+  module_defaults:
+    kubernetes.core.helm:
+      release_namespace: vector-perf
+      wait: true
+      timeout: 3m
+  tasks:
+    - name: Validate the experiment request before changing the cluster
+      ansible.builtin.assert:
+        that:
+          - experiment | string in ['all', '1', '3', '8', 'hpa']
+          - not ansible_check_mode
+        fail_msg: Choose all, 1, 3, 8, or hpa; this live benchmark cannot run with --check.
+
+    - name: Reset Vector to zero replicas with autoscaling disabled
+      kubernetes.core.helm:
+        name: vector
+        chart_ref: vectordotdev/vector
+        chart_version: "{{ chart_version }}"
+        values_files:
+          - "{{ guide_dir }}/values.yaml"
+        values:
+          replicas: 0
+          autoscaling:
+            enabled: false
+
+    - name: Wait for the previous Vector pods to terminate
+      # A plain kubectl read keeps the controller free of the Python client
+      # dependency that kubernetes.core.k8s_info would require.
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - -n
+          - vector-perf
+          - get
+          - pods
+          - -l
+          - app.kubernetes.io/name=vector
+          - -o
+          - json
+      register: vector_pods
+      until: ((vector_pods.stdout | from_json)["items"] | length == 0)
+      retries: 60
+      delay: 1
+      changed_when: false
+
+    - name: Restart the producer once for this invocation
+      kubernetes.core.helm:
+        name: producer
+        chart_ref: "{{ guide_dir }}/manifests/producer-chart"
+        values:
+          runId: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%S.%fZ') }}"
+
+    - name: Allow lading to initialise
+      ansible.builtin.pause:
+        seconds: 20
+
+    - name: Run the selected experiments in order
+      ansible.builtin.include_tasks: experiment.yaml
+      loop: "{{ ['1', '3', '8', 'hpa'] if experiment | string == 'all' else [experiment | string] }}"
+      loop_control:
+        loop_var: experiment_name
+
+    - name: Show experiment results
+      ansible.builtin.debug:
+        msg:
+          experiments: "{{ results }}"
+          manual_producer_restarts: 0

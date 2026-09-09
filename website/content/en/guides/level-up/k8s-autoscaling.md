@@ -152,6 +152,7 @@ overloads Vector, and the consumer discards the output.
 
 - [`helm`](https://helm.sh/) version 3.0 or later, configured against a target cluster
 - [`kubectl`](https://kubernetes.io/docs/reference/kubectl/) for read-only cluster inspection and port-forwarding
+- Python 3.12 or later and [Ansible Core](https://docs.ansible.com/ansible/latest/index.html) 2.20.5 with the `kubernetes.core` collection (see [Replicating these results](#replicating-these-results))
 - At least 9 allocatable CPUs total (8 for Vector at max scale, 0.5 for the consumer, 0.2 for the producer)
 - [`grpcurl`](https://github.com/fullstorydev/grpcurl) for metric collection
 - [Kubernetes Metrics API](https://github.com/kubernetes-sigs/metrics-server) (`metrics-server`) installed (This is required for `kubectl top pods` and HPA CPU targets. K3s bundles `metrics-server` by default. On other clusters, run `kubectl top nodes` to verify that `metrics-server` is available before you start.)
@@ -456,23 +457,42 @@ we used, if you don't already have a cluster to test
 against.
 
 Once the [Setup](#setup) steps are complete and the producer and ingress from
-[Manual scaling](#manual-scaling) are deployed, `run-experiment.sh` can run all
-four experiments or one selected experiment.
-It updates the Vector release, waits for the deployment to become ready,
-measures throughput, and manages the chart-provided HPA for the autoscaling experiment.
+[Manual scaling](#manual-scaling) are deployed, the `run-experiment.yaml` Ansible
+playbook can run all four experiments or one selected experiment. It updates
+the Vector release, waits for the deployment to become ready, measures
+throughput, and manages the chart-provided HPA for the autoscaling experiment.
 
-The script first scales Vector to 0 replicas and waits for its pods to
-terminate, so every invocation starts from the same clean state instead of
-measuring a transition from the replica count left by a previous run.
+The playbook first scales Vector to 0 replicas with autoscaling disabled and
+waits for its pods to terminate, so every invocation starts from the same clean
+state instead of measuring a transition from the replica count left by a
+previous run. It then installs the producer once with a unique `runId` so the
+lading workload restarts, waits 20 seconds for lading to initialise, and runs
+each experiment in sequence.
 
-{{< embed file="content/en/guides/level-up/k8s-autoscaling/scripts/run-experiment.sh" open="false" >}}
+Install the collection once from the `k8s-autoscaling/` directory:
+
+```bash
+ansible-galaxy collection install -r scripts/requirements.yaml
+```
+
+The playbook deploys the workloads and runs each experiment in sequence; the
+probe helper (`scripts/probe.py`) waits for the pods to stabilise, measures
+throughput over a 30-second window, and watches the HPA until it reaches
+equilibrium. Helm remains the sole owner of the Deployment and HPA
+configuration. The probe inherits the same `KUBECONFIG` as the playbook and
+prints one JSON result per experiment; the playbook aggregates those results
+and prints the summary.
+
+{{< embed file="content/en/guides/level-up/k8s-autoscaling/scripts/run-experiment.yaml" open="false" >}}
+
+{{< embed file="content/en/guides/level-up/k8s-autoscaling/scripts/experiment.yaml" open="false" >}}
 
 ```bash
 # Run all experiments.
-KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh
+KUBECONFIG=/path/to/kubeconfig ansible-playbook -i localhost, scripts/run-experiment.yaml
 
 # Run one experiment (1, 3, or 8 pods, or hpa).
-KUBECONFIG=/path/to/kubeconfig ./scripts/run-experiment.sh hpa
+KUBECONFIG=/path/to/kubeconfig ansible-playbook -i localhost, scripts/run-experiment.yaml -e experiment=hpa
 ```
 
 ## Deep dive: Why the HPA can stabilize at six pods

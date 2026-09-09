@@ -8,6 +8,8 @@ Prerequisites
 - An AWS account/credentials with permission to create EC2 instances, key
   pairs, and security groups in the default VPC of the target region
 - Helm 3.0 or later, kubectl, and grpcurl installed on the local workstation
+- Python >= 3.12 with Ansible Core 2.20.5 and the kubernetes.core collection,
+  installed with `ansible-galaxy collection install -r ../scripts/requirements.yaml`
 - An SSH key pair to access the instance:
 
     ssh-keygen -t ed25519 -f ~/.ssh/vector_tests -N ""
@@ -30,12 +32,13 @@ Usage
    concurrent reproduction, also pass `-var="cluster_suffix=<your-username>"`
    to avoid name collisions.
 
-3. Use the generated kubeconfig with Helm and with
-   ../scripts/run-experiment.sh. The script uses kubectl only for cluster
-   inspection and port-forwarding:
+3. Use the generated kubeconfig with Helm and with the experiment playbook.
+   The playbook deploys and scales the workloads; the probe helper
+   (../scripts/probe.py) measures throughput and watches the HPA:
 
     export KUBECONFIG=$(terraform output -raw kubeconfig_path)
     helm list --all-namespaces
+    ansible-playbook -i localhost, ../scripts/run-experiment.yaml -e experiment=hpa
 
 4. When finished, tear the cluster down (pass the same `-var` flags you
    applied with):

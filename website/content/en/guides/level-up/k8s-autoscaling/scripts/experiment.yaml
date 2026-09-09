@@ -1,0 +1,57 @@
+---
+- name: Start experiment {{ experiment_name }} with autoscaling disabled
+  kubernetes.core.helm:
+    name: vector
+    chart_ref: vectordotdev/vector
+    chart_version: "{{ chart_version }}"
+    values_files:
+      - "{{ guide_dir }}/values.yaml"
+    values:
+      replicas: "{{ 1 if experiment_name == 'hpa' else experiment_name | int }}"
+      autoscaling:
+        enabled: false
+
+- name: Require 30 seconds of stable, ready Vector pods
+  ansible.builtin.command:
+    argv: ["{{ ansible_playbook_python }}", "{{ playbook_dir }}/probe.py", stable]
+  changed_when: false
+
+- name: Enable the HPA with the guide's settings
+  kubernetes.core.helm:
+    name: vector
+    chart_ref: vectordotdev/vector
+    chart_version: "{{ chart_version }}"
+    values_files:
+      - "{{ guide_dir }}/values.yaml"
+    values:
+      replicas: 1
+      autoscaling:
+        enabled: true
+        minReplicas: 1
+        maxReplicas: 8
+        targetCPUUtilizationPercentage: 70
+        behavior:
+          scaleDown:
+            stabilizationWindowSeconds: 60
+  when: experiment_name == 'hpa'
+
+- name: Warm up the static experiment
+  ansible.builtin.pause:
+    seconds: 20
+  when: experiment_name != 'hpa'
+
+- name: Measure experiment {{ experiment_name }}
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - "{{ playbook_dir }}/probe.py"
+      - "{{ 'hpa' if experiment_name == 'hpa' else 'measure' }}"
+  register: measurement
+  changed_when: false
+
+- name: Collect experiment {{ experiment_name }} results
+  ansible.builtin.set_fact:
+    results: >-
+      {{ results | combine({experiment_name: (measurement.stdout | from_json) |
+         combine({'Bottleneck': 'Vector CPU' if experiment_name in ['1', '3']
+                   else 'None' if experiment_name == '8' else 'N/A'})}) }}
