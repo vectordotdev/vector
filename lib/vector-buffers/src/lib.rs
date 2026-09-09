@@ -46,7 +46,8 @@ use vector_common::{
     finalization::{AddBatchNotifier, Finalizable, GroupedFinalizable},
 };
 
-/// Event handling behavior when a buffer is full.
+/// Controls what happens when a buffer reaches its configured size limit or the host runs out of
+/// disk space at runtime.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]

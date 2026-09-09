@@ -772,8 +772,11 @@ generated: configuration: {
 									}
 									default: "block"
 								}
-								description: "Event handling behavior when a buffer is full."
-								required:    false
+								description: """
+																		Controls what happens when a buffer reaches its configured size limit or the host runs out of
+																		disk space at runtime.
+																		"""
+								required: false
 							}
 							max_events: {
 								type: uint: default: 500

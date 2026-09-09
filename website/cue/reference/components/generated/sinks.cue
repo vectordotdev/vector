@@ -51,8 +51,11 @@ generated: components: sinks: configuration: {
 				}
 			}
 			when_full: {
-				description: "Event handling behavior when a buffer is full."
-				required:    false
+				description: """
+					Controls what happens when a buffer reaches its configured size limit or the host runs out of
+					disk space at runtime.
+					"""
+				required: false
 				type: string: {
 					default: "block"
 					enum: {
