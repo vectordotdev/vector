@@ -15,8 +15,8 @@ import signal
 import subprocess
 import sys
 import tempfile
-import time
 from contextlib import ExitStack, contextmanager
+from urllib.parse import quote
 
 NAMESPACE = "vector-perf"
 SELECTOR = "app.kubernetes.io/name=vector"
@@ -150,7 +150,8 @@ def measure_pods(pods):
 def measure_stable_pods(probe, attempts=3):
     """Measure without racing an HPA scale-down: a pod deleted mid-window
     aborts the measurement (its port-forward dies) instead of silently
-    undercounting, and the pod set is re-read between attempts."""
+    undercounting, and the pod set is re-read between attempts. Returns the
+    measurement and the pod count it was taken against."""
     for attempt in range(1, attempts + 1):
         pods = probe.pods(running=True)
         names = [pod["metadata"]["name"] for pod in pods]
@@ -180,7 +181,7 @@ def measure_stable_pods(probe, attempts=3):
             )
             time.sleep(15)
             continue
-        return result
+        return result, len(pods)
     raise RuntimeError("unreachable")
 
 
@@ -226,10 +227,12 @@ class Probe:
         raise RuntimeError("Vector pods did not stabilise within 300s")
 
     def avg_cpu(self):
-        pods = kubectl_raw(f"/apis/metrics.k8s.io/v1beta1/namespaces/{NAMESPACE}/pods")[
-            "items"
-        ]
-        # values.yaml requests and limits one CPU per Vector pod.
+        # values.yaml requests and limits one CPU per Vector pod; the
+        # selector keeps the producer and consumer out of the average.
+        pods = kubectl_raw(
+            f"/apis/metrics.k8s.io/v1beta1/namespaces/{NAMESPACE}/pods"
+            f"?labelSelector={quote(SELECTOR)}"
+        )["items"]
         cores = sum(
             millicores(c["usage"]["cpu"]) for pod in pods for c in pod["containers"]
         )
@@ -316,6 +319,8 @@ class Probe:
                 log(
                     f"HPA at maxReplicas with only {available}/8 replicas Ready; waiting..."
                 )
+                time.sleep(15)
+                continue
             # Discrete HPA rounding means equilibrium need not be inside the
             # nominal CPU tolerance band: require 60s of replica-count stability
             # and the HPA not planning a rescale (desiredReplicas, which holds
@@ -324,11 +329,17 @@ class Probe:
                 log(f"Equilibrium: {replicas} pods, {cpu}% CPU, {elapsed}s elapsed.")
                 break
             time.sleep(15)
-        log("HPA: measuring equilibrium throughput...")
+        measurement, pod_count = measure_stable_pods(self)
+        # Re-read the HPA after the measurement window: a rescale during the
+        # retries means the pre-measurement values no longer describe the
+        # pod set the throughput was taken against.
+        status = kubectl("get", "hpa", "vector")["status"]
+        resource = (status.get("currentMetrics") or [{}])[0].get("resource")
+        cpu = (resource or {}).get("current", {}).get("averageUtilization")
         return {
-            **measure_stable_pods(self),
-            "Avg CPU": f"{cpu}%",
-            "Pods": str(last_replicas),
+            **measurement,
+            "Avg CPU": f"{cpu}%" if cpu is not None else "?",
+            "Pods": str(pod_count),
             "Scale events": str(self.rescale_events() - baseline),
             "Equilibrium": f"{elapsed}s",
         }
