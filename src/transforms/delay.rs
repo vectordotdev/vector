@@ -144,7 +144,13 @@ impl Delay {
             condition: config
                 .condition
                 .as_ref()
-                .map(|c| c.build(&context.enrichment_tables, &context.metrics_storage))
+                .map(|c| {
+                    c.build(
+                        &context.enrichment_tables,
+                        &context.metrics_storage,
+                        context.globals.timezone(),
+                    )
+                })
                 .transpose()?,
         })
     }

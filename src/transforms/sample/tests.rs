@@ -681,7 +681,11 @@ fn condition_contains(key: &str, needle: &str) -> Condition {
     };
 
     vrl_config
-        .build(&Default::default(), &Default::default())
+        .build(
+            &Default::default(),
+            &Default::default(),
+            vector_lib::TimeZone::default(),
+        )
         .expect("should not fail to build VRL condition")
 }
 

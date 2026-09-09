@@ -823,7 +823,8 @@ impl ValidatedSink for ElasticsearchConfig {
         // [`ElasticsearchConfig::common_mode`], which each `ElasticsearchCommon` calls while
         // parsing (which performs I/O: AWS credential resolution and API-version autodetection).
         // The pure request/health settings were resolved during `validate`.
-        let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
+        let commons =
+            ElasticsearchCommon::parse_many(self, cx.proxy(), cx.globals.timezone()).await?;
         let common = commons[0].clone();
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;

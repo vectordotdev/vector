@@ -181,6 +181,7 @@ humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
+jiff = { version = "0.2.35", default-features = false, features = ["std", "tz-system", "tzdb-bundle-platform", "tzdb-concatenated", "tzdb-zoneinfo"] }
 itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"

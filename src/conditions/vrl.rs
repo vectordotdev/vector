@@ -1,4 +1,6 @@
-use vector_lib::{TimeZone, compile_vrl, configurable::configurable_component, emit};
+use vector_lib::{
+    TimeZone, compile_vrl, configurable::configurable_component, emit, validate_timezone,
+};
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     compiler::{
@@ -30,11 +32,12 @@ pub struct VrlConfig {
 
 impl_generate_config_from_default!(VrlConfig);
 
-impl ConditionalConfig for VrlConfig {
-    fn build(
+impl VrlConfig {
+    pub(super) fn compile(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
         metrics_storage: &MetricsStorage,
+        timezone: TimeZone,
     ) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
@@ -75,8 +78,22 @@ impl ConditionalConfig for VrlConfig {
             VrlRuntime::Ast => Ok(Condition::Vrl(Vrl {
                 program,
                 source: self.source.clone(),
+                timezone,
             })),
         }
+    }
+}
+
+impl ConditionalConfig for VrlConfig {
+    fn build(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
+        timezone: TimeZone,
+    ) -> crate::Result<Condition> {
+        validate_timezone(timezone)?;
+        let condition = self.compile(enrichment_tables, metrics_storage, timezone)?;
+        Ok(condition)
     }
 }
 
@@ -84,6 +101,7 @@ impl ConditionalConfig for VrlConfig {
 pub struct Vrl {
     pub(super) program: Program,
     pub(super) source: String,
+    timezone: TimeZone,
 }
 
 impl Vrl {
@@ -93,10 +111,7 @@ impl Vrl {
             .map(|log| log.namespace())
             .unwrap_or(LogNamespace::Legacy);
         let mut target = VrlTarget::new(event, self.program.info(), MetricTagMode::Single);
-        // TODO: use timezone from remap config
-        let timezone = TimeZone::default();
-
-        let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
+        let result = Runtime::default().resolve(&mut target, &self.program, &self.timezone);
         let original_event = match target.into_events(log_namespace) {
             TargetEvents::One(event) => event,
             _ => panic!("Event was modified in a condition. This is an internal compiler error."),
@@ -179,6 +194,24 @@ mod test {
     }
 
     #[test]
+    fn uses_configured_timezone() {
+        let config = VrlConfig {
+            source: r#"parse_timestamp!("2020-01-01 00:00:00", format: "%F %T") == t'2020-01-01T05:00:00Z'"#
+                .into(),
+            runtime: Default::default(),
+        };
+        let condition = config
+            .build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::Named(chrono_tz::America::New_York),
+            )
+            .unwrap();
+
+        assert!(condition.check(log_event![]).0);
+    }
+
+    #[test]
     fn check_vrl() {
         let checks = vec![
             (
@@ -249,13 +282,21 @@ mod test {
 
             assert_eq!(
                 config
-                    .build(&Default::default(), &Default::default())
+                    .build(
+                        &Default::default(),
+                        &Default::default(),
+                        TimeZone::default(),
+                    )
                     .map(|_| ())
                     .map_err(|e| e.to_string()),
                 build
             );
 
-            if let Ok(cond) = config.build(&Default::default(), &Default::default()) {
+            if let Ok(cond) = config.build(
+                &Default::default(),
+                &Default::default(),
+                TimeZone::default(),
+            ) {
                 assert_eq!(
                     cond.check_with_context(event.clone()).0,
                     check.map_err(|e| e.to_string())

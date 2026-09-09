@@ -56,7 +56,13 @@ where
         let exclude = config
             .exclude
             .as_ref()
-            .map(|condition| condition.build(&context.enrichment_tables, &context.metrics_storage))
+            .map(|condition| {
+                condition.build(
+                    &context.enrichment_tables,
+                    &context.metrics_storage,
+                    context.globals.timezone(),
+                )
+            })
             .transpose()?;
 
         Ok(Self {

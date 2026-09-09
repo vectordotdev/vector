@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use vector_lib::configurable::configurable_component;
+use vector_lib::{TimeZone, configurable::configurable_component};
 use vector_vrl_metrics::MetricsStorage;
 
 use crate::event::Event;
@@ -122,13 +122,31 @@ impl ConditionConfig {
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
         metrics_storage: &MetricsStorage,
+        timezone: TimeZone,
     ) -> crate::Result<Condition> {
         match self {
             ConditionConfig::IsLog => Ok(Condition::IsLog),
             ConditionConfig::IsMetric => Ok(Condition::IsMetric),
             ConditionConfig::IsTrace => Ok(Condition::IsTrace),
-            ConditionConfig::Vrl(x) => x.build(enrichment_tables, metrics_storage),
-            ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables, metrics_storage),
+            ConditionConfig::Vrl(x) => x.build(enrichment_tables, metrics_storage, timezone),
+            ConditionConfig::DatadogSearch(x) => {
+                x.build(enrichment_tables, metrics_storage, timezone)
+            }
+        }
+    }
+
+    fn validate(
+        &self,
+        enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
+    ) -> crate::Result<()> {
+        match self {
+            ConditionConfig::Vrl(config) => config
+                .compile(enrichment_tables, metrics_storage, TimeZone::default())
+                .map(|_| ()),
+            _ => self
+                .build(enrichment_tables, metrics_storage, TimeZone::default())
+                .map(|_| ()),
         }
     }
 }
@@ -158,6 +176,7 @@ pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
         metrics_storage: &MetricsStorage,
+        timezone: TimeZone,
     ) -> crate::Result<Condition>;
 }
 
@@ -198,6 +217,7 @@ impl AnyCondition {
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
         metrics_storage: &MetricsStorage,
+        timezone: TimeZone,
     ) -> crate::Result<Condition> {
         match self {
             AnyCondition::String(s) => {
@@ -205,9 +225,9 @@ impl AnyCondition {
                     source: s.clone(),
                     runtime: Default::default(),
                 };
-                vrl_config.build(enrichment_tables, metrics_storage)
+                vrl_config.build(enrichment_tables, metrics_storage, timezone)
             }
-            AnyCondition::Map(m) => m.build(enrichment_tables, metrics_storage),
+            AnyCondition::Map(m) => m.build(enrichment_tables, metrics_storage, timezone),
         }
     }
 
@@ -216,7 +236,15 @@ impl AnyCondition {
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
         metrics_storage: &MetricsStorage,
     ) -> crate::Result<()> {
-        self.build(enrichment_tables, metrics_storage).map(|_| ())
+        match self {
+            AnyCondition::String(source) => VrlConfig {
+                source: source.clone(),
+                runtime: Default::default(),
+            }
+            .compile(enrichment_tables, metrics_storage, TimeZone::default())
+            .map(|_| ()),
+            AnyCondition::Map(config) => config.validate(enrichment_tables, metrics_storage),
+        }
     }
 }
 

@@ -8,6 +8,7 @@ use vector_lib::{
     config::LogNamespace,
     configurable::configurable_component,
     lookup::{PathPrefix, event_path, owned_value_path, path},
+    validate_timezone,
 };
 use vrl::{
     path::OwnedValuePath,
@@ -68,7 +69,7 @@ pub struct MetricToLogConfig {
 }
 
 impl MetricToLogConfig {
-    pub fn build_transform(&self, context: &TransformContext) -> MetricToLog {
+    pub fn build_transform(&self, context: &TransformContext) -> crate::Result<MetricToLog> {
         MetricToLog::new(
             self.host_tag.as_deref(),
             self.timezone.unwrap_or_else(|| context.globals.timezone()),
@@ -94,7 +95,7 @@ impl GenerateConfig for MetricToLogConfig {
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(self.build_transform(context)))
+        Ok(Transform::function(self.build_transform(context)?))
     }
 
     fn input(&self) -> Input {
@@ -268,8 +269,10 @@ impl MetricToLog {
         timezone: TimeZone,
         log_namespace: LogNamespace,
         tag_values: MetricTagValues,
-    ) -> Self {
-        Self {
+    ) -> crate::Result<Self> {
+        validate_timezone(timezone)?;
+
+        Ok(Self {
             host_tag: host_tag.map_or(
                 log_schema().host_key().cloned().map(|mut key| {
                     key.push_front_field("tags");
@@ -280,7 +283,7 @@ impl MetricToLog {
             timezone,
             log_namespace,
             tag_values,
-        }
+        })
     }
 
     pub fn transform_one(&self, mut metric: Metric) -> Option<LogEvent> {
@@ -728,6 +731,7 @@ mod tests {
             ..Default::default()
         }
         .build_transform(&TransformContext::default())
+        .unwrap()
         .transform(&mut output, counter.into());
 
         assert_eq!(output.len(), 1);

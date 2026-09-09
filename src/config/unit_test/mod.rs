@@ -235,8 +235,9 @@ impl UnitTestBuildMetadata {
     pub fn hydrate_into_sources(
         &self,
         inputs: &[TestInput],
+        timezone: TimeZone,
     ) -> Result<IndexMap<ComponentKey, SourceOuter>, Vec<String>> {
-        let inputs = build_and_validate_inputs(inputs, &self.available_insert_targets)?;
+        let inputs = build_and_validate_inputs(inputs, &self.available_insert_targets, timezone)?;
         let mut template_sources = self.template_sources.clone();
         Ok(inputs
             .into_iter()
@@ -270,6 +271,7 @@ impl UnitTestBuildMetadata {
         test_name: &str,
         outputs: &[TestOutput],
         no_outputs_from: &[OutputId],
+        timezone: TimeZone,
     ) -> Result<
         (
             Vec<Receiver<UnitTestSinkResult>>,
@@ -283,7 +285,7 @@ impl UnitTestBuildMetadata {
                     .to_string(),
             ]);
         }
-        let outputs = build_outputs(outputs)?;
+        let outputs = build_outputs(outputs, timezone)?;
 
         let mut template_sinks = IndexMap::new();
         let mut test_result_rxs = Vec::new();
@@ -398,9 +400,10 @@ async fn build_unit_test(
     );
     let test = test.resolve_outputs(&transform_only_graph)?;
 
-    let sources = metadata.hydrate_into_sources(&test.inputs)?;
+    let timezone = config_builder.global.timezone();
+    let sources = metadata.hydrate_into_sources(&test.inputs, timezone)?;
     let (test_result_rxs, sinks) =
-        metadata.hydrate_into_sinks(&test.name, &test.outputs, &test.no_outputs_from)?;
+        metadata.hydrate_into_sinks(&test.name, &test.outputs, &test.no_outputs_from, timezone)?;
 
     config_builder.sources = sources;
     config_builder.sinks = sinks;
@@ -529,6 +532,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
 fn build_and_validate_inputs(
     test_inputs: &[TestInput],
     available_insert_targets: &HashSet<ComponentKey>,
+    timezone: TimeZone,
 ) -> Result<HashMap<ComponentKey, Vec<Event>>, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut errors = Vec::new();
@@ -539,7 +543,7 @@ fn build_and_validate_inputs(
 
     for (index, input) in test_inputs.iter().enumerate() {
         if available_insert_targets.contains(&input.insert_at) {
-            match build_input_event(input) {
+            match build_input_event(input, timezone) {
                 Ok(input_event) => {
                     inputs
                         .entry(input.insert_at.clone())
@@ -573,6 +577,7 @@ pub(super) struct BuiltOutput {
 
 fn build_outputs(
     test_outputs: &[TestOutput],
+    timezone: TimeZone,
 ) -> Result<IndexMap<Vec<OutputId>, BuiltOutput>, Vec<String>> {
     let mut outputs: IndexMap<Vec<OutputId>, BuiltOutput> = IndexMap::new();
     let mut errors = Vec::new();
@@ -586,7 +591,7 @@ fn build_outputs(
             .iter()
             .enumerate()
         {
-            match condition.build(&Default::default(), &Default::default()) {
+            match condition.build(&Default::default(), &Default::default(), timezone) {
                 Ok(condition) => conditions.push(condition),
                 Err(error) => errors.push(format!(
                     "failed to create test condition '{index}': {error}"
@@ -644,7 +649,7 @@ fn build_outputs(
     }
 }
 
-fn build_input_event(input: &TestInput) -> Result<Event, String> {
+fn build_input_event(input: &TestInput, timezone: TimeZone) -> Result<Event, String> {
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
             Some(v) => Ok(Event::Log(LogEvent::from_str_legacy(v.clone()))),
@@ -652,6 +657,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
         },
         "vrl" => {
             if let Some(source) = &input.source {
+                vector_lib::validate_timezone(timezone).map_err(|error| error.to_string())?;
                 let result = vrl::compiler::compile(source, &vector_vrl_functions::all())
                     .map_err(|e| Formatter::new(source, e.clone()).to_string())?;
 
@@ -662,7 +668,6 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                 };
 
                 let mut state = RuntimeState::default();
-                let timezone = TimeZone::default();
                 let mut ctx = Context::new(&mut target, &mut state, &timezone);
 
                 result

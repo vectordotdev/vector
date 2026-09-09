@@ -29,6 +29,7 @@ hyper-proxy = { version = "0.9.1", default-features = false, features = ["openss
 indexmap.workspace = true
 inventory.workspace = true
 ipnet = { version = "2", default-features = false, features = ["serde", "std"] }
+jiff.workspace = true
 lookup = { package = "vector-lookup", path = "../vector-lookup" }
 metrics.workspace = true
 metrics-tracing-context.workspace = true

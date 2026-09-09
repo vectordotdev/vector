@@ -499,7 +499,8 @@ impl RequestSettings {
         let offset = config
             .timezone
             .or(cx.globals.timezone)
-            .and_then(timezone_to_offset);
+            .map(timezone_to_offset)
+            .transpose()?;
 
         Ok(Self {
             acl,

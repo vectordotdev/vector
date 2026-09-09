@@ -311,7 +311,8 @@ impl S3SinkConfig {
         let offset = self
             .timezone
             .or(cx.globals.timezone)
-            .and_then(timezone_to_offset);
+            .map(timezone_to_offset)
+            .transpose()?;
 
         // Configure our partitioning/batching.
         let batch_settings = validated.batch_settings;

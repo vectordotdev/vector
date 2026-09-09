@@ -56,7 +56,7 @@ pub use service::{
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::{HttpEndpoint, HttpEndpointError, UriSerde};
-use vector_lib::{TimeZone, json_size::JsonSize};
+use vector_lib::{TimeZone, json_size::JsonSize, validate_timezone};
 
 use crate::event::EventFinalizers;
 
@@ -139,9 +139,10 @@ impl<T> ElementCount for Vec<T> {
     }
 }
 
-pub fn timezone_to_offset(tz: TimeZone) -> Option<FixedOffset> {
-    match tz {
-        TimeZone::Local => Some(*Utc::now().with_timezone(&chrono::Local).offset()),
-        TimeZone::Named(tz) => Some(Utc::now().with_timezone(&tz).offset().fix()),
-    }
+pub fn timezone_to_offset(tz: TimeZone) -> crate::Result<FixedOffset> {
+    validate_timezone(tz)?;
+    Ok(match tz {
+        TimeZone::Local => *Utc::now().with_timezone(&chrono::Local).offset(),
+        TimeZone::Named(tz) => Utc::now().with_timezone(&tz).offset().fix(),
+    })
 }

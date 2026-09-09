@@ -18,6 +18,7 @@ use vector_lib::{
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, event_path, metadata_path, owned_value_path, path},
     schema::Definition,
+    validate_timezone,
 };
 use vrl::value::{KeyString, Kind, kind::Collection};
 
@@ -145,8 +146,10 @@ impl GenerateConfig for LogstashConfig {
 impl SourceConfig for LogstashConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
+        let timezone = cx.globals.timezone();
+        validate_timezone(timezone)?;
         let source = LogstashSource {
-            timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone()),
+            timestamp_converter: types::Conversion::Timestamp(timezone),
             legacy_host_key_path: log_schema().host_key().cloned(),
             log_namespace,
         };
