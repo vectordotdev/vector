@@ -1,6 +1,7 @@
 pub mod logs;
 pub mod metrics;
 pub mod metrics_native;
+pub mod traces;
 
 use std::{io, path::Path, process::Command};
 
@@ -49,12 +50,20 @@ fn parse_line_to_export_type_request<Message>(
 where
     Message: ProstMessage + Default,
 {
-    // Parse JSON and convert to VRL Value
     let vrl_value: VrlValue = serde_json::from_str::<serde_json::Value>(line)
         .map_err(|e| format!("Failed to parse JSON: {e}"))?
         .into();
 
-    // Get the message descriptor from the descriptor pool
+    parse_value_to_export_type_request(request_message_type, vrl_value)
+}
+
+fn parse_value_to_export_type_request<Message>(
+    request_message_type: &str,
+    vrl_value: VrlValue,
+) -> Result<Message, String>
+where
+    Message: ProstMessage + Default,
+{
     let descriptor_pool = DescriptorPool::decode(DESCRIPTOR_BYTES)
         .map_err(|e| format!("Failed to decode descriptor pool: {e}"))?;
 
@@ -64,7 +73,6 @@ where
             format!("Message type '{request_message_type}' not found in descriptor pool",)
         })?;
 
-    // Encode VRL Value to DynamicMessage using VRL's encode_message with JSON names enabled
     let dynamic_message = vrl::protobuf::encode::encode_message(
         &message_descriptor,
         vrl_value,
@@ -75,14 +83,11 @@ where
     )
     .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;
 
-    // Encode DynamicMessage to bytes (using prost 0.13.5)
     let mut buf = Vec::new();
     ProstReflectMessage::encode(&dynamic_message, &mut buf)
         .map_err(|e| format!("Failed to encode dynamic message to bytes: {e}"))?;
 
-    // Decode bytes into T (using prost 0.12.6)
-    ProstMessage::decode(&buf[..])
-        .map_err(|e| format!("Failed to decode ExportLogsServiceRequest: {e}"))
+    ProstMessage::decode(&buf[..]).map_err(|e| format!("Failed to decode protobuf message: {e}"))
 }
 
 pub fn assert_service_name_with<ResourceT, F>(

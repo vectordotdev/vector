@@ -219,7 +219,8 @@ jobs:
             "datadog-metrics",
             "opentelemetry-logs",
             "opentelemetry-metrics",
-            "opentelemetry-metrics-native"
+            "opentelemetry-metrics-native",
+            "opentelemetry-traces"
           ]
     timeout-minutes: 90
 
