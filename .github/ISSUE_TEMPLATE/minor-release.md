@@ -7,7 +7,7 @@ labels: "domain: releasing"
 
 # Before preparation
 
-- [ ] Confirm the [release automation setup](../../docs/RELEASE_AUTOMATION.md#one-time-repository-setup).
+- [ ] Confirm the release bot can create tags and merge housekeeping after required checks pass.
 - [ ] Cut a new [VRL release](https://github.com/vectordotdev/vrl/blob/main/release/README.md) if needed.
 - [ ] Choose the Vector release version and the released VRL version.
 
@@ -20,8 +20,7 @@ labels: "domain: releasing"
 The merge is the release approval. The autotag workflow validates the merged diff and creates the
 version tag at the exact squash-merge commit. That tag starts the existing release workflow.
 After publication, housekeeping restores VRL main, refreshes dependency files, and merges only its
-exact generated commit after required checks pass. See the [recovery guide](../../docs/RELEASE_AUTOMATION.md#recovery)
-if a step fails.
+exact generated commit after required checks pass.
 
 # Downstream releases
 
