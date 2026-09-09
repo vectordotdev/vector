@@ -210,6 +210,18 @@ impl FileWatcher {
                     Box::new(BufReader::new(gzip_multiple_decoder(reader)))
                 }
             } else {
+                let len = file_handle.metadata().await?.len();
+                if self.file_position > len {
+                    // Same protection as in `new`: rebinding to a file shorter
+                    // than the current position would silently skip its head.
+                    warn!(
+                        message = "Position is beyond the end of the replacement file; reading it from the beginning.",
+                        ?path,
+                        position = self.file_position,
+                        file_size = len,
+                    );
+                    self.file_position = 0;
+                }
                 reader.seek(io::SeekFrom::Start(self.file_position)).await?;
                 Box::new(reader)
             };

@@ -476,14 +476,21 @@ where
             && matches!(file_id, FileFingerprint::DevInode(..))
             && let Some(checkpoint_modified) = checkpoints.modified_time(file_id)
             && let Ok(created) = fs::metadata(&path).await.and_then(|m| m.created())
-            && DateTime::<Utc>::from(created) > checkpoint_modified
         {
-            warn!(
-                message = "Checkpoint predates the file's creation; assuming the inode was reused by a new file and discarding the checkpoint.",
-                ?path,
-                checkpoint = position,
-            );
-            read_from = fallback;
+            let created = DateTime::<Utc>::from(created);
+            // A creation time in the future means the filesystem's clock cannot
+            // be trusted (e.g. a skewed network filesystem); don't treat the
+            // comparison as proof of inode reuse there, or a legitimate
+            // checkpoint would be discarded on every startup.
+            let plausible = created < Utc::now() + chrono::TimeDelta::seconds(1);
+            if plausible && created > checkpoint_modified {
+                warn!(
+                    message = "Checkpoint predates the file's creation; assuming the inode was reused by a new file and discarding the checkpoint.",
+                    ?path,
+                    checkpoint = position,
+                );
+                read_from = fallback;
+            }
         }
 
         match FileWatcher::new(
@@ -496,11 +503,17 @@ where
         .await
         {
             Ok(mut watcher) => {
-                if let ReadFrom::Checkpoint(file_position) = read_from {
-                    self.emitter.emit_file_resumed(&path, file_position);
-                } else {
-                    self.emitter.emit_file_added(&path);
+                match read_from {
+                    // The watcher itself may have refused a checkpoint pointing
+                    // beyond the end of the file; report what actually happened.
+                    ReadFrom::Checkpoint(file_position)
+                        if watcher.get_file_position() == file_position =>
+                    {
+                        self.emitter.emit_file_resumed(&path, file_position);
+                    }
+                    _ => self.emitter.emit_file_added(&path),
                 }
+                checkpoints.claim(file_id);
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);
             }

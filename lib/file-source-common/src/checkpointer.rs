@@ -59,8 +59,28 @@ pub struct CheckpointsView {
 
 impl CheckpointsView {
     pub fn update(&self, fng: FileFingerprint, pos: FilePosition) {
+        // Once a `DevInode` watcher has died, further updates can only be late
+        // acknowledgements of data read before its file disappeared. Record the
+        // position (so a legitimate reappearance of the same file resumes
+        // correctly) but keep the entry marked dead and its modified time
+        // frozen: refreshing them would make a stale checkpoint look current to
+        // the inode-reuse detection in `FileServer::watch_new_file`, and keep
+        // the entry alive past its expiry for as long as acknowledgements
+        // trickle in. A new watcher claiming this fingerprint lifts the dead
+        // mark via `claim`.
+        if matches!(fng, FileFingerprint::DevInode(..)) && self.removed_times.contains_key(&fng) {
+            self.checkpoints.insert(fng, pos);
+            return;
+        }
+
         self.checkpoints.insert(fng, pos);
         self.modified_times.insert(fng, Utc::now());
+        self.removed_times.remove(&fng);
+    }
+
+    /// Mark a fingerprint as owned by a live watcher again, cancelling any
+    /// pending expiry without refreshing its modified time.
+    pub fn claim(&self, fng: FileFingerprint) {
         self.removed_times.remove(&fng);
     }
 
@@ -461,6 +481,46 @@ mod test {
         assert_eq!(chkptr.get_checkpoint(cases[1].0), None);
         assert_eq!(chkptr.get_checkpoint(cases[2].0), Some(42));
         assert_eq!(chkptr.get_checkpoint(cases[3].0), None);
+    }
+
+    #[tokio::test]
+    async fn test_update_does_not_resurrect_dead_dev_inode_checkpoints() {
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        let dev_inode = FileFingerprint::DevInode(1, 2);
+        let checksum = FileFingerprint::FirstLinesChecksum(78910);
+
+        chkptr.update_checkpoint(dev_inode, 100);
+        chkptr.update_checkpoint(checksum, 100);
+        let modified_before = chkptr.checkpoints.modified_time(dev_inode).unwrap();
+        chkptr.checkpoints.set_dead(dev_inode);
+        chkptr.checkpoints.set_dead(checksum);
+
+        // A late acknowledgement advances the position but must neither refresh
+        // the modified time nor lift the dead mark of a dev_inode fingerprint:
+        // its inode may already belong to a new file, and a refreshed modified
+        // time would defeat the inode-reuse detection at watcher creation.
+        chkptr.checkpoints.update(dev_inode, 200);
+        assert_eq!(chkptr.get_checkpoint(dev_inode), Some(200));
+        assert_eq!(
+            chkptr.checkpoints.modified_time(dev_inode),
+            Some(modified_before)
+        );
+        assert!(chkptr.checkpoints.removed_times.contains_key(&dev_inode));
+
+        // Checksum fingerprints keep the resurrect-on-update semantics.
+        chkptr.checkpoints.update(checksum, 200);
+        assert!(!chkptr.checkpoints.removed_times.contains_key(&checksum));
+
+        // A new watcher claiming the fingerprint lifts the dead mark without
+        // touching the modified time.
+        chkptr.checkpoints.claim(dev_inode);
+        assert!(!chkptr.checkpoints.removed_times.contains_key(&dev_inode));
+        assert_eq!(
+            chkptr.checkpoints.modified_time(dev_inode),
+            Some(modified_before)
+        );
     }
 
     #[tokio::test]
