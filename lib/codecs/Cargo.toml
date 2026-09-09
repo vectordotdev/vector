@@ -87,6 +87,6 @@ test = []
 
 [[bench]]
 name = "codecs"
-path = "benches/main.rs"
+path = "benches/codecs/main.rs"
 harness = false
 required-features = ["opentelemetry"]
