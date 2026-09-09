@@ -555,9 +555,12 @@ where
     filter_result_sync(result, message)
 }
 
-#[expect(
-    clippy::missing_const_for_fn,
-    reason = "#[cfg(linux)] calls non-const methods"
+#[cfg_attr(
+    not(target_os = "linux"),
+    expect(
+        clippy::missing_const_for_fn,
+        reason = "#[cfg(linux)] calls non-const methods"
+    )
 )]
 fn init_roots() {
     #[cfg(target_os = "linux")]
