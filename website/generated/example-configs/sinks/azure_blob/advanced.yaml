@@ -3,6 +3,7 @@ sinks:
     type: azure_blob
     inputs:
       - my-source-or-transform-id
+    api_version: 2021-08-06
     blob_append_uuid: false
     blob_prefix: blob/%F/
     blob_type: block

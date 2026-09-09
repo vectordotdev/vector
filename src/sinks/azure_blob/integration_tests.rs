@@ -627,6 +627,7 @@ impl AzureBlobSinkConfig {
             connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{address}:10000/devstoreaccount1;QueueEndpoint=http://{address}:10001/devstoreaccount1;TableEndpoint=http://{address}:10002/devstoreaccount1;").into()),
             account_name: None,
             blob_endpoint: None,
+            api_version: Some("2021-08-06".into()),
             container_name: "logs".to_string(),
             blob_prefix: Default::default(),
             blob_time_format: None,
@@ -655,6 +656,7 @@ impl AzureBlobSinkConfig {
             connection_string: Some(format!("DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;BlobEndpoint=https://{address}:14430/devstoreaccount1;QueueEndpoint=https://{address}:14431/devstoreaccount1;TableEndpoint=https://{address}:14432/devstoreaccount1;").into()),
             account_name: None,
             blob_endpoint: None,
+            api_version: None,
             container_name: "logs".to_string(),
             blob_prefix: Default::default(),
             blob_time_format: None,
@@ -697,6 +699,7 @@ impl AzureBlobSinkConfig {
             self.auth.clone(),
             parsed,
             url,
+            self.api_version.clone(),
             &crate::config::ProxyConfig::default(),
             self.tls.clone(),
         )

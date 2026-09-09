@@ -13,9 +13,10 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 
 /// Shared Key authorization policy for Azure Blob Storage requests.
 ///
-/// This policy injects the required headers (x-ms-date, x-ms-version, and
-/// content-length) if missing and adds the `Authorization: SharedKey {account}:{signature}` header. The signature
-/// is computed according to the "Authorize with Shared Key" rules for the Blob service:
+/// This policy injects x-ms-date and a missing content-length header, then adds the
+/// `Authorization: SharedKey {account}:{signature}` header. The x-ms-version header is supplied
+/// by the Azure SDK and signed without being changed. The signature is computed according to the
+/// "Authorize with Shared Key" rules for the Blob service:
 ///
 /// StringToSign =
 ///   VERB + "\n" +
@@ -43,7 +44,6 @@ use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 pub struct SharedKeyAuthorizationPolicy {
     account_name: String,
     account_key: Vec<u8>, // decoded from base64
-    storage_version: String,
 }
 
 impl SharedKeyAuthorizationPolicy {
@@ -51,12 +51,7 @@ impl SharedKeyAuthorizationPolicy {
     ///
     /// - `account_name`: The storage account name.
     /// - `account_key_b64`: Base64-encoded storage account key.
-    /// - `storage_version`: x-ms-version value to send (e.g. "2025-11-05").
-    pub fn new(
-        account_name: String,
-        account_key_b64: String,
-        storage_version: String,
-    ) -> AzureResult<Self> {
+    pub fn new(account_name: String, account_key_b64: String) -> AzureResult<Self> {
         let account_key = base64::decode(account_key_b64.as_bytes()).map_err(|e| {
             AzureError::with_message(
                 azure_core::error::ErrorKind::Other,
@@ -66,17 +61,13 @@ impl SharedKeyAuthorizationPolicy {
         Ok(Self {
             account_name,
             account_key,
-            storage_version,
         })
     }
 
-    fn ensure_signing_headers(&self, request: &mut Request) -> AzureResult<(String, String)> {
-        // Always set x-ms-date and x-ms-version explicitly to known values for signing.
+    fn ensure_signing_headers(&self, request: &mut Request) {
         let now = OffsetDateTime::now_utc();
         let ms_date = to_rfc7231(&now);
-        request.insert_header("x-ms-date", ms_date.clone());
-        let ms_version = self.storage_version.clone();
-        request.insert_header("x-ms-version", ms_version.clone());
+        request.insert_header("x-ms-date", ms_date);
 
         // Set a known body length before signing so the signature and wire request use the
         // same explicit value. Preserve a Content-Length supplied by the SDK.
@@ -87,16 +78,9 @@ impl SharedKeyAuthorizationPolicy {
         if !has_content_length && let Some(content_length) = request.body().len() {
             request.insert_header("content-length", content_length.to_string());
         }
-
-        Ok((ms_date, ms_version))
     }
 
-    fn build_string_to_sign(
-        &self,
-        req: &Request,
-        ms_date: &str,
-        ms_version: &str,
-    ) -> AzureResult<String> {
+    fn build_string_to_sign(&self, req: &Request) -> AzureResult<String> {
         let method = req.method().as_str();
         let url = req.url();
 
@@ -116,6 +100,15 @@ impl SharedKeyAuthorizationPolicy {
             }
             None
         };
+
+        for required_header in ["x-ms-date", "x-ms-version"] {
+            if header(required_header).is_none() {
+                return Err(AzureError::with_message(
+                    azure_core::error::ErrorKind::Other,
+                    format!("missing required {required_header} header"),
+                ));
+            }
+        }
 
         // Content-Encoding
         if let Some(v) = header("Content-Encoding") {
@@ -193,14 +186,6 @@ impl SharedKeyAuthorizationPolicy {
                     .push(value.as_str().trim().to_string());
             }
         }
-        // Ensure required headers are present (they should have been inserted).
-        xms.entry("x-ms-date".to_string())
-            .or_default()
-            .push(ms_date.to_string());
-        xms.entry("x-ms-version".to_string())
-            .or_default()
-            .push(ms_version.to_string());
-
         for (k, mut vals) in xms {
             vals.sort();
             vals.dedup();
@@ -252,10 +237,11 @@ impl Policy for SharedKeyAuthorizationPolicy {
         request: &mut Request,
         next: &[Arc<dyn Policy>],
     ) -> PolicyResult {
-        // Ensure required signing headers are present
-        let (ms_date, ms_version) = self.ensure_signing_headers(request)?;
+        // The Azure SDK sets x-ms-version before running policies. Add the remaining signing
+        // headers, then sign the exact headers that will be sent.
+        self.ensure_signing_headers(request);
         // Build string to sign
-        let sts = self.build_string_to_sign(request, &ms_date, &ms_version)?;
+        let sts = self.build_string_to_sign(request)?;
         let signature = self.sign(&sts)?;
 
         // Authorization: SharedKey {account}:{signature}
@@ -310,12 +296,39 @@ mod tests {
     use super::*;
 
     fn policy() -> SharedKeyAuthorizationPolicy {
-        SharedKeyAuthorizationPolicy::new(
-            "account".to_owned(),
-            "ZmFrZS10ZXN0LWFjY291bnQta2V5".to_owned(),
-            "2025-11-05".to_owned(),
-        )
-        .expect("test key should be valid base64")
+        SharedKeyAuthorizationPolicy::new("account".into(), "a2V5".into()).unwrap()
+    }
+
+    #[test]
+    fn build_string_to_sign_includes_existing_service_version() {
+        let policy = policy();
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob").unwrap(),
+            Method::Put,
+        );
+        request.insert_header("x-ms-version", "2021-08-06");
+
+        policy.ensure_signing_headers(&mut request);
+        let string_to_sign = policy.build_string_to_sign(&request).unwrap();
+
+        assert!(string_to_sign.contains("x-ms-version:2021-08-06\n"));
+    }
+
+    #[test]
+    fn build_string_to_sign_rejects_missing_service_version() {
+        let policy = policy();
+        let mut request = Request::new(
+            Url::parse("https://account.blob.core.windows.net/container/blob").unwrap(),
+            Method::Put,
+        );
+        policy.ensure_signing_headers(&mut request);
+
+        let error = policy.build_string_to_sign(&request).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("missing required x-ms-version header")
+        );
     }
 
     fn content_length_header(request: &Request) -> Option<&str> {
@@ -328,11 +341,10 @@ mod tests {
 
     fn content_length_field(request: &mut Request) -> String {
         let policy = policy();
+        request.insert_header("x-ms-version", "2025-11-05");
+        policy.ensure_signing_headers(request);
         policy
-            .ensure_signing_headers(request)
-            .expect("signing headers should be added");
-        policy
-            .build_string_to_sign(request, "Thu, 30 Jul 2026 16:02:25 GMT", "2025-11-05")
+            .build_string_to_sign(request)
             .expect("request should be signed")
             .lines()
             .nth(3)
