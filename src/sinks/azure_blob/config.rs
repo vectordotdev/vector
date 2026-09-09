@@ -1,10 +1,4 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with format_with expands to a must_use let binding"
-)]
-
 use std::collections::{BTreeMap, HashMap};
-use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
@@ -18,7 +12,6 @@ use azure_core::{
 use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
 
 use bytes::Bytes;
-use derivative::Derivative;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -365,40 +358,23 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedAzureBlob {
     // The connection string contains credentials (AccountKey / SAS token),
     // so it is intentionally omitted from diagnostics.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     parsed_connection_string: ParsedConnectionString,
     // The container URL may embed a SAS token as its query string, so it is
     // rendered without the query.
-    #[derivative(Debug(format_with = "fmt_container_url"))]
+    #[debug("{}", {let mut url = container_url.clone(); url.set_query(None); url})]
     container_url: Url,
     batcher_settings: BatcherSettings,
     request_settings: TowerRequestSettings,
     encoder: Encoder<Framer>,
     blob_time_format: String,
     blob_append_uuid: bool,
-    #[derivative(Debug(format_with = "fmt_confined_blob_prefix"))]
+    #[debug("{:?}", confined_blob_prefix.to_string())]
     confined_blob_prefix: ConfinedTemplate,
-}
-
-/// Formats a container URL without its query string, so a SAS token embedded
-/// as a query parameter is not leaked into diagnostics.
-fn fmt_container_url(url: &Url, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut url = url.clone();
-    url.set_query(None);
-    fmt::Debug::fmt(&url, f)
-}
-
-/// Formats a confined template as its rendered string.
-fn fmt_confined_blob_prefix(
-    template: &ConfinedTemplate,
-    f: &mut fmt::Formatter<'_>,
-) -> fmt::Result {
-    fmt::Debug::fmt(&template.to_string(), f)
 }
 
 #[async_trait::async_trait]
