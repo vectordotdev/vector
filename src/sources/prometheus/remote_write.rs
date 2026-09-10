@@ -56,21 +56,17 @@ pub struct PrometheusRemoteWriteConfig {
     #[configurable(metadata(docs::examples = "/remote-write"))]
     path: String,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
     /// Defines the behavior for handling conflicting metric metadata.
     #[serde(default)]
     metadata_conflict_strategy: MetadataConflictStrategy,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 

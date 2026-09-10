@@ -18,7 +18,7 @@ use super::{
     sink::StackdriverLogsSink,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     schema,
@@ -93,22 +93,17 @@ pub(super) struct StackdriverConfig {
     #[serde(flatten)]
     pub(super) auth: GcpAuthConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(super) encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig<StackdriverTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     pub(super) tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -116,11 +111,9 @@ pub(super) struct StackdriverConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -268,10 +261,6 @@ impl SinkConfig for StackdriverConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

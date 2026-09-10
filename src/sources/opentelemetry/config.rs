@@ -114,13 +114,10 @@ impl OtlpDecodingConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
-    #[configurable(derived)]
     pub grpc: GrpcConfig,
 
-    #[configurable(derived)]
     pub http: HttpConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
@@ -173,11 +170,9 @@ pub struct GrpcConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:4317", docs::examples = "localhost:4317"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub keepalive: GrpcKeepaliveConfig,
 }
@@ -202,11 +197,9 @@ pub struct HttpConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:4318", docs::examples = "localhost:4318"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub keepalive: KeepaliveConfig,
 

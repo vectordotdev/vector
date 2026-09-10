@@ -2,8 +2,8 @@
 
 use std::fmt;
 
-use http::{Request, StatusCode, Uri};
-use hyper::Body;
+use http::{StatusCode, Uri};
+use http_1::Request;
 use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::{
@@ -19,11 +19,14 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
-    config::{DynValidatedSink, SinkContext, ValidatedSink},
-    http::{Auth, HttpClient, MaybeAuth},
+    config::{SinkContext, ValidatedSink},
+    http::{
+        Auth, MaybeAuth,
+        client_v1::{HttpClient, empty_body},
+    },
     sinks::{
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http_v1::HttpService},
     },
     template::{ConfinedTemplate, ConfinementConfig, Template},
 };
@@ -117,11 +120,9 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub insert_random_shard: bool,
 
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
@@ -129,25 +130,19 @@ pub struct ClickhouseConfig {
     ///
     /// When specified, events are encoded together as a single batch.
     /// This is mutually exclusive with per-event encoding based on the `format` field.
-    #[configurable(derived)]
     #[serde(default)]
     pub batch_encoding: Option<ClickhouseBatchEncoding>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -155,11 +150,9 @@ pub struct ClickhouseConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub query_settings: QuerySettingsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -221,10 +214,6 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
-
     fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
         Some(&self.confinement)
     }
@@ -309,7 +298,7 @@ impl ValidatedSink for ClickhouseConfig {
         } = validated;
         let endpoint = self.endpoint.with_default_parts().uri;
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let client = HttpClient::new(tls_settings.into(), &cx.proxy)?;
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
@@ -327,7 +316,7 @@ impl ValidatedSink for ClickhouseConfig {
         let request_limits = self.request.into_settings();
 
         let service = ServiceBuilder::new()
-            .settings(request_limits, ClickhouseRetryLogic::default())
+            .settings(request_limits, ClickhouseRetryLogic)
             .service(service);
 
         // Resolve the encoding strategy (format + encoder) based on configuration.
@@ -486,15 +475,17 @@ fn get_healthcheck_uri(endpoint: &Uri) -> String {
 
 async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
     let uri = get_healthcheck_uri(&endpoint);
-    let mut request = Request::get(uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(uri).body(empty_body())?;
 
     if let Some(auth) = auth {
-        auth.apply(&mut request);
+        auth.apply_v1(&mut request);
     }
 
     let response = client.send(request).await?;
 
-    match response.status() {
+    let status = StatusCode::from_u16(response.status().as_u16())
+        .expect("HTTP status codes are valid u16 values");
+    match status {
         StatusCode::OK => Ok(()),
         status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
     }

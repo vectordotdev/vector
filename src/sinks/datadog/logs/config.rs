@@ -10,7 +10,7 @@ use vrl::value::Kind;
 use hyper::{Body, client::connect::Connect};
 
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
-use crate::config::{DynValidatedSink, ValidatedSink};
+use crate::config::ValidatedSink;
 use crate::{
     common::datadog,
     http::HttpClient,
@@ -56,20 +56,16 @@ pub struct DatadogLogsConfig {
     #[serde(flatten)]
     pub local_dd_common: LocalDatadogCommonConfig,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_compression()"))]
     #[serde(default = "default_compression")]
     pub compression: Option<Compression>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
 
@@ -203,10 +199,6 @@ impl SinkConfig for DatadogLogsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.local_dd_common.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -8,7 +8,7 @@ use super::{
     sink::StackdriverMetricsSink,
 };
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
@@ -64,18 +64,14 @@ pub struct StackdriverConfig {
     #[serde(default = "default_metric_namespace_value")]
     pub(super) default_namespace: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) request: TowerRequestConfig<StackdriverMetricsTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     pub(super) tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -83,7 +79,6 @@ pub struct StackdriverConfig {
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 }
@@ -108,10 +103,6 @@ impl SinkConfig for StackdriverConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 
