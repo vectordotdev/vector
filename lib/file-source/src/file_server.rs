@@ -207,7 +207,22 @@ where
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                // ok if this fails: might fix next cycle
+                                if let Ok(true) = watcher.update_path(path).await {
+                                    // The watcher restarted the replacement from
+                                    // the beginning: give it a new generation so
+                                    // in-flight reads from the previous file
+                                    // cannot be recorded as its progress, and
+                                    // persist the reset so the stale offset
+                                    // cannot be trusted again after a restart.
+                                    let generation = checkpoints.begin_generation(file_id);
+                                    watcher.set_generation(generation);
+                                    checkpoints.update(
+                                        file_id,
+                                        watcher.get_file_position(),
+                                        generation,
+                                    );
+                                }
                             } else {
                                 info!(
                                     message = "More than one file has the same fingerprint.",
@@ -225,7 +240,18 @@ where
                                         new_modified_time = ?new_modified_time,
                                         old_modified_time = ?old_modified_time,
                                     );
-                                    watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                    // ok if this fails: might fix next cycle
+                                    if let Ok(true) = watcher.update_path(path).await {
+                                        // Same as the rename branch above: reset
+                                        // means new generation + persisted reset.
+                                        let generation = checkpoints.begin_generation(file_id);
+                                        watcher.set_generation(generation);
+                                        checkpoints.update(
+                                            file_id,
+                                            watcher.get_file_position(),
+                                            generation,
+                                        );
+                                    }
                                 }
                             }
                         } else {
@@ -527,9 +553,27 @@ where
                 }
                 watcher.set_generation(generation);
                 watcher.set_file_findable(true);
+
+                // If the stored checkpoint was rejected (beyond-EOF guard in
+                // `FileWatcher::new`), persist the effective position under the
+                // new generation right away: leaving the stale offset in the
+                // checkpoint file until the first delivered line would let a
+                // restart trust it again once the file has grown past it.
+                if let ReadFrom::Checkpoint(file_position) = read_from
+                    && watcher.get_file_position() != file_position
+                {
+                    checkpoints.update(file_id, watcher.get_file_position(), generation);
+                }
+
                 fp_map.insert(file_id, watcher);
             }
-            Err(error) => self.emitter.emit_file_watch_error(&path, error),
+            Err(error) => {
+                // The generation was already claimed and its pending expiry
+                // cancelled, but no watcher exists to ever mark it dead again;
+                // re-arm the expiry so the fingerprint's state cannot leak.
+                checkpoints.set_dead(file_id);
+                self.emitter.emit_file_watch_error(&path, error)
+            }
         };
     }
 }

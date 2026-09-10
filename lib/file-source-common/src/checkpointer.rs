@@ -92,12 +92,17 @@ impl CheckpointsView {
     /// Start a new watcher generation for this fingerprint, invalidating
     /// updates from any previous watcher that used it. Taking ownership also
     /// cancels any pending expiry: the fingerprint is live again.
+    ///
+    /// The pending expiry is cleared while the generation entry guard is still
+    /// held: the guard serializes lifecycle transitions against
+    /// `remove_expired`, which re-checks the tombstone under the same guard
+    /// before discarding a generation.
     pub fn begin_generation(&self, fng: FileFingerprint) -> u64 {
         let mut entry = self.generations.entry(fng).or_insert(0);
         *entry += 1;
         let generation = *entry;
-        drop(entry);
         self.removed_times.remove(&fng);
+        drop(entry);
         generation
     }
 
@@ -145,14 +150,29 @@ impl CheckpointsView {
             .collect::<Vec<FileFingerprint>>();
 
         for fng in to_remove {
-            self.checkpoints.remove(&fng);
-            self.modified_times.remove(&fng);
-            self.removed_times.remove(&fng);
-            // Dropping the generation entry keeps this map bounded by the set
-            // of live and recently-dead fingerprints; any update still in
-            // flight for this fingerprint is rejected outright once the entry
-            // is gone (see `update`).
-            self.generations.remove(&fng);
+            // The generation entry guard serializes this against a concurrent
+            // `begin_generation`: either the claim completed first (clearing
+            // the tombstone, which the re-check below observes and keeps the
+            // fingerprint alive), or it waits until the removal is done and
+            // starts from a clean slate. Dropping the generation entry keeps
+            // the map bounded by the set of live and recently-dead
+            // fingerprints; any update still in flight for this fingerprint is
+            // rejected outright once the entry is gone (see `update`).
+            match self.generations.entry(fng) {
+                dashmap::mapref::entry::Entry::Occupied(occupied) => {
+                    if self.removed_times.remove(&fng).is_some() {
+                        self.checkpoints.remove(&fng);
+                        self.modified_times.remove(&fng);
+                        occupied.remove();
+                    }
+                }
+                dashmap::mapref::entry::Entry::Vacant(_) => {
+                    if self.removed_times.remove(&fng).is_some() {
+                        self.checkpoints.remove(&fng);
+                        self.modified_times.remove(&fng);
+                    }
+                }
+            }
         }
     }
 

@@ -729,23 +729,23 @@ fn wrap_with_line_agg(
         LineAgg::new(
             rx.map(|line| {
                 (
-                    line.filename,
+                    // Aggregate strictly within one watcher generation of one
+                    // file: a replacement file appearing under the same name
+                    // must not have its first line glued onto the previous
+                    // file's pending aggregate, nor its offsets recorded under
+                    // the previous generation.
+                    (line.filename, line.file_id, line.generation),
                     line.text,
-                    (
-                        line.file_id,
-                        line.generation,
-                        line.start_offset,
-                        line.end_offset,
-                    ),
+                    (line.start_offset, line.end_offset),
                 )
             }),
             logic,
         )
         .map(
             |(
-                filename,
+                (filename, file_id, generation),
                 text,
-                (file_id, generation, start_offset, initial_end),
+                (start_offset, initial_end),
                 lastline_context,
             )| {
                 Line {
@@ -755,9 +755,7 @@ fn wrap_with_line_agg(
                     generation,
                     start_offset,
                     end_offset: lastline_context
-                        .map_or(initial_end, |(_, _, _, lastline_end_offset)| {
-                            lastline_end_offset
-                        }),
+                        .map_or(initial_end, |(_, lastline_end_offset)| lastline_end_offset),
                 }
             },
         ),

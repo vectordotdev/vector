@@ -209,7 +209,13 @@ impl FileWatcher {
         self.generation = generation;
     }
 
-    pub async fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
+    /// Returns `true` when the watcher had to abandon its current position and
+    /// start the replacement file from the beginning; the caller should then
+    /// treat the replacement as a new file (new generation, refreshed
+    /// checkpoint) so in-flight reads from the previous file cannot be
+    /// recorded as the replacement's progress.
+    pub async fn update_path(&mut self, path: PathBuf) -> io::Result<bool> {
+        let mut reset = false;
         let file_handle = File::open(&path).await?;
 
         let file_info = file_handle.file_info().await?;
@@ -237,6 +243,7 @@ impl FileWatcher {
                     // A partial line buffered from the previous file must not
                     // be glued onto the replacement's first line.
                     self.buf.clear();
+                    reset = true;
                 }
                 reader.seek(io::SeekFrom::Start(self.file_position)).await?;
                 Box::new(reader)
@@ -250,7 +257,7 @@ impl FileWatcher {
         self.reached_eof = false;
         self.read_retry_delay = EOF_READ_BACKOFF_MIN;
         self.path = path;
-        Ok(())
+        Ok(reset)
     }
 
     pub fn set_file_findable(&mut self, f: bool) {
