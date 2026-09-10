@@ -111,6 +111,14 @@ enum WatcherState {
         /// `reactivate` itself: `deactivate` already rewinds `file_position` behind these bytes,
         /// so a successful reactivation just re-reads them from disk.
         pending_partial_line: Option<(FilePosition, Bytes)>,
+        /// Whether this watcher had reached EOF as of going `Idle`. `deactivate` only ever runs
+        /// after `reached_eof()` was already `true`, and the startup fast path in
+        /// `FileWatcher::new` starts a fully-read file `Idle` directly, so this is `true` in both
+        /// cases that produce an `Idle` watcher. Kept so `reached_eof()` (used by
+        /// `FileServer`'s `emit_file_unwatched` telemetry) doesn't misreport an `Idle` watcher as
+        /// having been abandoned mid-file, since `Active`'s own `reached_eof` flag would otherwise
+        /// be lost the moment the state switches.
+        reached_eof: bool,
     },
 }
 
@@ -230,6 +238,7 @@ impl FileWatcher {
                         truncated_while_idle: false,
                         force_recheck: false,
                         pending_partial_line: None,
+                        reached_eof: true,
                     },
                     file_position: stat.len(),
                     // We haven't kept the file open, so we don't yet know its
@@ -642,14 +651,24 @@ impl FileWatcher {
         let new_identity = (file_info.portable_dev(), file_info.portable_ino());
         let identity_changed = matches!(self.identity, Some(old) if old != new_identity);
         self.identity = Some(new_identity);
+
+        let mut reader = BufReader::new(f);
+        let gzipped = is_gzipped(&mut reader).await?;
+
         // Also fall back to a direct, final check against the file we just opened: this covers
         // reactivation paths that don't go through `check_for_new_data` first (e.g. a caller that
         // calls `reactivate` directly, as some tests do), where `truncated_while_idle` was never
-        // given a chance to latch.
-        let truncated_at_reactivation = f
-            .metadata()
-            .await
-            .is_ok_and(|m| m.len() < self.file_position);
+        // given a chance to latch. Skipped for gzip: `self.file_position` there counts decompressed
+        // bytes, not the compressed on-disk size `metadata().len()` reports, so comparing the two
+        // would misfire as "truncated" on ordinary compressible content. `truncated_while_idle`
+        // (raw on-disk size vs. raw on-disk size, from `check_for_new_data`) still catches a real
+        // gzip truncation correctly.
+        let truncated_at_reactivation = !gzipped
+            && reader
+                .get_ref()
+                .metadata()
+                .await
+                .is_ok_and(|m| m.len() < self.file_position);
         if identity_changed {
             debug!(
                 message = "Idle watcher's file identity changed on reactivation; \
@@ -675,9 +694,6 @@ impl FileWatcher {
             // invalidates whatever "skipped" state applied to the pre-truncation stream.
             self.gzip_read_skipped = false;
         }
-
-        let mut reader = BufReader::new(f);
-        let gzipped = is_gzipped(&mut reader).await?;
 
         let (reader, file_position, gzip_read_skipped): (
             Box<dyn AsyncBufRead + Send + Unpin>,
@@ -742,11 +758,13 @@ impl FileWatcher {
         let WatcherState::Active {
             buf,
             last_read_success,
+            reached_eof,
             ..
         } = &self.state
         else {
             return;
         };
+        let reached_eof = *reached_eof;
         // Preserve the time of the last successful read (i.e. last-observed activity), not
         // "now" (the moment of deactivation): `FileServer` only calls `deactivate` once a watcher
         // has already been sitting EOF'd and quiet for `idle_timeout`, so by the time we get here
@@ -821,6 +839,7 @@ impl FileWatcher {
             truncated_while_idle: false,
             force_recheck: false,
             pending_partial_line,
+            reached_eof,
         };
     }
 
@@ -1041,13 +1060,10 @@ impl FileWatcher {
 
     #[inline]
     pub fn reached_eof(&self) -> bool {
-        matches!(
-            self.state,
-            WatcherState::Active {
-                reached_eof: true,
-                ..
-            }
-        )
+        match &self.state {
+            WatcherState::Active { reached_eof, .. } => *reached_eof,
+            WatcherState::Idle { reached_eof, .. } => *reached_eof,
+        }
     }
 
     /// How long it has been since this watcher last successfully read data

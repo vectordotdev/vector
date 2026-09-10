@@ -44,13 +44,16 @@
 //!
 //! `notify`'s watcher delivers events via a synchronous callback, invoked on a thread owned by
 //! the OS backend (this is the same shape used elsewhere in this workspace for config file
-//! watching, see `src/config/watcher.rs`). We bridge this into the async world with a
-//! `tokio::sync::mpsc::UnboundedSender`, doing a blocking (but very cheap, non-blocking-in-practice)
-//! send from the notify callback.
+//! watching, see `src/config/watcher.rs`). We bridge this into the async world with a bounded
+//! `tokio::sync::mpsc::Sender`, using `try_send` (non-blocking) from the notify callback.
 
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use file_source_common::internal_events::FileSourceInternalEvents;
@@ -101,8 +104,25 @@ pub struct NotifyDiscovery {
     /// ancestor watch) rather than watching the ancestor forever. See `resync_watches` for
     /// details.
     fallback_watches: HashMap<PathBuf, PathBuf>,
-    receiver: mpsc::UnboundedReceiver<NotifyMessage>,
+    receiver: mpsc::Receiver<NotifyMessage>,
+    /// Set by the notify callback on a `BackendError`, regardless of whether the corresponding
+    /// `NotifyMessage::BackendError` made it onto the (bounded) channel. A `BackendError` can mean
+    /// the watcher silently dropped a watch, so it must always trigger `forget_watches` on the
+    /// next `resync_watches` call -- relying solely on the channel message would lose that
+    /// requirement if the channel happened to be full at the time (see `NOTIFY_CHANNEL_CAPACITY`),
+    /// since a full channel makes the callback substitute a plain `Overflow` for the dropped
+    /// message, and `Overflow` alone doesn't call `forget_watches`.
+    backend_error_pending: Arc<AtomicBool>,
 }
+
+/// Bound on the notify event channel: without this, a sustained burst of filesystem events could
+/// grow the channel (and the `Vec<PathBuf>` payload of each queued message) without limit while
+/// `FileServer` is busy with a reconciliation pass or a slow downstream send. Large enough that
+/// ordinary bursts (an editor doing several writes, a batch of files appearing at once) never hit
+/// it; a full channel just means an `Overflow` is reported instead of the specific event, which
+/// `FileServer` already treats as "something changed, go check everything" via the next
+/// reconciliation pass -- the same fallback already used for the OS-level notify queue overflow.
+const NOTIFY_CHANNEL_CAPACITY: usize = 8192;
 
 impl NotifyDiscovery {
     /// Create a new [`NotifyDiscovery`], watching the directories implied by `include_patterns`.
@@ -116,29 +136,42 @@ impl NotifyDiscovery {
         include_patterns: &[PathBuf],
         emitter: &E,
     ) -> notify::Result<Self> {
-        let (tx, receiver) = mpsc::unbounded_channel();
+        let (tx, receiver) = mpsc::channel(NOTIFY_CHANNEL_CAPACITY);
+        let backend_error_pending = Arc::new(AtomicBool::new(false));
 
+        let callback_backend_error_pending = Arc::clone(&backend_error_pending);
         let watcher = RecommendedWatcher::new(
             move |res: notify::Result<Event>| {
                 // This closure runs on a thread owned by the OS notification backend (e.g. the
-                // inotify reader thread). It must not block meaningfully; an unbounded channel
-                // send is effectively non-blocking (it only allocates).
+                // inotify reader thread), so it must not block: `try_send` rather than the
+                // blocking/async `send`.
                 let msg = match res {
                     Ok(event) => classify_event(event),
                     Err(error) => {
                         if is_overflow(&error) {
                             Some(NotifyMessage::Overflow)
                         } else {
+                            // Set this unconditionally, independent of whether the channel send
+                            // below succeeds: a `BackendError` must always trigger
+                            // `forget_watches` on the next `resync_watches`, and the channel
+                            // (bounded, and possibly full) is not a reliable way to guarantee
+                            // that. See `backend_error_pending`'s doc comment.
+                            callback_backend_error_pending.store(true, Ordering::Relaxed);
                             Some(NotifyMessage::BackendError(error.to_string()))
                         }
                     }
                 };
-                if let Some(msg) = msg {
-                    // The only way this fails is if every receiver has been dropped, i.e.
-                    // FileServer has shut down or was never polling; either way, there's
-                    // nothing useful to do with the error.
-                    drop(tx.send(msg));
+                let Some(msg) = msg else { return };
+                if let Err(mpsc::error::TrySendError::Full(_)) = tx.try_send(msg) {
+                    // The channel is full: fall back to reporting an overflow instead of this
+                    // specific event, same as the OS-level notify queue overflow case above --
+                    // `FileServer` treats both identically (trigger a full reconciliation pass).
+                    // If even that doesn't fit, the channel has been unread for a while and the
+                    // backstop `reconcile_interval` timer will catch up regardless.
+                    drop(tx.try_send(NotifyMessage::Overflow));
                 }
+                // Any other send error means every receiver has been dropped (FileServer shut
+                // down or never polled); nothing useful to do about it.
             },
             Config::default(),
         )?;
@@ -148,6 +181,7 @@ impl NotifyDiscovery {
             watched_dirs: WantedDirs::new(),
             fallback_watches: HashMap::new(),
             receiver,
+            backend_error_pending,
         };
         discovery.resync_watches(include_patterns, emitter);
         Ok(discovery)
@@ -170,7 +204,26 @@ impl NotifyDiscovery {
         include_patterns: &[PathBuf],
         emitter: &E,
     ) {
-        let wanted = compute_watch_directories(include_patterns);
+        // A `BackendError` since the last call means the watcher backend may have silently
+        // dropped a watch; forget all bookkeeping so every directory below is re-`watch`ed from
+        // scratch. Checked here (not just via the `NotifyMessage::BackendError` channel handler)
+        // because a full channel can substitute a plain `Overflow` for the dropped message -- see
+        // `backend_error_pending`'s doc comment.
+        if self.backend_error_pending.swap(false, Ordering::Relaxed) {
+            self.forget_watches();
+        }
+
+        // Absolutize first: `notify` always resolves the path it's asked to `watch()` to an
+        // absolute one internally and reports events using that form, but `include_patterns` can
+        // be relative. Without this, `watched_dirs`/`fallback_watches` would be keyed by relative
+        // paths that never match the absolute paths notify events carry (e.g. in
+        // `is_watched_dir`/`forget_watch`).
+        let cwd = std::env::current_dir().ok();
+        let include_patterns: Vec<PathBuf> = include_patterns
+            .iter()
+            .map(|p| crate::absolutize(p, cwd.as_deref()))
+            .collect();
+        let wanted = compute_watch_directories(&include_patterns);
 
         // Directories we're not already watching under the mode we now want. This also catches
         // a directory that's currently watched `NonRecursive` but now needs `Recursive` (a
@@ -759,6 +812,39 @@ mod tests {
     }
 
     #[test]
+    fn backend_error_pending_forces_forget_watches_even_without_the_channel_message() {
+        // Regression test for a bug found in review: the notify channel is bounded
+        // (`NOTIFY_CHANNEL_CAPACITY`), so a `BackendError` can lose its race to a full channel --
+        // the callback then substitutes a plain `Overflow` for it, which alone does not trigger
+        // `forget_watches`. `backend_error_pending` is set directly by the callback, independent
+        // of whether the `BackendError` message itself made it onto the channel, so
+        // `resync_watches` must still forget all bookkeeping even when no `BackendError` message
+        // was ever received.
+        let dir = tempfile::tempdir().unwrap();
+        let pattern = dir.path().join("*.log");
+        let mut discovery =
+            NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter).unwrap();
+        assert_eq!(discovery.watched_dirs.len(), 1);
+
+        // Simulate the callback having observed a BackendError that lost the race for channel
+        // space, without ever going through `handle_notify_message`.
+        discovery
+            .backend_error_pending
+            .store(true, Ordering::Relaxed);
+
+        discovery.resync_watches(&[pattern], &NoopEmitter);
+        assert_eq!(
+            discovery.watched_dirs.len(),
+            1,
+            "resync_watches must still re-establish the watch via the sticky flag alone"
+        );
+        assert!(
+            !discovery.backend_error_pending.load(Ordering::Relaxed),
+            "the flag must be cleared once acted on"
+        );
+    }
+
+    #[test]
     fn forget_watch_makes_resync_re_watch_one_directory() {
         // Regression test for a bug found in review: removing a watched *directory* on
         // Linux/inotify invalidates the watch on that inode, but a `PathsRemoved` notification for
@@ -784,6 +870,34 @@ mod tests {
         assert!(
             discovery.is_watched_dir(dir.path()),
             "resync_watches must re-establish the watch after it was forgotten"
+        );
+    }
+
+    #[test]
+    fn resync_watches_absolutizes_relative_include_patterns() {
+        // Regression test for a bug found in review: `watched_dirs` used to be keyed by whatever
+        // form `include_patterns` came in, which can be relative (e.g. `include: ["logs/*.log"]`).
+        // `notify` always reports its events using absolute paths, so `is_watched_dir`/
+        // `forget_watch` (used by `PathsRemoved` handling to invalidate a lost watch) would never
+        // match a relative key against the absolute path notify reports for the same directory,
+        // leaving a stale registration in place after the directory is removed and recreated.
+        let cwd = std::env::current_dir().unwrap();
+        // Created directly under the test process's cwd (rather than the system temp directory,
+        // which `tempfile::tempdir()` would use and which usually isn't under `cwd`), so a
+        // relative pattern can always be constructed via `strip_prefix` below -- otherwise this
+        // test would silently skip its own assertion on most platforms/setups.
+        let dir = tempfile::tempdir_in(&cwd).unwrap();
+        let relative_dir = dir
+            .path()
+            .strip_prefix(&cwd)
+            .expect("dir was created under cwd");
+        let pattern = relative_dir.join("*.log");
+        let discovery = NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter).unwrap();
+
+        assert!(
+            discovery.is_watched_dir(dir.path()),
+            "watched_dirs must be keyed by the absolute path, matching what notify reports, \
+             even though the include pattern was relative"
         );
     }
 

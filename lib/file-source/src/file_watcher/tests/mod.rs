@@ -643,6 +643,44 @@ async fn deactivate_closes_handle_and_retains_checkpoint() {
 }
 
 #[tokio::test]
+async fn deactivate_preserves_reached_eof() {
+    // Regression test for a bug found in review: `reached_eof()` used to look only at
+    // `WatcherState::Active`'s own flag, always reporting `false` for an `Idle` watcher.
+    // `deactivate` only ever runs after EOF was reached (checked by `FileServer` before calling
+    // it), so every `Idle` watcher had, by construction, reached EOF -- but that fact was lost
+    // the moment the state switched, making `FileServer`'s `emit_file_unwatched` telemetry
+    // misreport such watchers as abandoned mid-file when they're later reaped.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("reaches_eof.log");
+    fs::write(&path, b"hello\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    // Read the one line, then read again to actually hit EOF.
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_some());
+    let result = watcher.read_line().await.expect("read_line error");
+    assert!(result.raw_line.is_none());
+    assert!(watcher.reached_eof(), "sanity check: watcher hit EOF");
+
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+    assert!(
+        watcher.reached_eof(),
+        "reached_eof() must stay true across the Active -> Idle transition"
+    );
+}
+
+#[tokio::test]
 async fn deactivate_rewinds_past_unterminated_partial_line() {
     // `read_until_with_max_size` advances `file_position` for every byte it
     // reads into its buffer, delimiter or not: a partial line with no
@@ -1556,6 +1594,82 @@ async fn idle_gzip_read_from_end_stays_skipped_on_reactivation() {
         "a gzip stream skipped via `read_from: end` must stay skipped after an idle \
          reactivation triggered by a mere mtime/size change, not suddenly decode and emit \
          the backlog it was supposed to skip"
+    );
+}
+
+#[tokio::test]
+async fn idle_gzip_reactivation_does_not_misdetect_truncation_from_compressed_size() {
+    // Regression test for a bug found in review: `reactivate`'s own truncation check compares
+    // `metadata().len()` (the compressed on-disk size) against `self.file_position`, which for a
+    // gzip stream read from the beginning counts *decompressed* bytes emitted by the decoder.
+    // For any reasonably compressible content, decompressed size quickly exceeds the compressed
+    // file size, so this comparison would misfire as "truncated" on ordinary content, resetting
+    // file_position to 0 and replaying the entire backlog on every reactivation.
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("compressible.gz");
+    // Highly compressible content so decompressed size >> compressed on-disk size.
+    let decompressed = "the quick brown fox jumps over the lazy dog\n".repeat(200);
+    let gz = encode(decompressed.as_bytes()).await;
+    assert!(
+        (gz.len() as u64) < decompressed.len() as u64,
+        "sanity check: the test content must actually compress smaller than its decompressed size"
+    );
+    fs::write(&path, &gz).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        decompressed.len() + 1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_active());
+
+    // Drain the whole decompressed stream so file_position ends up well past the compressed
+    // on-disk size.
+    while watcher
+        .read_line()
+        .await
+        .expect("read_line error")
+        .raw_line
+        .is_some()
+    {}
+    let position_before = watcher.get_file_position();
+    assert!(
+        position_before > gz.len() as u64,
+        "sanity check: decompressed position must exceed the compressed on-disk size"
+    );
+
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    // Touch the file (e.g. an mtime bump from an unrelated append) without truncating it.
+    let mut gz_touched = gz.clone();
+    gz_touched.extend_from_slice(&encode(b"more\n").await);
+    fs::write(&path, &gz_touched).unwrap();
+
+    let changed = watcher.check_for_new_data().await.unwrap();
+    assert!(changed);
+    watcher.reactivate().await.expect("reactivate failed");
+
+    assert_eq!(
+        watcher.get_file_position(),
+        position_before,
+        "reactivate must not reset position to 0 just because the compressed on-disk size is \
+         smaller than the decompressed file_position -- that's expected for gzip, not evidence \
+         of truncation"
     );
 }
 

@@ -132,26 +132,6 @@ impl NotifyWakeup {
     }
 }
 
-/// Absolutize `path` the same way the `notify` crate does internally before using a path passed
-/// to `watch()`: if it's already absolute, leave it as-is; otherwise join it onto `cwd`. This
-/// matters because `notify` always reports its events using the absolute form it resolved
-/// `watch()`'s argument to, but a glob-based `PathsProvider` can yield a relative path unchanged
-/// if the configured `include` pattern was itself relative -- without this, comparing such a path
-/// directly against a notify-reported path would never match. `cwd` is `None` only if
-/// `std::env::current_dir()` itself failed (e.g. the working directory was removed out from under
-/// the process); in that rare case `path` is returned unchanged, since there's no well-defined way
-/// to absolutize it, which merely reproduces the not-nudged-this-pass degradation this function
-/// exists to avoid rather than introducing a new failure mode.
-fn absolutize_for_notify_comparison(path: &Path, cwd: Option<&Path>) -> PathBuf {
-    if path.is_absolute() {
-        return path.to_path_buf();
-    }
-    match cwd {
-        Some(cwd) => cwd.join(path),
-        None => path.to_path_buf(),
-    }
-}
-
 /// Whether a watcher that `discover`'s glob/fingerprint pass just marked unfindable should be
 /// reaped (`set_dead`) on this cycle.
 ///
@@ -714,9 +694,24 @@ where
             // call. Also since we are using block_on here and in the above code,
             // this should be run in its own thread. `spawn_blocking` fulfills
             // all of these requirements.
+            //
+            // Capped at `next_notify_discovery_time` when a notify wakeup is already pending:
+            // otherwise, once `backoff_cap` has grown large from a quiet spell, a pending wakeup
+            // with no further events to cut the sleep short (see the `tokio::select!` below) would
+            // wait out the full backoff instead of the much shorter `MIN_NOTIFY_DISCOVERY_INTERVAL`
+            // throttle it's actually waiting on. Uses a fresh `Instant::now()`, not the `now_time`
+            // captured at the top of the loop: `discover`/reading files/sending downstream can
+            // take a while, and computing the remaining time against a stale timestamp would
+            // overstate it, adding back some of the latency this cap exists to remove.
+            let sleep_duration = if pending_notify_wakeup.is_pending() {
+                Duration::from_millis(backoff as u64)
+                    .min(next_notify_discovery_time.saturating_duration_since(time::Instant::now()))
+            } else {
+                Duration::from_millis(backoff as u64)
+            };
             let sleep_fut = async move {
-                if backoff > 0 {
-                    sleep(Duration::from_millis(backoff as u64)).await;
+                if !sleep_duration.is_zero() {
+                    sleep(sleep_duration).await;
                 }
             };
             futures::pin_mut!(sleep_fut);
@@ -912,7 +907,7 @@ where
     /// itself relative. Without accounting for this, `notify_wakeup.names(&path)` would compare a
     /// relative `path` against an absolute event path and never match, silently defeating the
     /// nudge for every file matched by a relative `include` pattern. `discover` absolutizes `path`
-    /// (via `absolutize_for_notify_comparison`) the same way `notify` would before comparing.
+    /// (via `crate::absolutize`) the same way `notify` would before comparing.
     ///
     /// **Known limitation**: this only accounts for relative-vs-absolute, not full
     /// canonicalization (symlink resolution): canonicalizing every tracked file's path on every
@@ -971,10 +966,8 @@ where
                             message = "Continue watching file.",
                             path = ?path,
                         );
-                        let absolutized_path = absolutize_for_notify_comparison(
-                            &path,
-                            cwd_for_notify_comparison.as_deref(),
-                        );
+                        let absolutized_path =
+                            crate::absolutize(&path, cwd_for_notify_comparison.as_deref());
                         if notify_wakeup.names(&absolutized_path) {
                             // A concrete filesystem event named this exact path (or we can't tell
                             // which paths changed, e.g. `Overflow`), so this watcher may have new
@@ -1431,52 +1424,12 @@ mod tests {
     }
 
     #[test]
-    fn absolutize_leaves_absolute_paths_unchanged() {
-        let cwd = PathBuf::from("/home/user/project");
-        let absolute = PathBuf::from("/var/log/app.log");
-        assert_eq!(
-            absolutize_for_notify_comparison(&absolute, Some(&cwd)),
-            absolute
-        );
-    }
-
-    #[test]
-    fn absolutize_joins_relative_paths_onto_cwd() {
-        // Regression test for a bug found in review: `notify` always resolves the path it's
-        // asked to `watch()` to an absolute one internally (via the current working directory)
-        // before using it in the events it reports, but `Glob::paths()` (paths_provider.rs) can
-        // yield a relative path unchanged when the configured `include` pattern is itself
-        // relative (e.g. `include: ["logs/*.log"]`). Comparing such a relative path directly
-        // against notify's absolute event path -- as `NotifyWakeup::names` used to do -- would
-        // never match, silently defeating `mark_ready_to_read`'s nudge for every file matched by
-        // a relative `include` pattern, delaying their reads until the next backoff/backstop tick
-        // instead of the promised prompt notify wakeup.
-        let cwd = PathBuf::from("/home/user/project");
-        let relative = PathBuf::from("logs/app.log");
-        assert_eq!(
-            absolutize_for_notify_comparison(&relative, Some(&cwd)),
-            PathBuf::from("/home/user/project/logs/app.log")
-        );
-    }
-
-    #[test]
-    fn absolutize_falls_back_to_the_relative_path_when_cwd_is_unknown() {
-        // If `std::env::current_dir()` itself failed, there's no well-defined way to absolutize;
-        // returning the path unchanged merely reproduces the pre-fix "doesn't match" degradation
-        // (nudge doesn't fire, `should_read`'s own timers and the periodic backstop still apply)
-        // rather than introducing a new failure mode (e.g. panicking).
-        let relative = PathBuf::from("logs/app.log");
-        assert_eq!(absolutize_for_notify_comparison(&relative, None), relative);
-    }
-
-    #[test]
     fn notify_wakeup_matches_relative_include_path_once_absolutized() {
-        // End-to-end regression test for the same bug covered by `absolutize_joins_relative_paths_onto_cwd`,
-        // exercised through the exact `NotifyWakeup` API `discover` calls: a notify event names an
-        // absolute path (as `notify` always reports), while the glob-discovered path for the same
-        // file is relative (as `Glob::paths()` yields for a relative `include` pattern). Without
-        // absolutizing the glob path first, `names()` would report `false` even though both sides
-        // refer to the same file.
+        // Regression test for a bug found in review: a notify event names an absolute path (as
+        // `notify` always reports), while the glob-discovered path for the same file is relative
+        // (as `Glob::paths()` yields for a relative `include` pattern). Without absolutizing the
+        // glob path first, `names()` would report `false` even though both sides refer to the
+        // same file.
         let cwd = PathBuf::from("/home/user/project");
         let mut wakeup = NotifyWakeup::default();
         wakeup.add_paths([PathBuf::from("/home/user/project/logs/app.log")]);
@@ -1488,7 +1441,7 @@ mod tests {
              must not match"
         );
 
-        let absolutized = absolutize_for_notify_comparison(&glob_discovered_path, Some(&cwd));
+        let absolutized = crate::absolutize(&glob_discovered_path, Some(&cwd));
         assert!(
             wakeup.names(&absolutized),
             "after absolutizing the glob-discovered relative path the same way notify resolves \
