@@ -125,24 +125,19 @@ pub struct HostMetricsConfig {
     #[serde(default = "default_namespace")]
     pub namespace: Option<String>,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_cgroups_config()"))]
     #[serde(default = "default_cgroups_config")]
     pub cgroups: Option<CGroupsConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub disk: disk::DiskConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub filesystem: filesystem::FilesystemConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub network: network::NetworkConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub process: process::ProcessConfig,
 }
@@ -560,7 +555,13 @@ where
     filter_result_sync(result, message)
 }
 
-#[allow(clippy::missing_const_for_fn)]
+#[cfg_attr(
+    not(target_os = "linux"),
+    expect(
+        clippy::missing_const_for_fn,
+        reason = "#[cfg(linux)] calls non-const methods"
+    )
+)]
 fn init_roots() {
     #[cfg(target_os = "linux")]
     {

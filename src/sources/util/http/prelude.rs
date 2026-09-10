@@ -145,8 +145,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 HttpMethod::Options => warp::options().boxed(),
             };
 
-            // https://github.com/rust-lang/rust-clippy/issues/8148
-            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
@@ -271,9 +269,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
             info!(message = "Building HTTP server.", address = %address);
 
-            let listener = tls.bind(&address).await.map_err(|err| {
-                error!("An error occurred: {:?}.", err);
-            })?;
+            let listener = tls
+                .bind(&address)
+                .await
+                .map_err(|err| {
+                    error!("An error occurred: {:?}.", err);
+                })?
+                .with_keepalive(keepalive_settings.tcp_keepalive);
 
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(make_svc)

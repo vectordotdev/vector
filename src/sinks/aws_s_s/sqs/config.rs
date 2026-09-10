@@ -11,8 +11,8 @@ use crate::{
     aws::{RegionOrEndpoint, create_client},
     common::sqs::SqsClientBuilder,
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
     },
     template::UnconfinedTemplate,
 };
@@ -76,10 +76,6 @@ impl SinkConfig for SqsSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.base_config.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone)]
@@ -105,6 +101,7 @@ impl ValidatedSink for SqsSinkConfig {
         )?;
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
+        self.base_config.encoding.validate()?;
 
         Ok(ValidatedSqsSink {
             message_group_id,

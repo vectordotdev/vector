@@ -119,8 +119,8 @@ mod parser;
 mod postgresql_metrics;
 mod process;
 #[cfg(any(
-    feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-remote-write",
+    feature = "sources-prometheus_scrape",
+    feature = "sources-prometheus_remote_write",
     feature = "sinks-prometheus"
 ))]
 mod prometheus;
@@ -152,7 +152,7 @@ mod udp;
 mod unix;
 #[cfg(any(feature = "sources-websocket", feature = "sinks-websocket"))]
 mod websocket;
-#[cfg(feature = "sinks-websocket-server")]
+#[cfg(feature = "sinks-websocket_server")]
 mod websocket_server;
 #[cfg(feature = "transforms-window")]
 mod window;
@@ -271,8 +271,8 @@ pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
 #[cfg(any(
-    feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-remote-write",
+    feature = "sources-prometheus_scrape",
+    feature = "sources-prometheus_remote_write",
     feature = "sinks-prometheus"
 ))]
 pub(crate) use self::prometheus::*;
@@ -300,7 +300,7 @@ pub(crate) use self::throttle::*;
 pub(crate) use self::unix::*;
 #[cfg(any(feature = "sources-websocket", feature = "sinks-websocket"))]
 pub(crate) use self::websocket::*;
-#[cfg(feature = "sinks-websocket-server")]
+#[cfg(feature = "sinks-websocket_server")]
 pub(crate) use self::websocket_server::*;
 #[cfg(feature = "transforms-window")]
 pub(crate) use self::window::*;

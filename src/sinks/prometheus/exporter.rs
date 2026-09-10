@@ -34,8 +34,8 @@ use vector_lib::{
 use super::collector::{MetricCollector, StringCollector};
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, Resource, SinkConfig,
-        SinkContext, ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
+        ValidatedSink,
     },
     event::{
         Event, EventStatus, Finalizable,
@@ -79,10 +79,8 @@ pub struct PrometheusExporterConfig {
     #[configurable(metadata(docs::examples = "192.160.0.10:9598"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
     /// Default buckets to use for aggregating [distribution][dist_metric_docs] metrics into histograms.
@@ -132,7 +130,6 @@ pub struct PrometheusExporterConfig {
     #[serde(default)]
     pub suppress_timestamp: bool,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -193,10 +190,6 @@ impl SinkConfig for PrometheusExporterConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

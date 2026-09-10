@@ -18,7 +18,7 @@ use vector_lib::{
     },
 };
 
-use super::config::AzureBlobSinkConfig;
+use super::config::{AzureBlobSinkConfig, AzureBlobType};
 use crate::{
     config::ValidatedSink,
     event::{Event, EventArray, LogEvent},
@@ -321,6 +321,304 @@ async fn azure_blob_insert_lines_with_blob_tags_and_metadata_with_oauth() {
     .await;
 }
 
+async fn assert_append_blob_reuses_same_blob(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("append/basic/{}", random_string(10));
+    let config = AzureBlobSinkConfig {
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
+        blob_type: AzureBlobType::Append,
+        blob_time_format: Some(String::new()), // stable name — no time component
+        blob_append_uuid: Some(false),
+        ..config
+    };
+
+    let (lines1, input1) = random_lines_with_stream(100, 5, None);
+    let (lines2, input2) = random_lines_with_stream(100, 5, None);
+
+    config.run_assert(input1).await;
+    config.run_assert(input2).await;
+
+    let blobs = config.list_blobs(blob_prefix).await;
+    assert_eq!(blobs.len(), 1, "append blob mode must reuse a single blob");
+    let (content_type, _content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    assert_eq!(content_type, Some(String::from("text/plain")));
+
+    let expected: Vec<String> = lines1.into_iter().chain(lines2).collect();
+    assert_eq!(blob_lines, expected);
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_reuses_same_blob() {
+    assert_append_blob_reuses_same_blob(AzureBlobSinkConfig::new_emulator().await).await;
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_reuses_same_blob_with_oauth() {
+    assert_append_blob_reuses_same_blob(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;
+}
+
+/// NDJSON append: two batches of structured events land in one blob with the correct content-type
+/// and all JSON lines intact and in order.
+async fn assert_append_blob_json_encoding(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("append/json/{}", random_string(10));
+    let config = AzureBlobSinkConfig {
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
+        blob_type: AzureBlobType::Append,
+        blob_time_format: Some(String::new()),
+        blob_append_uuid: Some(false),
+        encoding: (
+            Some(NewlineDelimitedEncoderConfig::new()),
+            JsonSerializerConfig::default(),
+        )
+            .into(),
+        ..config
+    };
+
+    let (events1, input1) = random_events_with_stream(100, 5, None);
+    let (events2, input2) = random_events_with_stream(100, 5, None);
+
+    config.run_assert(input1).await;
+    config.run_assert(input2).await;
+
+    let blobs = config.list_blobs(blob_prefix).await;
+    assert_eq!(blobs.len(), 1, "append blob must produce exactly one blob");
+    let (content_type, _content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    assert_eq!(
+        content_type,
+        Some(String::from("application/x-ndjson")),
+        "content-type must reflect NDJSON encoding"
+    );
+
+    let expected: Vec<String> = events1
+        .iter()
+        .chain(events2.iter())
+        .map(|e| serde_json::to_string(&e.as_log().all_event_fields().unwrap()).unwrap())
+        .collect();
+    assert_eq!(blob_lines, expected);
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_json_encoding() {
+    assert_append_blob_json_encoding(AzureBlobSinkConfig::new_emulator().await).await;
+}
+
+/// The minimal JSON append config — `codec = "json"` with no `framing` — must produce NDJSON.
+/// Block mode would frame each batch as a JSON array, and appending a second array would leave the
+/// blob unparseable, so append mode defaults to newline framing instead.
+async fn assert_append_blob_json_default_framing(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("append/json-default-framing/{}", random_string(10));
+    let config = AzureBlobSinkConfig {
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
+        blob_type: AzureBlobType::Append,
+        blob_time_format: Some(String::new()),
+        blob_append_uuid: Some(false),
+        // Deliberately no framing: this is the config that array-framed each batch.
+        encoding: (None::<FramingConfig>, JsonSerializerConfig::default()).into(),
+        ..config
+    };
+
+    let (events1, input1) = random_events_with_stream(100, 5, None);
+    let (events2, input2) = random_events_with_stream(100, 5, None);
+
+    config.run_assert(input1).await;
+    config.run_assert(input2).await;
+
+    let blobs = config.list_blobs(blob_prefix).await;
+    assert_eq!(blobs.len(), 1, "append blob must produce exactly one blob");
+    let (content_type, _content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    assert_eq!(
+        content_type,
+        Some(String::from("application/x-ndjson")),
+        "append mode must default to NDJSON framing, not a JSON array per batch"
+    );
+
+    let expected: Vec<String> = events1
+        .iter()
+        .chain(events2.iter())
+        .map(|e| serde_json::to_string(&e.as_log().all_event_fields().unwrap()).unwrap())
+        .collect();
+    assert_eq!(blob_lines, expected);
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_json_default_framing() {
+    assert_append_blob_json_default_framing(AzureBlobSinkConfig::new_emulator().await).await;
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_json_encoding_with_oauth() {
+    assert_append_blob_json_encoding(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;
+}
+
+/// Default hourly rotation: without explicit blob_time_format or blob_append_uuid overrides,
+/// append blobs use `%Y-%m-%dT%H` and no UUID — two batches both write to the current hour's blob.
+async fn assert_append_blob_default_hourly_rotation(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("append/hourly/{}/", random_string(10));
+    let config = AzureBlobSinkConfig {
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
+        blob_type: AzureBlobType::Append,
+        // Intentionally leave blob_time_format and blob_append_uuid at None
+        // to exercise the type-aware defaults in build_processor.
+        blob_time_format: None,
+        blob_append_uuid: None,
+        ..config
+    };
+
+    let (lines1, input1) = random_lines_with_stream(100, 5, None);
+    let (lines2, input2) = random_lines_with_stream(100, 5, None);
+
+    // Bracket both runs with the current hour so an hour boundary crossing mid-test is handled
+    // rather than flaking: the batches then legitimately rotate into a second blob.
+    let before = chrono::Utc::now().format("%Y-%m-%dT%H").to_string();
+    config.run_assert(input1).await;
+    config.run_assert(input2).await;
+    let after = chrono::Utc::now().format("%Y-%m-%dT%H").to_string();
+
+    // Sorted explicitly: for this time format lexicographic order is chronological, so the two
+    // blobs of an hour-boundary crossing read back in write order.
+    let mut blobs = config.list_blobs(blob_prefix.clone()).await;
+    blobs.sort();
+    let expected: Vec<String> = lines1.into_iter().chain(lines2).collect();
+
+    if before == after {
+        assert_eq!(
+            blobs.len(),
+            1,
+            "both batches must go to the same hourly-rotated blob"
+        );
+        assert!(
+            blobs[0].contains(&before),
+            "blob name '{}' must contain the current hour '{}'",
+            blobs[0],
+            before
+        );
+    } else {
+        assert!(
+            blobs.len() <= 2,
+            "expected at most two blobs across an hour boundary, got {blobs:?}"
+        );
+    }
+
+    // Blob listings come back lexicographically, which for this format is chronological.
+    let mut blob_lines = Vec::new();
+    for blob in &blobs {
+        let (_content_type, _content_encoding, lines) = config.get_blob(blob.clone()).await;
+        blob_lines.extend(lines);
+    }
+    assert_eq!(blob_lines, expected);
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_default_hourly_rotation() {
+    assert_append_blob_default_hourly_rotation(AzureBlobSinkConfig::new_emulator().await).await;
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_default_hourly_rotation_with_oauth() {
+    assert_append_blob_default_hourly_rotation(
+        AzureBlobSinkConfig::new_emulator_with_oauth().await,
+    )
+    .await;
+}
+
+/// Forced multi-flush: a low batch.max_bytes causes Vector to flush many small blocks within a
+/// single run. All blocks must land in one append blob and every line must be present.
+async fn assert_append_blob_multiple_forced_flushes(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("append/multiflush/{}", random_string(10));
+
+    // Generate enough lines that at ~100 bytes each we get at least 5 forced flushes.
+    let line_count = 50;
+    let (lines, input) = random_lines_with_stream(100, line_count, None);
+
+    // Rough per-line size: 100 bytes content + framing. Force a flush every ~3 lines.
+    let flush_every_n_bytes = 350;
+
+    let mut batch = config.batch;
+    batch.max_bytes = Some(flush_every_n_bytes);
+
+    let config = AzureBlobSinkConfig {
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
+        blob_type: AzureBlobType::Append,
+        blob_time_format: Some(String::new()),
+        blob_append_uuid: Some(false),
+        batch,
+        ..config
+    };
+
+    config.run_assert(input).await;
+
+    let blobs = config.list_blobs(blob_prefix).await;
+    assert_eq!(
+        blobs.len(),
+        1,
+        "all forced flushes must append to the same blob"
+    );
+    let (_content_type, _content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    assert_eq!(
+        blob_lines.len(),
+        line_count,
+        "every flushed line must appear in the blob"
+    );
+    assert_eq!(blob_lines, lines);
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_multiple_forced_flushes() {
+    assert_append_blob_multiple_forced_flushes(AzureBlobSinkConfig::new_emulator().await).await;
+}
+
+/// Tags and metadata must survive on the created append blob just as they do on block blobs.
+/// This is the cross-feature check that append blobs correctly wire the tags/metadata into
+/// `AppendBlobClientCreateOptions`.
+async fn assert_append_blob_with_tags_and_metadata(config: AzureBlobSinkConfig) {
+    let blob_prefix = format!("append/tags-meta/{}", random_string(10));
+
+    let mut tags = BTreeMap::new();
+    tags.insert("Project".to_string(), "Blue".to_string());
+    tags.insert("Owner".to_string(), "vector".to_string());
+
+    let mut metadata = HashMap::new();
+    metadata.insert("source".to_string(), "vector".to_string());
+    metadata.insert("environment".to_string(), "test".to_string());
+
+    let config = AzureBlobSinkConfig {
+        blob_prefix: blob_prefix.clone().try_into().unwrap(),
+        blob_type: AzureBlobType::Append,
+        blob_time_format: Some(String::new()),
+        blob_append_uuid: Some(false),
+        tags: Some(tags.clone()),
+        metadata: Some(metadata.clone()),
+        ..config
+    };
+    let (_lines, input) = random_lines_with_stream(100, 5, None);
+
+    config.run_assert(input).await;
+
+    let blobs = config.list_blobs(blob_prefix).await;
+    assert_eq!(
+        blobs.len(),
+        1,
+        "append blob with tags/metadata must still land in a single blob"
+    );
+
+    let blob_metadata = config.get_blob_metadata(blobs[0].clone()).await;
+    assert_eq!(blob_metadata, metadata);
+
+    let blob_tags = config.get_blob_tags(blobs[0].clone()).await;
+    let expected: HashMap<String, String> = tags.into_iter().collect();
+    assert_eq!(blob_tags, expected);
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_with_tags_and_metadata() {
+    assert_append_blob_with_tags_and_metadata(AzureBlobSinkConfig::new_emulator().await).await;
+}
+
+#[tokio::test]
+async fn azure_blob_append_blob_with_tags_and_metadata_with_oauth() {
+    assert_append_blob_with_tags_and_metadata(AzureBlobSinkConfig::new_emulator_with_oauth().await)
+        .await;
+}
+
 impl AzureBlobSinkConfig {
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURITE_ADDRESS").unwrap_or_else(|_| "localhost".into());
@@ -333,6 +631,7 @@ impl AzureBlobSinkConfig {
             blob_prefix: Default::default(),
             blob_time_format: None,
             blob_append_uuid: None,
+            blob_type: AzureBlobType::Block,
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             tags: None,
@@ -360,6 +659,7 @@ impl AzureBlobSinkConfig {
             blob_prefix: Default::default(),
             blob_time_format: None,
             blob_append_uuid: None,
+            blob_type: AzureBlobType::Block,
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
             compression: Compression::None,
             tags: None,
