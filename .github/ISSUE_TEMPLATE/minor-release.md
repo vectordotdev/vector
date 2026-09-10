@@ -7,15 +7,17 @@ labels: "domain: releasing"
 
 # Before preparation
 
-- [ ] Confirm the release bot can create tags and merge housekeeping after required checks pass.
 - [ ] Cut a new [VRL release](https://github.com/vectordotdev/vrl/blob/main/release/README.md) if needed.
 - [ ] Choose the Vector release version and the released VRL version.
+- [ ] Activate the [Release freeze](https://github.com/vectordotdev/vector/rules/22807978)
+      ruleset. Keep it active until automated housekeeping has merged.
 
 # Prepare the release
 
 - [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml) workflow with the Vector and released VRL versions.
 - [ ] Review the generated release notes in the bot-authored PR, including changelog entries, breaking changes, deprecations, and upgrade guidance.
-- [ ] Squash-merge the preparation PR into `master`.
+- [ ] Use **Bypass rules and merge** to squash-merge the preparation PR directly into `master`.
+- [ ] After the automated housekeeping PR merges, disable the release freeze.
 
 The merge is the release approval. The autotag workflow validates the merged diff and creates the
 version tag at the exact squash-merge commit. That tag starts the existing release workflow.

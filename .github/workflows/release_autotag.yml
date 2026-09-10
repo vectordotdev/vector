@@ -15,10 +15,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  tag:
-    name: Validate merge and create release tag
+  validate:
+    name: Validate release merge
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      release_branch: ${{ steps.validation.outputs.release_branch }}
+      tag: ${{ steps.validation.outputs.tag }}
+      tag_required: ${{ steps.validation.outputs.tag_required }}
     steps:
       - name: Checkout pushed commit
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -43,8 +47,32 @@ jobs:
           --sha "$GITHUB_SHA"
           --repository "$GITHUB_REPOSITORY"
 
+  tag:
+    name: Create release tag
+    needs: validate
+    if: needs.validate.outputs.tag_required == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout validated release commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release refs
+        env:
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$TAG" == "v${version}" ]]
+          [[ "$RELEASE_BRANCH" == "${TAG%.*}" ]]
+
       - name: Create Vector bot token
-        if: steps.validation.outputs.tag_required == 'true'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -53,11 +81,10 @@ jobs:
           permission-contents: write
 
       - name: Create tag and release branch with Vector bot token
-        if: steps.validation.outputs.tag_required == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          TAG: ${{ steps.validation.outputs.tag }}
-          RELEASE_BRANCH: ${{ steps.validation.outputs.release_branch }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
         run: |
           set -euo pipefail
           gh auth setup-git

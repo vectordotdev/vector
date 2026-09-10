@@ -97,7 +97,7 @@ fn check(repo: &Path, base: &str, branch: &str, success: bool) -> String {
 }
 
 #[test]
-fn release_preparation_can_be_updated_from_master() {
+fn release_preparation_requires_its_frozen_base() {
     let (temp, base) = preparation();
     let repo = temp.path();
     check(repo, &base, "release/prepare-v0.59.0", true);
@@ -106,16 +106,8 @@ fn release_preparation_can_be_updated_from_master() {
     let updated = commit(repo);
     git(repo, &["switch", "release/prepare-v0.59.0"]);
     git(repo, &["merge", "--no-edit", "master"]);
-    check(repo, &updated, "release/prepare-v0.59.0", true);
-
-    // A syntactically valid SHA that is not a commit is not an approved base.
-    write(
-        repo,
-        ".github/release-state.json",
-        r#"{"schema_version":1,"status":"prepared","version":"0.59.0","prepared_from":"0000000000000000000000000000000000000000"}"#,
-    );
-    commit(repo);
-    check(repo, &updated, "release/prepare-v0.59.0", false);
+    let error = check(repo, &updated, "release/prepare-v0.59.0", false);
+    assert!(error.contains("release state prepared_from does not match"));
 }
 
 #[test]

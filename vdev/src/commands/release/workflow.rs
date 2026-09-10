@@ -211,8 +211,7 @@ impl PrCheck {
         ensure_sha(&self.base_sha, "base SHA")?;
         let base_version = cargo_version_at(&self.base_sha)?;
         let head_version = current_cargo_version()?;
-        let merge_base = merge_base(&self.base_sha, "HEAD")?;
-        let changed_files = changed_files(&merge_base, "HEAD")?;
+        let changed_files = changed_files(&self.base_sha, "HEAD")?;
 
         if let Some(version) = self.head_ref.strip_prefix("release/prepare-v") {
             let version = parse_stable_version(version, "preparation branch version")?;
@@ -230,15 +229,7 @@ impl PrCheck {
             let base_metadata = metadata_at(&self.base_sha)?;
             validate_development_metadata(&base_metadata, &expected_base)?;
             let metadata = read_metadata(Path::new(STATE_PATH))?;
-            let prepared_from = metadata
-                .prepared_from
-                .as_deref()
-                .context("prepared release state is missing prepared_from")?;
-            validate_prepared_metadata(&metadata, &version, prepared_from)?;
-            ensure!(
-                is_ancestor(prepared_from, &merge_base)?,
-                "prepared release base {prepared_from} is not an ancestor of {merge_base}"
-            );
+            validate_prepared_metadata(&metadata, &version, &self.base_sha)?;
 
             let release_file = format!("website/cue/reference/releases/{version}.cue");
             ensure!(
@@ -300,16 +291,7 @@ impl AutotagCheck {
             "release merge",
         )?;
         let metadata = read_metadata(Path::new(STATE_PATH))?;
-        let prepared_from = metadata
-            .prepared_from
-            .as_deref()
-            .context("prepared release state is missing prepared_from")?;
-        validate_prepared_metadata(&metadata, &current, prepared_from)?;
-        ensure!(
-            is_ancestor(prepared_from, &self.before_sha)?,
-            "prepared release base {prepared_from} is not an ancestor of {}",
-            self.before_sha
-        );
+        validate_prepared_metadata(&metadata, &current, &self.before_sha)?;
         validate_associated_preparation_pr(&self.repository, &self.sha, &current)?;
 
         let tag = format!("v{current}");
@@ -439,8 +421,8 @@ impl HousekeepingCheck {
             "release commit does not match the published tag"
         );
         ensure!(
-            is_ancestor(&self.release_commit, "HEAD")?,
-            "release commit is not an ancestor of master"
+            resolve_ref("HEAD")?.as_deref() == Some(self.release_commit.as_str()),
+            "master does not match the release commit"
         );
         set_output("skip", "false")
     }
@@ -704,12 +686,6 @@ fn changed_files(before: &str, after: &str) -> Result<Vec<String>> {
             .map(str::to_owned)
             .collect(),
     )
-}
-
-fn merge_base(left: &str, right: &str) -> Result<String> {
-    Ok(git::run_and_check_output(&["merge-base", left, right])?
-        .trim()
-        .to_owned())
 }
 
 fn resolve_ref(reference: &str) -> Result<Option<String>> {
