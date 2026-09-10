@@ -9,10 +9,14 @@ use std::{
 
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
+#[cfg(any(feature = "sinks-clickhouse", test))]
+use headers_1::{Authorization as AuthorizationV1, HeaderMapExt as HeaderMapExtV1};
 use http::{
     HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
     uri::InvalidUri,
 };
+#[cfg(any(feature = "sinks-clickhouse", test))]
+use http_1::Request as RequestV1;
 use hyper::{
     body::{Body, HttpBody},
     client,
@@ -462,6 +466,11 @@ impl Auth {
         builder
     }
 
+    #[cfg(any(feature = "sinks-clickhouse", test))]
+    pub(crate) fn apply_v1<B>(&self, request: &mut RequestV1<B>) {
+        self.apply_headers_map_v1(request.headers_mut())
+    }
+
     pub fn apply_headers_map(&self, map: &mut HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
@@ -478,6 +487,34 @@ impl Auth {
                 match HeaderValue::from_str(value) {
                     Ok(header_val) => {
                         map.insert(http::header::AUTHORIZATION, header_val);
+                    }
+                    Err(error) => {
+                        error!(message = "Invalid custom auth header value.", value = %value, %error)
+                    }
+                }
+            }
+            #[cfg(feature = "aws-core")]
+            _ => {}
+        }
+    }
+
+    #[cfg(any(feature = "sinks-clickhouse", test))]
+    fn apply_headers_map_v1(&self, map: &mut http_1::HeaderMap) {
+        match &self {
+            Auth::Basic { user, password } => {
+                let auth = AuthorizationV1::basic(user.as_str(), password.inner());
+                map.typed_insert(auth);
+            }
+            Auth::Bearer { token } => match AuthorizationV1::bearer(token.inner()) {
+                Ok(auth) => map.typed_insert(auth),
+                Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
+            },
+            Auth::Custom { value } => {
+                // The value contains just the value of the Authorization header
+                // Expected format: "SSWS token123" or "Bearer token123", etc.
+                match http_1::HeaderValue::from_str(value) {
+                    Ok(header_val) => {
+                        map.insert(http_1::header::AUTHORIZATION, header_val);
                     }
                     Err(error) => {
                         error!(message = "Invalid custom auth header value.", value = %value, %error)
@@ -824,7 +861,7 @@ impl IntoIterator for QueryParameterValue {
 
 pub type QueryParameters = HashMap<String, QueryParameterValue>;
 
-mod client_v1;
+pub(crate) mod client_v1;
 
 #[cfg(test)]
 mod transport_tests;
@@ -900,6 +937,40 @@ mod tests {
         assert_eq!(
             request.headers().get("User-Agent"),
             Some(&HeaderValue::from_static("foo"))
+        );
+    }
+
+    #[test]
+    fn test_auth_apply_v1() {
+        let mut basic = http_1::Request::get("http://example.com").body(()).unwrap();
+        Auth::Basic {
+            user: "user".to_owned(),
+            password: SensitiveString::from("pass".to_owned()),
+        }
+        .apply_v1(&mut basic);
+        assert_eq!(
+            basic.headers().get(http_1::header::AUTHORIZATION),
+            Some(&http_1::HeaderValue::from_static("Basic dXNlcjpwYXNz"))
+        );
+
+        let mut bearer = http_1::Request::get("http://example.com").body(()).unwrap();
+        Auth::Bearer {
+            token: SensitiveString::from("token".to_owned()),
+        }
+        .apply_v1(&mut bearer);
+        assert_eq!(
+            bearer.headers().get(http_1::header::AUTHORIZATION),
+            Some(&http_1::HeaderValue::from_static("Bearer token"))
+        );
+
+        let mut custom = http_1::Request::get("http://example.com").body(()).unwrap();
+        Auth::Custom {
+            value: "SSWS token123".to_owned(),
+        }
+        .apply_v1(&mut custom);
+        assert_eq!(
+            custom.headers().get(http_1::header::AUTHORIZATION),
+            Some(&http_1::HeaderValue::from_static("SSWS token123"))
         );
     }
 

@@ -396,17 +396,13 @@ impl SourceConfig for FileConfig {
             // source are only global, name can be used for subdir
             .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
-        // Clippy rule, because async_trait?
-        #[allow(clippy::suspicious_else_formatting)]
-        {
-            if let Some(ref config) = self.multiline {
-                let _: line_agg::Config = config.try_into()?;
-            }
+        if let Some(ref config) = self.multiline {
+            let _: line_agg::Config = config.try_into()?;
+        }
 
-            if let Some(ref indicator) = self.message_start_indicator {
-                Regex::new(indicator)
-                    .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
-            }
+        if let Some(ref indicator) = self.message_start_indicator {
+            Regex::new(indicator)
+                .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
         }
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);

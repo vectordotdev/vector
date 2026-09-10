@@ -490,7 +490,6 @@ pub struct LokiSink {
 
 impl LokiSink {
     #[cfg(test)]
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
         let validated = config.validate()?;
         Self::from_validated(&config, validated, client)
@@ -499,7 +498,6 @@ impl LokiSink {
     /// Builds the sink from already-validated state. No pure validation is
     /// repeated here: auth, request limits, encoder, confined templates and
     /// batch settings all come from `validated`.
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn from_validated(
         config: &LokiConfig,
         validated: ValidatedLokiSink,
