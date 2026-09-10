@@ -414,7 +414,6 @@ impl Target for VrlTarget {
         }
     }
 
-    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
         match target_path.prefix {
             PathPrefix::Event => match self {

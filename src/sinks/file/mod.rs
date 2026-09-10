@@ -263,6 +263,7 @@ impl ValidatedSink for FileSinkConfig {
     type Validated = ValidatedFileSink;
 
     fn validate(&self) -> crate::Result<ValidatedFileSink> {
+        self.encoding.validate()?;
         let transformer = self.encoding.transformer();
 
         // Pure path-confinement checks. `PathConfinement` itself is not

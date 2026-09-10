@@ -325,6 +325,7 @@ impl ValidatedSink for ChronicleUnstructuredConfig {
         healthcheck_endpoint.parse::<Uri>()?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
+        self.encoding.validate()?;
 
         Ok(ValidatedChronicleUnstructured {
             endpoint,

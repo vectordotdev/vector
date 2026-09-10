@@ -89,7 +89,7 @@ impl ValidatedSink for ConsoleSinkConfig {
     type Validated = ();
 
     fn validate(&self) -> crate::Result<()> {
-        Ok(())
+        self.encoding.validate()
     }
 
     async fn build(

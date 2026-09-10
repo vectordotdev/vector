@@ -20,7 +20,6 @@ components: transforms: dedupe: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.dedupe.configuration

@@ -448,6 +448,7 @@ impl ValidatedSink for PulsarSinkConfig {
                 format!("Invalid Pulsar endpoint `{}`: missing host", self.endpoint).into(),
             );
         }
+        self.encoding.validate()?;
         let topic = self
             .topic
             .clone()
