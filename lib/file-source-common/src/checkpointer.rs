@@ -56,9 +56,13 @@ pub struct CheckpointsView {
     modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
     removed_times: DashMap<FileFingerprint, DateTime<Utc>>,
     /// Current watcher generation per fingerprint; `update` ignores positions
-    /// recorded under an older generation. Not persisted: generations only
+    /// recorded under any other generation. Not persisted: generations only
     /// disambiguate in-flight updates within a single process lifetime.
     generations: DashMap<FileFingerprint, u64>,
+    /// Process-wide monotonic source of generation tokens. Tokens are never
+    /// reused, so an old acknowledgement outliving its fingerprint's expiry
+    /// cannot collide with a token handed to a later watcher.
+    next_generation: std::sync::atomic::AtomicU64,
 }
 
 impl CheckpointsView {
@@ -98,9 +102,12 @@ impl CheckpointsView {
     /// `remove_expired`, which re-checks the tombstone under the same guard
     /// before discarding a generation.
     pub fn begin_generation(&self, fng: FileFingerprint) -> u64 {
+        let generation = self
+            .next_generation
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            + 1;
         let mut entry = self.generations.entry(fng).or_insert(0);
-        *entry += 1;
-        let generation = *entry;
+        *entry = generation;
         self.removed_times.remove(&fng);
         drop(entry);
         generation
@@ -160,14 +167,22 @@ impl CheckpointsView {
             // rejected outright once the entry is gone (see `update`).
             match self.generations.entry(fng) {
                 dashmap::mapref::entry::Entry::Occupied(occupied) => {
-                    if self.removed_times.remove(&fng).is_some() {
+                    if self
+                        .removed_times
+                        .remove_if(&fng, |_, ts| now - *ts >= chrono::Duration::seconds(60))
+                        .is_some()
+                    {
                         self.checkpoints.remove(&fng);
                         self.modified_times.remove(&fng);
                         occupied.remove();
                     }
                 }
                 dashmap::mapref::entry::Entry::Vacant(_) => {
-                    if self.removed_times.remove(&fng).is_some() {
+                    if self
+                        .removed_times
+                        .remove_if(&fng, |_, ts| now - *ts >= chrono::Duration::seconds(60))
+                        .is_some()
+                    {
                         self.checkpoints.remove(&fng);
                         self.modified_times.remove(&fng);
                     }
@@ -560,6 +575,14 @@ mod test {
         // Once the fingerprint's state has expired (no generation entry left),
         // any straggling update is rejected rather than resurrecting it.
         chkptr.checkpoints.generations.remove(&fingerprint);
+        chkptr.checkpoints.update(fingerprint, 999_999, second);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(200));
+
+        // Tokens are process-wide monotonic: a fingerprint claimed again after
+        // its expiry never reuses a token, so acknowledgements from before the
+        // expiry stay rejected.
+        let third = chkptr.checkpoints.begin_generation(fingerprint);
+        assert!(third > second);
         chkptr.checkpoints.update(fingerprint, 999_999, second);
         assert_eq!(chkptr.get_checkpoint(fingerprint), Some(200));
     }
