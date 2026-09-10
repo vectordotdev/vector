@@ -58,6 +58,10 @@ where
     pub remove_after: Option<Duration>,
     pub emitter: E,
     pub rotate_wait: Duration,
+    /// Maximum number of files to keep open simultaneously.
+    /// When this limit is reached, the least recently read file is evicted
+    /// (closed with its checkpoint preserved) to make room for new files.
+    pub max_open_files: Option<usize>,
 }
 
 /// `FileServer` as Source
@@ -137,10 +141,17 @@ where
 
         existing_files.sort_by_key(|(key, _, _)| *key);
 
+        // Limit startup file opens to max_open_files to avoid exhausting FDs
+        if let Some(max) = self.max_open_files
+            && max > 0
+        {
+            existing_files.truncate(max);
+        }
+
         let checkpoints = checkpointer.view();
 
         for (_key, path, file_id) in existing_files {
-            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true)
+            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true, false)
                 .await;
         }
         self.emitter.emit_files_open(fp_map.len());
@@ -164,6 +175,7 @@ where
         // exponential fashion to some hard-coded cap. To reduce time using glob,
         // we do not re-scan for major file changes (new files, moves, deletes),
         // or write new checkpoints, on every iteration.
+        let mut evicted_files: HashMap<FileFingerprint, time::Instant> = HashMap::new();
         let mut next_glob_time = time::Instant::now();
         loop {
             // Glob find files to follow, but not too often.
@@ -185,6 +197,21 @@ where
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
+
+                // Pre-sort eviction candidates by last read time (oldest first)
+                // Skip when max_open_files is None or 0 (unlimited)
+                let eviction_candidates: Vec<FileFingerprint> = if self.max_open_files.is_some_and(|m| m > 0) {
+                    let mut candidates: Vec<_> = fp_map
+                        .iter()
+                        .map(|(&fid, w)| (w.last_read_success(), fid))
+                        .collect();
+                    candidates.sort_unstable();
+                    candidates.into_iter().map(|(_, fid)| fid).collect()
+                } else {
+                    Vec::new()
+                };
+                let mut eviction_idx = 0;
+
                 for path in self.paths_provider.paths().into_iter() {
                     if let Some(file_id) = self
                         .fingerprinter
@@ -229,8 +256,52 @@ where
                                 }
                             }
                         } else {
-                            // untracked file fingerprint
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
+                            // untracked file fingerprint — evict LRU file if at limit
+                            // (max_open_files = 0 means unlimited, skip eviction)
+                            if let Some(max) = self.max_open_files
+                                && max > 0
+                                && fp_map.len() >= max
+                            {
+                                let mut evicted = false;
+                                while eviction_idx < eviction_candidates.len() {
+                                    let evict_id = eviction_candidates[eviction_idx];
+                                    eviction_idx += 1;
+                                    // Skip recently-rotated files whose open FD is the
+                                    // only way to drain remaining bytes. We identify them
+                                    // by last_seen being older than the glob interval
+                                    // (meaning the file was NOT found in the previous
+                                    // cycle) but younger than rotate_wait.
+                                    if let Some(candidate) = fp_map.get(&evict_id) {
+                                        let since_seen = candidate.last_seen().elapsed();
+                                        if since_seen > self.glob_minimum_cooldown * 2
+                                            && since_seen <= self.rotate_wait
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                    if let Some(watcher) = fp_map.shift_remove(&evict_id) {
+                                        info!(
+                                            message = "Evicting least recently read file due to max_open_files limit.",
+                                            evicted_path = ?watcher.path,
+                                            new_path = ?path,
+                                            max_open_files = max,
+                                        );
+                                        self.emitter
+                                            .emit_file_unwatched(&watcher.path, watcher.reached_eof());
+                                        evicted_files.insert(evict_id, time::Instant::now());
+                                        evicted = true;
+                                        break;
+                                    }
+                                }
+                                if !evicted {
+                                    if let Some(ts) = evicted_files.get_mut(&file_id) {
+                                        *ts = time::Instant::now();
+                                    }
+                                    continue; // skip this file, retry next glob cycle
+                                }
+                            }
+                            let was_evicted = evicted_files.remove(&file_id).is_some();
+                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false, was_evicted)
                                 .await;
                             self.emitter.emit_files_open(fp_map.len());
                         }
@@ -360,6 +431,16 @@ where
                 }
             }
 
+            // Expire checkpoints for evicted files that were never rediscovered.
+            evicted_files.retain(|fid, evicted_at| {
+                if evicted_at.elapsed() > self.rotate_wait {
+                    checkpoints.set_dead(*fid);
+                    false
+                } else {
+                    true
+                }
+            });
+
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
             fp_map.retain(|file_id, watcher| {
@@ -439,6 +520,7 @@ where
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         checkpoints: &CheckpointsView,
         startup: bool,
+        force_checkpoint: bool,
     ) {
         // Determine the initial _requested_ starting point in the file. This can be overridden
         // once the file is actually opened and we determine it is compressed, older than we're
@@ -457,7 +539,11 @@ where
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
         // https://github.com/vectordotdev/vector/issues/7139
-        let read_from = if !self.ignore_checkpoints {
+        //
+        // force_checkpoint overrides ignore_checkpoints for evicted files —
+        // their checkpoint is an internal offset, not a persisted one the user
+        // opted out of.
+        let read_from = if !self.ignore_checkpoints || force_checkpoint {
             checkpoints
                 .get(file_id)
                 .map(ReadFrom::Checkpoint)
