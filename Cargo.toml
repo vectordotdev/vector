@@ -145,6 +145,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(dds
 string_slice = "warn"
 await_holding_lock = "warn"
 let_underscore_must_use = "warn"
+uninlined_format_args = "warn"
 
 [workspace.dependencies]
 antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }

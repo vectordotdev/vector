@@ -751,69 +751,7 @@ generated: configuration: {
 			type: object: options: "*": {
 				type: object: options: {
 					buffer: {
-						type: object: options: {
-							when_full: {
-								type: string: {
-									enum: {
-										block: """
-																					Wait for free space in the buffer.
-
-																					This applies backpressure up the topology, signalling that sources should slow down
-																					the acceptance/consumption of events. This means that while no data is lost, data will pile
-																					up at the edge.
-																					"""
-										drop_newest: """
-																					Drops the event instead of waiting for free space in buffer.
-
-																					The event will be intentionally dropped. This mode is typically used when performance is the
-																					highest priority, and it is preferable to temporarily lose events rather than cause a
-																					slowdown in the acceptance/consumption of events.
-																					"""
-									}
-									default: "block"
-								}
-								description: "Event handling behavior when a buffer is full."
-								required:    false
-							}
-							max_events: {
-								type: uint: default: 500
-								required:      false
-								description:   "The maximum number of events allowed in the buffer."
-								relevant_when: "type = \"memory\""
-							}
-							max_size: {
-								type: uint: unit: "bytes"
-								required: true
-								description: """
-																		The maximum allowed amount of allocated memory the buffer can hold.
-
-																		If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
-																		"""
-							}
-							type: {
-								required: false
-								type: string: {
-									enum: {
-										memory: """
-																					Events are buffered in memory.
-
-																					This is more performant, but less durable. Data will be lost if Vector is restarted
-																					forcefully or crashes.
-																					"""
-										disk: """
-																					Events are buffered on disk.
-
-																					This is less performant, but more durable. Data that has been synchronized to disk will not
-																					be lost if Vector is restarted forcefully or crashes.
-
-																					Data is synchronized to disk every 500ms.
-																					"""
-									}
-									default: "memory"
-								}
-								description: "The type of buffer to use."
-							}
-						}
+						type: _schemaDefinitions["derived::vector_buffers::config::BufferType::6c60e9549d874ce4350c077a"]
 						description: """
 														Configures the buffering behavior for this sink.
 
@@ -834,31 +772,7 @@ generated: configuration: {
 						required: false
 					}
 					healthcheck: {
-						type: object: options: {
-							enabled: {
-								type: bool: default: true
-								description: "Whether or not to check the health of the sink when Vector starts up."
-								required:    false
-							}
-							timeout: {
-								type: float: {
-									default: 10.0
-									unit:    "seconds"
-								}
-								description: "Timeout duration for healthcheck in seconds."
-								required:    false
-							}
-							uri: {
-								type: string: {}
-								description: """
-																		The full URI to make HTTP healthcheck requests to.
-
-																		This must be a valid URI, which requires at least the scheme and host. All other
-																		components -- port, path, etc -- are allowed as well.
-																		"""
-								required: false
-							}
-						}
+						type:        _schemaDefinitions["derived::d1a2a37da28b48074a6aa38c"]
 						description: "Healthcheck configuration."
 						required:    false
 					}

@@ -322,7 +322,7 @@ fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
                 Auth::Basic { user, password } => Some(HeaderValue::from_str(
                     format!(
                         "Basic {}",
-                        BASE64_STANDARD.encode(format!("{}:{}", user, password.inner()))
+                        BASE64_STANDARD.encode(format!("{user}:{}", password.inner()))
                     )
                     .as_str(),
                 )),
@@ -480,7 +480,7 @@ impl PrometheusExporter {
                 .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
                 .instrument(span)
                 .await
-                .map_err(|error| error!("Server error: {}.", error))?;
+                .map_err(|error| error!("Server error: {error}."))?;
 
             Ok::<(), ()>(())
         });
@@ -544,7 +544,7 @@ impl StreamSink<Event> for PrometheusExporter {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed()
             .await
-            .map_err(|error| error!("Failed to start Prometheus exporter: {}.", error))?;
+            .map_err(|error| error!("Failed to start Prometheus exporter: {error}."))?;
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
@@ -1566,11 +1566,7 @@ mod integration_tests {
     }
 
     async fn prometheus_query(query: &str) -> Value {
-        let url = format!(
-            "http://{}/api/v1/query?query={}",
-            prometheus_address(),
-            query
-        );
+        let url = format!("http://{}/api/v1/query?query={query}", prometheus_address());
         let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");

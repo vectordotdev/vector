@@ -21,6 +21,7 @@ inputs:
     default: true
     description: "Install mold linker and configure a rustc wrapper to speed up linking. Avoid enabling with cross."
 
+  # prepare.sh - standalone and system dependencies
   protoc:
     required: false
     default: false
@@ -36,7 +37,23 @@ inputs:
   unixodbc:
     required: false
     default: false
-    description: "Install unixODBC headers/libs (apt unixodbc-dev, dnf unixODBC-devel, or brew unixodbc). Required when sources-odbc is enabled."
+    description: "Install unixODBC headers/libs (apt unixodbc-dev or brew unixodbc). Required when sources-odbc is enabled."
+  cmark-gfm:
+    required: false
+    default: false
+    description: "Install cmark-gfm."
+  cross-binutils:
+    required: false
+    default: false
+    description: "Install ARM cross-compilation binutils."
+  rpm:
+    required: false
+    default: false
+    description: "Install rpm."
+  lcov:
+    required: false
+    default: false
+    description: "Install lcov."
 
   # prepare.sh - rust
   rust: # rustup module
@@ -106,11 +123,12 @@ runs:
       shell: bash
       run: |
         rust="false"
+        mold="${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}"
 
         # If any rust-related inputs are true, enable rust.
         # vdev itself does not compile, but cargo binstall is a cargo subcommand
         # and needs the rust toolchain on PATH to install it.
-        for val in "${{ inputs.mold }}" \
+        for val in "$mold" \
                    "${{ inputs.rust }}" \
                    "${{ inputs.cargo-deb }}" \
                    "${{ inputs.cross }}" \
@@ -129,6 +147,7 @@ runs:
         done
 
         echo "NEEDS_RUST=$rust" >> "$GITHUB_ENV"
+        echo "INSTALL_MOLD=$mold" >> "$GITHUB_ENV"
 
         if [[ "$rust" == "true" ]]; then
           echo "RUST_BACKTRACE=full" >> "$GITHUB_ENV"
@@ -143,34 +162,16 @@ runs:
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
 
-    - name: Install mold
-      if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
+    - name: Configure mold
+      if: ${{ env.INSTALL_MOLD == 'true' }}
       shell: bash
       run: |
-        echo "Installing mold"
-
         CARGO_OVERRIDE_DIR="${HOME}/.cargo"
         CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
 
-        # Install mold, because the system linker wastes a bunch of time.
-        #
         # Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
         # configuration from the host system and ships it over...  which isn't good when we're overriding the `rustc-wrapper`
         # and all of that.
-
-        # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
-        # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
-        TEMP=$(mktemp -d)
-        MOLD_VERSION=2.40.4
-        MOLD_TARGET=mold-${MOLD_VERSION}-$(uname -m)-linux
-        curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
-        --output "$TEMP/${MOLD_TARGET}.tar.gz"
-        tar \
-            -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
-            -C "${TEMP}"
-        sudo cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
-        sudo cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
-        rm -rf "$TEMP"
 
         # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
         # anything linking calls to use `mold` instead of `ld`, etc.
@@ -189,61 +190,6 @@ runs:
         [build]
         rustc-wrapper = "$RUSTC_WRAPPER"
         EOF
-
-    - name: Install cue
-      if: ${{ inputs.cue == 'true' }}
-      shell: bash
-      run: |
-        echo "Installing cue"
-        TEMP=$(mktemp -d)
-        curl \
-          -L https://github.com/cue-lang/cue/releases/download/v0.17.1/cue_v0.17.1_linux_amd64.tar.gz \
-          -o "${TEMP}/cue_v0.17.1_linux_amd64.tar.gz"
-        tar \
-          -xvf "${TEMP}/cue_v0.17.1_linux_amd64.tar.gz" \
-          -C "${TEMP}"
-        sudo cp "${TEMP}/cue" /usr/bin/cue
-        rm -rf "$TEMP"
-
-    - name: Install system libraries (Linux)
-      if: ${{ runner.os == 'Linux' && (inputs.libsasl2 == 'true' || inputs.unixodbc == 'true') }}
-      shell: bash
-      run: |
-        if command -v apt-get >/dev/null 2>&1; then
-          pkgs=()
-          [[ "${{ inputs.libsasl2 }}" == "true" ]] && pkgs+=(libsasl2-dev)
-          [[ "${{ inputs.unixodbc }}" == "true" ]] && pkgs+=(unixodbc-dev)
-          timeout 30m sudo apt-get update
-          timeout 30m sudo apt-get install -y "${pkgs[@]}"
-        elif command -v dnf >/dev/null 2>&1; then
-          pkgs=()
-          [[ "${{ inputs.libsasl2 }}" == "true" ]] && pkgs+=(cyrus-sasl-devel)
-          [[ "${{ inputs.unixodbc }}" == "true" ]] && pkgs+=(unixODBC-devel)
-          timeout 30m sudo dnf install -y --setopt=install_weak_deps=False "${pkgs[@]}"
-        else
-          echo "No supported package manager (apt-get/dnf) found for system libraries" >&2
-          exit 1
-        fi
-
-    - name: Install unixODBC (macOS)
-      if: ${{ runner.os == 'macOS' && inputs.unixodbc == 'true' }}
-      shell: bash
-      run: |
-        echo "Installing unixODBC"
-        brew install unixodbc
-        # Use the formula prefix so Intel (/usr/local) and Apple Silicon (/opt/homebrew)
-        # both work. odbc-sys also probes `brew --prefix`, but these keep the linker,
-        # headers, and pkg-config consistent for the rest of the build.
-        prefix="$(brew --prefix unixodbc)"
-        lib_dir="${prefix}/lib"
-        include_dir="${prefix}/include"
-        pkgconfig_dir="${prefix}/lib/pkgconfig"
-        {
-          echo "LIBRARY_PATH=${lib_dir}${LIBRARY_PATH:+:$LIBRARY_PATH}"
-          echo "CPATH=${include_dir}${CPATH:+:$CPATH}"
-          echo "PKG_CONFIG_PATH=${pkgconfig_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-          echo "DYLD_FALLBACK_LIBRARY_PATH=${lib_dir}${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
-        } >> "$GITHUB_ENV"
 
     - name: Cache cargo binaries
       id: cache-cargo-binaries
@@ -276,8 +222,16 @@ runs:
         GITHUB_TOKEN: ${{ github.token }}
       run: |
         mods=()
+        [[ "$INSTALL_MOLD" == "true" ]] && mods+=("mold")
         [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
         [[ "${{ inputs.protoc }}" == "true" ]] && mods+=("protoc")
+        [[ "${{ inputs.cue }}" == "true" ]] && mods+=("cue")
+        [[ "${{ inputs.libsasl2 }}" == "true" ]] && mods+=("libsasl2")
+        [[ "${{ inputs.unixodbc }}" == "true" ]] && mods+=("unixodbc")
+        [[ "${{ inputs.cmark-gfm }}" == "true" ]] && mods+=("cmark-gfm")
+        [[ "${{ inputs.cross-binutils }}" == "true" ]] && mods+=("cross-binutils")
+        [[ "${{ inputs.rpm }}" == "true" ]] && mods+=("rpm")
+        [[ "${{ inputs.lcov }}" == "true" ]] && mods+=("lcov")
         [[ "${{ inputs.cargo-deb }}" == "true" ]] && mods+=("cargo-deb")
         [[ "${{ inputs.cross }}" == "true" ]] && mods+=("cross")
         [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
