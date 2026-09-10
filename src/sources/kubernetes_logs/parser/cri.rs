@@ -1,8 +1,4 @@
-// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use chrono::{DateTime, Utc};
-use derivative::Derivative;
 use vector_lib::{
     config::{LegacyKey, LogNamespace, log_schema},
     conversion,
@@ -31,8 +27,7 @@ const TIMESTAMP_KEY: &str = "timestamp";
 /// Normalizes parsed data for consistency.
 ///
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Cri {
     log_namespace: LogNamespace,
 }

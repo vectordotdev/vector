@@ -278,7 +278,7 @@ impl Fanout {
                     // `SendGroup`, since it has exclusive access to the senders.
                     match maybe_msg {
                         Some(ControlMessage::Add(id, sink)) => {
-                            send_group.add(id, sink);
+                            send_group.add(&id, sink);
                         },
                         Some(ControlMessage::Remove(id)) => {
                             send_group.remove(&id);
@@ -376,8 +376,7 @@ impl<'a> SendGroup<'a> {
         }
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn add(&mut self, id: ComponentKey, sink: BufferSender<EventArray>) {
+    fn add(&mut self, id: &ComponentKey, sink: BufferSender<EventArray>) {
         // When we're in the middle of a send, we can only keep track of the new sink, but can't
         // actually send to it, as we don't have the item to send... so only add it to `senders`.
         assert!(

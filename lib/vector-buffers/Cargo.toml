@@ -17,7 +17,7 @@ bytes.workspace = true
 crc32fast = { version = "1.5.0", default-features = false }
 crossbeam-queue = { version = "0.3.12", default-features = false, features = ["std"] }
 crossbeam-utils.workspace = true
-derivative.workspace = true
+derive_more.workspace = true
 fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures.workspace = true
 memmap2 = { version = "0.9.10", default-features = false }
