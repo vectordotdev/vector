@@ -89,7 +89,6 @@ impl HttpResourceConfig {
 }
 
 /// Spawns an HTTP server that a source will make requests to in order to get events.
-#[allow(clippy::missing_const_for_fn)]
 fn spawn_input_http_server(
     config: HttpResourceConfig,
     codec: ResourceCodec,
@@ -273,7 +272,7 @@ fn spawn_input_http_client(
                 }
                 Err(e) => {
                     // TODO: Emit metric that tracks a failed response from the HTTP server.
-                    error!("Failed to send request: {}", e);
+                    error!("Failed to send request: {e}");
                 }
             }
         }
@@ -298,7 +297,6 @@ pub struct HttpResourceOutputContext<'a> {
 
 impl HttpResourceOutputContext<'_> {
     /// Spawns an HTTP server that accepts events sent by a sink.
-    #[allow(clippy::missing_const_for_fn)]
     fn spawn_output_http_server(&self, config: HttpResourceConfig) -> vector_lib::Result<()> {
         // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
         // via an output sender. We accept/collect events until we're told to shutdown.
@@ -439,7 +437,6 @@ impl HttpResourceOutputContext<'_> {
     }
 
     /// Spawns an HTTP client that pulls events by making requests to an HTTP server driven by a sink.
-    #[allow(clippy::missing_const_for_fn)]
     fn spawn_output_http_client(&self, _config: HttpResourceConfig) {
         // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
         // scraped... but since we need special logic to aggregate/deduplicate scraped metrics, we can't

@@ -47,7 +47,6 @@ pub enum RequestBuilderError {
 }
 
 impl RequestBuilderError {
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_parts(self) -> (&'static str, String, u64) {
         match self {
             Self::FailedToBuild {
@@ -521,9 +520,8 @@ mod test {
                     assert_eq!(1, processed.len());
                     assert!(
                         encoded.len() <= max_size,
-                        "encoded len {} longer than max size {}",
-                        encoded.len(),
-                        max_size
+                        "encoded len {} longer than max size {max_size}",
+                        encoded.len()
                     );
                 }
             }

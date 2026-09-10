@@ -37,7 +37,7 @@ use crate::{
             },
         },
     },
-    template::ConfinementConfig,
+    template::{ConfinementConfig, UriTemplate},
 };
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
@@ -53,7 +53,7 @@ pub struct HttpSinkConfig {
     ///
     /// This should include the protocol and host, but can also include the port, path, and any other valid part of a URI.
     #[configurable(metadata(docs::examples = "https://10.22.212.22:9000/endpoint"))]
-    pub uri: Template,
+    pub uri: UriTemplate,
 
     /// The HTTP method to use when making the request.
     #[serde(default)]
@@ -316,6 +316,7 @@ impl ValidatedSink for HttpSinkConfig {
     type Validated = ValidatedHttp;
 
     fn validate(&self) -> crate::Result<ValidatedHttp> {
+        self.encoding.validate()?;
         let batch_settings = self.batch.validate()?.into_batcher_settings()?;
 
         let serializer_config = self.encoding.config().1;
@@ -346,7 +347,7 @@ impl ValidatedSink for HttpSinkConfig {
             }
         }
 
-        // `Template::default()` — produced by delegating sinks such as
+        // `UriTemplate::default()` — produced by delegating sinks such as
         // `opentelemetry` before the user supplies a URI — yields an empty
         // template whose `is_static` is false, so `is_dynamic()` reports true
         // even though there is nothing to render. Reject the empty URI up
@@ -560,7 +561,7 @@ mod tests {
 
     use super::*;
     use crate::components::validation::prelude::*;
-    use crate::template::{ConfinementConfig, Template};
+    use crate::template::{ConfinementConfig, UriTemplate};
 
     impl ValidatableComponent for HttpSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {
@@ -575,7 +576,7 @@ mod tests {
             let uri = UriSerde::from_str(endpoint).expect("should never fail to parse");
 
             let config = HttpSinkConfig {
-                uri: Template::try_from(endpoint).expect("should never fail to parse"),
+                uri: UriTemplate::try_from(endpoint).expect("should never fail to parse"),
                 method: HttpMethod::Post,
                 encoding: EncodingConfigWithFraming::new(
                     None,
@@ -672,7 +673,7 @@ mod tests {
     #[test]
     fn validate_rejects_empty_default_uri() {
         use crate::config::ValidatedSink;
-        // `Template::default()` — produced by delegating sinks such as
+        // `UriTemplate::default()` — produced by delegating sinks such as
         // `opentelemetry` before the user supplies a URI — is empty but reports
         // `is_dynamic() == true` (the derived default leaves `is_static` false),
         // so it must be rejected explicitly rather than deferred as a dynamic
@@ -685,7 +686,7 @@ mod tests {
             "#,
         )
         .unwrap();
-        config.uri = Template::default();
+        config.uri = UriTemplate::default();
         assert!(
             config.validate().is_err(),
             "empty default uri should fail validation"
@@ -710,8 +711,52 @@ mod tests {
     }
 
     #[test]
+    fn validate_rejects_unbuildable_encoding() {
+        use crate::config::ValidatedSink;
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: avro
+              avro:
+                schema: "not a valid avro schema"
+            "#,
+        )
+        .unwrap();
+        let error = config.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn validate_assumes_protobuf_encoding_valid_without_disk_access() {
+        use crate::config::ValidatedSink;
+        // The protobuf codec reads its descriptor set from `desc_file` on
+        // disk; pure validation must stay filesystem-free, so an unbuildable
+        // protobuf encoding is caught in the build phase instead.
+        let config: HttpSinkConfig = serde_yaml::from_str(
+            r#"
+            uri: "http://localhost:9000/endpoint"
+            encoding:
+              codec: protobuf
+              protobuf:
+                desc_file: "/nonexistent/protobuf.desc"
+                message_type: "package.Message"
+            "#,
+        )
+        .unwrap();
+        config
+            .validate()
+            .expect("protobuf encoding assumed valid without disk access");
+    }
+
+    #[test]
     fn confinement_rejects_unconfined_uri() {
-        let template: Template = "{{ endpoint }}".try_into().unwrap();
+        let template: UriTemplate = "{{ endpoint }}".try_into().unwrap();
         let err = template
             .confine(&ConfinementConfig::default(), "http", "uri")
             .unwrap_err();
@@ -726,24 +771,24 @@ mod tests {
         let cfg = ConfinementConfig {
             dangerously_allow_unconfined_template_resolution: true,
         };
-        let template: Template = "{{ endpoint }}".try_into().unwrap();
+        let template: UriTemplate = "{{ endpoint }}".try_into().unwrap();
         assert!(template.confine(&cfg, "http", "uri").is_ok());
     }
 
     #[test]
-    fn confinement_blocks_host_redirect_at_render() {
+    fn confinement_rejects_path_traversal_and_query_injection() {
         use crate::event::Event;
         use vector_lib::event::LogEvent;
         use vrl::event_path;
 
-        let template: Template = "https://logs.example.com/ingest/{{ tenant }}"
+        let template: UriTemplate = "https://logs.example.com/ingest/{{ tenant }}"
             .try_into()
             .unwrap();
         let template = template
             .confine(&ConfinementConfig::default(), "http", "uri")
             .unwrap();
 
-        // Attacker tries to redirect to a different host via the tenant field.
+        // Attacker tries to traverse path and inject query via tenant field
         let mut event = Event::Log(LogEvent::from("x"));
         event
             .as_mut_log()

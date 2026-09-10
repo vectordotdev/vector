@@ -33,7 +33,7 @@ fn parse_export_metrics_request(content: &str) -> Result<ExportMetricsServiceReq
                 METRICS_REQUEST_MESSAGE_TYPE,
                 line,
             )
-            .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+            .map_err(|e| format!("Line {}: {e}", line_num + 1))?
             .resource_metrics,
         );
     }

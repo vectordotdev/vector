@@ -1,10 +1,4 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use bytes::Bytes;
-use derivative::Derivative;
 use futures::FutureExt;
 use http::{HeaderValue, Request, StatusCode};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
@@ -114,15 +108,14 @@ impl SinkConfig for HoneycombConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedHoneycomb {
     batch_settings: BatcherSettings,
     uri: HttpEndpoint,
     request_limits: TowerRequestSettings,
     // Omitted: `api_key` is sent as the `X-Honeycomb-Team` header on every
     // request.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     api_key: HeaderValue,
 }
 
