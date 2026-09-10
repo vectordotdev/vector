@@ -332,6 +332,14 @@ components: sources: [Name=string]: {
 									examples: ["CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
 								}
 							}
+							subject_altnames: {
+								description: "The Subject Alternative Names (SANs) from the client TLS certificate, as a comma-separated list. Each SAN is prefixed with its type (for example `DNS:example.com`, `email:admin@example.com`, `URI:https://example.com`, or `IP Address:127.0.0.1`) to match the output of `openssl x509 -text`. Only added if `tls.client_metadata_key` is set and the client certificate contains SANs. Key name depends on configured `client_metadata_key`"
+								required:    false
+								type: string: {
+									default: null
+									examples: ["DNS:localhost,IP Address:127.0.0.1"]
+								}
+							}
 						}
 					}
 				}
