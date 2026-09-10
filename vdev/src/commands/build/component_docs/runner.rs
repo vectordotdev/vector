@@ -13,8 +13,6 @@ const CUE_DEFINITIONS_PLACEHOLDER_FIELD: &str = "vector_internal_schema_definiti
 const CUE_REFERENCE_MARKER_PREFIX: &str = "__VECTOR_CUE_REFERENCE__";
 const CUE_DEFINITIONS_DIRECTORY: &str =
     "website/cue/reference/components/generated/schema_definitions";
-const LEGACY_CUE_DEFINITIONS_FILE: &str =
-    "website/cue/reference/components/generated/schema_definitions.cue";
 
 // Component schemas are resolved independently before being imported from JSON into CUE. Reused
 // JSON Schema definitions are interned here so repeated resolved values can instead point at one
@@ -684,11 +682,6 @@ fn render_and_import_cue_definitions(
     context: &SchemaContext,
     cue_definitions: &CueDefinitions,
 ) -> Result<()> {
-    let legacy_file = PathBuf::from(LEGACY_CUE_DEFINITIONS_FILE);
-    if legacy_file.exists() {
-        fs::remove_file(legacy_file)?;
-    }
-
     let definitions_directory = PathBuf::from(CUE_DEFINITIONS_DIRECTORY);
     if definitions_directory.exists() {
         fs::remove_dir_all(&definitions_directory)?;
@@ -720,6 +713,10 @@ fn render_and_import_cue_definitions(
 }
 
 fn definition_file_name(name: &str) -> String {
+    if let Some(identity) = name.strip_prefix("derived::") {
+        return format!("derived_{identity}.cue");
+    }
+
     let mut stem = String::with_capacity(name.len());
     let mut previous_was_separator = false;
     for character in name.chars() {
@@ -898,6 +895,11 @@ mod tests {
 
     #[test]
     fn definition_file_names_are_stable_and_safe() {
+        assert_eq!(
+            definition_file_name("derived::bb2440a04988b7e322be398c"),
+            "derived_bb2440a04988b7e322be398c.cue"
+        );
+
         let name = "core::option::Option<vector_core::tls::settings::TlsConfig>";
         let filename = definition_file_name(name);
 
