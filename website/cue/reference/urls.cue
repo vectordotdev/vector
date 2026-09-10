@@ -377,7 +377,6 @@ urls: {
 	mqtt:                                       "https://mqtt.org/"
 	musl_builder_docker_image:                  "\(vector_repo)/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile"
 	native_proto_schema:                        "\(vector_repo)/blob/master/lib/vector-core/proto/event.proto"
-	native_json_schema:                         "\(vector_repo)/blob/master/lib/codecs/tests/data/native_encoding/schema.cue"
 	nats:                                       "https://nats.io/"
 	nats_rs:                                    "\(github)/nats-io/nats.rs"
 	new_bug_report:                             "\(vector_repo)/issues/new?labels=type%3A+bug"

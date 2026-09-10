@@ -35,6 +35,13 @@ message EventWrapper {
   }
 }
 
+// The stable envelope for the native JSON codec. The extra message layer is an
+// unambiguous discriminator from the legacy native JSON representation, whose
+// top-level object is Vector's in-memory Event enum serialized by serde.
+message NativeJsonEnvelope {
+  EventWrapper event = 1;
+}
+
 message Log {
   // Deprecated, use value instead.
   map<string, Value> fields = 1 [deprecated = true];
@@ -126,6 +133,9 @@ message Metric {
     AggregatedSummary3 aggregated_summary3 = 17;
   }
   string namespace = 11;
+  // Presence-aware namespace used by native JSON. Binary native retains the
+  // original namespace field so its wire representation remains unchanged.
+  optional string namespace_v2 = 22;
   uint32 interval_ms = 18;
   Value metadata = 19 [deprecated = true];
   Metadata metadata_full = 21;

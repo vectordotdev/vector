@@ -11,6 +11,9 @@ use crate::{event, metrics::AgentDDSketch};
 mod proto_event {
     include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
+/// Protobuf descriptors for the native event wire model and its imports.
+pub const FILE_DESCRIPTOR_SET: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/event_descriptor.bin"));
 pub use event_wrapper::Event;
 pub use metric::Value as MetricValue;
 pub use proto_event::*;
@@ -215,7 +218,9 @@ impl From<Metric> for super::Metric {
 
         let name = metric.name;
 
-        let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
+        let namespace = metric
+            .namespace_v2
+            .or_else(|| (!metric.namespace.is_empty()).then_some(metric.namespace));
 
         // Sign can never be lost as ts.nanos is always non negative (per proto spec)
         #[allow(clippy::cast_sign_loss)]
@@ -307,9 +312,9 @@ impl From<super::LogEvent> for WithMetadata<Log> {
         // in fields instead which is ignored during decoding. To reduce encoding bloat
         // from a dummy value, it is only used when the root value type is not an object.
         // Once this backwards compatibility is no longer required, "fields" can
-        // be entirely removed from the Log object
+        // be entirely removed from the Log object.
         let (fields, value) = if let VrlValue::Object(fields) = value {
-            // using only "fields" to prevent having to use the dummy value
+            // Use only "fields" to prevent having to use the dummy value.
             let fields = fields
                 .into_iter()
                 .map(|(k, v)| (k.into(), encode_value(v)))
@@ -479,6 +484,7 @@ impl From<super::Metric> for WithMetadata<Metric> {
         let data = Metric {
             name,
             namespace,
+            namespace_v2: None,
             timestamp,
             tags_v1,
             tags_v2,
@@ -518,6 +524,40 @@ impl From<super::Event> for EventWrapper {
 impl From<super::Event> for WithMetadata<EventWrapper> {
     fn from(event: super::Event) -> Self {
         WithMetadata::<Event>::from(event).into()
+    }
+}
+
+impl EventWrapper {
+    /// Converts an event using only the current log value representation.
+    ///
+    /// Binary native encoding continues to use the standard `From` conversion so older
+    /// receivers and its wider object-root nesting boundary remain compatible. Native JSON uses
+    /// this conversion because deprecated fields are omitted from its published representation.
+    pub fn from_event_for_native_json(event: super::Event) -> Self {
+        let event = match event {
+            super::Event::Log(log) => {
+                let (value, metadata) = log.into_parts();
+                #[allow(deprecated)]
+                let log = Log {
+                    fields: BTreeMap::new(),
+                    value: Some(encode_value(value)),
+                    metadata: Some(encode_value(metadata.value().clone())),
+                    metadata_full: Some(metadata.into()),
+                };
+                Event::Log(log)
+            }
+            super::Event::Metric(metric) => {
+                let has_namespace = metric.namespace().is_some();
+                let mut metric: Metric = metric.into();
+                if has_namespace {
+                    metric.namespace_v2 = Some(std::mem::take(&mut metric.namespace));
+                }
+                Event::Metric(metric)
+            }
+            super::Event::Trace(trace) => Event::Trace(trace.into()),
+        };
+
+        Self { event: Some(event) }
     }
 }
 
@@ -794,6 +834,12 @@ mod tests {
     // regenerate them from the current Rust types; each payload's exact contents are documented
     // below and mirrored by its test assertions.
 
+    // Pre-v23 Log with deprecated fields map entry message="hello" and no value field. This pins
+    // decoding for logs produced before object-root logs moved to the Value representation.
+    const PRE_V23_LOG_FIELDS: &[u8] = &[
+        10, 18, 10, 7, 109, 101, 115, 115, 97, 103, 101, 18, 7, 10, 5, 104, 101, 108, 108, 111,
+    ];
+
     // EventArray.metrics containing four pre-v24 metrics:
     // - AggregatedHistogram1 (field 9): bucket 1.5/count 2, total count 2, sum 3.0.
     // - AggregatedHistogram2 (field 13): bucket 1.5/count 2, total count 2, sum 3.0.
@@ -838,6 +884,18 @@ mod tests {
     // Pre-v41 Metadata with source_type field 4 set to "legacy" and no source_event_id field 7.
     // This pins the expected default when decoding payloads created before event IDs existed.
     const PRE_V41_METADATA: &[u8] = &[34, 6, 108, 101, 103, 97, 99, 121];
+
+    #[test]
+    fn decodes_pre_v23_log_fields() {
+        let decoded = crate::event::LogEvent::from(Log::decode(PRE_V23_LOG_FIELDS).unwrap());
+
+        assert_eq!(
+            decoded.value(),
+            &VrlValue::Object(vrl::btreemap! {
+                "message" => VrlValue::from("hello")
+            })
+        );
+    }
 
     #[test]
     fn decodes_pre_v24_histogram_and_summary_variants() {
@@ -925,6 +983,52 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(values, [Some(String::new()), None]);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn native_json_log_encoding_does_not_change_native_protobuf_encoding() {
+        let event = crate::event::Event::Log(crate::event::LogEvent::from(vrl::btreemap! {
+            "message" => VrlValue::from("hello")
+        }));
+
+        let native = EventWrapper::from(event.clone()).event.unwrap();
+        let native_json = EventWrapper::from_event_for_native_json(event)
+            .event
+            .unwrap();
+        let (Event::Log(native), Event::Log(native_json)) = (native, native_json) else {
+            panic!("event wrappers did not contain logs");
+        };
+
+        assert!(!native.fields.is_empty());
+        assert!(native.value.is_none());
+        assert!(native_json.fields.is_empty());
+        assert!(native_json.value.is_some());
+    }
+
+    #[test]
+    fn native_json_metric_encoding_preserves_empty_namespace_presence() {
+        let event = crate::event::Event::Metric(
+            crate::event::Metric::new(
+                "requests",
+                crate::event::MetricKind::Absolute,
+                EventMetricValue::Counter { value: 1.0 },
+            )
+            .with_namespace(Some(String::new())),
+        );
+
+        let native = EventWrapper::from(event.clone()).event.unwrap();
+        let native_json = EventWrapper::from_event_for_native_json(event)
+            .event
+            .unwrap();
+        let (Event::Metric(native), Event::Metric(native_json)) = (native, native_json) else {
+            panic!("event wrappers did not contain metrics");
+        };
+
+        assert!(native.namespace.is_empty());
+        assert_eq!(native.namespace_v2, None);
+        assert!(native_json.namespace.is_empty());
+        assert_eq!(native_json.namespace_v2, Some(String::new()));
     }
 
     #[test]
