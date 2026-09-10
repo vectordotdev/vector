@@ -1,9 +1,3 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
-use derivative::Derivative;
 use futures::FutureExt;
 use http::{HeaderValue, Request, header::AUTHORIZATION};
 use hyper::Body;
@@ -52,26 +46,20 @@ pub(super) struct AppsignalConfig {
     #[configurable(metadata(docs::examples = "${APPSIGNAL_PUSH_API_KEY}"))]
     push_api_key: SensitiveString,
 
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<AppsignalDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -79,7 +67,6 @@ pub(super) struct AppsignalConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     retry_strategy: RetryStrategy,
 }
@@ -154,14 +141,13 @@ impl SinkConfig for AppsignalConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedAppsignal {
     batch_settings: BatcherSettings,
     endpoint: HttpEndpoint,
     healthcheck_endpoint: HttpEndpoint,
     // Omitted: `authorization` embeds the push API key.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     authorization: HeaderValue,
 }
 

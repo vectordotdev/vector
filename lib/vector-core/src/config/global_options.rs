@@ -108,7 +108,6 @@ pub struct GlobalOptions {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub timezone: Option<TimeZone>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::required = false))]
     pub proxy: ProxyConfig,

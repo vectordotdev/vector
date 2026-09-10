@@ -23,7 +23,6 @@ pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -72,7 +71,6 @@ pub struct UdpMode {
     #[serde(flatten)]
     config: UdpSinkConfig,
 
-    #[configurable(derived)]
     encoding: EncodingConfig,
 }
 
@@ -180,6 +178,7 @@ impl ValidatedSink for SocketSinkConfig {
         match &self.mode {
             Mode::Tcp(TcpMode { config, encoding }) => {
                 let (host, port) = config.parse_address()?;
+                encoding.validate()?;
                 let transformer = encoding.transformer();
                 Ok(ValidatedSocket::Tcp {
                     host,
@@ -191,11 +190,13 @@ impl ValidatedSink for SocketSinkConfig {
                 // Mirror the pure host/port check from `UdpSinkConfig::build`
                 // so malformed addresses are rejected here instead.
                 config.parse_address()?;
+                encoding.validate()?;
                 let transformer = encoding.transformer();
                 Ok(ValidatedSocket::Udp { transformer })
             }
             #[cfg(unix)]
             Mode::UnixStream(UnixMode { encoding, .. }) => {
+                encoding.validate()?;
                 let transformer = encoding.transformer();
                 Ok(ValidatedSocket::UnixStream { transformer })
             }
@@ -204,6 +205,7 @@ impl ValidatedSink for SocketSinkConfig {
             Mode::UnixDatagram(UnixMode { encoding, .. }) => {
                 cfg_if! {
                     if #[cfg(not(target_os = "macos"))] {
+                        encoding.validate()?;
                         let transformer = encoding.transformer();
                         Ok(ValidatedSocket::UnixDatagram { transformer })
                     }

@@ -1,10 +1,4 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use async_trait::async_trait;
-use derivative::Derivative;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
@@ -33,7 +27,6 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct SematextLogsConfig {
     #[serde(default = "super::default_region")]
-    #[configurable(derived)]
     region: Region,
 
     /// The endpoint to send data to.
@@ -49,19 +42,15 @@ pub struct SematextLogsConfig {
     #[configurable(metadata(docs::examples = "some-sematext-token"))]
     token: SensitiveString,
 
-    #[configurable(derived)]
     #[serde(skip_serializing_if = "crate::serde::is_default", default)]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -94,12 +83,11 @@ impl SinkConfig for SematextLogsConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedSematextLogs {
     endpoint: String,
     // Omitted: `index` is built from the write token and would leak it via Debug.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     index: Template,
 }
 

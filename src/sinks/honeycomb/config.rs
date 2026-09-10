@@ -1,10 +1,4 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use bytes::Bytes;
-use derivative::Derivative;
 use futures::FutureExt;
 use http::{HeaderValue, Request, StatusCode};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
@@ -52,24 +46,19 @@ pub struct HoneycombConfig {
     // but this limits us in how we can do our healthcheck.
     dataset: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<HoneycombDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
 
     /// The compression algorithm to use.
-    #[configurable(derived)]
     #[serde(default = "Compression::zstd_default")]
     compression: Compression,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -77,7 +66,6 @@ pub struct HoneycombConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 }
@@ -120,15 +108,14 @@ impl SinkConfig for HoneycombConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedHoneycomb {
     batch_settings: BatcherSettings,
     uri: HttpEndpoint,
     request_limits: TowerRequestSettings,
     // Omitted: `api_key` is sent as the `X-Honeycomb-Team` header on every
     // request.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     api_key: HeaderValue,
 }
 

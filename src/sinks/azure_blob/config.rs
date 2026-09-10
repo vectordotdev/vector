@@ -1,10 +1,4 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with format_with expands to a must_use let binding"
-)]
-
 use std::collections::{BTreeMap, HashMap};
-use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
@@ -18,7 +12,6 @@ use azure_core::{
 use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
 
 use bytes::Bytes;
-use derivative::Derivative;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -99,7 +92,6 @@ pub enum AzureBlobType {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: Option<AzureAuthentication>,
 
@@ -240,7 +232,6 @@ pub struct AzureBlobSinkConfig {
     /// the block is appended twice. Setting `request.retry_attempts` to `0` disables sink-level
     /// retries, but it does not give at-most-once delivery — upstream retries and resending
     /// sources can still produce duplicates.
-    #[configurable(derived)]
     #[serde(default)]
     pub blob_type: AzureBlobType,
 
@@ -253,7 +244,6 @@ pub struct AzureBlobSinkConfig {
     ///
     /// Some cloud storage API clients and browsers handle decompression transparently, so
     /// depending on how they are accessed, files may not always appear to be compressed.
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
@@ -294,15 +284,12 @@ pub struct AzureBlobSinkConfig {
     #[serde(default)]
     pub metadata: Option<HashMap<String, String>>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig<AzureBlobTowerRequestConfigDefaults>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -310,7 +297,6 @@ pub struct AzureBlobSinkConfig {
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<AzureBlobTlsConfig>,
 
@@ -372,40 +358,23 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedAzureBlob {
     // The connection string contains credentials (AccountKey / SAS token),
     // so it is intentionally omitted from diagnostics.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     parsed_connection_string: ParsedConnectionString,
     // The container URL may embed a SAS token as its query string, so it is
     // rendered without the query.
-    #[derivative(Debug(format_with = "fmt_container_url"))]
+    #[debug("{}", {let mut url = container_url.clone(); url.set_query(None); url})]
     container_url: Url,
     batcher_settings: BatcherSettings,
     request_settings: TowerRequestSettings,
     encoder: Encoder<Framer>,
     blob_time_format: String,
     blob_append_uuid: bool,
-    #[derivative(Debug(format_with = "fmt_confined_blob_prefix"))]
+    #[debug("{:?}", confined_blob_prefix.to_string())]
     confined_blob_prefix: ConfinedTemplate,
-}
-
-/// Formats a container URL without its query string, so a SAS token embedded
-/// as a query parameter is not leaked into diagnostics.
-fn fmt_container_url(url: &Url, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut url = url.clone();
-    url.set_query(None);
-    fmt::Debug::fmt(&url, f)
-}
-
-/// Formats a confined template as its rendered string.
-fn fmt_confined_blob_prefix(
-    template: &ConfinedTemplate,
-    f: &mut fmt::Formatter<'_>,
-) -> fmt::Result {
-    fmt::Debug::fmt(&template.to_string(), f)
 }
 
 #[async_trait::async_trait]
@@ -413,6 +382,7 @@ impl ValidatedSink for AzureBlobSinkConfig {
     type Validated = ValidatedAzureBlob;
 
     fn validate(&self) -> crate::Result<ValidatedAzureBlob> {
+        self.encoding.validate()?;
         if self.blob_type == AzureBlobType::Append && !supports_append(self.compression) {
             // An error rather than a warning because of zlib: standard zlib decoders return only
             // the first block and report success, so the loss is invisible to the consumer.

@@ -22,10 +22,8 @@ pub struct WebSocketSinkConfig {
     #[serde(flatten)]
     pub common: WebSocketCommonConfig,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -72,6 +70,7 @@ impl ValidatedSink for WebSocketSinkConfig {
     fn validate(&self) -> crate::Result<ValidatedWebSocketSink> {
         let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
         let transformer = self.encoding.transformer();
+        self.encoding.validate()?;
         Ok(ValidatedWebSocketSink { uri, transformer })
     }
 

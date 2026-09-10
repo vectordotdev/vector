@@ -27,6 +27,7 @@ bytes.workspace = true
 chrono.workspace = true
 csv-core = { version = "0.1.13", default-features = false }
 derivative.workspace = true
+derive_more.workspace = true
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 futures.workspace = true
@@ -64,6 +65,7 @@ toml = { version = "0.9.8", optional = true }
 criterion.workspace = true
 futures.workspace = true
 indoc.workspace = true
+proptest.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 toml.workspace = true
 similar-asserts = "2.0.0"
@@ -85,6 +87,6 @@ test = []
 
 [[bench]]
 name = "codecs"
-path = "benches/main.rs"
+path = "benches/codecs/main.rs"
 harness = false
 required-features = ["opentelemetry"]

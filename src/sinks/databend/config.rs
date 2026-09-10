@@ -1,12 +1,6 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::{collections::BTreeMap, sync::Arc};
 
 use databend_client::APIClient as DatabendAPIClient;
-use derivative::Derivative;
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
 use vector_lib::{
@@ -62,34 +56,27 @@ pub struct DatabendConfig {
     pub database: Option<String>,
 
     /// The username and password to authenticate with. Overrides the username and password in DSN.
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
     pub table: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub missing_field_as: DatabendMissingFieldAS,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub encoding: DatabendEncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: DatabendCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -121,11 +108,10 @@ impl SinkConfig for DatabendConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedDatabend {
     // Omitted: `endpoint` embeds the basic-auth username/password in its URL.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     endpoint: String,
     request_settings: TowerRequestSettings,
     batch_settings: BatcherSettings,

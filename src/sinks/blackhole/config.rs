@@ -41,7 +41,6 @@ pub struct BlackholeConfig {
     #[configurable(metadata(docs::examples = 1000))]
     pub rate: Option<usize>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

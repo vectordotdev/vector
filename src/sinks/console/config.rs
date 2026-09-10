@@ -43,14 +43,12 @@ pub enum Target {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {
-    #[configurable(derived)]
     #[serde(default = "default_target")]
     pub target: Target,
 
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -91,7 +89,7 @@ impl ValidatedSink for ConsoleSinkConfig {
     type Validated = ();
 
     fn validate(&self) -> crate::Result<()> {
-        Ok(())
+        self.encoding.validate()
     }
 
     async fn build(

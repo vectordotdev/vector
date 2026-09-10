@@ -29,7 +29,6 @@ use crate::{
 #[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
 pub struct RemoteWriteBatchConfig {
-    #[configurable(derived)]
     #[serde(flatten)]
     pub batch_settings: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
 
@@ -78,11 +77,9 @@ pub struct RemoteWriteConfig {
     #[serde(default = "crate::sinks::prometheus::default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: RemoteWriteBatchConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RemoteWriteRequestConfig,
 
@@ -103,17 +100,13 @@ pub struct RemoteWriteConfig {
     #[configurable(metadata(docs::required = false))]
     pub expire_metrics_secs: Option<f64>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     pub auth: Option<PrometheusRemoteWriteAuth>,
 
     #[cfg(feature = "aws-config")]
-    #[configurable(derived)]
     pub aws: Option<crate::aws::RegionOrEndpoint>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -121,16 +114,13 @@ pub struct RemoteWriteConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_compression")]
     #[derivative(Default(value = "default_compression()"))]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }

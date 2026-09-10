@@ -25,17 +25,13 @@ pub struct WebSocketListenerSinkConfig {
     #[configurable(metadata(docs::examples = "localhost:80"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub subprotocol: SubProtocolConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -43,14 +39,11 @@ pub struct WebSocketListenerSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     pub message_buffering: Option<MessageBufferingConfig>,
 
-    #[configurable(derived)]
     pub auth: Option<HttpServerAuthConfig>,
 
     /// Configuration of internal metrics
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
 }
@@ -164,6 +157,7 @@ impl ValidatedSink for WebSocketListenerSinkConfig {
 
     fn validate(&self) -> crate::Result<ValidatedWebSocketListenerSink> {
         let transformer = self.encoding.transformer();
+        self.encoding.validate()?;
         // Custom-auth VRL compilation is deferred to `validate_with_context`, which
         // has the enrichment tables needed to resolve `get_enrichment_table_record!`.
         Ok(ValidatedWebSocketListenerSink { transformer })

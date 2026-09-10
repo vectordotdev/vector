@@ -1,9 +1,6 @@
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{any::Any, cell::RefCell, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use derivative::Derivative;
 use dyn_clone::DynClone;
 use serde::Serialize;
 use serde_with::serde_as;
@@ -60,17 +57,14 @@ impl<T: SinkConfig + 'static> From<T> for BoxedSink {
 /// Fully resolved sink component.
 #[configurable_component]
 #[configurable(metadata(docs::component_base_type = "sink"))]
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct SinkOuter<T>
 where
     T: Configurable + Serialize + 'static,
 {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 
-    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     /// The full URI to make HTTP healthcheck requests to.
@@ -80,15 +74,12 @@ where
     #[configurable(deprecated, metadata(docs::hidden), validation(format = "uri"))]
     pub healthcheck_uri: Option<UriSerde>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "crate::serde::bool_or_struct")]
     pub healthcheck: SinkHealthcheckOptions,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub buffer: BufferConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
@@ -103,7 +94,7 @@ where
     /// or diffed (see `#[serde(skip)]`), and is shared (via `Arc`) so enrichment-table-derived
     /// sinks can carry it without cloning the underlying value.
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 

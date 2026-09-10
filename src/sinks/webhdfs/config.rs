@@ -66,15 +66,12 @@ pub struct WebHdfsConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -135,6 +132,7 @@ impl ValidatedSink for WebHdfsConfig {
     type Validated = ValidatedWebHdfs;
 
     fn validate(&self) -> crate::Result<ValidatedWebHdfs> {
+        self.encoding.validate()?;
         let batcher_settings = self.batch.into_batcher_settings()?;
         let confined_prefix = self.confined_prefix()?;
 

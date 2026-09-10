@@ -72,7 +72,6 @@ pub struct KinesisFirehoseSinkConfig {
     #[serde(flatten)]
     pub base: KinesisSinkBaseConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<KinesisFirehoseDefaultBatchSettings>,
 }
@@ -147,6 +146,7 @@ impl ValidatedSink for KinesisFirehoseSinkConfig {
             .limit_max_bytes(MAX_PAYLOAD_SIZE)?
             .limit_max_events(MAX_PAYLOAD_EVENTS)?
             .into_batcher_settings()?;
+        self.base.encoding.validate()?;
 
         Ok(ValidatedKinesisFirehose { batch_settings })
     }

@@ -27,13 +27,10 @@ pub struct PapertrailConfig {
     #[configurable(metadata(docs::examples = "logs.papertrailapp.com:12345"))]
     endpoint: UriSerde,
 
-    #[configurable(derived)]
     encoding: EncodingConfig,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
     /// Configures the send buffer size using the `SO_SNDBUF` option on the socket.
@@ -44,7 +41,6 @@ pub struct PapertrailConfig {
     #[serde(default = "default_process")]
     process: UnconfinedTemplate,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -106,6 +102,7 @@ impl ValidatedSink for PapertrailConfig {
             .uri
             .port_u16()
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
+        self.encoding.validate()?;
 
         let address = format!("{host}:{port}");
         let tls = Some(

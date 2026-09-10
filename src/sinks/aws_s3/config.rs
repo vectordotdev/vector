@@ -134,7 +134,6 @@ pub struct S3SinkConfig {
     /// instead of the standard per-event framing-based encoding. The columnar format handles
     /// its own internal compression, so the top-level `compression` setting is bypassed.
     #[cfg(feature = "codecs-parquet")]
-    #[configurable(derived)]
     #[serde(default)]
     pub batch_encoding: Option<S3BatchEncoding>,
 
@@ -144,26 +143,20 @@ pub struct S3SinkConfig {
     ///
     /// Some cloud storage API clients and browsers handle decompression transparently, so
     /// depending on how they are accessed, files may not always appear to be compressed.
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -171,7 +164,6 @@ pub struct S3SinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
 
@@ -185,7 +177,6 @@ pub struct S3SinkConfig {
     ///
     /// By default, the sink only retries attempts it deems possible to retry.
     /// These settings extend the default behavior.
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub retry_strategy: RetryStrategy,
 
@@ -263,6 +254,7 @@ impl ValidatedSink for S3SinkConfig {
     type Validated = ValidatedAwsS3;
 
     fn validate(&self) -> crate::Result<ValidatedAwsS3> {
+        self.encoding.validate()?;
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let key_prefix = Template::try_from(self.key_prefix.clone())?.confine(

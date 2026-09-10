@@ -1,11 +1,5 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::sync::Arc;
 
-use derivative::Derivative;
 use http::{Uri, header::HeaderValue};
 use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
@@ -87,29 +81,22 @@ pub struct NewRelicConfig {
     #[configurable(metadata(docs::examples = "${NEW_RELIC_ACCOUNT_KEY}"))]
     pub account_id: SensitiveString,
 
-    #[configurable(derived)]
     pub region: Option<NewRelicRegion>,
 
-    #[configurable(derived)]
     pub api: NewRelicApi,
 
-    #[configurable(derived)]
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -145,14 +132,13 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedNewRelic {
     batcher_settings: BatcherSettings,
     request_limits: TowerRequestSettings,
     // The credentials contain the license key and account ID, so they are
     // intentionally omitted from diagnostics.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     credentials: Arc<NewRelicCredentials>,
 }
 

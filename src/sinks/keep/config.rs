@@ -41,19 +41,15 @@ pub struct KeepConfig {
     #[configurable(metadata(docs::examples = "keepappkey"))]
     api_key: SensitiveString,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<KeepDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -61,7 +57,6 @@ pub struct KeepConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_strategy: RetryStrategy,
 }
