@@ -57,9 +57,9 @@ impl RetryLogic for DorisRetryLogic {
                     error_message = %message
                 );
 
-                if let Some(url) = doris_resp.error_url {
+                if let Some(url) = doris_resp.error_url.as_ref() {
                     debug!(
-                        message = "Doris stream load failed, details can findout from: ",
+                        message = "Doris stream load failed; details can be found at:",
                         error_url = %url
                     );
                 }
