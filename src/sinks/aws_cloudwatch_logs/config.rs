@@ -235,6 +235,7 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
                 .confine(&self.confinement, Self::NAME, "group_name")?;
         let batcher_settings = self.batch.into_batcher_settings()?;
         let headers = validate_headers(&self.request.headers)?;
+        self.encoding.validate()?;
 
         Ok(ValidatedCloudwatchLogs {
             group_template,

@@ -23,7 +23,6 @@ pub struct LuaMetricTags {
 }
 
 impl IntoLua for MetricKind {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let kind = match self {
             MetricKind::Absolute => "absolute",
@@ -126,7 +125,6 @@ impl IntoLua for LuaMetricTags {
 }
 
 impl IntoLua for LuaMetric {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let tbl = lua.create_table()?;
 
