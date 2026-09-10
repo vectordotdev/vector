@@ -520,9 +520,8 @@ mod test {
                     assert_eq!(1, processed.len());
                     assert!(
                         encoded.len() <= max_size,
-                        "encoded len {} longer than max size {}",
-                        encoded.len(),
-                        max_size
+                        "encoded len {} longer than max size {max_size}",
+                        encoded.len()
                     );
                 }
             }

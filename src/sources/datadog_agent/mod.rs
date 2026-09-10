@@ -263,7 +263,7 @@ impl SourceConfig for DatadogAgentConfig {
                 .with_graceful_shutdown(shutdown.map(|_| ()))
                 .await
                 .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
+                    error!("An error occurred: {err:?}.");
                 })?;
 
             Ok(())

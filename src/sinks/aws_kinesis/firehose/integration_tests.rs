@@ -100,7 +100,7 @@ async fn firehose_put_records_without_partition_key() {
         .expect("Could not build HTTP client");
 
     let response = client
-        .get(format!("{}/{}/_search", common.base_url, stream))
+        .get(format!("{}/{stream}/_search", common.base_url))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -212,7 +212,7 @@ async fn firehose_put_records_with_partition_key() {
         .expect("Could not build HTTP client");
 
     let response = client
-        .get(format!("{}/{}/_search", common.base_url, stream))
+        .get(format!("{}/{stream}/_search", common.base_url))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))

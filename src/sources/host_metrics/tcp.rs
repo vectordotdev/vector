@@ -19,8 +19,7 @@ impl HostMetrics {
             .await
             .unwrap_or_else(|join_error| {
                 Err(procfs::ProcError::Other(format!(
-                    "Failed to join blocking task: {}",
-                    join_error
+                    "Failed to join blocking task: {join_error}"
                 )))
             });
 

@@ -421,9 +421,8 @@ impl TokenCredential for MockTokenCredential {
         .to_string();
 
         warn!(
-            "Using mock token credential, JWT: {}, base64: {}",
-            serde_json::to_string(&jwt).unwrap(),
-            jwt_base64
+            "Using mock token credential, JWT: {}, base64: {jwt_base64}",
+            serde_json::to_string(&jwt).unwrap()
         );
 
         Ok(azure_core::credentials::AccessToken::new(

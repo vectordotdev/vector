@@ -554,9 +554,9 @@ mod integration_tests {
             let included1_message = "included 1";
 
             let prefix = format!("vector_test_exclude_containers_{}", uuid::Uuid::new_v4());
-            let included0 = format!("{}_{}", prefix, "include0");
-            let included1 = format!("{}_{}", prefix, "include1");
-            let excluded0 = format!("{}_{}", prefix, "excluded0");
+            let included0 = format!("{prefix}_{}", "include0");
+            let included1 = format!("{prefix}_{}", "include1");
+            let excluded0 = format!("{prefix}_{}", "excluded0");
 
             let docker = docker(None, None).unwrap();
 

@@ -57,7 +57,7 @@ async fn insert_metrics(url: &str) {
             let metric = event.into_metric();
             let result = query(
                 url,
-                &format!(r#"SELECT * FROM "{}".."{}""#, database, metric.name()),
+                &format!(r#"SELECT * FROM "{database}".."{}""#, metric.name()),
             )
             .await;
 
