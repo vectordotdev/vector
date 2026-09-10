@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Write as _};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Write as _};
 
 use chrono::Utc;
 use indexmap::map::IndexMap;
@@ -234,9 +234,10 @@ impl MetricCollector for StringCollector {
     }
 
     fn emit_metadata(&mut self, name: &str, fullname: &str, value: &MetricValue) {
-        if !self.processed.contains_key(fullname) {
-            let header = Self::encode_header(name, fullname, value);
-            self.processed.insert(fullname.into(), header);
+        let fullname = Self::sanitize_metric_name_newlines(fullname).into_owned();
+        if let std::collections::btree_map::Entry::Vacant(entry) = self.processed.entry(fullname) {
+            let header = Self::encode_header(name, entry.key(), value);
+            entry.insert(header);
         }
     }
 
@@ -249,12 +250,13 @@ impl MetricCollector for StringCollector {
         tags: Option<&MetricTags>,
         extra: Option<(&str, String)>,
     ) {
+        let name = Self::sanitize_metric_name_newlines(name);
         let result = self
             .processed
-            .get_mut(name)
+            .get_mut(name.as_ref())
             .expect("metric metadata not encoded");
 
-        result.push_str(name);
+        result.push_str(name.as_ref());
         result.push_str(suffix);
         Self::encode_tags(result, tags, extra);
         _ = match timestamp_millis {
@@ -292,7 +294,38 @@ impl StringCollector {
 
     fn encode_header(name: &str, fullname: &str, value: &MetricValue) -> String {
         let r#type = prometheus_metric_type(value).as_str();
-        format!("# HELP {fullname} {name}\n# TYPE {fullname} {type}\n")
+        let help = Self::escape_help(name);
+        format!("# HELP {fullname} {help}\n# TYPE {fullname} {type}\n")
+    }
+
+    fn sanitize_metric_name_newlines(name: &str) -> Cow<'_, str> {
+        if name.contains('\n') {
+            Cow::Owned(name.replace('\n', "_"))
+        } else {
+            Cow::Borrowed(name)
+        }
+    }
+
+    fn escape_help(mut help: &str) -> String {
+        let mut result = String::with_capacity(help.len());
+        while let Some(i) = help.find(['\\', '\n']) {
+            #[expect(
+                clippy::string_slice,
+                reason = "i comes from find() on ASCII chars, i and i+1 are char boundaries"
+            )]
+            {
+                result.push_str(&help[..i]);
+                result.push('\\');
+                result.push(if help.as_bytes()[i] == b'\n' {
+                    'n'
+                } else {
+                    '\\'
+                });
+                help = &help[i + 1..];
+            }
+        }
+        result.push_str(help);
+        result
     }
 
     fn format_tag(key: &str, mut value: &str) -> String {
@@ -300,7 +333,7 @@ impl StringCollector {
         let mut result = String::with_capacity(key.len() + value.len() + 3);
         result.push_str(key);
         result.push_str("=\"");
-        while let Some(i) = value.find(['\\', '"']) {
+        while let Some(i) = value.find(['\\', '"', '\n']) {
             #[expect(
                 clippy::string_slice,
                 reason = "i comes from find() on ASCII chars, i and i+1 are char boundaries"
@@ -308,8 +341,11 @@ impl StringCollector {
             {
                 result.push_str(&value[..i]);
                 result.push('\\');
-                // Ugly but works because we know the character at `i` is ASCII
-                result.push(value.as_bytes()[i] as char);
+                result.push(if value.as_bytes()[i] == b'\n' {
+                    'n'
+                } else {
+                    value.as_bytes()[i] as char
+                });
                 value = &value[i + 1..];
             }
         }
@@ -927,6 +963,7 @@ mod tests {
     fn escapes_tags_text() {
         let tags = metric_tags!(
             "code" => "200",
+            "line" => "first\nsecond",
             "quoted" => r#"host"1""#,
             "path" => r"c:\Windows",
         );
@@ -942,8 +979,36 @@ mod tests {
             indoc! {r#"
                 # HELP something something
                 # TYPE something counter
-                something{code="200",path="c:\\Windows",quoted="host\"1\""} 1
+                something{code="200",line="first\nsecond",path="c:\\Windows",quoted="host\"1\""} 1
             "#}
+        );
+        vector_lib::prometheus::parser::parse_text(&encoded).unwrap();
+    }
+
+    #[test]
+    fn sanitizes_metric_name_newlines_text() {
+        let metric = Metric::new(
+            "invalid_metric\nname".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+        assert_eq!(
+            encoded,
+            indoc! {r#"
+                # HELP invalid_metric_name invalid_metric\nname
+                # TYPE invalid_metric_name counter
+                invalid_metric_name 1
+            "#}
+        );
+        vector_lib::prometheus::parser::parse_text(&encoded).unwrap();
+    }
+
+    #[test]
+    fn escapes_help_text() {
+        assert_eq!(
+            StringCollector::escape_help("line\npath\\name"),
+            r"line\npath\\name"
         );
     }
 
