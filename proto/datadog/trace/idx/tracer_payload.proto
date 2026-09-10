@@ -54,14 +54,14 @@ message TracerPayload {
 
 // ContainerDebug holds debug information about the container tags resolution process.
 message ContainerDebug {
-	// error specifies any error that occurred during container tag resolution.
-	string error = 1;
+	// errorRef specifies the string table ref of any error that occurred during container tag resolution.
+	uint32 errorRef = 1;
 	// latencyMs specifies the latency in milliseconds of the container tag resolution.
 	int64 latencyMs = 2;
 	// wasBuffered specifies whether the payload was buffered while waiting for container tags.
 	bool wasBuffered = 3;
 	// bufferMs specifies how long the payload was buffered in milliseconds.
 	int64 bufferMs = 4;
-	// bufferEvictionReason specifies why the payload was evicted from the buffer.
-	string bufferEvictionReason = 5;
+	// bufferEvictionReasonRef specifies the string table ref of why the payload was evicted from the buffer.
+	uint32 bufferEvictionReasonRef = 5;
 }

@@ -136,7 +136,10 @@ message Span {
     // @gotags: json:"type" msg:"type"
     string type = 12;
     // meta_struct is a registry of structured "other" data used by, e.g., AppSec.
-    // @gotags: json:"meta_struct,omitempty" msg:"meta_struct,omitempty"
+    // Entries can legitimately be much larger than other span fields, so this
+    // field overrides the package-wide messagepack allocation limit with a 10MiB
+    // cap (see the //msgp:limit directives in pkg/proto/pbgo/trace).
+    // @gotags: json:"meta_struct,omitempty" msg:"meta_struct,omitempty,limit=10485760"
     map<string, bytes> meta_struct = 13;
     // span_links represents a collection of links, where each link defines a causal relationship between two spans.
     // @gotags: json:"span_links,omitempty" msg:"span_links,omitempty"
