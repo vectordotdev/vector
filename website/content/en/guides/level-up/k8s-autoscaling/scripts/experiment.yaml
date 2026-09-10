@@ -12,8 +12,12 @@
         enabled: false
 
 - name: Require 30 seconds of stable, ready Vector pods
+  # The stable run also captures the rescale-event baseline before the
+  # HPA exists, so a rescale during the enabling Helm task is counted
+  # instead of vanishing into the baseline.
   ansible.builtin.command:
     argv: ["{{ ansible_playbook_python }}", "{{ playbook_dir }}/probe.py", stable]
+  register: stable_probe
   changed_when: false
 
 - name: Enable the HPA with the guide's settings
@@ -46,6 +50,7 @@
       - "{{ ansible_playbook_python }}"
       - "{{ playbook_dir }}/probe.py"
       - "{{ 'hpa' if experiment_name == 'hpa' else 'measure' }}"
+      - "{{ '--baseline=' ~ ((stable_probe.stdout | from_json).scale_events_baseline | string) if experiment_name == 'hpa' else omit }}"
   register: measurement
   changed_when: false
 

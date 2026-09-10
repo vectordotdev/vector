@@ -15,6 +15,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 from contextlib import ExitStack, contextmanager
 from urllib.parse import quote
 
@@ -127,9 +128,19 @@ def snapshot(port):
     raise RuntimeError("No 'in' component found in the observability response")
 
 
+def restart_counts(pods):
+    return {
+        pod["metadata"]["uid"]: tuple(
+            c["restartCount"] for c in pod["status"].get("containerStatuses") or []
+        )
+        for pod in pods
+    }
+
+
 def measure_pods(pods):
     if not pods:
         raise RuntimeError("No running Vector pods to measure")
+    before_restarts = restart_counts(pods)
     with ExitStack() as stack:
         ports = [
             stack.enter_context(port_forward(pod["metadata"]["name"], 18700 + i))
@@ -138,6 +149,15 @@ def measure_pods(pods):
         before = [snapshot(port) for port in ports]
         time.sleep(30)
         after = [snapshot(port) for port in ports]
+    # A container restart mid-window resets the process-local counters while
+    # the pod (and its port-forward) stay alive: subtracting the pre-restart
+    # values would then report negative or understated throughput.
+    after_restarts = restart_counts(kubectl("get", "pods", "-l", SELECTOR)["items"])
+    if after_restarts != before_restarts:
+        raise RuntimeError(
+            "A Vector container restarted during the measurement window "
+            "(counters reset): " + f"{before_restarts} -> {after_restarts}"
+        )
     # Keep the guide's two-snapshot, 30-second measurement method.
     byte_delta = sum(end[0] - start[0] for start, end in zip(before, after))
     event_delta = sum(end[1] - start[1] for start, end in zip(before, after))
@@ -151,7 +171,9 @@ def measure_stable_pods(probe, attempts=3):
     """Measure without racing an HPA scale-down: a pod deleted mid-window
     aborts the measurement (its port-forward dies) instead of silently
     undercounting, and the pod set is re-read between attempts. Returns the
-    measurement and the pod count it was taken against."""
+    measurement, the pod count it was taken against, and whether any retry
+    was needed (a rescale or restart mid-window means the caller must not
+    trust pre-measurement equilibrium evidence)."""
     for attempt in range(1, attempts + 1):
         pods = probe.pods(running=True)
         names = [pod["metadata"]["name"] for pod in pods]
@@ -169,6 +191,12 @@ def measure_stable_pods(probe, attempts=3):
             )
             time.sleep(15)
             continue
+        except RuntimeError as error:
+            if attempt == attempts:
+                raise
+            log(f"Measurement attempt {attempt}/{attempts} failed ({error}); retrying...")
+            time.sleep(15)
+            continue
         if probe.pods(running=True) != pods:
             if attempt == attempts:
                 raise RuntimeError(
@@ -181,7 +209,7 @@ def measure_stable_pods(probe, attempts=3):
             )
             time.sleep(15)
             continue
-        return result, len(pods)
+        return result, len(pods), attempt > 1
     raise RuntimeError("unreachable")
 
 
@@ -200,13 +228,7 @@ class Probe:
         previous = None
         while time.monotonic() - start < 300:
             pods = self.pods()
-            restarts = {
-                pod["metadata"]["uid"]: tuple(
-                    c["restartCount"]
-                    for c in pod["status"].get("containerStatuses") or []
-                )
-                for pod in pods
-            }
+            restarts = restart_counts(pods)
             ready = bool(pods) and all(
                 any(
                     c["type"] == "Ready" and c["status"] == "True"
@@ -259,30 +281,31 @@ class Probe:
         except subprocess.CalledProcessError:
             return 0
 
-    def hpa(self):
-        # The HPA is already enabled; observe it to equilibrium.
-        log("HPA: observing already-enabled HPA (timeout 900s)...")
-        start = time.monotonic()
+    def hpa_status(self):
+        try:
+            status = kubectl("get", "hpa", "vector")["status"]
+            replicas = status.get("currentReplicas")
+            desired = status.get("desiredReplicas")
+            metrics = status.get("currentMetrics") or []
+            resource = metrics[0].get("resource") if metrics else None
+            current = resource.get("current") if resource else None
+            cpu = current.get("averageUtilization") if current else None
+        except (subprocess.CalledProcessError, IndexError, KeyError):
+            return None, None, None
+        return replicas, desired, cpu
+
+    def wait_equilibrium(self, start):
+        """Observe the HPA until it settles; returns (replicas, cpu,
+        elapsed) at equilibrium."""
         last_replicas, last_stable, stable_count = 1, 0, 0
-        cpu = None
-        baseline = self.rescale_events()
         while True:
             elapsed = int(time.monotonic() - start)
             if elapsed >= 900:
                 raise RuntimeError(
                     f"HPA did not reach equilibrium within 900s "
-                    f"(last: {last_replicas} pods, {cpu}% CPU)"
+                    f"(last: {last_replicas} pods)"
                 )
-            try:
-                status = kubectl("get", "hpa", "vector")["status"]
-                replicas = status.get("currentReplicas")
-                desired = status.get("desiredReplicas")
-                metrics = status.get("currentMetrics") or []
-                resource = metrics[0].get("resource") if metrics else None
-                current = resource.get("current") if resource else None
-                cpu = current.get("averageUtilization") if current else None
-            except (subprocess.CalledProcessError, IndexError, KeyError):
-                replicas = desired = cpu = None
+            replicas, desired, cpu = self.hpa_status()
             if replicas is None or cpu is None:
                 log(f"[{elapsed}s] HPA metrics unavailable; retrying...")
                 time.sleep(15)
@@ -292,11 +315,9 @@ class Probe:
                 last_replicas = replicas
             else:
                 log(f"[{elapsed}s] replicas={replicas} cpu={cpu}%")
-            stable_count = stable_count + 1 if replicas == last_stable else 1
-            last_stable = replicas
             if desired != replicas:
                 # The HPA intends another rescale (e.g. waiting out the
-                # scale-down stabilization window): not equilibrium yet.
+                # scaleDown stabilization window): not equilibrium yet.
                 # Reset the settled evidence so a later transient
                 # desired==current sample can't declare equilibrium on the
                 # back of pre-rescale samples.
@@ -307,6 +328,8 @@ class Probe:
                 stable_count = 0
                 time.sleep(15)
                 continue
+            stable_count = stable_count + 1 if replicas == last_stable else 1
+            last_stable = replicas
             # Pending pods must not make a scale-out look stuck at maxReplicas.
             if replicas == 8 and cpu > 77 and stable_count >= 3:
                 deployment = kubectl("get", "deployment", "vector")
@@ -322,20 +345,37 @@ class Probe:
                 time.sleep(15)
                 continue
             # Discrete HPA rounding means equilibrium need not be inside the
-            # nominal CPU tolerance band: require 60s of replica-count stability
-            # and the HPA not planning a rescale (desiredReplicas, which holds
-            # through the scaleDown stabilization window).
+            # nominal CPU tolerance band: require 60s of replica-count
+            # stability and the HPA not planning a rescale (desiredReplicas,
+            # which holds through the scaleDown stabilization window).
             if stable_count >= 5 and elapsed > 120:
                 log(f"Equilibrium: {replicas} pods, {cpu}% CPU, {elapsed}s elapsed.")
-                break
+                return replicas, cpu, elapsed
             time.sleep(15)
-        measurement, pod_count = measure_stable_pods(self)
+
+    def hpa(self, baseline=None):
+        # The HPA is already enabled; observe it to equilibrium. The
+        # baseline (rescale events before the HPA was enabled) and the
+        # elapsed clock may come from the caller: the HPA can reconcile
+        # during the Helm task that enables it, so capturing them only
+        # here would misattribute that first rescale and start late.
+        log("HPA: observing already-enabled HPA (timeout 900s)...")
+        start = time.monotonic()
+        if baseline is None:
+            baseline = self.rescale_events()
+        replicas, cpu, elapsed = self.wait_equilibrium(start)
+        log("HPA: measuring equilibrium throughput...")
+        measurement, pod_count, retried = measure_stable_pods(self)
+        if retried:
+            # A rescale or restart happened during the measurement window:
+            # the pre-measurement equilibrium evidence is stale, so confirm
+            # the HPA has settled on the new pod set before reporting.
+            log("HPA: pod set changed during measurement; re-checking equilibrium...")
+            replicas, cpu, elapsed = self.wait_equilibrium(time.monotonic())
         # Re-read the HPA after the measurement window: a rescale during the
         # retries means the pre-measurement values no longer describe the
         # pod set the throughput was taken against.
-        status = kubectl("get", "hpa", "vector")["status"]
-        resource = (status.get("currentMetrics") or [{}])[0].get("resource")
-        cpu = (resource or {}).get("current", {}).get("averageUtilization")
+        _, _, cpu = self.hpa_status()
         return {
             **measurement,
             "Avg CPU": f"{cpu}%" if cpu is not None else "?",
@@ -352,6 +392,11 @@ def interrupt(signum, _frame):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("stable", "measure", "hpa"))
+    parser.add_argument(
+        "--baseline",
+        type=int,
+        help="rescale-event count captured before the HPA was enabled",
+    )
     args = parser.parse_args()
     signal.signal(signal.SIGINT, interrupt)
     signal.signal(signal.SIGTERM, interrupt)
@@ -359,11 +404,13 @@ def main():
         probe = Probe()
         if args.action == "stable":
             probe.wait_stable()
-            result = {}
+            # Emits the pre-HPA baseline so the enabling Helm task's own
+            # reconciliations are not misattributed by the later hpa run.
+            result = {"scale_events_baseline": probe.rescale_events()}
         elif args.action == "measure":
             result = probe.measure()
         else:
-            result = probe.hpa()
+            result = probe.hpa(baseline=args.baseline)
         print(json.dumps(result))
         return 0
     except subprocess.CalledProcessError as error:
