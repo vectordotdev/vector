@@ -1,6 +1,6 @@
 package metadata
 
-_schemaDefinitions: "derived::2c0db0ef1f05c78303bd4391": object: options: {
+_schemaDefinitions: "derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391": object: options: {
 	avro: {
 		description:   "Apache Avro-specific encoder options."
 		relevant_when: "codec = \"avro\""
@@ -125,7 +125,7 @@ _schemaDefinitions: "derived::2c0db0ef1f05c78303bd4391": object: options: {
 		description:   "Protobuf-specific decoding options."
 		relevant_when: "codec = \"protobuf\""
 		required:      false
-		type:          _schemaDefinitions["derived::535994dff55dd58163f1867e"]
+		type:          _schemaDefinitions["derived::codecs::decoding::format::protobuf::ProtobufDeserializerOptions::535994dff55dd58163f1867e"]
 	}
 	signal_types: {
 		description: """

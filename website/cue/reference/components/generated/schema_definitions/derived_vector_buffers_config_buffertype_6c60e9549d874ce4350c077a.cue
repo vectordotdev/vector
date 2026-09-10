@@ -1,6 +1,6 @@
 package metadata
 
-_schemaDefinitions: "derived::6c60e9549d874ce4350c077a": object: options: {
+_schemaDefinitions: "derived::vector_buffers::config::BufferType::6c60e9549d874ce4350c077a": object: options: {
 	max_events: {
 		description:   "The maximum number of events allowed in the buffer."
 		relevant_when: "type = \"memory\""

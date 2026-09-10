@@ -1,6 +1,6 @@
 package metadata
 
-_schemaDefinitions: "derived::64fe77681a1c274eed24cca6": object: options: {
+_schemaDefinitions: "derived::vector::sinks::util::http::RetryStrategy::64fe77681a1c274eed24cca6": object: options: {
 	status_codes: {
 		description:   "Retry on these specific HTTP status codes"
 		relevant_when: "type = \"custom\""

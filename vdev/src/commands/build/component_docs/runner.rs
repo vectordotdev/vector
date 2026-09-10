@@ -92,6 +92,14 @@ impl CueDefinitions {
     }
 
     fn discover_reused_anonymous_values<'a>(&mut self, roots: impl IntoIterator<Item = &'a Value>) {
+        let mut named_definitions_by_shape = HashMap::<String, Vec<String>>::new();
+        for (name, value) in &self.values {
+            named_definitions_by_shape
+                .entry(canonical_value(&schema_shape(value)))
+                .or_default()
+                .push(name.clone());
+        }
+
         let mut candidates = HashMap::<String, (Value, usize)>::new();
         for root in roots {
             collect_object_values(root, &mut candidates);
@@ -103,7 +111,12 @@ impl CueDefinitions {
                 *count >= 2 && !self.names_by_value.contains_key(serialized)
             })
             .map(|(serialized, (value, _))| {
-                let name = derived_definition_name(&value);
+                let shape = canonical_value(&schema_shape(&value));
+                let hint = named_definitions_by_shape
+                    .get(&shape)
+                    .filter(|names| names.len() == 1)
+                    .map(|names| names[0].as_str());
+                let name = derived_definition_name(&value, hint);
                 (name, serialized, value)
             })
             .collect::<Vec<_>>();
@@ -269,11 +282,29 @@ fn collect_object_values(value: &Value, candidates: &mut HashMap<String, (Value,
     }
 }
 
-fn derived_definition_name(value: &Value) -> String {
+fn derived_definition_name(value: &Value, hint: Option<&str>) -> String {
     let identity = schema_identity(value);
     let serialized = canonical_value(&identity);
     let digest = Sha256::digest(serialized.as_bytes());
-    format!("derived::{}", hex::encode(&digest[..12]))
+    let digest = hex::encode(&digest[..12]);
+    hint.map_or_else(
+        || format!("derived::{digest}"),
+        |hint| format!("derived::{hint}::{digest}"),
+    )
+}
+
+fn schema_shape(value: &Value) -> Value {
+    match value {
+        Value::Array(values) => Value::Array(values.iter().map(schema_shape).collect()),
+        Value::Object(values) => Value::Object(
+            values
+                .iter()
+                .filter(|(key, _)| !matches!(key.as_str(), "default" | "required"))
+                .map(|(key, value)| (key.clone(), schema_shape(value)))
+                .collect(),
+        ),
+        _ => value.clone(),
+    }
 }
 
 fn schema_identity(value: &Value) -> Value {
@@ -712,9 +743,21 @@ fn render_and_import_cue_definitions(
 
 fn definition_file_name(name: &str) -> String {
     if let Some(identity) = name.strip_prefix("derived::") {
-        return format!("derived_{identity}.cue");
+        let (hint, digest) = identity.rsplit_once("::").unwrap_or(("", identity));
+        let stem = if hint.is_empty() {
+            "derived".to_string()
+        } else {
+            sanitized_definition_name(&format!("derived::{hint}"))
+        };
+        return format!("{stem}_{digest}.cue");
     }
 
+    let stem = sanitized_definition_name(name);
+    let digest = Sha256::digest(name.as_bytes());
+    format!("{stem}-{}.cue", hex::encode(&digest[..4]))
+}
+
+fn sanitized_definition_name(name: &str) -> String {
     let mut stem = String::with_capacity(name.len());
     let mut previous_was_separator = false;
     for character in name.chars() {
@@ -731,8 +774,7 @@ fn definition_file_name(name: &str) -> String {
         stem.push_str("definition");
     }
     stem.truncate(80);
-    let digest = Sha256::digest(name.as_bytes());
-    format!("{stem}-{}.cue", hex::encode(&digest[..4]))
+    stem
 }
 
 fn hide_cue_definitions_field(cue_output: &str) -> Result<String> {
@@ -805,10 +847,24 @@ mod tests {
                 },
             },
         });
+        let named = json!({
+            "object": {
+                "options": {
+                    "codec": {
+                        "description": "Codec to use.",
+                        "required": true,
+                        "type": {"string": {}},
+                    },
+                },
+            },
+        });
         let mut definitions = CueDefinitions {
-            values: IndexMap::new(),
-            usage_counts: IndexMap::new(),
-            names_by_value: HashMap::new(),
+            values: IndexMap::from([("DeserializerConfig".to_string(), named.clone())]),
+            usage_counts: IndexMap::from([("DeserializerConfig".to_string(), 0)]),
+            names_by_value: HashMap::from([(
+                canonical_value(&named),
+                "DeserializerConfig".to_string(),
+            )]),
         };
         let mut generated = json!({
             "first": {"type": shared.clone()},
@@ -823,7 +879,7 @@ mod tests {
         definitions.retain_used();
 
         let name = definitions.values.keys().next().unwrap();
-        assert!(name.starts_with("derived::"));
+        assert!(name.starts_with("derived::DeserializerConfig::"));
         let marker = Value::String(format!("{CUE_REFERENCE_MARKER_PREFIX}{name}"));
         assert_eq!(generated.pointer("/first/type"), Some(&marker));
         assert_eq!(generated.pointer("/second/type"), Some(&marker));
@@ -888,7 +944,10 @@ mod tests {
             },
         });
 
-        assert_eq!(derived_definition_name(&old), derived_definition_name(&new));
+        assert_eq!(
+            derived_definition_name(&old, Some("DeserializerConfig")),
+            derived_definition_name(&new, Some("DeserializerConfig"))
+        );
     }
 
     #[test]
@@ -896,6 +955,12 @@ mod tests {
         assert_eq!(
             definition_file_name("derived::bb2440a04988b7e322be398c"),
             "derived_bb2440a04988b7e322be398c.cue"
+        );
+        assert_eq!(
+            definition_file_name(
+                "derived::codecs::decoding::DeserializerConfig::bb2440a04988b7e322be398c"
+            ),
+            "derived_codecs_decoding_deserializerconfig_bb2440a04988b7e322be398c.cue"
         );
 
         let name = "core::option::Option<vector_core::tls::settings::TlsConfig>";

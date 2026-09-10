@@ -11,7 +11,7 @@ generated: components: sinks: configuration: {
 			[buffering_model]: /docs/architecture/buffering-model/
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::6c60e9549d874ce4350c077a"]
+		type:     _schemaDefinitions["derived::vector_buffers::config::BufferType::6c60e9549d874ce4350c077a"]
 	}
 	graph: {
 		description: """

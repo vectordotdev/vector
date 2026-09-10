@@ -98,7 +98,7 @@ generated: components: sinks: nats: configuration: {
 			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::bb2440a04988b7e322be398c"]
+		type:     _schemaDefinitions["derived::vector::sinks::util::service::TowerRequestConfig::bb2440a04988b7e322be398c"]
 	}
 	subject: {
 		description: """

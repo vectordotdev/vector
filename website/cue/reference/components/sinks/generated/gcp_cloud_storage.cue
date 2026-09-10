@@ -298,7 +298,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::c01c924c3c7445635044bd00"]
+		type:     _schemaDefinitions["derived::vector::sinks::util::service::TowerRequestConfig::c01c924c3c7445635044bd00"]
 	}
 	storage_class: {
 		description: """

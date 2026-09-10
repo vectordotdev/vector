@@ -201,7 +201,7 @@ generated: components: sinks: gcp_chronicle_unstructured: configuration: {
 			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::c01c924c3c7445635044bd00"]
+		type:     _schemaDefinitions["derived::vector::sinks::util::service::TowerRequestConfig::c01c924c3c7445635044bd00"]
 	}
 	tls: {
 		description: "TLS configuration."

@@ -49,7 +49,7 @@ generated: components: sources: aws_s3: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::2c0db0ef1f05c78303bd4391"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
 	}
 	endpoint: {
 		description: "Custom endpoint for use with AWS-compatible services."

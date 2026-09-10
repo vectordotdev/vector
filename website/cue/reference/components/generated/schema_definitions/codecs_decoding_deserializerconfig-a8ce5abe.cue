@@ -122,7 +122,7 @@ _schemaDefinitions: "codecs::decoding::DeserializerConfig": object: options: {
 		description:   "Protobuf-specific decoding options."
 		relevant_when: "codec = \"protobuf\""
 		required:      false
-		type:          _schemaDefinitions["derived::535994dff55dd58163f1867e"]
+		type:          _schemaDefinitions["derived::codecs::decoding::format::protobuf::ProtobufDeserializerOptions::535994dff55dd58163f1867e"]
 	}
 	signal_types: {
 		description: """

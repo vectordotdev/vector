@@ -22,7 +22,7 @@ generated: components: sources: redis: configuration: {
 			type (log, metric, trace).
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::2c0db0ef1f05c78303bd4391"]
+		type:     _schemaDefinitions["derived::codecs::decoding::DeserializerConfig::2c0db0ef1f05c78303bd4391"]
 	}
 	framing: {
 		description: """
@@ -33,7 +33,7 @@ generated: components: sources: redis: configuration: {
 			ends within the byte stream.
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::2a4f9b813a8f495175f80ccf"]
+		type:     _schemaDefinitions["derived::codecs::decoding::FramingConfig::2a4f9b813a8f495175f80ccf"]
 	}
 	key: {
 		description: "The Redis key to read messages from."

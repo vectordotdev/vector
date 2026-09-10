@@ -1,6 +1,6 @@
 package metadata
 
-_schemaDefinitions: "derived::c01c924c3c7445635044bd00": object: options: {
+_schemaDefinitions: "derived::vector::sinks::util::service::TowerRequestConfig::c01c924c3c7445635044bd00": object: options: {
 	adaptive_concurrency: {
 		description: """
 			Configuration of adaptive concurrency parameters.

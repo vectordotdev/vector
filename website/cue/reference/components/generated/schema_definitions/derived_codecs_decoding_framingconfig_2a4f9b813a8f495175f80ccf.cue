@@ -1,6 +1,6 @@
 package metadata
 
-_schemaDefinitions: "derived::2a4f9b813a8f495175f80ccf": object: options: {
+_schemaDefinitions: "derived::codecs::decoding::FramingConfig::2a4f9b813a8f495175f80ccf": object: options: {
 	character_delimited: {
 		description:   "Options for the character delimited decoder."
 		relevant_when: "method = \"character_delimited\""

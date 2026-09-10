@@ -1,6 +1,6 @@
 package metadata
 
-_schemaDefinitions: "derived::535994dff55dd58163f1867e": object: options: {
+_schemaDefinitions: "derived::codecs::decoding::format::protobuf::ProtobufDeserializerOptions::535994dff55dd58163f1867e": object: options: {
 	desc_file: {
 		description: """
 			The path to the protobuf descriptor set file.

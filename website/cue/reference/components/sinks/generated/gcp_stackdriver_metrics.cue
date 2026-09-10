@@ -79,7 +79,7 @@ generated: components: sinks: gcp_stackdriver_metrics: configuration: {
 			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::c01c924c3c7445635044bd00"]
+		type:     _schemaDefinitions["derived::vector::sinks::util::service::TowerRequestConfig::c01c924c3c7445635044bd00"]
 	}
 	resource: {
 		description: """
@@ -126,7 +126,7 @@ generated: components: sinks: gcp_stackdriver_metrics: configuration: {
 			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::64fe77681a1c274eed24cca6"]
+		type:     _schemaDefinitions["derived::vector::sinks::util::http::RetryStrategy::64fe77681a1c274eed24cca6"]
 	}
 	tls: {
 		description: "TLS configuration."

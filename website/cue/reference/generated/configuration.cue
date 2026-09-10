@@ -751,7 +751,7 @@ generated: configuration: {
 			type: object: options: "*": {
 				type: object: options: {
 					buffer: {
-						type: _schemaDefinitions["derived::6c60e9549d874ce4350c077a"]
+						type: _schemaDefinitions["derived::vector_buffers::config::BufferType::6c60e9549d874ce4350c077a"]
 						description: """
 														Configures the buffering behavior for this sink.
 

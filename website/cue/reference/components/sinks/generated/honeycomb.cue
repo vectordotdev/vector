@@ -90,6 +90,6 @@ generated: components: sinks: honeycomb: configuration: {
 			[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
 			"""
 		required: false
-		type:     _schemaDefinitions["derived::64fe77681a1c274eed24cca6"]
+		type:     _schemaDefinitions["derived::vector::sinks::util::http::RetryStrategy::64fe77681a1c274eed24cca6"]
 	}
 }
