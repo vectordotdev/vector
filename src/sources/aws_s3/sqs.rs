@@ -42,7 +42,7 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    aws::AwsTimeout,
+    aws::{AwsTimeout, RegionOrEndpoint},
     codecs::Decoder,
     common::backoff::ExponentialBackoff,
     config::{SourceAcknowledgementsConfig, SourceContext},
@@ -179,6 +179,15 @@ pub(super) struct Config {
 
     /// Configuration for deferring events to another queue based on their age.
     pub(super) deferred: Option<DeferredConfig>,
+
+    /// Override the region/endpoint used for the SQS client.
+    ///
+    /// When set, this takes precedence over the top-level `region`/`endpoint` fields,
+    /// allowing S3 and SQS to connect to different hosts (e.g. MinIO for S3 and
+    /// ElasticMQ for SQS).
+    #[configurable(derived)]
+    #[serde(flatten, default)]
+    pub(super) region: Option<RegionOrEndpoint>,
 }
 
 pub(super) struct S3Options {
