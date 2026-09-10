@@ -134,23 +134,20 @@ jobs:
     timeout-minutes: 95
     permissions:
       contents: read
-      pull-requests: read
       checks: read
-      statuses: read
-      actions: read # gh pr checks also queries each check's workflow run
     env:
       PR_NUMBER: ${{ needs.housekeeping.outputs.pr_number }}
       HEAD_SHA: ${{ needs.housekeeping.outputs.head_sha }}
     steps:
-      # Use trusted release-tag code, never the mutable housekeeping PR head.
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Wait for checks on the generated commit
+        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
         with:
-          persist-credentials: false
-
-      - name: Wait for required checks on the generated commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash scripts/wait-release-housekeeping.sh
+          ref: ${{ needs.housekeeping.outputs.head_sha }}
+          repo-token: ${{ github.token }}
+          running-workflow-name: Merge checked housekeeping commit
+          check-regexp: ".+"
+          checks-discovery-timeout: 300
+          wait-interval: 15
 
       - name: Create Vector bot token
         id: app-token
