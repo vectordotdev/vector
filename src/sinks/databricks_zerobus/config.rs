@@ -4,8 +4,7 @@ use vector_lib::configurable::configurable_component;
 use vector_lib::sensitive_string::SensitiveString;
 
 use crate::config::{
-    AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-    ValidatedSink,
+    AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
 };
 use crate::sinks::{
     prelude::*,
@@ -94,7 +93,6 @@ pub struct ZerobusStreamOptions {
     pub server_lack_of_ack_timeout_ms: u64,
 
     /// Arrow IPC compression for Flight payloads. Defaults to no compression.
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub compression: Compression,
 }
@@ -163,7 +161,6 @@ pub struct ZerobusSinkConfig {
     /// principal and grant it permissions to write to the target table.
     ///
     /// [zerobus_service_principal]: https://docs.databricks.com/aws/en/ingestion/zerobus-ingest#create-a-service-principal-and-grant-permissions
-    #[configurable(derived)]
     pub auth: DatabricksAuthentication,
 
     /// Custom identifier appended to the `user-agent` header sent to Databricks.
@@ -174,19 +171,15 @@ pub struct ZerobusSinkConfig {
     #[configurable(metadata(docs::examples = "my-service/1.2"))]
     pub user_agent: Option<String>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub stream_options: ZerobusStreamOptions,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -230,10 +223,6 @@ impl SinkConfig for ZerobusSinkConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

@@ -49,7 +49,6 @@ components: sources: gcp_pubsub: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	installation: {

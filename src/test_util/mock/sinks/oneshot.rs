@@ -11,7 +11,7 @@ use vector_lib::{
 };
 
 use crate::{
-    config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext, ValidatedSink},
     sinks::Healthcheck,
 };
 
@@ -43,8 +43,21 @@ impl SinkConfig for OneshotSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &AcknowledgementsConfig::DEFAULT
     }
+}
 
-    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+#[async_trait]
+impl ValidatedSink for OneshotSinkConfig {
+    type Validated = ();
+
+    fn validate(&self) -> crate::Result<Self::Validated> {
+        Ok(())
+    }
+
+    async fn build(
+        &self,
+        _validated: &Self::Validated,
+        _cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let tx = {
             let mut guard = self.tx.lock().expect("who cares if the lock is poisoned");
             guard.take()

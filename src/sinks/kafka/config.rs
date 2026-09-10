@@ -10,7 +10,7 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
@@ -64,19 +64,15 @@ pub struct KafkaSinkConfig {
     #[configurable(metadata(docs::examples = "%my_topic"))]
     pub key_field: Option<ConfigTargetPath>,
 
-    #[configurable(derived)]
     pub encoding: EncodingConfig,
 
     // These batching options will **not** override librdkafka_options values.
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: KafkaCompression,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub auth: KafkaAuthConfig,
 
@@ -125,7 +121,6 @@ pub struct KafkaSinkConfig {
     #[configurable(metadata(docs::examples = "headers"))]
     pub headers_key: Option<ConfigTargetPath>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -133,7 +128,6 @@ pub struct KafkaSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub confinement: ConfinementConfig,
 }
@@ -332,10 +326,6 @@ impl SinkConfig for KafkaSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -356,6 +346,8 @@ impl ValidatedSink for KafkaSinkConfig {
             .topic
             .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
+        self.encoding.validate()?;
+
         Ok(ValidatedKafkaSink { topic })
     }
 
@@ -395,6 +387,49 @@ mod tests {
         .unwrap();
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.topic.to_string(), "test-topic");
+    }
+
+    #[test]
+    fn validate_assumes_protobuf_encoding_valid_without_disk_access() {
+        // The protobuf codec reads its descriptor set from `desc_file` on
+        // disk; pure validation must stay filesystem-free, so an unbuildable
+        // protobuf encoding is caught in the build phase instead.
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: protobuf
+                protobuf:
+                    desc_file: "/nonexistent/protobuf.desc"
+                    message_type: "package.Message"
+            "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.topic.to_string(), "test-topic");
+    }
+
+    #[test]
+    fn validate_rejects_unbuildable_encoding() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: avro
+                avro:
+                    schema: "not a valid avro schema"
+            "#,
+        )
+        .unwrap();
+        let error = config.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

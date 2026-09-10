@@ -156,14 +156,11 @@ pub struct Config {
     #[configurable(metadata(docs::human_name = "Data Directory"))]
     data_dir: Option<PathBuf>,
 
-    #[configurable(derived)]
     #[serde(alias = "annotation_fields")]
     pod_annotation_fields: pod_metadata_annotator::FieldsSpec,
 
-    #[configurable(derived)]
     namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec,
 
-    #[configurable(derived)]
     node_annotation_fields: node_metadata_annotator::FieldsSpec,
 
     /// A list of glob patterns to include while reading the files.
@@ -174,7 +171,6 @@ pub struct Config {
     #[configurable(metadata(docs::examples = "**/exclude/**"))]
     exclude_paths_glob_patterns: Vec<PathBuf>,
 
-    #[configurable(derived)]
     #[serde(default = "default_read_from")]
     read_from: ReadFromConfig,
 
@@ -231,7 +227,6 @@ pub struct Config {
     ///
     /// This option has no effect if `max_merged_line_bytes` is not set.
     #[serde(default)]
-    #[configurable(derived)]
     max_merged_line_action: OversizedAction,
 
     /// The number of lines to read for generating the checksum.
@@ -289,7 +284,6 @@ pub struct Config {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     internal_metrics: FileInternalMetricsConfig,
 

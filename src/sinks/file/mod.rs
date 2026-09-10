@@ -31,8 +31,7 @@ use vector_lib::{
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
@@ -99,11 +98,9 @@ pub struct FileSinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub compression: Compression,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -111,15 +108,12 @@ pub struct FileSinkConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub timezone: Option<TimeZone>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: FileInternalMetricsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub truncate: FileTruncateConfig,
 }
@@ -257,10 +251,6 @@ impl SinkConfig for FileSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -273,6 +263,7 @@ impl ValidatedSink for FileSinkConfig {
     type Validated = ValidatedFileSink;
 
     fn validate(&self) -> crate::Result<ValidatedFileSink> {
+        self.encoding.validate()?;
         let transformer = self.encoding.transformer();
 
         // Pure path-confinement checks. `PathConfinement` itself is not

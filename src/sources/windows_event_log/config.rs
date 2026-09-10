@@ -193,7 +193,6 @@ pub struct WindowsEventLogConfig {
     /// When disabled (default), checkpoints are updated immediately after reading
     /// events, which may result in data loss if Vector crashes before events are
     /// delivered to sinks.
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }

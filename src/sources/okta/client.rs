@@ -74,7 +74,6 @@ pub struct OktaConfig {
     pub since: Option<u64>,
 
     /// TLS configuration.
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.

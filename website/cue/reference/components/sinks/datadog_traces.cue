@@ -75,7 +75,6 @@ components: sinks: datadog_traces: {
 				function correctly.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.datadog_traces.configuration
