@@ -523,7 +523,7 @@ async fn s3_parquet_insert_message() {
     let (batch_notifier, receiver) = BatchNotifier::new_with_receiver();
     let events: Vec<Event> = (0..10)
         .map(|i| {
-            let mut log = LogEvent::from(format!("message_{}", i));
+            let mut log = LogEvent::from(format!("message_{i}"));
             log.insert(event_path!("host"), format!("host_{}", i % 3));
             Event::from(log).with_batch_notifier(&batch_notifier)
         })
@@ -539,8 +539,7 @@ async fn s3_parquet_insert_message() {
     let key = keys[0].clone();
     assert!(
         key.ends_with(".parquet"),
-        "Expected .parquet extension, got: {}",
-        key
+        "Expected .parquet extension, got: {key}"
     );
 
     // Download and validate Parquet file

@@ -261,7 +261,7 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: HttpEndpoint::parse(&format!("{}://localhost:{}/", proto, address.port()))
+            endpoint: HttpEndpoint::parse(&format!("{proto}://localhost:{}/", address.port()))
                 .unwrap(),
             tls: tls.map(|tls| tls.options),
             ..Default::default()
@@ -335,7 +335,7 @@ mod test {
         // Send the request via HTTP POST
         let client = reqwest::Client::new();
         let response = client
-            .post(format!("http://localhost:{}{}", port, default_path()))
+            .post(format!("http://localhost:{port}{}", default_path()))
             .header("Content-Type", "application/x-protobuf")
             .header("Content-Encoding", "snappy")
             .body(request_body)
@@ -422,7 +422,7 @@ mod test {
     async fn send_request(port: u16, request_body: Vec<u8>) -> reqwest::Response {
         let client = reqwest::Client::new();
         client
-            .post(format!("http://localhost:{}{}", port, default_path()))
+            .post(format!("http://localhost:{port}{}", default_path()))
             .header("Content-Type", "application/x-protobuf")
             .header("Content-Encoding", "snappy")
             .body(request_body)

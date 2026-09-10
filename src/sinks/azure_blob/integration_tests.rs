@@ -487,9 +487,8 @@ async fn assert_append_blob_default_hourly_rotation(config: AzureBlobSinkConfig)
         );
         assert!(
             blobs[0].contains(&before),
-            "blob name '{}' must contain the current hour '{}'",
-            blobs[0],
-            before
+            "blob name '{}' must contain the current hour '{before}'",
+            blobs[0]
         );
     } else {
         assert!(

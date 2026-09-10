@@ -866,7 +866,7 @@ mod integration_tests {
 
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: LazyLock<String> =
-        LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
+        LazyLock::new(|| format!("{}/v1/projects/{PROJECT}", *gcp::PUBSUB_ADDRESS));
     static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
     #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
@@ -1047,7 +1047,7 @@ mod integration_tests {
             this.request(Method::PUT, "topics/{topic}", json!({})).await;
 
             let body = json!({
-                "topic": format!("projects/{}/topics/{}", PROJECT, this.topic),
+                "topic": format!("projects/{PROJECT}/topics/{}", this.topic),
                 "ackDeadlineSeconds": *ACK_DEADLINE,
             });
             this.request(Method::PUT, "subscriptions/{sub}", body).await;

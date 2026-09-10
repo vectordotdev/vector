@@ -577,7 +577,7 @@ fn scale(bytes: u64) -> String {
         bytes /= 1000.0;
         i += 1;
     }
-    format!("{:.3}{}/sec", bytes, units[i])
+    format!("{bytes:.3}{}/sec", units[i])
 }
 
 impl Default for TimingStats {

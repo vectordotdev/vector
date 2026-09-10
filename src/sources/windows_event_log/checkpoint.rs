@@ -309,8 +309,7 @@ mod tests {
     /// Helper to create test bookmark XML
     fn test_bookmark_xml(channel: &str, record_id: u64) -> String {
         format!(
-            r#"<BookmarkList><Bookmark Channel="{}" RecordId="{}" IsCurrent="True"/></BookmarkList>"#,
-            channel, record_id
+            r#"<BookmarkList><Bookmark Channel="{channel}" RecordId="{record_id}" IsCurrent="True"/></BookmarkList>"#
         )
     }
 

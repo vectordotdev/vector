@@ -117,7 +117,7 @@ impl ControlHeader {
             0x04 => Ok(ControlHeader::Ready),
             0x05 => Ok(ControlHeader::Finish),
             _ => {
-                error!("Don't know header value {} (expected 0x01 - 0x05).", val);
+                error!("Don't know header value {val} (expected 0x01 - 0x05).");
                 Err(())
             }
         }
@@ -143,7 +143,7 @@ impl ControlField {
         match val {
             0x01 => Ok(ControlField::ContentType),
             _ => {
-                error!("Don't know field type {} (expected 0x01).", val);
+                error!("Don't know field type {val} (expected 0x01).");
                 Err(())
             }
         }
@@ -341,8 +341,8 @@ impl FrameStreamReader {
         }
 
         error!(
-            "Content types did not match up. Expected {} got {:?}.",
-            self.expected_content_type, content_types
+            "Content types did not match up. Expected {} got {content_types:?}.",
+            self.expected_content_type
         );
         Err(())
     }
@@ -363,7 +363,7 @@ impl FrameStreamReader {
         let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)]);
 
         if let Err(e) = block_on(self.response_sink.lock().unwrap().send_all(&mut stream)) {
-            error!("Encountered error '{:#?}' while sending control frame.", e);
+            error!("Encountered error '{e:#?}' while sending control frame.");
         }
     }
 }
@@ -704,7 +704,7 @@ pub fn build_framestream_unix_source(
         }
         Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {} //doesn't exist, do nothing
         Err(e) => {
-            error!("Unable to get socket information; error = {:?}.", e);
+            error!("Unable to get socket information; error = {e:?}.");
             return Err(Box::new(e));
         }
     };
@@ -751,13 +751,10 @@ pub fn build_framestream_unix_source(
         }
         match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
             Ok(_) => {
-                info!("Socket permissions updated to {:#o}.", socket_permission);
+                info!("Socket permissions updated to {socket_permission:#o}.");
             }
             Err(e) => {
-                error!(
-                    "Failed to update listener socket permissions; error = {:?}.",
-                    e
-                );
+                error!("Failed to update listener socket permissions; error = {e:?}.");
                 return Err(Box::new(e));
             }
         };
@@ -772,7 +769,7 @@ pub fn build_framestream_unix_source(
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(e) => {
-                    error!("Failed to accept socket; error = {:?}.", e);
+                    error!("Failed to accept socket; error = {e:?}.");
                     continue;
                 }
                 Ok(s) => s,
@@ -864,7 +861,7 @@ fn build_framestream_source<T: Send + 'static>(
 
         let handler = async move {
             if let Err(e) = event_sink.send_event_stream(&mut events).await {
-                error!("Error sending event: {:?}.", e);
+                error!("Error sending event: {e:?}.");
             }
 
             info!("Finished sending.");

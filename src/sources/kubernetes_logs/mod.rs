@@ -1178,10 +1178,7 @@ fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Resul
         return Ok(field_selector);
     }
 
-    Ok(format!(
-        "{},{}",
-        field_selector, config.extra_field_selector
-    ))
+    Ok(format!("{field_selector},{}", config.extra_field_selector))
 }
 
 // This function constructs the selector for a node to annotate entries with a node metadata.

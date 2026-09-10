@@ -314,8 +314,7 @@ fn render_tags(
                 if let Some(discarded_v) = dynamic_tags.insert(k.clone(), v.clone()) {
                     warn!(
                         "Static tags overrides dynamic tags. \
-                key: {}, value: {:?}, discarded value: {:?}",
-                        k, v, discarded_v
+                key: {k}, value: {v:?}, discarded value: {discarded_v:?}"
                     );
                 };
             }
