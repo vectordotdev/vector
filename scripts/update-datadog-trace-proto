@@ -1,0 +1,7 @@
+#!/bin/bash
+set -o errexit
+TMPDIR=$( mktemp --directory --tmpdir="$PWD" )
+trap 'rm -fr "$TMPDIR"' EXIT
+git clone --depth 1 --filter blob:none https://github.com/DataDog/datadog-agent "$TMPDIR"
+cp --verbose "$TMPDIR"/pkg/proto/datadog/trace/*.proto proto/datadog/trace/
+cp --verbose "$TMPDIR"/pkg/proto/datadog/trace/idx/*.proto proto/datadog/trace/idx/
