@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    io::Read,
     sync::LazyLock,
 };
 
@@ -8,14 +7,15 @@ use futures::TryFutureExt;
 use indexmap::IndexMap;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use vector_lib::config::ComponentKey;
 
 use crate::{
     config::{
         SecretBackend,
         loading::{
-            ComponentHint, Loader, deserialize_config_map, prepare_input, process::Process,
-            representation::ConfigMap,
+            ComponentHint, Loader, deserialize_config_map, interpolate_config_map,
+            process::Process, representation::ConfigMap,
         },
     },
     secrets::SecretBackends,
@@ -34,6 +34,8 @@ use crate::{
 pub static COLLECTOR: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]\-]+)\.([[:word:].\-/]+)\]").unwrap());
 
+const SECRET_KEY: &str = "secret";
+
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub(crate) struct SecretBackendOuter {
@@ -45,7 +47,8 @@ pub(crate) struct SecretBackendOuter {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SecretBackendLoader {
     backends: IndexMap<ComponentKey, SecretBackends>,
-    secret_keys: HashMap<String, HashSet<String>>,
+    pub(crate) secret_keys: HashMap<String, HashSet<String>>,
+    #[serde(skip)]
     interpolate_env: bool,
 }
 
@@ -56,20 +59,11 @@ impl SecretBackendLoader {
         self
     }
 
-    /// Retrieve secrets from backends.
-    /// Returns an empty HashMap if there are no secrets to retrieve.
-    pub(crate) async fn retrieve_secrets(
-        mut self,
-        signal_handler: &mut signal::SignalHandler,
+    pub(crate) async fn retrieve(
+        &mut self,
+        signal_rx: &mut signal::SignalRx,
     ) -> Result<HashMap<String, String>, String> {
-        if self.secret_keys.is_empty() {
-            debug!(message = "No secret placeholder found, skipping secret resolution.");
-            return Ok(HashMap::new());
-        }
-
-        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
         let mut secrets: HashMap<String, String> = HashMap::new();
-        let mut signal_rx = signal_handler.subscribe();
 
         for (backend_name, keys) in &self.secret_keys {
             let backend = self
@@ -83,7 +77,7 @@ impl SecretBackendLoader {
 
             debug!(message = "Retrieving secrets from a backend.", backend = ?backend_name, keys = ?keys);
             let backend_secrets = backend
-                .retrieve(keys.clone(), &mut signal_rx)
+                .retrieve(keys.clone(), signal_rx)
                 .map_err(|e| {
                     format!("Error while retrieving secret from backend \"{backend_name}\": {e}.")
                 })
@@ -96,6 +90,10 @@ impl SecretBackendLoader {
         }
 
         Ok(secrets)
+    }
+
+    pub(crate) fn has_secrets_to_retrieve(&self) -> bool {
+        !self.secret_keys.is_empty()
     }
 }
 
@@ -110,16 +108,20 @@ impl Default for SecretBackendLoader {
 }
 
 impl Process for SecretBackendLoader {
-    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let config_string = prepare_input(input, self.interpolate_env)?;
-        // Collect secret placeholders just after env var processing
-        collect_secret_keys(&config_string, &mut self.secret_keys);
-        Ok(config_string)
+    fn should_interpolate_env(&self) -> bool {
+        self.interpolate_env
+    }
+
+    fn postprocess(&mut self, map: ConfigMap) -> Result<ConfigMap, Vec<String>> {
+        collect_secret_keys_from_map(&map, &mut self.secret_keys);
+        Ok(map)
     }
 
     fn merge(&mut self, map: ConfigMap, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        if map.contains_key("secret") {
-            let additional = deserialize_config_map::<SecretBackendOuter>(map)?;
+        if let Some(secret_value) = map.get(SECRET_KEY) {
+            let mut secret_map = ConfigMap::new();
+            secret_map.insert(SECRET_KEY.to_string(), secret_value.clone());
+            let additional = deserialize_config_map::<SecretBackendOuter>(secret_map)?;
             self.backends.extend(additional.secret);
         }
         Ok(())
@@ -147,7 +149,38 @@ fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>)
     });
 }
 
-pub fn interpolate(input: &str, secrets: &HashMap<String, String>) -> Result<String, Vec<String>> {
+/// Recursively collects secret references from object keys and string leaves.
+pub fn collect_secret_keys_from_map(map: &ConfigMap, keys: &mut HashMap<String, HashSet<String>>) {
+    for (key, value) in map {
+        collect_secret_keys(key, keys);
+        collect_secret_keys_from_value(value, keys);
+    }
+}
+
+fn collect_secret_keys_from_value(value: &Value, keys: &mut HashMap<String, HashSet<String>>) {
+    match value {
+        Value::String(value) => collect_secret_keys(value, keys),
+        Value::Array(values) => {
+            for value in values {
+                collect_secret_keys_from_value(value, keys);
+            }
+        }
+        Value::Object(map) => collect_secret_keys_from_map(map, keys),
+        _ => {}
+    }
+}
+
+pub fn interpolate_config_map_with_secrets(
+    map: &ConfigMap,
+    secrets: &HashMap<String, String>,
+) -> Result<ConfigMap, Vec<String>> {
+    interpolate_config_map(map, secrets, interpolate_secrets)
+}
+
+fn interpolate_secrets(
+    input: &str,
+    secrets: &HashMap<String, String>,
+) -> Result<String, Vec<String>> {
     let mut errors = Vec::<String>::new();
     let output = COLLECTOR
         .replace_all(input, |caps: &Captures<'_>| {
@@ -177,7 +210,7 @@ mod tests {
 
     use indoc::indoc;
 
-    use super::{collect_secret_keys, interpolate};
+    use super::{collect_secret_keys, interpolate_secrets as interpolate};
 
     #[test]
     fn replacement() {
