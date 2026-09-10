@@ -14,15 +14,15 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub(super) struct ConfinedStackdriverLabelConfig {
+pub(super) struct StackdriverLabelConfig {
     pub(super) labels_key: Option<String>,
-    pub(super) labels: HashMap<String, ConfinedTemplate>,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct ConfinedStackdriverResource {
+pub(super) struct StackdriverResource {
     pub(super) type_: String,
-    pub(super) labels: HashMap<String, ConfinedTemplate>,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
 }
 
 #[derive(Clone, Debug)]
@@ -30,8 +30,8 @@ pub(super) struct StackdriverLogsEncoder {
     transformer: Transformer,
     log_id: ConfinedTemplate,
     log_name: StackdriverLogName,
-    label_config: ConfinedStackdriverLabelConfig,
-    resource: ConfinedStackdriverResource,
+    label_config: StackdriverLabelConfig,
+    resource: StackdriverResource,
     severity_key: Option<ConfigValuePath>,
 }
 
@@ -41,8 +41,8 @@ impl StackdriverLogsEncoder {
         transformer: Transformer,
         log_id: ConfinedTemplate,
         log_name: StackdriverLogName,
-        label_config: ConfinedStackdriverLabelConfig,
-        resource: ConfinedStackdriverResource,
+        label_config: StackdriverLabelConfig,
+        resource: StackdriverResource,
         severity_key: Option<ConfigValuePath>,
     ) -> Self {
         Self {

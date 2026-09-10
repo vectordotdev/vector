@@ -22,7 +22,7 @@ use crate::{
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
         },
         util::{
-            Compression, encoding::Encoder as _, processed_event::ProcessedEvent,
+            Compression, HttpEndpoint, encoding::Encoder as _, processed_event::ProcessedEvent,
             test::build_test_server,
         },
     },
@@ -241,7 +241,7 @@ async fn splunk_passthrough_token() {
     let (_guard, addr) = next_addr();
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
-        endpoint: format!("http://{addr}"),
+        endpoint: HttpEndpoint::parse(&format!("http://{addr}")).unwrap(),
         host_key: None,
         indexed_fields: Vec::new(),
         index: None,

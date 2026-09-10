@@ -3,6 +3,7 @@
 
 mod config;
 mod decoder;
+mod decompression;
 mod error;
 pub mod format;
 pub mod framing;
@@ -12,6 +13,7 @@ use std::fmt::Debug;
 use bytes::{Bytes, BytesMut};
 pub use config::DecodingConfig;
 pub use decoder::Decoder;
+pub use decompression::{DecompressionAlgorithm, DecompressionConfig, Decompressor};
 pub use error::StreamDecodingError;
 pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,

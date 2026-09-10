@@ -2,8 +2,10 @@ name: vector-e2e
 
 x-vector-build: &vector-build
   context: ../../../..
-  dockerfile: tests/antithesis/scenarios/vector_e2e/Dockerfile
+  dockerfile: tests/antithesis/Dockerfile
   target: vector
+  args:
+    SCENARIO: vector_e2e
 
 x-node-health: &node-health
   test: ["CMD", "curl", "-fsS", "http://localhost:9598/metrics"]
@@ -32,7 +34,7 @@ services:
     init: true
     build:
       context: ../../../..
-      dockerfile: tests/antithesis/scenarios/vector_e2e/Dockerfile
+      dockerfile: tests/antithesis/Dockerfile
       target: workload
     image: ve2e-oracle:${ANTITHESIS_IMAGE_TAG:-dev}
     environment:

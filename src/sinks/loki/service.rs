@@ -7,7 +7,7 @@ use tracing::Instrument;
 
 use crate::{
     http::{Auth, HttpClient},
-    sinks::{prelude::*, util::UriSerde},
+    sinks::{prelude::*, util::HttpEndpoint},
 };
 
 #[derive(Clone)]
@@ -85,20 +85,18 @@ impl MetaDescriptive for LokiRequest {
 
 #[derive(Debug, Clone)]
 pub struct LokiService {
-    endpoint: UriSerde,
+    endpoint: HttpEndpoint,
     client: HttpClient,
+    auth: Option<Auth>,
 }
 
 impl LokiService {
-    pub fn new(
-        client: HttpClient,
-        endpoint: UriSerde,
-        path: String,
-        auth: Option<Auth>,
-    ) -> crate::Result<Self> {
-        let endpoint = endpoint.append_path(&path)?.with_auth(auth);
-
-        Ok(Self { client, endpoint })
+    pub const fn new(client: HttpClient, endpoint: HttpEndpoint, auth: Option<Auth>) -> Self {
+        Self {
+            client,
+            endpoint,
+            auth,
+        }
     }
 }
 
@@ -116,7 +114,8 @@ impl Service<LokiRequest> for LokiService {
             Compression::Snappy => "application/x-protobuf",
             _ => "application/json",
         };
-        let mut req = http::Request::post(&self.endpoint.uri).header("Content-Type", content_type);
+        let mut req =
+            http::Request::post(self.endpoint.as_uri()).header("Content-Type", content_type);
 
         let metadata = request.get_metadata().clone();
 
@@ -131,7 +130,7 @@ impl Service<LokiRequest> for LokiService {
         let body = hyper::Body::from(request.payload);
         let mut req = req.body(body).unwrap();
 
-        if let Some(auth) = &self.endpoint.auth {
+        if let Some(auth) = &self.auth {
             auth.apply(&mut req);
         }
 

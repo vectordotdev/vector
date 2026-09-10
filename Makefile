@@ -19,7 +19,8 @@ else
     export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
     export DNSTAP_BENCHES := dnstap-benches
 endif
-export FEATURES ?=
+FEATURES ?=
+VDEV_FEATURE_ARGS = $(if $(strip $(FEATURES)),--features "$(FEATURES)")
 
 # When COVERAGE=true, swap cargo-nextest for cargo-llvm-cov so test targets collect
 # coverage data. Run `make coverage-report` afterwards to emit the lcov file.
@@ -283,7 +284,7 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-amqp test-integration-appsignal test-integration-aws test-integration-axiom test-integration-azure test-integration-chronicle test-integration-clickhouse
-test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-databend test-integration-docker-logs test-integration-elasticsearch test-integration-opensearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-greptimedb test-integration-humio test-integration-http-client test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-opentelemetry test-integration-postgres test-integration-prometheus test-integration-pulsar
@@ -370,7 +371,7 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	$(VDEV) check rust
+	$(VDEV) check rust $(VDEV_FEATURE_ARGS)
 
 .PHONY: check-all
 check-all: ## Check everything
@@ -387,8 +388,8 @@ check-component-features: ## Check that all component features are setup properl
 	$(VDEV) check component-features
 
 .PHONY: check-clippy
-check-clippy: ## Check code with Clippy
-	$(VDEV) check rust
+check-clippy: ## Check code with Clippy; when set, FEATURES is the exact feature set
+	$(VDEV) check rust $(VDEV_FEATURE_ARGS)
 
 .PHONY: check-docs
 check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
@@ -570,7 +571,7 @@ ci-generate-publish-metadata: ## Generates the necessary metadata required for b
 
 .PHONY: clippy-fix
 clippy-fix:
-	$(VDEV) check rust --fix
+	$(VDEV) check rust $(VDEV_FEATURE_ARGS) --fix
 
 .PHONY: fmt
 fmt:

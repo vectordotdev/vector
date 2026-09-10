@@ -6,7 +6,7 @@ sources:
   internal_metrics:
     type: "internal_metrics"
   http_source:
-    type: "http"
+    type: "http_server"
     acknowledgements: false
     address: "0.0.0.0:8282"
     decoding:

@@ -99,7 +99,6 @@ pub struct FileConfig {
     pub ignore_checkpoints: Option<bool>,
 
     #[serde(default = "default_read_from")]
-    #[configurable(derived)]
     pub read_from: ReadFromConfig,
 
     /// Ignore files with a data modification date older than the specified number of seconds.
@@ -162,7 +161,6 @@ pub struct FileConfig {
     #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     pub glob_minimum_cooldown_ms: Duration,
 
-    #[configurable(derived)]
     #[serde(alias = "fingerprinting", default)]
     fingerprint: FingerprintConfig,
 
@@ -187,7 +185,6 @@ pub struct FileConfig {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
-    #[configurable(derived)]
     #[serde(default)]
     pub multiline: Option<MultilineConfig>,
 
@@ -220,11 +217,9 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = "\r\n"))]
     pub line_delimiter: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub encoding: Option<EncodingConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -233,7 +228,6 @@ pub struct FileConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     internal_metrics: FileInternalMetricsConfig,
 
@@ -402,17 +396,13 @@ impl SourceConfig for FileConfig {
             // source are only global, name can be used for subdir
             .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
-        // Clippy rule, because async_trait?
-        #[allow(clippy::suspicious_else_formatting)]
-        {
-            if let Some(ref config) = self.multiline {
-                let _: line_agg::Config = config.try_into()?;
-            }
+        if let Some(ref config) = self.multiline {
+            let _: line_agg::Config = config.try_into()?;
+        }
 
-            if let Some(ref indicator) = self.message_start_indicator {
-                Regex::new(indicator)
-                    .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
-            }
+        if let Some(ref indicator) = self.message_start_indicator {
+            Regex::new(indicator)
+                .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
         }
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);

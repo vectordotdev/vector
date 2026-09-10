@@ -35,7 +35,6 @@ pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
 pub struct ArrowStreamSerializerConfig {
     /// The Arrow schema to use for encoding
     #[serde(skip)]
-    #[configurable(derived)]
     pub schema: Option<arrow::datatypes::Schema>,
 
     /// Allow null values for non-nullable fields in the schema.
@@ -47,7 +46,6 @@ pub struct ArrowStreamSerializerConfig {
     /// When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
     /// help ensure all required data is present before sending it to the sink.
     #[serde(default)]
-    #[configurable(derived)]
     pub allow_nullable_fields: bool,
 }
 

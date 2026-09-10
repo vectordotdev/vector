@@ -19,7 +19,6 @@ chrono-tz.workspace = true
 encoding_rs = { version = "0.8", default-features = false, features = ["alloc", "serde"] }
 indexmap.workspace = true
 inventory = { version = "0.3" }
-no-proxy = { version = "0.3.6", default-features = false, features = ["serialize"] }
 num-traits = { version = "0.2.19", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
@@ -35,4 +34,7 @@ vector-config-macros = { path = "../vector-config-macros" }
 
 [dev-dependencies]
 assert-json-diff = { version = "2", default-features = false }
+jsonschema = { version = "0.38.1", default-features = false }
+proptest.workspace = true
+proptest-derive.workspace = true
 serde_with.workspace = true

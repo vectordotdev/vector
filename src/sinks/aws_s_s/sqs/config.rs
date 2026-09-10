@@ -1,3 +1,5 @@
+use std::fmt;
+
 use aws_sdk_sqs::Client as SqsClient;
 use vector_lib::configurable::configurable_component;
 
@@ -11,9 +13,10 @@ use crate::{
     common::sqs::SqsClientBuilder,
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
-        SinkContext,
+        SinkContext, ValidatedSink,
     },
     sinks::util::{BatchConfig, SinkBatchSettings},
+    template::UnconfinedTemplate,
 };
 
 /// Default batch settings for the SQS sink.
@@ -67,7 +70,6 @@ pub(super) struct SqsSinkConfig {
     ///
     /// Note: Batching introduces latency based on the `timeout_secs` setting.
     /// If omitted, messages are sent individually (legacy behavior).
-    #[configurable(derived)]
     #[serde(default)]
     pub(super) batch: BatchConfig<SqsDefaultBatchSettings>,
 
@@ -110,72 +112,87 @@ impl SqsSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_sqs")]
 impl SinkConfig for SqsSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
-        let client = self.create_client(&cx.proxy).await?;
-        let healthcheck = Box::pin(healthcheck(client.clone(), self.queue_url.clone()));
-
-        let message_group_id = message_group_id(
-            self.base_config.message_group_id.clone(),
-            self.queue_url.ends_with(".fifo"),
-        )?;
-        let message_deduplication_id =
-            message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
-
-        if self.batching_enabled() {
-            // New batched path using send_message_batch API
-            let batch_settings = self
-                .batch
-                .validate()?
-                .limit_max_events(10)? // SQS API limit
-                .limit_max_bytes(1_048_576)? // Max with extended client library
-                .into_batcher_settings()?;
-
-            let publisher = SqsBatchMessagePublisher::new(client.clone(), self.queue_url.clone());
-            let request_builder = SSRequestBuilder::new(
-                message_group_id,
-                message_deduplication_id,
-                self.base_config.encoding.clone(),
-            )?;
-
-            let sink = super::batch_sink::BatchedSqsSink::new(
-                batch_settings,
-                request_builder,
-                self.base_config.request,
-                publisher,
-            )?;
-
-            Ok((
-                crate::sinks::VectorSink::from_event_streamsink(sink),
-                healthcheck,
-            ))
-        } else {
-            // Legacy non-batched path using send_message API
-            let publisher = SqsMessagePublisher::new(client.clone(), self.queue_url.clone());
-            let sink = SSSink::new(
-                SSRequestBuilder::new(
-                    message_group_id,
-                    message_deduplication_id,
-                    self.base_config.encoding.clone(),
-                )?,
-                self.base_config.request,
-                publisher,
-            )?;
-            Ok((
-                crate::sinks::VectorSink::from_event_streamsink(sink),
-                healthcheck,
-            ))
-        }
-    }
-
     fn input(&self) -> Input {
         Input::new(self.base_config.encoding.config().input_type() & DataType::Log)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.base_config.acknowledgements
+    }
+}
+
+#[derive(Clone)]
+pub struct ValidatedSqsSink {
+    message_group_id: Option<UnconfinedTemplate>,
+    message_deduplication_id: Option<UnconfinedTemplate>,
+}
+
+impl fmt::Debug for ValidatedSqsSink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ValidatedSqsSink").finish_non_exhaustive()
+    }
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for SqsSinkConfig {
+    type Validated = ValidatedSqsSink;
+
+    fn validate(&self) -> crate::Result<ValidatedSqsSink> {
+        let message_group_id = message_group_id(
+            self.base_config.message_group_id.clone(),
+            self.queue_url.ends_with(".fifo"),
+        )?;
+        let message_deduplication_id =
+            message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
+        self.base_config.encoding.validate()?;
+
+        Ok(ValidatedSqsSink {
+            message_group_id,
+            message_deduplication_id,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedSqsSink,
+        cx: SinkContext,
+    ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
+        let client = self.create_client(&cx.proxy).await?;
+        let healthcheck = Box::pin(healthcheck(client.clone(), self.queue_url.clone()));
+        let request_builder = || {
+            SSRequestBuilder::new(
+                validated.message_group_id.clone(),
+                validated.message_deduplication_id.clone(),
+                self.base_config.encoding.clone(),
+            )
+        };
+
+        if self.batching_enabled() {
+            let batch_settings = self
+                .batch
+                .validate()?
+                .limit_max_events(10)?
+                .limit_max_bytes(1_048_576)?
+                .into_batcher_settings()?;
+            let publisher = SqsBatchMessagePublisher::new(client.clone(), self.queue_url.clone());
+            let sink = super::batch_sink::BatchedSqsSink::new(
+                batch_settings,
+                request_builder()?,
+                self.base_config.request,
+                publisher,
+            )?;
+            Ok((
+                crate::sinks::VectorSink::from_event_streamsink(sink),
+                healthcheck,
+            ))
+        } else {
+            let publisher = SqsMessagePublisher::new(client.clone(), self.queue_url.clone());
+            let sink = SSSink::new(request_builder()?, self.base_config.request, publisher)?;
+            Ok((
+                crate::sinks::VectorSink::from_event_streamsink(sink),
+                healthcheck,
+            ))
+        }
     }
 }
 
@@ -223,6 +240,32 @@ mod tests {
             !config.batching_enabled(),
             "Batching should be disabled by default"
         );
+    }
+
+    #[test]
+    fn validate_rejects_fifo_without_message_group_id() {
+        let config = SqsSinkConfig {
+            queue_url: "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue.fifo".to_string(),
+            region: RegionOrEndpoint::with_region(String::from(TEST_REGION)),
+            batch: Default::default(),
+            base_config: create_test_base_config(),
+        };
+        let err = config.validate().unwrap_err().to_string();
+        assert!(
+            err.contains("message_group_id"),
+            "expected error to mention message_group_id, got: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_produces_validated_state() {
+        let config = SqsSinkConfig {
+            queue_url: "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue".to_string(),
+            region: RegionOrEndpoint::with_region(String::from(TEST_REGION)),
+            batch: Default::default(),
+            base_config: create_test_base_config(),
+        };
+        config.validate().expect("validation should succeed");
     }
 
     #[test]

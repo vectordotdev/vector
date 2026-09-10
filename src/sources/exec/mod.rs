@@ -44,13 +44,10 @@ mod tests;
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ExecConfig {
-    #[configurable(derived)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     pub scheduled: Option<ScheduledConfig>,
 
-    #[configurable(derived)]
     pub streaming: Option<StreamingConfig>,
 
     /// The command to run, plus any arguments required.
@@ -79,10 +76,8 @@ pub struct ExecConfig {
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
 
-    #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 

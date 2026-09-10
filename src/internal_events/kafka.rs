@@ -115,6 +115,36 @@ impl InternalEvent for KafkaReadError {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct KafkaPayloadDecompressionError<'a> {
+    pub error: &'a std::io::Error,
+    pub topic: &'a str,
+    pub partition: i32,
+    pub offset: i64,
+}
+
+impl InternalEvent for KafkaPayloadDecompressionError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed decompressing message payload.",
+            error = %self.error,
+            error_code = "failed_decompressing_payload",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::RECEIVING,
+            topic = self.topic,
+            partition = %self.partition,
+            offset = %self.offset,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "failed_decompressing_payload",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
     pub expose_lag_metrics: bool,
