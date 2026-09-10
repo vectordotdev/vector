@@ -52,8 +52,10 @@ pub struct Checkpointer {
 /// multiple threads.
 #[derive(Debug, Default)]
 pub struct CheckpointsView {
-    checkpoints: DashMap<FileFingerprint, FilePosition>,
-    modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
+    /// Position and last-progress time are stored together so that a
+    /// concurrent persistence pass can never pair a fresh position with a
+    /// previous generation's timestamp (or vice versa).
+    checkpoints: DashMap<FileFingerprint, (FilePosition, DateTime<Utc>)>,
     removed_times: DashMap<FileFingerprint, DateTime<Utc>>,
     /// Current watcher generation per fingerprint; `update` ignores positions
     /// recorded under any other generation. Not persisted: generations only
@@ -87,9 +89,13 @@ impl CheckpointsView {
             return;
         }
 
-        self.checkpoints.insert(fng, pos);
-        self.modified_times.insert(fng, Utc::now());
-        self.removed_times.remove(&fng);
+        self.checkpoints.insert(fng, (pos, Utc::now()));
+        // A pending expiry is deliberately left armed: once a watcher has
+        // died, its remaining same-generation acknowledgements should record
+        // their final positions without keeping the fingerprint's state alive
+        // forever (the watcher is gone, so nothing would ever mark it dead
+        // again). A file coming back to life clears the tombstone through
+        // `begin_generation` when a new watcher claims the fingerprint.
         drop(current);
     }
 
@@ -114,11 +120,11 @@ impl CheckpointsView {
     }
 
     pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
-        self.checkpoints.get(&fng).map(|r| *r.value())
+        self.checkpoints.get(&fng).map(|r| r.value().0)
     }
 
     pub fn modified_time(&self, fng: FileFingerprint) -> Option<DateTime<Utc>> {
-        self.modified_times.get(&fng).map(|r| *r.value())
+        self.checkpoints.get(&fng).map(|r| r.value().1)
     }
 
     pub fn set_dead(&self, fng: FileFingerprint) {
@@ -128,10 +134,6 @@ impl CheckpointsView {
     pub fn update_key(&self, old: FileFingerprint, new: FileFingerprint) {
         if let Some((_, value)) = self.checkpoints.remove(&old) {
             self.checkpoints.insert(new, value);
-        }
-
-        if let Some((_, value)) = self.modified_times.remove(&old) {
-            self.modified_times.insert(new, value);
         }
 
         if let Some((_, value)) = self.removed_times.remove(&old) {
@@ -173,7 +175,6 @@ impl CheckpointsView {
                         .is_some()
                     {
                         self.checkpoints.remove(&fng);
-                        self.modified_times.remove(&fng);
                         occupied.remove();
                     }
                 }
@@ -184,7 +185,6 @@ impl CheckpointsView {
                         .is_some()
                     {
                         self.checkpoints.remove(&fng);
-                        self.modified_times.remove(&fng);
                     }
                 }
             }
@@ -192,10 +192,10 @@ impl CheckpointsView {
     }
 
     fn load(&self, checkpoint: Checkpoint) {
-        self.checkpoints
-            .insert(checkpoint.fingerprint, checkpoint.position);
-        self.modified_times
-            .insert(checkpoint.fingerprint, checkpoint.modified);
+        self.checkpoints.insert(
+            checkpoint.fingerprint,
+            (checkpoint.position, checkpoint.modified),
+        );
     }
 
     fn set_state(&self, state: State, ignore_before: Option<DateTime<Utc>>) {
@@ -220,15 +220,11 @@ impl CheckpointsView {
                 .iter()
                 .map(|entry| {
                     let fingerprint = entry.key();
-                    let position = entry.value();
+                    let (position, modified) = entry.value();
                     Checkpoint {
                         fingerprint: *fingerprint,
                         position: *position,
-                        modified: self
-                            .modified_times
-                            .get(fingerprint)
-                            .map(|r| *r.value())
-                            .unwrap_or_else(Utc::now),
+                        modified: *modified,
                     }
                 })
                 .collect(),
