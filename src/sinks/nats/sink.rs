@@ -86,7 +86,7 @@ impl NatsSink {
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build NATS request: {:?}.", e);
+                        error!("Failed to build NATS request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),

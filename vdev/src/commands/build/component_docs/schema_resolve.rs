@@ -174,7 +174,7 @@ impl SchemaContext {
 
                 if let Some(props) = properties {
                     for (prop_name, prop_schema) in props {
-                        debug!("Resolving object property '{}'...", prop_name);
+                        debug!("Resolving object property '{prop_name}'...");
                         let mut resolved_property = self.resolve_schema(prop_schema)?;
                         if !resolved_property.is_null() {
                             self.apply_object_property_fields(

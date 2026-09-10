@@ -301,12 +301,11 @@ fn import_json_as_cue(
     let json_output_file = write_to_temp_file(prefix, ".json", &final_json)?;
 
     debug!(
-        "[✓]   Wrote {} schema to '{}'. ({} bytes)",
-        friendly_name,
+        "[✓]   Wrote {friendly_name} schema to '{}'. ({} bytes)",
         json_output_file.display(),
         final_json.len()
     );
-    debug!("[*] Importing {} schema as Cue file...", friendly_name);
+    debug!("[*] Importing {friendly_name} schema as Cue file...");
 
     if let Some(parent) = cue_output_file.parent() {
         fs::create_dir_all(parent)?;
@@ -336,8 +335,7 @@ fn import_json_as_cue(
     }
 
     debug!(
-        "[✓]   Imported {} schema to '{}'.",
-        friendly_name,
+        "[✓]   Imported {friendly_name} schema to '{}'.",
         cue_output_file.display()
     );
     Ok(())

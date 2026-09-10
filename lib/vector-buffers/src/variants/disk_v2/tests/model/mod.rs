@@ -560,10 +560,8 @@ impl WriterModel {
         match self.record_writer.archive_record(1, record) {
             Ok(token) => token.serialized_len() as u64,
             Err(e) => panic!(
-                "unexpected encode error: archived_len={} max_record_size={} error={:?}",
-                record_len,
+                "unexpected encode error: archived_len={record_len} max_record_size={} error={e:?}",
                 self.ledger.config().max_record_size,
-                e,
             ),
         }
     }
