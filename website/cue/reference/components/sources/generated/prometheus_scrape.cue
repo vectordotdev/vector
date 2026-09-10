@@ -66,6 +66,36 @@ generated: components: sources: prometheus_scrape: configuration: {
 			}
 		}
 	}
+	scrape_delay: {
+		description: """
+			When scrapes happen, relative to the configured scrape interval.
+
+			`none` scrapes as soon as the source starts and then every `scrape_interval_secs` exactly,
+			which means the source raises load at one unvarying period, and sources that share an
+			interval all scrape at the same instant.
+
+			A delay in seconds, such as `30s`, holds the first scrape back by exactly that much and then
+			keeps the same fixed cadence. Give each source a different value to stagger them by hand.
+
+			`auto` chooses a position inside each interval independently. Under normal polling, the
+			source starts one scrape round in each interval, but it does not remain at one fixed phase;
+			intervals missed while the schedule is not polled are skipped rather than replayed. This
+			reduces persistent alignment with other periodic work and with sources sharing the same
+			interval. Two consecutive scrape starts can be anywhere from nearly zero to nearly two
+			intervals apart, which can increase short-lived overlap and load compared with a fixed
+			cadence. The scheduler does not enforce a minimum gap between starts or place an upper bound
+			on in-flight scrapes. The positions come from a hash of the host name, the component ID and
+			the scrape number rather than from a random number, so the sequence is reproducible relative
+			to source start. Hash-derived positions do not guarantee distinct slots: individual scrapes
+			can still coincide, and instances with the same host name and component ID use the same
+			sequence.
+			"""
+		required: false
+		type: string: {
+			default: "none"
+			examples: ["none", "auto", "30s"]
+		}
+	}
 	scrape_interval_secs: {
 		description: """
 			The interval between scrapes. Requests are run concurrently so if a scrape takes longer
