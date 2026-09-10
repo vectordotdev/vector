@@ -57,6 +57,7 @@ pub struct OdbcConfig {
     #[configurable(metadata(
         docs::examples = "driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
     ))]
+    #[configurable(metadata(docs::minimal = true))]
     #[serde(default)]
     pub connection_string: SensitiveString,
 
@@ -69,7 +70,8 @@ pub struct OdbcConfig {
     /// This SQL statement is executed periodically according to the `schedule`.
     /// Defaults to `None`. If no SQL statement is provided, the source returns an error.
     /// If the `statement_filepath` is set, this value is ignored.
-    #[configurable(metadata(docs::examples = "SELECT * FROM users WHERE id = ?"))]
+    #[configurable(metadata(docs::examples = "SELECT * FROM users WHERE id > ? ORDER BY id ASC"))]
+    #[configurable(metadata(docs::minimal = true))]
     pub statement: Option<String>,
 
     /// The path to the file that contains the SQL statement.
@@ -144,6 +146,7 @@ pub struct OdbcConfig {
     pub statement_init_params: Option<Vec<OdbcStatementParam>>,
 
     /// Cron expression used to schedule database queries. This field is required.
+    #[configurable(metadata(docs::examples = "*/5 * * * * *"))]
     pub schedule: OdbcSchedule,
 
     /// The timezone to use for the `schedule`.

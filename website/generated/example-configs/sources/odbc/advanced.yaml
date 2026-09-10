@@ -8,8 +8,9 @@ sources:
     odbc_batch_size: 100
     odbc_default_timezone: UTC
     odbc_max_str_limit: 4096
+    schedule: "*/5 * * * * *"
     schedule_timezone: UTC
-    statement: SELECT * FROM users WHERE id = ?
+    statement: SELECT * FROM users WHERE id > ? ORDER BY id ASC
     statement_init_params:
       - name: id
         value: "0"
