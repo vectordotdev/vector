@@ -153,27 +153,7 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 				[error_responses]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status#client_error_responses
 				"""
 			required: false
-			type: object: options: {
-				status_codes: {
-					description:   "Retry on these specific HTTP status codes"
-					relevant_when: "type = \"custom\""
-					required:      true
-					type: array: items: type: uint: {}
-				}
-				type: {
-					description: "The retry strategy enum."
-					required:    false
-					type: string: {
-						default: "default"
-						enum: {
-							all:     "Retry on *all* HTTP status codes except for success codes (2xx)"
-							custom:  "Custom retry strategy"
-							default: "Default strategy. See [`RetryStrategy::retry_action`] for more details."
-							none:    "Don't retry any errors, including request timeouts."
-						}
-					}
-				}
-			}
+			type:     _schemaDefinitions["derived::64fe77681a1c274eed24cca6"]
 		}
 		tls: {
 			description: "TLS configuration."
