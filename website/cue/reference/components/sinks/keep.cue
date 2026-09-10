@@ -62,7 +62,6 @@ components: sinks: keep: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.keep.configuration

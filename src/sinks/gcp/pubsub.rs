@@ -139,6 +139,7 @@ impl ValidatedSink for PubsubConfig {
             .validate()?
             .limit_max_bytes(MAX_BATCH_PAYLOAD_SIZE)?
             .into_batch_settings()?;
+        self.encoding.validate()?;
 
         let transformer = self.encoding.transformer();
 

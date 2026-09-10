@@ -221,17 +221,34 @@ fn build_struct_generate_schema_fn(
     }
 }
 
-fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
+fn generate_struct_field(field: &Field<'_>, sibling_keys: &[String]) -> proc_macro2::TokenStream {
     let field_metadata_ref = Ident::new("field_metadata", Span::call_site());
     let field_metadata = generate_field_metadata(&field_metadata_ref, field);
     let field_schema_ty = get_field_schema_ty(field);
 
-    let spanned_generate_schema = quote_spanned! {field.span()=>
-        ::vector_config::schema::get_or_generate_schema(
-            &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
-            schema_gen,
-            Some(#field_metadata_ref),
-        )?
+    // Flattened `Option<T>` cannot use `Option`'s nullable-property schema: `allOf` merge
+    // validates the parent object, which is never JSON `null`. Tagged enums get an absence
+    // encoding instead; other `Option<T>` flatten fields fall back to the property schema.
+    let spanned_generate_schema = match (field.flatten(), option_inner_type(field_schema_ty)) {
+        (true, Some(inner_ty)) => {
+            let sibling_key_lits = sibling_keys.iter().map(|key| quote! { #key });
+            quote_spanned! {field.span()=>
+                ::vector_config::schema::generate_flattened_optional_schema(
+                    &<#inner_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                    &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                    schema_gen,
+                    Some(#field_metadata_ref),
+                    &[#(#sibling_key_lits),*],
+                )?
+            }
+        }
+        _ => quote_spanned! {field.span()=>
+            ::vector_config::schema::get_or_generate_schema(
+                &<#field_schema_ty as ::vector_config::Configurable>::as_configurable_ref(),
+                schema_gen,
+                Some(#field_metadata_ref),
+            )?
+        },
     };
 
     quote! {
@@ -251,6 +268,7 @@ fn generate_named_struct_field(
     container: &Container<'_>,
     field: &Field<'_>,
     required_one_of: Option<RequiredOneOf>,
+    sibling_keys: &[String],
 ) -> proc_macro2::TokenStream {
     let field_name = field
         .ident()
@@ -261,7 +279,7 @@ fn generate_named_struct_field(
     );
     let field_key = field.name();
 
-    let field_schema = generate_struct_field(field);
+    let field_schema = generate_struct_field(field, sibling_keys);
 
     // Inject docs::required_one_of and docs::required_one_of_group metadata so the CUE doc
     // builder can render the mutual exclusivity constraint and its group name.
@@ -343,12 +361,34 @@ fn generate_named_struct_field(
 }
 
 fn is_option_type(ty: &syn::Type) -> bool {
-    matches!(ty, syn::Type::Path(tp)
-        if tp.path.segments.last().is_some_and(|s| s.ident == "Option"))
+    option_inner_type(ty).is_some()
+}
+
+fn option_inner_type(ty: &syn::Type) -> Option<&syn::Type> {
+    match ty {
+        syn::Type::Path(tp) => {
+            let segment = tp.path.segments.last()?;
+            if segment.ident == "Option"
+                && let PathArguments::AngleBracketed(args) = &segment.arguments
+            {
+                args.args.iter().find_map(generic_argument_type)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn generic_argument_type(arg: &syn::GenericArgument) -> Option<&syn::Type> {
+    match arg {
+        syn::GenericArgument::Type(inner) => Some(inner),
+        _ => None,
+    }
 }
 
 fn generate_tuple_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
-    let field_schema = generate_struct_field(field);
+    let field_schema = generate_struct_field(field, &[]);
 
     quote! {
         {
@@ -469,13 +509,14 @@ fn build_named_struct_generate_schema_fn(
         }
     });
 
+    let sibling_keys = unflattened_serialized_names(fields);
     let mapped_fields = fields
         .iter()
         // Don't map this field if it's marked to be skipped for both serialization and deserialization.
         .filter(|field| field.visible())
         .map(|field| {
             let members = field_group_members.get(field.name()).cloned();
-            generate_named_struct_field(container, field, members)
+            generate_named_struct_field(container, field, members, &sibling_keys)
         });
 
     quote! {
@@ -564,7 +605,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
         .iter()
         // Don't map this field if it's marked to be skipped for both serialization and deserialization.
         .filter(|field| field.visible())
-        .map(generate_struct_field)
+        .map(|field| generate_struct_field(field, &[]))
         .collect::<Vec<_>>();
 
     if mapped_fields.len() != 1 {
@@ -836,7 +877,26 @@ fn get_field_schema_ty<'a>(field: &'a Field<'a>) -> &'a syn::Type {
     field.delegated_ty().unwrap_or_else(|| field.ty())
 }
 
-fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
+fn unflattened_serialized_names(fields: &[Field<'_>]) -> Vec<String> {
+    fields
+        .iter()
+        .filter(|field| field.visible() && !field.flatten())
+        .map(|field| field.name().to_string())
+        .collect()
+}
+
+fn collision_sibling_keys(fields: &[Field<'_>], enclosing_tag: Option<&str>) -> Vec<String> {
+    let mut names = unflattened_serialized_names(fields);
+    if let Some(tag) = enclosing_tag {
+        names.push(tag.to_owned());
+    }
+    names
+}
+
+fn generate_named_enum_field(
+    field: &Field<'_>,
+    sibling_keys: &[String],
+) -> proc_macro2::TokenStream {
     if field.required_one_of().is_some() {
         return syn::Error::new(
             field.span(),
@@ -851,7 +911,7 @@ fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
     );
     let field_key = field.name().to_string();
 
-    let field_schema = generate_struct_field(field);
+    let field_schema = generate_struct_field(field, sibling_keys);
 
     // Fields that have no default value are inherently required.  Unlike fields on a normal
     // struct, we can't derive a default value for an individual field because `serde`
@@ -896,9 +956,14 @@ fn generate_named_enum_field(field: &Field<'_>) -> proc_macro2::TokenStream {
 fn generate_enum_struct_named_variant_schema(
     variant: &Variant<'_>,
     post_fields: Option<proc_macro2::TokenStream>,
+    enclosing_tag: Option<&str>,
     is_potentially_ambiguous: bool,
 ) -> proc_macro2::TokenStream {
-    let mapped_fields = variant.fields().iter().map(generate_named_enum_field);
+    let sibling_keys = collision_sibling_keys(variant.fields(), enclosing_tag);
+    let mapped_fields = variant
+        .fields()
+        .iter()
+        .map(|field| generate_named_enum_field(field, &sibling_keys));
 
     // If this variant is part of a potentially ambiguous enum schema, we add this variant's
     // required fields to the discriminant map, keyed off of the variant name.
@@ -952,7 +1017,7 @@ fn generate_enum_newtype_struct_variant_schema(
         )
         .to_compile_error();
     }
-    let field_schema = generate_struct_field(field);
+    let field_schema = generate_struct_field(field, &[]);
     let maybe_fill_discriminant_map = is_potentially_ambiguous.then(|| {
         let variant_name = variant.ident().to_string();
         quote! {
@@ -1016,7 +1081,7 @@ fn generate_enum_variant_schema(
             let (wrapped, variant_schema) = match variant.style() {
                 Style::Struct => (
                     true,
-                    generate_enum_struct_named_variant_schema(variant, None, false),
+                    generate_enum_struct_named_variant_schema(variant, None, None, false),
                 ),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => (
@@ -1069,7 +1134,12 @@ fn generate_enum_variant_schema(
                         }
                     }
                 };
-                generate_enum_struct_named_variant_schema(variant, Some(tag_field), false)
+                generate_enum_struct_named_variant_schema(
+                    variant,
+                    Some(tag_field),
+                    Some(tag),
+                    false,
+                )
             }
             Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
             Style::Newtype => {
@@ -1124,7 +1194,7 @@ fn generate_enum_variant_schema(
             let tag_schema = generate_enum_variant_tag_schema(variant);
             let maybe_content_schema = match variant.style() {
                 Style::Struct => Some(generate_enum_struct_named_variant_schema(
-                    variant, None, false,
+                    variant, None, None, false,
                 )),
                 Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
                 Style::Newtype => Some(generate_enum_newtype_struct_variant_schema(variant, false)),
@@ -1180,6 +1250,7 @@ fn generate_enum_variant_schema(
             match variant.style() {
                 Style::Struct => generate_enum_struct_named_variant_schema(
                     variant,
+                    None,
                     None,
                     is_potentially_ambiguous,
                 ),

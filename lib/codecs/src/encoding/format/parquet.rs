@@ -1,6 +1,3 @@
-// Derivative's Debug impl generates 'let _ = field.fmt(f)' which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 //! Parquet batch format codec for batched event encoding
 //!
 //! Provides Apache Parquet format encoding with schema file support and auto-inference.
@@ -16,7 +13,6 @@ use arrow::error::ArrowError;
 use arrow::json::reader::infer_json_schema_from_iterator;
 use arrow::record_batch::RecordBatch;
 use bytes::{BufMut, BytesMut};
-use derivative::Derivative;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::ZstdLevel;
 use parquet::basic::{Compression as ParquetCodecCompression, GzipLevel};
@@ -204,8 +200,7 @@ fn reject_unsupported_arrow_types(
 }
 
 /// Parquet batch serializer.
-#[derive(Derivative)]
-#[derivative(Debug, Clone)]
+#[derive(derive_more::Debug, Clone)]
 pub struct ParquetSerializer {
     schema: SchemaRef,
     writer_props: Arc<WriterProperties>,
@@ -213,7 +208,7 @@ pub struct ParquetSerializer {
     /// Pre-built set of schema field names for O(1) strict-mode lookups.
     schema_field_names: HashSet<String>,
 
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     events_dropped_handle: Registered<EventsDroppedError>,
 }
 

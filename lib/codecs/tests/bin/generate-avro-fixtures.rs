@@ -5,6 +5,9 @@ use apache_avro::{Decimal, Schema, types::Value};
 use serde::{Deserialize, Serialize};
 
 const FIXTURES_PATH: &str = "lib/codecs/tests/data/avro/generated";
+// OCF sync markers are randomized by default. Fixtures must be reproducible, so use a fixed,
+// non-production marker when generating them.
+const FIXTURE_SYNC_MARKER: [u8; 16] = *b"vector-avro-ocf!";
 
 fn generate_avro_test_case_boolean() -> Result<()> {
     let schema = r#"
@@ -486,12 +489,16 @@ fn generate_test_case_ocf_from_value(schema: &str, value: Value, filename: &str)
     let schema = Schema::parse_str(schema)?;
     let value = value.resolve(&schema)?;
 
-    // Use apache_avro::Writer to produce a correct OCF file:
-    // - The library generates a random sync marker per file
-    // - The schema is embedded in the header using the full JSON (not PCF/canonical form),
-    //   preserving doc strings, aliases, defaults, etc.
-    // - Records are batched into blocks with correct count/size encoding
-    let mut writer = apache_avro::Writer::new(&schema, Vec::new())?;
+    // Use apache_avro::Writer to produce a correct OCF file. The production writer generates a
+    // random marker, but fixtures need a stable marker so that this generator is reproducible.
+    // The schema is embedded in the header using the full JSON (not PCF/canonical form),
+    // preserving doc strings, aliases, defaults, etc., and records are batched into blocks with
+    // correct count/size encoding.
+    let mut writer = apache_avro::Writer::builder()
+        .schema(&schema)
+        .writer(Vec::new())
+        .marker(FIXTURE_SYNC_MARKER)
+        .build()?;
     writer.append_value(value)?;
     let buf = writer.into_inner()?;
 
