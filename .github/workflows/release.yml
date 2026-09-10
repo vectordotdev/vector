@@ -169,12 +169,11 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
 
-      - name: Merge only the generated commit
+      - name: Queue only the generated commit
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          # The app needs a required-review bypass, NOT a status-check bypass.
-          # GitHub rechecks required checks, base freshness, and the expected SHA.
-          gh api --method PUT "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge" \
-            -f sha="$HEAD_SHA" -f merge_method=squash --jq '.merged' | grep -qx true
-          echo "Merged housekeeping PR #${PR_NUMBER} at ${HEAD_SHA}." >> "$GITHUB_STEP_SUMMARY"
+          gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --squash --match-head-commit "$HEAD_SHA"
+          echo "Submitted housekeeping PR #${PR_NUMBER} at ${HEAD_SHA} for merge." \
+            >> "$GITHUB_STEP_SUMMARY"

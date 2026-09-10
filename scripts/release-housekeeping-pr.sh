@@ -29,7 +29,8 @@ if [[ "$status" == 0 ]]; then
   # Append a merge commit with the freshly generated tree. This preserves PR
   # history and incorporates current master without a force push.
   parents=(-p "$previous" -p "$base")
-  if [[ "$(git rev-parse "${previous}^{tree}")" == "$tree" ]]; then
+  if [[ "$(git rev-parse "${previous}^{tree}")" == "$tree" ]] &&
+    git merge-base --is-ancestor "$base" "$previous"; then
     sha="$previous"
   fi
 elif [[ "$status" != 2 ]]; then
