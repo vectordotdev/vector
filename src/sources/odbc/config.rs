@@ -144,7 +144,6 @@ pub struct OdbcConfig {
     pub statement_init_params: Option<Vec<OdbcStatementParam>>,
 
     /// Cron expression used to schedule database queries. This field is required.
-    #[configurable(derived)]
     pub schedule: OdbcSchedule,
 
     /// The timezone to use for the `schedule`.
@@ -250,8 +249,8 @@ pub struct OdbcConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
+    /// Limits scheduled query runs in unit tests. Not part of the public configuration.
     #[cfg(test)]
-    #[configurable(derived)]
     #[serde(default)]
     pub iterations: Option<usize>,
 }

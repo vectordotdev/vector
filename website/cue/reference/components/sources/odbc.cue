@@ -59,7 +59,6 @@ components: sources: odbc: {
 				delay Vector exit until the driver returns. Prefer positive timeouts.
 				""",
 		]
-		notices: []
 	}
 
 	installation: {
@@ -81,7 +80,6 @@ components: sources: odbc: {
 				"""
 			fields: {
 				"*": {
-					common:      false
 					description: "A column from the query result set."
 					required:    false
 					type: "*": {}
