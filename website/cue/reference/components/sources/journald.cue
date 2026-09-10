@@ -40,7 +40,6 @@ components: sources: journald: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	installation: {

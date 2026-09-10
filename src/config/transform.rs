@@ -61,11 +61,9 @@ pub struct TransformOuter<T>
 where
     T: Configurable + Serialize + 'static,
 {
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
 
-    #[configurable(derived)]
     pub inputs: Inputs<T>,
 
     /// Enable CPU usage metrics for this transform.
@@ -181,9 +179,6 @@ impl Default for TransformContext {
 }
 
 impl TransformContext {
-    // clippy allow avoids an issue where vrl is flagged off and `globals` is
-    // the sole field in the struct
-    #[allow(clippy::needless_update)]
     pub fn new_with_globals(globals: GlobalOptions) -> Self {
         Self {
             globals,

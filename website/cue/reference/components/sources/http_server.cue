@@ -47,7 +47,6 @@ components: sources: http_server: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

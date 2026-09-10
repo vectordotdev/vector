@@ -147,7 +147,9 @@ impl Deserializer for AvroDeserializer {
             bytes
         };
 
-        let value = apache_avro::from_avro_datum(&self.schema, &mut bytes.reader(), None)?;
+        let value = apache_avro::reader::datum::GenericDatumReader::builder(&self.schema)
+            .build()?
+            .read_value(&mut bytes.reader())?;
 
         let apache_avro::types::Value::Record(fields) = value else {
             return Err(vector_common::Error::from("Expected an avro Record"));
@@ -280,7 +282,11 @@ mod tests {
             message: "hello from avro".to_owned(),
         };
         let record_value = apache_avro::to_value(event).unwrap();
-        let record_datum = apache_avro::to_avro_datum(&schema, record_value).unwrap();
+        let record_datum = apache_avro::writer::datum::GenericDatumWriter::builder(&schema)
+            .build()
+            .unwrap()
+            .write_value_to_vec(record_value)
+            .unwrap();
         let record_bytes = Bytes::from(record_datum);
 
         let deserializer = AvroDeserializer::new(schema, false);
@@ -303,7 +309,11 @@ mod tests {
             message: "hello from avro".to_owned(),
         };
         let record_value = apache_avro::to_value(event).unwrap();
-        let record_datum = apache_avro::to_avro_datum(&schema, record_value).unwrap();
+        let record_datum = apache_avro::writer::datum::GenericDatumWriter::builder(&schema)
+            .build()
+            .unwrap()
+            .write_value_to_vec(record_value)
+            .unwrap();
 
         let mut bytes = BytesMut::new();
         bytes.extend([0, 0, 0, 0, 0]); // 0 prefix + 4 byte schema id
@@ -331,7 +341,11 @@ mod tests {
         };
         let value = apache_avro::to_value(event).unwrap();
         // let value = value.resolve(&schema).unwrap();
-        let datum = apache_avro::to_avro_datum(&schema, value).unwrap();
+        let datum = apache_avro::writer::datum::GenericDatumWriter::builder(&schema)
+            .build()
+            .unwrap()
+            .write_value_to_vec(value)
+            .unwrap();
 
         let mut bytes = BytesMut::new();
         bytes.extend([0, 0, 0, 0, 0]); // 0 prefix + 4 byte schema id
