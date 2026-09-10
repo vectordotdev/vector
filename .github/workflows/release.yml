@@ -139,6 +139,16 @@ jobs:
       PR_NUMBER: ${{ needs.housekeeping.outputs.pr_number }}
       HEAD_SHA: ${{ needs.housekeeping.outputs.head_sha }}
     steps:
+      - name: Wait for release validation
+        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
+        with:
+          ref: ${{ needs.housekeeping.outputs.head_sha }}
+          repo-token: ${{ github.token }}
+          check-name: Validate release state transition
+          allowed-conclusions: success
+          checks-discovery-timeout: 300
+          wait-interval: 15
+
       - name: Wait for checks on the generated commit
         uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
         with:
@@ -146,6 +156,7 @@ jobs:
           repo-token: ${{ github.token }}
           running-workflow-name: Merge checked housekeeping commit
           check-regexp: ".+"
+          allowed-conclusions: success,skipped,neutral
           checks-discovery-timeout: 300
           wait-interval: 15
 
