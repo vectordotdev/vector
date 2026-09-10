@@ -13,6 +13,6 @@ darling.workspace = true
 proc-macro2 = { version = "1.0", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
-syn = { version = "2.0", features = ["full", "extra-traits", "visit-mut", "visit"] }
+syn = { version = "3.0", features = ["full", "extra-traits", "visit-mut", "visit"] }
 tracing.workspace = true
 quote = { version = "1.0", default-features = false }
