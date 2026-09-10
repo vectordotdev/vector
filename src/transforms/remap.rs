@@ -1,6 +1,3 @@
-// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{
     collections::{BTreeMap, HashMap},
     fs::File,
@@ -56,9 +53,8 @@ type CacheValue = (Program, String, MeaningList);
     "remap",
     "Modify your observability data as it passes through your topology using Vector Remap Language (VRL)."
 ))]
-#[derive(Derivative)]
+#[derive(Default, derive_more::Debug)]
 #[serde(deny_unknown_fields)]
-#[derivative(Default, Debug)]
 pub struct RemapConfig {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
@@ -160,7 +156,7 @@ pub struct RemapConfig {
 
     #[configurable(metadata(docs::hidden))]
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     /// Cache can't be `BTreeMap` or `HashMap` because of `TableRegistry`, which doesn't allow us to inspect tables inside it.
     /// And even if we allowed the inspection, the tables can be huge, resulting in a long comparison or hash computation
     /// while using `Vec` allows us to use just a shallow comparison

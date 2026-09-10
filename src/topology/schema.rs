@@ -827,7 +827,7 @@ mod tests {
                 &mut HashMap::default(),
             )
             .unwrap();
-            assert_eq!(got, case.want, "{}", title);
+            assert_eq!(got, case.want, "{title}");
         }
     }
 }

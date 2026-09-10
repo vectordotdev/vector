@@ -397,14 +397,14 @@ mod test {
             // We want (delimiter_len - 1) bytes before boundary, then 1 byte after
             let line_content = if bytes_until_boundary > delimiter_len {
                 let content_len = bytes_until_boundary - (delimiter_len - 1);
-                format!("line{:0width$}", i, width = content_len.saturating_sub(4)).into_bytes()
+                format!("line{i:0width$}", width = content_len.saturating_sub(4)).into_bytes()
             } else {
                 // Not enough room in this buffer, pad to next boundary
                 let padding = bytes_until_boundary;
                 let extra_content = buffer_capacity - (delimiter_len - 1);
                 let mut content = vec![b'X'; padding];
                 content.extend_from_slice(
-                    format!("L{:0width$}", i, width = extra_content.saturating_sub(1)).as_bytes(),
+                    format!("L{i:0width$}", width = extra_content.saturating_sub(1)).as_bytes(),
                 );
                 content
             };
@@ -436,16 +436,14 @@ mod test {
             assert_eq!(
                 buffer.as_ref(),
                 expected_line.as_slice(),
-                "Line {} should match expected content. Got: {:?}, Expected: {:?}",
-                i,
+                "Line {i} should match expected content. Got: {:?}, Expected: {:?}",
                 String::from_utf8_lossy(&buffer),
                 String::from_utf8_lossy(expected_line)
             );
 
             assert!(
                 result.successfully_read.is_some(),
-                "Should find delimiter for line {}",
-                i
+                "Should find delimiter for line {i}"
             );
         }
     }

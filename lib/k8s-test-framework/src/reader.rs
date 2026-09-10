@@ -50,7 +50,7 @@ impl Reader {
         match result {
             Ok(0) => None,
             Ok(_) => Some(s),
-            Err(err) => panic!("{}", err),
+            Err(err) => panic!("{err}"),
         }
     }
 }

@@ -574,7 +574,7 @@ impl Formatter {
         I::Item: fmt::Display,
     {
         for msg in msgs {
-            self.print(format!("{} {}\n", intro.as_ref(), msg));
+            self.print(format!("{} {msg}\n", intro.as_ref()));
         }
         self.space();
     }

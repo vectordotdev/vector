@@ -360,7 +360,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         wait_for_tcp(in_addr).await;
 
         let config = ApacheMetricsConfig {
-            endpoints: vec![format!("http://foo:bar@{}/metrics", in_addr)],
+            endpoints: vec![format!("http://foo:bar@{in_addr}/metrics")],
             scrape_interval_secs: Duration::from_secs(1),
             namespace: "custom".to_string(),
         };
@@ -419,7 +419,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         let (tx, rx) = SourceSender::new_test();
 
         let source = ApacheMetricsConfig {
-            endpoints: vec![format!("http://{}", in_addr)],
+            endpoints: vec![format!("http://{in_addr}")],
             scrape_interval_secs: Duration::from_secs(1),
             namespace: "apache".to_string(),
         }
@@ -453,7 +453,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         let (tx, rx) = SourceSender::new_test();
 
         let source = ApacheMetricsConfig {
-            endpoints: vec![format!("http://{}", in_addr)],
+            endpoints: vec![format!("http://{in_addr}")],
             scrape_interval_secs: Duration::from_secs(1),
             namespace: "custom".to_string(),
         }

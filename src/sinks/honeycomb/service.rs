@@ -1,11 +1,5 @@
 //! Service implementation for the `honeycomb` sink.
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use bytes::Bytes;
-use derivative::Derivative;
 use http::{HeaderValue, Request};
 use snafu::ResultExt;
 
@@ -19,13 +13,12 @@ use crate::sinks::{
     },
 };
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub(super) struct HoneycombSvcRequestBuilder {
     pub(super) uri: HttpEndpoint,
     // Omitted: `api_key` is sent as the `X-Honeycomb-Team` header on every
     // request.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     pub(super) api_key: HeaderValue,
     pub(super) compression: Compression,
 }

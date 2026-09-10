@@ -435,7 +435,7 @@ impl ValidatedSink for PulsarSinkConfig {
             validate_auth_shape(auth)?;
         }
         let url = url::Url::parse(&self.endpoint)
-            .map_err(|e| format!("Invalid Pulsar endpoint `{}`: {}", self.endpoint, e))?;
+            .map_err(|e| format!("Invalid Pulsar endpoint `{}`: {e}", self.endpoint))?;
         if !matches!(url.scheme(), "pulsar" | "pulsar+ssl") {
             return Err(format!(
                 "Invalid Pulsar endpoint `{}`: scheme must be pulsar or pulsar+ssl",
@@ -448,6 +448,7 @@ impl ValidatedSink for PulsarSinkConfig {
                 format!("Invalid Pulsar endpoint `{}`: missing host", self.endpoint).into(),
             );
         }
+        self.encoding.validate()?;
         let topic = self
             .topic
             .clone()
