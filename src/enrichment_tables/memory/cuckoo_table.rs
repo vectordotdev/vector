@@ -238,9 +238,8 @@ impl CuckooMemoryTable {
                         }
                         _ => {
                             return Err(format!(
-                                "Couldn't open \"{}\" for cuckoo filter state import. {}",
-                                path.to_str().unwrap_or(""),
-                                err
+                                "Couldn't open \"{}\" for cuckoo filter state import. {err}",
+                                path.to_str().unwrap_or("")
                             )
                             .into());
                         }
@@ -252,14 +251,14 @@ impl CuckooMemoryTable {
                         Ok(imported) => imported,
                         Err(error) => {
                             return Err(
-                            format!("Cuckoo filter state import failed: {}. Delete the persisted state file ({}) to proceed.", error, path.to_str().unwrap_or("")).into(),
+                            format!("Cuckoo filter state import failed: {error}. Delete the persisted state file ({}) to proceed.", path.to_str().unwrap_or("")).into(),
                         );
                         }
                     };
 
                 if !built_config.compatible_layout(&persisted_config) {
                     return Err(
-                        format!("Stored cuckoo filter configuration is not compatible with new configuration. Only changes to values that don't affect layout or size are allowed. If this is intended, remove the persisted state file ({}). Built: {:?}. Persisted: {:?}", path.to_str().unwrap_or(""), built_config, persisted_config).into(),
+                        format!("Stored cuckoo filter configuration is not compatible with new configuration. Only changes to values that don't affect layout or size are allowed. If this is intended, remove the persisted state file ({}). Built: {built_config:?}. Persisted: {persisted_config:?}", path.to_str().unwrap_or("")).into(),
                     );
                 }
 
@@ -280,7 +279,7 @@ impl CuckooMemoryTable {
                     Ok(filter) => filter,
                     Err(error) => {
                         return Err(
-                            format!("Cuckoo filter state import failed: {}. Delete the persisted state file ({}) to proceed.", error, path.to_str().unwrap_or("")).into(),
+                            format!("Cuckoo filter state import failed: {error}. Delete the persisted state file ({}) to proceed.", path.to_str().unwrap_or("")).into(),
                         );
                     }
                 }
@@ -366,9 +365,8 @@ impl CuckooMemoryTable {
                 + 1;
             if starting_value_needed_bits as usize > cuckoo_config.lru_bits.get() {
                 return Err(format!(
-                    "`lru_bits` ({}) must be set to at least {} to support the `lru_starting_value` value ({}).",
+                    "`lru_bits` ({}) must be set to at least {starting_value_needed_bits} to support the `lru_starting_value` value ({}).",
                     cuckoo_config.lru_bits.get(),
-                    starting_value_needed_bits,
                     cuckoo_config.lru_starting_value,
                 ).into());
             }
@@ -376,9 +374,8 @@ impl CuckooMemoryTable {
                 cuckoo_config.lru_increment.checked_ilog2().unwrap_or(0) + 1;
             if increment_needed_bits as usize > cuckoo_config.lru_bits.get() {
                 return Err(format!(
-                    "`lru_bits` ({}) must be set to at least {} to support the `lru_increment` value ({}).",
+                    "`lru_bits` ({}) must be set to at least {increment_needed_bits} to support the `lru_increment` value ({}).",
                     cuckoo_config.lru_bits.get(),
-                    increment_needed_bits,
                     cuckoo_config.lru_increment,
                 ).into());
             }
@@ -397,9 +394,8 @@ impl CuckooMemoryTable {
             if needed_bits as usize > cuckoo_config.ttl_bits.get() {
                 return Err(
                     format!(
-                    "`ttl_bits` ({}) must be set to at least {} to support the default `ttl` value ({}) at the configured scan interval ({}).",
+                    "`ttl_bits` ({}) must be set to at least {needed_bits} to support the default `ttl` value ({}) at the configured scan interval ({}).",
                     cuckoo_config.ttl_bits.get(),
-                        needed_bits,
                     config.ttl,
                     config.scan_interval.get()).into(),
                 );
@@ -424,7 +420,7 @@ impl CuckooMemoryTable {
         if let Some(max_byte_size) = config.max_byte_size
             && filter_size as u64 > max_byte_size
         {
-            return Err(format!("Configured cuckoo filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of cuckoo filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
+            return Err(format!("Configured cuckoo filter is larger ({filter_size}) than defined `max_byte_size` ({max_byte_size}). Reduce the size of cuckoo filter or increase or remove `max_byte_size`.").into());
         }
 
         Ok(built_config)
@@ -446,12 +442,11 @@ impl CuckooMemoryTable {
                             }
                         }
                         if let Err(error) = temp.persist(path) {
-                            warn!("Cuckoo filter export failed: {}", error);
+                            warn!("Cuckoo filter export failed: {error}");
                         }
                     }
                     Err(err) => warn!(
-                        "Couldn't open temporary file for export. Aborting export. Error: {}",
-                        err
+                        "Couldn't open temporary file for export. Aborting export. Error: {err}"
                     ),
                 }
             }
@@ -508,13 +503,13 @@ impl CuckooMemoryTable {
         match self.filter.exporter().write_to(&mut writer) {
             Ok(()) => {
                 if let Err(error) = writer.flush() {
-                    warn!("Cuckoo filter export failed: {}", error);
+                    warn!("Cuckoo filter export failed: {error}");
                     return Err(());
                 };
                 Ok(())
             }
             Err(error) => {
-                warn!("Cuckoo filter export failed: {}", error);
+                warn!("Cuckoo filter export failed: {error}");
                 Err(())
             }
         }
@@ -549,10 +544,8 @@ impl CuckooMemoryTable {
                     let needed_bits = ttl.checked_ilog2().unwrap_or(0) + 1;
                     if needed_bits as usize > self.cuckoo_config.ttl_bits.get() {
                         warn!(
-                            "`ttl_bits` ({}) must be set to at least {} to support the provided `ttl` value ({}) at the configured scan interval ({}).",
+                            "`ttl_bits` ({}) must be set to at least {needed_bits} to support the provided `ttl` value ({ttl}) at the configured scan interval ({}).",
                             self.cuckoo_config.ttl_bits.get(),
-                            needed_bits,
-                            ttl,
                             self.config.scan_interval.get()
                         );
                         // Unchecked conversion to u32, because ttl_bits can't be higher than 32 anyways
@@ -783,7 +776,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
                         continue;
                     } else if let Some(handle) = export_handle
                         && let Err(join_error) = handle.join() {
-                        warn!("Cuckoo enrichment table export failed: {:?}", join_error);
+                        warn!("Cuckoo enrichment table export failed: {join_error:?}");
                     }
                     let exporting_instance = self.clone();
                     export_handle = Some(std::thread::spawn(move || {
@@ -804,7 +797,7 @@ impl StreamSink<Event> for CuckooMemoryTable {
         if let Some(handle) = export_handle
             && let Err(join_error) = handle.join()
         {
-            warn!("Cuckoo enrichment table export failed: {:?}", join_error);
+            warn!("Cuckoo enrichment table export failed: {join_error:?}");
         }
 
         // Final export before exiting

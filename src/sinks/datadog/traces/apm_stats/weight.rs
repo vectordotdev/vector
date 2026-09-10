@@ -75,8 +75,7 @@ pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
         // TODO remove the debug print and emit the Error event as outlined in
         // https://github.com/vectordotdev/vector/issues/14859
         debug!(
-            "Didn't reliably find the root span for weight calculation of trace_id {:?}.",
-            trace_id
+            "Didn't reliably find the root span for weight calculation of trace_id {trace_id:?}."
         );
     }
 
@@ -87,8 +86,7 @@ pub(crate) fn extract_weight_from_root_span(spans: &[&ObjectMap]) -> f64 {
             // TODO remove the debug print and emit the Error event as outlined in
             // https://github.com/vectordotdev/vector/issues/14859
             debug!(
-                "Root span was not found. Defaulting to weight of 1.0 for trace_id {:?}.",
-                trace_id
+                "Root span was not found. Defaulting to weight of 1.0 for trace_id {trace_id:?}."
             );
             &1.0
         })

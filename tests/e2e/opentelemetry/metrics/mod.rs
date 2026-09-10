@@ -30,7 +30,7 @@ fn parse_export_metrics_request(content: &str) -> Result<ExportMetricsServiceReq
                 METRICS_REQUEST_MESSAGE_TYPE,
                 line,
             )
-            .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+            .map_err(|e| format!("Line {}: {e}", line_num + 1))?
             .resource_metrics,
         );
     }
@@ -220,8 +220,7 @@ fn assert_metric_names_and_types(request: &ExportMetricsServiceRequest) {
     let total_count: usize = metric_type_counts.values().sum();
     assert_eq!(
         total_count, EXPECTED_METRIC_COUNT,
-        "Total metric count mismatch. Breakdown: {:?}",
-        metric_type_counts
+        "Total metric count mismatch. Breakdown: {metric_type_counts:?}"
     );
 }
 

@@ -404,14 +404,13 @@ impl ChronicleUnstructuredConfig {
 
     fn create_endpoint(&self, path: &str) -> Result<String, ChronicleError> {
         Ok(format!(
-            "{}/{}",
+            "{}/{path}",
             match (&self.endpoint, self.region) {
                 (Some(endpoint), None) => endpoint.to_string().trim_end_matches('/').to_string(),
                 (None, Some(region)) => region.endpoint().to_string(),
                 (Some(_), Some(_)) => return Err(ChronicleError::BothRegionAndEndpoint),
                 (None, None) => return Err(ChronicleError::RegionOrEndpoint),
-            },
-            path
+            }
         ))
     }
 }

@@ -714,8 +714,7 @@ async fn query_vrl_compilation_error() {
             let err_msg = err.to_string();
             assert!(
                 err_msg.contains("VRL compilation failed"),
-                "Expected VRL compilation error, got: {}",
-                err_msg
+                "Expected VRL compilation error, got: {err_msg}"
             );
         }
         Ok(_) => panic!("Expected build to fail with VRL compilation error, but it succeeded"),
@@ -757,8 +756,7 @@ async fn body_vrl_compilation_error() {
             let err_msg = err.to_string();
             assert!(
                 err_msg.contains("VRL compilation failed"),
-                "Expected VRL compilation error, got: {}",
-                err_msg
+                "Expected VRL compilation error, got: {err_msg}"
             );
         }
         Ok(_) => panic!("Expected build to fail with VRL compilation error, but it succeeded"),

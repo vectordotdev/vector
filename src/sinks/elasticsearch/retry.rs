@@ -117,8 +117,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
             }
             _ if status.is_server_error() => RetryAction::Retry(
                 format!(
-                    "{}: {}",
-                    status,
+                    "{status}: {}",
                     String::from_utf8_lossy(response.http_response.body())
                 )
                 .into(),

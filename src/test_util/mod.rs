@@ -73,7 +73,7 @@ macro_rules! assert_downcast_matches {
     ($e:expr_2021, $t:ty, $v:pat) => {{
         match $e.downcast_ref::<$t>() {
             Some($v) => (),
-            got => panic!("Assertion failed: got wrong error variant {:?}", got),
+            got => panic!("Assertion failed: got wrong error variant {got:?}"),
         }
     }};
 }

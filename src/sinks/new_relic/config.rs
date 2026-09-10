@@ -324,7 +324,7 @@ mod tests {
         config.account_id = SensitiveString::from("super-secret-account-id".to_string());
 
         let validated = config.validate().expect("validation should succeed");
-        let debug = format!("{:?}", validated);
+        let debug = format!("{validated:?}");
 
         assert!(!debug.contains("super-secret-license-key"));
         assert!(!debug.contains("super-secret-account-id"));

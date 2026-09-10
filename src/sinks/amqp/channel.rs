@@ -22,7 +22,7 @@ pub(super) fn new_channel_pool(config: &AmqpSinkConfig) -> crate::Result<AmqpSin
         .max_size(max_channels)
         .runtime(deadpool::Runtime::Tokio1)
         .build()?;
-    debug!("AMQP channel pool created with max size: {}", max_channels);
+    debug!("AMQP channel pool created with max size: {max_channels}");
     Ok(channels)
 }
 

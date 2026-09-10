@@ -148,8 +148,8 @@ impl ComposeTest {
         // hyphens, and underscores. Replace any dots with hyphens.
         let sanitized_env = self.environment.replace('.', "-");
         format!(
-            "vector-{}-{}-{}",
-            self.local_config.directory, self.test_name, sanitized_env
+            "vector-{}-{}-{sanitized_env}",
+            self.local_config.directory, self.test_name
         )
     }
 

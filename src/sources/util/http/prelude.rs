@@ -275,7 +275,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .bind(&address)
                 .await
                 .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
+                    error!("An error occurred: {err:?}.");
                 })?
                 .with_keepalive(keepalive_settings.tcp_keepalive);
 
@@ -284,7 +284,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .with_graceful_shutdown(cx.shutdown.map(|_| ()))
                 .await
                 .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
+                    error!("An error occurred: {err:?}.");
                 })?;
 
             Ok(())

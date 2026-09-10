@@ -273,7 +273,7 @@ fn spawn_input_http_client(
                 }
                 Err(e) => {
                     // TODO: Emit metric that tracks a failed response from the HTTP server.
-                    error!("Failed to send request: {}", e);
+                    error!("Failed to send request: {e}");
                 }
             }
         }

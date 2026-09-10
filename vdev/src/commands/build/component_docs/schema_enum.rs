@@ -388,7 +388,7 @@ impl SchemaContext {
 
         // Fallback schema pattern: mixed-mode enums.
         debug!("Resolved as 'fallback mixed-mode' enum schema.");
-        debug!("Tagging mode: {}", enum_tagging);
+        debug!("Tagging mode: {enum_tagging}");
 
         let mut resolved_subschemas: Vec<Value> = Vec::new();
         for subschema in &subschemas {
