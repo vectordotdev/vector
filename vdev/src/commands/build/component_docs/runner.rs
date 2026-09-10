@@ -717,13 +717,20 @@ fn render_and_import_cue_definitions(
     }
     fs::create_dir_all(&definitions_directory)?;
 
+    let definition_file_names =
+        definition_file_names(cue_definitions.values.keys().map(String::as_str));
+
     for (name, value) in &cue_definitions.values {
         let data = json!({
             (CUE_DEFINITIONS_PLACEHOLDER_FIELD): {
                 (name): value,
             },
         });
-        let cue_output_file = definitions_directory.join(definition_file_name(name));
+        let cue_output_file = definitions_directory.join(
+            definition_file_names
+                .get(name)
+                .expect("every CUE definition has a filename"),
+        );
         import_json_as_cue(
             context,
             Some(cue_definitions),
@@ -752,9 +759,34 @@ fn definition_file_name(name: &str) -> String {
         return format!("{stem}_{digest}.cue");
     }
 
-    let stem = sanitized_definition_name(name);
-    let digest = Sha256::digest(name.as_bytes());
-    format!("{stem}-{}.cue", hex::encode(&digest[..4]))
+    format!("{}.cue", sanitized_definition_name(name))
+}
+
+fn definition_file_names<'a>(names: impl IntoIterator<Item = &'a str>) -> HashMap<String, String> {
+    let names = names.into_iter().collect::<Vec<_>>();
+    let mut counts = HashMap::<String, usize>::new();
+    for name in &names {
+        *counts.entry(definition_file_name(name)).or_default() += 1;
+    }
+
+    names
+        .into_iter()
+        .map(|name| {
+            let file_name = definition_file_name(name);
+            if counts.get(&file_name) == Some(&1) {
+                return (name.to_string(), file_name);
+            }
+
+            let stem = file_name
+                .strip_suffix(".cue")
+                .expect("definition filenames use the CUE extension");
+            let digest = Sha256::digest(name.as_bytes());
+            (
+                name.to_string(),
+                format!("{stem}-{}.cue", hex::encode(&digest[..4])),
+            )
+        })
+        .collect()
 }
 
 fn sanitized_definition_name(name: &str) -> String {
@@ -773,7 +805,6 @@ fn sanitized_definition_name(name: &str) -> String {
     if stem.is_empty() {
         stem.push_str("definition");
     }
-    stem.truncate(80);
     stem
 }
 
@@ -966,7 +997,10 @@ mod tests {
         let name = "core::option::Option<vector_core::tls::settings::TlsConfig>";
         let filename = definition_file_name(name);
 
-        assert!(filename.starts_with("core_option_option_vector_core_tls_settings_tlsconfig-"));
+        assert_eq!(
+            filename,
+            "core_option_option_vector_core_tls_settings_tlsconfig.cue"
+        );
         assert!(
             Path::new(&filename)
                 .extension()
@@ -979,6 +1013,13 @@ mod tests {
                     || character.is_ascii_digit()
                     || matches!(character, '_' | '-' | '.'))
         );
+
+        let colliding = definition_file_names(["example::Config", "example<Config>"]);
+        let first = &colliding["example::Config"];
+        let second = &colliding["example<Config>"];
+        assert!(first.starts_with("example_config-"));
+        assert!(second.starts_with("example_config-"));
+        assert_ne!(first, second);
     }
 
     #[test]
