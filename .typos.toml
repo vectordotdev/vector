@@ -98,3 +98,6 @@ seeked = "seeked"
 raison = "raison"
 # TextMate scope name — historical upstream misspelling, must match exactly
 repitition = "repitition"
+# Avro Object Container File format acronym
+OCF = "OCF"
+ocf = "ocf"
