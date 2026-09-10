@@ -1094,15 +1094,13 @@ async fn sends_through_authenticated_proxy() {
         no_proxy: Default::default(),
     };
 
-    let config = format!(
-        r#"
+    let config = indoc::formatdoc! {r#"
         uri: "http://{in_addr}/frames"
         framing:
           method: newline_delimited
         encoding:
           codec: json
-        "#
-    );
+    "#};
     let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
 
     let cx = SinkContext {
