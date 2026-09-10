@@ -1,5 +1,3 @@
-#![allow(dead_code)] // This shared service is exercised as sinks migrate to the native client.
-
 use std::{
     marker::PhantomData,
     sync::Arc,
