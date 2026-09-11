@@ -8,7 +8,7 @@ use smallvec::{SmallVec, smallvec};
 use vector_config::{configurable_component, indexmap::IndexSet};
 use vector_core::{
     config::{DataType, LogNamespace},
-    event::Event,
+    event::{Event, TRACE_LAYOUT_OTLP, TraceEvent},
     schema,
 };
 use vrl::{event_path, protobuf::parse::Options, value::Kind};
@@ -192,8 +192,9 @@ impl Deserializer for OtlpDeserializer {
                     {
                         // Convert the log event to a trace event by taking ownership
                         if let Some(Event::Log(log)) = events.pop() {
-                            let trace_event = Event::Trace(log.into());
-                            return Ok(smallvec![trace_event]);
+                            let mut trace = TraceEvent::from(log);
+                            trace.metadata_mut().set_trace_layout(TRACE_LAYOUT_OTLP);
+                            return Ok(smallvec![Event::Trace(trace)]);
                         }
                     }
                 }
@@ -380,6 +381,7 @@ mod tests {
             let trace = events[0].as_trace();
             assert!(trace.get(event_path!(field)).is_some());
             validate_trace_ids(trace.value());
+            assert_eq!(events[0].metadata().trace_layout(), Some(TRACE_LAYOUT_OTLP));
         } else {
             assert!(events[0].as_log().get(event_path!(field)).is_some());
         }

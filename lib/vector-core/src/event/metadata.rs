@@ -3,7 +3,7 @@
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc, time::Instant};
 
 use derivative::Derivative;
-use lookup::OwnedTargetPath;
+use lookup::{OwnedTargetPath, path};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use vector_common::{EventDataEq, byte_size_of::ByteSizeOf, config::ComponentKey};
@@ -20,6 +20,27 @@ use crate::{
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
 const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
+const VECTOR_METADATA_NAMESPACE: &str = "vector";
+
+/// Field name of the internal, unstable trace-layout marker under the read-only
+/// `vector` metadata namespace (`%vector.trace_layout`).
+///
+/// This marker records which trace key layout an event was produced with so
+/// Vector's own transforms and sinks can dispatch on layout. It lives under
+/// `%vector` so it is already reserved and locked to VRL. Log namespacing does
+/// not apply to traces; `trace_to_log` drops the field when converting to a
+/// log. It is not documented for users, is not a compatibility contract, and
+/// may change or be removed without a deprecation cycle.
+pub const TRACE_LAYOUT_KEY: &str = "trace_layout";
+
+/// Layout marker value written by the `datadog_agent` source.
+pub const TRACE_LAYOUT_DATADOG: &str = "datadog";
+
+/// Layout marker value for flattened native traces from the `opentelemetry` source.
+pub const TRACE_LAYOUT_OPENTELEMETRY: &str = "opentelemetry";
+
+/// Layout marker value for raw OTLP `resourceSpans` batches from the `opentelemetry` source.
+pub const TRACE_LAYOUT_OTLP: &str = "otlp";
 
 /// The event metadata structure is a `Arc` wrapper around the actual metadata to avoid cloning the
 /// underlying data until it becomes necessary to provide a `mut` copy.
@@ -202,6 +223,21 @@ impl EventMetadata {
     /// Sets the `source_type` in the metadata to the provided value.
     pub fn set_source_type<S: Into<Cow<'static, str>>>(&mut self, source_type: S) {
         self.get_mut().source_type = Some(source_type.into());
+    }
+
+    /// Writes the internal, unstable trace-layout marker under `%vector.trace_layout`.
+    pub fn set_trace_layout(&mut self, layout: &'static str) {
+        self.value_mut()
+            .insert(path!(VECTOR_METADATA_NAMESPACE, TRACE_LAYOUT_KEY), layout);
+    }
+
+    /// Returns the internal, unstable trace-layout marker, if present.
+    #[must_use]
+    pub fn trace_layout(&self) -> Option<&str> {
+        self.value()
+            .get(path!(VECTOR_METADATA_NAMESPACE, TRACE_LAYOUT_KEY))
+            .and_then(Value::as_bytes)
+            .and_then(|bytes| std::str::from_utf8(bytes).ok())
     }
 
     /// Sets the `upstream_id` in the metadata to the provided value.
@@ -561,6 +597,18 @@ mod test {
 
     const SECRET: &str = "secret";
     const SECRET2: &str = "secret2";
+
+    #[test]
+    fn trace_layout_round_trip() {
+        let mut metadata = EventMetadata::default();
+        assert_eq!(metadata.trace_layout(), None);
+        metadata.set_trace_layout(TRACE_LAYOUT_DATADOG);
+        assert_eq!(metadata.trace_layout(), Some(TRACE_LAYOUT_DATADOG));
+        metadata.set_trace_layout(TRACE_LAYOUT_OPENTELEMETRY);
+        assert_eq!(metadata.trace_layout(), Some(TRACE_LAYOUT_OPENTELEMETRY));
+        metadata.set_trace_layout(TRACE_LAYOUT_OTLP);
+        assert_eq!(metadata.trace_layout(), Some(TRACE_LAYOUT_OTLP));
+    }
 
     #[test]
     fn metadata_hardcoded_secrets_get_set() {
