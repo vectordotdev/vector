@@ -14,6 +14,31 @@ generated: components: sources: internal_logs: configuration: {
 		required: false
 		type: string: {}
 	}
+	level: {
+		description: """
+			The maximum verbosity of log events to expose.
+
+			Log events at this severity level and above are delivered to this source,
+			independently of the console log level Vector was started with (`VECTOR_LOG`,
+			`--verbose`, and `--quiet`).
+
+			This setting takes effect once the configuration has been loaded. The few events emitted
+			before that, during early startup, are captured at the console log level (with a floor of
+			`info`), so exposing `debug` or `trace` events from early startup additionally requires
+			starting Vector with a verbose console log level (for example, `VECTOR_LOG=debug`).
+			"""
+		required: false
+		type: string: {
+			default: "info"
+			enum: {
+				debug: "Expose log events at the `DEBUG` level and above."
+				error: "Expose only log events at the `ERROR` level."
+				info:  "Expose log events at the `INFO` level and above."
+				trace: "Expose all log events."
+				warn:  "Expose log events at the `WARN` level and above."
+			}
+		}
+	}
 	pid_key: {
 		description: """
 			Overrides the name of the log field used to add the current process ID to each event.
