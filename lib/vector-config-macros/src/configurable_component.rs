@@ -238,6 +238,9 @@ impl FromMeta for Options {
                 }
 
                 NestedMeta::Lit(lit) => errors.push(Error::unexpected_lit_type(lit)),
+                NestedMeta::NameValueInvalidExpr(invalid) => {
+                    errors.push(invalid.error.clone().with_span(nm));
+                }
             }
         }
 
