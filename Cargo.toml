@@ -466,6 +466,7 @@ regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
 seahash = { version = "4.1.0", default-features = false }
+sha2 = { version = "0.10.9", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2.workspace = true
@@ -712,6 +713,7 @@ sources-logs = [
   "sources-internal_logs",
   "sources-journald",
   "sources-kafka",
+  "sources-kubernetes_events",
   "sources-kubernetes_logs",
   "sources-logstash",
   "sources-mqtt",
@@ -771,6 +773,7 @@ sources-internal_metrics = []
 sources-static_metrics = []
 sources-journald = []
 sources-kafka = ["dep:rdkafka"]
+sources-kubernetes_events = ["kubernetes"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
