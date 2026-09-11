@@ -44,13 +44,10 @@ mod tests;
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ExecConfig {
-    #[configurable(derived)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     pub scheduled: Option<ScheduledConfig>,
 
-    #[configurable(derived)]
     pub streaming: Option<StreamingConfig>,
 
     /// The command to run, plus any arguments required.
@@ -79,10 +76,8 @@ pub struct ExecConfig {
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
 
-    #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
@@ -725,7 +720,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 ) {
     // Start the green background thread for collecting
     drop(crate::spawn_in_current_span(async move {
-        debug!("Start capturing {} command output.", origin);
+        debug!("Start capturing {origin} command output.");
 
         let mut stream = DecoderFramedRead::new(reader, decoder);
         while let Some(result) = stream.next().await {
@@ -748,6 +743,6 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
             }
         }
 
-        debug!("Finished capturing {} command output.", origin);
+        debug!("Finished capturing {origin} command output.");
     }));
 }

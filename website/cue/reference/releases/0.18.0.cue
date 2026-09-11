@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.18.0": {
-	date:     "2021-11-18"
-	codename: ""
+	date: "2021-11-18"
 
 	description: """
 		The Vector team is pleased to announce version 0.18.0!
@@ -335,7 +334,7 @@ releases: "0.18.0": {
 				"""
 		},
 		{
-			type:     "deprecation"
+			type:     "chore"
 			breaking: true
 			scopes: ["sinks"]
 			description: """
@@ -345,7 +344,7 @@ releases: "0.18.0": {
 				"""
 		},
 		{
-			type:     "deprecation"
+			type:     "chore"
 			breaking: true
 			scopes: ["sinks"]
 			description: """
@@ -355,7 +354,7 @@ releases: "0.18.0": {
 				"""
 		},
 		{
-			type:     "deprecation"
+			type:     "chore"
 			breaking: true
 			scopes: ["datadog_metrics sink"]
 			description: """

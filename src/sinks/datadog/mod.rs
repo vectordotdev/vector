@@ -1,6 +1,6 @@
 use futures_util::FutureExt;
 use http::{Request, StatusCode, Uri};
-use hyper::body::Body;
+use hyper::{body::Body, client::connect::Connect};
 use snafu::Snafu;
 use vector_lib::{
     config::AcknowledgementsConfig, configurable::configurable_component,
@@ -11,7 +11,7 @@ use super::Healthcheck;
 use crate::{
     common::datadog,
     http::{HttpClient, HttpError},
-    sinks::HealthcheckError,
+    sinks::{HealthcheckError, util::HttpEndpoint},
 };
 
 #[cfg(feature = "sinks-datadog_events")]
@@ -38,12 +38,11 @@ pub mod traces;
 pub struct LocalDatadogCommonConfig {
     /// The endpoint to send observability data to.
     ///
-    /// The endpoint must contain an HTTP scheme, and may specify a hostname or IP
-    /// address and port. The API path should NOT be specified as this is handled by
+    /// The endpoint must be an absolute HTTP(S) URL. A missing scheme defaults
+    /// to `https`. The API path should NOT be specified as this is handled by
     /// the sink.
     ///
     /// If set, overrides the `site` option.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8080"))]
     #[configurable(metadata(docs::examples = "http://example.com:12345"))]
     #[serde(default)]
@@ -76,11 +75,9 @@ pub struct LocalDatadogCommonConfig {
     #[configurable(metadata(docs::examples = "ef8d5de700e7989468166c40fc8a0ccd"))]
     pub default_api_key: Option<SensitiveString>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -137,7 +134,10 @@ pub struct DatadogCommonConfig {
 impl DatadogCommonConfig {
     /// Returns a `Healthcheck` which is a future that will be used to ensure the
     /// `<site>/api/v1/validate` endpoint is reachable.
-    pub fn build_healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
+    pub fn build_healthcheck<C>(&self, client: HttpClient<Body, C>) -> crate::Result<Healthcheck>
+    where
+        C: Connect + Clone + Send + Sync + 'static,
+    {
         let validate_endpoint = self.get_api_endpoint("/api/v1/validate")?;
 
         let api_key: String = self.default_api_key.clone().into();
@@ -147,19 +147,25 @@ impl DatadogCommonConfig {
 
     /// Gets the API endpoint with a given suffix path.
     ///
-    /// If `endpoint` is not specified, we fallback to `site`.
+    /// If `endpoint` is not specified, we fallback to `site`. A missing scheme
+    /// is defaulted to `https`, so the healthcheck and data endpoints agree on
+    /// the scheme even for a scheme-less custom endpoint.
     fn get_api_endpoint(&self, path: &str) -> crate::Result<Uri> {
         let base = datadog::get_api_base_endpoint(self.endpoint.as_deref(), self.site.as_str());
-        [&base, path].join("").parse().map_err(Into::into)
+        let endpoint = HttpEndpoint::parse(&base)?.append_path(path)?;
+        Ok(endpoint.into_uri())
     }
 }
 
 /// Makes a GET HTTP request to `<site>/api/v1/validate` using the provided client and API key.
-async fn build_healthcheck_future(
-    client: HttpClient,
+async fn build_healthcheck_future<C>(
+    client: HttpClient<Body, C>,
     validate_endpoint: Uri,
     api_key: String,
-) -> crate::Result<()> {
+) -> crate::Result<()>
+where
+    C: Connect + Clone + Send + Sync + 'static,
+{
     let request = Request::get(validate_endpoint)
         .header("DD-API-KEY", api_key)
         .body(hyper::Body::empty())
@@ -310,5 +316,36 @@ mod tests {
 
         let error = local.with_globals(global).unwrap_err();
         assert_eq!(ConfigurationError::ApiKeyRequired, error);
+    }
+
+    #[test]
+    fn get_api_endpoint_defaults_missing_scheme_to_https() {
+        let config = DatadogCommonConfig {
+            endpoint: Some("localhost:8080".to_string()),
+            site: "datadoghq.com".to_string(),
+            default_api_key: SensitiveString::from("key".to_string()),
+            acknowledgements: Default::default(),
+        };
+        assert_eq!(
+            config
+                .get_api_endpoint("/api/v1/validate")
+                .unwrap()
+                .to_string(),
+            "https://localhost:8080/api/v1/validate"
+        );
+        // The default site-based endpoint keeps its scheme.
+        let default = DatadogCommonConfig {
+            endpoint: None,
+            site: "datadoghq.com".to_string(),
+            default_api_key: SensitiveString::from("key".to_string()),
+            acknowledgements: Default::default(),
+        };
+        assert_eq!(
+            default
+                .get_api_endpoint("/api/v1/validate")
+                .unwrap()
+                .to_string(),
+            "https://api.datadoghq.com/api/v1/validate"
+        );
     }
 }

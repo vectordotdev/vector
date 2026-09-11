@@ -9,7 +9,7 @@ use crate::{
     conditions::AnyCondition,
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     schema,
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::Transform,
 };
 
@@ -52,12 +52,11 @@ pub struct ThrottleConfig {
     /// If left unspecified, or if the event doesn't have `key_field`, then the event is not rate
     /// limited separately.
     #[configurable(metadata(docs::examples = "{{ message }}", docs::examples = "{{ hostname }}",))]
-    pub key_field: Option<Template>,
+    pub key_field: Option<UnconfinedTemplate>,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: ThrottleInternalMetricsConfig,
 }
@@ -85,6 +84,28 @@ impl TransformConfig for ThrottleConfig {
             DataType::Log,
             clone_input_definitions(input_definitions),
         )]
+    }
+
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        if self.threshold == 0 || self.window_secs.as_secs_f64() == 0.0 {
+            Err(vec![
+                "`threshold` and `window_secs` must be non-zero".to_string(),
+            ])
+        } else {
+            Ok(())
+        }
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        if let Some(Err(e)) = self
+            .exclude
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            Err(vec![format!("exclude: {e}")])
+        } else {
+            Ok(())
+        }
     }
 }
 

@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: demo_logs
+    format: apache_common
+    interval: 1.0

@@ -19,6 +19,14 @@ fn generate_config() {
     crate::test_util::test_generate_config::<CloudWatchMetricsSinkConfig>();
 }
 
+#[test]
+fn prepares_valid_config() {
+    let config = config();
+    let validated = config.validate().expect("preparation should succeed");
+    assert_eq!(validated.storage_resolution.get("bytes_out"), Some(&1));
+    assert_eq!(validated.batch.size.events, 20);
+}
+
 fn config() -> CloudWatchMetricsSinkConfig {
     CloudWatchMetricsSinkConfig {
         default_namespace: "vector".into(),

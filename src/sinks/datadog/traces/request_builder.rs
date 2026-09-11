@@ -47,7 +47,6 @@ pub enum RequestBuilderError {
 }
 
 impl RequestBuilderError {
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_parts(self) -> (&'static str, String, u64) {
         match self {
             Self::FailedToBuild {
@@ -197,7 +196,9 @@ pub fn build_request(
         body: payload,
         headers,
         finalizers: ddtraces_metadata.finalizers,
-        uri: endpoint_configuration.get_uri_for_endpoint(ddtraces_metadata.endpoint),
+        uri: endpoint_configuration
+            .get_uri_for_endpoint(ddtraces_metadata.endpoint)
+            .into_uri(),
         uncompressed_size: ddtraces_metadata.uncompressed_size,
         metadata: request_metadata,
     }
@@ -519,9 +520,8 @@ mod test {
                     assert_eq!(1, processed.len());
                     assert!(
                         encoded.len() <= max_size,
-                        "encoded len {} longer than max size {}",
-                        encoded.len(),
-                        max_size
+                        "encoded len {} longer than max size {max_size}",
+                        encoded.len()
                     );
                 }
             }

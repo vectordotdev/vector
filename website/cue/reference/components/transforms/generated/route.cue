@@ -29,7 +29,7 @@ generated: components: transforms: route: configuration: {
 			is set to `true` (the default), it is sent to the `<transform_name>._unmatched` output.
 			Otherwise, the unmatched event is instead silently discarded.
 			"""
-		required: false
+		required: true
 		type: object: {
 			examples: [{
 				"foo-does-not-exist": {

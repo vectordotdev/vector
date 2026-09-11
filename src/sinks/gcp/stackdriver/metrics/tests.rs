@@ -1,13 +1,15 @@
 use chrono::Utc;
 use futures::{future::ready, stream};
-use serde::Deserialize;
 use vector_lib::event::{Metric, MetricKind, MetricValue};
 
 use super::config::StackdriverConfig;
 use crate::{
     config::SinkContext,
     gcp::GcpAuthConfig,
-    sinks::{prelude::*, util::test::build_test_server},
+    sinks::{
+        prelude::*,
+        util::{HttpEndpoint, test::build_test_server},
+    },
     test_util::{
         addr::next_addr,
         components::{SINK_TAGS, run_and_assert_sink_compliance},
@@ -24,17 +26,15 @@ fn generate_config() {
 async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-    let config = StackdriverConfig::generate_config().to_string();
-    let mut config = StackdriverConfig::deserialize(
-        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
-    )
-    .expect("config should be valid");
+    let mut config: StackdriverConfig =
+        serde_json::from_value(StackdriverConfig::generate_config())
+            .expect("config should be valid");
 
     // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
     // Metadata API, which we clearly don't have in unit tests. :)
     config.auth.credentials_path = None;
     config.auth.api_key = Some("fake".to_string().into());
-    config.endpoint = mock_endpoint.to_string();
+    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -51,7 +51,7 @@ async fn component_spec_compliance() {
 async fn sends_metric() {
     let (_guard, in_addr) = next_addr();
     let config = StackdriverConfig {
-        endpoint: format!("http://{in_addr}"),
+        endpoint: HttpEndpoint::parse(&format!("http://{in_addr}")).unwrap(),
         auth: GcpAuthConfig {
             api_key: None,
             credentials_path: None,
@@ -111,7 +111,7 @@ async fn sends_multiple_metrics() {
     batch.max_events = Some(5);
 
     let config = StackdriverConfig {
-        endpoint: format!("http://{in_addr}"),
+        endpoint: HttpEndpoint::parse(&format!("http://{in_addr}")).unwrap(),
         auth: GcpAuthConfig {
             api_key: None,
             credentials_path: None,
@@ -198,7 +198,7 @@ async fn does_not_aggregate_metrics() {
     batch.max_events = Some(5);
 
     let config = StackdriverConfig {
-        endpoint: format!("http://{in_addr}"),
+        endpoint: HttpEndpoint::parse(&format!("http://{in_addr}")).unwrap(),
         auth: GcpAuthConfig {
             api_key: None,
             credentials_path: None,

@@ -234,3 +234,21 @@ impl InternalEvent for KubernetesMergedLineTooBigError<'_> {
         });
     }
 }
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct KubernetesMergedLineTruncated {
+    pub configured_limit: usize,
+    pub original_size: usize,
+}
+
+impl InternalEvent for KubernetesMergedLineTruncated {
+    fn emit(self) {
+        warn!(
+            message = "Truncated line that exceeds max_merged_line_bytes.",
+            configured_limit = self.configured_limit,
+            original_size = self.original_size,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(CounterName::K8sMergedLineTruncatedTotal).increment(1);
+    }
+}

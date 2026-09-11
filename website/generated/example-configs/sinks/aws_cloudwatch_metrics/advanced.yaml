@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: aws_cloudwatch_metrics
+    inputs:
+      - my-source-or-transform-id
+    compression: none
+    default_namespace: service
+    endpoint: http://127.0.0.0:5000/path/to/service
+    region: us-east-1

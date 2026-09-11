@@ -237,7 +237,7 @@ impl AwsAuthentication {
 
     /// Create the AssumeRoleProviderBuilder, ensuring we create the HTTP client with
     /// the correct proxy and TLS options.
-    fn assume_role_provider_builder(
+    async fn assume_role_provider_builder(
         proxy: &ProxyConfig,
         tls_options: Option<&TlsConfig>,
         region: &Region,
@@ -245,11 +245,16 @@ impl AwsAuthentication {
         external_id: Option<&str>,
         session_name: Option<&str>,
     ) -> crate::Result<AssumeRoleProviderBuilder> {
-        let connector = super::connector(proxy, tls_options)?;
+        let connector = super::AwsHttpClient {
+            http: super::connector(proxy, tls_options)?,
+            region: region.clone(),
+            emit_bytes_sent: false,
+        };
         let config = SdkConfig::builder()
             .http_client(connector)
             .region(region.clone())
             .time_source(SystemTimeSource::new())
+            .use_fips(resolve_use_fips().await.unwrap_or(false))
             .build();
 
         let mut builder = AssumeRoleProviderBuilder::new(assume_role)
@@ -298,7 +303,8 @@ impl AwsAuthentication {
                         assume_role,
                         external_id.as_deref(),
                         session_name.as_deref(),
-                    )?;
+                    )
+                    .await?;
 
                     let provider = builder.build_from_provider(provider).await;
 
@@ -311,8 +317,6 @@ impl AwsAuthentication {
                 profile,
                 region,
             } => {
-                let connector = super::connector(proxy, tls_options)?;
-
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
                 let profile_files = EnvConfigFiles::builder()
@@ -320,6 +324,11 @@ impl AwsAuthentication {
                     .build();
 
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
+                let connector = super::AwsHttpClient {
+                    http: super::connector(proxy, tls_options)?,
+                    region: auth_region.clone(),
+                    emit_bytes_sent: false,
+                };
                 let provider_config = ProviderConfig::empty()
                     .with_region(Option::from(auth_region))
                     .with_http_client(connector);
@@ -347,7 +356,8 @@ impl AwsAuthentication {
                     assume_role,
                     external_id.as_deref(),
                     session_name.as_deref(),
-                )?;
+                )
+                .await?;
 
                 let provider = builder
                     .build_from_provider(
@@ -385,17 +395,31 @@ impl AwsAuthentication {
     }
 }
 
+/// Resolves the FIPS endpoint setting from the environment variable
+/// `AWS_USE_FIPS_ENDPOINT`.
+///
+/// Returns `Some(true)` if FIPS is enabled, `Some(false)` if explicitly
+/// disabled, or `None` if the environment variable is not set.
+async fn resolve_use_fips() -> Option<bool> {
+    aws_config::default_provider::use_fips::use_fips_provider(&ProviderConfig::empty()).await
+}
+
 async fn default_credentials_provider(
     region: Region,
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
-    let connector = super::connector(proxy, tls_options)?;
+    let connector = super::AwsHttpClient {
+        http: super::connector(proxy, tls_options)?,
+        region: region.clone(),
+        emit_bytes_sent: false,
+    };
 
     let provider_config = ProviderConfig::empty()
         .with_region(Some(region.clone()))
-        .with_http_client(connector);
+        .with_http_client(connector)
+        .with_use_fips(resolve_use_fips().await);
 
     let client = imds::Client::builder()
         .max_attempts(imds.max_attempts)
@@ -416,6 +440,7 @@ async fn default_credentials_provider(
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
     use serde::{Deserialize, Serialize};
 
     use super::*;
@@ -433,18 +458,17 @@ mod tests {
 
     #[test]
     fn parsing_default() {
-        let config = toml::from_str::<ComponentConfig>("").unwrap();
+        let config = serde_yaml::from_str::<ComponentConfig>("").unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::Default { .. }));
     }
 
     #[test]
     fn parsing_default_with_load_timeout() {
-        let config = toml::from_str::<ComponentConfig>(
-            "
-            auth.load_timeout_secs = 10
-        ",
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {"
+            auth:
+              load_timeout_secs: 10
+        "})
         .unwrap();
 
         assert!(matches!(
@@ -459,11 +483,10 @@ mod tests {
 
     #[test]
     fn parsing_default_with_region() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.region = "us-east-2"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              region: "us-east-2"
+        "#})
         .unwrap();
 
         match config.auth {
@@ -476,13 +499,13 @@ mod tests {
 
     #[test]
     fn parsing_default_with_imds_client() {
-        let config = toml::from_str::<ComponentConfig>(
-            "
-            auth.imds.max_attempts = 5
-            auth.imds.connect_timeout_seconds = 30
-            auth.imds.read_timeout_seconds = 10
-        ",
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {"
+            auth:
+              imds:
+                max_attempts: 5
+                connect_timeout_seconds: 30
+                read_timeout_seconds: 10
+        "})
         .unwrap();
 
         assert!(matches!(
@@ -501,11 +524,9 @@ mod tests {
 
     #[test]
     fn parsing_old_assume_role() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            assume_role = "root"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            assume_role: "root"
+        "#})
         .unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::Default { .. }));
@@ -513,12 +534,11 @@ mod tests {
 
     #[test]
     fn parsing_assume_role() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.assume_role = "root"
-            auth.load_timeout_secs = 10
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              assume_role: "root"
+              load_timeout_secs: 10
+        "#})
         .unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::Role { .. }));
@@ -526,13 +546,12 @@ mod tests {
 
     #[test]
     fn parsing_external_id_with_assume_role() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.assume_role = "root"
-            auth.external_id = "id"
-            auth.load_timeout_secs = 10
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              assume_role: "root"
+              external_id: "id"
+              load_timeout_secs: 10
+        "#})
         .unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::Role { .. }));
@@ -540,13 +559,12 @@ mod tests {
 
     #[test]
     fn parsing_session_name_with_assume_role() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.assume_role = "root"
-            auth.session_name = "session_name"
-            auth.load_timeout_secs = 10
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              assume_role: "root"
+              session_name: "session_name"
+              load_timeout_secs: 10
+        "#})
         .unwrap();
 
         match config.auth {
@@ -559,14 +577,14 @@ mod tests {
 
     #[test]
     fn parsing_assume_role_with_imds_client() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.assume_role = "root"
-            auth.imds.max_attempts = 5
-            auth.imds.connect_timeout_seconds = 30
-            auth.imds.read_timeout_seconds = 10
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              assume_role: "root"
+              imds:
+                max_attempts: 5
+                connect_timeout_seconds: 30
+                read_timeout_seconds: 10
+        "#})
         .unwrap();
 
         match config.auth {
@@ -598,14 +616,13 @@ mod tests {
 
     #[test]
     fn parsing_both_assume_role() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            assume_role = "root"
-            auth.assume_role = "auth.root"
-            auth.load_timeout_secs = 10
-            auth.region = "us-west-2"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            assume_role: "root"
+            auth:
+              assume_role: "auth.root"
+              load_timeout_secs: 10
+              region: "us-west-2"
+        "#})
         .unwrap();
 
         match config.auth {
@@ -630,12 +647,11 @@ mod tests {
 
     #[test]
     fn parsing_static() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.access_key_id = "key"
-            auth.secret_access_key = "other"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              access_key_id: "key"
+              secret_access_key: "other"
+        "#})
         .unwrap();
 
         assert!(matches!(config.auth, AwsAuthentication::AccessKey { .. }));
@@ -643,13 +659,12 @@ mod tests {
 
     #[test]
     fn parsing_static_with_assume_role() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.access_key_id = "key"
-            auth.secret_access_key = "other"
-            auth.assume_role = "root"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              access_key_id: "key"
+              secret_access_key: "other"
+              assume_role: "root"
+        "#})
         .unwrap();
 
         match config.auth {
@@ -672,14 +687,13 @@ mod tests {
 
     #[test]
     fn parsing_static_with_assume_role_and_external_id() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.access_key_id = "key"
-            auth.secret_access_key = "other"
-            auth.assume_role = "root"
-            auth.external_id = "id"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              access_key_id: "key"
+              secret_access_key: "other"
+              assume_role: "root"
+              external_id: "id"
+        "#})
         .unwrap();
 
         match config.auth {
@@ -704,13 +718,12 @@ mod tests {
 
     #[test]
     fn parsing_file() {
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.credentials_file = "/path/to/file"
-            auth.profile = "foo"
-            auth.region = "us-west-2"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              credentials_file: "/path/to/file"
+              profile: "foo"
+              region: "us-west-2"
+        "#})
         .unwrap();
 
         match config.auth {
@@ -726,11 +739,10 @@ mod tests {
             _ => panic!(),
         }
 
-        let config = toml::from_str::<ComponentConfig>(
-            r#"
-            auth.credentials_file = "/path/to/file"
-        "#,
-        )
+        let config = serde_yaml::from_str::<ComponentConfig>(indoc! {r#"
+            auth:
+              credentials_file: "/path/to/file"
+        "#})
         .unwrap();
 
         match config.auth {

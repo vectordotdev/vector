@@ -14,7 +14,10 @@ use crate::{
             grpc::Service,
             http::{build_warp_filter, run_http_server},
         },
-        util::grpc::run_grpc_server_with_routes,
+        util::{
+            decompression::max_decompressed_size_bytes,
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        },
     },
 };
 use futures::FutureExt;
@@ -39,7 +42,7 @@ use vector_lib::{
         },
     },
     schema::Definition,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig},
 };
 use vrl::value::{Kind, kind::Collection};
 
@@ -111,13 +114,10 @@ impl OtlpDecodingConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
-    #[configurable(derived)]
     pub grpc: GrpcConfig,
 
-    #[configurable(derived)]
     pub http: HttpConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
@@ -170,15 +170,18 @@ pub struct GrpcConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:4317", docs::examples = "localhost:4317"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
+
+    #[serde(default)]
+    pub keepalive: GrpcKeepaliveConfig,
 }
 
 fn example_grpc_config() -> GrpcConfig {
     GrpcConfig {
         address: "0.0.0.0:4317".parse().unwrap(),
         tls: None,
+        keepalive: GrpcKeepaliveConfig::default(),
     }
 }
 
@@ -194,11 +197,9 @@ pub struct HttpConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:4318", docs::examples = "localhost:4318"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub keepalive: KeepaliveConfig,
 
@@ -228,8 +229,8 @@ fn example_http_config() -> HttpConfig {
 }
 
 impl GenerateConfig for OpentelemetryConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             grpc: example_grpc_config(),
             http: example_http_config(),
             acknowledgements: Default::default(),
@@ -261,10 +262,14 @@ impl OpentelemetryConfig {
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "opentelemetry")]
-impl SourceConfig for OpentelemetryConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+impl OpentelemetryConfig {
+    /// Build the source serving runtime-swappable TLS acceptors for the gRPC and/or HTTP listeners.
+    pub async fn build_with_tls_reloaders(
+        &self,
+        cx: SourceContext,
+        grpc_tls_reloader: Option<TlsAcceptorReloader>,
+        http_tls_reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
         let log_namespace = cx.log_namespace(self.log_namespace);
@@ -295,7 +300,7 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: logs_deserializer.clone(),
         })
-        .max_decoding_message_size(usize::MAX);
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         let metrics_service = MetricsServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -304,7 +309,7 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: metrics_deserializer.clone(),
         })
-        .max_decoding_message_size(usize::MAX);
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         let trace_service = TraceServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -313,7 +318,7 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: traces_deserializer.clone(),
         })
-        .max_decoding_message_size(usize::MAX);
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         let mut builder = RoutesBuilder::default();
         builder
@@ -324,7 +329,9 @@ impl SourceConfig for OpentelemetryConfig {
         let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
             grpc_tls_settings,
+            grpc_tls_reloader,
             builder.routes(),
+            self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
         )
         .map_err(|error| {
@@ -352,6 +359,7 @@ impl SourceConfig for OpentelemetryConfig {
         let http_source = run_http_server(
             self.http.address,
             http_tls_settings,
+            http_tls_reloader,
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
@@ -361,6 +369,14 @@ impl SourceConfig for OpentelemetryConfig {
         });
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "opentelemetry")]
+impl SourceConfig for OpentelemetryConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        self.build_with_tls_reloaders(cx, None, None).await
     }
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",

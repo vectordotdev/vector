@@ -426,10 +426,8 @@ mod tests {
             // Check if the backoff is within the expected range, considering the jitter
             assert!(
                 !backoff.is_zero() && backoff <= upper_bound,
-                "Attempt {}: Expected backoff to be within 0 and {:?}, got {:?}",
-                i + 1,
-                upper_bound,
-                backoff
+                "Attempt {}: Expected backoff to be within 0 and {upper_bound:?}, got {backoff:?}",
+                i + 1
             );
 
             policy.advance();

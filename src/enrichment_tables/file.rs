@@ -59,7 +59,6 @@ pub struct FileSettings {
     pub path: PathBuf,
 
     /// File encoding configuration.
-    #[configurable(derived)]
     pub encoding: Encoding,
 }
 
@@ -68,7 +67,6 @@ pub struct FileSettings {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileConfig {
     /// File-specific settings.
-    #[configurable(derived)]
     pub file: FileSettings,
 
     /// Key/value pairs representing mapped log field names and types.
@@ -220,9 +218,8 @@ impl FileConfig {
             .collect::<crate::Result<Vec<_>>>()?;
 
         trace!(
-            "Loaded enrichment file {} with headers {:?}.",
-            self.file.path.to_str().unwrap_or("path with invalid utf"),
-            headers
+            "Loaded enrichment file {} with headers {headers:?}.",
+            self.file.path.to_str().unwrap_or("path with invalid utf")
         );
 
         let file = reader.into_inner();
@@ -239,6 +236,7 @@ impl EnrichmentTableConfig for FileConfig {
     async fn build(
         &self,
         globals: &crate::config::GlobalOptions,
+        _prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         Ok(Box::new(File::new(
             self.clone(),

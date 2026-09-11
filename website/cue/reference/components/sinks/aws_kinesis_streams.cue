@@ -18,7 +18,6 @@ components: sinks: aws_kinesis_streams: components._aws & {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    5000000
 				max_events:   500
 				timeout_secs: 1.0
@@ -68,7 +67,6 @@ components: sinks: aws_kinesis_streams: components._aws & {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

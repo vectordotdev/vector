@@ -175,6 +175,51 @@ impl Arbitrary for FileWatcherAction {
     }
 }
 
+#[tokio::test]
+async fn gzip_multi_stream_reads_all_members() {
+    use async_compression::tokio::bufread::GzipEncoder;
+    use std::fs;
+    use tokio::io::AsyncReadExt as _;
+
+    let dir = tempfile::TempDir::new().expect("could not create tempdir");
+    let path = dir.path().join("multi.gz");
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    // Write two separate gzip members into one file — the bug dropped the second.
+    let mut bytes = encode(b"first\n").await;
+    bytes.extend(encode(b"second\n").await);
+    fs::write(&path, &bytes).unwrap();
+
+    let mut fw = FileWatcher::new(
+        path,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        100_000,
+        Bytes::from("\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let mut lines = Vec::new();
+    for _ in 0..10 {
+        fw.track_read_attempt();
+        let result = fw.read_line().await.expect("read_line error");
+        if let Some(raw) = result.raw_line {
+            lines.push(String::from_utf8(raw.bytes.to_vec()).unwrap());
+        }
+        if lines.len() == 2 {
+            break;
+        }
+    }
+
+    assert_eq!(lines, vec!["first", "second"]);
+}
+
 fn watcher_for_timing() -> FileWatcher {
     let now = Instant::now();
 

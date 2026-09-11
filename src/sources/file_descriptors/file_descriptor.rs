@@ -34,10 +34,8 @@ pub struct FileDescriptorSourceConfig {
     /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     pub host_key: Option<OptionalValuePath>,
 
-    #[configurable(derived)]
     pub framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
@@ -71,7 +69,7 @@ impl FileDescriptorConfig for FileDescriptorSourceConfig {
 }
 
 impl GenerateConfig for FileDescriptorSourceConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         let fd = null_fd().unwrap();
         toml::from_str(&format!(
             r#"
@@ -249,7 +247,7 @@ mod tests {
             write(&write_fd, b"hello world\nhello world again\n").unwrap();
             // Consume the OwnedFd without closing it to avoid double-close
             // with the File created in build().
-            let _ = write_fd.into_raw_fd();
+            _ = write_fd.into_raw_fd();
 
             let context = SourceContext::new_test(tx, None);
             config.build(context).await.unwrap().await.unwrap();

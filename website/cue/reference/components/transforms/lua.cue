@@ -34,10 +34,11 @@ components: transforms: lua: {
 			us know.
 			""",
 		]
-		notices: []
 	}
 
-	configuration: generated.components.transforms.lua.configuration
+	configuration: generated.components.transforms.lua.configuration & {
+		timers: type: array: items: type: object: options: interval_seconds: type: uint: examples: [2]
+	}
 
 	input: {
 		logs: true

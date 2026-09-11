@@ -196,6 +196,14 @@ impl TableRegistry {
             None => true,
         }
     }
+
+    /// Extracts state from the table if available.
+    pub fn extract_state(&self, table: &str) -> Option<Box<dyn std::any::Any + Send + Sync>> {
+        match &**self.tables.load() {
+            Some(tables) => tables.get(table).and_then(|t| t.extract_state()),
+            None => None,
+        }
+    }
 }
 
 impl std::fmt::Debug for TableRegistry {

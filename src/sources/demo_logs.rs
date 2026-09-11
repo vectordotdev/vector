@@ -62,12 +62,10 @@ pub struct DemoLogsConfig {
     ))]
     pub format: OutputFormat,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_framing_message_based()"))]
     #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
@@ -339,6 +337,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use futures::{Stream, StreamExt, poll};
+    use indoc::indoc;
 
     use super::*;
     use crate::{
@@ -357,7 +356,7 @@ mod tests {
     async fn runit(config: &str) -> impl Stream<Item = Event> + use<> {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tx, rx) = SourceSender::new_test();
-            let config: DemoLogsConfig = toml::from_str(config).unwrap();
+            let config: DemoLogsConfig = serde_yaml::from_str(config).unwrap();
             let decoder = DecodingConfig::new(
                 default_framing_message_based(),
                 default_decoding(),
@@ -403,11 +402,15 @@ mod tests {
     #[tokio::test]
     async fn shuffle_demo_logs_copies_lines() {
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut rx = runit(
-            r#"format = "shuffle"
-               lines = ["one", "two", "three", "four"]
-               count = 5"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: shuffle
+            lines:
+              - one
+              - two
+              - three
+              - four
+            count: 5
+        "#})
         .await;
 
         let lines = &["one", "two", "three", "four"];
@@ -427,11 +430,13 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_demo_logs_limits_count() {
-        let mut rx = runit(
-            r#"format = "shuffle"
-               lines = ["one", "two"]
-               count = 5"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: shuffle
+            lines:
+              - one
+              - two
+            count: 5
+        "#})
         .await;
 
         for _ in 0..5 {
@@ -443,12 +448,14 @@ mod tests {
     #[tokio::test]
     async fn shuffle_demo_logs_adds_sequence() {
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut rx = runit(
-            r#"format = "shuffle"
-               lines = ["one", "two"]
-               sequence = true
-               count = 5"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: shuffle
+            lines:
+              - one
+              - two
+            sequence: true
+            count: 5
+        "#})
         .await;
 
         for n in 0..5 {
@@ -467,12 +474,14 @@ mod tests {
     #[tokio::test]
     async fn shuffle_demo_logs_obeys_interval() {
         let start = Instant::now();
-        let mut rx = runit(
-            r#"format = "shuffle"
-               lines = ["one", "two"]
-               count = 3
-               interval = 1.0"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: shuffle
+            lines:
+              - one
+              - two
+            count: 3
+            interval: 1.0
+        "#})
         .await;
 
         for _ in 0..3 {
@@ -487,10 +496,10 @@ mod tests {
     #[tokio::test]
     async fn host_is_set() {
         let host_key = log_schema().host_key().unwrap().to_string();
-        let mut rx = runit(
-            r#"format = "syslog"
-            count = 5"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: syslog
+            count: 5
+        "#})
         .await;
 
         let event = match poll!(rx.next()) {
@@ -504,10 +513,10 @@ mod tests {
 
     #[tokio::test]
     async fn apache_common_format_generates_output() {
-        let mut rx = runit(
-            r#"format = "apache_common"
-            count = 5"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: apache_common
+            count: 5
+        "#})
         .await;
 
         for _ in 0..5 {
@@ -518,10 +527,10 @@ mod tests {
 
     #[tokio::test]
     async fn apache_error_format_generates_output() {
-        let mut rx = runit(
-            r#"format = "apache_error"
-            count = 5"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: apache_error
+            count: 5
+        "#})
         .await;
 
         for _ in 0..5 {
@@ -532,10 +541,10 @@ mod tests {
 
     #[tokio::test]
     async fn syslog_5424_format_generates_output() {
-        let mut rx = runit(
-            r#"format = "syslog"
-            count = 5"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: syslog
+            count: 5
+        "#})
         .await;
 
         for _ in 0..5 {
@@ -546,10 +555,10 @@ mod tests {
 
     #[tokio::test]
     async fn syslog_3164_format_generates_output() {
-        let mut rx = runit(
-            r#"format = "bsd_syslog"
-            count = 5"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: bsd_syslog
+            count: 5
+        "#})
         .await;
 
         for _ in 0..5 {
@@ -561,10 +570,10 @@ mod tests {
     #[tokio::test]
     async fn json_format_generates_output() {
         let message_key = log_schema().message_key().unwrap().to_string();
-        let mut rx = runit(
-            r#"format = "json"
-            count = 5"#,
-        )
+        let mut rx = runit(indoc! {r#"
+            format: json
+            count: 5
+        "#})
         .await;
 
         for _ in 0..5 {

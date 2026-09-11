@@ -78,20 +78,19 @@ more info navigating your solution.
 
 1. Search GitHub for [previous issues](https://github.com/vectordotdev/vector/issues) and
    [RFCs](https://github.com/vectordotdev/vector/tree/master/rfcs) on this topic.
-2. If an RFC issue does not exist, [open one](https://github.com/vectordotdev/vector/issues/new/choose).
-3. Use the issue to obtain consensus that an RFC is necessary.
+2. If you are unsure whether an RFC is the right path forward, consider
+   [opening an issue](https://github.com/vectordotdev/vector/issues/new/choose) first to get community input.
    - The change might be quickly rejected.
-   - The change might be on our long term roadmap and get deferred.
+   - The change might already be planned and get deferred.
    - The change might be blocked by other work.
 
 ### Creating an RFC
 
-1. Create a new branch
-2. Copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template with the appropriate
-   name. Be sure to use the issue number you created above. (e.g., `rfcs/2020-02-10-445-internal-observability.md`)
-3. Fill in your RFC, pay attention the bullets and guidelines. Do not omit any sections.
-4. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
-5. Submit your RFC as a pull request and tag reviewers for approval.
+1. Copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template with the appropriate
+   name. (e.g., `rfcs/2020-02-10-445-internal-observability.md`)
+2. Fill in your RFC, pay attention the bullets and guidelines. Do not omit any sections.
+3. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
+4. Submit your RFC as a pull request and tag reviewers for approval.
 
 ### Getting an RFC accepted
 

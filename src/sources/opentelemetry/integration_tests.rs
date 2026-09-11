@@ -53,6 +53,7 @@ async fn receive_logs_legacy_namespace() {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
@@ -152,6 +153,7 @@ async fn receive_trace() {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
@@ -257,6 +259,7 @@ async fn receive_metric() {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),

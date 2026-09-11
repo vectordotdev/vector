@@ -31,19 +31,14 @@ extern crate tracing;
 #[macro_use]
 extern crate vector_lib;
 
+#[cfg(all(target_os = "linux", feature = "antithesis-scenario-disk"))]
+extern crate antithesis_instrumentation as _;
+
 pub use indoc::indoc;
 // re-export codecs for convenience
 pub use vector_lib::codecs;
 
-#[cfg(all(
-    unix,
-    feature = "tikv-jemallocator",
-    not(feature = "allocation-tracing")
-))]
-#[global_allocator]
-static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-#[cfg(all(unix, feature = "tikv-jemallocator", feature = "allocation-tracing"))]
+#[cfg(all(unix, feature = "tikv-jemallocator"))]
 #[global_allocator]
 static ALLOC: self::internal_telemetry::allocations::Allocator<tikv_jemallocator::Jemalloc> =
     self::internal_telemetry::allocations::get_grouped_tracing_allocator(
@@ -210,7 +205,7 @@ pub fn get_version() -> String {
     let pkg_version = vector_version();
     let build_desc = built_info::VECTOR_BUILD_DESC;
     let build_string = match build_desc {
-        Some(desc) => format!("{} {}", built_info::TARGET, desc),
+        Some(desc) => format!("{} {desc}", built_info::TARGET),
         None => built_info::TARGET.into(),
     };
 
@@ -236,7 +231,7 @@ pub mod built_info {
 /// The hostname can be overridden by setting the VECTOR_HOSTNAME environment variable.
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(if let Ok(hostname) = std::env::var("VECTOR_HOSTNAME") {
-        hostname.to_string()
+        hostname
     } else {
         hostname::get()?.to_string_lossy().into_owned()
     })

@@ -4,7 +4,7 @@ use vector_config_macros::configurable_component;
 use vector_core::{
     compile_vrl,
     config::{DataType, LogNamespace},
-    event::{Event, TargetEvents, VrlTarget},
+    event::{Event, MetricTagMode, TargetEvents, VrlTarget},
     schema,
 };
 use vrl::{
@@ -45,7 +45,6 @@ pub struct VrlDeserializerOptions {
     ///
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     pub timezone: Option<TimeZone>,
 }
 
@@ -148,7 +147,7 @@ impl VrlDeserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         let mut runtime = Runtime::default();
-        let mut target = VrlTarget::new(event, self.program.info(), true);
+        let mut target = VrlTarget::new(event, self.program.info(), MetricTagMode::Full);
         match runtime.resolve(&mut target, &self.program, &self.timezone) {
             Ok(_) => match target.into_events(log_namespace) {
                 TargetEvents::One(event) => Ok(smallvec![event]),
@@ -164,7 +163,7 @@ impl VrlDeserializer {
 mod tests {
     use chrono::{DateTime, Utc};
     use indoc::indoc;
-    use vrl::{btreemap, path::OwnedTargetPath, value::Value};
+    use vrl::{btreemap, event_path, path::OwnedTargetPath, value::Value};
 
     use super::*;
 
@@ -369,7 +368,7 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         assert_eq!(
-            *events[0].as_log().get("secret_value").unwrap(),
+            *events[0].as_log().get(event_path!("secret_value")).unwrap(),
             Value::from("super-secret")
         );
     }
