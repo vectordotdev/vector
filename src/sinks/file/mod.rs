@@ -829,6 +829,7 @@ impl FileSink {
                         break Ok(());
                     }
                 }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
                 Err(e) => break Err(e),
             }
         };
