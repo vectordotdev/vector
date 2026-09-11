@@ -407,7 +407,7 @@ impl ValidatedSink for AzureBlobSinkConfig {
                         "`auth` configuration must be provided when using `account_name`".into(),
                     );
                 }
-                format!("AccountName={}", account_name)
+                format!("AccountName={account_name}")
             }
             (None, None, Some(blob_endpoint)) => {
                 if self.auth.is_none() {
@@ -419,9 +419,9 @@ impl ValidatedSink for AzureBlobSinkConfig {
                 let blob_endpoint = if blob_endpoint.ends_with('/') {
                     blob_endpoint.clone()
                 } else {
-                    format!("{}/", blob_endpoint)
+                    format!("{blob_endpoint}/")
                 };
-                format!("BlobEndpoint={}", blob_endpoint)
+                format!("BlobEndpoint={blob_endpoint}")
             }
             (None, None, None) => {
                 return Err("One of `connection_string`, `account_name`, or `blob_endpoint` must be provided".into());
@@ -1149,7 +1149,7 @@ pub async fn build_client(
         let port = url.port();
         proxy.no_proxy.matches(host)
             || port
-                .map(|p| proxy.no_proxy.matches(&format!("{}:{}", host, p)))
+                .map(|p| proxy.no_proxy.matches(&format!("{host}:{p}")))
                 .unwrap_or(false)
     };
     if bypass_proxy || !proxy.enabled {

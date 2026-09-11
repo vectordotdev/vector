@@ -108,10 +108,7 @@ fn get_authority(url: &str) -> Result<String, Error> {
 
 async fn pull_image(docker: &Docker, image: &str, tag: &str) {
     let mut filters = HashMap::new();
-    filters.insert(
-        String::from("reference"),
-        vec![format!("{}:{}", image, tag)],
-    );
+    filters.insert(String::from("reference"), vec![format!("{image}:{tag}")]);
 
     let options = Some(ListImagesOptionsBuilder::new().filters(&filters).build());
 

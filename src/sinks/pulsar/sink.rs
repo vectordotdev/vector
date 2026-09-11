@@ -121,7 +121,7 @@ impl PulsarSink {
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 request
-                    .map_err(|e| error!("Failed to build Pulsar request: {:?}.", e))
+                    .map_err(|e| error!("Failed to build Pulsar request: {e:?}."))
                     .ok()
             })
             .into_driver(service)

@@ -249,7 +249,8 @@ impl EventLogSubscription {
                 EvtSubscribeToFutureEvents.0
             };
 
-            let fallback_flags = if config.read_existing_events {
+            // Last-resort flags when even a soft bookmark resume fails.
+            let last_resort_flags = if config.read_existing_events {
                 EvtSubscribeStartAtOldestRecord.0
             } else {
                 EvtSubscribeToFutureEvents.0
@@ -261,56 +262,23 @@ impl EventLogSubscription {
                 query = %query,
                 has_valid_checkpoint = has_valid_checkpoint,
                 read_existing = config.read_existing_events,
-                flags = format!("{:#x}", subscription_flags)
+                flags = format!("{subscription_flags:#x}")
             );
 
             // EvtSubscribe with signal event and NULL callback = pull mode
             let bookmark_handle = bookmark.as_handle();
             let subscription_result = unsafe {
-                if has_valid_checkpoint {
-                    let strict_result = EvtSubscribe(
-                        None,
-                        signal_event,
-                        &channel_hstring,
-                        &query_hstring,
-                        bookmark_handle,
-                        None, // NULL context = pull mode
-                        None, // NULL callback = pull mode
-                        subscription_flags,
-                    );
-                    match strict_result {
-                        Ok(handle) => Ok(handle),
-                        Err(e) => {
-                            warn!(
-                                message = "Strict bookmark subscribe failed, retrying without bookmark. Potential re-delivery of events.",
-                                channel = %channel,
-                                error = %e,
-                                fallback_flags = format!("{:#x}", fallback_flags)
-                            );
-                            EvtSubscribe(
-                                None,
-                                signal_event,
-                                &channel_hstring,
-                                &query_hstring,
-                                None, // No bookmark for fallback
-                                None,
-                                None,
-                                fallback_flags,
-                            )
-                        }
-                    }
-                } else {
-                    EvtSubscribe(
-                        None,
-                        signal_event,
-                        &channel_hstring,
-                        &query_hstring,
-                        None, // No bookmark for fresh start
-                        None, // NULL context
-                        None, // NULL callback
-                        subscription_flags,
-                    )
-                }
+                Self::subscribe_pull(
+                    signal_event,
+                    &channel_hstring,
+                    &query_hstring,
+                    channel,
+                    has_valid_checkpoint,
+                    bookmark_handle,
+                    subscription_flags,
+                    last_resort_flags,
+                    false,
+                )
             };
 
             match subscription_result {
@@ -800,6 +768,117 @@ impl EventLogSubscription {
         Ok(all_events)
     }
 
+    /// Subscribes to Windows Event Log in pull mode with bookmark fallback strategy.
+    ///
+    /// When `has_bookmark` is true:
+    /// 1. Tries strict bookmark subscribe (`subscription_flags`, which includes `EvtSubscribeStrict`).
+    /// 2. If strict subscribe fails (e.g. invalid/stale bookmark cursor), falls back to a soft bookmark
+    ///    resume (`EvtSubscribeStartAfterBookmark` without `Strict`). This keeps the cursor near the last
+    ///    bookmark so events between the last consumed event and "now" are not dropped when
+    ///    `read_existing_events=false` (#26120).
+    /// 3. If soft bookmark resume also fails, falls back to `last_resort_flags` without a bookmark.
+    ///
+    /// When `has_bookmark` is false, subscribes directly using `subscription_flags`.
+    #[allow(clippy::too_many_arguments)]
+    unsafe fn subscribe_pull(
+        signal_event: HANDLE,
+        channel_hstring: &HSTRING,
+        query_hstring: &HSTRING,
+        channel: &str,
+        has_bookmark: bool,
+        bookmark_handle: EVT_HANDLE,
+        subscription_flags: u32,
+        last_resort_flags: u32,
+        is_resubscribe: bool,
+    ) -> windows::core::Result<EVT_HANDLE> {
+        if has_bookmark {
+            let strict_result = EvtSubscribe(
+                None,
+                signal_event,
+                channel_hstring,
+                query_hstring,
+                bookmark_handle,
+                None, // NULL context = pull mode
+                None, // NULL callback = pull mode
+                subscription_flags,
+            );
+            match strict_result {
+                Ok(handle) => Ok(handle),
+                Err(e) => {
+                    // Soft resume: StartAfterBookmark without Strict keeps
+                    // the cursor near the last bookmark so records between
+                    // the last consumed event and "now" are not dropped
+                    // when falling straight to FutureEvents (#26120).
+                    // Windows may re-deliver a few events; that is safer
+                    // than silent loss under read_existing_events=false.
+                    if is_resubscribe {
+                        warn!(
+                            message = "Strict bookmark resubscribe failed, retrying soft bookmark resume.",
+                            channel = %channel,
+                            error = %e
+                        );
+                    } else {
+                        warn!(
+                            message = "Strict bookmark subscribe failed, retrying soft bookmark resume.",
+                            channel = %channel,
+                            error = %e
+                        );
+                    }
+                    match EvtSubscribe(
+                        None,
+                        signal_event,
+                        channel_hstring,
+                        query_hstring,
+                        bookmark_handle,
+                        None,
+                        None,
+                        EvtSubscribeStartAfterBookmark.0,
+                    ) {
+                        Ok(handle) => Ok(handle),
+                        Err(e2) => {
+                            if is_resubscribe {
+                                warn!(
+                                    message = "Soft bookmark resubscribe failed, retrying without bookmark. Potential gap or re-delivery of events.",
+                                    channel = %channel,
+                                    error = %e2,
+                                    fallback_flags = format!("{last_resort_flags:#x}")
+                                );
+                            } else {
+                                warn!(
+                                    message = "Soft bookmark subscribe failed, retrying without bookmark. Potential gap or re-delivery of events.",
+                                    channel = %channel,
+                                    error = %e2,
+                                    fallback_flags = format!("{last_resort_flags:#x}")
+                                );
+                            }
+                            EvtSubscribe(
+                                None,
+                                signal_event,
+                                channel_hstring,
+                                query_hstring,
+                                None,
+                                None,
+                                None,
+                                last_resort_flags,
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            EvtSubscribe(
+                None,
+                signal_event,
+                channel_hstring,
+                query_hstring,
+                None, // No bookmark for fresh start
+                None, // NULL context
+                None, // NULL callback
+                subscription_flags,
+            )
+        }
+    }
+
     /// Re-subscribe a channel after its query position becomes invalid
     /// (e.g., an admin cleared the event log). Closes the old subscription
     /// handle and creates a new one using the current bookmark.
@@ -836,75 +915,17 @@ impl EventLogSubscription {
         };
 
         let new_handle = unsafe {
-            if has_bookmark {
-                let strict_result = EvtSubscribe(
-                    None,
-                    channel_sub.signal_event,
-                    &channel_hstring,
-                    &query_hstring,
-                    bookmark_handle,
-                    None,
-                    None,
-                    subscription_flags,
-                );
-                match strict_result {
-                    Ok(handle) => Ok(handle),
-                    Err(e) => {
-                        // Soft resume: StartAfterBookmark without Strict keeps
-                        // the cursor near the last bookmark so records between
-                        // the last consumed event and "now" are not dropped
-                        // when falling straight to FutureEvents (#26120).
-                        // Windows may re-deliver a few events; that is safer
-                        // than silent loss under read_existing_events=false.
-                        warn!(
-                            message = "Strict bookmark resubscribe failed, retrying soft bookmark resume.",
-                            channel = %channel_sub.channel,
-                            error = %e
-                        );
-                        match EvtSubscribe(
-                            None,
-                            channel_sub.signal_event,
-                            &channel_hstring,
-                            &query_hstring,
-                            bookmark_handle,
-                            None,
-                            None,
-                            EvtSubscribeStartAfterBookmark.0,
-                        ) {
-                            Ok(handle) => Ok(handle),
-                            Err(e2) => {
-                                warn!(
-                                    message = "Soft bookmark resubscribe failed, retrying without bookmark. Potential gap or re-delivery of events.",
-                                    channel = %channel_sub.channel,
-                                    error = %e2,
-                                    fallback_flags = format!("{:#x}", last_resort_flags)
-                                );
-                                EvtSubscribe(
-                                    None,
-                                    channel_sub.signal_event,
-                                    &channel_hstring,
-                                    &query_hstring,
-                                    None,
-                                    None,
-                                    None,
-                                    last_resort_flags,
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                EvtSubscribe(
-                    None,
-                    channel_sub.signal_event,
-                    &channel_hstring,
-                    &query_hstring,
-                    None,
-                    None,
-                    None,
-                    subscription_flags,
-                )
-            }
+            Self::subscribe_pull(
+                channel_sub.signal_event,
+                &channel_hstring,
+                &query_hstring,
+                &channel_sub.channel,
+                has_bookmark,
+                bookmark_handle,
+                subscription_flags,
+                last_resort_flags,
+                true,
+            )
         }
         .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?;
 
@@ -1378,10 +1399,9 @@ mod tests {
         for event in &events {
             assert!(
                 event.time_created >= earliest_allowed,
-                "Event timestamp {} is before subscription start time {} (minus tolerance). \
+                "Event timestamp {} is before subscription start time {subscription_start_time} (minus tolerance). \
                  read_existing_events=false may not be respected. Event ID: {}, Record ID: {}",
                 event.time_created,
-                subscription_start_time,
                 event.event_id,
                 event.record_id
             );

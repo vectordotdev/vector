@@ -246,12 +246,7 @@ mod tests {
             "filesystem_total_bytes",
             "filesystem_used_bytes",
         ] {
-            assert_eq!(
-                count_name(&metrics, name),
-                metrics.len() / 3,
-                "name={}",
-                name
-            );
+            assert_eq!(count_name(&metrics, name), metrics.len() / 3, "name={name}");
         }
 
         // They should all have "filesystem" and "mountpoint" tags

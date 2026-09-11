@@ -20,7 +20,7 @@ fn truncate_string_at(s: &str, maxlen: usize) -> Cow<'_, str> {
             clippy::string_slice,
             reason = "len is adjusted to a char boundary in the loop above"
         )]
-        format!("{}{}", &s[..len], ellipsis).into()
+        format!("{}{ellipsis}", &s[..len]).into()
     } else {
         s.into()
     }
