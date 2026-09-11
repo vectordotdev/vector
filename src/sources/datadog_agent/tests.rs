@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     iter::FromIterator,
     net::SocketAddr,
-    str,
     sync::Arc,
     time::Duration,
 };
@@ -342,13 +341,18 @@ async fn source_with_sender(
     (logs_output, metrics_output, address, guard)
 }
 
-async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
+async fn send_with_path(
+    address: SocketAddr,
+    body: impl AsRef<[u8]>,
+    headers: HeaderMap,
+    path: &str,
+) -> u16 {
     timeout(
         HTTP_REQUEST_TIMEOUT,
         reqwest::Client::new()
             .post(format!("http://{address}{path}"))
             .headers(headers)
-            .body(body.to_owned())
+            .body(body.as_ref().to_owned())
             .send(),
     )
     .await
@@ -360,7 +364,7 @@ async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, pat
 
 async fn send_and_collect(
     address: SocketAddr,
-    body: String,
+    body: impl AsRef<[u8]> + Send + 'static,
     headers: HeaderMap,
     path: &'static str,
     rx: impl Stream<Item = Event> + Unpin,
@@ -368,7 +372,7 @@ async fn send_and_collect(
 ) -> Vec<Event> {
     spawn_collect_n(
         async move {
-            assert_eq!(200, send_with_path(address, &body, headers, path).await);
+            assert_eq!(200, send_with_path(address, body, headers, path).await);
         },
         rx,
         expected_count,
@@ -1152,7 +1156,7 @@ async fn decode_sketches() {
         };
 
         sketch_payload.encode(&mut buf).unwrap();
-        let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
+        let body = buf;
         let events = send_and_collect(
             addr,
             body,
@@ -1302,23 +1306,11 @@ async fn decode_traces() {
             async move {
                 assert_eq!(
                     200,
-                    send_with_path(
-                        addr,
-                        str::from_utf8(&buf_v1).expect("encoded protobuf should be valid UTF-8"),
-                        headers.clone(),
-                        DD_API_TRACES_PATH
-                    )
-                    .await
+                    send_with_path(addr, &buf_v1, headers.clone(), DD_API_TRACES_PATH).await
                 );
                 assert_eq!(
                     200,
-                    send_with_path(
-                        addr,
-                        str::from_utf8(&buf_v2).expect("encoded protobuf should be valid UTF-8"),
-                        headers,
-                        DD_API_TRACES_PATH
-                    )
-                    .await
+                    send_with_path(addr, &buf_v2, headers, DD_API_TRACES_PATH).await
                 );
             },
             rx,
@@ -2192,7 +2184,7 @@ async fn decode_series_endpoint_v2() {
 
         let mut buf = Vec::new();
         series_payload.encode(&mut buf).unwrap();
-        let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
+        let body = buf;
         let events = send_and_collect(
             addr,
             body,
@@ -2653,7 +2645,7 @@ async fn test_series_v2_split_metric_namespace_impl(
 
     let mut buf = Vec::new();
     series_payload.encode(&mut buf).unwrap();
-    let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
+    let body = buf;
     let events = send_and_collect(
         addr,
         body,
@@ -2729,7 +2721,7 @@ async fn series_v2_resources_preserved_as_tags() {
         let series_payload = ddmetric_proto::MetricPayload { series };
         let mut buf = Vec::new();
         series_payload.encode(&mut buf).unwrap();
-        let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
+        let body = buf;
 
         let events = send_and_collect(
             addr,
@@ -2800,7 +2792,7 @@ async fn test_sketches_split_metric_namespace_impl(
     };
 
     sketch_payload.encode(&mut buf).unwrap();
-    let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
+    let body = buf;
     let events = send_and_collect(
         addr,
         body,
