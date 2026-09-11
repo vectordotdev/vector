@@ -12,7 +12,6 @@ use chrono::{TimeZone, Utc};
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
-use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
@@ -30,11 +29,7 @@ use vector_lib::{
     lookup::{OwnedTargetPath, owned_value_path},
     metric_tags,
 };
-use vrl::{
-    compiler::value::Collection,
-    event_path, value,
-    value::{Kind, ObjectMap},
-};
+use vrl::{compiler::value::Collection, value, value::Kind};
 
 use crate::{
     SourceSender,
@@ -45,6 +40,7 @@ use crate::{
         Event, EventStatus, Metric, Value, into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
     },
+    metrics::Controller,
     schema,
     schema::Definition,
     serde::{default_decoding, default_framing_message_based},
@@ -54,7 +50,10 @@ use crate::{
     },
     test_util::{
         addr::{PortGuard, next_addr},
-        components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
+        components::{
+            COMPONENT_ERROR_TAGS, HTTP_PUSH_SOURCE_TAGS, assert_source_compliance,
+            assert_source_error,
+        },
         spawn_collect_n, trace_init, wait_for_tcp,
     },
 };
@@ -1218,10 +1217,7 @@ async fn decode_traces() {
         let (rx, _, _, addr, _guard) =
             source(EventStatus::Delivered, true, true, false, true).await;
 
-        let mut headers = dd_api_key_headers();
-        headers.insert("X-Datadog-Reported-Languages", "ada".parse().unwrap());
-
-        let mut buf_v1 = Vec::new();
+        let headers = dd_api_key_headers();
 
         let span = ddtrace_proto::Span {
             service: "a_service".to_string(),
@@ -1236,32 +1232,10 @@ async fn decode_traces() {
             meta: BTreeMap::from_iter([("foo".to_string(), "bar".to_string())].into_iter()),
             metrics: BTreeMap::from_iter([("a_metrics".to_string(), 0.577f64)].into_iter()),
             r#type: "a_type".to_string(),
-            meta_struct: BTreeMap::new(),
+            ..Default::default()
         };
 
-        let trace = ddtrace_proto::ApiTrace {
-            trace_id: 123u64,
-            spans: vec![span.clone()],
-            start_time: 1_431_648_000_000_001i64,
-            end_time: 1_431_649_000_000_001i64,
-        };
-
-        let payload_v1 = ddtrace_proto::TracePayload {
-            host_name: "a_hostname".to_string(),
-            env: "an_environment".to_string(),
-            traces: vec![trace],
-            transactions: vec![span.clone()],
-            // Other filea
-            tracer_payloads: vec![],
-            tags: BTreeMap::new(),
-            agent_version: "".to_string(),
-            target_tps: 0f64,
-            error_tps: 0f64,
-        };
-
-        payload_v1.encode(&mut buf_v1).unwrap();
-
-        let mut buf_v2 = Vec::new();
+        let mut buf = Vec::new();
 
         let chunk = ddtrace_proto::TraceChunk {
             priority: 42i32,
@@ -1282,21 +1256,21 @@ async fn decode_traces() {
             tags: BTreeMap::from_iter([("another".to_string(), "tag".to_string())].into_iter()),
             hostname: "hostname".to_string(),
             app_version: "v314".to_string(),
+            ..Default::default()
         };
 
-        let payload_v2 = ddtrace_proto::TracePayload {
+        let payload = ddtrace_proto::AgentPayload {
             host_name: "a_hostname".to_string(),
             env: "env".to_string(),
-            traces: vec![],
-            transactions: vec![],
             tracer_payloads: vec![tracer_payload],
             tags: BTreeMap::new(),
             agent_version: "v1.23456".to_string(),
             target_tps: 10f64,
             error_tps: 10f64,
+            ..Default::default()
         };
 
-        payload_v2.encode(&mut buf_v2).unwrap();
+        payload.encode(&mut buf).unwrap();
 
         let events = spawn_collect_n(
             async move {
@@ -1304,17 +1278,7 @@ async fn decode_traces() {
                     200,
                     send_with_path(
                         addr,
-                        unsafe { str::from_utf8_unchecked(&buf_v1) },
-                        headers.clone(),
-                        DD_API_TRACES_PATH
-                    )
-                    .await
-                );
-                assert_eq!(
-                    200,
-                    send_with_path(
-                        addr,
-                        unsafe { str::from_utf8_unchecked(&buf_v2) },
+                        unsafe { str::from_utf8_unchecked(&buf) },
                         headers,
                         DD_API_TRACES_PATH
                     )
@@ -1322,130 +1286,269 @@ async fn decode_traces() {
                 );
             },
             rx,
-            3,
+            1,
         )
         .await;
 
         {
-            let trace_v1 = events[0].as_trace();
-            assert_eq!(trace_v1.as_map()["host"], "a_hostname".into());
-            assert_eq!(trace_v1.as_map()["env"], "an_environment".into());
-            assert_eq!(trace_v1.as_map()["language_name"], "ada".into());
-            assert!(trace_v1.contains(vrl::event_path!("spans")));
-            assert_eq!(trace_v1.as_map()["spans"].as_array().unwrap().len(), 1);
-            let span_from_trace_v1 = trace_v1.as_map()["spans"].as_array().unwrap()[0]
-                .as_object()
-                .unwrap();
-            assert_eq!(span_from_trace_v1["service"], "a_service".into());
-            assert_eq!(span_from_trace_v1["name"], "a_name".into());
-            assert_eq!(span_from_trace_v1["resource"], "a_resource".into());
-            assert_eq!(span_from_trace_v1["trace_id"], Value::Integer(123));
-            assert_eq!(span_from_trace_v1["span_id"], Value::Integer(456));
-            assert_eq!(span_from_trace_v1["parent_id"], Value::Integer(789));
-            assert_eq!(
-                span_from_trace_v1["start"],
-                Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64))
-            );
-            assert_eq!(
-                span_from_trace_v1["duration"],
-                Value::Integer(1_000_000_000)
-            );
-            assert_eq!(span_from_trace_v1["error"], Value::Integer(404));
-            assert_eq!(span_from_trace_v1["meta"].as_object().unwrap().len(), 1);
-            assert_eq!(
-                span_from_trace_v1["meta"].as_object().unwrap()["foo"],
-                "bar".into()
-            );
-            assert_eq!(span_from_trace_v1["metrics"].as_object().unwrap().len(), 1);
-            assert_eq!(
-                span_from_trace_v1["metrics"].as_object().unwrap()["a_metrics"],
-                0.577.into()
-            );
+            let trace = events[0].as_trace();
             assert_eq!(
                 events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
-
-            let apm_event = events[1].as_trace();
-            assert!(apm_event.contains(event_path!("spans")));
-            assert_eq!(apm_event.as_map()["host"], "a_hostname".into());
-            assert_eq!(apm_event.as_map()["env"], "an_environment".into());
-            assert_eq!(apm_event.as_map()["language_name"], "ada".into());
-            let span_from_apm_event = apm_event.as_map()["spans"].as_array().unwrap()[0]
-                .as_object()
-                .unwrap();
-
-            assert_eq!(span_from_apm_event["service"], "a_service".into());
-            assert_eq!(span_from_apm_event["name"], "a_name".into());
-            assert_eq!(span_from_apm_event["resource"], "a_resource".into());
-
+            let start = Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64));
             assert_eq!(
-                events[1].metadata().datadog_api_key().as_deref().unwrap(),
-                DD_API_KEY
-            );
-
-            let trace_v2 = events[2].as_trace();
-            assert_eq!(trace_v2.as_map()["host"], "a_hostname".into());
-            assert_eq!(trace_v2.as_map()["env"], "env".into());
-
-            assert_eq!(
-                trace_v2.as_map()["tags"],
-                Value::Object(ObjectMap::from_iter(
-                    [("a".into(), "tag".into()), ("another".into(), "tag".into())].into_iter()
-                ))
-            );
-
-            assert_eq!(trace_v2.as_map()["language_name"], "plop".into());
-            assert_eq!(trace_v2.as_map()["language_version"], "v33".into());
-            assert_eq!(trace_v2.as_map()["container_id"], "an_id".into());
-            assert_eq!(trace_v2.as_map()["origin"], "an_origin".into());
-            assert_eq!(trace_v2.as_map()["tracer_version"], "v577".into());
-            assert_eq!(trace_v2.as_map()["runtime_id"], "123abc".into());
-            assert_eq!(trace_v2.as_map()["app_version"], "v314".into());
-            assert_eq!(trace_v2.as_map()["priority"], Value::Integer(42));
-            assert_eq!(
-                trace_v2.as_map()["target_tps"],
-                Value::Float(NotNan::new(10.0f64).unwrap())
-            );
-            assert_eq!(
-                trace_v2.as_map()["error_tps"],
-                Value::Float(NotNan::new(10.0f64).unwrap())
-            );
-            assert!(trace_v2.contains(vrl::event_path!("spans")));
-            assert_eq!(trace_v2.as_map()["spans"].as_array().unwrap().len(), 1);
-            let span_from_trace_v2 = trace_v2.as_map()["spans"].as_array().unwrap()[0]
-                .as_object()
-                .unwrap();
-            assert_eq!(span_from_trace_v2["service"], "a_service".into());
-            assert_eq!(span_from_trace_v2["name"], "a_name".into());
-            assert_eq!(span_from_trace_v2["resource"], "a_resource".into());
-            assert_eq!(span_from_trace_v2["trace_id"], Value::Integer(123));
-            assert_eq!(span_from_trace_v2["span_id"], Value::Integer(456));
-            assert_eq!(span_from_trace_v2["parent_id"], Value::Integer(789));
-            assert_eq!(
-                span_from_trace_v2["start"],
-                Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64))
-            );
-            assert_eq!(
-                span_from_trace_v2["duration"],
-                Value::Integer(1_000_000_000)
-            );
-            assert_eq!(span_from_trace_v2["error"], Value::Integer(404));
-            assert_eq!(span_from_trace_v2["meta"].as_object().unwrap().len(), 1);
-            assert_eq!(
-                span_from_trace_v2["meta"].as_object().unwrap()["foo"],
-                "bar".into()
-            );
-            assert_eq!(span_from_trace_v2["metrics"].as_object().unwrap().len(), 1);
-            assert_eq!(
-                span_from_trace_v2["metrics"].as_object().unwrap()["a_metrics"],
-                0.577.into()
-            );
-            assert_eq!(
-                events[2].metadata().datadog_api_key().as_deref().unwrap(),
-                DD_API_KEY
+                Value::Object(trace.as_map().clone()),
+                value!({
+                    "host": "a_hostname",
+                    "env": "env",
+                    "source_type": "datadog_agent",
+                    "payload_version": "v2",
+                    "agent_version": "v1.23456",
+                    "target_tps": 10.0,
+                    "error_tps": 10.0,
+                    "priority": 42,
+                    "origin": "an_origin",
+                    "dropped": false,
+                    "tags": {
+                        "a": "tag",
+                        "another": "tag"
+                    },
+                    "container_id": "an_id",
+                    "language_name": "plop",
+                    "language_version": "v33",
+                    "tracer_version": "v577",
+                    "runtime_id": "123abc",
+                    "app_version": "v314",
+                    "spans": [{
+                        "service": "a_service",
+                        "name": "a_name",
+                        "resource": "a_resource",
+                        "trace_id": 123,
+                        "span_id": 456,
+                        "parent_id": 789,
+                        "start": start,
+                        "duration": 1_000_000_000,
+                        "error": 404,
+                        "meta": { "foo": "bar" },
+                        "metrics": { "a_metrics": 0.577 },
+                        "type": "a_type",
+                        "meta_struct": {},
+                        "span_links": [],
+                        "span_events": []
+                    }]
+                })
             );
         }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_span_links_and_events() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let headers = dd_api_key_headers();
+        let mut buf = Vec::new();
+
+        let span = ddtrace_proto::Span {
+            service: "a_service".to_string(),
+            name: "a_name".to_string(),
+            resource: "a_resource".to_string(),
+            trace_id: 123u64,
+            span_id: 456u64,
+            span_links: vec![ddtrace_proto::SpanLink {
+                trace_id: u64::MAX,
+                trace_id_high: 1u64 << 63,
+                span_id: 0xdead_beef_cafe_babe,
+                attributes: BTreeMap::from([("link".to_string(), "yes".to_string())]),
+                tracestate: "vendor=1".to_string(),
+                flags: 1,
+            }],
+            span_events: vec![ddtrace_proto::SpanEvent {
+                time_unix_nano: 1_431_648_000_000_001,
+                name: "exception".to_string(),
+                attributes: BTreeMap::from([(
+                    "exception.message".to_string(),
+                    ddtrace_proto::AttributeAnyValue {
+                        r#type:
+                            ddtrace_proto::attribute_any_value::AttributeAnyValueType::StringValue
+                                as i32,
+                        string_value: "boom".to_string(),
+                        ..Default::default()
+                    },
+                )]),
+            }],
+            ..Default::default()
+        };
+
+        ddtrace_proto::AgentPayload {
+            tracer_payloads: vec![ddtrace_proto::TracerPayload {
+                chunks: vec![ddtrace_proto::TraceChunk {
+                    spans: vec![span],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode(&mut buf)
+        .unwrap();
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        unsafe { str::from_utf8_unchecked(&buf) },
+                        headers,
+                        DD_API_TRACES_PATH
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        let event_time = Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64));
+        let start = Value::from(Utc.timestamp_nanos(0));
+        assert_eq!(
+            Value::Object(events[0].as_trace().as_map().clone()),
+            value!({
+                "host": "",
+                "env": "",
+                "source_type": "datadog_agent",
+                "payload_version": "v2",
+                "agent_version": "",
+                "target_tps": 0.0,
+                "error_tps": 0.0,
+                "priority": 0,
+                "origin": "",
+                "dropped": false,
+                "tags": {},
+                "container_id": "",
+                "language_name": "",
+                "language_version": "",
+                "tracer_version": "",
+                "runtime_id": "",
+                "app_version": "",
+                "spans": [{
+                    "service": "a_service",
+                    "name": "a_name",
+                    "resource": "a_resource",
+                    "trace_id": 123,
+                    "span_id": 456,
+                    "parent_id": 0,
+                    "start": start,
+                    "duration": 0,
+                    "error": 0,
+                    "meta": {},
+                    "metrics": {},
+                    "type": "",
+                    "meta_struct": {},
+                    "span_links": [{
+                        "trace_id": "ffffffffffffffff",
+                        "trace_id_high": "8000000000000000",
+                        "span_id": "deadbeefcafebabe",
+                        "attributes": { "link": "yes" },
+                        "tracestate": "vendor=1",
+                        "flags": 1
+                    }],
+                    "span_events": [{
+                        "time_unix_nano": event_time,
+                        "name": "exception",
+                        "attributes": { "exception.message": "boom" }
+                    }]
+                }]
+            })
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_empty_tracer_payloads_emits_error() {
+    crate::test_util::components::init_test();
+    assert_source_error(&COMPONENT_ERROR_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let mut buf = Vec::new();
+        ddtrace_proto::AgentPayload::default()
+            .encode(&mut buf)
+            .unwrap();
+
+        assert_eq!(
+            200,
+            send_with_path(
+                addr,
+                unsafe { str::from_utf8_unchecked(&buf) },
+                dd_api_key_headers(),
+                DD_API_TRACES_PATH
+            )
+            .await
+        );
+
+        let events = crate::test_util::collect_ready(rx).await;
+        assert!(events.is_empty());
+
+        let metrics = Controller::get().unwrap().capture_metrics();
+        let errors = metrics
+            .iter()
+            .find(|m| m.name() == "component_errors_total")
+            .expect("component_errors_total should be present");
+        match errors.value() {
+            crate::event::metric::MetricValue::Counter { value } => {
+                assert!(*value >= 1.0, "expected at least one component error");
+            }
+            other => panic!("unexpected metric value {other:?}"),
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn decode_traces_idx_only_payload_emits_error() {
+    crate::test_util::components::init_test();
+    assert_source_error(&COMPONENT_ERROR_TAGS, async {
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
+
+        let mut buf = Vec::new();
+        ddtrace_proto::AgentPayload {
+            idx_tracer_payloads: vec![ddtrace_proto::idx::TracerPayload::default()],
+            ..Default::default()
+        }
+        .encode(&mut buf)
+        .unwrap();
+
+        assert_eq!(
+            200,
+            send_with_path(
+                addr,
+                unsafe { str::from_utf8_unchecked(&buf) },
+                dd_api_key_headers(),
+                DD_API_TRACES_PATH
+            )
+            .await
+        );
+
+        let events = crate::test_util::collect_ready(rx).await;
+        assert!(events.is_empty());
+
+        let metrics = Controller::get().unwrap().capture_metrics();
+        assert!(
+            metrics.iter().any(|m| {
+                m.name() == "component_errors_total"
+                    && m.tag_matches("error_code", "idx_tracer_payloads")
+            }),
+            "expected component_errors_total with error_code=idx_tracer_payloads"
+        );
     })
     .await;
 }

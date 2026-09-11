@@ -12,6 +12,8 @@ use vector_lib::{
     event::DatadogMetricOriginMetadata, schema::meaning, sensitive_string::SensitiveString,
 };
 
+use crate::event::Value;
+
 pub(crate) const DD_US_SITE: &str = "datadoghq.com";
 pub(crate) const DD_EU_SITE: &str = "datadoghq.eu";
 
@@ -142,6 +144,25 @@ pub(crate) fn default_site() -> String {
     std::env::var("DD_SITE").unwrap_or(DD_US_SITE.to_string())
 }
 
+/// Encode a Datadog 64-bit identifier as 16 lowercase hexadecimal characters.
+///
+/// Vector's integer `Value` is `i64`, so casting a Datadog `uint64` ID would wrap any value
+/// above `i64::MAX`. A fixed-width hex string preserves the full unsigned range.
+pub(crate) fn encode_u64_id_hex(id: u64) -> String {
+    format!("{id:016x}")
+}
+
+/// Decode a Datadog 64-bit identifier from an event value.
+///
+/// Hex strings are the source encoding. Integers are still accepted so a sink can reverse
+/// the historical `u64 as i64` wrap for in-flight events.
+pub(crate) fn decode_u64_id(value: &Value) -> u64 {
+    match value {
+        Value::Integer(v) => *v as u64,
+        other => u64::from_str_radix(&other.to_string_lossy(), 16).unwrap_or(0),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use similar_asserts::assert_eq;
@@ -195,6 +216,25 @@ mod tests {
             compute_api_endpoint("https://1-2-3-observability-pipelines.agent.us3.datadoghq.com"),
             "https://api.us3.datadoghq.com"
         );
+    }
+
+    #[test]
+    fn encode_u64_id_hex_is_fixed_width_lowercase() {
+        assert_eq!(encode_u64_id_hex(0), "0000000000000000");
+        assert_eq!(encode_u64_id_hex(999), "00000000000003e7");
+        assert_eq!(encode_u64_id_hex(1u64 << 63), "8000000000000000");
+        assert_eq!(encode_u64_id_hex(u64::MAX), "ffffffffffffffff");
+    }
+
+    #[test]
+    fn decode_u64_id_preserves_unsigned_range() {
+        assert_eq!(decode_u64_id(&Value::from("ffffffffffffffff")), u64::MAX);
+        assert_eq!(decode_u64_id(&Value::from("8000000000000000")), 1u64 << 63);
+        assert_eq!(decode_u64_id(&Value::from("00000000000003e7")), 999);
+        assert_eq!(decode_u64_id(&Value::from(999i64)), 999);
+        // Historical wrap: `u64 as i64` for the high bit, then back.
+        assert_eq!(decode_u64_id(&Value::from(i64::MIN)), 1u64 << 63);
+        assert_eq!(decode_u64_id(&Value::from("not-hex")), 0);
     }
 
     #[test]
