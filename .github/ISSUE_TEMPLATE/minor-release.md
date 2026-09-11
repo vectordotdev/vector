@@ -15,7 +15,8 @@ labels: "domain: releasing"
 # Prepare the release
 
 - [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml) workflow with the Vector and released VRL versions.
-- [ ] Review the generated release notes in the bot-authored PR, including changelog entries, breaking changes, deprecations, and upgrade guidance.
+- [ ] Review the generated release notes in the bot-authored PR, including the release date,
+      changelog entries, breaking changes, deprecations, and upgrade guidance.
 - [ ] Use **Bypass rules and merge** to squash-merge the preparation PR directly into `master`.
 - [ ] After the automated housekeeping PR merges, disable the release freeze.
 
