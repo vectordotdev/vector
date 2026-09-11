@@ -8050,7 +8050,7 @@ dependencies = [
  "log",
  "md-5 0.11.0",
  "percent-encoding",
- "quick-xml 0.41.0",
+ "quick-xml",
  "serde",
  "serde_json",
  "tokio",
@@ -9380,20 +9380,10 @@ dependencies = [
  "chrono",
  "indexmap 2.14.2",
  "newtype-uuid",
- "quick-xml 0.41.0",
+ "quick-xml",
  "strip-ansi-escapes",
  "thiserror 2.0.18",
  "uuid",
-]
-
-[[package]]
-name = "quick-xml"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
-dependencies = [
- "memchr",
- "serde",
 ]
 
 [[package]]
@@ -12903,7 +12893,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "futures",
- "quick-xml 0.41.0",
+ "quick-xml",
  "serde",
  "serde_json",
  "url",
@@ -13379,7 +13369,7 @@ dependencies = [
  "prost-types 0.12.6",
  "pulsar",
  "quick-junit",
- "quick-xml 0.31.0",
+ "quick-xml",
  "quickcheck",
  "rand 0.10.1",
  "rand_distr",
