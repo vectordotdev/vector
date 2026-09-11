@@ -91,7 +91,7 @@ fn component_to_row(component: &Component) -> state::ComponentRow {
     let metrics = component.metrics.as_ref();
 
     state::ComponentRow {
-        key: key.clone(),
+        key,
         kind: match component.component_type() {
             ComponentType::Unspecified => "unknown",
             ComponentType::Source => "source",

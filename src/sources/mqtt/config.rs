@@ -80,7 +80,7 @@ impl SourceConfig for MqttSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let sink = MqttSource::new(connector.clone(), decoder, log_namespace, self.clone())?;
+        let sink = MqttSource::new(connector, decoder, log_namespace, self.clone())?;
         Ok(Box::pin(sink.run(cx.out, cx.shutdown)))
     }
 

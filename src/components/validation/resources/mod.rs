@@ -259,7 +259,7 @@ fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decod
         }
         encoding::FramingConfig::LengthDelimited(config) => {
             decoding::FramingConfig::LengthDelimited(decoding::LengthDelimitedDecoderConfig {
-                length_delimited: config.length_delimited.clone(),
+                length_delimited: config.length_delimited,
             })
         }
         encoding::FramingConfig::NewlineDelimited => {

@@ -39,7 +39,7 @@ impl InternalEvent for WebSocketListenerConnectionFailedError {
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
         );
-        let mut all_tags = self.extra_tags.clone();
+        let mut all_tags = self.extra_tags;
         all_tags.extend([
             ("error_code".to_string(), "ws_connection_failed".to_string()),
             (
