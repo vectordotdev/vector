@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     collections::{BTreeMap, btree_map::Entry},
     fmt::Write as _,
 };
@@ -35,6 +34,10 @@ pub(super) trait MetricCollector {
 
     fn finish(self) -> Self::Output;
 
+    fn should_encode_metric(&self, _name: &str, _tags: Option<&MetricTags>) -> bool {
+        true
+    }
+
     fn encode_metric(
         &mut self,
         default_namespace: Option<&str>,
@@ -44,10 +47,15 @@ pub(super) trait MetricCollector {
     ) {
         let name = encode_namespace(metric.namespace().or(default_namespace), '_', metric.name());
         let name = &name;
+        let tags = metric.tags();
+
+        if !self.should_encode_metric(name, tags) {
+            return;
+        }
+
         let timestamp = metric.timestamp().map(|t| t.timestamp_millis());
 
         if metric.kind() == MetricKind::Absolute {
-            let tags = metric.tags();
             self.emit_metadata(metric.name(), name, metric.value());
 
             match metric.value() {
@@ -237,9 +245,16 @@ impl MetricCollector for StringCollector {
         Self { processed }
     }
 
+    fn should_encode_metric(&self, name: &str, tags: Option<&MetricTags>) -> bool {
+        !Self::contains_line_break(name)
+            && tags.is_none_or(|tags| {
+                tags.iter_single()
+                    .all(|(key, _)| !Self::contains_line_break(key))
+            })
+    }
+
     fn emit_metadata(&mut self, name: &str, fullname: &str, value: &MetricValue) {
-        let fullname = Self::sanitize_metric_name_newlines(fullname).into_owned();
-        if let Entry::Vacant(entry) = self.processed.entry(fullname) {
+        if let Entry::Vacant(entry) = self.processed.entry(fullname.into()) {
             let header = Self::encode_header(name, entry.key(), value);
             entry.insert(header);
         }
@@ -254,13 +269,12 @@ impl MetricCollector for StringCollector {
         tags: Option<&MetricTags>,
         extra: Option<(&str, String)>,
     ) {
-        let name = Self::sanitize_metric_name_newlines(name);
         let result = self
             .processed
-            .get_mut(name.as_ref())
+            .get_mut(name)
             .expect("metric metadata not encoded");
 
-        result.push_str(name.as_ref());
+        result.push_str(name);
         result.push_str(suffix);
         Self::encode_tags(result, tags, extra);
         _ = match timestamp_millis {
@@ -302,12 +316,8 @@ impl StringCollector {
         format!("# HELP {fullname} {help}\n# TYPE {fullname} {type}\n")
     }
 
-    fn sanitize_metric_name_newlines(name: &str) -> Cow<'_, str> {
-        if name.contains('\n') {
-            Cow::Owned(name.replace('\n', "_"))
-        } else {
-            Cow::Borrowed(name)
-        }
+    fn contains_line_break(value: &str) -> bool {
+        value.contains(['\r', '\n'])
     }
 
     fn escape_help(help: &str) -> String {
@@ -975,19 +985,63 @@ mod tests {
     }
 
     #[test]
-    fn sanitizes_metric_name_newlines_text() {
-        let metric = Metric::new(
-            "invalid_metric\nname".to_owned(),
+    fn rejects_metric_name_and_namespace_line_breaks_text() {
+        for (default_namespace, name) in [
+            (None, "invalid_metric\nname"),
+            (None, "invalid_metric\rname"),
+            (Some("invalid\nnamespace"), "valid_metric"),
+            (Some("invalid\rnamespace"), "valid_metric"),
+        ] {
+            let metric = Metric::new(
+                name.to_owned(),
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            );
+            let encoded = encode_one::<StringCollector>(default_namespace, &[], &[], &metric);
+            assert_eq!(encoded, "");
+            parse_text(&encoded).unwrap();
+        }
+    }
+
+    #[test]
+    fn rejects_tag_name_line_breaks_text() {
+        for key in ["invalid_tag\nname", "invalid_tag\rname"] {
+            let mut tags = MetricTags::default();
+            tags.replace(key.to_owned(), "value".to_owned());
+            let metric = Metric::new(
+                "valid_metric".to_owned(),
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(tags));
+            let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+            assert_eq!(encoded, "");
+            parse_text(&encoded).unwrap();
+        }
+    }
+
+    #[test]
+    fn rejected_metric_name_does_not_collide_text() {
+        let invalid = Metric::new(
+            "requests\ncount".to_owned(),
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
         );
-        let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+        let valid = Metric::new(
+            "requests_count".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 2.0 },
+        );
+        let mut collector = StringCollector::new();
+        collector.encode_metric(None, &[], &[], &invalid);
+        collector.encode_metric(None, &[], &[], &valid);
+        let encoded = collector.finish();
         assert_eq!(
             encoded,
             indoc! {r#"
-                # HELP invalid_metric_name invalid_metric\nname
-                # TYPE invalid_metric_name counter
-                invalid_metric_name 1
+                # HELP requests_count requests_count
+                # TYPE requests_count gauge
+                requests_count 2
             "#}
         );
         parse_text(&encoded).unwrap();
