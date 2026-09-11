@@ -310,25 +310,17 @@ impl StringCollector {
         }
     }
 
-    fn escape_help(mut help: &str) -> String {
+    fn escape_help(help: &str) -> String {
         let mut result = String::with_capacity(help.len());
-        while let Some(i) = help.find(['\\', '\n']) {
-            #[expect(
-                clippy::string_slice,
-                reason = "i comes from find() on ASCII chars, i and i+1 are char boundaries"
-            )]
-            {
-                result.push_str(&help[..i]);
-                result.push('\\');
-                result.push(if help.as_bytes()[i] == b'\n' {
-                    'n'
-                } else {
-                    '\\'
-                });
-                help = &help[i + 1..];
+
+        for character in help.chars() {
+            match character {
+                '\\' => result.push_str("\\\\"),
+                '\n' => result.push_str("\\n"),
+                character => result.push(character),
             }
         }
-        result.push_str(help);
+
         result
     }
 
