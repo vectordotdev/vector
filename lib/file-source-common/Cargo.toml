@@ -9,6 +9,9 @@ license = "MIT"
 [lints]
 workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
 [target.'cfg(windows)'.dependencies]
 libc.workspace = true
 winapi = { version = "0.3", features = ["winioctl", "ioapiset"] }

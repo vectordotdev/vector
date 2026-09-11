@@ -145,6 +145,12 @@ async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
     let mut skipped_bytes = 0;
     while skipped_bytes < n {
         let chunk = reader.fill_buf().await?;
+        if chunk.is_empty() {
+            return Err(std::io::Error::new(
+                ErrorKind::UnexpectedEof,
+                "EOF reached while skipping ignored header bytes",
+            ));
+        }
         let bytes_to_skip = std::cmp::min(chunk.len(), n - skipped_bytes);
         reader.consume(bytes_to_skip);
         skipped_bytes += bytes_to_skip;
@@ -174,7 +180,7 @@ impl Fingerprinter {
 
         match self.strategy {
             FingerprintStrategy::DevInode => {
-                let file_handle = File::open(path).await?;
+                let file_handle = open_regular_file(path).await?;
                 let file_info = file_handle.file_info().await?;
                 let dev = file_info.portable_dev();
                 let ino = file_info.portable_ino();
@@ -185,7 +191,7 @@ impl Fingerprinter {
                 lines,
             } => {
                 let buffer = self.buffer.resize_slice_mut(self.max_line_length);
-                let mut fp = File::open(path).await?;
+                let mut fp = open_regular_file(path).await?;
                 let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
 
                 skip_first_n_bytes(&mut reader, ignored_header_bytes).await?;
@@ -204,7 +210,7 @@ impl Fingerprinter {
     ) -> Option<FileFingerprint> {
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
-                if !metadata.is_dir() {
+                if metadata.is_file() {
                     self.fingerprint(path).await.map(Some)
                 } else {
                     Ok(None)
@@ -242,6 +248,29 @@ impl Fingerprinter {
             .ok()
             .flatten()
     }
+}
+
+/// Open a path without allowing a race to turn a regular-file read into a blocking FIFO read.
+/// The metadata check in `fingerprint_or_emit` is only a fast path; the descriptor is checked too
+/// because the path can change between the stat and the open.
+async fn open_regular_file(path: &Path) -> Result<File> {
+    #[cfg(unix)]
+    let file = tokio::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)
+        .await?;
+    #[cfg(not(unix))]
+    let file = File::open(path).await?;
+
+    if !file.metadata().await?.is_file() {
+        return Err(std::io::Error::new(
+            ErrorKind::InvalidInput,
+            "path is not a regular file",
+        ));
+    }
+
+    Ok(file)
 }
 
 async fn fingerprinter_read_until(
@@ -594,6 +623,29 @@ mod test {
     }
 
     #[tokio::test]
+    async fn short_file_with_ignored_header_returns_eof() {
+        let target_dir = tempdir().unwrap();
+        let path = target_dir.path().join("short.log");
+        fs::write(&path, b"short").unwrap();
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 10,
+                lines: 1,
+            },
+            1024,
+            false,
+        );
+
+        let result = tokio::time::timeout(Duration::from_secs(1), fingerprinter.fingerprint(&path))
+            .await
+            .expect("short files must not make header skipping loop at EOF");
+        assert_eq!(
+            result.unwrap_err().kind(),
+            std::io::ErrorKind::UnexpectedEof
+        );
+    }
+
+    #[tokio::test]
     async fn test_inode_fingerprint() {
         let mut fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode, 42, false);
 
@@ -636,6 +688,43 @@ mod test {
                 .await
                 .is_none()
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn ignores_fifo_without_blocking() {
+        let target_dir = tempdir().unwrap();
+        let fifo = target_dir.path().join("events.log");
+        let status = std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .expect("mkfifo must be available on Unix test systems");
+        assert!(status.success(), "mkfifo failed with status {status}");
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            false,
+        );
+        let mut small_files = HashMap::new();
+
+        let fingerprint = tokio::time::timeout(
+            Duration::from_secs(1),
+            fingerprinter.fingerprint_or_emit(&fifo, &mut small_files, &NoErrors),
+        )
+        .await
+        .expect("fingerprinting a FIFO must not block waiting for a writer");
+
+        assert!(fingerprint.is_none());
+
+        let direct_result =
+            tokio::time::timeout(Duration::from_secs(1), fingerprinter.fingerprint(&fifo))
+                .await
+                .expect("direct fingerprinting a FIFO must not wait for a writer");
+        assert!(direct_result.is_err());
     }
 
     #[test]

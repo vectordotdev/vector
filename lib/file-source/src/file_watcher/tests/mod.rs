@@ -1,7 +1,7 @@
 mod experiment;
 mod experiment_no_truncations;
 
-use std::{path::PathBuf, str, thread};
+use std::{collections::HashSet, io::Write, path::PathBuf, str, thread};
 
 use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
@@ -9,7 +9,7 @@ use tokio::time::Instant;
 
 use super::{
     EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, SKIP_CHUNK_BYTES, SkipPrefixReader,
-    WatcherState, null_reader,
+    WatcherState, identify_event_paths, null_reader,
 };
 
 // Welcome.
@@ -224,12 +224,138 @@ async fn gzip_multi_stream_reads_all_members() {
     assert_eq!(lines, vec!["first", "second"]);
 }
 
+#[tokio::test]
+async fn find_renamed_path_uses_notify_destination_for_cross_directory_rotation() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("app.log");
+    let archive_dir = dir.path().join("archive");
+    let destination = archive_dir.join("app.log.1");
+    fs::create_dir(&archive_dir).unwrap();
+    fs::write(&source, b"first\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        source,
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        false,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert_eq!(
+        watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+        "first"
+    );
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    watcher.deactivate().await;
+
+    fs::rename(watcher.path.clone(), &destination).unwrap();
+    assert_eq!(
+        watcher.find_renamed_path(None).await,
+        Some(destination.clone()),
+        "polling recovery must search archive subdirectories below the old parent"
+    );
+    let event_paths = std::iter::once(destination.clone()).collect();
+
+    assert_eq!(
+        watcher.find_renamed_path(Some(&event_paths)).await,
+        Some(destination.clone()),
+        "the notify rename destination must be considered even when it is outside the old parent"
+    );
+    let event_identities = super::identify_event_paths(&event_paths).await;
+    assert_eq!(
+        watcher
+            .find_renamed_path_with_identities(Some(&event_identities), None)
+            .await,
+        Some(destination),
+        "precomputed notify identities must recover the same rename destination"
+    );
+}
+
+#[tokio::test]
+async fn find_renamed_path_handles_a_relative_file_without_a_parent_component() {
+    let cwd = std::env::current_dir().unwrap();
+    let dir = tempfile::tempdir_in(&cwd).unwrap();
+    let relative_dir = dir
+        .path()
+        .strip_prefix(&cwd)
+        .expect("temporary directory must be below cwd");
+    let source = relative_dir.join("app.log");
+    let destination = dir.path().join("app.log.1");
+    fs::write(&source, b"first\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        source,
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        false,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert_eq!(
+        watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+        "first"
+    );
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    watcher.deactivate().await;
+
+    fs::rename(&watcher.path, &destination).unwrap();
+
+    assert_eq!(
+        watcher.find_renamed_path(None).await,
+        Some(destination),
+        "a bare relative include such as *.log must search the current directory"
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn find_renamed_path_follows_file_symlink_in_parent_scan() {
+    let link_dir = tempdir().unwrap();
+    let target_dir = tempdir().unwrap();
+    let target = target_dir.path().join("real.log");
+    let source = link_dir.path().join("app.log");
+    let destination = link_dir.path().join("app.log.1");
+    fs::write(&target, b"first\n").unwrap();
+    std::os::unix::fs::symlink(&target, &source).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        source,
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        false,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert_eq!(
+        watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+        "first"
+    );
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    watcher.deactivate().await;
+
+    fs::rename(&watcher.path, &destination).unwrap();
+
+    assert_eq!(
+        watcher.find_renamed_path(None).await,
+        Some(destination),
+        "polling recovery must include symlinks to regular files in the parent scan"
+    );
+}
+
 fn watcher_for_timing() -> FileWatcher {
     let now = Instant::now();
 
     FileWatcher {
         path: PathBuf::new(),
+        canonical_path: None,
         findable: true,
+        path_outside_glob: false,
         state: WatcherState::Active {
             reader: Box::new(null_reader()),
             reached_eof: false,
@@ -241,11 +367,50 @@ fn watcher_for_timing() -> FileWatcher {
         file_position: 0,
         identity: None,
         gzip_read_skipped: false,
+        is_gzip: false,
+        gzip_raw_metadata: None,
         is_dead: false,
         last_seen: now,
         max_line_bytes: 1024,
         line_delimiter: Bytes::from_static(b"\n"),
     }
+}
+
+#[tokio::test]
+async fn identify_event_paths_ignores_non_regular_files() {
+    let directory = tempfile::tempdir().unwrap();
+    let paths = HashSet::from([directory.path().to_path_buf()]);
+
+    let identities = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        identify_event_paths(&paths),
+    )
+    .await
+    .expect("checking a non-file notify path must not block");
+
+    assert!(identities.is_empty());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn identify_event_paths_does_not_block_on_fifo() {
+    let directory = tempfile::tempdir().unwrap();
+    let fifo = directory.path().join("events.fifo");
+    let status = std::process::Command::new("mkfifo")
+        .arg(&fifo)
+        .status()
+        .expect("mkfifo must be available on Unix test systems");
+    assert!(status.success(), "mkfifo failed with status {status}");
+
+    let paths = HashSet::from([fifo]);
+    let identities = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        identify_event_paths(&paths),
+    )
+    .await
+    .expect("checking a FIFO notify path must not block");
+
+    assert!(identities.is_empty());
 }
 
 fn read_retry_delay(watcher: &FileWatcher) -> std::time::Duration {
@@ -409,6 +574,34 @@ async fn new_old_fully_read_file_starts_idle_without_opening() {
 }
 
 #[tokio::test]
+async fn startup_idle_since_preserves_file_age() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("old.log");
+    let contents = b"line one\n";
+    let ignore_before = Some(write_file_and_ignore_before(&path, contents));
+
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+    let watcher = FileWatcher::new(
+        path,
+        ReadFrom::Checkpoint(contents.len() as u64),
+        ignore_before,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(watcher.is_idle());
+    assert!(
+        watcher.idle_since().expect("startup watcher must be idle")
+            >= std::time::Duration::from_millis(40),
+        "startup idle timer must be based on mtime, not process discovery time"
+    );
+}
+
+#[tokio::test]
 async fn idle_on_startup_false_keeps_old_file_active() {
     // Regression test for a bug found in review: `idle_timeout: null` is documented as
     // restoring the prior always-open behavior entirely, but the startup fast path (this same
@@ -441,6 +634,45 @@ async fn idle_on_startup_false_keeps_old_file_active() {
          silently start it Idle regardless of the opt-out"
     );
     assert!(!watcher.is_idle());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn reactivate_does_not_block_on_a_file_replaced_with_fifo() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("events.log");
+    fs::write(&path, b"existing\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    watcher.read_line().await.unwrap();
+    watcher.read_line().await.unwrap();
+    watcher.deactivate().await;
+
+    fs::remove_file(&path).unwrap();
+    let status = std::process::Command::new("mkfifo")
+        .arg(&path)
+        .status()
+        .expect("mkfifo must be available on Unix test systems");
+    assert!(status.success(), "mkfifo failed with status {status}");
+
+    assert!(watcher.check_for_new_data().await.unwrap());
+    let result = tokio::time::timeout(std::time::Duration::from_secs(1), watcher.reactivate())
+        .await
+        .expect("reactivating a FIFO must not wait for a writer");
+    assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+    assert!(
+        watcher.is_idle(),
+        "a non-regular replacement must not activate"
+    );
 }
 
 #[tokio::test]
@@ -646,6 +878,73 @@ async fn deactivate_closes_handle_and_retains_checkpoint() {
 }
 
 #[tokio::test]
+async fn deactivate_does_not_hide_data_written_during_transition() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("deactivate_race.log");
+    fs::write(&path, b"first\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+
+    let mut file = fs::OpenOptions::new().append(true).open(&path).unwrap();
+    writeln!(file, "late").unwrap();
+    file.flush().unwrap();
+
+    watcher.deactivate().await;
+    assert!(
+        watcher.is_active(),
+        "the watcher must keep its handle when data is already present during deactivation"
+    );
+    assert_eq!(
+        watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+        "late"
+    );
+}
+
+#[tokio::test]
+async fn deactivate_keeps_active_reader_position_for_racing_partial_line() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("deactivate_partial_race.log");
+    let partial = b"partial";
+    fs::write(&path, partial).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    let mut file = fs::OpenOptions::new().append(true).open(&path).unwrap();
+    writeln!(file).unwrap();
+    file.flush().unwrap();
+
+    watcher.deactivate().await;
+    assert!(watcher.is_active());
+    assert_eq!(watcher.get_file_position(), partial.len() as u64);
+    assert_eq!(
+        &watcher.read_line().await.unwrap().raw_line.unwrap().bytes[..],
+        partial
+    );
+}
+
+#[tokio::test]
 async fn deactivate_preserves_reached_eof() {
     // Regression test for a bug found in review: `reached_eof()` used to look only at
     // `WatcherState::Active`'s own flag, always reporting `false` for an `Idle` watcher.
@@ -680,6 +979,85 @@ async fn deactivate_preserves_reached_eof() {
     assert!(
         watcher.reached_eof(),
         "reached_eof() must stay true across the Active -> Idle transition"
+    );
+}
+
+#[tokio::test]
+async fn outside_glob_watcher_stays_alive_after_reactivation() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log");
+    let archive = dir.path().join("app.log.1");
+    fs::write(&path, b"first\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    watcher.deactivate().await;
+
+    fs::rename(&path, &archive).unwrap();
+    watcher.set_file_findable(false);
+    watcher.update_path(archive.clone()).await.unwrap();
+    watcher.mark_path_outside_glob();
+    assert!(watcher.path_has_tracked_identity().await);
+    let mut file = fs::OpenOptions::new().append(true).open(&archive).unwrap();
+    writeln!(file, "late").unwrap();
+    file.flush().unwrap();
+
+    assert!(watcher.check_for_new_data().await.unwrap());
+    watcher.reactivate().await.unwrap();
+    assert_eq!(
+        watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+        "late"
+    );
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    assert!(!watcher.dead(), "outside-glob watcher must remain tracked");
+}
+
+#[tokio::test]
+async fn update_path_resets_position_for_a_different_identity() {
+    let dir = tempdir().unwrap();
+    let old_path = dir.path().join("old.log");
+    let new_path = dir.path().join("new.log");
+    fs::write(&old_path, b"old content\n").unwrap();
+    fs::write(&new_path, b"new content\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        old_path,
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+    assert!(watcher.get_file_position() > 0);
+
+    watcher.update_path(new_path).await.unwrap();
+
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "a different file identity must not inherit the old byte offset"
+    );
+    assert_eq!(
+        watcher
+            .read_line()
+            .await
+            .unwrap()
+            .raw_line
+            .map(|line| String::from_utf8(line.bytes.to_vec()).unwrap()),
+        Some("new content".to_owned())
     );
 }
 
@@ -1532,6 +1910,50 @@ async fn idle_gzip_file_detected_correctly_on_reactivation() {
 }
 
 #[tokio::test]
+async fn idle_reactivation_resets_position_when_compression_format_changes() {
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("format-change.log");
+    fs::write(&path, b"old\n").unwrap();
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    watcher.deactivate().await;
+
+    fs::write(&path, encode(b"new compressed content\n").await).unwrap();
+    assert!(watcher.check_for_new_data().await.unwrap());
+    watcher.reactivate().await.expect("reactivate failed");
+
+    assert_eq!(
+        watcher
+            .read_line()
+            .await
+            .unwrap()
+            .raw_line
+            .map(|line| String::from_utf8(line.bytes.to_vec()).unwrap()),
+        Some("new compressed content".to_string())
+    );
+}
+
+#[tokio::test]
 async fn idle_gzip_read_from_end_stays_skipped_on_reactivation() {
     // Regression test for a bug found in review: `read_from: end` on a gzip file installs a
     // null reader and leaves `file_position` at `0` (the "already read, ignore" case in
@@ -1677,6 +2099,56 @@ async fn idle_gzip_reactivation_does_not_misdetect_truncation_from_compressed_si
 }
 
 #[tokio::test]
+async fn idle_gzip_with_unknown_raw_size_baseline_does_not_reset_position() {
+    // If metadata fails while entering Idle, the fallback must not use gzip's decompressed
+    // file_position as a raw on-disk size. Otherwise the next successful stat appears to be a
+    // truncation whenever the compressed file is smaller than its decoded content.
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    let mut compressed = Vec::new();
+    let decompressed = b"compressible line\n".repeat(200);
+    GzipEncoder::new(decompressed.as_slice())
+        .read_to_end(&mut compressed)
+        .await
+        .unwrap();
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("unknown-baseline.gz");
+    fs::write(&path, &compressed).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        decompressed.len() + 1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+    let position_before = watcher.get_file_position();
+    assert!(position_before > compressed.len() as u64);
+
+    watcher.deactivate().await;
+    if let WatcherState::Idle {
+        last_known_size, ..
+    } = &mut watcher.state
+    {
+        // Model the metadata failure in deactivate(): no raw-size baseline is available.
+        *last_known_size = None;
+    } else {
+        panic!("watcher should be idle");
+    }
+
+    assert!(watcher.check_for_new_data().await.unwrap());
+    watcher.reactivate().await.expect("reactivate failed");
+    assert_eq!(watcher.get_file_position(), position_before);
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+}
+
+#[tokio::test]
 async fn reactivate_resumes_gzip_member_appended_after_idle() {
     // A gzip watcher that already decoded member 1, went idle, and then had member 2 appended
     // must emit only member 2 on reactivate -- not a duplicate of member 1, not nothing.
@@ -1728,6 +2200,43 @@ async fn reactivate_resumes_gzip_member_appended_after_idle() {
         result.raw_line.unwrap().bytes,
         "second",
         "must resume with member 2 only, not replay member 1"
+    );
+}
+
+#[tokio::test]
+async fn unchanged_gzip_does_not_force_reactivation_after_idle_transition() {
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    let mut encoded = Vec::new();
+    GzipEncoder::new(&b"quiet\n"[..])
+        .read_to_end(&mut encoded)
+        .await
+        .unwrap();
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("quiet.gz");
+    fs::write(&path, encoded).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path,
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    watcher.deactivate().await;
+
+    assert!(watcher.is_idle());
+    assert!(
+        !watcher.check_for_new_data().await.unwrap(),
+        "an unchanged gzip must not be reactivated solely because it entered Idle"
     );
 }
 
@@ -1784,6 +2293,34 @@ fn skip_prefix_reader_yields_instead_of_blocking_on_a_large_skip() {
         "the whole {skip}-byte skip completed in a single poll_read call, meaning it never \
          yielded back to the executor"
     );
+    assert!(
+        reader.scratch.is_none(),
+        "the skip buffer must be released before the reader delegates to the underlying stream"
+    );
+}
+
+#[test]
+fn skip_prefix_reader_stays_at_eof_after_short_input() {
+    use std::{
+        pin::Pin,
+        task::{Context, Poll, Waker},
+    };
+
+    use tokio::io::AsyncRead;
+
+    let mut reader = SkipPrefixReader::new(tokio::io::empty(), 1);
+    let mut out = [0u8; 1];
+    let mut read_buf = tokio::io::ReadBuf::new(&mut out);
+    let mut cx = Context::from_waker(Waker::noop());
+
+    assert!(matches!(
+        Pin::new(&mut reader).poll_read(&mut cx, &mut read_buf),
+        Poll::Ready(Ok(()))
+    ));
+    assert!(matches!(
+        Pin::new(&mut reader).poll_read(&mut cx, &mut read_buf),
+        Poll::Ready(Ok(()))
+    ));
 }
 
 #[inline]

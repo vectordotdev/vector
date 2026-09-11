@@ -1,8 +1,9 @@
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use std::{
+    collections::{HashMap, HashSet},
     io::{self, SeekFrom},
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{Duration, SystemTime},
 };
 use tokio::{
@@ -64,8 +65,9 @@ enum WatcherState {
         buf: BytesMut,
     },
     Idle {
-        /// Last known size of the file, as of the last successful stat.
-        last_known_size: u64,
+        /// Last known size of the file, as of the last successful stat. `None` means the stat
+        /// taken while entering `Idle` failed, so no raw-size baseline is available yet.
+        last_known_size: Option<u64>,
         /// Last known mtime of the file, as of the last successful stat. Used,
         /// together with `last_known_size`, to cheaply detect whether the file
         /// has been written to (or truncated) since we last looked, without
@@ -131,14 +133,19 @@ enum WatcherState {
 /// longer exist.
 pub struct FileWatcher {
     pub path: PathBuf,
+    /// Canonical form of `path`, cached when the watcher is created or moved. Notify backends
+    /// may report either this form or the logical path used by the glob.
+    canonical_path: Option<PathBuf>,
     findable: bool,
+    /// Set when an idle watcher was located by its identity at a path outside the configured
+    /// include patterns. Such a watcher must continue to be polled there after rotation, even
+    /// though the normal glob pass will keep marking it unfindable.
+    path_outside_glob: bool,
     state: WatcherState,
     file_position: FilePosition,
-    /// Device and inode of the underlying file, once known. `None` only for a
-    /// watcher that started `Idle` and has never been opened: there is no
-    /// portable way to learn a file's identity without a handle
-    /// (`GetFileInformationByHandle` is required even on Windows), so we
-    /// can't populate this until the first `reactivate`/`update_path` open.
+    /// Device and inode of the underlying file, once known. The startup idle path obtains this
+    /// from its short-lived gzip probe, while `None` remains a safe fallback if that probe cannot
+    /// complete.
     /// Callers that need identity to detect renames (`update_path`) already
     /// treat "identity unknown" the same as "identity changed", which is the
     /// correct, safe behavior: it forces a fresh open rather than risking a
@@ -148,11 +155,21 @@ pub struct FileWatcher {
     /// as opposed to `file_position == 0` meaning "not decoded yet, about to start from zero."
     /// Lets `reactivate` tell the two apart instead of wrongly replaying a skipped backlog.
     gzip_read_skipped: bool,
+    /// Whether the current path contains gzip data. Gzip's logical position is decompressed bytes,
+    /// so it cannot be compared with the raw on-disk size when establishing an idle baseline.
+    is_gzip: bool,
+    /// Raw size/mtime captured when the current gzip reader was opened. Comparing this with the
+    /// final active-state metadata lets `deactivate` detect writes during the transition without
+    /// forcing a full re-decode after every quiet idle period.
+    gzip_raw_metadata: Option<(u64, Option<SystemTime>)>,
     is_dead: bool,
     last_seen: Instant,
     max_line_bytes: usize,
     line_delimiter: Bytes,
 }
+
+/// The device/inode pair used to identify a file across a rename.
+pub type FileIdentity = (u64, u64);
 
 impl FileWatcher {
     /// Create a new `FileWatcher`
@@ -164,8 +181,8 @@ impl FileWatcher {
     /// If the file is old enough to be excluded by `ignore_before` and its size
     /// on disk already matches the position we'd resume reading from (i.e.
     /// there's no new data waiting), and `idle_on_startup` is `true`, the file
-    /// is *not* opened at all: the watcher starts in the `Idle` state, holding
-    /// no file handle. This is the core of the fix for
+    /// is only opened briefly for a gzip/identity probe: the watcher starts in
+    /// the `Idle` state and holds no file handle. This is the core of the fix for
     /// https://github.com/vectordotdev/vector/issues/3567, where a large
     /// number of `ignore_older`-excluded files would otherwise each hold open
     /// an unused file handle for as long as they existed on disk.
@@ -187,18 +204,11 @@ impl FileWatcher {
         line_delimiter: Bytes,
         idle_on_startup: bool,
     ) -> Result<FileWatcher, std::io::Error> {
-        // Cheap stat-only pass first. This lets us avoid ever calling
-        // `File::open` for files that are both old (per `ignore_before`) and
-        // fully read already (size == checkpointed position), which is
-        // exactly the "12,000 idle files" scenario from #3567.
+        // Cheap stat-first pass. The old, fully-read path still needs one short-lived open to
+        // probe gzip and capture identity, but never keeps a handle in the returned watcher.
         let stat = tokio::fs::metadata(&path).await?;
         let modified_time = stat.modified().ok();
-        let too_old =
-            if let (Some(ignore_before), Some(modified_time)) = (ignore_before, modified_time) {
-                DateTime::<Utc>::from(modified_time) < ignore_before
-            } else {
-                false
-            };
+        let mut too_old = is_too_old(ignore_before, modified_time);
 
         if too_old && idle_on_startup {
             // For a *non-gzip* file that's too old, the read position ends up
@@ -211,37 +221,46 @@ impl FileWatcher {
             // position 0 rather than EOF (`(true, true, _)` below), so those
             // still need the full open+decode path to get that right.
             let gzip_check = peek_is_gzipped(&path).await;
-            if let Some(false) = gzip_check {
-                debug!(
-                    message = "Starting file watcher in idle state; no unread data and file is older than `ignore_older`.",
-                    ?path,
-                    file_position = %stat.len(),
-                );
-                return Ok(FileWatcher {
-                    path,
-                    findable: true,
-                    state: WatcherState::Idle {
-                        last_known_size: stat.len(),
-                        last_known_mtime: modified_time,
-                        idle_since: Instant::now(),
-                        truncated_while_idle: false,
-                        force_recheck: false,
-                        pending_partial_line: None,
-                        reached_eof: true,
-                    },
-                    file_position: stat.len(),
-                    // We haven't kept the file open, so we don't yet know its
-                    // dev/inode; the first reopen (triggered by the
-                    // idle->active transition, or by `update_path` on a
-                    // rename) will populate it.
-                    identity: None,
-                    // Confirmed non-gzip by `gzip_check` above.
-                    gzip_read_skipped: false,
-                    is_dead: false,
-                    last_seen: Instant::now(),
-                    max_line_bytes,
-                    line_delimiter,
-                });
+            if let Some((is_gzip, identity, probe_size, probe_mtime)) = gzip_check {
+                // Use the metadata from the same descriptor as the gzip/identity probe. The
+                // initial path stat can be stale if rotation happens before the probe opens it.
+                too_old = is_too_old(ignore_before, probe_mtime);
+                if !is_gzip && too_old {
+                    let idle_since = instant_from_system_time(probe_mtime);
+                    let canonical_path = tokio::fs::canonicalize(&path).await.ok();
+                    debug!(
+                        message = "Starting file watcher in idle state; no unread data and file is older than `ignore_older`.",
+                        ?path,
+                        file_position = %probe_size,
+                    );
+                    return Ok(FileWatcher {
+                        path,
+                        canonical_path,
+                        findable: true,
+                        path_outside_glob: false,
+                        state: WatcherState::Idle {
+                            last_known_size: Some(probe_size),
+                            last_known_mtime: probe_mtime,
+                            idle_since,
+                            truncated_while_idle: false,
+                            force_recheck: false,
+                            pending_partial_line: None,
+                            reached_eof: true,
+                        },
+                        file_position: probe_size,
+                        // The gzip probe already gave us the identity, but the handle was closed
+                        // before returning, so this watcher still holds no file descriptor.
+                        identity: Some(identity),
+                        // Confirmed non-gzip by `gzip_check` above.
+                        gzip_read_skipped: false,
+                        is_gzip: false,
+                        gzip_raw_metadata: None,
+                        is_dead: false,
+                        last_seen: Instant::now(),
+                        max_line_bytes,
+                        line_delimiter,
+                    });
+                }
             }
             // Either it's gzip (needs the full open+decode path below to get
             // position 0 vs EOF right) or the file vanished/became
@@ -251,7 +270,7 @@ impl FileWatcher {
             // surface a real error for the latter case).
         }
 
-        let f = File::open(&path).await?;
+        let f = open_regular_file(&path).await?;
         let file_info = f.file_info().await?;
         let (devno, ino) = (file_info.portable_dev(), file_info.portable_ino());
 
@@ -260,9 +279,14 @@ impl FileWatcher {
         #[cfg(windows)]
         let metadata = f.metadata().await?;
 
+        // The path may have changed again after the short-lived startup probe. The descriptor
+        // metadata is the authoritative snapshot for the file we are about to read.
+        let too_old = is_too_old(ignore_before, metadata.modified().ok());
+
         let mut reader = BufReader::new(f);
 
         let gzipped = is_gzipped(&mut reader).await?;
+        let gzip_raw_metadata = gzipped.then(|| (metadata.len(), metadata.modified().ok()));
 
         // Determine the actual position at which we should start reading
         let (reader, file_position, gzip_read_skipped): (
@@ -319,16 +343,14 @@ impl FileWatcher {
             }
         };
 
-        let ts = metadata
-            .modified()
-            .ok()
-            .and_then(|mtime| mtime.elapsed().ok())
-            .and_then(|diff| Instant::now().checked_sub(diff))
-            .unwrap_or_else(Instant::now);
+        let ts = instant_from_system_time(metadata.modified().ok());
+        let canonical_path = tokio::fs::canonicalize(&path).await.ok();
 
         Ok(FileWatcher {
             path,
+            canonical_path,
             findable: true,
+            path_outside_glob: false,
             state: WatcherState::Active {
                 reader,
                 reached_eof: false,
@@ -340,6 +362,8 @@ impl FileWatcher {
             file_position,
             identity: Some((devno, ino)),
             gzip_read_skipped,
+            is_gzip: gzipped,
+            gzip_raw_metadata,
             is_dead: false,
             last_seen: ts,
             max_line_bytes,
@@ -367,30 +391,39 @@ impl FileWatcher {
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let was_idle = self.is_idle();
 
-        let file_handle = File::open(&path).await?;
+        let file_handle = open_regular_file(&path).await?;
 
         let file_info = file_handle.file_info().await?;
         let new_identity = (file_info.portable_dev(), file_info.portable_ino());
+        let raw_metadata = file_handle.metadata().await.ok();
+        let canonical_path = tokio::fs::canonicalize(&path).await.ok();
         if Some(new_identity) != self.identity {
-            let mut reader = BufReader::new(File::open(&path).await?);
+            // Keep identity and reader tied to the same descriptor. Opening the path a second
+            // time would allow a rotation between the two opens to pair the first file's
+            // identity with the replacement file's contents.
+            let mut reader = BufReader::new(file_handle);
             let gzipped = is_gzipped(&mut reader).await?;
-            let new_reader: Box<dyn AsyncBufRead + Send + Unpin> = if gzipped {
-                if self.file_position != 0 {
-                    self.gzip_read_skipped = true;
-                    Box::new(null_reader())
+            let gzip_raw_metadata = gzipped.then(|| {
+                raw_metadata
+                    .as_ref()
+                    .map(|metadata| (metadata.len(), metadata.modified().ok()))
+            });
+            let (new_reader, new_gzip_read_skipped): (Box<dyn AsyncBufRead + Send + Unpin>, bool) =
+                if gzipped {
+                    (
+                        Box::new(BufReader::new(gzip_multiple_decoder(reader))),
+                        false,
+                    )
                 } else {
-                    self.gzip_read_skipped = false;
-                    Box::new(BufReader::new(gzip_multiple_decoder(reader)))
-                }
-            } else {
-                self.gzip_read_skipped = false;
-                reader.seek(io::SeekFrom::Start(self.file_position)).await?;
-                Box::new(reader)
-            };
+                    reader.seek(io::SeekFrom::Start(0)).await?;
+                    (Box::new(reader), false)
+                };
 
-            let file_info = file_handle.file_info().await?;
-            self.identity = Some((file_info.portable_dev(), file_info.portable_ino()));
-
+            self.identity = Some(new_identity);
+            self.gzip_read_skipped = new_gzip_read_skipped;
+            self.is_gzip = gzipped;
+            self.gzip_raw_metadata = gzip_raw_metadata.flatten();
+            self.file_position = 0;
             self.state = WatcherState::Active {
                 reader: new_reader,
                 reached_eof: false,
@@ -407,6 +440,11 @@ impl FileWatcher {
             // stats `self.path`, so update it first.
             drop(file_handle);
             self.path = path;
+            self.canonical_path = canonical_path;
+            if self.is_gzip {
+                self.gzip_raw_metadata =
+                    raw_metadata.map(|metadata| (metadata.len(), metadata.modified().ok()));
+            }
             self.deactivate().await;
             return Ok(());
         } else if let WatcherState::Active {
@@ -418,7 +456,12 @@ impl FileWatcher {
             *reached_eof = false;
             *read_retry_delay = EOF_READ_BACKOFF_MIN;
         }
+        if self.is_gzip {
+            self.gzip_raw_metadata =
+                raw_metadata.map(|metadata| (metadata.len(), metadata.modified().ok()));
+        }
         self.path = path;
+        self.canonical_path = canonical_path;
         Ok(())
     }
 
@@ -437,6 +480,128 @@ impl FileWatcher {
         self.findable = f;
         if f {
             self.last_seen = Instant::now();
+            self.path_outside_glob = false;
+        }
+    }
+
+    /// Mark this watcher as still live at a path outside the configured include patterns. This
+    /// is used after an idle watcher is found by identity following a rotation, so subsequent
+    /// glob passes do not make `poll_idle_watchers` abandon the rotated inode.
+    pub fn mark_path_outside_glob(&mut self) {
+        self.path_outside_glob = true;
+        self.last_seen = Instant::now();
+    }
+
+    #[inline]
+    pub fn path_is_outside_glob(&self) -> bool {
+        self.path_outside_glob
+    }
+
+    /// Check whether the current path still resolves to the tracked file identity. This is a
+    /// single-file check used to avoid rescanning an entire archive tree on every polling pass
+    /// for an outside-glob idle watcher; a tree scan is only needed once this path disappears or
+    /// resolves to a replacement.
+    pub fn path_has_tracked_identity(
+        &self,
+    ) -> impl std::future::Future<Output = bool> + Send + 'static {
+        let path = self.path.clone();
+        let identity = self.identity;
+        async move {
+            let Some(identity) = identity else {
+                return false;
+            };
+            path_identity(&path).await == Some(identity)
+        }
+    }
+
+    /// Find this watcher's previously opened inode at a path named by a notify event or below its
+    /// current parent directory. The event candidates cover destinations outside the include glob;
+    /// the recursive parent scan also handles archive subdirectories in polling mode.
+    pub async fn find_renamed_path(
+        &self,
+        event_paths: Option<&HashSet<PathBuf>>,
+    ) -> Option<PathBuf> {
+        let event_identities = match event_paths {
+            Some(paths) => Some(identify_event_paths(paths).await),
+            None => None,
+        };
+        if let Some(path) = self.find_renamed_path_in_identities(event_identities.as_ref()) {
+            return Some(path);
+        }
+
+        let root = self.rename_search_root()?;
+        let tree_identities = identify_paths_in_tree(&root).await;
+        self.find_renamed_path_with_identities(None, Some(&tree_identities))
+            .await
+    }
+
+    /// Return the absolute directory below which polling-based rename recovery searches.
+    pub fn rename_search_root(&self) -> Option<PathBuf> {
+        let cwd = std::env::current_dir().ok();
+        self.path.parent().map(|parent| {
+            let parent = if parent.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                parent
+            };
+            crate::absolutize(parent, cwd.as_deref())
+        })
+    }
+
+    /// Find this watcher's inode in identities already collected from notify event paths.
+    /// Keeping this step synchronous lets callers try the cheap, precise event candidates before
+    /// starting the potentially expensive recursive parent-directory scan.
+    pub(crate) fn find_renamed_path_in_identities(
+        &self,
+        identities: Option<&HashMap<FileIdentity, Vec<PathBuf>>>,
+    ) -> Option<PathBuf> {
+        let identity = self.identity?;
+        let cwd = std::env::current_dir().ok();
+        let current_path = crate::absolutize(&self.path, cwd.as_deref());
+        identities?.get(&identity)?.iter().find_map(|candidate| {
+            (crate::absolutize(candidate, cwd.as_deref()) != current_path)
+                .then(|| candidate.clone())
+        })
+    }
+
+    /// Find this watcher's inode using event-path identities prepared once for the whole polling
+    /// pass. Unlike `find_renamed_path`, this avoids reopening every event candidate and scanning
+    /// the same parent directory for every idle watcher when a rename burst affects many files.
+    pub fn find_renamed_path_with_identities(
+        &self,
+        event_identities: Option<&HashMap<FileIdentity, Vec<PathBuf>>>,
+        tree_identities: Option<&HashMap<FileIdentity, Vec<PathBuf>>>,
+    ) -> impl std::future::Future<Output = Option<PathBuf>> + Send + 'static {
+        let event_candidate = self.find_renamed_path_in_identities(event_identities);
+        let tree_candidate = self.find_renamed_path_in_identities(tree_identities);
+        let identity = self.identity;
+        let cwd = std::env::current_dir().ok();
+        let current_path = crate::absolutize(&self.path, cwd.as_deref());
+        let parent = self.rename_search_root();
+        let tree_was_indexed = tree_identities.is_some();
+
+        async move {
+            if event_candidate.is_some() {
+                return event_candidate;
+            }
+            if tree_candidate.is_some() {
+                return tree_candidate;
+            }
+
+            if tree_was_indexed {
+                None
+            } else {
+                let parent = parent?;
+                let tree_identities = identify_paths_in_tree(&parent).await;
+                // No event candidate was found above, so the tree scan is the only remaining
+                // source of a possible replacement path.
+                tree_identities.get(&identity?).and_then(|candidates| {
+                    candidates.iter().find_map(|candidate| {
+                        (crate::absolutize(candidate, cwd.as_deref()) != current_path)
+                            .then(|| candidate.clone())
+                    })
+                })
+            }
         }
     }
 
@@ -454,6 +619,10 @@ impl FileWatcher {
 
     pub fn get_file_position(&self) -> FilePosition {
         self.file_position
+    }
+
+    pub fn canonical_path(&self) -> Option<&Path> {
+        self.canonical_path.as_deref()
     }
 
     /// Cheaply (via `fs::metadata`, no `File::open`) check whether an `Idle`
@@ -487,10 +656,10 @@ impl FileWatcher {
 
         // The real baseline (`last_known_size`/`last_known_mtime`) is never destroyed to force a
         // retry -- see `invalidate_idle_bookkeeping`'s doc comment for why an earlier version of
-        // this that clobbered it with a sentinel was wrong. So the size/mtime comparison here is
-        // always a genuine one, and `force_recheck` only affects whether `changed` is reported as
-        // `true` on top of that; it never suppresses or replaces the real shrink check below.
-        let sizes_or_mtimes_differ = new_size != *last_known_size || new_mtime != *last_known_mtime;
+        // this that clobbered it with a sentinel was wrong. A missing size means the stat during
+        // deactivation failed, so the first successful poll is a change but cannot prove a shrink.
+        let sizes_or_mtimes_differ =
+            last_known_size.is_none_or(|size| new_size != size) || new_mtime != *last_known_mtime;
         let changed = sizes_or_mtimes_differ || *force_recheck;
         *force_recheck = false;
 
@@ -502,7 +671,7 @@ impl FileWatcher {
         // taken only at reactivation time, isn't sufficient. This check is against the real
         // baseline (never a sentinel), so it correctly fires for a genuine truncation regardless
         // of whether `force_recheck` also happens to be set on this same poll.
-        if new_size < *last_known_size {
+        if last_known_size.is_some_and(|size| new_size < size) {
             *truncated_while_idle = true;
             // The pre-truncation offset/bytes no longer correspond to anything on disk.
             *pending_partial_line = None;
@@ -511,7 +680,7 @@ impl FileWatcher {
         // Always keep our idle bookkeeping current so that a subsequent
         // truncation-then-refill (or vice versa) is still detected relative
         // to what we most recently observed.
-        *last_known_size = new_size;
+        *last_known_size = Some(new_size);
         *last_known_mtime = new_mtime;
         if changed {
             // Reset the idle clock: something happened, so this file is not
@@ -571,30 +740,20 @@ impl FileWatcher {
     /// file is longer) or read nothing until it grows past that point (if shorter) -- either way
     /// losing the new file's opening bytes. Start over from position 0 instead.
     ///
-    /// A `self.identity` of `None`, by contrast, means this watcher has *never* opened the file:
-    /// it started `Idle` straight out of `FileWatcher::new`'s startup fast path for an
-    /// `ignore_older`-excluded file, without ever confirming any identity at all. That's not
-    /// evidence of a replacement -- it's simply "unconfirmed" -- so unlike a real identity
-    /// mismatch, it must not reset `file_position`: doing so would re-read a file's entire old
-    /// content (which `ignore_older` deliberately skipped) the very first time it receives new
-    /// data, since `file_position` in that case holds the file's size *as of discovery*, not a
-    /// checkpoint from a previous read. This reactivation is simply the first time we're
-    /// confirming identity, not a change of it.
+    /// A `self.identity` of `None`, by contrast, means identity is still "unconfirmed" (for
+    /// example, if the short-lived startup probe could not complete). That's not evidence of a
+    /// replacement, so unlike a real identity mismatch, it must not reset `file_position`: doing
+    /// so would re-read a file's entire old content (which `ignore_older` deliberately skipped)
+    /// the first time it receives new data, since `file_position` holds the file's size as of
+    /// discovery rather than a checkpoint from a previous read.
     ///
-    /// **Known limitation**, an accepted trade-off of the startup fast path rather than something
-    /// this function can fix on its own: because a never-opened watcher has no identity to compare
-    /// against, this function cannot distinguish "an `ignore_older`-excluded file received its
-    /// first append" from "that file was replaced (not renamed) by a different, larger file at
-    /// the same path, whose content happens to fingerprint identically to the old one under the
-    /// default first-line-only strategy" before its first reactivation. The former (by far the
-    /// common case) requires resuming from the retained `file_position`; the latter would need
-    /// resuming from 0. Since a replacement can't be told apart from a growth here, and 0 would be
-    /// wrong far more often (re-sending the entire skipped backlog on every single first
-    /// reactivation, defeating the point of the fast path), this function assumes growth. Getting
-    /// this case exactly right would require either opening the file at startup after all
-    /// (eliminating the fast path this exists to provide) or a fingerprinting strategy strong
-    /// enough to make same-content-prefix collisions practically impossible, neither of which is
-    /// a change this function is positioned to make locally.
+    /// **Known limitation**: when identity is unavailable, this function cannot distinguish "an
+    /// `ignore_older`-excluded file received its first append" from "that file was replaced (not
+    /// renamed) by a different, larger file at the same path, whose content happens to fingerprint
+    /// identically to the old one under the default first-line-only strategy" before its first
+    /// reactivation. The former (by far the common case) requires resuming from the retained
+    /// `file_position`; the latter would need resuming from 0. Since a replacement can't be told
+    /// apart from growth here, this function assumes growth.
     ///
     /// Separately, even when the identity is unchanged (the same inode is still at this path --
     /// no rename/replace happened), the file can still have been truncated in place while idle
@@ -635,32 +794,33 @@ impl FileWatcher {
             }
         );
 
-        let f = File::open(&self.path).await?;
+        let f = open_regular_file(&self.path).await?;
         let file_info = f.file_info().await?;
         let new_identity = (file_info.portable_dev(), file_info.portable_ino());
+        let raw_metadata = f.metadata().await?;
         let identity_changed = matches!(self.identity, Some(old) if old != new_identity);
-        self.identity = Some(new_identity);
+        let old_file_position = self.file_position;
+        let mut file_position = old_file_position;
+        let mut gzip_read_skipped = self.gzip_read_skipped;
 
         let mut reader = BufReader::new(f);
         let gzipped = is_gzipped(&mut reader).await?;
+        let canonical_path = tokio::fs::canonicalize(&self.path).await.ok();
+        let gzip_raw_metadata = gzipped.then(|| (raw_metadata.len(), raw_metadata.modified().ok()));
+        let format_changed = gzipped != self.is_gzip;
 
         // Final direct check in case `check_for_new_data` was never called before this. Skipped
         // for gzip: `file_position` is a decompressed offset, not comparable to on-disk size.
-        let truncated_at_reactivation = !gzipped
-            && reader
-                .get_ref()
-                .metadata()
-                .await
-                .is_ok_and(|m| m.len() < self.file_position);
-        if identity_changed {
+        let truncated_at_reactivation = !gzipped && raw_metadata.len() < old_file_position;
+        if identity_changed || format_changed {
             debug!(
-                message = "Idle watcher's file identity changed on reactivation; \
-                           the file at this path was replaced while idle. Resuming \
-                           from the start rather than the stale checkpoint offset.",
+                message = "Idle watcher's file identity or compression format changed on \
+                           reactivation; resuming from the start rather than the stale \
+                           checkpoint offset.",
                 path = ?self.path,
             );
-            self.file_position = 0;
-            self.gzip_read_skipped = false;
+            file_position = 0;
+            gzip_read_skipped = false;
         } else if truncated_while_idle || truncated_at_reactivation {
             debug!(
                 message = "Idle watcher's file was truncated in place while idle (same \
@@ -668,8 +828,8 @@ impl FileWatcher {
                            stale, since-invalidated content.",
                 path = ?self.path,
             );
-            self.file_position = 0;
-            self.gzip_read_skipped = false;
+            file_position = 0;
+            gzip_read_skipped = false;
         }
 
         let (reader, file_position, gzip_read_skipped): (
@@ -677,10 +837,10 @@ impl FileWatcher {
             FilePosition,
             bool,
         ) = if gzipped {
-            if self.gzip_read_skipped {
+            if gzip_read_skipped {
                 // Deliberately unread (e.g. `read_from: end`): no decoded prefix to resume from.
-                (Box::new(null_reader()), self.file_position, true)
-            } else if self.file_position == 0 {
+                (Box::new(null_reader()), file_position, true)
+            } else if file_position == 0 {
                 (
                     Box::new(BufReader::new(gzip_multiple_decoder(reader))),
                     0,
@@ -690,7 +850,7 @@ impl FileWatcher {
                 // `GzipDecoder` can't seek to a decompressed offset, so resume by redecoding from
                 // the start and discarding the already-emitted prefix via `SkipPrefixReader`.
                 // This also naturally picks up any member appended after `file_position`.
-                let skip = self.file_position;
+                let skip = file_position;
                 (
                     Box::new(BufReader::new(SkipPrefixReader::new(
                         gzip_multiple_decoder(reader),
@@ -703,10 +863,14 @@ impl FileWatcher {
         } else {
             // Propagate seek errors instead of guessing the position; the caller retries from
             // `Idle` on `Err`, which is safer than reading from an unknown offset.
-            let pos = reader.seek(SeekFrom::Start(self.file_position)).await?;
+            let pos = reader.seek(SeekFrom::Start(file_position)).await?;
             (Box::new(reader), pos, false)
         };
+        self.identity = Some(new_identity);
+        self.canonical_path = canonical_path;
         self.gzip_read_skipped = gzip_read_skipped;
+        self.is_gzip = gzipped;
+        self.gzip_raw_metadata = gzip_raw_metadata;
 
         self.file_position = file_position;
         self.state = WatcherState::Active {
@@ -748,6 +912,7 @@ impl FileWatcher {
         // documented `remove_after`-since-EOF grace period every time `remove_after_secs` exceeds
         // `idle_timeout_secs`.
         let idle_since = *last_read_success;
+        let old_file_position = self.file_position;
 
         // `buf` holds bytes already consumed from the reader (and counted
         // into `file_position`) for a line that hasn't seen its delimiter
@@ -784,17 +949,39 @@ impl FileWatcher {
         } else {
             Some((rewound_file_position, buf.clone().freeze()))
         };
+        let metadata = tokio::fs::metadata(&self.path).await.ok();
+        if !self.is_gzip
+            && metadata
+                .as_ref()
+                .is_some_and(|stat| stat.len() > old_file_position)
+        {
+            // A write can race with the EOF read and land before this transition. Do not close
+            // the handle in that case: treating the current size as the idle baseline would make
+            // the new bytes invisible to the next poll. Keep the active reader so the normal read
+            // loop can observe them.
+            debug!(
+                message = "Keeping file watcher active because data arrived during idle transition.",
+                path = ?self.path,
+                file_position = %self.file_position,
+            );
+            return;
+        }
+
         self.file_position = rewound_file_position;
 
-        // Best-effort stat so our idle bookkeeping starts accurate; if this
-        // fails (e.g. file was just deleted) fall back to what we already
-        // know from `file_position`, which will simply cause the next
-        // `check_for_new_data` poll to treat any discrepancy as "changed",
-        // which is a safe (if slightly wasteful) default.
-        let (last_known_size, last_known_mtime) = match tokio::fs::metadata(&self.path).await {
-            Ok(stat) => (stat.len(), stat.modified().ok()),
-            Err(_) => (self.file_position, None),
-        };
+        // For a plain file the stat is a trustworthy raw-size baseline once it has not raced past
+        // the pre-rewind position. Gzip's decoded position cannot be compared with raw size, so
+        // force a re-check only if its raw metadata changed while the reader was active.
+        let last_known_size = metadata.as_ref().map(|stat| stat.len());
+        let force_recheck = self.is_gzip
+            && !self.gzip_read_skipped
+            && match (self.gzip_raw_metadata, metadata.as_ref()) {
+                (Some((size, mtime)), Some(stat)) => {
+                    size != stat.len() || mtime != stat.modified().ok()
+                }
+                _ => true,
+            };
+        let last_known_mtime = metadata.and_then(|stat| stat.modified().ok());
 
         debug!(
             message = "File watcher deactivated to idle state; file handle closed.",
@@ -812,7 +999,7 @@ impl FileWatcher {
             // resume reading, not evidence the file itself was truncated on disk. There's nothing
             // yet for a subsequent `check_for_new_data` poll to have observed shrinking.
             truncated_while_idle: false,
-            force_recheck: false,
+            force_recheck,
             pending_partial_line,
             reached_eof,
         };
@@ -871,7 +1058,7 @@ impl FileWatcher {
                 successfully_read: None,
                 discarded_for_size_and_truncated,
             }) => {
-                if !self.file_findable() {
+                if !self.file_findable() && !self.path_outside_glob {
                     self.set_dead();
                     // File has been deleted, so return what we have in the buffer, even though it
                     // didn't end with a newline. This is not a perfect signal for when we should
@@ -1091,11 +1278,107 @@ impl FileWatcher {
     }
 }
 
+async fn path_identity(path: &std::path::Path) -> Option<(u64, u64)> {
+    let file = open_regular_file(path).await.ok()?;
+    let file_info = file.file_info().await.ok()?;
+    Some((file_info.portable_dev(), file_info.portable_ino()))
+}
+
+/// Open only a regular file without allowing a path/type race to turn the operation into a
+/// blocking FIFO read. The descriptor check closes the gap between the initial metadata check and
+/// opening the path.
+async fn open_regular_file(path: &Path) -> io::Result<File> {
+    #[cfg(unix)]
+    let file = tokio::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)
+        .await?;
+    #[cfg(not(unix))]
+    let file = File::open(path).await?;
+
+    if !file.metadata().await?.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "path is not a regular file",
+        ));
+    }
+
+    Ok(file)
+}
+
+/// Resolve the identities of notify rename candidates once per reconciliation pass.
+pub async fn identify_event_paths(paths: &HashSet<PathBuf>) -> HashMap<FileIdentity, Vec<PathBuf>> {
+    let mut identities = HashMap::new();
+    for path in paths {
+        if let Some(identity) = path_identity(path).await {
+            identities
+                .entry(identity)
+                .or_insert_with(Vec::new)
+                .push(path.clone());
+        }
+    }
+    identities
+}
+
+/// Resolve the identities of regular files below `root` once per reconciliation pass.
+///
+/// Symlinks to regular files are included because the glob provider returns those paths and
+/// `File::open` follows them when the watcher identity is captured. Symlinked directories are not
+/// traversed, avoiding cycles while still covering the file-rotation case.
+pub async fn identify_paths_in_tree(root: &Path) -> HashMap<FileIdentity, Vec<PathBuf>> {
+    let mut identities = HashMap::new();
+    let mut directories = vec![root.to_path_buf()];
+    while let Some(directory) = directories.pop() {
+        let Ok(mut entries) = tokio::fs::read_dir(directory).await else {
+            continue;
+        };
+        loop {
+            let entry = match entries.next_entry().await {
+                Ok(Some(entry)) => entry,
+                Ok(None) => break,
+                Err(_) => break,
+            };
+            let candidate = entry.path();
+            let Ok(file_type) = entry.file_type().await else {
+                continue;
+            };
+            if file_type.is_dir() {
+                directories.push(candidate);
+            } else {
+                let is_regular_file = if file_type.is_symlink() {
+                    tokio::fs::metadata(&candidate)
+                        .await
+                        .is_ok_and(|metadata| metadata.is_file())
+                } else {
+                    file_type.is_file()
+                };
+                if !is_regular_file {
+                    continue;
+                }
+                if let Some(identity) = path_identity(&candidate).await {
+                    identities
+                        .entry(identity)
+                        .or_insert_with(Vec::new)
+                        .push(candidate);
+                }
+            }
+        }
+    }
+
+    identities
+}
+
 async fn is_gzipped(r: &mut BufReader<File>) -> io::Result<bool> {
     let header_bytes = r.fill_buf().await?;
     // WARN: The paired `BufReader::consume` is not called intentionally. If we
     // do we'll chop a decent part of the potential gzip stream off.
     Ok(header_bytes.starts_with(GZIP_MAGIC))
+}
+
+fn is_too_old(ignore_before: Option<DateTime<Utc>>, modified_time: Option<SystemTime>) -> bool {
+    matches!((ignore_before, modified_time), (Some(ignore_before), Some(modified_time))
+        if DateTime::<Utc>::from(modified_time) < ignore_before)
 }
 
 /// Cheaply check whether a file starts with the gzip magic bytes, opening and
@@ -1106,14 +1389,31 @@ async fn is_gzipped(r: &mut BufReader<File>) -> io::Result<bool> {
 /// outlives the single `.await` here, so it doesn't reintroduce the
 /// long-lived handle the `Idle` state exists to avoid.
 ///
-/// Returns `Ok(None)` if the file couldn't be opened or read (e.g. deleted or
+/// Returns `None` if the file couldn't be opened or read (e.g. deleted or
 /// permissions changed since the earlier `fs::metadata` call); callers should
 /// treat that the same as "unknown, fall back to the full open path" rather
 /// than assuming either gzip or not.
-async fn peek_is_gzipped(path: &std::path::Path) -> Option<bool> {
-    let f = File::open(path).await.ok()?;
+async fn peek_is_gzipped(
+    path: &std::path::Path,
+) -> Option<(bool, (u64, u64), u64, Option<SystemTime>)> {
+    let f = open_regular_file(path).await.ok()?;
+    let file_info = f.file_info().await.ok()?;
+    let identity = (file_info.portable_dev(), file_info.portable_ino());
+    let metadata = f.metadata().await.ok()?;
     let mut reader = BufReader::new(f);
-    is_gzipped(&mut reader).await.ok()
+    Some((
+        is_gzipped(&mut reader).await.ok()?,
+        identity,
+        metadata.len(),
+        metadata.modified().ok(),
+    ))
+}
+
+fn instant_from_system_time(system_time: Option<SystemTime>) -> Instant {
+    system_time
+        .and_then(|mtime| mtime.elapsed().ok())
+        .and_then(|diff| Instant::now().checked_sub(diff))
+        .unwrap_or_else(Instant::now)
 }
 
 fn null_reader() -> impl AsyncBufRead {
@@ -1129,7 +1429,7 @@ const SKIP_CHUNK_BYTES: usize = 64 * 1024;
 struct SkipPrefixReader<R> {
     inner: R,
     remaining_to_skip: u64,
-    scratch: Box<[u8; SKIP_CHUNK_BYTES]>,
+    scratch: Option<Box<[u8; SKIP_CHUNK_BYTES]>>,
 }
 
 impl<R> SkipPrefixReader<R> {
@@ -1137,7 +1437,7 @@ impl<R> SkipPrefixReader<R> {
         Self {
             inner,
             remaining_to_skip: skip,
-            scratch: Box::new([0u8; SKIP_CHUNK_BYTES]),
+            scratch: (skip > 0).then(|| Box::new([0u8; SKIP_CHUNK_BYTES])),
         }
     }
 }
@@ -1149,6 +1449,11 @@ impl<R: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for SkipPrefixReader<
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> std::task::Poll<io::Result<()>> {
         use std::task::Poll;
+
+        if self.remaining_to_skip == 0 {
+            self.scratch = None;
+            return std::pin::Pin::new(&mut self.inner).poll_read(cx, buf);
+        }
 
         // A large `remaining_to_skip` (a big already-decoded gzip prefix) could otherwise keep
         // this loop spinning on synchronously-available data for a long time without ever
@@ -1164,11 +1469,18 @@ impl<R: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for SkipPrefixReader<
             budget -= 1;
 
             let chunk = self.remaining_to_skip.min(SKIP_CHUNK_BYTES as u64) as usize;
-            let this = &mut *self;
-            let mut discard_buf = tokio::io::ReadBuf::new(&mut this.scratch[..chunk]);
-            match std::pin::Pin::new(&mut this.inner).poll_read(cx, &mut discard_buf) {
+            let (result, filled) = {
+                let this = &mut *self;
+                let scratch = this
+                    .scratch
+                    .as_mut()
+                    .expect("scratch exists while bytes remain to skip");
+                let mut discard_buf = tokio::io::ReadBuf::new(&mut scratch[..chunk]);
+                let result = std::pin::Pin::new(&mut this.inner).poll_read(cx, &mut discard_buf);
+                (result, discard_buf.filled().len())
+            };
+            match result {
                 Poll::Ready(Ok(())) => {
-                    let filled = discard_buf.filled().len();
                     if filled == 0 {
                         // The underlying stream ended before we finished skipping. This can only
                         // mean the file was truncated to something shorter than what was already
@@ -1177,6 +1489,8 @@ impl<R: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for SkipPrefixReader<
                         // (and thus never construct this reader) in that case, so reaching this
                         // is unexpected, but returning a clean EOF here rather than looping
                         // forever is the safe fallback either way.
+                        self.remaining_to_skip = 0;
+                        self.scratch = None;
                         return Poll::Ready(Ok(()));
                     }
                     self.remaining_to_skip -= filled as u64;
@@ -1186,6 +1500,7 @@ impl<R: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for SkipPrefixReader<
             }
         }
 
+        self.scratch = None;
         std::pin::Pin::new(&mut self.inner).poll_read(cx, buf)
     }
 }

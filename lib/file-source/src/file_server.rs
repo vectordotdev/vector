@@ -27,7 +27,7 @@ use tokio::{
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    file_watcher::{FileWatcher, RawLineResult},
+    file_watcher::{FileWatcher, RawLineResult, identify_event_paths, identify_paths_in_tree},
     notify_watcher::{NotifyDiscovery, NotifyMessage},
     paths_provider::PathsProvider,
 };
@@ -57,13 +57,12 @@ const CHECKPOINT_WRITE_INTERVAL: Duration = Duration::from_secs(1);
 const MIN_NOTIFY_DISCOVERY_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Above this many distinct paths accumulated from notify events since the last reconciliation
-/// pass, stop tracking them individually and fall back to treating the wakeup as "something
-/// changed, go check everything" (`NotifyWakeup::All`). This bounds the memory a burst of events
-/// across many different paths can make `NotifyWakeup::Paths` hold onto, and avoids the
-/// per-watcher `HashSet` lookups in `discover`'s hot loop becoming worse than just nudging every
-/// watcher once the set is large enough that "every watcher" and "every named path" are close in
-/// size anyway.
+/// pass, stop tracking them individually and treat the wakeup as "something changed".
 const NOTIFY_WAKEUP_PATH_LIMIT: usize = 1024;
+
+/// Keep rename candidates separately from ordinary change paths. A large write burst must not
+/// discard the paths needed to recover an idle rotated file.
+const NOTIFY_RENAME_PATH_LIMIT: usize = 1024;
 
 /// Accumulates, between reconciliation passes, which specific paths (if known) notify events have
 /// named -- so that `discover`'s "nudge this watcher past its read-pacing timers" step (see
@@ -73,48 +72,128 @@ const NOTIFY_WAKEUP_PATH_LIMIT: usize = 1024;
 /// under a large `include` glob turns "one file got appended to" into "redundantly reconsider
 /// every other file's read pacing too."
 #[derive(Debug, Default)]
-enum NotifyWakeup {
-    /// No notify event has arrived since the last reconciliation pass.
+struct NotifyWakeup {
+    state: NotifyWakeupState,
+    /// Canonical forms of named event paths. This is populated once per notify batch so a
+    /// watcher whose glob path contains a symlink can still be nudged without canonicalizing
+    /// every tracked file on every discovery pass.
+    canonical_paths: HashSet<PathBuf>,
+    /// Raw paths whose canonical form has not been resolved successfully yet. Keeping only this
+    /// delta makes repeated notify events O(new paths) while still retrying paths that temporarily
+    /// disappear during a rename.
+    canonical_paths_pending: HashSet<PathBuf>,
+    rename_paths: HashSet<PathBuf>,
+    rename_paths_incomplete: bool,
+}
+
+#[derive(Debug, Default)]
+enum NotifyWakeupState {
     #[default]
     None,
-    /// One or more notify events arrived, each naming specific paths (`PathsChanged`/
-    /// `PathsRemoved`), and the total distinct path count so far has stayed at or under
-    /// `NOTIFY_WAKEUP_PATH_LIMIT`.
     Paths(HashSet<PathBuf>),
-    /// A notify event arrived that doesn't name specific paths at all (`Overflow`,
-    /// `BackendError`), or the accumulated path count exceeded `NOTIFY_WAKEUP_PATH_LIMIT`: treat
-    /// every currently-tracked watcher as possibly needing a nudge, same as the pre-existing
-    /// coarse "just rerun discovery" behavior.
     All,
 }
 
 impl NotifyWakeup {
     fn is_pending(&self) -> bool {
-        !matches!(self, NotifyWakeup::None)
+        !matches!(&self.state, NotifyWakeupState::None)
     }
 
     fn add_paths(&mut self, paths: impl IntoIterator<Item = PathBuf>) {
-        match self {
-            NotifyWakeup::All => {}
-            NotifyWakeup::None => {
+        let paths: Vec<PathBuf> = paths.into_iter().collect();
+        // A pathless notify event is coarse by definition. Preserve that meaning even if a
+        // named event arrives before the pending wakeup is reconciled.
+        if paths.is_empty() {
+            self.mark_all();
+            return;
+        }
+        let mut newly_added = HashSet::new();
+
+        match &mut self.state {
+            NotifyWakeupState::All => {}
+            NotifyWakeupState::None => {
                 let set: HashSet<PathBuf> = paths.into_iter().collect();
-                *self = if set.len() > NOTIFY_WAKEUP_PATH_LIMIT {
-                    NotifyWakeup::All
+                self.state = if set.len() > NOTIFY_WAKEUP_PATH_LIMIT {
+                    NotifyWakeupState::All
                 } else {
-                    NotifyWakeup::Paths(set)
+                    newly_added.extend(set.iter().cloned());
+                    NotifyWakeupState::Paths(set)
                 };
             }
-            NotifyWakeup::Paths(existing) => {
-                existing.extend(paths);
-                if existing.len() > NOTIFY_WAKEUP_PATH_LIMIT {
-                    *self = NotifyWakeup::All;
+            NotifyWakeupState::Paths(existing) => {
+                for path in paths {
+                    if existing.insert(path.clone()) {
+                        newly_added.insert(path);
+                    }
                 }
+                if existing.len() > NOTIFY_WAKEUP_PATH_LIMIT {
+                    self.state = NotifyWakeupState::All;
+                }
+            }
+        }
+
+        if matches!(self.state, NotifyWakeupState::Paths(_)) {
+            self.canonical_paths_pending.extend(newly_added);
+        } else {
+            self.canonical_paths.clear();
+            self.canonical_paths_pending.clear();
+        }
+    }
+
+    /// Resolve named event paths without blocking the async file-server task. Notify callbacks
+    /// run outside the runtime, so filesystem work must be offloaded before matching symlinked
+    /// watcher paths during reconciliation.
+    async fn resolve_canonical_paths(&mut self) {
+        let paths: Vec<PathBuf> = match &self.state {
+            NotifyWakeupState::Paths(_) => self.canonical_paths_pending.iter().cloned().collect(),
+            NotifyWakeupState::None | NotifyWakeupState::All => return,
+        };
+        if paths.is_empty() {
+            return;
+        }
+
+        let canonical_paths = join_all(paths.iter().map(fs::canonicalize))
+            .await
+            .into_iter();
+        for (path, canonical) in paths.into_iter().zip(canonical_paths) {
+            if let Ok(canonical) = canonical {
+                self.canonical_paths.insert(canonical);
+                self.canonical_paths_pending.remove(&path);
+            }
+        }
+        if self.canonical_paths.len() > NOTIFY_WAKEUP_PATH_LIMIT {
+            self.mark_all();
+        }
+    }
+
+    fn add_removed_paths(&mut self, paths: impl IntoIterator<Item = PathBuf>) {
+        let paths: Vec<PathBuf> = paths.into_iter().collect();
+        self.add_paths(paths.iter().cloned());
+        self.add_rename_candidates(paths);
+    }
+
+    fn add_created_paths(&mut self, paths: impl IntoIterator<Item = PathBuf>) {
+        let paths: Vec<PathBuf> = paths.into_iter().collect();
+        self.add_paths(paths.iter().cloned());
+        self.add_rename_candidates(paths);
+    }
+
+    fn add_rename_candidates(&mut self, paths: impl IntoIterator<Item = PathBuf>) {
+        for path in paths {
+            if self.rename_paths.len() < NOTIFY_RENAME_PATH_LIMIT
+                || self.rename_paths.contains(&path)
+            {
+                self.rename_paths.insert(path);
+            } else {
+                self.rename_paths_incomplete = true;
             }
         }
     }
 
     fn mark_all(&mut self) {
-        *self = NotifyWakeup::All;
+        self.state = NotifyWakeupState::All;
+        self.canonical_paths.clear();
+        self.canonical_paths_pending.clear();
     }
 
     fn take(&mut self) -> NotifyWakeup {
@@ -123,12 +202,35 @@ impl NotifyWakeup {
 
     /// Whether `path` should have its watcher nudged past its own read-pacing timers (see
     /// `FileWatcher::mark_ready_to_read`) for this reconciliation pass.
-    fn names(&self, path: &Path) -> bool {
-        match self {
-            NotifyWakeup::None => false,
-            NotifyWakeup::All => true,
-            NotifyWakeup::Paths(paths) => paths.contains(path),
+    fn names(&self, path: &Path, canonical_path: Option<&Path>) -> bool {
+        match &self.state {
+            NotifyWakeupState::None => false,
+            NotifyWakeupState::All => true,
+            NotifyWakeupState::Paths(paths) => {
+                paths.contains(path)
+                    || canonical_path.is_some_and(|path| self.canonical_paths.contains(path))
+            }
         }
+    }
+
+    fn named_paths(&self) -> Option<&HashSet<PathBuf>> {
+        (!self.rename_paths.is_empty()).then_some(&self.rename_paths)
+    }
+
+    fn requires_broad_rename_scan(&self) -> bool {
+        self.rename_paths_incomplete
+            // Raw rename paths are only candidates. Until one resolves to this watcher's inode,
+            // the path may already be gone (RenameFrom/Remove), so a tree scan is still needed.
+            || !self.rename_paths.is_empty()
+            || matches!(
+                &self.state,
+                NotifyWakeupState::None | NotifyWakeupState::All
+            )
+            || matches!(&self.state, NotifyWakeupState::Paths(paths) if paths.is_empty())
+    }
+
+    fn rename_paths_incomplete(&self) -> bool {
+        self.rename_paths_incomplete
     }
 }
 
@@ -140,26 +242,53 @@ impl NotifyWakeup {
 /// premature `unwatch`; this function's `false` result for such a watcher (until `rotate_wait`
 /// elapses) preserves that pre-existing behavior unchanged.
 ///
-/// An `Idle` watcher, by contrast, is never read while unfindable (`poll_idle_watchers` skips
-/// unfindable watchers outright, to avoid reactivating against a different file that's since
-/// appeared at the same path -- see that function's doc comment), so it has no other path to
-/// reaping at all. Waiting out the full `rotate_wait` (whose default is effectively unlimited)
-/// before reaping it would let every rotation past an `include` glob permanently add another
-/// watcher/checkpoint to `fp_map`. But reaping it the instant it's first seen unfindable is also
-/// wrong: a rename's target might not be fingerprint-matched back to this watcher in the exact
-/// same `discover()` pass that saw it disappear (a slow/partial rename, or -- under `Notify` mode
-/// -- the create/rename-to event simply hasn't been delivered/debounced through yet), in which
-/// case it would still be matched on a *later* pass if given the chance. This grants an `Idle`
-/// watcher at least one full `discovery_interval` -- the same cadence `discover()` itself already
-/// runs on -- to be rediscovered before reaping it: long enough to survive a rename spanning one
-/// discovery pass, but nowhere near `rotate_wait`'s effectively-unlimited default.
+/// An `Idle` watcher is normally not read while unfindable, because reopening its old path could
+/// attach the stale checkpoint to a replacement file. It is instead given one full
+/// `discovery_interval` to be fingerprint-matched at a new in-glob path. If the watcher has been
+/// located by identity at a path outside the glob, it follows the old `rotate_wait` grace period
+/// just like an `Active` watcher; `poll_idle_watchers` continues checking that known path.
+/// If rename candidates were truncated by a burst, defer this short idle grace period for a bounded
+/// recovery window, because the missing destination may still be found by a later pass. The window
+/// is managed by the caller and must not be extended by unrelated unfindable watchers.
 fn should_reap_unfindable_watcher(
     is_idle: bool,
+    path_outside_glob: bool,
     unfindable_for: Duration,
     discovery_interval: Duration,
     rotate_wait: Duration,
+    rename_recovery_protected: bool,
 ) -> bool {
-    (is_idle && unfindable_for > discovery_interval) || unfindable_for > rotate_wait
+    (is_idle
+        && !path_outside_glob
+        && !rename_recovery_protected
+        && unfindable_for > discovery_interval)
+        || unfindable_for > rotate_wait
+}
+
+fn idle_watcher_can_be_polled(
+    file_findable: bool,
+    path_outside_glob: bool,
+    path_has_tracked_identity: bool,
+) -> bool {
+    file_findable || (path_outside_glob && path_has_tracked_identity)
+}
+
+fn update_rename_recovery_deadline(
+    deadline: Option<time::Instant>,
+    incomplete: bool,
+    now: time::Instant,
+    discovery_interval: Duration,
+) -> Option<time::Instant> {
+    // Keep an already-live window unchanged. This makes repeated observations of one truncated
+    // burst idempotent; only an incomplete burst observed after expiry starts a new window.
+    if incomplete && deadline.is_none_or(|deadline| deadline <= now) {
+        Some(
+            now.checked_add(discovery_interval.saturating_mul(2))
+                .unwrap_or(now),
+        )
+    } else {
+        deadline
+    }
 }
 
 /// Salvage `watcher`'s final unterminated line, if any, into `lines`. Call this right before
@@ -333,7 +462,7 @@ where
         let include_patterns = self.paths_provider.watch_roots();
         let mut notify_discovery = match self.discovery_mode {
             FileDiscoveryMode::Notify if !include_patterns.is_empty() => {
-                match NotifyDiscovery::new(&include_patterns, &self.emitter) {
+                match NotifyDiscovery::new(&include_patterns, &self.emitter).await {
                     Ok(discovery) => Some(discovery),
                     Err(error) => {
                         warn!(
@@ -435,15 +564,21 @@ where
         // loop is captured strictly later, so `next_glob_time <= now_time` is unconditionally true
         // on that first check -- no separate "force the first pass" flag is needed. This pass must
         // not be treated as notify-triggered (that would wrongly nudge every watcher's read pacing
-        // via `NotifyWakeup::All`/`Paths` on startup, and under `PollingOnly` a notify-triggered
+        // via an `All`/`Paths` wakeup on startup, and under `PollingOnly` a notify-triggered
         // pass should never happen at all), so `pending_notify_wakeup` starts at `None`.
-        let mut pending_notify_wakeup = NotifyWakeup::None;
+        let mut pending_notify_wakeup = NotifyWakeup::default();
         // Throttles notify-triggered full reconciliation passes independently of the backstop
         // timer (`next_glob_time`/`discovery_interval`): see `MIN_NOTIFY_DISCOVERY_INTERVAL`'s
         // doc comment for why. Starts at "now" so the very first notify event, whenever it
         // arrives, is handled immediately rather than waiting out this interval from process
         // start for no reason.
         let mut next_notify_discovery_time = time::Instant::now();
+        // Keep this separate from the wakeup itself. A truncated candidate set gets a bounded
+        // recovery window after the wakeup is consumed; otherwise the next main-loop iteration
+        // could reap a watcher before the next reconciliation pass has had a chance to find the
+        // omitted rename destination. The deadline is never extended by an ordinary wakeup or by
+        // an unrelated watcher that happens to remain unfindable.
+        let mut rename_recovery_deadline = None;
         loop {
             // Use `reconcile_interval` whenever `Notify` mode was configured, even if the notify
             // watcher isn't currently live (it failed to initialize, or died mid-run and was set
@@ -462,6 +597,15 @@ where
             // triggers this early (ahead of `next_glob_time`) once `next_notify_discovery_time`
             // has also elapsed -- see `MIN_NOTIFY_DISCOVERY_INTERVAL`.
             let now_time = time::Instant::now();
+            // Raise this as soon as the truncated wakeup is pending, not only after a
+            // reconciliation consumes it. Notify throttling can leave a wakeup queued for a few
+            // iterations, and the reaping check below must be conservative during that window.
+            rename_recovery_deadline = update_rename_recovery_deadline(
+                rename_recovery_deadline,
+                pending_notify_wakeup.rename_paths_incomplete(),
+                now_time,
+                discovery_interval,
+            );
             let notify_wakeup_ready =
                 pending_notify_wakeup.is_pending() && next_notify_discovery_time <= now_time;
             if next_glob_time <= now_time || notify_wakeup_ready {
@@ -472,7 +616,7 @@ where
                         now_time.checked_add(MIN_NOTIFY_DISCOVERY_INTERVAL).unwrap();
                     pending_notify_wakeup.take()
                 } else {
-                    NotifyWakeup::None
+                    NotifyWakeup::default()
                 };
                 // Schedule the next backstop reconciliation time.
                 next_glob_time = now_time.checked_add(discovery_interval).unwrap();
@@ -506,7 +650,17 @@ where
                 stats.record("discovery", start.elapsed());
 
                 let start = time::Instant::now();
-                self.poll_idle_watchers(&mut fp_map, &mut lines).await;
+                // An event can be pending during the notify throttle while this pass is being
+                // run for the ordinary reconciliation timer. Idle rename recovery may use those
+                // named paths immediately; unlike active-read nudges, it does not bypass any
+                // read pacing and is needed to avoid reaping a cross-directory rotation first.
+                let idle_poll_wakeup = if woken_by_notify_event.is_pending() {
+                    &woken_by_notify_event
+                } else {
+                    &pending_notify_wakeup
+                };
+                self.poll_idle_watchers(&mut fp_map, &mut lines, idle_poll_wakeup)
+                    .await;
                 stats.record("idle-poll", start.elapsed());
             }
 
@@ -646,9 +800,12 @@ where
                 // watchers need different grace periods here.
                 if should_reap_unfindable_watcher(
                     watcher.is_idle(),
+                    watcher.path_is_outside_glob(),
                     watcher.last_seen().elapsed(),
                     discovery_interval,
                     self.rotate_wait,
+                    rename_recovery_deadline
+                        .is_some_and(|deadline| deadline > time::Instant::now()),
                 ) {
                     salvage_final_partial_line(watcher, file_id, &mut lines);
                     watcher.set_dead();
@@ -741,7 +898,9 @@ where
                     msg = discovery.recv() => {
                         let channel_closed = msg.is_none();
                         disable_notify = channel_closed
-                            || !self.handle_notify_message(msg, discovery, &mut pending_notify_wakeup);
+                            || !self
+                                .handle_notify_message(msg, discovery, &mut pending_notify_wakeup)
+                                .await;
                         // Briefly drain/debounce further events so a burst of writes collapses
                         // into a single reconciliation pass. Each drained message still goes
                         // through the same handling as the message above (not just discarded):
@@ -757,7 +916,13 @@ where
                                     let msg = discovery.recv().await;
                                     let is_none = msg.is_none();
                                     if is_none
-                                        || !self.handle_notify_message(msg, discovery, &mut pending_notify_wakeup)
+                                        || !self
+                                            .handle_notify_message(
+                                                msg,
+                                                discovery,
+                                                &mut pending_notify_wakeup,
+                                            )
+                                            .await
                                     {
                                         return true;
                                     }
@@ -830,7 +995,7 @@ where
     /// Returns `false` if notify-based discovery must be disabled entirely (the watcher failed to
     /// rebuild after a backend error), `true` otherwise.
     #[must_use]
-    fn handle_notify_message(
+    async fn handle_notify_message(
         &self,
         msg: Option<NotifyMessage>,
         discovery: &mut NotifyDiscovery,
@@ -843,6 +1008,10 @@ where
                 // should only touch watchers this event actually concerns, not every tracked file --
                 // see `NotifyWakeup`'s docs for why nudging everything on every event doesn't scale.
                 pending_notify_wakeup.add_paths(paths);
+            }
+            Some(NotifyMessage::PathsCreated(paths)) => {
+                trace!(message = "Received file creation notification.", ?paths);
+                pending_notify_wakeup.add_created_paths(paths);
             }
             Some(NotifyMessage::PathsRemoved(paths)) => {
                 trace!(message = "Received file removal notification.", ?paths);
@@ -859,7 +1028,7 @@ where
                         discovery.forget_watch(path);
                     }
                 }
-                pending_notify_wakeup.add_paths(paths);
+                pending_notify_wakeup.add_removed_paths(paths);
             }
             Some(NotifyMessage::Overflow) => {
                 self.emitter.emit_file_watch_events_overflowed();
@@ -890,6 +1059,7 @@ where
             }
             None => {}
         }
+        pending_notify_wakeup.resolve_canonical_paths().await;
         true
     }
 
@@ -912,7 +1082,7 @@ where
     /// `notify_wakeup` distinguishes a pass triggered by an actual OS-level filesystem event from
     /// one triggered by the periodic timer alone (`glob_minimum_cooldown` in `PollingOnly` mode,
     /// or the `reconcile_interval` backstop in `Notify` mode): only for a watcher whose path
-    /// `notify_wakeup` actually names (`NotifyWakeup::Paths`) or when it's `NotifyWakeup::All`
+    /// `notify_wakeup` actually names or when it's an `All` wakeup
     /// (an event that didn't name specific paths, e.g. `Overflow`/`BackendError`, or more distinct
     /// paths than `NOTIFY_WAKEUP_PATH_LIMIT`) does an already-tracked, still-`Active` watcher get
     /// nudged past its own independent read-pacing timers (see the "same path" branch below and
@@ -922,26 +1092,11 @@ where
     /// meant a single notify event under a large `include` glob cost an O(N) sweep of every other
     /// tracked file's read pacing too, not just the one path that actually changed.
     ///
-    /// `notify_wakeup.names(&path)` compares paths as reported by the OS notify backend against
-    /// `path` as yielded by `paths_provider.paths()`. The `notify` crate always resolves the path
-    /// it was asked to `watch()` to an absolute one internally (via the current working directory)
-    /// before using it, and reports its events using that same absolute form -- but a glob-based
-    /// `PathsProvider` can yield a relative path unchanged if the configured `include` pattern was
-    /// itself relative. Without accounting for this, `notify_wakeup.names(&path)` would compare a
-    /// relative `path` against an absolute event path and never match, silently defeating the
-    /// nudge for every file matched by a relative `include` pattern. `discover` absolutizes `path`
-    /// (via `crate::absolutize`) the same way `notify` would before comparing.
-    ///
-    /// **Known limitation**: this only accounts for relative-vs-absolute, not full
-    /// canonicalization (symlink resolution): canonicalizing every tracked file's path on every
-    /// pass, just to cover a much rarer case, would cost a `stat`-like syscall per file per pass
-    /// for a benefit that's purely about read-latency, not correctness. If an `include` pattern
-    /// traverses a symlink and the two sides resolve it differently even after absolutizing, the
-    /// nudge can still silently not fire for that watcher on that pass. This degrades gracefully:
-    /// `should_read`'s own timers still fire eventually, and the periodic
-    /// `reconcile_interval`/`glob_minimum_cooldown` backstop still runs regardless of this nudge,
-    /// so the affected file falls back to ordinary polling-like latency rather than losing data or
-    /// getting stuck.
+    /// `notify_wakeup.names` compares the absolute event path with the path yielded by
+    /// `paths_provider.paths()`. It also compares the event's canonical path with the cached
+    /// canonical path of the watcher, so symlink aliases do not silently lose the low-latency
+    /// nudge. Canonicalization is done once per event path while building the bounded wakeup set,
+    /// not once per tracked file on every pass.
     /// Returns `false` if notify-based discovery must be disabled entirely (the watcher failed to
     /// rebuild after a backend error), `true` otherwise.
     #[must_use]
@@ -962,8 +1117,9 @@ where
         // own once a recursive watch is established on their ancestor.
         let mut keep_notify_discovery = true;
         if let Some(discovery) = notify_discovery {
-            keep_notify_discovery =
-                discovery.resync_watches(&self.paths_provider.watch_roots(), &self.emitter);
+            keep_notify_discovery = discovery
+                .resync_watches(&self.paths_provider.watch_roots(), &self.emitter)
+                .await;
         }
 
         for (_file_id, watcher) in &mut *fp_map {
@@ -988,15 +1144,15 @@ where
                 if let Some(watcher) = fp_map.get_mut(&file_id) {
                     // file fingerprint matches a watched file
                     let was_found_this_cycle = watcher.file_findable();
-                    watcher.set_file_findable(true);
                     if watcher.path == path {
+                        watcher.set_file_findable(true);
                         trace!(
                             message = "Continue watching file.",
                             path = ?path,
                         );
                         let absolutized_path =
                             crate::absolutize(&path, cwd_for_notify_comparison.as_deref());
-                        if notify_wakeup.names(&absolutized_path) {
+                        if notify_wakeup.names(&absolutized_path, watcher.canonical_path()) {
                             // A concrete filesystem event named this exact path (or we can't tell
                             // which paths changed, e.g. `Overflow`), so this watcher may have new
                             // data waiting even if it's currently mid-EOF-backoff or past the
@@ -1012,8 +1168,16 @@ where
                             path = ?path,
                             old_path = ?watcher.path
                         );
-                        watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                        // Keep the watcher unfindable until the new path is opened successfully.
+                        // The path may disappear between fingerprinting and opening it.
+                        if watcher.update_path(path).await.is_ok() {
+                            watcher.set_file_findable(true);
+                        }
                     } else {
+                        // This watcher was already matched by another path in this pass, so the
+                        // original path remains valid even if switching to this newer duplicate
+                        // fails.
+                        watcher.set_file_findable(true);
                         info!(
                             message = "More than one file has the same fingerprint.",
                             path = ?path,
@@ -1048,23 +1212,88 @@ where
     /// the same discovery cadence (`discover`'s caller) rather than adding a whole separate
     /// polling loop. Promotes any that changed back to `Active` so the read loop picks them up.
     ///
-    /// Skips watchers that `discover`'s glob/fingerprint pass just marked unfindable. An `Idle`
-    /// watcher holds no handle, so unlike an `Active` one it has no OS-level pin on the specific
-    /// inode it was watching: if its old path was renamed away (rotation) and something new was
-    /// created at that same path before `rotate_wait` elapses and the stale watcher is reaped, a
-    /// stat against `watcher.path` here would be observing the *new* file. Reactivating in that
-    /// case would seek the new file to the old, unrelated checkpoint offset -- silently skipping
-    /// or re-reading data. Findable watchers are exactly the ones `discover`'s fingerprint match
-    /// confirmed still refer to the same file, so only those are safe to promote here.
+    /// Normally skips watchers that `discover`'s glob/fingerprint pass marked unfindable. An
+    /// `Idle` watcher holds no handle, so reopening its old path could attach the stale checkpoint
+    /// to a replacement file. The exception is a watcher whose original inode was located at a
+    /// path outside the glob; notify event paths are checked for every unfindable watcher so
+    /// repeated rotations remain recoverable. A broad scan is also used for an outside-glob
+    /// watcher when there is no precise rename candidate (polling, overflow, or an empty event)
+    /// or when the candidate set was truncated. Once the path is identity-verified, it is safe to
+    /// continue polling, preserving data appended after rotation.
     async fn poll_idle_watchers(
         &self,
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         lines: &mut Vec<Line>,
+        notify_wakeup: &NotifyWakeup,
     ) {
+        let event_identities = match notify_wakeup.named_paths() {
+            Some(paths) => Some(identify_event_paths(paths).await),
+            None => None,
+        };
+        let mut tree_identities_by_root = HashMap::new();
+
         for (&file_id, watcher) in &mut *fp_map {
-            if !watcher.is_idle() || !watcher.file_findable() {
+            if !watcher.is_idle() {
                 continue;
             }
+
+            let mut path_has_tracked_identity = false;
+            if !watcher.file_findable() {
+                // Event paths are precise and cheap to inspect. Check them even after this
+                // watcher was moved outside the glob: a later rotation can move that same inode
+                // again. Scan the parent tree when raw rename candidates cannot identify this
+                // watcher, or when polling/coarse reconciliation requires a fallback. For an
+                // outside-glob watcher, first avoid that scan while its current path still has
+                // the tracked identity (unless an explicit rename candidate is pending, because
+                // the event can arrive before the filesystem rename has finished); the scan is
+                // still shared per root for the whole pass.
+                let path_outside_glob = watcher.path_is_outside_glob();
+                path_has_tracked_identity =
+                    path_outside_glob && watcher.path_has_tracked_identity().await;
+                let broad_scan_required = !path_outside_glob
+                    || self.discovery_mode == FileDiscoveryMode::PollingOnly
+                    || notify_wakeup.requires_broad_rename_scan();
+                let path = if let Some(path) =
+                    watcher.find_renamed_path_in_identities(event_identities.as_ref())
+                {
+                    Some(path)
+                } else if broad_scan_required
+                    && (!path_outside_glob
+                        || event_identities.is_some()
+                        || !path_has_tracked_identity)
+                {
+                    let Some(root) = watcher.rename_search_root() else {
+                        continue;
+                    };
+                    if !tree_identities_by_root.contains_key(&root) {
+                        tree_identities_by_root
+                            .insert(root.clone(), identify_paths_in_tree(&root).await);
+                    }
+                    watcher
+                        .find_renamed_path_with_identities(None, tree_identities_by_root.get(&root))
+                        .await
+                } else {
+                    None
+                };
+
+                if let Some(path) = path {
+                    if let Err(error) = watcher.update_path(path).await {
+                        self.emitter.emit_file_watch_error(&watcher.path, error);
+                    } else {
+                        watcher.mark_path_outside_glob();
+                        path_has_tracked_identity = true;
+                    }
+                }
+            }
+
+            if !idle_watcher_can_be_polled(
+                watcher.file_findable(),
+                watcher.path_is_outside_glob(),
+                path_has_tracked_identity,
+            ) {
+                continue;
+            }
+
             match watcher.check_for_new_data().await {
                 Ok(true) => {
                     if let Err(error) = watcher.reactivate().await {
@@ -1314,7 +1543,7 @@ mod tests {
     fn notify_wakeup_starts_none_and_reports_not_pending() {
         let wakeup = NotifyWakeup::default();
         assert!(!wakeup.is_pending());
-        assert!(!wakeup.names(&PathBuf::from("/var/log/a.log")));
+        assert!(!wakeup.names(&PathBuf::from("/var/log/a.log"), None));
     }
 
     #[test]
@@ -1327,11 +1556,19 @@ mod tests {
         wakeup.add_paths([PathBuf::from("/var/log/a.log")]);
 
         assert!(wakeup.is_pending());
-        assert!(wakeup.names(&PathBuf::from("/var/log/a.log")));
+        assert!(wakeup.names(&PathBuf::from("/var/log/a.log"), None));
         assert!(
-            !wakeup.names(&PathBuf::from("/var/log/b.log")),
+            !wakeup.names(&PathBuf::from("/var/log/b.log"), None),
             "a path the event didn't name must not be reported as needing a nudge"
         );
+    }
+
+    #[test]
+    fn outside_glob_idle_watcher_requires_identity_before_polling() {
+        assert!(idle_watcher_can_be_polled(true, true, false));
+        assert!(idle_watcher_can_be_polled(false, true, true));
+        assert!(!idle_watcher_can_be_polled(false, true, false));
+        assert!(!idle_watcher_can_be_polled(false, false, true));
     }
 
     #[test]
@@ -1340,9 +1577,9 @@ mod tests {
         wakeup.add_paths([PathBuf::from("/var/log/a.log")]);
         wakeup.add_paths([PathBuf::from("/var/log/b.log")]);
 
-        assert!(wakeup.names(&PathBuf::from("/var/log/a.log")));
-        assert!(wakeup.names(&PathBuf::from("/var/log/b.log")));
-        assert!(!wakeup.names(&PathBuf::from("/var/log/c.log")));
+        assert!(wakeup.names(&PathBuf::from("/var/log/a.log"), None));
+        assert!(wakeup.names(&PathBuf::from("/var/log/b.log"), None));
+        assert!(!wakeup.names(&PathBuf::from("/var/log/c.log"), None));
     }
 
     #[test]
@@ -1354,7 +1591,7 @@ mod tests {
         wakeup.mark_all();
 
         assert!(wakeup.is_pending());
-        assert!(wakeup.names(&PathBuf::from("/var/log/anything.log")));
+        assert!(wakeup.names(&PathBuf::from("/var/log/anything.log"), None));
     }
 
     #[test]
@@ -1367,8 +1604,157 @@ mod tests {
             (0..=NOTIFY_WAKEUP_PATH_LIMIT).map(|i| PathBuf::from(format!("/var/log/{i}.log")));
         wakeup.add_paths(many_paths);
 
-        assert!(matches!(wakeup, NotifyWakeup::All));
-        assert!(wakeup.names(&PathBuf::from("/var/log/anything-else.log")));
+        assert!(matches!(&wakeup.state, NotifyWakeupState::All));
+        assert!(wakeup.names(&PathBuf::from("/var/log/anything-else.log"), None));
+    }
+
+    #[test]
+    fn notify_wakeup_keeps_rename_paths_when_change_path_limit_is_exceeded() {
+        let mut wakeup = NotifyWakeup::default();
+        let destination = PathBuf::from("/var/log/archive/app.log.1");
+        wakeup.add_removed_paths([destination.clone()]);
+        wakeup.add_paths(
+            (0..=NOTIFY_WAKEUP_PATH_LIMIT).map(|i| PathBuf::from(format!("/var/log/{i}.log"))),
+        );
+
+        assert!(matches!(&wakeup.state, NotifyWakeupState::All));
+        assert_eq!(
+            wakeup
+                .named_paths()
+                .and_then(|paths| paths.get(&destination)),
+            Some(&destination),
+            "rename candidates must survive the coarse change-path wakeup"
+        );
+    }
+
+    #[test]
+    fn notify_wakeup_does_not_use_ordinary_change_paths_for_rename_recovery() {
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([PathBuf::from("/var/log/app.log")]);
+
+        assert!(
+            wakeup.named_paths().is_none(),
+            "ordinary writes must not cause every idle watcher to scan their event path"
+        );
+    }
+
+    #[test]
+    fn broad_rename_scan_is_used_when_precise_candidates_are_unavailable() {
+        let wakeup = NotifyWakeup::default();
+        assert!(wakeup.requires_broad_rename_scan());
+
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([PathBuf::from("/var/log/app.log")]);
+        assert!(!wakeup.requires_broad_rename_scan());
+
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.mark_all();
+        assert!(wakeup.requires_broad_rename_scan());
+
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_removed_paths(
+            (0..=NOTIFY_RENAME_PATH_LIMIT)
+                .map(|i| PathBuf::from(format!("/var/log/archive/{i}.log"))),
+        );
+        assert!(wakeup.requires_broad_rename_scan());
+
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_removed_paths([PathBuf::from("/var/log/app.log.1")]);
+        assert!(
+            wakeup.requires_broad_rename_scan(),
+            "raw rename paths are candidates only; an already-removed source path still needs a tree scan"
+        );
+    }
+
+    #[test]
+    fn pathless_wakeup_remains_coarse_after_named_event() {
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths(std::iter::empty());
+        wakeup.add_paths([PathBuf::from("/var/log/app.log")]);
+
+        assert!(matches!(&wakeup.state, NotifyWakeupState::All));
+        assert!(wakeup.requires_broad_rename_scan());
+        assert!(wakeup.names(&PathBuf::from("/var/log/other.log"), None));
+    }
+
+    #[test]
+    fn incomplete_rename_paths_temporarily_defer_idle_reaping() {
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_removed_paths(
+            (0..=NOTIFY_RENAME_PATH_LIMIT)
+                .map(|i| PathBuf::from(format!("/var/log/archive/{i}.log"))),
+        );
+
+        assert!(wakeup.rename_paths_incomplete());
+        assert!(!should_reap_unfindable_watcher(
+            true,
+            false,
+            Duration::from_secs(60),
+            Duration::from_secs(5),
+            Duration::from_secs(3600),
+            wakeup.rename_paths_incomplete(),
+        ));
+    }
+
+    #[test]
+    fn incomplete_rename_recovery_window_is_bounded_and_not_extended() {
+        let started_at = time::Instant::now();
+        let interval = Duration::from_secs(5);
+        let deadline = update_rename_recovery_deadline(None, true, started_at, interval)
+            .expect("an incomplete rename burst must start a recovery window");
+
+        let unchanged = update_rename_recovery_deadline(
+            Some(deadline),
+            false,
+            started_at + Duration::from_secs(1),
+            interval,
+        );
+        assert_eq!(
+            unchanged,
+            Some(deadline),
+            "an unrelated wakeup must not extend the recovery window"
+        );
+
+        let unchanged_for_same_burst = update_rename_recovery_deadline(
+            Some(deadline),
+            true,
+            started_at + Duration::from_secs(1),
+            interval,
+        );
+        assert_eq!(
+            unchanged_for_same_burst,
+            Some(deadline),
+            "revisiting the same incomplete burst must not extend its recovery window"
+        );
+
+        let refreshed = update_rename_recovery_deadline(
+            Some(deadline),
+            true,
+            deadline + Duration::from_millis(1),
+            interval,
+        )
+        .expect("a later incomplete burst may start its own recovery window");
+        assert!(
+            refreshed > deadline,
+            "a new incomplete burst after expiry must get a fresh bounded window"
+        );
+
+        assert!(!should_reap_unfindable_watcher(
+            true,
+            false,
+            Duration::from_secs(60),
+            interval,
+            Duration::from_secs(3600),
+            true,
+        ));
+        assert!(should_reap_unfindable_watcher(
+            true,
+            false,
+            Duration::from_secs(60),
+            interval,
+            Duration::from_secs(3600),
+            false,
+        ));
     }
 
     #[test]
@@ -1397,27 +1783,33 @@ mod tests {
         assert!(
             !should_reap_unfindable_watcher(
                 true,
+                false,
                 Duration::from_millis(1),
                 discovery_interval,
                 rotate_wait,
+                false,
             ),
             "an idle watcher must not be reaped the instant it's first seen unfindable"
         );
         assert!(
             !should_reap_unfindable_watcher(
                 true,
+                false,
                 discovery_interval - Duration::from_millis(1),
                 discovery_interval,
                 rotate_wait,
+                false,
             ),
             "an idle watcher must survive at least one full discovery interval unfindable"
         );
         assert!(
             should_reap_unfindable_watcher(
                 true,
+                false,
                 discovery_interval + Duration::from_millis(1),
                 discovery_interval,
                 rotate_wait,
+                false,
             ),
             "an idle watcher must be reaped once it's been unfindable longer than a discovery \
              interval, rather than waiting out the (possibly effectively-infinite) rotate_wait"
@@ -1435,21 +1827,48 @@ mod tests {
         assert!(
             !should_reap_unfindable_watcher(
                 false,
+                false,
                 discovery_interval + Duration::from_secs(1),
                 discovery_interval,
                 rotate_wait,
+                false,
             ),
             "an active watcher must not be reaped just because a discovery interval elapsed"
         );
         assert!(
             should_reap_unfindable_watcher(
                 false,
+                false,
                 rotate_wait + Duration::from_millis(1),
                 discovery_interval,
                 rotate_wait,
+                false,
             ),
             "an active watcher must still be reaped once rotate_wait elapses"
         );
+    }
+
+    #[test]
+    fn idle_watcher_found_outside_glob_keeps_its_rotate_wait_grace_period() {
+        let discovery_interval = Duration::from_secs(5);
+        let rotate_wait = Duration::from_secs(3600);
+
+        assert!(!should_reap_unfindable_watcher(
+            true,
+            true,
+            rotate_wait - Duration::from_millis(1),
+            discovery_interval,
+            rotate_wait,
+            false,
+        ));
+        assert!(should_reap_unfindable_watcher(
+            true,
+            true,
+            rotate_wait + Duration::from_millis(1),
+            discovery_interval,
+            rotate_wait,
+            false,
+        ));
     }
 
     #[test]
@@ -1465,17 +1884,70 @@ mod tests {
 
         let glob_discovered_path = PathBuf::from("logs/app.log");
         assert!(
-            !wakeup.names(&glob_discovered_path),
+            !wakeup.names(&glob_discovered_path, None),
             "sanity check: comparing the raw relative path against the absolute notify path \
              must not match"
         );
 
         let absolutized = crate::absolutize(&glob_discovered_path, Some(&cwd));
         assert!(
-            wakeup.names(&absolutized),
+            wakeup.names(&absolutized, None),
             "after absolutizing the glob-discovered relative path the same way notify resolves \
              its own watch paths, it must match the notify-reported absolute path"
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn notify_wakeup_matches_canonical_file_path() {
+        let directory = tempfile::tempdir().unwrap();
+        let real_path = directory.path().join("real.log");
+        let alias_path = directory.path().join("alias.log");
+        std::fs::write(&real_path, b"line\n").unwrap();
+        std::os::unix::fs::symlink(&real_path, &alias_path).unwrap();
+
+        let canonical_path = std::fs::canonicalize(&real_path).unwrap();
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([alias_path]);
+        wakeup.resolve_canonical_paths().await;
+
+        assert!(
+            wakeup.names(&canonical_path, Some(&canonical_path)),
+            "a canonical notify path must match a watcher reached through a symlink alias"
+        );
+    }
+
+    #[tokio::test]
+    async fn notify_wakeup_canonicalizes_only_new_paths_and_retries_missing_paths() {
+        let directory = tempfile::tempdir().unwrap();
+        let existing_path = directory.path().join("existing.log");
+        let missing_path = directory.path().join("missing.log");
+        std::fs::write(&existing_path, b"line\n").unwrap();
+
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([existing_path.clone()]);
+        wakeup.resolve_canonical_paths().await;
+        assert!(
+            wakeup.canonical_paths_pending.is_empty(),
+            "a successfully canonicalized path should leave the pending delta"
+        );
+
+        wakeup.add_paths([existing_path.clone()]);
+        assert!(
+            wakeup.canonical_paths_pending.is_empty(),
+            "repeated events for a resolved path must not enqueue another canonicalization"
+        );
+
+        wakeup.add_paths([missing_path.clone()]);
+        wakeup.resolve_canonical_paths().await;
+        assert!(
+            wakeup.canonical_paths_pending.contains(&missing_path),
+            "a path that disappeared during a rename must remain retryable"
+        );
+
+        std::fs::write(&missing_path, b"line\n").unwrap();
+        wakeup.resolve_canonical_paths().await;
+        assert!(!wakeup.canonical_paths_pending.contains(&missing_path));
     }
 
     #[derive(Clone)]

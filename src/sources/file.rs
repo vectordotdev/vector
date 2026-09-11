@@ -281,11 +281,16 @@ pub struct FileConfig {
     /// by itself stop an already-discovered file from holding a handle open indefinitely -- this
     /// option is what does that.
     ///
-    /// This also applies at startup: a file that also matches `ignore_older_secs` is never opened
-    /// in the first place, as long as Vector can determine without opening it that there is no
-    /// new data to read (either because its on-disk size already matches its stored checkpoint
-    /// position, or because it isn't gzip-compressed, in which case an old file is never read
-    /// from regardless of checkpoint).
+    /// After the handle is closed, rotation recovery can identify the old file at a path reported
+    /// by `notify` or below its previous parent directory. If a rotator moves it outside both of
+    /// those areas, there is no portable way to find the file after its handle is closed. Set this
+    /// option to `null` when arbitrary cross-directory rotation must be supported.
+    ///
+    /// This also applies at startup: a file that also matches `ignore_older_secs` is only opened
+    /// briefly to check whether it is gzip-compressed and to capture its identity, then the handle
+    /// is closed when Vector can determine that there is no new data to read (either because its
+    /// on-disk size already matches its stored checkpoint position, or because it isn't
+    /// gzip-compressed, in which case an old file is never read from regardless of checkpoint).
     ///
     /// Defaults to 60 seconds. Set this explicitly to `null` to disable idle-timeout-based closing
     /// entirely, so that active file handles are only ever closed by other means (for example,
@@ -2872,21 +2877,12 @@ mod tests {
 
     #[tokio::test]
     async fn idle_file_rotation_behind_narrow_glob_reads_new_file_not_stale_offset() {
-        // Same scenario as `idle_file_rotation_reads_new_file_not_stale_offset`,
-        // but with an `include` glob narrow enough that the archived file left
-        // behind by rotation does *not* match it (a common real-world setup,
-        // e.g. `*.log` with rotated files renamed to `*.log.1`). In that case
-        // the old watcher never gets an `update_path` call pointing it at the
-        // archive -- its fingerprint simply isn't found under any matched path
-        // during the glob rescan -- so it's marked unfindable and left exactly
-        // where it was: watching the *original path*, which now refers to a
-        // brand new file on disk. An `Idle` watcher holds no handle, so unlike
-        // an `Active` one it has no OS-level pin on the specific inode it was
-        // watching; if `FileServer`'s idle-poll pass doesn't also check
-        // findability before stat-ing and reactivating, it will observe the
-        // new file's size/mtime differing from what it last knew, reactivate
-        // by reopening the (new) file at the *old* checkpoint offset, and
-        // silently skip or corrupt the new file's content.
+        // Same scenario as `idle_file_rotation_reads_new_file_not_stale_offset`, but with an
+        // `include` glob narrow enough that the archived file does *not* match it (a common
+        // setup, e.g. `*.log` with rotated files renamed to `*.log.1`). The idle watcher has no
+        // descriptor to pin the old inode, so it must locate that inode by identity in the parent
+        // directory before reopening; otherwise an append through the writer's retained
+        // descriptor would be lost and the replacement file could inherit a stale offset.
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*.log")],
@@ -2921,13 +2917,94 @@ mod tests {
                 writeln!(&mut new_file, "brand new file content").unwrap();
                 new_file.flush().unwrap();
 
-                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 2, 5_000).await;
+                // The writer still has the rotated inode open. This data must be read from the
+                // archive even though that path is outside the include glob.
+                writeln!(&mut file, "late old file content").unwrap();
+                file.flush().unwrap();
+
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 3, 5_000).await;
+
+                // Rotate the already archived inode again. This exercises the case where the
+                // watcher is already tracking a path outside the glob: the next notify event
+                // must still relocate that inode instead of abandoning it after the first move.
+                sleep(Duration::from_millis(750)).await;
+                let second_archive_path = dir.path().join("app.log.2");
+                fs::rename(&archive_path, &second_archive_path).expect("could not rename again");
+                writeln!(&mut file, "late old file content after second rotation").unwrap();
+                file.flush().unwrap();
+
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 4, 5_000).await;
+            },
+        )
+        .await;
+
+        let mut lines = extract_messages_string(received);
+        lines.sort();
+        assert_eq!(
+            lines,
+            vec![
+                "brand new file content",
+                "late old file content",
+                "late old file content after second rotation",
+                "old file content",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn idle_outside_glob_replacement_is_not_reopened() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*.log")],
+            idle_timeout_secs: Some(0),
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("app.log");
+        let archive_path = dir.path().join("app.log.1");
+        let counter = Arc::new(AtomicUsize::new(0));
+        let received = run_file_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(Arc::clone(&counter)),
+            async {
+                let mut old_file = File::create(&path).unwrap();
+                writeln!(&mut old_file, "old file content").unwrap();
+                old_file.flush().unwrap();
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 1, 5_000).await;
+
+                sleep(Duration::from_millis(750)).await;
+                fs::rename(&path, &archive_path).unwrap();
+
+                let mut new_file = File::create(&path).unwrap();
+                writeln!(&mut new_file, "new file content").unwrap();
+                new_file.flush().unwrap();
+                writeln!(&mut old_file, "late old file content").unwrap();
+                old_file.flush().unwrap();
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 3, 5_000).await;
+
+                // Ensure the old inode has been found outside the glob and its idle handle closed
+                // before removing it. The replacement below must not be attached to that watcher.
+                sleep(Duration::from_millis(750)).await;
+                drop(old_file);
+                fs::remove_file(&archive_path).unwrap();
+                let mut replacement = File::create(&archive_path).unwrap();
+                writeln!(&mut replacement, "unrelated replacement").unwrap();
+                replacement.flush().unwrap();
+
+                sleep(Duration::from_millis(750)).await;
             },
         )
         .await;
 
         let lines = extract_messages_string(received);
-        assert_eq!(lines, vec!["old file content", "brand new file content"]);
+        assert_eq!(lines.len(), 3);
+        assert!(
+            !lines.iter().any(|line| line == "unrelated replacement"),
+            "a replacement at the old outside-glob path must not be reopened"
+        );
     }
 
     #[derive(Clone, Copy, Eq, PartialEq)]

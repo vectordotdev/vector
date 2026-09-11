@@ -22,6 +22,9 @@ file-source-common = { path = "../file-source-common" }
 async-compression.workspace = true
 notify.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
 quickcheck.workspace = true

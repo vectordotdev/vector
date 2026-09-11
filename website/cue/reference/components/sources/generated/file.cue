@@ -67,6 +67,17 @@ generated: components: sources: file: configuration: {
 			items: type: string: examples: ["/var/log/binary-file.log"]
 		}
 	}
+	file_discovery_mode: {
+		description: "The mechanism used to discover new files, detect renames, and wake up reads of existing files."
+		required:    false
+		type: string: {
+			default: "polling"
+			enum: {
+				notify:  "Use OS-level file system event notifications to discover files and wake up reads promptly, falling back to a periodic reconciliation pass (`reconcile_interval_secs`) as a correctness backstop."
+				polling: "Re-scan the `include` glob patterns on a fixed interval (`glob_minimum_cooldown_ms`)."
+			}
+		}
+	}
 	file_key: {
 		description: """
 			Overrides the name of the log field used to add the file path to each event.
@@ -169,6 +180,35 @@ generated: components: sources: file: configuration: {
 			"""
 		required: false
 		type: string: examples: ["hostname"]
+	}
+	idle_timeout_secs: {
+		description: """
+			How long to wait, after a file has been fully read (reached EOF) and stops receiving new
+			data, before closing its file handle.
+
+			Vector keeps polling the file's metadata (size and modification time) cheaply, without
+			holding the handle open, and transparently reopens the file if new data arrives. This
+			avoids holding a large number of open file handles for files that are being watched but
+			are not actively being written to.
+
+			After the handle is closed, rotation recovery can identify the old file at a path reported
+			by `notify` or below its previous parent directory. If a rotator moves it outside both of
+			those areas, there is no portable way to find the file after its handle is closed. Set this
+			option to `null` when arbitrary cross-directory rotation must be supported.
+
+			This also applies at startup: a file that also matches `ignore_older_secs` is only opened
+			briefly to check whether it is gzip-compressed and to capture its identity, then the handle
+			is closed when Vector can determine that there is no new data to read.
+
+			Defaults to 60 seconds. Set this explicitly to `null` to disable idle-timeout-based
+			closing entirely.
+			"""
+		required: false
+		type: uint: {
+			default: 60
+			examples: [60]
+			unit:    "seconds"
+		}
 	}
 	ignore_checkpoints: {
 		description: """
@@ -280,6 +320,19 @@ generated: components: sources: file: configuration: {
 				beginning: "Read from the beginning of the file."
 				end:       "Start reading from the current end of the file."
 			}
+		}
+	}
+	reconcile_interval_secs: {
+		description: """
+			How often to run the full glob+fingerprint reconciliation pass when
+			`file_discovery_mode` is `notify`. This exists purely as a correctness backstop for
+			OS-level file watch events that were dropped or that occurred before the watch was
+			established. Ignored when `file_discovery_mode` is `polling`.
+			"""
+		required: false
+		type: uint: {
+			default: 300
+			unit:    "seconds"
 		}
 	}
 	remove_after_secs: {
