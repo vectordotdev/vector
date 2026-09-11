@@ -1,10 +1,7 @@
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeSet, HashMap},
-    env,
-    ffi::OsString,
     mem,
-    sync::Mutex,
 };
 
 use indexmap::IndexMap;
@@ -611,32 +608,30 @@ where
     generate_root_schema_with_settings::<T>(default_schema_settings())
 }
 
-static SCHEMA_ENV_LOCK: Mutex<()> = Mutex::new(());
-
-struct SchemaEnvironment {
-    previous: Option<OsString>,
+thread_local! {
+    static GENERATING_ROOT_SCHEMA: Cell<bool> = const { Cell::new(false) };
 }
 
-impl SchemaEnvironment {
+struct SchemaGeneration {
+    previous: bool,
+}
+
+impl SchemaGeneration {
     fn enable() -> Self {
-        let previous = env::var_os("VECTOR_GENERATE_SCHEMA");
-        // SAFETY: `SCHEMA_ENV_LOCK` serializes schema generation and all accesses to this variable.
-        unsafe { env::set_var("VECTOR_GENERATE_SCHEMA", "true") };
+        let previous = GENERATING_ROOT_SCHEMA.replace(true);
         Self { previous }
     }
 }
 
-impl Drop for SchemaEnvironment {
+impl Drop for SchemaGeneration {
     fn drop(&mut self) {
-        // SAFETY: The schema environment lock remains held while the previous value is restored.
-        unsafe {
-            if let Some(previous) = self.previous.take() {
-                env::set_var("VECTOR_GENERATE_SCHEMA", previous);
-            } else {
-                env::remove_var("VECTOR_GENERATE_SCHEMA");
-            }
-        }
+        GENERATING_ROOT_SCHEMA.set(self.previous);
     }
+}
+
+/// Returns whether the current thread is generating a root configuration schema.
+pub fn is_generating_root_schema() -> bool {
+    GENERATING_ROOT_SCHEMA.get()
 }
 
 pub fn generate_root_schema_with_settings<T>(
@@ -645,10 +640,7 @@ pub fn generate_root_schema_with_settings<T>(
 where
     T: Configurable + 'static,
 {
-    let _environment_lock = SCHEMA_ENV_LOCK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let _environment = SchemaEnvironment::enable();
+    let _generation = SchemaGeneration::enable();
     let schema_gen = RefCell::new(schema_settings.into_generator());
 
     let schema =
@@ -928,6 +920,26 @@ fn instance_type_for_value(value: &Value) -> InstanceType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn root_schema_generation_state_is_scoped_to_the_current_thread() {
+        assert!(!is_generating_root_schema());
+
+        let outer = SchemaGeneration::enable();
+        assert!(is_generating_root_schema());
+        std::thread::spawn(|| assert!(!is_generating_root_schema()))
+            .join()
+            .unwrap();
+
+        {
+            let _inner = SchemaGeneration::enable();
+            assert!(is_generating_root_schema());
+        }
+        assert!(is_generating_root_schema());
+
+        drop(outer);
+        assert!(!is_generating_root_schema());
+    }
 
     #[test]
     fn single_discriminant_is_not_ambiguous() {

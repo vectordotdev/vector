@@ -16,7 +16,7 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
-    configurable::configurable_component,
+    configurable::{configurable_component, schema::is_generating_root_schema},
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
@@ -218,7 +218,7 @@ fn default_collectors() -> Option<Vec<Collector>> {
         collectors.push(Collector::TCP);
     }
     #[cfg(not(target_os = "linux"))]
-    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+    if is_generating_root_schema() {
         collectors.push(Collector::CGroups);
         collectors.push(Collector::TCP);
     }
@@ -266,8 +266,8 @@ fn example_cgroups() -> FilterList {
 }
 
 fn default_cgroups_config() -> Option<CGroupsConfig> {
-    // Check env variable to allow generating docs on non-linux systems.
-    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+    // Include the Linux-only default when generating docs on other platforms.
+    if is_generating_root_schema() {
         return Some(CGroupsConfig::default());
     }
 
