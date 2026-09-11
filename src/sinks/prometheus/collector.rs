@@ -1,4 +1,8 @@
-use std::{borrow::Cow, collections::BTreeMap, fmt::Write as _};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, btree_map::Entry},
+    fmt::Write as _,
+};
 
 use chrono::Utc;
 use indexmap::map::IndexMap;
@@ -235,7 +239,7 @@ impl MetricCollector for StringCollector {
 
     fn emit_metadata(&mut self, name: &str, fullname: &str, value: &MetricValue) {
         let fullname = Self::sanitize_metric_name_newlines(fullname).into_owned();
-        if let std::collections::btree_map::Entry::Vacant(entry) = self.processed.entry(fullname) {
+        if let Entry::Vacant(entry) = self.processed.entry(fullname) {
             let header = Self::encode_header(name, entry.key(), value);
             entry.insert(header);
         }
@@ -481,7 +485,7 @@ mod tests {
     use chrono::{DateTime, TimeZone, Timelike};
     use indoc::indoc;
     use similar_asserts::assert_eq;
-    use vector_lib::metric_tags;
+    use vector_lib::{metric_tags, prometheus::parser::parse_text};
 
     use super::{super::default_summary_quantiles, *};
     use crate::{
@@ -982,7 +986,7 @@ mod tests {
                 something{code="200",line="first\nsecond",path="c:\\Windows",quoted="host\"1\""} 1
             "#}
         );
-        vector_lib::prometheus::parser::parse_text(&encoded).unwrap();
+        parse_text(&encoded).unwrap();
     }
 
     #[test]
@@ -1001,7 +1005,7 @@ mod tests {
                 invalid_metric_name 1
             "#}
         );
-        vector_lib::prometheus::parser::parse_text(&encoded).unwrap();
+        parse_text(&encoded).unwrap();
     }
 
     #[test]
