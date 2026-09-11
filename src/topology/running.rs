@@ -343,7 +343,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, new_config.healthchecks)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces).await;
+                self.connect_diff(&diff, &mut new_pieces);
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
                 self.refresh_confinement_gauges();
@@ -370,7 +370,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
         {
-            self.connect_diff(&diff, &mut new_pieces).await;
+            self.connect_diff(&diff, &mut new_pieces);
             self.spawn_diff(&diff, new_pieces);
             // `self.config` still holds the old config on the rollback path, so
             // this restores the gauges for the re-spawned old sinks.
@@ -502,7 +502,7 @@ impl RunningTopology {
             let previous = self.tasks.remove(key).unwrap();
             drop(previous); // detach and forget
 
-            self.remove_inputs(key, diff, new_config).await;
+            self.remove_inputs(key, diff, new_config);
             self.remove_outputs(key);
 
             if let Some(registry) = self.utilization_registry.as_ref() {
@@ -513,7 +513,7 @@ impl RunningTopology {
         for key in &diff.transforms.to_change {
             debug!(component_id = %key, "Changing transform.");
 
-            self.remove_inputs(key, diff, new_config).await;
+            self.remove_inputs(key, diff, new_config);
             self.remove_outputs(key);
         }
 
@@ -646,7 +646,7 @@ impl RunningTopology {
             .collect::<Vec<_>>();
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
-            self.remove_inputs(key, diff, new_config).await;
+            self.remove_inputs(key, diff, new_config);
 
             if let Some(registry) = self.utilization_registry.as_ref() {
                 registry.remove_component(key);
@@ -687,7 +687,7 @@ impl RunningTopology {
                     buffer_tx.insert((*key).clone(), self.inputs.get(key).unwrap().clone());
                 }
             }
-            self.remove_inputs(key, diff, new_config).await;
+            self.remove_inputs(key, diff, new_config);
         }
 
         // Now that we've disconnected or temporarily detached the inputs to all changed/removed
@@ -736,11 +736,7 @@ impl RunningTopology {
     }
 
     /// Connects all changed/added components in the given configuration diff.
-    pub(crate) async fn connect_diff(
-        &mut self,
-        diff: &ConfigDiff,
-        new_pieces: &mut TopologyPieces,
-    ) {
+    pub(crate) fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut TopologyPieces) {
         debug!("Connecting changed/added component(s).");
 
         // Update tap metadata
@@ -827,7 +823,7 @@ impl RunningTopology {
         // transforms and sinks that come afterwards.
         for key in diff.sources.changed_and_added() {
             debug!(component_id = %key, "Configuring outputs for source.");
-            self.setup_outputs(key, new_pieces).await;
+            self.setup_outputs(key, new_pieces);
         }
 
         let added_changed_table_sources: Vec<ComponentKey> = diff
@@ -838,27 +834,27 @@ impl RunningTopology {
             .collect();
         for key in &added_changed_table_sources {
             debug!(component_id = %key, "Connecting outputs for enrichment table source.");
-            self.setup_outputs(key, new_pieces).await;
+            self.setup_outputs(key, new_pieces);
         }
 
         // We configure the outputs of any changed/added transforms next, for the same reason: we
         // need them to be available to any transforms and sinks that come afterwards.
         for key in diff.transforms.changed_and_added() {
             debug!(component_id = %key, "Configuring outputs for transform.");
-            self.setup_outputs(key, new_pieces).await;
+            self.setup_outputs(key, new_pieces);
         }
 
         // Now that all possible outputs are configured, we can start wiring up inputs, starting
         // with transforms.
         for key in diff.transforms.changed_and_added() {
             debug!(component_id = %key, "Connecting inputs for transform.");
-            self.setup_inputs(key, diff, new_pieces).await;
+            self.setup_inputs(key, diff, new_pieces);
         }
 
         // Now that all sources and transforms are fully configured, we can wire up sinks.
         for key in diff.sinks.changed_and_added() {
             debug!(component_id = %key, "Connecting inputs for sink.");
-            self.setup_inputs(key, diff, new_pieces).await;
+            self.setup_inputs(key, diff, new_pieces);
         }
         let added_changed_tables: Vec<ComponentKey> = diff
             .enrichment_tables
@@ -868,7 +864,7 @@ impl RunningTopology {
             .collect();
         for key in &added_changed_tables {
             debug!(component_id = %key, "Connecting inputs for enrichment table sink.");
-            self.setup_inputs(key, diff, new_pieces).await;
+            self.setup_inputs(key, diff, new_pieces);
         }
 
         // We do a final pass here to reconnect unchanged components.
@@ -941,11 +937,7 @@ impl RunningTopology {
         }
     }
 
-    async fn setup_outputs(
-        &mut self,
-        key: &ComponentKey,
-        new_pieces: &mut builder::TopologyPieces,
-    ) {
+    fn setup_outputs(&mut self, key: &ComponentKey, new_pieces: &mut builder::TopologyPieces) {
         let outputs = new_pieces.outputs.remove(key).unwrap();
         for (port, output) in outputs {
             debug!(component_id = %key, output_id = ?port, "Configuring output for component.");
@@ -959,7 +951,7 @@ impl RunningTopology {
         }
     }
 
-    async fn setup_inputs(
+    fn setup_inputs(
         &mut self,
         key: &ComponentKey,
         diff: &ConfigDiff,
@@ -1010,7 +1002,7 @@ impl RunningTopology {
         self.outputs.retain(|id, _output| &id.component != key);
     }
 
-    async fn remove_inputs(&mut self, key: &ComponentKey, diff: &ConfigDiff, new_config: &Config) {
+    fn remove_inputs(&mut self, key: &ComponentKey, diff: &ConfigDiff, new_config: &Config) {
         self.inputs.remove(key);
         self.detach_triggers.remove(key);
 
@@ -1439,7 +1431,7 @@ impl RunningTopology {
         {
             return None;
         }
-        running_topology.connect_diff(&diff, &mut pieces).await;
+        running_topology.connect_diff(&diff, &mut pieces);
         running_topology.spawn_diff(&diff, pieces);
         // `running_topology.config` was set from the initial config in `new()`.
         running_topology.refresh_confinement_gauges();

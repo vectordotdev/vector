@@ -301,7 +301,7 @@ pub(super) struct Ingestor {
 }
 
 impl Ingestor {
-    pub(super) async fn new(
+    pub(super) fn new(
         region: Region,
         sqs_client: SqsClient,
         s3_client: S3Client,

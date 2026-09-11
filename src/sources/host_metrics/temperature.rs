@@ -8,7 +8,7 @@ const TEMPERATURE_MAX_CELSIUS: &str = "temperature_max_celsius";
 const TEMPERATURE_CRITICAL_CELSIUS: &str = "temperature_critical_celsius";
 
 impl HostMetrics {
-    pub async fn temperature_metrics(&mut self, output: &mut super::MetricsBuffer) {
+    pub fn temperature_metrics(&mut self, output: &mut super::MetricsBuffer) {
         output.name = "temperature";
         // Refresh the long-lived component list in place. `Component::max()` is
         // derived by sysinfo from successive refreshes when the sensor does not
@@ -57,9 +57,7 @@ mod tests {
     #[tokio::test]
     async fn generates_temperature_metrics() {
         let mut buffer = MetricsBuffer::new(None);
-        HostMetrics::new(HostMetricsConfig::default())
-            .temperature_metrics(&mut buffer)
-            .await;
+        HostMetrics::new(HostMetricsConfig::default()).temperature_metrics(&mut buffer);
         let metrics = buffer.metrics;
 
         // Temperature sensors are not exposed in many environments (containers,

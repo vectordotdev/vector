@@ -1428,7 +1428,7 @@ mod integration_tests {
                         .unwrap();
                     sleep(Duration::from_secs(2)).await;
 
-                    collect_ready(out).await
+                    collect_ready(out)
                 })
                 .await;
 
@@ -1508,7 +1508,7 @@ mod integration_tests {
                         .await
                         .unwrap();
                     sleep(Duration::from_secs(2)).await;
-                    collect_ready(out).await
+                    collect_ready(out)
                 })
                 .await;
 

@@ -497,7 +497,7 @@ async fn run_command(
     'outer: loop {
         tokio::select! {
             _ = &mut shutdown => {
-                if !shutdown_child(&mut child, &command).await {
+                if !shutdown_child(&mut child, &command) {
                         break 'outer; // couldn't signal, exit early
                 }
             }
@@ -560,10 +560,7 @@ fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_durati
 }
 
 #[cfg(unix)]
-async fn shutdown_child(
-    child: &mut tokio::process::Child,
-    command: &tokio::process::Command,
-) -> bool {
+fn shutdown_child(child: &mut tokio::process::Child, command: &tokio::process::Command) -> bool {
     match child.id().map(i32::try_from) {
         Some(Ok(pid)) => {
             // shutting down, send a SIGTERM to the child

@@ -257,7 +257,6 @@ async fn correct_request() {
             config.token_scope.clone(),
             config.timestamp_field.clone(),
         )
-        .await
         .unwrap();
 
     run_and_assert_sink_compliance(sink, stream::iter(vec![log1, log2]), &SINK_TAGS).await;
@@ -369,7 +368,6 @@ async fn mock_healthcheck_with_400_response() {
             config.token_scope.clone(),
             config.timestamp_field.clone(),
         )
-        .await
         .unwrap();
 
     let hc_err = healthcheck.await.unwrap_err();
@@ -434,7 +432,6 @@ async fn mock_healthcheck_with_403_response() {
             config.token_scope.clone(),
             config.timestamp_field.clone(),
         )
-        .await
         .unwrap();
 
     let hc_err = healthcheck.await.unwrap_err();
