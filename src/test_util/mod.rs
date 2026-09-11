@@ -434,7 +434,7 @@ pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n:
     events
 }
 
-pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
+pub fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
 where
     S: Stream + Unpin,
 {
@@ -781,7 +781,7 @@ where
 {
     let sender = tokio::spawn(future);
     tokio::time::sleep(Duration::from_secs(sleep)).await;
-    let events = collect_ready(stream).await;
+    let events = collect_ready(stream);
     sender.await.expect("Failed to send data");
     events
 }
@@ -796,7 +796,7 @@ mod tests {
     use super::retry_until;
 
     // helper which errors the first 3x, and succeeds on the 4th
-    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
+    fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
         if *count.read().unwrap() < 3 {
             let mut c = count.write().unwrap();
             *c += 1;
@@ -810,7 +810,7 @@ mod tests {
         let count = Arc::new(RwLock::new(0));
         let func = || {
             let count = Arc::clone(&count);
-            retry_until_helper(count)
+            async move { retry_until_helper(count) }
         };
 
         retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;

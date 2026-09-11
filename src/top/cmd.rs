@@ -66,7 +66,7 @@ pub async fn top(opts: &super::Opts, uri: Uri, dashboard_title: &str) -> exitcod
         .as_deref()
         .map(Regex::new)
         .and_then(Result::ok);
-    let state_rx = state::updater(rx, ui_rx, starting_state).await;
+    let state_rx = state::updater(rx, ui_rx, starting_state);
     // Channel for shutdown signal
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 

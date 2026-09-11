@@ -23,7 +23,7 @@ const MEMORY_USAGE: &str = "process_memory_usage";
 const MEMORY_VIRTUAL_USAGE: &str = "process_memory_virtual_usage";
 
 impl HostMetrics {
-    pub async fn process_metrics(&mut self, output: &mut super::MetricsBuffer) {
+    pub fn process_metrics(&mut self, output: &mut super::MetricsBuffer) {
         self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,
             true,
@@ -66,9 +66,7 @@ mod tests {
     #[tokio::test]
     async fn generates_process_metrics() {
         let mut buffer = MetricsBuffer::new(None);
-        HostMetrics::new(HostMetricsConfig::default())
-            .process_metrics(&mut buffer)
-            .await;
+        HostMetrics::new(HostMetricsConfig::default()).process_metrics(&mut buffer);
         let metrics = buffer.metrics;
         assert!(!metrics.is_empty());
 

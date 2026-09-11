@@ -401,7 +401,7 @@ impl HostMetrics {
             self.cpu_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Process) {
-            self.process_metrics(&mut buffer).await;
+            self.process_metrics(&mut buffer);
         }
         if self.config.has_collector(Collector::Disk) {
             self.disk_metrics(&mut buffer).await;
@@ -427,7 +427,7 @@ impl HostMetrics {
             self.tcp_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Temperature) {
-            self.temperature_metrics(&mut buffer).await;
+            self.temperature_metrics(&mut buffer);
         }
 
         let metrics = buffer.metrics;

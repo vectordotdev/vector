@@ -970,7 +970,7 @@ mod test {
     }
 
     //////// UDP TESTS ////////
-    async fn send_lines_udp(to: SocketAddr, lines: impl IntoIterator<Item = String>) -> UdpSocket {
+    fn send_lines_udp(to: SocketAddr, lines: impl IntoIterator<Item = String>) -> UdpSocket {
         send_lines_udp_from(bind_unused_udp(), to, lines)
     }
 
@@ -982,10 +982,7 @@ mod test {
         send_packets_udp_from(from, to, lines.into_iter().map(|line| line.into()))
     }
 
-    async fn send_packets_udp(
-        to: SocketAddr,
-        packets: impl IntoIterator<Item = Bytes>,
-    ) -> UdpSocket {
+    fn send_packets_udp(to: SocketAddr, packets: impl IntoIterator<Item = Bytes>) -> UdpSocket {
         send_packets_udp_from(bind_unused_udp(), to, packets)
     }
 
@@ -1109,7 +1106,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            send_lines_udp(address, vec!["test".to_string()]).await;
+            send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1126,7 +1123,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            send_lines_udp(address, vec!["foo\nbar".to_string()]).await;
+            send_lines_udp(address, vec!["foo\nbar".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1143,7 +1140,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]).await;
+            send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]);
             let events = collect_n(rx, 2).await;
 
             assert_eq!(
@@ -1174,8 +1171,7 @@ mod test {
                     "test with a long line".to_string(),
                     "a short un".to_string(),
                 ],
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
@@ -1213,8 +1209,7 @@ mod test {
             send_lines_udp(
                 address,
                 vec!["test with, long line".to_string(), "short one".to_string()],
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
@@ -1248,7 +1243,7 @@ mod test {
             chunks.append(&mut another_chunks);
             chunks.shuffle(&mut rng);
 
-            send_packets_udp(address, chunks).await;
+            send_packets_udp(address, chunks);
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
@@ -1269,7 +1264,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            let from = send_lines_udp(address, vec!["test".to_string()]).await;
+            let from = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1290,7 +1285,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, true).await;
 
-            let from = send_lines_udp(address, vec!["test".to_string()]).await;
+            let from = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
             let log = events[0].as_log();
             let event_meta = log.metadata().value();
@@ -1318,7 +1313,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            _ = send_lines_udp(address, vec!["test".to_string()]).await;
+            _ = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1339,7 +1334,7 @@ mod test {
             let (address, source_handle) =
                 init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;
 
-            send_lines_udp(address, vec!["test".to_string()]).await;
+            send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1373,12 +1368,11 @@ mod test {
             let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
             let run_pump_atomic_receiver = Arc::clone(&run_pump_atomic_sender);
             let pump_handle = tokio::task::spawn_blocking(move || {
-                let handle = tokio::runtime::Handle::current();
-                handle.block_on(send_lines_udp(
+                send_lines_udp(
                     address,
                     std::iter::repeat("test".to_string())
                         .take_while(move |_| run_pump_atomic_receiver.load(Ordering::Relaxed)),
-                ));
+                );
             });
 
             // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.

@@ -213,7 +213,7 @@ fn default_profile() -> String {
 
 impl AwsAuthentication {
     /// Creates the identity cache to store credentials based on the authentication mechanism chosen.
-    pub(super) async fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
+    pub(super) fn credentials_cache(&self) -> crate::Result<SharedIdentityCache> {
         match self {
             AwsAuthentication::Role {
                 load_timeout_secs, ..
