@@ -285,13 +285,10 @@ we prefer `std::sync::OnceLock` over **[`once_cell`](https://docs.rs/once_cell)*
 [`lazy_static`](https://docs.rs/lazy-static). It is slightly faster and provides a richer API than
 `lazy_static`, and has equivalent features to the `once_cell` version.
 
-If you're working with data that _changes over time_, but has a very high read-to-write ratio, such
-as _many readers_, but _one writer_ and infrequent writes, we prefer
-**[`arc-swap`](https://docs.rs/arc-swap)**.  The main feature of this crate is allowing a piece of
-data to be atomically updated while being shared concurrently. It does this by wrapping all data in
-`Arc<T>` to provide the safe, concurrent access, while adding the ability to atomically swap the
-`Arc<T>` itself. As it cannot be constructed in a const fashion, `arc-swap` pairs well with
-`once_cell` for actually storing it in a global static variable.
+If you're working with data that _changes over time_, prefer the synchronization primitives in the
+standard library unless measurements show they are insufficient. For data with many readers and
+infrequent writes, wrapping an `Arc<T>` inside a `Mutex` lets readers cheaply clone a consistent
+snapshot and release the lock before doing more expensive work.
 
 #### Concurrent data structures
 

@@ -10,7 +10,6 @@ license = "MPL-2.0"
 workspace = true
 
 [dependencies]
-arc-swap.workspace = true
 const-str.workspace = true
 vrl.workspace = true
 vector-core = { path = "../../vector-core", default-features = false }

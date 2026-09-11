@@ -18,12 +18,11 @@
 //!
 //! Once all the data has been loaded we can move to the next stage. This is
 //! signified by calling the `finish_load` method. At this point all the data is
-//! swapped into the `ArcSwap` of the `tables` field. `ArcSwap` provides
-//! lock-free read-only access to the data. From this point on we have fast,
-//! efficient read-only access and can no longer add indexes or otherwise mutate
-//! the data.
+//! published as a shared snapshot in the `tables` field. From this point on we
+//! have read-only access and can no longer add indexes or otherwise mutate the
+//! data.
 //!
-//! This data within the `ArcSwap` is accessed through the `TableSearch`
+//! This snapshot is accessed through the `TableSearch`
 //! struct. Any transform that needs access to this can call
 //! `TableRegistry::as_readonly`. This returns a cheaply cloneable struct that
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
@@ -31,10 +30,9 @@
 
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
 };
 
-use arc_swap::ArcSwap;
 use vrl::value::{ObjectMap, Value};
 
 use super::{Condition, Error, IndexHandle, InternalError, Table};
@@ -46,15 +44,15 @@ type TableMap = HashMap<String, Box<dyn Table + Send + Sync>>;
 #[derive(Clone, Default)]
 pub struct TableRegistry {
     loading: Arc<Mutex<Option<TableMap>>>,
-    tables: Arc<ArcSwap<Option<TableMap>>>,
+    tables: Arc<Mutex<Arc<Option<TableMap>>>>,
 }
 
 /// Pessimistic Eq implementation for caching purposes
 impl PartialEq for TableRegistry {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.tables, &other.tables) && Arc::ptr_eq(&self.loading, &other.loading)
-            || self.tables.load().is_none()
-                && other.tables.load().is_none()
+            || self.table_snapshot().is_none()
+                && other.table_snapshot().is_none()
                 && self.loading.lock().expect("lock poison").is_none()
                 && other.loading.lock().expect("lock poison").is_none()
     }
@@ -71,12 +69,11 @@ impl TableRegistry {
     ///
     /// If there are tables that have already been loaded things get a bit more
     /// complicated. This can occur when the config is reloaded. Vector will be
-    /// currently running and transforming events, thus the tables loaded into
-    /// the `tables` field could be in active use. Since there is no lock
-    /// against these tables, we cannot mutate this list. We do need to have a
-    /// full list of tables in the `loading` field since there may be some
-    /// transforms that will need to add indexes to these tables during the
-    /// reload.
+    /// currently running and transforming events, thus the snapshot in the
+    /// `tables` field could be in active use. We cannot mutate that snapshot.
+    /// We do need to have a full list of tables in the `loading` field since
+    /// there may be some transforms that will need to add indexes to these
+    /// tables during the reload.
     ///
     /// Our only option is to clone the data that is in `tables` and move it
     /// into the `loading` field so it can be mutated. This could be a
@@ -92,8 +89,8 @@ impl TableRegistry {
     /// Panics if the Mutex is poisoned.
     pub fn load(&self, mut tables: TableMap) {
         let mut loading = self.loading.lock().unwrap();
-        let existing = self.tables.load();
-        if let Some(existing) = &**existing {
+        let existing = Arc::clone(&self.tables.lock().unwrap_or_else(PoisonError::into_inner));
+        if let Some(existing) = &*existing {
             // We already have some tables
             let extend = existing
                 .iter()
@@ -109,7 +106,7 @@ impl TableRegistry {
         }
     }
 
-    /// Swap the data out of the `HashTable` into the `ArcSwap`.
+    /// Publish the data from the `HashTable` as the current shared snapshot.
     ///
     /// From this point we can no longer add indexes to the tables, but are now
     /// allowed to read the data.
@@ -120,7 +117,7 @@ impl TableRegistry {
     pub fn finish_load(&self) {
         let mut tables_lock = self.loading.lock().unwrap();
         let tables = tables_lock.take();
-        self.tables.swap(Arc::new(tables));
+        *self.tables.lock().unwrap_or_else(PoisonError::into_inner) = Arc::new(tables);
     }
 
     /// Return a list of the available tables that we can write to.
@@ -167,8 +164,7 @@ impl TableRegistry {
         }
     }
 
-    /// Returns a cheaply cloneable struct through that provides lock free read
-    /// access to the enrichment tables.
+    /// Returns a cheaply cloneable struct that provides read access to the enrichment tables.
     pub fn as_readonly(&self) -> TableSearch {
         TableSearch(self.tables.clone())
     }
@@ -176,7 +172,7 @@ impl TableRegistry {
     /// Returns the indexes that have been applied to the given table.
     /// If the table is reloaded we need these to reapply them to the new reloaded tables.
     pub fn index_fields(&self, table: &str) -> Vec<(Case, Vec<String>)> {
-        match &**self.tables.load() {
+        match &*self.table_snapshot() {
             Some(tables) => tables
                 .get(table)
                 .map(|table| table.index_fields())
@@ -188,7 +184,7 @@ impl TableRegistry {
     /// Checks if the table needs reloading.
     /// If in doubt (the table isn't in our list) we return true.
     pub fn needs_reload(&self, table: &str) -> bool {
-        match &**self.tables.load() {
+        match &*self.table_snapshot() {
             Some(tables) => tables
                 .get(table)
                 .map(|table| table.needs_reload())
@@ -199,10 +195,14 @@ impl TableRegistry {
 
     /// Extracts state from the table if available.
     pub fn extract_state(&self, table: &str) -> Option<Box<dyn std::any::Any + Send + Sync>> {
-        match &**self.tables.load() {
+        match &*self.table_snapshot() {
             Some(tables) => tables.get(table).and_then(|t| t.extract_state()),
             None => None,
         }
+    }
+
+    fn table_snapshot(&self) -> Arc<Option<TableMap>> {
+        Arc::clone(&self.tables.lock().unwrap_or_else(PoisonError::into_inner))
     }
 }
 
@@ -216,7 +216,7 @@ impl std::fmt::Debug for TableRegistry {
 /// `vrl::EnrichmentTableSearch` trait. Cloning this object is designed to be
 /// cheap. The underlying data will be shared by all clones.
 #[derive(Clone, Default)]
-pub struct TableSearch(Arc<ArcSwap<Option<TableMap>>>);
+pub struct TableSearch(Arc<Mutex<Arc<Option<TableMap>>>>);
 
 impl TableSearch {
     /// Search the given table to find the data.
@@ -231,8 +231,8 @@ impl TableSearch {
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, Error> {
-        let tables = self.0.load();
-        if let Some(ref tables) = **tables {
+        let tables = table_snapshot(&self.0);
+        if let Some(ref tables) = *tables {
             match tables.get(table) {
                 None => Err(Error::TableNotLoaded {
                     table: table.to_string(),
@@ -258,8 +258,8 @@ impl TableSearch {
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, Error> {
-        let tables = self.0.load();
-        if let Some(ref tables) = **tables {
+        let tables = table_snapshot(&self.0);
+        if let Some(ref tables) = *tables {
             match tables.get(table) {
                 None => Err(Error::TableNotLoaded {
                     table: table.to_string(),
@@ -284,10 +284,10 @@ impl std::fmt::Debug for TableSearch {
 fn fmt_enrichment_table(
     f: &mut std::fmt::Formatter<'_>,
     name: &'static str,
-    tables: &Arc<ArcSwap<Option<TableMap>>>,
+    tables: &Arc<Mutex<Arc<Option<TableMap>>>>,
 ) -> std::fmt::Result {
-    let tables = tables.load();
-    match **tables {
+    let tables = table_snapshot(tables);
+    match *tables {
         Some(ref tables) => {
             let mut tables = tables.iter().fold(String::from("("), |mut s, (key, _)| {
                 s.push_str(key);
@@ -302,6 +302,10 @@ fn fmt_enrichment_table(
         }
         None => write!(f, "{name} loading"),
     }
+}
+
+fn table_snapshot(tables: &Arc<Mutex<Arc<Option<TableMap>>>>) -> Arc<Option<TableMap>> {
+    Arc::clone(&tables.lock().unwrap_or_else(PoisonError::into_inner))
 }
 
 #[cfg(test)]
