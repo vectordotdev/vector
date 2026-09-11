@@ -45,6 +45,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
             }
 
             let group_id_ptr = actual_ptr.add(offset_to_group_id).cast::<u8>();
+            group_id_ptr.write(AllocationGroupId::ROOT.as_raw());
 
             let object_size = object_layout.size();
 

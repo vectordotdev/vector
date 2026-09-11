@@ -1,7 +1,10 @@
 use std::{
     cell::RefCell,
     collections::{BTreeSet, HashMap},
-    env, mem,
+    env,
+    ffi::OsString,
+    mem,
+    sync::Mutex,
 };
 
 use indexmap::IndexMap;
@@ -608,25 +611,48 @@ where
     generate_root_schema_with_settings::<T>(default_schema_settings())
 }
 
+static SCHEMA_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+struct SchemaEnvironment {
+    previous: Option<OsString>,
+}
+
+impl SchemaEnvironment {
+    fn enable() -> Self {
+        let previous = env::var_os("VECTOR_GENERATE_SCHEMA");
+        // SAFETY: `SCHEMA_ENV_LOCK` serializes schema generation and all accesses to this variable.
+        unsafe { env::set_var("VECTOR_GENERATE_SCHEMA", "true") };
+        Self { previous }
+    }
+}
+
+impl Drop for SchemaEnvironment {
+    fn drop(&mut self) {
+        // SAFETY: The schema environment lock remains held while the previous value is restored.
+        unsafe {
+            if let Some(previous) = self.previous.take() {
+                env::set_var("VECTOR_GENERATE_SCHEMA", previous);
+            } else {
+                env::remove_var("VECTOR_GENERATE_SCHEMA");
+            }
+        }
+    }
+}
+
 pub fn generate_root_schema_with_settings<T>(
     schema_settings: SchemaSettings,
 ) -> Result<RootSchema, GenerateError>
 where
     T: Configurable + 'static,
 {
+    let _environment_lock = SCHEMA_ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _environment = SchemaEnvironment::enable();
     let schema_gen = RefCell::new(schema_settings.into_generator());
-
-    // Set env variable to enable generating all schemas, including platform-specific ones.
-    // SAFETY: Schema generation is run by single-threaded tooling before worker threads start, so
-    // no other thread can concurrently read or modify the process environment.
-    unsafe { env::set_var("VECTOR_GENERATE_SCHEMA", "true") };
 
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
-
-    // SAFETY: This restores the environment under the same single-threaded conditions described
-    // above.
-    unsafe { env::remove_var("VECTOR_GENERATE_SCHEMA") };
 
     Ok(schema_gen.into_inner().into_root_schema(schema))
 }
