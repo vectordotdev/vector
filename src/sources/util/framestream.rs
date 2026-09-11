@@ -410,8 +410,6 @@ pub fn build_framestream_tcp_source(
 ) -> crate::Result<Source> {
     let addr = frame_handler.address();
     let tls = frame_handler.tls();
-    let shutdown = shutdown;
-    let out = out;
 
     Ok(Box::pin(async move {
         let listenfd = ListenFd::from_env();
