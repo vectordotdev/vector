@@ -49,6 +49,8 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
             key_file,
             key_pass,
             server_name,
+            min_tls_version,
+            max_tls_version,
         } = tls_config;
 
         if verify_certificate.is_some()
@@ -56,9 +58,11 @@ fn new_client_from_config(config: &GreptimeDBGrpcServiceConfig) -> crate::Result
             || alpn_protocols.is_some()
             || key_pass.is_some()
             || server_name.is_some()
+            || min_tls_version.is_some()
+            || max_tls_version.is_some()
         {
             warn!(
-                message = "TlsConfig: verify_certificate, verify_hostname, alpn_protocols, key_pass and server_name are not supported by greptimedb client at the moment."
+                message = "TlsConfig: verify_certificate, verify_hostname, alpn_protocols, key_pass, server_name, min_tls_version and max_tls_version are not supported by greptimedb client at the moment."
             );
         }
 
