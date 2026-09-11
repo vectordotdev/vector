@@ -5,6 +5,7 @@ transforms:
       - my-source-or-transform-id
     group_by: "{{ service }}"
     key_field: message
+    max_groups: 5000
     measure_cpu_usage: false
     ratio: 0.13
     sample_rate_key: sample_rate

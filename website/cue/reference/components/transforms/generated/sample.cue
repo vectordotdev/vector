@@ -41,6 +41,16 @@ generated: components: transforms: sample: configuration: {
 		required: false
 		type: string: examples: ["message"]
 	}
+	max_groups: {
+		description: """
+			The maximum number of distinct group values whose sampling state is retained.
+
+			When this limit is reached, the least recently used group's state is evicted. If
+			`group_by` is not configured, only one group is retained.
+			"""
+		required: false
+		type: uint: default: 5000
+	}
 	rate: {
 		description: """
 			The rate at which events are forwarded, expressed as `1/N`.
