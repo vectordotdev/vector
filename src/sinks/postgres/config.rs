@@ -48,7 +48,7 @@ pub struct PostgresConfig {
     /// as table names as parameters in prepared statements are not allowed in PostgreSQL.
     pub table: String,
 
-    /// The columns to insert data into. If not specified, all columns from the input data will be used.
+    /// The columns to insert data into. If not specified, all columns matching from the input data will be used and inserted into the table.
     /// This allows you to exclude columns like serial/auto-increment columns that should be handled by PostgreSQL.
     /// This parameter is vulnerable to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

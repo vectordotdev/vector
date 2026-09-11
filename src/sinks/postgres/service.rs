@@ -158,6 +158,19 @@ impl Service<PostgresRequest> for PostgresService {
                 .map(|event| json_serializer.to_json_value(event))
                 .collect::<Result<Vec<_>, _>>()
                 .context(VectorCommonSnafu)?;
+            let serialized_values = if columns.is_empty() {
+                serialized_values
+            } else {
+                serialized_values
+                    .into_iter()
+                    .map(|mut value| {
+                        if let serde_json::Value::Object(object) = &mut value {
+                            object.retain(|column, _| columns.iter().any(|name| name == column));
+                        }
+                        value
+                    })
+                    .collect()
+            };
 
             let query = if columns.is_empty() {
                 format!(
