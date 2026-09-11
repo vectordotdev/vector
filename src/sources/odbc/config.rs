@@ -143,6 +143,7 @@ pub struct OdbcConfig {
     ///         value: "acme"
     ///     # The rest of the fields are omitted
     /// ```
+    #[configurable(metadata(docs::minimal = true))]
     pub statement_init_params: Option<Vec<OdbcStatementParam>>,
 
     /// Cron expression used to schedule database queries. This field is required.

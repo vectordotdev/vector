@@ -4,3 +4,6 @@ sources:
     connection_string: driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>
     schedule: "*/5 * * * * *"
     statement: SELECT * FROM users WHERE id > ? ORDER BY id ASC
+    statement_init_params:
+      - name: id
+        value: "0"
