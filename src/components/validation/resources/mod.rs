@@ -170,7 +170,7 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf(Default::default()),
         DeserializerConfig::Avro { avro } => SerializerConfig::Avro { avro: avro.into() },
         // TODO: Influxdb has no serializer yet
-        DeserializerConfig::Influxdb { .. } => todo!(),
+        DeserializerConfig::Influxdb { .. } => unimplemented!(),
         DeserializerConfig::Vrl { .. } => unimplemented!(),
         #[cfg(feature = "codecs-opentelemetry")]
         DeserializerConfig::Otlp { .. } => SerializerConfig::Otlp,
@@ -199,9 +199,9 @@ fn decoder_framing_to_encoding_framer(framing: &decoding::FramingConfig) -> enco
         decoding::FramingConfig::NewlineDelimited(_) => encoding::FramingConfig::NewlineDelimited,
         // TODO: There's no equivalent octet counting framer for encoding... although
         // there's no particular reason that would make it hard to write.
-        decoding::FramingConfig::OctetCounting(_) => todo!(),
+        decoding::FramingConfig::OctetCounting(_) => unimplemented!(),
         // TODO: chunked gelf is not supported yet in encoding
-        decoding::FramingConfig::ChunkedGelf(_) => todo!(),
+        decoding::FramingConfig::ChunkedGelf(_) => unimplemented!(),
         decoding::FramingConfig::VarintLengthDelimited(config) => {
             encoding::FramingConfig::VarintLengthDelimited(
                 encoding::VarintLengthDelimitedEncoderConfig {
@@ -218,12 +218,12 @@ fn serializer_config_to_deserializer(
     config: &SerializerConfig,
 ) -> vector_lib::Result<decoding::Deserializer> {
     let deserializer_config = match config {
-        SerializerConfig::Avro { .. } => todo!(),
-        SerializerConfig::Cef { .. } => todo!(),
-        SerializerConfig::Csv { .. } => todo!(),
+        SerializerConfig::Avro { .. } => unimplemented!(),
+        SerializerConfig::Cef { .. } => unimplemented!(),
+        SerializerConfig::Csv { .. } => unimplemented!(),
         SerializerConfig::Gelf { .. } => DeserializerConfig::Gelf(Default::default()),
         SerializerConfig::Json(_) => DeserializerConfig::Json(Default::default()),
-        SerializerConfig::Logfmt => todo!(),
+        SerializerConfig::Logfmt => unimplemented!(),
         SerializerConfig::Native => DeserializerConfig::Native,
         SerializerConfig::NativeJson => DeserializerConfig::NativeJson(Default::default()),
         SerializerConfig::Protobuf(config) => {
@@ -237,9 +237,9 @@ fn serializer_config_to_deserializer(
         }
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
         #[cfg(feature = "codecs-opentelemetry")]
-        SerializerConfig::Otlp => todo!(),
+        SerializerConfig::Otlp => unimplemented!(),
         #[cfg(feature = "codecs-syslog")]
-        SerializerConfig::Syslog(_) => todo!(),
+        SerializerConfig::Syslog(_) => unimplemented!(),
     };
 
     deserializer_config.build()
