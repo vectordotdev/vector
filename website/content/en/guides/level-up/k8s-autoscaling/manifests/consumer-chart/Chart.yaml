@@ -1,0 +1,4 @@
+apiVersion: v2
+name: consumer
+description: TCP sink target that drains all data forwarded by Vector
+version: 0.1.0

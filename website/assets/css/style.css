@@ -72,6 +72,19 @@
   }
 }
 
+.disclosure-chevron {
+  transition: transform 300ms ease;
+}
+
+details[open] > summary .disclosure-chevron {
+  transform: rotate(90deg);
+}
+
+.disclosure-content {
+  overflow: hidden;
+  transition: height 300ms ease;
+}
+
 /* --------------------------------------------------------------------------
    Custom typography overrides migrated from the v3 configuration.
 

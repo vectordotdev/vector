@@ -1,0 +1,4 @@
+apiVersion: v2
+name: vector-ingress
+description: NGINX ingress that distributes HTTP requests across Vector pods
+version: 0.1.0

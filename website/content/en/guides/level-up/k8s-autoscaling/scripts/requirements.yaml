@@ -1,0 +1,4 @@
+---
+collections:
+  - name: kubernetes.core
+    version: 6.5.0
