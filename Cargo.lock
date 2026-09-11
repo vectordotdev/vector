@@ -11922,12 +11922,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "temp-dir"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "016ef9739649996fcc983b9c588fe3d557cf216d4d98503ce1b057ab5a66d689"
-
-[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13556,7 +13550,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "snafu 0.9.0",
- "temp-dir",
+ "tempfile",
  "tokio",
  "tokio-test",
  "tokio-util",
