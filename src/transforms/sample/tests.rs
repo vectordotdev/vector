@@ -14,7 +14,7 @@ use crate::{
     transforms::{
         FunctionTransform, OutputBuffer,
         sample::{
-            config::{SampleConfig, default_sample_rate_key},
+            config::{SampleConfig, default_max_groups, default_sample_rate_key},
             transform::{DynamicSampleFields, Sample, SampleMode},
         },
         test::{create_topology, transform_one},
@@ -31,6 +31,7 @@ async fn emits_internal_events() {
             rate_field: None,
             key_field: None,
             group_by: None,
+            max_groups: default_max_groups(),
             exclude: None,
             sample_rate_key: default_sample_rate_key(),
         };
@@ -59,6 +60,7 @@ fn hash_samples_at_roughly_the_configured_rate() {
         SampleMode::new_rate(2),
         log_schema().message_key().map(ToString::to_string),
         None,
+        default_max_groups(),
         Some(condition_contains(
             log_schema().message_key().unwrap().to_string().as_str(),
             "na",
@@ -82,6 +84,7 @@ fn hash_samples_at_roughly_the_configured_rate() {
         SampleMode::new_ratio(0.04),
         log_schema().message_key().map(ToString::to_string),
         None,
+        default_max_groups(),
         Some(condition_contains(
             log_schema().message_key().unwrap().to_string().as_str(),
             "na",
@@ -108,6 +111,7 @@ fn hash_consistently_samples_the_same_events() {
         SampleMode::new_rate(2),
         log_schema().message_key().map(ToString::to_string),
         None,
+        default_max_groups(),
         Some(condition_contains(
             log_schema().message_key().unwrap().to_string().as_str(),
             "na",
@@ -145,6 +149,7 @@ fn always_passes_events_matching_pass_list() {
             SampleMode::new_rate(0),
             key_field.clone(),
             None,
+            default_max_groups(),
             Some(condition_contains(
                 log_schema().message_key().unwrap().to_string().as_str(),
                 "important",
@@ -175,6 +180,7 @@ fn handles_group_by() {
             SampleMode::new_rate(0),
             log_schema().message_key().map(ToString::to_string),
             group_by.clone(),
+            default_max_groups(),
             Some(condition_contains(
                 log_schema().message_key().unwrap().to_string().as_str(),
                 "na",
@@ -202,6 +208,7 @@ fn handles_key_field() {
             SampleMode::new_ratio(0.0),
             key_field.clone(),
             None,
+            default_max_groups(),
             Some(condition_contains("other_field", "foo")),
             default_sample_rate_key(),
         );
@@ -225,6 +232,7 @@ fn sampler_adds_sampling_rate_to_event() {
             SampleMode::new_ratio(0.1),
             key_field.clone(),
             None,
+            default_max_groups(),
             Some(condition_contains(&message_key, "na")),
             default_sample_rate_key(),
         );
@@ -241,6 +249,7 @@ fn sampler_adds_sampling_rate_to_event() {
             SampleMode::new_rate(25),
             key_field.clone(),
             None,
+            default_max_groups(),
             Some(condition_contains(&message_key, "na")),
             OptionalValuePath::from(owned_value_path!("custom_sample_rate")),
         );
@@ -258,6 +267,7 @@ fn sampler_adds_sampling_rate_to_event() {
             SampleMode::new_rate(2),
             key_field.clone(),
             None,
+            default_max_groups(),
             Some(condition_contains(&message_key, "na")),
             OptionalValuePath::from(owned_value_path!("")),
         );
@@ -274,6 +284,7 @@ fn sampler_adds_sampling_rate_to_event() {
             SampleMode::new_ratio(0.04),
             key_field.clone(),
             None,
+            default_max_groups(),
             Some(condition_contains(&message_key, "na")),
             default_sample_rate_key(),
         );
@@ -293,6 +304,7 @@ fn handles_trace_event() {
         SampleMode::new_rate(2),
         None,
         None,
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -311,6 +323,7 @@ fn group_by_uses_independent_ratio_samplers() {
         SampleMode::new_ratio(0.5),
         None,
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -321,7 +334,130 @@ fn group_by_uses_independent_ratio_samplers() {
         transform_one(&mut sampler, event.into()).is_some()
     });
 
-    assert_eq!(sampled, [true, true, false, false]);
+    assert_eq!(sampled, [true, false, false, true]);
+}
+
+#[test]
+fn group_state_evicts_least_recently_used_group() {
+    let mut sampler = Sample::new(
+        "sample".to_string(),
+        SampleMode::new_rate(2),
+        None,
+        Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        std::num::NonZeroUsize::new(2).unwrap(),
+        None,
+        default_sample_rate_key(),
+    );
+
+    let sampled = [
+        "service-a",
+        "service-b",
+        "service-a",
+        "service-c",
+        "service-a",
+        "service-b",
+    ]
+    .map(|service| {
+        let mut event = LogEvent::from("event");
+        event.insert(event_path!("service"), service);
+        transform_one(&mut sampler, event.into()).is_some()
+    });
+
+    assert_eq!(sampled, [true, false, false, true, true, false]);
+}
+
+#[test]
+fn capacity_thrashing_does_not_bypass_static_sampling() {
+    for (name, mode) in [
+        ("rate", SampleMode::new_rate(2)),
+        ("ratio", SampleMode::new_ratio(0.5)),
+    ] {
+        let mut sampler = Sample::new(
+            "sample".to_string(),
+            mode,
+            None,
+            Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+            std::num::NonZeroUsize::new(2).unwrap(),
+            None,
+            default_sample_rate_key(),
+        );
+
+        let sampled = (0..6).map(|index| {
+            let mut event = LogEvent::from("event");
+            event.insert(event_path!("service"), format!("service-{}", index % 3));
+            transform_one(&mut sampler, event.into()).is_some()
+        });
+
+        assert_eq!(
+            sampled.collect::<Vec<_>>(),
+            [true, false, true, false, true, false],
+            "{name} sampling was bypassed",
+        );
+    }
+}
+
+#[test]
+fn capacity_thrashing_does_not_bypass_dynamic_sampling() {
+    for (name, fields) in [
+        (
+            "rate",
+            DynamicSampleFields {
+                ratio_field: None,
+                rate_field: Some("dynamic_rate".to_string()),
+            },
+        ),
+        (
+            "ratio",
+            DynamicSampleFields {
+                ratio_field: Some("dynamic_ratio".to_string()),
+                rate_field: None,
+            },
+        ),
+    ] {
+        let make_sampler = |max_groups| {
+            Sample::new_with_dynamic(
+                "sample".to_string(),
+                SampleMode::new_ratio(0.0),
+                fields.clone(),
+                Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+                max_groups,
+                None,
+                default_sample_rate_key(),
+            )
+        };
+        let make_event = |service: &str| {
+            let mut event = LogEvent::from("event");
+            event.insert(event_path!("service"), service);
+            if fields.rate_field.is_some() {
+                event.insert(event_path!("dynamic_rate"), 2);
+            } else {
+                event.insert(event_path!("dynamic_ratio"), 0.5);
+            }
+            event.into()
+        };
+
+        let passing_groups = (0..100)
+            .filter_map(|index| {
+                let service = format!("service-{index}");
+                let mut sampler = make_sampler(default_max_groups());
+                transform_one(&mut sampler, make_event(&service))
+                    .is_some()
+                    .then_some(service)
+            })
+            .take(3)
+            .collect::<Vec<_>>();
+        assert_eq!(passing_groups.len(), 3);
+
+        let mut sampler = make_sampler(std::num::NonZeroUsize::new(2).unwrap());
+        let retained = (0..30)
+            .filter(|index| {
+                let service = &passing_groups[index % passing_groups.len()];
+                transform_one(&mut sampler, make_event(service)).is_some()
+            })
+            .count();
+
+        assert!(retained < 30, "{name} sampling was bypassed");
+    }
 }
 
 #[test]
@@ -335,6 +471,7 @@ fn sample_at_rates_higher_then_half() {
             SampleMode::new_ratio(ratio),
             None,
             None,
+            default_max_groups(),
             None,
             default_sample_rate_key(),
         );
@@ -360,6 +497,7 @@ fn dynamic_ratio_field_overrides_static_ratio() {
             rate_field: None,
         },
         None,
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -382,6 +520,7 @@ fn dynamic_ratio_field_falls_back_to_static_ratio_when_missing() {
             rate_field: None,
         },
         None,
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -401,6 +540,7 @@ fn dynamic_rate_field_overrides_static_ratio() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         None,
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -423,6 +563,7 @@ fn dynamic_rate_field_falls_back_to_static_ratio_when_missing() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         None,
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -442,6 +583,7 @@ fn dynamic_rate_field_rejects_float_and_falls_back_to_static_ratio() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         None,
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -466,6 +608,7 @@ fn dynamic_ratio_honors_group_by_key() {
             rate_field: None,
         },
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -511,6 +654,7 @@ fn dynamic_rate_honors_group_by_key() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -555,6 +699,7 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
             rate_field: None,
         },
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
@@ -603,6 +748,7 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
             rate_field: Some("dynamic_rate".to_string()),
         },
         Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
+        default_max_groups(),
         None,
         default_sample_rate_key(),
     );
