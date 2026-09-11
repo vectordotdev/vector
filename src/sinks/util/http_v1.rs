@@ -9,6 +9,12 @@ use futures::future::BoxFuture;
 use http_1::{Request, Response, Uri};
 use http_body_util::BodyExt;
 use tower::Service;
+#[cfg(any(
+    feature = "sinks-gcp",
+    feature = "sinks-greptimedb_logs",
+    feature = "sinks-honeycomb",
+    feature = "sinks-keep",
+))]
 use tracing::debug;
 
 use vector_lib::{
@@ -138,6 +144,13 @@ where
     }
 }
 
+// Clickhouse implements its own retry logic, so this is only used by the sinks below.
+#[cfg(any(
+    feature = "sinks-gcp",
+    feature = "sinks-greptimedb_logs",
+    feature = "sinks-honeycomb",
+    feature = "sinks-keep",
+))]
 pub(crate) fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     retry_strategy: super::http::RetryStrategy,
 ) -> super::http::HttpStatusRetryLogic<
