@@ -324,28 +324,21 @@ impl StringCollector {
         result
     }
 
-    fn format_tag(key: &str, mut value: &str) -> String {
+    fn format_tag(key: &str, value: &str) -> String {
         // For most tags, this is just `{KEY}="{VALUE}"` so allocate optimistically
         let mut result = String::with_capacity(key.len() + value.len() + 3);
         result.push_str(key);
         result.push_str("=\"");
-        while let Some(i) = value.find(['\\', '"', '\n']) {
-            #[expect(
-                clippy::string_slice,
-                reason = "i comes from find() on ASCII chars, i and i+1 are char boundaries"
-            )]
-            {
-                result.push_str(&value[..i]);
-                result.push('\\');
-                result.push(if value.as_bytes()[i] == b'\n' {
-                    'n'
-                } else {
-                    value.as_bytes()[i] as char
-                });
-                value = &value[i + 1..];
+
+        for character in value.chars() {
+            match character {
+                '\\' => result.push_str("\\\\"),
+                '"' => result.push_str("\\\""),
+                '\n' => result.push_str("\\n"),
+                character => result.push(character),
             }
         }
-        result.push_str(value);
+
         result.push('"');
         result
     }
