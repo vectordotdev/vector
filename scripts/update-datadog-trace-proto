@@ -1,7 +1,19 @@
 #!/bin/bash
 set -o errexit
+DEST=proto/datadog/trace
 TMPDIR=$( mktemp --directory --tmpdir="$PWD" )
 trap 'rm -fr "$TMPDIR"' EXIT
 git clone --depth 1 --filter blob:none https://github.com/DataDog/datadog-agent "$TMPDIR"
-cp --verbose "$TMPDIR"/pkg/proto/datadog/trace/*.proto proto/datadog/trace/
-cp --verbose "$TMPDIR"/pkg/proto/datadog/trace/idx/*.proto proto/datadog/trace/idx/
+cp --verbose "$TMPDIR"/pkg/proto/datadog/trace/*.proto "$DEST"/
+cp --verbose "$TMPDIR"/pkg/proto/datadog/trace/idx/*.proto "$DEST"/idx/
+COMMIT=$( git -C "$TMPDIR" log -1 --format='commit `%H` (%cs): %s' )
+cat > "$DEST"/README.md <<EOF
+# Datadog Agent trace protobufs
+
+Vendored from [\`DataDog/datadog-agent\`](https://github.com/DataDog/datadog-agent)
+\`pkg/proto/datadog/trace\`.
+
+Pinned to ${COMMIT}
+
+Refresh by running \`scripts/update-datadog-trace-proto\`.
+EOF
