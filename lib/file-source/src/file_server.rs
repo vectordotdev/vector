@@ -499,6 +499,8 @@ where
                     warn!(
                         "Notify-based discovery unavailable; relying on periodic reconciliation only."
                     );
+                    // `NotifyDiscovery::drop` hands the watcher to a detached teardown thread, so
+                    // this never runs `notify`'s own (possibly blocking/panicking) `Drop` here.
                     notify_discovery = None;
                 }
                 stats.record("discovery", start.elapsed());

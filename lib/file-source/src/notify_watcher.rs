@@ -92,11 +92,15 @@ pub enum NotifyMessage {
 
 /// Owns the live `notify` watcher and the receiving end of the bridge channel.
 ///
-/// Dropping this stops the watcher thread (via `notify`'s own `Drop` impl on the underlying
-/// watcher) and closes the channel.
+/// `Drop` hands the underlying watcher off to `spawn_teardown` rather than dropping it inline, so
+/// this is always safe to simply drop -- from anywhere, including `= None` on an `Option`, an
+/// early `return`, or a panic unwind -- even when the backend is unhealthy, which `notify`'s own
+/// `Drop` impl on the watcher is not: it can itself block (joining a backend thread) or panic (an
+/// `unwrap()` on a shutdown-channel send) in that case.
 pub struct NotifyDiscovery {
     /// `None` only transiently, while `forget_watches` is tearing down the old watcher before
-    /// building its replacement; every other method can assume this is always `Some`.
+    /// building its replacement, or once `Drop` has taken it; every other method can assume this
+    /// is always `Some`.
     watcher: Option<RecommendedWatcher>,
     watched_dirs: WantedDirs,
     /// For a wanted directory that doesn't exist yet (so it can't be `watch()`-ed directly),
@@ -121,6 +125,17 @@ pub struct NotifyDiscovery {
     backend_error_pending: Arc<AtomicBool>,
 }
 
+impl Drop for NotifyDiscovery {
+    /// See the struct-level doc comment: this is what makes an ordinary drop of `NotifyDiscovery`
+    /// (from anywhere -- an early `return`, `Option::take`, a panic unwind) safe against an
+    /// unhealthy backend, without every call site needing to remember to do anything special.
+    fn drop(&mut self) {
+        if let Some(watcher) = self.watcher.take() {
+            let _spawned = spawn_teardown(watcher);
+        }
+    }
+}
+
 /// Bound on the notify event channel: without this, a sustained burst of filesystem events could
 /// grow the channel (and the `Vec<PathBuf>` payload of each queued message) without limit while
 /// `FileServer` is busy with a reconciliation pass or a slow downstream send. Large enough that
@@ -133,6 +148,41 @@ const NOTIFY_CHANNEL_CAPACITY: usize = 8192;
 /// `NotifyDiscovery::watcher` is only ever `None` transiently inside `forget_watches`; every
 /// other method observing `None` here indicates a bug in this module.
 const WATCHER_INVARIANT: &str = "NotifyDiscovery::watcher must be Some outside forget_watches";
+
+/// Get rid of `value` without ever running its `Drop` impl on the calling thread: hand it to a
+/// detached thread to drop there instead. Used for the underlying `notify` watcher, whose `Drop`
+/// impl can itself block (joining a backend thread) or panic (an `unwrap()` on a shutdown-channel
+/// send) if the backend is already unhealthy -- which is exactly the situation this is usually
+/// called from (recovering after a `BackendError`, or a dead notify channel).
+///
+/// A plain `move || drop(value)` closure would defeat this on the failure path: if
+/// `Builder::spawn` can't create the OS thread, it drops the closure (and therefore `value`)
+/// itself before returning `Err`, which runs the drop on the calling thread right here -- exactly
+/// what this function exists to avoid. Instead, `value` goes into a `Mutex` shared via `Arc` with
+/// the spawned closure: on the failure path, taking it back out of *this* handle and
+/// `mem::forget`-ing it guarantees the calling thread never runs `value`'s `Drop`, regardless of
+/// whether `spawn` already dropped the closure's own `Arc` clone (a no-op refcount decrement,
+/// since this handle still holds `value`) or never got that far.
+///
+/// Returns `false` if the teardown thread itself couldn't be spawned: `value` is leaked (not
+/// dropped) in that case, which callers should treat as a real, ongoing resource loss rather than
+/// silently reporting success.
+#[must_use]
+fn spawn_teardown<T: Send + 'static>(value: T) -> bool {
+    let value = Arc::new(std::sync::Mutex::new(Some(value)));
+    let for_thread = Arc::clone(&value);
+    let spawned = std::thread::Builder::new()
+        .name("notify-watcher-teardown".to_owned())
+        .spawn(move || drop(for_thread.lock().unwrap().take()));
+    match spawned {
+        Ok(_join_handle) => true,
+        Err(error) => {
+            std::mem::forget(value.lock().unwrap().take());
+            warn!(message = "Failed to spawn file watcher teardown thread.", %error);
+            false
+        }
+    }
+}
 
 /// Build a fresh `RecommendedWatcher` bridging its synchronous callback into `tx`, along with a
 /// new `backend_error_pending` flag owned solely by this watcher generation.
@@ -420,24 +470,25 @@ impl NotifyDiscovery {
     /// installed, and sharing the flag would let it wrongly mark the new, healthy watcher for
     /// another (possibly endless) teardown.
     ///
-    /// Returns `false` if the new watcher, or a thread to drop the old one on, could not be
-    /// created; callers should then stop using notify-based discovery and fall back to polling.
+    /// Returns `false` if the new watcher could not be created, or if the old one could not be
+    /// handed off for teardown (in which case it's leaked rather than dropped inline -- see
+    /// `spawn_teardown`); callers should then stop using notify-based discovery and fall back to
+    /// polling, the same as any other unrecoverable resource exhaustion here.
     #[must_use]
     pub fn forget_watches(&mut self) -> bool {
-        if let Some(old_watcher) = self.watcher.take()
-            && let Err(error) = std::thread::Builder::new()
-                .name("notify-watcher-teardown".to_owned())
-                .spawn(move || drop(old_watcher))
-        {
-            // Couldn't even spawn a thread to drop it on (e.g. process out of threads); the old
-            // watcher leaks for the life of the process, same as any other unrecoverable
-            // exhaustion here.
-            warn!(message = "Failed to spawn file watcher teardown thread.", %error);
+        let old_watcher_handed_off = match self.watcher.take() {
+            Some(old_watcher) => spawn_teardown(old_watcher),
+            None => true,
+        };
+        if !old_watcher_handed_off {
+            // Do not construct a replacement after teardown failed: the old watcher is already
+            // leaked to avoid dropping it inline, so creating another backend would only increase
+            // resource pressure before we fall back to polling.
             return false;
         }
 
         let (tx, receiver) = mpsc::channel(NOTIFY_CHANNEL_CAPACITY);
-        match build_watcher(tx) {
+        let new_watcher_built = match build_watcher(tx) {
             Ok((watcher, backend_error_pending)) => {
                 self.watcher = Some(watcher);
                 self.receiver = receiver;
@@ -450,7 +501,9 @@ impl NotifyDiscovery {
                 warn!(message = "Failed to rebuild file watcher after backend error.", %error);
                 false
             }
-        }
+        };
+
+        new_watcher_built
     }
 
     /// Forget bookkeeping for a single watched directory, without touching the underlying OS-level
@@ -690,6 +743,60 @@ mod tests {
     use super::*;
 
     #[test]
+    fn spawn_teardown_drops_the_value_exactly_once_off_the_calling_thread() {
+        // Regression test for a bug found in review: an earlier version of `spawn_teardown` used
+        // a plain `move || drop(value)` closure, which `Builder::spawn` would itself drop --
+        // running the drop on the calling thread -- if it failed to create the OS thread. This
+        // can't easily force that failure path (spawning threads essentially never fails in a
+        // test), but it does verify the success path's actual guarantee: the value is dropped
+        // exactly once, and not on the thread that called `spawn_teardown`.
+        struct DropRecorder {
+            dropped_on: Arc<std::sync::Mutex<Option<std::thread::ThreadId>>>,
+            drop_count: Arc<std::sync::atomic::AtomicUsize>,
+        }
+        impl Drop for DropRecorder {
+            fn drop(&mut self) {
+                *self.dropped_on.lock().unwrap() = Some(std::thread::current().id());
+                self.drop_count
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+
+        let dropped_on = Arc::new(std::sync::Mutex::new(None));
+        let drop_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let calling_thread = std::thread::current().id();
+        let recorder = DropRecorder {
+            dropped_on: Arc::clone(&dropped_on),
+            drop_count: Arc::clone(&drop_count),
+        };
+
+        assert!(
+            spawn_teardown(recorder),
+            "spawning the teardown thread should succeed here"
+        );
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while drop_count.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "timed out waiting for the teardown thread to drop the value"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        assert_eq!(
+            drop_count.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "the value must be dropped exactly once"
+        );
+        assert_ne!(
+            dropped_on.lock().unwrap().unwrap(),
+            calling_thread,
+            "the value must not be dropped on the thread that called spawn_teardown"
+        );
+    }
+
+    #[test]
     fn literal_pattern_watches_parent_non_recursive() {
         let dirs = compute_watch_directories(&[PathBuf::from("/var/log/vector.log")]);
         assert_eq!(dirs.len(), 1);
@@ -834,6 +941,27 @@ mod tests {
         fn emit_files_idle(&self, _count: usize) {}
         fn emit_path_globbing_failed(&self, _path: &std::path::Path, _error: &std::io::Error) {}
         fn emit_file_line_too_long(&self, _buf: &bytes::BytesMut, _max_size: usize, _size: usize) {}
+    }
+
+    #[test]
+    fn dropping_discovery_hands_the_watcher_to_the_teardown_thread() {
+        // Regression test for a bug found in review: `FileServer` used to drop the whole
+        // `NotifyDiscovery` on several paths (`notify_discovery = None`, and an early `return Err`
+        // when the output channel closed), each of which ran the underlying watcher's `Drop`
+        // inline -- exactly the hang/panic risk `forget_watches`'s detached teardown avoids, just
+        // reached another way. `NotifyDiscovery::drop` now routes through the same teardown, so
+        // every such path is safe without the call site having to remember anything.
+        let dir = tempfile::tempdir().unwrap();
+        let pattern = dir.path().join("*.log");
+        let discovery = NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter).unwrap();
+
+        let start = std::time::Instant::now();
+        drop(discovery);
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(1),
+            "dropping NotifyDiscovery must return promptly, handing teardown to another thread \
+             rather than running the watcher's own (possibly blocking) Drop inline"
+        );
     }
 
     #[tokio::test]
