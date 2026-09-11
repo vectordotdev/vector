@@ -86,7 +86,7 @@ impl FromLua for TagValueSet {
                         Ok(value) => string_values.push(value),
                         Err(err) => {
                             return Err(LuaError::FromLuaConversionError {
-                                from: String::from("metric tag value"),
+                                from: "metric tag value",
                                 to: String::from("string"),
                                 message: Some(err.to_string()),
                             });
@@ -464,7 +464,7 @@ mod test {
 
         let table = lua.create_table().unwrap();
         table.push("example value").unwrap();
-        table.push(42).unwrap();
+        table.push(true).unwrap();
 
         let result = TagValueSet::from_lua(LuaValue::Table(table), &lua);
 
