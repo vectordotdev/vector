@@ -145,6 +145,11 @@ string_slice = "warn"
 await_holding_lock = "warn"
 let_underscore_must_use = "warn"
 uninlined_format_args = "warn"
+borrow_as_ptr = "warn"
+checked_conversions = "warn"
+ptr_as_ptr = "warn"
+rc_buffer = "warn"
+todo = "warn"
 
 [workspace.dependencies]
 antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }

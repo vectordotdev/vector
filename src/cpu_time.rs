@@ -91,7 +91,7 @@ impl Inner {
         //   are an invalid clock ID (not the case here) or an invalid pointer
         //   (not the case here), neither of which can occur.
         unsafe {
-            libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut ts);
+            libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &raw mut ts);
         }
         Inner(Duration::new(ts.tv_sec as u64, ts.tv_nsec as u32))
     }
