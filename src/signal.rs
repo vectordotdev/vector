@@ -314,25 +314,33 @@ impl ShutdownReceiver {
 
 /// Resolves when a shutdown signal (or a closed shutdown channel) is received. Reload
 /// signals received along the way are forwarded to `on_reload` (e.g. so startup can
-/// re-broadcast them once it completes). Lag on the reload channel is logged; lag on the
-/// shutdown channel means multiple shutdowns were sent, which quits immediately.
+/// re-broadcast them once it completes). Both channels are polled for the whole call, so
+/// reloads arriving during a long blocked phase are coalesced as they arrive instead of
+/// overflowing the bounded reload channel; a queued shutdown always wins a poll. Lag on
+/// the reload channel is logged; lag on the shutdown channel means multiple shutdowns were
+/// sent, which quits immediately.
 pub async fn recv_shutdown(
     rx: &mut SignalRx,
     shutdown_rx: &mut ShutdownReceiver,
     mut on_reload: impl FnMut(SignalTo),
 ) -> ShutdownSignal {
-    // Check the reload channel first so reloads are never re-ordered ahead of an
-    // already-queued shutdown; a pending shutdown still wins the next poll.
+    // The reload channel closing mid-phase is not a shutdown; stop polling it so the
+    // select below isn't woken by `RecvError::Closed` in a tight loop.
+    let mut reloads_open = true;
     loop {
-        match rx.try_recv() {
-            Ok(reload) => on_reload(reload),
-            Err(TryRecvError::Lagged(amt)) => {
-                warn!(message = "Overflow, dropped {} signals.", amt)
-            }
-            Err(TryRecvError::Closed | TryRecvError::Empty) => break,
+        tokio::select! {
+            biased;
+
+            shutdown = shutdown_rx.recv() => return shutdown,
+            reload = rx.recv(), if reloads_open => match reload {
+                Ok(reload) => on_reload(reload),
+                Err(RecvError::Lagged(amt)) => {
+                    warn!(message = "Overflow, dropped {} signals.", amt)
+                }
+                Err(RecvError::Closed) => reloads_open = false,
+            },
         }
     }
-    shutdown_rx.recv().await
 }
 
 /// Non-blocking counterpart of [`recv_shutdown`]: drains the signal receiver, returning the
@@ -435,6 +443,42 @@ mod tests {
         assert_eq!(received, ShutdownSignal::Graceful(None));
     }
 
+    #[tokio::test]
+    async fn reloads_arriving_during_a_blocked_phase_are_coalesced() {
+        // Reloads that keep arriving while `recv_shutdown` is waiting for a shutdown must
+        // be coalesced as they arrive (not left to overflow the bounded reload channel),
+        // and a queued shutdown must still win the next poll.
+        let (handler, mut rx, shutdown_rx) = SignalHandler::new();
+        let mut shutdown_rx = ShutdownReceiver::new(shutdown_rx);
+        let tx = handler.clone_tx();
+
+        // Reloads stream in while no shutdown has been sent yet, then a shutdown arrives.
+        let shutdown_sender = handler.clone_shutdown_tx();
+        let reloader = tokio::spawn(async move {
+            for _ in 0..500 {
+                drop(tx.send(SignalTo::ReloadFromDisk));
+                tokio::task::yield_now().await;
+            }
+            shutdown_sender
+                .send(ShutdownSignal::Graceful(None))
+                .unwrap();
+        });
+        tokio::task::yield_now().await;
+
+        let mut coalesced = 0;
+        let received = timeout(Duration::from_secs(1), async {
+            recv_shutdown(&mut rx, &mut shutdown_rx, |_| coalesced += 1).await
+        })
+        .await
+        .expect("shutdown not received within timeout");
+        reloader.await.unwrap();
+
+        assert_eq!(received, ShutdownSignal::Graceful(None));
+        assert!(
+            coalesced > 0,
+            "reloads arriving during the phase must be coalesced, saw {coalesced}"
+        );
+    }
     #[tokio::test]
     async fn try_recv_shutdown_finds_queued_shutdown() {
         let (handler, mut rx, shutdown_rx) = SignalHandler::new();
