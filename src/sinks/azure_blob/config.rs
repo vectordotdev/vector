@@ -1,10 +1,4 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with format_with expands to a must_use let binding"
-)]
-
 use std::collections::{BTreeMap, HashMap};
-use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
@@ -18,7 +12,6 @@ use azure_core::{
 use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
 
 use bytes::Bytes;
-use derivative::Derivative;
 use futures::FutureExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
@@ -365,40 +358,23 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedAzureBlob {
     // The connection string contains credentials (AccountKey / SAS token),
     // so it is intentionally omitted from diagnostics.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     parsed_connection_string: ParsedConnectionString,
     // The container URL may embed a SAS token as its query string, so it is
     // rendered without the query.
-    #[derivative(Debug(format_with = "fmt_container_url"))]
+    #[debug("{}", {let mut url = container_url.clone(); url.set_query(None); url})]
     container_url: Url,
     batcher_settings: BatcherSettings,
     request_settings: TowerRequestSettings,
     encoder: Encoder<Framer>,
     blob_time_format: String,
     blob_append_uuid: bool,
-    #[derivative(Debug(format_with = "fmt_confined_blob_prefix"))]
+    #[debug("{:?}", confined_blob_prefix.to_string())]
     confined_blob_prefix: ConfinedTemplate,
-}
-
-/// Formats a container URL without its query string, so a SAS token embedded
-/// as a query parameter is not leaked into diagnostics.
-fn fmt_container_url(url: &Url, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut url = url.clone();
-    url.set_query(None);
-    fmt::Debug::fmt(&url, f)
-}
-
-/// Formats a confined template as its rendered string.
-fn fmt_confined_blob_prefix(
-    template: &ConfinedTemplate,
-    f: &mut fmt::Formatter<'_>,
-) -> fmt::Result {
-    fmt::Debug::fmt(&template.to_string(), f)
 }
 
 #[async_trait::async_trait]
@@ -406,6 +382,7 @@ impl ValidatedSink for AzureBlobSinkConfig {
     type Validated = ValidatedAzureBlob;
 
     fn validate(&self) -> crate::Result<ValidatedAzureBlob> {
+        self.encoding.validate()?;
         if self.blob_type == AzureBlobType::Append && !supports_append(self.compression) {
             // An error rather than a warning because of zlib: standard zlib decoders return only
             // the first block and report success, so the loss is invisible to the consumer.
@@ -430,7 +407,7 @@ impl ValidatedSink for AzureBlobSinkConfig {
                         "`auth` configuration must be provided when using `account_name`".into(),
                     );
                 }
-                format!("AccountName={}", account_name)
+                format!("AccountName={account_name}")
             }
             (None, None, Some(blob_endpoint)) => {
                 if self.auth.is_none() {
@@ -442,9 +419,9 @@ impl ValidatedSink for AzureBlobSinkConfig {
                 let blob_endpoint = if blob_endpoint.ends_with('/') {
                     blob_endpoint.clone()
                 } else {
-                    format!("{}/", blob_endpoint)
+                    format!("{blob_endpoint}/")
                 };
-                format!("BlobEndpoint={}", blob_endpoint)
+                format!("BlobEndpoint={blob_endpoint}")
             }
             (None, None, None) => {
                 return Err("One of `connection_string`, `account_name`, or `blob_endpoint` must be provided".into());
@@ -1172,7 +1149,7 @@ pub async fn build_client(
         let port = url.port();
         proxy.no_proxy.matches(host)
             || port
-                .map(|p| proxy.no_proxy.matches(&format!("{}:{}", host, p)))
+                .map(|p| proxy.no_proxy.matches(&format!("{host}:{p}")))
                 .unwrap_or(false)
     };
     if bypass_proxy || !proxy.enabled {

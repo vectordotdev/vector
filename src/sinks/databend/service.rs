@@ -129,7 +129,7 @@ impl DatabendService {
             .take(8)
             .map(char::from)
             .collect::<String>();
-        format!("@~/vector/{}/{}/{}-{}", database, self.table, now, suffix,)
+        format!("@~/vector/{database}/{}/{now}-{suffix}", self.table,)
     }
 
     pub(crate) async fn insert_with_stage(&self, data: Bytes) -> Result<(), DatabendError> {

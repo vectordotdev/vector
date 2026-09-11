@@ -2860,6 +2860,7 @@ dependencies = [
  "criterion",
  "csv-core",
  "derivative",
+ "derive_more",
  "dyn-clone",
  "flate2",
  "futures",
@@ -13219,7 +13220,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.18"
+version = "0.3.19"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -13504,7 +13505,7 @@ dependencies = [
  "criterion",
  "crossbeam-queue",
  "crossbeam-utils",
- "derivative",
+ "derive_more",
  "fslock",
  "futures",
  "hdrhistogram",

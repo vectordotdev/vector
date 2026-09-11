@@ -555,7 +555,7 @@ mod integration_tests {
     }
 
     fn pulsar_address(scheme: &str, port: u16) -> String {
-        format!("{}://{}:{}", scheme, pulsar_host(), port)
+        format!("{scheme}://{}:{port}", pulsar_host())
     }
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {

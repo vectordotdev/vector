@@ -256,8 +256,7 @@ pub fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> 
     for (idx, name) in list.iter().enumerate() {
         if idx < list.len() - 1 && list[idx] == list[idx + 1] {
             warn!(
-                "`{}` configuration contains duplicate entry for `{}`. Removing duplicate.",
-                list_name, name
+                "`{list_name}` configuration contains duplicate entry for `{name}`. Removing duplicate."
             );
             dedup = true;
         }

@@ -275,7 +275,7 @@ impl ComponentTester {
                             .tags()
                             .map(|t| format!("{{{}}}", itertools::join(t.keys(), ",")))
                             .unwrap_or_default();
-                        format!("\n    -> Found similar metric `{}{}`", m.name(), tags)
+                        format!("\n    -> Found similar metric `{}{tags}`", m.name())
                     })
                     .collect::<Vec<_>>();
                 let partial = partial_matches.join("");
@@ -298,7 +298,7 @@ impl ComponentTester {
         let expected: HashSet<String> = requirement
             .suffixes
             .iter()
-            .map(|suffix| format!("{}{}", requirement.prefix, suffix))
+            .map(|suffix| format!("{}{suffix}", requirement.prefix))
             .collect();
 
         let mut missing = expected.clone();

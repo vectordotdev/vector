@@ -194,7 +194,7 @@ where
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build Remote Write request: {:?}.", e);
+                        error!("Failed to build Remote Write request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),

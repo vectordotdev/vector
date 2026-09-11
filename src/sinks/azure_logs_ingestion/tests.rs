@@ -116,8 +116,7 @@ async fn basic_config_error_with_no_auth() {
             let err_str = e.to_string();
             assert!(
                 err_str.contains("missing field `auth`"),
-                "Config parsing did not complain about missing auth field: {}",
-                err_str
+                "Config parsing did not complain about missing auth field: {err_str}"
             );
         }
     }
@@ -378,13 +377,11 @@ async fn mock_healthcheck_with_400_response() {
     // Both generic 400 "Bad Request", and our mock error message should be present
     assert!(
         err_str.contains("Bad Request"),
-        "Healthcheck error does not contain 'Bad Request': {}",
-        err_str
+        "Healthcheck error does not contain 'Bad Request': {err_str}"
     );
     assert!(
         err_str.contains("Mock400ErrorResponse"),
-        "Healthcheck error does not contain 'Mock400ErrorResponse': {}",
-        err_str
+        "Healthcheck error does not contain 'Mock400ErrorResponse': {err_str}"
     );
 }
 
@@ -444,7 +441,6 @@ async fn mock_healthcheck_with_403_response() {
     let err_str = hc_err.to_string();
     assert!(
         err_str.contains("Forbidden"),
-        "Healthcheck error does not contain 'Forbidden': {}",
-        err_str
+        "Healthcheck error does not contain 'Forbidden': {err_str}"
     );
 }
