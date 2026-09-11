@@ -55,7 +55,7 @@ setup and scaling sections. The sections on
 are useful when diagnosing slow scale-up or an unexpected steady-state replica
 count; the walkthrough is not a comprehensive production operations guide.
 
-All steps in this guide are reproducible. See [Replicating these results](#replicating-these-results)
+All steps in this guide are reproducible. See [Replicating the experiments](#replicating-the-experiments)
 for the manifests and Helm values used.
 
 ## Background
@@ -208,7 +208,7 @@ pipeline throughput, not a measure of successful delivery to the downstream
 consumer. Read per-pod CPU through `kubectl top pods` and average the value
 across all Vector pods.
 
-The scripts in [Replicating these results](#replicating-these-results) automate
+The scripts in [Replicating the experiments](#replicating-the-experiments) automate
 these measurements.
 
 At 55 MiB/s, the workload is expected to overwhelm a single pod's regex-parsing capacity.
@@ -320,7 +320,7 @@ its recommendation up to a whole pod. See [Why the HPA can stabilize at six
 pods](#deep-dive-why-the-hpa-can-stabilize-at-six-pods) for the algorithm and
 an example run that settles at six pods.
 
-### Results comparison
+## Results comparison
 
 | | 1 pod | 3 pods | 8 pods | HPA |
 | - | ----------------- | ------------------ | ------------------ | ------------------ |
@@ -413,7 +413,7 @@ with representative traffic in a test environment, then verify traffic reaches
 added replicas before enabling the HPA. Test burst behavior as well as steady-state
 throughput; a stable replica count alone does not establish reliable delivery.
 
-## Replicating
+## Replicating the experiments
 
 The Helm values, charts, and scripts used throughout this guide live in
 [`k8s-autoscaling/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling).
