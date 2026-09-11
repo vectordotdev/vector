@@ -4344,7 +4344,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7188,9 +7188,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.17.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1ada651cd6bdffe01e5f35067df53491f1fe853d2b154008ca2bd30b3d3fcf6"
+checksum = "93551ba7648013c25bece467fa087a54dd8dd50a4515182ecf9efb7630b1ed0d"
 dependencies = [
  "indexmap 2.14.2",
  "itoa",
@@ -7205,19 +7205,22 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.18.0"
+version = "0.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15b482df36c13dd1869d73d14d28cd4855fbd6cfc32294bee109908a9f4a4ed7"
+checksum = "96f8722f8562635f92f8ed992f26df0532266eb03d5202607c20c0d7e9745e13"
 dependencies = [
  "aho-corasick",
  "crossbeam-epoch",
  "crossbeam-utils",
- "hashbrown 0.15.2",
+ "hashbrown 0.16.0",
  "indexmap 2.14.2",
  "metrics",
- "ordered-float 4.6.0",
+ "ordered-float 5.3.0",
  "quanta",
  "radix_trie",
+ "rand 0.9.4",
+ "rand_xoshiro",
+ "rapidhash",
  "sketches-ddsketch",
 ]
 
@@ -8216,15 +8219,6 @@ name = "ordered-float"
 version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68f19d67e5a2795c94e73e0bb1cc1a7edeb2e28efd39e2e1c9b7a40c1108b11c"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
-name = "ordered-float"
-version = "4.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
 dependencies = [
  "num-traits",
 ]
@@ -9485,7 +9479,7 @@ dependencies = [
  "once_cell",
  "socket2 0.5.10",
  "tracing 0.1.44",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9641,6 +9635,15 @@ name = "rand_xorshift"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
+dependencies = [
+ "rand_core 0.9.0",
+]
+
+[[package]]
+name = "rand_xoshiro"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
 dependencies = [
  "rand_core 0.9.0",
 ]
