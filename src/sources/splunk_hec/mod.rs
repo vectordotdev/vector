@@ -1812,7 +1812,7 @@ fn raw_event(
             Utc::now(),
         );
 
-        if let Some(batch) = batch.clone() {
+        if let Some(batch) = batch {
             log = log.with_batch_notifier(&batch);
         }
         (vec![Event::from(log)], false)

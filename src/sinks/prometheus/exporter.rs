@@ -457,7 +457,7 @@ impl PrometheusExporter {
             });
 
             let service = ServiceBuilder::new()
-                .layer(build_http_trace_layer(span.clone()))
+                .layer(build_http_trace_layer(span))
                 .layer(CompressionLayer::new())
                 .service(inner);
 

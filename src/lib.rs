@@ -231,7 +231,7 @@ pub mod built_info {
 /// The hostname can be overridden by setting the VECTOR_HOSTNAME environment variable.
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(if let Ok(hostname) = std::env::var("VECTOR_HOSTNAME") {
-        hostname.to_string()
+        hostname
     } else {
         hostname::get()?.to_string_lossy().into_owned()
     })

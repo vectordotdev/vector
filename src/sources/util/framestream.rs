@@ -410,8 +410,6 @@ pub fn build_framestream_tcp_source(
 ) -> crate::Result<Source> {
     let addr = frame_handler.address();
     let tls = frame_handler.tls();
-    let shutdown = shutdown.clone();
-    let out = out.clone();
 
     Ok(Box::pin(async move {
         let listenfd = ListenFd::from_env();
@@ -835,7 +833,7 @@ fn build_framestream_source<T: Send + 'static>(
     error_mapper: impl FnMut(std::io::Error) + Send + 'static,
 ) {
     let content_type = frame_handler.content_type();
-    let mut event_sink = out.clone();
+    let mut event_sink = out;
     let (sock_sink, sock_stream) = Framed::new(
         socket,
         length_delimited::Builder::new()

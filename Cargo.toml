@@ -144,6 +144,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(dds
 string_slice = "warn"
 await_holding_lock = "warn"
 let_underscore_must_use = "warn"
+redundant_clone = "warn"
 uninlined_format_args = "warn"
 borrow_as_ptr = "warn"
 checked_conversions = "warn"

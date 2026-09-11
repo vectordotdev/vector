@@ -500,7 +500,7 @@ impl HttpSinkConfig {
                     AwsAuthentication::Role { region, .. } => region.clone(),
                     AwsAuthentication::Default { region, .. } => region.clone(),
                 })
-                .map_or(default_region, |r| Some(Region::new(r.to_string())))
+                .map_or(default_region, |r| Some(Region::new(r)))
                 .expect("Region must be specified");
 
                 HttpService::new_with_sig_v4(
