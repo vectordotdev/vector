@@ -168,7 +168,7 @@ convert_case = { version = "0.10", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 cuckoo-clock = { version = "0.2.7" , default-features = false }
-darling = { version = "0.23.0", default-features = false, features = ["suggestions"] }
+darling = { version = "0.24.1", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 derive_more = { version = "2.1.1", default-features = false, features = ["display", "debug"] }
@@ -219,7 +219,7 @@ tokio-test = "0.4.5"
 tokio-tungstenite = { version = "0.20.1", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
-syn = { version = "3", default-features = false }
+syn = { version = "3", default-features = false, features = ["full", "visit", "extra-traits"] }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip", "zstd"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
