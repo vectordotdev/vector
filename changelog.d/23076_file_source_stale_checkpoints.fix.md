@@ -1,0 +1,3 @@
+The `file` source no longer silently drops data when a checkpoint entry is stale. Previously, when a new file happened to match the fingerprint of an old checkpoint — typically a recycled inode with `fingerprint.strategy: device_and_inode` after rotated logs were pruned — Vector resumed reading at the stale offset: nothing was emitted until the new file grew past it, and with an offset beyond the file's size that meant losing the entire file. Vector now starts from the beginning when the stored position lies beyond the end of the file (which also covers truncated files), and discards `device_and_inode` checkpoints recorded before the file's creation time.
+
+authors: Adelagric

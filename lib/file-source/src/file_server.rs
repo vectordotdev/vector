@@ -24,7 +24,7 @@ use tokio::{
     time::sleep,
 };
 
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     file_watcher::{FileWatcher, RawLineResult},
@@ -207,7 +207,22 @@ where
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                // ok if this fails: might fix next cycle
+                                if let Ok(true) = watcher.update_path(path).await {
+                                    // The watcher restarted the replacement from
+                                    // the beginning: give it a new generation so
+                                    // in-flight reads from the previous file
+                                    // cannot be recorded as its progress, and
+                                    // persist the reset so the stale offset
+                                    // cannot be trusted again after a restart.
+                                    let generation = checkpoints.begin_generation(file_id);
+                                    watcher.set_generation(generation);
+                                    checkpoints.update(
+                                        file_id,
+                                        watcher.get_file_position(),
+                                        generation,
+                                    );
+                                }
                             } else {
                                 info!(
                                     message = "More than one file has the same fingerprint.",
@@ -225,7 +240,18 @@ where
                                         new_modified_time = ?new_modified_time,
                                         old_modified_time = ?old_modified_time,
                                     );
-                                    watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                    // ok if this fails: might fix next cycle
+                                    if let Ok(true) = watcher.update_path(path).await {
+                                        // Same as the rename branch above: reset
+                                        // means new generation + persisted reset.
+                                        let generation = checkpoints.begin_generation(file_id);
+                                        watcher.set_generation(generation);
+                                        checkpoints.update(
+                                            file_id,
+                                            watcher.get_file_position(),
+                                            generation,
+                                        );
+                                    }
                                 }
                             }
                         } else {
@@ -316,6 +342,7 @@ where
                         text: line.bytes,
                         filename: watcher.path.to_str().expect("not a valid path").to_owned(),
                         file_id,
+                        generation: watcher.generation(),
                         start_offset: line.offset,
                         end_offset: watcher.get_file_position(),
                     });
@@ -452,12 +479,20 @@ where
             ReadFrom::Beginning
         };
 
+        // Invalidate any previous watcher's generation BEFORE reading the stored
+        // checkpoint, so a late acknowledgement from a previous file bearing this
+        // fingerprint cannot refresh the entry between here and the validation
+        // below. Acknowledgements arriving before this point are inherently
+        // indistinguishable from real progress (no new claimant exists yet); the
+        // beyond-EOF guard in `FileWatcher::new` remains the backstop for those.
+        let generation = checkpoints.begin_generation(file_id);
+
         // Always prefer the stored checkpoint unless the user has opted out.  Previously, the
         // checkpoint was only loaded for new files when Vector was started up, but the
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
         // https://github.com/vectordotdev/vector/issues/7139
-        let read_from = if !self.ignore_checkpoints {
+        let mut read_from = if !self.ignore_checkpoints {
             checkpoints
                 .get(file_id)
                 .map(ReadFrom::Checkpoint)
@@ -465,6 +500,36 @@ where
         } else {
             fallback
         };
+
+        // A `DevInode` checkpoint recorded before this file was created cannot hold
+        // this file's progress: the inode has been recycled by a new file (common
+        // after rotated logs are pruned). Trusting it would silently skip the head
+        // of the file, or all of it while it is smaller than the stale position.
+        // Content-based (checksum) fingerprints are exempt: for those, a recreated
+        // file with a matching fingerprint legitimately carries the same identity.
+        if let ReadFrom::Checkpoint(position) = read_from
+            && matches!(file_id, FileFingerprint::DevInode(..))
+            && let Some(checkpoint_modified) = checkpoints.modified_time(file_id)
+            && let Ok(created) = fs::metadata(&path).await.and_then(|m| m.created())
+        {
+            let created = DateTime::<Utc>::from(created);
+            // A creation time in the future means the filesystem's clock cannot
+            // be trusted (e.g. a skewed network filesystem); don't treat the
+            // comparison as proof of inode reuse there, or a legitimate
+            // checkpoint would be discarded on every startup. The comparison
+            // itself also carries an allowance, so sub-second skew between the
+            // two clocks cannot invalidate a legitimate checkpoint.
+            let allowance = chrono::TimeDelta::seconds(1);
+            let plausible = created < Utc::now() + allowance;
+            if plausible && created > checkpoint_modified + allowance {
+                warn!(
+                    message = "Checkpoint predates the file's creation; assuming the inode was reused by a new file and discarding the checkpoint.",
+                    ?path,
+                    checkpoint = position,
+                );
+                read_from = fallback;
+            }
+        }
 
         match FileWatcher::new(
             path.clone(),
@@ -476,15 +541,39 @@ where
         .await
         {
             Ok(mut watcher) => {
-                if let ReadFrom::Checkpoint(file_position) = read_from {
-                    self.emitter.emit_file_resumed(&path, file_position);
-                } else {
-                    self.emitter.emit_file_added(&path);
+                match read_from {
+                    // The watcher itself may have refused a checkpoint pointing
+                    // beyond the end of the file; report what actually happened.
+                    ReadFrom::Checkpoint(file_position)
+                        if watcher.get_file_position() == file_position =>
+                    {
+                        self.emitter.emit_file_resumed(&path, file_position);
+                    }
+                    _ => self.emitter.emit_file_added(&path),
                 }
+                watcher.set_generation(generation);
                 watcher.set_file_findable(true);
+
+                // If the stored checkpoint was rejected (beyond-EOF guard in
+                // `FileWatcher::new`), persist the effective position under the
+                // new generation right away: leaving the stale offset in the
+                // checkpoint file until the first delivered line would let a
+                // restart trust it again once the file has grown past it.
+                if let ReadFrom::Checkpoint(file_position) = read_from
+                    && watcher.get_file_position() != file_position
+                {
+                    checkpoints.update(file_id, watcher.get_file_position(), generation);
+                }
+
                 fp_map.insert(file_id, watcher);
             }
-            Err(error) => self.emitter.emit_file_watch_error(&path, error),
+            Err(error) => {
+                // The generation was already claimed and its pending expiry
+                // cancelled, but no watcher exists to ever mark it dead again;
+                // re-arm the expiry so the fingerprint's state cannot leak.
+                checkpoints.set_dead(file_id);
+                self.emitter.emit_file_watch_error(&path, error)
+            }
         };
     }
 }
@@ -596,6 +685,9 @@ pub struct Line {
     pub text: Bytes,
     pub filename: String,
     pub file_id: FileFingerprint,
+    /// Watcher generation this line was read under; see
+    /// [`CheckpointsView::update`](file_source_common::checkpointer::CheckpointsView::update).
+    pub generation: u64,
     pub start_offset: u64,
     pub end_offset: u64,
 }

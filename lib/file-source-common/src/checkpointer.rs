@@ -52,20 +52,79 @@ pub struct Checkpointer {
 /// multiple threads.
 #[derive(Debug, Default)]
 pub struct CheckpointsView {
-    checkpoints: DashMap<FileFingerprint, FilePosition>,
-    modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
+    /// Position and last-progress time are stored together so that a
+    /// concurrent persistence pass can never pair a fresh position with a
+    /// previous generation's timestamp (or vice versa).
+    checkpoints: DashMap<FileFingerprint, (FilePosition, DateTime<Utc>)>,
     removed_times: DashMap<FileFingerprint, DateTime<Utc>>,
+    /// Current watcher generation per fingerprint; `update` ignores positions
+    /// recorded under any other generation. Not persisted: generations only
+    /// disambiguate in-flight updates within a single process lifetime.
+    generations: DashMap<FileFingerprint, u64>,
+    /// Process-wide monotonic source of generation tokens. Tokens are never
+    /// reused, so an old acknowledgement outliving its fingerprint's expiry
+    /// cannot collide with a token handed to a later watcher.
+    next_generation: std::sync::atomic::AtomicU64,
 }
 
 impl CheckpointsView {
-    pub fn update(&self, fng: FileFingerprint, pos: FilePosition) {
-        self.checkpoints.insert(fng, pos);
-        self.modified_times.insert(fng, Utc::now());
+    pub fn update(&self, fng: FileFingerprint, pos: FilePosition, generation: u64) {
+        // A fingerprint can be reused by a different file over time (most
+        // notably a recycled inode with `dev_inode` fingerprints), and
+        // acknowledgements from a dead watcher's file can arrive arbitrarily
+        // late. Each watcher records progress under the generation it was
+        // created with; anything else refers to a previous file's data and
+        // must not touch the checkpoint, or a stale offset could masquerade as
+        // current progress for the file now bearing this fingerprint. An
+        // absent entry means every watcher of this fingerprint is gone and its
+        // state has expired, so such updates are stale by definition.
+        //
+        // The entry guard is held for the duration of the writes so that a
+        // concurrent `begin_generation` cannot invalidate the check mid-update
+        // (it only touches this map, so no lock cycle is possible).
+        let Some(current) = self.generations.get(&fng) else {
+            return;
+        };
+        if *current.value() != generation {
+            return;
+        }
+
+        self.checkpoints.insert(fng, (pos, Utc::now()));
+        // A pending expiry is deliberately left armed: once a watcher has
+        // died, its remaining same-generation acknowledgements should record
+        // their final positions without keeping the fingerprint's state alive
+        // forever (the watcher is gone, so nothing would ever mark it dead
+        // again). A file coming back to life clears the tombstone through
+        // `begin_generation` when a new watcher claims the fingerprint.
+        drop(current);
+    }
+
+    /// Start a new watcher generation for this fingerprint, invalidating
+    /// updates from any previous watcher that used it. Taking ownership also
+    /// cancels any pending expiry: the fingerprint is live again.
+    ///
+    /// The pending expiry is cleared while the generation entry guard is still
+    /// held: the guard serializes lifecycle transitions against
+    /// `remove_expired`, which re-checks the tombstone under the same guard
+    /// before discarding a generation.
+    pub fn begin_generation(&self, fng: FileFingerprint) -> u64 {
+        let generation = self
+            .next_generation
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            + 1;
+        let mut entry = self.generations.entry(fng).or_insert(0);
+        *entry = generation;
         self.removed_times.remove(&fng);
+        drop(entry);
+        generation
     }
 
     pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
-        self.checkpoints.get(&fng).map(|r| *r.value())
+        self.checkpoints.get(&fng).map(|r| r.value().0)
+    }
+
+    pub fn modified_time(&self, fng: FileFingerprint) -> Option<DateTime<Utc>> {
+        self.checkpoints.get(&fng).map(|r| r.value().1)
     }
 
     pub fn set_dead(&self, fng: FileFingerprint) {
@@ -75,10 +134,6 @@ impl CheckpointsView {
     pub fn update_key(&self, old: FileFingerprint, new: FileFingerprint) {
         if let Some((_, value)) = self.checkpoints.remove(&old) {
             self.checkpoints.insert(new, value);
-        }
-
-        if let Some((_, value)) = self.modified_times.remove(&old) {
-            self.modified_times.insert(new, value);
         }
 
         if let Some((_, value)) = self.removed_times.remove(&old) {
@@ -104,17 +159,43 @@ impl CheckpointsView {
             .collect::<Vec<FileFingerprint>>();
 
         for fng in to_remove {
-            self.checkpoints.remove(&fng);
-            self.modified_times.remove(&fng);
-            self.removed_times.remove(&fng);
+            // The generation entry guard serializes this against a concurrent
+            // `begin_generation`: either the claim completed first (clearing
+            // the tombstone, which the re-check below observes and keeps the
+            // fingerprint alive), or it waits until the removal is done and
+            // starts from a clean slate. Dropping the generation entry keeps
+            // the map bounded by the set of live and recently-dead
+            // fingerprints; any update still in flight for this fingerprint is
+            // rejected outright once the entry is gone (see `update`).
+            match self.generations.entry(fng) {
+                dashmap::mapref::entry::Entry::Occupied(occupied) => {
+                    if self
+                        .removed_times
+                        .remove_if(&fng, |_, ts| now - *ts >= chrono::Duration::seconds(60))
+                        .is_some()
+                    {
+                        self.checkpoints.remove(&fng);
+                        occupied.remove();
+                    }
+                }
+                dashmap::mapref::entry::Entry::Vacant(_) => {
+                    if self
+                        .removed_times
+                        .remove_if(&fng, |_, ts| now - *ts >= chrono::Duration::seconds(60))
+                        .is_some()
+                    {
+                        self.checkpoints.remove(&fng);
+                    }
+                }
+            }
         }
     }
 
     fn load(&self, checkpoint: Checkpoint) {
-        self.checkpoints
-            .insert(checkpoint.fingerprint, checkpoint.position);
-        self.modified_times
-            .insert(checkpoint.fingerprint, checkpoint.modified);
+        self.checkpoints.insert(
+            checkpoint.fingerprint,
+            (checkpoint.position, checkpoint.modified),
+        );
     }
 
     fn set_state(&self, state: State, ignore_before: Option<DateTime<Utc>>) {
@@ -139,15 +220,11 @@ impl CheckpointsView {
                 .iter()
                 .map(|entry| {
                     let fingerprint = entry.key();
-                    let position = entry.value();
+                    let (position, modified) = entry.value();
                     Checkpoint {
                         fingerprint: *fingerprint,
                         position: *position,
-                        modified: self
-                            .modified_times
-                            .get(fingerprint)
-                            .map(|r| *r.value())
-                            .unwrap_or_else(Utc::now),
+                        modified: *modified,
                     }
                 })
                 .collect(),
@@ -174,7 +251,8 @@ impl Checkpointer {
 
     #[cfg(test)]
     pub fn update_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
-        self.checkpoints.update(fng, pos);
+        let generation = self.checkpoints.begin_generation(fng);
+        self.checkpoints.update(fng, pos, generation);
     }
 
     #[cfg(test)]
@@ -457,6 +535,52 @@ mod test {
         assert_eq!(chkptr.get_checkpoint(cases[1].0), None);
         assert_eq!(chkptr.get_checkpoint(cases[2].0), Some(42));
         assert_eq!(chkptr.get_checkpoint(cases[3].0), None);
+    }
+
+    #[tokio::test]
+    async fn test_update_ignores_stale_generations() {
+        let data_dir = tempdir().unwrap();
+        let chkptr = Checkpointer::new(data_dir.path());
+
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+
+        let first = chkptr.checkpoints.begin_generation(fingerprint);
+        chkptr.checkpoints.update(fingerprint, 100, first);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(100));
+        let modified_before = chkptr.checkpoints.modified_time(fingerprint).unwrap();
+
+        // A new watcher takes over the fingerprint (e.g. a recycled inode).
+        let second = chkptr.checkpoints.begin_generation(fingerprint);
+        assert!(second > first);
+
+        // A late acknowledgement from the previous watcher's file must not
+        // touch the checkpoint: its offset belongs to a different file, and a
+        // refreshed modified time would defeat the inode-reuse detection at
+        // watcher creation.
+        chkptr.checkpoints.update(fingerprint, 999_999, first);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(100));
+        assert_eq!(
+            chkptr.checkpoints.modified_time(fingerprint),
+            Some(modified_before)
+        );
+
+        // The current watcher's updates apply normally.
+        chkptr.checkpoints.update(fingerprint, 200, second);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(200));
+
+        // Once the fingerprint's state has expired (no generation entry left),
+        // any straggling update is rejected rather than resurrecting it.
+        chkptr.checkpoints.generations.remove(&fingerprint);
+        chkptr.checkpoints.update(fingerprint, 999_999, second);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(200));
+
+        // Tokens are process-wide monotonic: a fingerprint claimed again after
+        // its expiry never reuses a token, so acknowledgements from before the
+        // expiry stay rejected.
+        let third = chkptr.checkpoints.begin_generation(fingerprint);
+        assert!(third > second);
+        chkptr.checkpoints.update(fingerprint, 999_999, second);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(200));
     }
 
     #[tokio::test]

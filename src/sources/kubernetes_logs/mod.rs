@@ -946,7 +946,7 @@ impl Source {
                 }
             }
 
-            checkpoints.update(line.file_id, line.end_offset);
+            checkpoints.update(line.file_id, line.end_offset, line.generation);
             event
         });
 
