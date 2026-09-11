@@ -74,23 +74,6 @@ avoids event loss only as long as those stalled connections stay open. If the
 NGINX Ingress Controller or the load generator times out and closes a connection
 first, the in-flight request's events are lost along with it.
 
-## Test environment
-
-To evaluate Vector's scaling behavior under a sustained CPU-bound workload, we used a **[K3s](https://k3s.io/) single-node cluster hosted on an [Amazon EC2](https://aws.amazon.com/ec2/) c5.4xlarge** instance
-(16 vCPU, 32 GiB RAM). We chose a single-node cluster to eliminate latency and
-network overhead as factors, making the collected metrics more precise.
-We used the following configuration for the tests:
-
-- **Load generator:** [lading](https://github.com/DataDog/lading),
-  generating `apache_common` log lines at a configurable byte rate. It
-  maintains persistent parallel connections and is capable of generating sustained
-  high-throughput HTTP load.
-- **Load level:** **55 MiB/s** across all tests to get comparable
-  throughput measurements.
-- **Vector pod resources:** **1 vCPU and 2 GiB of memory**, with `requests == limits`
-  (Guaranteed QoS) to ensure that CPU throttling, not memory pressure or scheduling
-  variance, was the only bottleneck tested.
-
 ## Architecture
 
 ```goat
@@ -144,72 +127,47 @@ of data entirely.
 This is why we installed an NGINX Ingress Controller in front of Vector instead of exposing
 Vector through a ClusterIP Service.
 
-## Prerequisites
+## Methodology
 
-The following tools and cluster capacity are needed to reproduce the experiments,
-not just to read the guide. Use a test environment: the workload deliberately
-overloads Vector, and the consumer discards the output.
+The experiments apply a sustained CPU-bound workload to a stateless Vector
+pipeline and compare one, three, and eight fixed replicas with an HPA-managed
+deployment. We used a [K3s](https://k3s.io/) single-node cluster on an
+[Amazon EC2](https://aws.amazon.com/ec2/) `c5.4xlarge` instance (16 vCPU,
+32 GiB RAM). The single-node cluster reduces latency and network variance in
+the measurements. The same setup can run on a local Kubernetes cluster with
+sufficient capacity, although the results may be less consistent.
 
-- [`helm`](https://helm.sh/) version 3.0 or later, configured against a target cluster
-- [`kubectl`](https://kubernetes.io/docs/reference/kubectl/) for read-only cluster inspection and port-forwarding
-- Python 3.12 or later and [Ansible Core](https://docs.ansible.com/ansible/latest/index.html) 2.20.5 with the `kubernetes.core` collection (see [Replicating these results](#replicating-these-results))
-- At least 9 allocatable CPUs total (8 for Vector at max scale, 0.5 for the consumer, 0.2 for the producer)
-- [`grpcurl`](https://github.com/fullstorydev/grpcurl) for metric collection
-- [Kubernetes Metrics API](https://github.com/kubernetes-sigs/metrics-server) (`metrics-server`) installed (This is required for `kubectl top pods` and HPA CPU targets. K3s bundles `metrics-server` by default. On other clusters, run `kubectl top nodes` to verify that `metrics-server` is available before you start.)
+All runs use the same workload and pod configuration:
 
-## Collecting throughput and CPU metrics
+- **Load generator:** [lading](https://github.com/DataDog/lading), generating
+  `apache_common` log lines over 100 persistent parallel connections.
+- **Load level:** 55 MiB/s across all tests.
+- **Vector pod resources:** 1 vCPU and 2 GiB of memory, with
+  `requests == limits` for Guaranteed QoS.
 
-Throughout this guide, **throughput** refers to the input byte rate at Vector's
-`http_server` source, used as a proxy for pipeline throughput. It does not measure
-successful delivery to the downstream consumer.
+## Manual scaling
 
-Each Vector pod exposes [`ObservabilityService`](https://github.com/vectordotdev/vector/blob/master/proto/vector/observability.proto) on port 8686 ([gRPC](https://grpc.io/)). For
-each test run, we measured throughput by port-forwarding to a pod,
-capturing two `GetComponents` samples 30 seconds apart, and calculating the difference in `receivedBytesTotal` for
-the `in` source component to determine a per-pod throughput rate. Per-pod CPU was
-read via `kubectl top pods` and averaged across all Vector pods.
-
-The following commands collect the data used to calculate throughput for a single pod:
-
-```bash
-kubectl port-forward -n vector-perf pod/<pod-name> 18686:8686 &
-
-grpcurl -plaintext -d '{}' localhost:18686 \
-  vector.observability.v1.ObservabilityService/GetComponents > t0.json
-sleep 30
-grpcurl -plaintext -d '{}' localhost:18686 \
-  vector.observability.v1.ObservabilityService/GetComponents > t30.json
-```
-
-The difference in `receivedBytesTotal` for the `in` component between `t0.json` and
-`t30.json`, divided by 30 seconds, gives that pod's throughput.
-
-See [Replicating these results](#replicating-these-results) for a link to the script that
-automates this process.
-
-## Setup
-
-The following Helm release creates the namespace and deploys the consumer that drains all data forwarded by Vector:
+Deploy the shared test components before starting the measurements. The
+consumer drains all data forwarded by Vector, and the NGINX Ingress Controller
+distributes requests across the Vector replicas:
 
 {{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/consumer-chart/templates/consumer.yaml" dir="true" >}}
 
 ```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo add vectordotdev https://helm.vector.dev
+helm repo update
+
 helm upgrade --install consumer manifests/consumer-chart \
   -n vector-perf --create-namespace --wait --timeout=3m
 
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   -n ingress-nginx --create-namespace \
   --version 4.15.1 \
   --set controller.service.type=ClusterIP \
   --set controller.replicaCount=1 \
   --wait --timeout=3m
-
-helm repo add vectordotdev https://helm.vector.dev
-helm repo update
 ```
-
-## Manual scaling
 
 The following Helm values configure Vector with an
 `http_server` source, the `parse_regex!` transform, and the `socket` sink that forwards data to
@@ -242,17 +200,25 @@ generate `apache_common` log lines at 55 MiB/s across 100 parallel connections:
 
 {{< embed file="content/en/guides/level-up/k8s-autoscaling/manifests/producer-chart/templates/producer.yaml" dir="true" >}}
 
+After the environment is running, collect two samples of Vector's per-component
+counters 30 seconds apart. Calculate throughput from the change in
+`receivedBytesTotal` for the `in` source. This input byte rate is a proxy for
+pipeline throughput, not a measure of successful delivery to the downstream
+consumer. Read per-pod CPU through `kubectl top pods` and average the value
+across all Vector pods.
+
+The scripts in [Replicating these results](#replicating-these-results) automate
+these measurements.
+
 At 55 MiB/s, the workload is expected to overwhelm a single pod's regex-parsing capacity.
 When the pod reaches CPU saturation, Vector applies backpressure, reducing the rate at which lading can send data.
-
 
 The pod is pinned at its 1000m CPU limit, and throughput tops out at
 16.93 MiB/s, confirming the expected CPU ceiling. This per-pod throughput is the
 baseline for the three- and eight-pod measurements.
 
-After collecting the [single-pod metrics](#collecting-throughput-and-cpu-metrics),
-scale to three replicas, then eight. Collect metrics after each upgrade before
-continuing to the next replica count:
+After collecting the single-pod metrics, scale to three replicas, then eight.
+Collect metrics after each upgrade before continuing to the next replica count:
 
 ```bash
 # Three pods.
@@ -451,16 +417,28 @@ throughput; a stable replica count alone does not establish reliable delivery.
 The Helm values, charts, and scripts used throughout this guide live in
 [`k8s-autoscaling/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling).
 
-The [`terraform/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling/terraform)
-directory provisions the K3s single-node cluster (EC2 `c5.4xlarge`) that
-we used, if you don't already have a cluster to test
-against.
+### Tools and cluster requirements
 
-Once the [Setup](#setup) steps are complete and the producer and ingress from
-[Manual scaling](#manual-scaling) are deployed, the `run-experiment.yaml` Ansible
-playbook can run all four experiments or one selected experiment. It updates
-the Vector release, waits for the deployment to become ready, measures
-throughput, and manages the chart-provided HPA for the autoscaling experiment.
+- [`helm`](https://helm.sh/) version 3.0 or later, configured for the target cluster
+- [`kubectl`](https://kubernetes.io/docs/reference/kubectl/) for cluster inspection and port-forwarding
+- Python 3.12 or later and [Ansible Core](https://docs.ansible.com/ansible/latest/index.html) 2.20.5
+- The `kubernetes.core` Ansible collection
+- [`grpcurl`](https://github.com/fullstorydev/grpcurl) for metric collection
+- The [Kubernetes Metrics API](https://github.com/kubernetes-sigs/metrics-server);
+  run `kubectl top nodes` to verify that it is available
+- At least 9 allocatable CPUs: 8 for Vector at maximum scale, 0.5 for the
+  consumer, and 0.2 for the producer
+
+You can use any Kubernetes cluster with enough capacity, including a local
+cluster. The [`terraform/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling/terraform)
+directory provisions the K3s single-node EC2 environment used for the published
+measurements if you want to reduce infrastructure variance.
+
+After deploying the components in [Manual scaling](#manual-scaling), the
+`run-experiment.yaml` Ansible playbook can run all four experiments or one
+selected experiment. It updates the Vector release, waits for the deployment
+to become ready, measures throughput, and manages the chart-provided HPA for
+the autoscaling experiment.
 
 The playbook first scales Vector to 0 replicas with autoscaling disabled and
 waits for its pods to terminate, so every invocation starts from the same clean
