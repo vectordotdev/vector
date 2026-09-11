@@ -15,6 +15,23 @@ use crate::{
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
 
+pub(super) fn metric_identifiers_have_no_line_breaks(
+    metric: &Metric,
+    default_namespace: Option<&str>,
+) -> bool {
+    let name = encode_namespace(metric.namespace().or(default_namespace), '_', metric.name());
+    identifiers_have_no_line_breaks(&name, metric.tags())
+}
+
+fn identifiers_have_no_line_breaks(name: &str, tags: Option<&MetricTags>) -> bool {
+    !contains_line_break(name)
+        && tags.is_none_or(|tags| tags.iter_single().all(|(key, _)| !contains_line_break(key)))
+}
+
+fn contains_line_break(value: &str) -> bool {
+    value.contains(['\r', '\n'])
+}
+
 pub(super) trait MetricCollector {
     type Output;
 
@@ -246,11 +263,7 @@ impl MetricCollector for StringCollector {
     }
 
     fn should_encode_metric(&self, name: &str, tags: Option<&MetricTags>) -> bool {
-        !Self::contains_line_break(name)
-            && tags.is_none_or(|tags| {
-                tags.iter_single()
-                    .all(|(key, _)| !Self::contains_line_break(key))
-            })
+        identifiers_have_no_line_breaks(name, tags)
     }
 
     fn emit_metadata(&mut self, name: &str, fullname: &str, value: &MetricValue) {
@@ -314,10 +327,6 @@ impl StringCollector {
         let r#type = prometheus_metric_type(value).as_str();
         let help = Self::escape_help(name);
         format!("# HELP {fullname} {help}\n# TYPE {fullname} {type}\n")
-    }
-
-    fn contains_line_break(value: &str) -> bool {
-        value.contains(['\r', '\n'])
     }
 
     fn escape_help(help: &str) -> String {
