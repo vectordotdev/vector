@@ -95,7 +95,9 @@ pub enum NotifyMessage {
 /// Dropping this stops the watcher thread (via `notify`'s own `Drop` impl on the underlying
 /// watcher) and closes the channel.
 pub struct NotifyDiscovery {
-    watcher: RecommendedWatcher,
+    /// `None` only transiently, while `forget_watches` is tearing down the old watcher before
+    /// building its replacement; every other method can assume this is always `Some`.
+    watcher: Option<RecommendedWatcher>,
     watched_dirs: WantedDirs,
     /// For a wanted directory that doesn't exist yet (so it can't be `watch()`-ed directly),
     /// tracks the nearest existing ancestor we're watching recursively instead, keyed by the
@@ -105,13 +107,17 @@ pub struct NotifyDiscovery {
     /// details.
     fallback_watches: HashMap<PathBuf, PathBuf>,
     receiver: mpsc::Receiver<NotifyMessage>,
-    /// Set by the notify callback on a `BackendError`, regardless of whether the corresponding
-    /// `NotifyMessage::BackendError` made it onto the (bounded) channel. A `BackendError` can mean
-    /// the watcher silently dropped a watch, so it must always trigger `forget_watches` on the
-    /// next `resync_watches` call -- relying solely on the channel message would lose that
-    /// requirement if the channel happened to be full at the time (see `NOTIFY_CHANNEL_CAPACITY`),
-    /// since a full channel makes the callback substitute a plain `Overflow` for the dropped
-    /// message, and `Overflow` alone doesn't call `forget_watches`.
+    /// Set by `watcher`'s notify callback on a `BackendError`, regardless of whether the
+    /// corresponding `NotifyMessage::BackendError` made it onto the (bounded) channel. A
+    /// `BackendError` can mean the watcher silently dropped a watch, so it must always trigger
+    /// `forget_watches` on the next `resync_watches` call -- relying solely on the channel message
+    /// would lose that requirement if the channel happened to be full at the time (see
+    /// `NOTIFY_CHANNEL_CAPACITY`), since a full channel makes the callback substitute a plain
+    /// `Overflow` for the dropped message, and `Overflow` alone doesn't call `forget_watches`.
+    ///
+    /// Owned solely by the current `watcher` generation (see `build_watcher`/`forget_watches`):
+    /// never shared with a previous or future watcher, so a stale callback from an already-
+    /// replaced watcher can't wrongly flag the current one.
     backend_error_pending: Arc<AtomicBool>,
 }
 
@@ -123,6 +129,62 @@ pub struct NotifyDiscovery {
 /// `FileServer` already treats as "something changed, go check everything" via the next
 /// reconciliation pass -- the same fallback already used for the OS-level notify queue overflow.
 const NOTIFY_CHANNEL_CAPACITY: usize = 8192;
+
+/// `NotifyDiscovery::watcher` is only ever `None` transiently inside `forget_watches`; every
+/// other method observing `None` here indicates a bug in this module.
+const WATCHER_INVARIANT: &str = "NotifyDiscovery::watcher must be Some outside forget_watches";
+
+/// Build a fresh `RecommendedWatcher` bridging its synchronous callback into `tx`, along with a
+/// new `backend_error_pending` flag owned solely by this watcher generation.
+///
+/// The flag must not be shared across generations: `forget_watches` replaces the watcher (and
+/// its callback thread) without waiting for the old one to actually stop, so a `BackendError`
+/// from the old, already-discarded generation can still fire after a new one is already in
+/// place. If both generations shared one flag, that stale callback would set it, causing the
+/// next `resync_watches` to tear down and rebuild the perfectly healthy new watcher too --
+/// forever, if the old backend keeps erroring right up until it's finally gone.
+fn build_watcher(
+    tx: mpsc::Sender<NotifyMessage>,
+) -> notify::Result<(RecommendedWatcher, Arc<AtomicBool>)> {
+    let backend_error_pending = Arc::new(AtomicBool::new(false));
+    let callback_backend_error_pending = Arc::clone(&backend_error_pending);
+    let watcher = RecommendedWatcher::new(
+        move |res: notify::Result<Event>| {
+            // This closure runs on a thread owned by the OS notification backend (e.g. the
+            // inotify reader thread), so it must not block: `try_send` rather than the
+            // blocking/async `send`.
+            let msg = match res {
+                Ok(event) => classify_event(event),
+                Err(error) => {
+                    if is_overflow(&error) {
+                        Some(NotifyMessage::Overflow)
+                    } else {
+                        // Set this unconditionally, independent of whether the channel send
+                        // below succeeds: a `BackendError` must always trigger
+                        // `forget_watches` on the next `resync_watches`, and the channel
+                        // (bounded, and possibly full) is not a reliable way to guarantee
+                        // that. See `backend_error_pending`'s doc comment.
+                        callback_backend_error_pending.store(true, Ordering::Relaxed);
+                        Some(NotifyMessage::BackendError(error.to_string()))
+                    }
+                }
+            };
+            let Some(msg) = msg else { return };
+            if let Err(mpsc::error::TrySendError::Full(_)) = tx.try_send(msg) {
+                // The channel is full: fall back to reporting an overflow instead of this
+                // specific event, same as the OS-level notify queue overflow case above --
+                // `FileServer` treats both identically (trigger a full reconciliation pass).
+                // If even that doesn't fit, the channel has been unread for a while and the
+                // backstop `reconcile_interval` timer will catch up regardless.
+                drop(tx.try_send(NotifyMessage::Overflow));
+            }
+            // Any other send error means every receiver has been dropped (FileServer shut
+            // down or never polled); nothing useful to do about it.
+        },
+        Config::default(),
+    )?;
+    Ok((watcher, backend_error_pending))
+}
 
 impl NotifyDiscovery {
     /// Create a new [`NotifyDiscovery`], watching the directories implied by `include_patterns`.
@@ -137,54 +199,24 @@ impl NotifyDiscovery {
         emitter: &E,
     ) -> notify::Result<Self> {
         let (tx, receiver) = mpsc::channel(NOTIFY_CHANNEL_CAPACITY);
-        let backend_error_pending = Arc::new(AtomicBool::new(false));
-
-        let callback_backend_error_pending = Arc::clone(&backend_error_pending);
-        let watcher = RecommendedWatcher::new(
-            move |res: notify::Result<Event>| {
-                // This closure runs on a thread owned by the OS notification backend (e.g. the
-                // inotify reader thread), so it must not block: `try_send` rather than the
-                // blocking/async `send`.
-                let msg = match res {
-                    Ok(event) => classify_event(event),
-                    Err(error) => {
-                        if is_overflow(&error) {
-                            Some(NotifyMessage::Overflow)
-                        } else {
-                            // Set this unconditionally, independent of whether the channel send
-                            // below succeeds: a `BackendError` must always trigger
-                            // `forget_watches` on the next `resync_watches`, and the channel
-                            // (bounded, and possibly full) is not a reliable way to guarantee
-                            // that. See `backend_error_pending`'s doc comment.
-                            callback_backend_error_pending.store(true, Ordering::Relaxed);
-                            Some(NotifyMessage::BackendError(error.to_string()))
-                        }
-                    }
-                };
-                let Some(msg) = msg else { return };
-                if let Err(mpsc::error::TrySendError::Full(_)) = tx.try_send(msg) {
-                    // The channel is full: fall back to reporting an overflow instead of this
-                    // specific event, same as the OS-level notify queue overflow case above --
-                    // `FileServer` treats both identically (trigger a full reconciliation pass).
-                    // If even that doesn't fit, the channel has been unread for a while and the
-                    // backstop `reconcile_interval` timer will catch up regardless.
-                    drop(tx.try_send(NotifyMessage::Overflow));
-                }
-                // Any other send error means every receiver has been dropped (FileServer shut
-                // down or never polled); nothing useful to do about it.
-            },
-            Config::default(),
-        )?;
+        let (watcher, backend_error_pending) = build_watcher(tx)?;
 
         let mut discovery = Self {
-            watcher,
+            watcher: Some(watcher),
             watched_dirs: WantedDirs::new(),
             fallback_watches: HashMap::new(),
             receiver,
             backend_error_pending,
         };
-        discovery.resync_watches(include_patterns, emitter);
+        // Can't fail here: `backend_error_pending` is freshly `false`, so this can't hit the
+        // rebuild-failure path.
+        let succeeded = discovery.resync_watches(include_patterns, emitter);
+        debug_assert!(succeeded);
         Ok(discovery)
+    }
+
+    fn watcher_mut(&mut self) -> &mut RecommendedWatcher {
+        self.watcher.as_mut().expect(WATCHER_INVARIANT)
     }
 
     /// Recompute the set of directories that should be watched from `include_patterns`, and
@@ -199,18 +231,22 @@ impl NotifyDiscovery {
     /// rather than only on the next `reconcile_interval` backstop. Once the wanted directory
     /// exists, a later call upgrades to watching it directly and drops the broader ancestor watch
     /// (unless some other wanted directory still needs that same ancestor as its own fallback).
+    ///
+    /// Returns `false` if a pending backend error forced a watcher rebuild that failed; callers
+    /// should then stop using notify-based discovery entirely and fall back to polling.
+    #[must_use]
     pub fn resync_watches<E: FileSourceInternalEvents>(
         &mut self,
         include_patterns: &[PathBuf],
         emitter: &E,
-    ) {
+    ) -> bool {
         // A `BackendError` since the last call means the watcher backend may have silently
         // dropped a watch; forget all bookkeeping so every directory below is re-`watch`ed from
         // scratch. Checked here (not just via the `NotifyMessage::BackendError` channel handler)
         // because a full channel can substitute a plain `Overflow` for the dropped message -- see
         // `backend_error_pending`'s doc comment.
-        if self.backend_error_pending.swap(false, Ordering::Relaxed) {
-            self.forget_watches();
+        if self.backend_error_pending.swap(false, Ordering::Relaxed) && !self.forget_watches() {
+            return false;
         }
 
         // Absolutize first: `notify` always resolves the path it's asked to `watch()` to an
@@ -255,7 +291,7 @@ impl NotifyDiscovery {
             if self.watched_dirs.get(path) == Some(&mode) {
                 continue;
             }
-            match self.watcher.watch(path, mode.mode()) {
+            match self.watcher_mut().watch(path, mode.mode()) {
                 Ok(()) => {
                     trace!(message = "Watching directory for file events.", path = ?path, ?mode);
                     // Only record success: if `watch` failed, leaving this path out of
@@ -306,17 +342,19 @@ impl NotifyDiscovery {
         // unwatched and forgotten.
         let ancestors_in_use: std::collections::HashSet<&PathBuf> =
             self.fallback_watches.values().collect();
+        let watcher = self.watcher.as_mut().expect(WATCHER_INVARIANT);
         self.watched_dirs.retain(|path, _mode| {
             if wanted.contains_key(path) || ancestors_in_use.contains(path) {
                 return true;
             }
             // Best-effort: if the directory is already gone, unwatch will simply error, which we
             // can ignore -- there's nothing left to watch.
-            drop(self.watcher.unwatch(path));
+            drop(watcher.unwatch(path));
             false
         });
 
         emitter.emit_file_watch_directories(self.watched_dirs.len());
+        true
     }
 
     /// Watch `ancestor` (recursively, so creation of `wanted` underneath it is observed) as a
@@ -336,7 +374,10 @@ impl NotifyDiscovery {
             self.fallback_watches.insert(wanted.to_path_buf(), ancestor);
             return;
         }
-        match self.watcher.watch(&ancestor, RecursiveMode::Recursive) {
+        match self
+            .watcher_mut()
+            .watch(&ancestor, RecursiveMode::Recursive)
+        {
             Ok(()) => {
                 debug!(
                     message = "Configured directory does not exist yet; watching nearest existing ancestor instead.",
@@ -359,23 +400,57 @@ impl NotifyDiscovery {
         self.receiver.recv().await
     }
 
-    /// Forget which directories we believe are currently watched, without touching the
-    /// underlying OS-level watcher. The next `resync_watches` call will then treat every
-    /// directory implied by `include_patterns` as unwatched and re-`watch` it.
+    /// Recover from a lost/uncertain watch state by discarding the underlying OS watcher and
+    /// building a brand new one, rather than trying to `unwatch()` the old registrations (which
+    /// isn't reliable cleanup on every backend, and can block if the backend is already
+    /// unhealthy). Call this after a [`NotifyMessage::BackendError`] or [`NotifyMessage::Overflow`].
     ///
-    /// Call this after a [`NotifyMessage::BackendError`], which signals that the watcher backend
-    /// itself hit a problem (e.g. it silently dropped a watch because the directory it was
-    /// watching was removed and recreated, or some other backend-specific hiccup). Without this,
-    /// `resync_watches`'s "only `watch()` a path if we don't already believe it's watched" check
-    /// (necessary so it doesn't uselessly re-`watch` paths on every call) means a watch lost this
-    /// way is never re-established: `include_patterns` hasn't changed, so the set of "wanted"
-    /// directories is identical to what's already recorded in `watched_dirs`, and the loop skips
-    /// every one of them. Re-`watch`-ing a path notify still has registered correctly is a
-    /// harmless no-op, so clearing all bookkeeping on any backend error, rather than trying to
-    /// determine which specific watch was affected (which notify's error doesn't tell us), is the
-    /// simple, safe choice here.
-    pub fn forget_watches(&mut self) {
-        self.watched_dirs.clear();
+    /// The old watcher is moved onto a detached thread and dropped there, without awaiting that
+    /// thread, since `notify`'s own `Drop` impls can themselves block or panic if the backend is
+    /// already wedged. This is a bounded compromise, not a complete fix: `notify` gives no way to
+    /// know when the old backend's thread actually exits, so its fd/thread can still leak for an
+    /// unbounded time, and the new watcher is built without waiting for that teardown, so the two
+    /// can briefly coexist under fd pressure. Accepted because the alternative (teardown inline,
+    /// or waiting for it) reintroduces the hang/panic risk this exists to avoid; a resource-
+    /// starved system still degrades to polling via this method's `false` return, rather than
+    /// wedging `FileServer`.
+    ///
+    /// Each generation gets its own `backend_error_pending` flag (from `build_watcher`), not one
+    /// shared across generations: the old watcher's callback can still fire after the new one is
+    /// installed, and sharing the flag would let it wrongly mark the new, healthy watcher for
+    /// another (possibly endless) teardown.
+    ///
+    /// Returns `false` if the new watcher, or a thread to drop the old one on, could not be
+    /// created; callers should then stop using notify-based discovery and fall back to polling.
+    #[must_use]
+    pub fn forget_watches(&mut self) -> bool {
+        if let Some(old_watcher) = self.watcher.take()
+            && let Err(error) = std::thread::Builder::new()
+                .name("notify-watcher-teardown".to_owned())
+                .spawn(move || drop(old_watcher))
+        {
+            // Couldn't even spawn a thread to drop it on (e.g. process out of threads); the old
+            // watcher leaks for the life of the process, same as any other unrecoverable
+            // exhaustion here.
+            warn!(message = "Failed to spawn file watcher teardown thread.", %error);
+            return false;
+        }
+
+        let (tx, receiver) = mpsc::channel(NOTIFY_CHANNEL_CAPACITY);
+        match build_watcher(tx) {
+            Ok((watcher, backend_error_pending)) => {
+                self.watcher = Some(watcher);
+                self.receiver = receiver;
+                self.backend_error_pending = backend_error_pending;
+                self.watched_dirs.clear();
+                self.fallback_watches.clear();
+                true
+            }
+            Err(error) => {
+                warn!(message = "Failed to rebuild file watcher after backend error.", %error);
+                false
+            }
+        }
     }
 
     /// Forget bookkeeping for a single watched directory, without touching the underlying OS-level
@@ -761,25 +836,84 @@ mod tests {
         fn emit_file_line_too_long(&self, _buf: &bytes::BytesMut, _max_size: usize, _size: usize) {}
     }
 
+    #[tokio::test]
+    async fn forget_watches_rebuilds_a_working_watcher() {
+        // Regression test for a bug found in review: `forget_watches` used to only best-effort
+        // `unwatch()` old paths and clear bookkeeping, which isn't reliable cleanup on every
+        // notify backend and can block if the backend is already unhealthy. It now discards the
+        // whole `RecommendedWatcher` (and its bridge channel) and builds a new one instead.
+        let dir = tempfile::tempdir().unwrap();
+        let pattern = dir.path().join("*.log");
+        let mut discovery =
+            NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter).unwrap();
+
+        assert!(discovery.forget_watches());
+
+        // The old watcher (and its bridge channel) is gone at this point, and `resync_watches`
+        // hasn't re-`watch`ed anything on the new one yet, so an event on the old, still-watched
+        // directory must not reach `discovery.recv()` -- if it did, that would mean the old
+        // watcher (or its channel) were somehow still wired up rather than genuinely replaced.
+        std::fs::write(dir.path().join("stale.log"), b"hello\n").unwrap();
+        let leaked_old_event =
+            tokio::time::timeout(std::time::Duration::from_millis(200), discovery.recv());
+        assert!(
+            leaked_old_event.await.is_err(),
+            "no event should arrive from the old, detached watcher/channel"
+        );
+
+        // Once resync_watches re-establishes watches on the *new* watcher, a real filesystem
+        // event must be delivered end-to-end through the new channel.
+        assert!(discovery.resync_watches(&[pattern], &NoopEmitter));
+        std::fs::write(dir.path().join("new.log"), b"hello\n").unwrap();
+
+        let msg = tokio::time::timeout(std::time::Duration::from_secs(5), discovery.recv())
+            .await
+            .expect("timed out waiting for a notify event from the rebuilt watcher");
+        assert!(
+            msg.is_some(),
+            "the rebuilt watcher's channel must still be alive"
+        );
+    }
+
+    #[test]
+    fn stale_generations_backend_error_does_not_flag_the_new_watcher() {
+        // Regression test for a bug found in review: `forget_watches` detaches the old watcher's
+        // teardown from the critical path, so its callback thread isn't guaranteed to have
+        // stopped by the time a new watcher is already installed. If both generations shared one
+        // `backend_error_pending` flag, a `BackendError` the old (already-replaced) watcher
+        // observes while winding down could still fire after the swap and wrongly flag the brand
+        // new, healthy watcher for another teardown -- and again, and again, if the old backend
+        // keeps erroring for a while. Each generation must own its own flag instead.
+        let dir = tempfile::tempdir().unwrap();
+        let pattern = dir.path().join("*.log");
+        let mut discovery =
+            NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter).unwrap();
+
+        // Capture the first generation's flag before replacing it.
+        let old_generation_flag = Arc::clone(&discovery.backend_error_pending);
+
+        assert!(discovery.forget_watches());
+        assert!(discovery.resync_watches(&[pattern], &NoopEmitter));
+        assert_eq!(
+            discovery.watched_dirs.len(),
+            1,
+            "sanity check: the new generation re-established its watch"
+        );
+
+        // Simulate the old generation's callback firing late, after the new one is in place.
+        old_generation_flag.store(true, Ordering::Relaxed);
+
+        assert!(
+            !discovery.backend_error_pending.load(Ordering::Relaxed),
+            "the new generation's own flag must be untouched by the old generation's callback"
+        );
+    }
+
     #[test]
     fn forget_watches_makes_resync_re_watch_everything() {
-        // Regression test for a bug found in review: on `NotifyMessage::BackendError` (the
-        // watcher backend silently dropping a watch, e.g. because a watched directory was
-        // removed and recreated out from under it), `FileServer` used to just trigger a
-        // reconciliation pass without clearing `NotifyDiscovery`'s own bookkeeping first.
-        // `resync_watches` only calls `watch()` on a directory it doesn't already believe is
-        // watched -- necessary so it doesn't uselessly re-`watch` every directory on every call
-        // -- so with `include_patterns` unchanged, the "wanted" set is identical to what's
-        // already recorded, and the loop would skip re-`watch`-ing the directory that actually
-        // lost its watch. The watch would then never be re-established until Vector restarted.
-        //
-        // This can't easily be tested by actually breaking notify's underlying watch (that's
-        // backend- and OS-specific, and not something the `notify` crate exposes a way to
-        // simulate), but the property that matters is `NotifyDiscovery`-internal and doesn't
-        // require one: `forget_watches` must leave `resync_watches` believing every directory is
-        // unwatched, so it re-`watch`es all of them. Re-`watch`-ing a path the backend actually
-        // still has registered correctly is a harmless no-op, so this is the right (and only
-        // practical) recovery strategy regardless of which specific watch was actually lost.
+        // Regression test: forget_watches must leave resync_watches believing every directory is
+        // unwatched, so a lost watch (e.g. after a BackendError) gets re-established rather than
+        // being skipped as "already watched".
         let dir = tempfile::tempdir().unwrap();
         let pattern = dir.path().join("*.log");
         let mut discovery =
@@ -791,7 +925,7 @@ mod tests {
             "resync_watches (called from `new`) should have recorded the one watched directory"
         );
 
-        discovery.forget_watches();
+        assert!(discovery.forget_watches());
         assert!(
             discovery.watched_dirs.is_empty(),
             "forget_watches must clear the watched-directories bookkeeping"
@@ -799,7 +933,7 @@ mod tests {
 
         // With bookkeeping cleared but `include_patterns` unchanged, resync_watches must
         // re-`watch` (not skip) the directory, ending up back where it started.
-        discovery.resync_watches(&[pattern], &NoopEmitter);
+        assert!(discovery.resync_watches(&[pattern], &NoopEmitter));
         assert_eq!(
             discovery.watched_dirs.len(),
             1,
@@ -809,6 +943,41 @@ mod tests {
             discovery.watched_dirs.get(dir.path()),
             Some(&WatchMode::NonRecursive)
         );
+    }
+
+    #[test]
+    fn forget_watches_unwatches_and_clears_fallback_watches_too() {
+        // Regression test: forget_watches must also clear fallback_watches, not just
+        // watched_dirs, or an ancestor watch can become permanently orphaned.
+        let root = tempfile::tempdir().unwrap();
+        let missing_dir = root.path().join("newapp");
+        let pattern = missing_dir.join("*.log");
+        let mut discovery =
+            NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter).unwrap();
+
+        assert!(
+            discovery.is_watched_dir(root.path()),
+            "sanity check: the fallback ancestor should be watched"
+        );
+        assert!(
+            !discovery.fallback_watches.is_empty(),
+            "sanity check: a fallback relationship should be recorded"
+        );
+
+        assert!(discovery.forget_watches());
+        assert!(
+            discovery.watched_dirs.is_empty(),
+            "forget_watches must clear watched_dirs"
+        );
+        assert!(
+            discovery.fallback_watches.is_empty(),
+            "forget_watches must also clear fallback_watches, not just watched_dirs"
+        );
+
+        // resync_watches must still work correctly afterwards: it re-derives the fallback
+        // relationship from scratch rather than relying on anything forget_watches left behind.
+        assert!(discovery.resync_watches(&[pattern], &NoopEmitter));
+        assert!(discovery.is_watched_dir(root.path()));
     }
 
     #[test]
@@ -832,7 +1001,7 @@ mod tests {
             .backend_error_pending
             .store(true, Ordering::Relaxed);
 
-        discovery.resync_watches(&[pattern], &NoopEmitter);
+        assert!(discovery.resync_watches(&[pattern], &NoopEmitter));
         assert_eq!(
             discovery.watched_dirs.len(),
             1,
@@ -866,7 +1035,7 @@ mod tests {
             "forget_watch must remove just this directory's bookkeeping"
         );
 
-        discovery.resync_watches(&[pattern], &NoopEmitter);
+        assert!(discovery.resync_watches(&[pattern], &NoopEmitter));
         assert!(
             discovery.is_watched_dir(dir.path()),
             "resync_watches must re-establish the watch after it was forgotten"
@@ -928,7 +1097,7 @@ mod tests {
         // Once the directory is created, the next resync should upgrade to watching it directly
         // and drop the broader ancestor watch.
         std::fs::create_dir(&missing_dir).unwrap();
-        discovery.resync_watches(&[pattern], &NoopEmitter);
+        assert!(discovery.resync_watches(&[pattern], &NoopEmitter));
         assert_eq!(
             discovery.watched_dirs.get(&missing_dir),
             Some(&WatchMode::NonRecursive),
@@ -995,7 +1164,7 @@ mod tests {
         // Re-running resync_watches (e.g. the periodic backstop, with nothing on disk having
         // changed) must not downgrade it either, regardless of `wanted`'s iteration order on this
         // second pass.
-        discovery.resync_watches(&[missing_pattern, direct_pattern], &NoopEmitter);
+        assert!(discovery.resync_watches(&[missing_pattern, direct_pattern], &NoopEmitter));
         assert_eq!(
             discovery.watched_dirs.get(root.path()),
             Some(&WatchMode::Recursive),

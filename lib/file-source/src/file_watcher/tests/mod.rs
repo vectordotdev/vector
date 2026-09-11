@@ -7,7 +7,10 @@ use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
 use tokio::time::Instant;
 
-use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, WatcherState, null_reader};
+use super::{
+    EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, SKIP_CHUNK_BYTES, SkipPrefixReader,
+    WatcherState, null_reader,
+};
 
 // Welcome.
 //
@@ -1670,6 +1673,116 @@ async fn idle_gzip_reactivation_does_not_misdetect_truncation_from_compressed_si
         "reactivate must not reset position to 0 just because the compressed on-disk size is \
          smaller than the decompressed file_position -- that's expected for gzip, not evidence \
          of truncation"
+    );
+}
+
+#[tokio::test]
+async fn reactivate_resumes_gzip_member_appended_after_idle() {
+    // A gzip watcher that already decoded member 1, went idle, and then had member 2 appended
+    // must emit only member 2 on reactivate -- not a duplicate of member 1, not nothing.
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("multi.gz");
+    let member1 = encode(b"first\n").await;
+    fs::write(&path, &member1).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert_eq!(result.raw_line.unwrap().bytes, "first");
+
+    // Hits real EOF between members.
+    let eof = watcher.read_line().await.expect("read_line error");
+    assert!(eof.raw_line.is_none());
+
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+
+    let member2 = encode(b"second\n").await;
+    let mut combined = member1;
+    combined.extend_from_slice(&member2);
+    fs::write(&path, &combined).unwrap();
+
+    assert!(watcher.check_for_new_data().await.unwrap());
+    watcher.reactivate().await.expect("reactivate failed");
+
+    let result = watcher.read_line().await.expect("read_line error");
+    assert_eq!(
+        result.raw_line.unwrap().bytes,
+        "second",
+        "must resume with member 2 only, not replay member 1"
+    );
+}
+
+#[test]
+fn skip_prefix_reader_yields_instead_of_blocking_on_a_large_skip() {
+    // Regression test for a bug found in review: a single `poll_read` used to loop until the
+    // entire (possibly huge) skip amount was discarded, which could starve other tasks on the
+    // same worker thread when resuming a gzip watcher with a large decompressed offset. It must
+    // instead return `Pending` (and wake itself) after a bounded amount of work per call.
+    use std::{
+        pin::Pin,
+        task::{Context, Poll, Waker},
+    };
+
+    use tokio::io::AsyncRead;
+
+    // Always has more zero bytes ready, so the only thing that can end the loop is the reader's
+    // own per-call budget, not the source running out of data.
+    struct AlwaysReady;
+    impl tokio::io::AsyncRead for AlwaysReady {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            buf.initialize_unfilled();
+            let n = buf.remaining();
+            buf.advance(n);
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    let skip = SKIP_CHUNK_BYTES as u64 * 100;
+    let mut reader = SkipPrefixReader::new(AlwaysReady, skip);
+    let mut out = [0u8; 8];
+    let mut read_buf = tokio::io::ReadBuf::new(&mut out);
+    let mut cx = Context::from_waker(Waker::noop());
+
+    let mut polls = 0;
+    loop {
+        polls += 1;
+        assert!(
+            polls < 1000,
+            "skip never completed after {polls} polls; each poll should make bounded progress"
+        );
+        match Pin::new(&mut reader).poll_read(&mut cx, &mut read_buf) {
+            Poll::Pending => continue,
+            Poll::Ready(Ok(())) => break,
+            Poll::Ready(Err(e)) => panic!("unexpected error: {e}"),
+        }
+    }
+    assert!(
+        polls > 1,
+        "the whole {skip}-byte skip completed in a single poll_read call, meaning it never \
+         yielded back to the executor"
     );
 }
 

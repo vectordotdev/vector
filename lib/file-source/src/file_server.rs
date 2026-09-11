@@ -486,14 +486,21 @@ where
                 }
 
                 let start = time::Instant::now();
-                self.discover(
-                    &mut fp_map,
-                    &mut known_small_files,
-                    &checkpoints,
-                    notify_discovery.as_mut(),
-                    &woken_by_notify_event,
-                )
-                .await;
+                let keep_notify_discovery = self
+                    .discover(
+                        &mut fp_map,
+                        &mut known_small_files,
+                        &checkpoints,
+                        notify_discovery.as_mut(),
+                        &woken_by_notify_event,
+                    )
+                    .await;
+                if !keep_notify_discovery {
+                    warn!(
+                        "Notify-based discovery unavailable; relying on periodic reconciliation only."
+                    );
+                    notify_discovery = None;
+                }
                 stats.record("discovery", start.elapsed());
 
                 let start = time::Instant::now();
@@ -610,14 +617,10 @@ where
                         }
                     }
 
-                    // The file has reached EOF and produced nothing this
-                    // cycle. If it's been quiet (no successful reads) for
-                    // `idle_timeout`, close its handle and move it to the
-                    // passive `Idle` state: we keep the checkpoint and keep
-                    // polling cheaply via `fs::metadata`, but stop holding a
-                    // file descriptor open for a file nobody is writing to.
-                    // This is the runtime (as opposed to startup) half of the
-                    // fix for https://github.com/vectordotdev/vector/issues/3567.
+                    // Quiet past `idle_timeout` after EOF: close the handle and move to `Idle`,
+                    // keeping the checkpoint and polling cheaply via `fs::metadata` instead.
+                    // Runtime half of the #3567 fix; `reactivate` (see `SkipPrefixReader`)
+                    // handles resuming gzip files correctly too.
                     if !watcher.dead()
                         && let Some(idle_timeout) = self.idle_timeout
                         && watcher.reached_eof()
@@ -723,15 +726,20 @@ where
             // mutable reference across loop iterations without re-pinning.
             if let Some(discovery) = notify_discovery.as_mut() {
                 let mut shutdown = false;
-                let mut channel_closed = false;
+                // Set when notify-based discovery must be disabled: either the channel closed
+                // (the watcher task/thread went away, e.g. panicked) or a backend error left the
+                // watcher unrebuildable. Either way we fall back to periodic reconciliation only,
+                // not treating it as fatal to the file source.
+                let mut disable_notify = false;
                 tokio::select! {
                     biased;
                     _ = &mut shutdown_data => {
                         shutdown = true;
                     }
                     msg = discovery.recv() => {
-                        channel_closed = msg.is_none();
-                        self.handle_notify_message(msg, discovery, &mut pending_notify_wakeup);
+                        let channel_closed = msg.is_none();
+                        disable_notify = channel_closed
+                            || !self.handle_notify_message(msg, discovery, &mut pending_notify_wakeup);
                         // Briefly drain/debounce further events so a burst of writes collapses
                         // into a single reconciliation pass. Each drained message still goes
                         // through the same handling as the message above (not just discarded):
@@ -741,31 +749,32 @@ where
                         // `NOTIFY_EVENT_DEBOUNCE` of another event, which -- for a backend error
                         // specifically -- would leave `forget_watches` never called and the lost
                         // watch registration never re-established.
-                        if !channel_closed {
+                        if !disable_notify {
                             let drain_result = tokio::time::timeout(NOTIFY_EVENT_DEBOUNCE, async {
                                 loop {
                                     let msg = discovery.recv().await;
                                     let is_none = msg.is_none();
-                                    self.handle_notify_message(msg, discovery, &mut pending_notify_wakeup);
-                                    if is_none {
-                                        break;
+                                    if is_none
+                                        || !self.handle_notify_message(msg, discovery, &mut pending_notify_wakeup)
+                                    {
+                                        return true;
                                     }
                                 }
                             })
                             .await;
                             // A timeout just means the debounce window elapsed while events were
-                            // still arriving, which is the expected/common case. If the drain loop
-                            // instead broke out on its own, the channel closed.
-                            channel_closed = drain_result.is_ok();
+                            // still arriving, which is the expected/common case; the drain loop
+                            // otherwise returns `true` on either a closed channel or a failed
+                            // watcher rebuild.
+                            disable_notify = drain_result.unwrap_or(false);
                         }
                     }
                     _ = &mut sleep_fut => {}
                 }
-                if channel_closed {
-                    // The notify watcher task/thread went away entirely (e.g. panicked). Fall
-                    // back to relying solely on the backstop reconcile interval from here on; do
-                    // not treat this as fatal to the file source.
-                    warn!("Notify event channel closed; relying on periodic reconciliation only.");
+                if disable_notify {
+                    warn!(
+                        "Notify-based discovery unavailable; relying on periodic reconciliation only."
+                    );
                     notify_discovery = None;
                 }
                 stats.record("sleeping", start.elapsed());
@@ -816,12 +825,15 @@ where
     /// during debounce -- in particular, a `BackendError`'s `forget_watches()` call and an
     /// `Overflow`'s telemetry must fire even when they land inside the debounce window, not just
     /// on the message that started it.
+    /// Returns `false` if notify-based discovery must be disabled entirely (the watcher failed to
+    /// rebuild after a backend error), `true` otherwise.
+    #[must_use]
     fn handle_notify_message(
         &self,
         msg: Option<NotifyMessage>,
         discovery: &mut NotifyDiscovery,
         pending_notify_wakeup: &mut NotifyWakeup,
-    ) {
+    ) -> bool {
         match msg {
             Some(NotifyMessage::PathsChanged(paths)) => {
                 trace!(message = "Received file change notification.", ?paths);
@@ -852,22 +864,31 @@ where
                 // No specific paths are known to have changed; treat every tracked watcher as
                 // possibly needing a nudge, same as the pre-existing coarse behavior.
                 pending_notify_wakeup.mark_all();
+                // An overflow means some events were dropped -- possibly including a
+                // `PathsRemoved` for a watched directory, which (e.g. on Linux/inotify) can
+                // invalidate the OS-level watch on that inode. Since we can't tell which events
+                // were lost, rebuild the watcher from scratch, same as on a `BackendError` below.
+                if !discovery.forget_watches() {
+                    return false;
+                }
             }
             Some(NotifyMessage::BackendError(error)) => {
                 self.emitter
                     .emit_file_watch_backend_error(&std::io::Error::other(error));
                 // A backend error can mean the watcher silently dropped a watch (e.g. a watched
-                // directory was removed and recreated). Forget our bookkeeping of which
-                // directories are watched so the upcoming reconciliation pass's `resync_watches`
-                // call re-`watch`s everything from scratch, rather than skipping paths it
-                // incorrectly still believes are watched. See `NotifyDiscovery::forget_watches`
-                // for why this is necessary.
-                discovery.forget_watches();
+                // directory was removed and recreated). Rebuild the watcher and its bookkeeping
+                // from scratch so the upcoming reconciliation pass's `resync_watches` call
+                // re-`watch`es everything, rather than trusting stale registrations. See
+                // `NotifyDiscovery::forget_watches` for why a full rebuild is necessary here.
+                if !discovery.forget_watches() {
+                    return false;
+                }
                 // No specific paths are known to have changed here either.
                 pending_notify_wakeup.mark_all();
             }
             None => {}
         }
+        true
     }
 
     /// Perform a full glob+fingerprint reconciliation pass: re-glob the configured `include`
@@ -919,6 +940,9 @@ where
     /// `reconcile_interval`/`glob_minimum_cooldown` backstop still runs regardless of this nudge,
     /// so the affected file falls back to ordinary polling-like latency rather than losing data or
     /// getting stuck.
+    /// Returns `false` if notify-based discovery must be disabled entirely (the watcher failed to
+    /// rebuild after a backend error), `true` otherwise.
+    #[must_use]
     async fn discover(
         &mut self,
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
@@ -926,7 +950,7 @@ where
         checkpoints: &CheckpointsView,
         notify_discovery: Option<&mut NotifyDiscovery>,
         notify_wakeup: &NotifyWakeup,
-    ) {
+    ) -> bool {
         // Defensive resync: cheap to call, and covers the (rare) case where the set of
         // directories implied by `include` patterns needs to change -- e.g. a literal include
         // path's directory didn't exist at startup and now does, or the `PathsProvider`
@@ -934,8 +958,10 @@ where
         // *inside* an already-recursively-watched directory tree don't need this: the OS
         // backend (inotify/FSEvents/ReadDirectoryChangesW) follows new subdirectories on its
         // own once a recursive watch is established on their ancestor.
+        let mut keep_notify_discovery = true;
         if let Some(discovery) = notify_discovery {
-            discovery.resync_watches(&self.paths_provider.watch_roots(), &self.emitter);
+            keep_notify_discovery =
+                discovery.resync_watches(&self.paths_provider.watch_roots(), &self.emitter);
         }
 
         for (_file_id, watcher) in &mut *fp_map {
@@ -1013,6 +1039,7 @@ where
                 }
             }
         }
+        keep_notify_discovery
     }
 
     /// Cheaply poll `Idle` watchers (no open file handle) for new data by stat-ing them, reusing
@@ -1447,5 +1474,225 @@ mod tests {
             "after absolutizing the glob-discovered relative path the same way notify resolves \
              its own watch paths, it must match the notify-reported absolute path"
         );
+    }
+
+    #[derive(Clone)]
+    struct NoopEmitter;
+
+    impl file_source_common::FileSourceInternalEvents for NoopEmitter {
+        fn emit_file_added(&self, _path: &Path) {}
+        fn emit_file_resumed(&self, _path: &Path, _file_position: u64) {}
+        fn emit_file_watch_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_unwatched(&self, _path: &Path, _reached_eof: bool) {}
+        fn emit_file_deleted(&self, _path: &Path) {}
+        fn emit_file_delete_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_fingerprint_read_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_checkpointed(&self, _count: usize, _duration: Duration) {}
+        fn emit_file_checksum_failed(&self, _path: &Path) {}
+        fn emit_file_checkpoint_write_error(&self, _error: std::io::Error) {}
+        fn emit_files_open(&self, _count: usize) {}
+        fn emit_files_idle(&self, _count: usize) {}
+        fn emit_path_globbing_failed(&self, _path: &Path, _error: &std::io::Error) {}
+        fn emit_file_line_too_long(&self, _buf: &bytes::BytesMut, _max_size: usize, _size: usize) {}
+    }
+
+    /// Like `NoopEmitter`, but records the most recent `files_open`/`files_idle` gauge values so
+    /// a test can observe whether `FileServer` ever moved a watcher to `Idle`.
+    #[derive(Clone)]
+    struct OpenIdleCountingEmitter {
+        open: Arc<std::sync::atomic::AtomicUsize>,
+        idle: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl file_source_common::FileSourceInternalEvents for OpenIdleCountingEmitter {
+        fn emit_file_added(&self, _path: &Path) {}
+        fn emit_file_resumed(&self, _path: &Path, _file_position: u64) {}
+        fn emit_file_watch_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_unwatched(&self, _path: &Path, _reached_eof: bool) {}
+        fn emit_file_deleted(&self, _path: &Path) {}
+        fn emit_file_delete_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_fingerprint_read_error(&self, _path: &Path, _error: std::io::Error) {}
+        fn emit_file_checkpointed(&self, _count: usize, _duration: Duration) {}
+        fn emit_file_checksum_failed(&self, _path: &Path) {}
+        fn emit_file_checkpoint_write_error(&self, _error: std::io::Error) {}
+        fn emit_files_open(&self, count: usize) {
+            self.open.store(count, std::sync::atomic::Ordering::SeqCst);
+        }
+        fn emit_files_idle(&self, count: usize) {
+            self.idle.store(count, std::sync::atomic::Ordering::SeqCst);
+        }
+        fn emit_path_globbing_failed(&self, _path: &Path, _error: &std::io::Error) {}
+        fn emit_file_line_too_long(&self, _buf: &bytes::BytesMut, _max_size: usize, _size: usize) {}
+    }
+
+    /// A `Sink<Vec<Line>>` that just appends everything it's given to a shared `Vec`, for
+    /// collecting `FileServer::run`'s output in a test without pulling in a full downstream
+    /// pipeline. `futures-util`'s own channel-based sinks aren't guaranteed available here (this
+    /// crate depends on `futures-util` with default features disabled), so this is a minimal
+    /// hand-rolled implementation instead.
+    #[derive(Clone)]
+    struct CollectSink(Arc<std::sync::Mutex<Vec<Line>>>);
+
+    impl Sink<Vec<Line>> for CollectSink {
+        type Error = std::convert::Infallible;
+
+        fn poll_ready(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+
+        fn start_send(self: std::pin::Pin<&mut Self>, item: Vec<Line>) -> Result<(), Self::Error> {
+            self.0.lock().unwrap().extend(item);
+            Ok(())
+        }
+
+        fn poll_flush(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+
+        fn poll_close(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    #[tokio::test]
+    async fn idle_gzip_watcher_resumes_appended_member_after_idle_close() {
+        // End-to-end regression test: a gzip watcher reads member 1, goes idle (handle closed)
+        // after `idle_timeout`, then member 2 is appended. Reactivation must read only member 2,
+        // not lose it and not replay member 1.
+        use async_compression::tokio::bufread::GzipEncoder;
+        use tokio::io::AsyncReadExt as _;
+
+        use crate::paths_provider::Glob;
+
+        async fn encode(data: &[u8]) -> Vec<u8> {
+            let mut out = Vec::new();
+            GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+            out
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("idle_gzip.gz");
+        std::fs::write(&path, encode(b"first\n").await).unwrap();
+
+        let paths_provider = Glob::new(
+            &[dir.path().join("*.gz")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+
+        let checkpoint_dir = tempfile::tempdir().unwrap();
+        let checkpointer =
+            file_source_common::checkpointer::Checkpointer::new(checkpoint_dir.path());
+
+        let idle_timeout = Duration::from_millis(50);
+        let emitter = OpenIdleCountingEmitter {
+            open: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            idle: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        };
+        let file_server = FileServer {
+            paths_provider,
+            max_read_bytes: 1024 * 1024,
+            ignore_checkpoints: true,
+            read_from: ReadFrom::Beginning,
+            ignore_before: None,
+            max_line_bytes: 1024,
+            line_delimiter: Bytes::from_static(b"\n"),
+            data_dir: checkpoint_dir.path().to_path_buf(),
+            glob_minimum_cooldown: Duration::from_millis(20),
+            fingerprinter: file_source_common::Fingerprinter::new(
+                file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                    ignored_header_bytes: 0,
+                    lines: 1,
+                },
+                1024,
+                true,
+            ),
+            oldest_first: false,
+            remove_after: None,
+            emitter: emitter.clone(),
+            rotate_wait: Duration::from_secs(3600),
+            discovery_mode: FileDiscoveryMode::PollingOnly,
+            reconcile_interval: Duration::from_secs(3600),
+            idle_timeout: Some(idle_timeout),
+        };
+
+        let lines = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = CollectSink(Arc::clone(&lines));
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let (checkpointer_shutdown_tx, checkpointer_shutdown_rx) =
+            tokio::sync::oneshot::channel::<()>();
+
+        let run_handle = tokio::spawn(file_server.run(
+            sink,
+            futures::FutureExt::map(shutdown_rx, |_| ()),
+            futures::FutureExt::map(checkpointer_shutdown_rx, |_| ()),
+            checkpointer,
+        ));
+
+        // Wait for the member to be read, confirming the watcher actually started up correctly.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            if !lines.lock().unwrap().is_empty() {
+                break;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "timed out waiting for the gzip member to be read"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        // Wait for the watcher to be idle-closed.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            if emitter.idle.load(std::sync::atomic::Ordering::SeqCst) > 0 {
+                break;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "timed out waiting for the watcher to go idle"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        // Append member 2 after the handle has been closed.
+        let mut combined = encode(b"first\n").await;
+        combined.extend_from_slice(&encode(b"second\n").await);
+        std::fs::write(&path, &combined).unwrap();
+
+        // Only "second" should show up; "first" must not be replayed.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            let got: Vec<String> = lines
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|l| String::from_utf8_lossy(&l.text).into_owned())
+                .collect();
+            if got.iter().any(|l| l == "second") {
+                assert_eq!(got, vec!["first".to_string(), "second".to_string()]);
+                break;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "timed out waiting for the appended gzip member to be read; got {got:?}"
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        drop(shutdown_tx);
+        drop(checkpointer_shutdown_tx);
+        run_handle.await.expect("file_server task panicked").ok();
     }
 }

@@ -144,20 +144,9 @@ pub struct FileWatcher {
     /// correct, safe behavior: it forces a fresh open rather than risking a
     /// stale-offset read against the wrong file.
     identity: Option<(u64, u64)>,
-    /// Whether the current gzip stream (if any) was deliberately left unread, rather than being
-    /// positioned wherever it is because we've actually decoded up to that point. Distinct from
-    /// "`file_position == 0`," which is ambiguous: `0` also means "haven't decoded anything yet
-    /// because we're about to start at the beginning," a completely different situation this flag
-    /// exists so `reactivate` can tell apart. Set whenever `FileWatcher::new`/`reactivate`/
-    /// `update_path` choose a null reader over the real gzip decoder (an already-compressed file
-    /// with `read_from: end`, or with `read_from: checkpoint` pointing at a non-zero -- and thus
-    /// unresumable -- gzip byte offset); cleared whenever they instead install a real decoder.
-    /// Without this, an idle gzip watcher skipped via `read_from: end` (file position ends up `0`,
-    /// same as "start of file") gets misread on reactivation as "never started decoding, so start
-    /// decoding from the beginning," installing a real decoder and emitting the entire backlog
-    /// that `read_from: end` was supposed to skip -- even though nothing about a mere mtime bump
-    /// means the file is safe to resume decoding (gzip streams can't be resumed from an arbitrary
-    /// point anyway, which is exactly why this was skipped in the first place).
+    /// Whether the current gzip stream was deliberately left unread (e.g. `read_from: end`),
+    /// as opposed to `file_position == 0` meaning "not decoded yet, about to start from zero."
+    /// Lets `reactivate` tell the two apart instead of wrongly replaying a skipped backlog.
     gzip_read_skipped: bool,
     is_dead: bool,
     last_seen: Instant,
@@ -655,14 +644,8 @@ impl FileWatcher {
         let mut reader = BufReader::new(f);
         let gzipped = is_gzipped(&mut reader).await?;
 
-        // Also fall back to a direct, final check against the file we just opened: this covers
-        // reactivation paths that don't go through `check_for_new_data` first (e.g. a caller that
-        // calls `reactivate` directly, as some tests do), where `truncated_while_idle` was never
-        // given a chance to latch. Skipped for gzip: `self.file_position` there counts decompressed
-        // bytes, not the compressed on-disk size `metadata().len()` reports, so comparing the two
-        // would misfire as "truncated" on ordinary compressible content. `truncated_while_idle`
-        // (raw on-disk size vs. raw on-disk size, from `check_for_new_data`) still catches a real
-        // gzip truncation correctly.
+        // Final direct check in case `check_for_new_data` was never called before this. Skipped
+        // for gzip: `file_position` is a decompressed offset, not comparable to on-disk size.
         let truncated_at_reactivation = !gzipped
             && reader
                 .get_ref()
@@ -677,10 +660,6 @@ impl FileWatcher {
                 path = ?self.path,
             );
             self.file_position = 0;
-            // A different file is now at this path: whatever was true of the old file's gzip
-            // stream (skipped or not) says nothing about this one, which we haven't looked at
-            // yet. Clear the flag so the check below falls through to installing a real decoder,
-            // the same as `FileWatcher::new` would for a freshly-discovered gzip file.
             self.gzip_read_skipped = false;
         } else if truncated_while_idle || truncated_at_reactivation {
             debug!(
@@ -690,8 +669,6 @@ impl FileWatcher {
                 path = ?self.path,
             );
             self.file_position = 0;
-            // Same reasoning as the identity-changed case above: the truncated content
-            // invalidates whatever "skipped" state applied to the pre-truncation stream.
             self.gzip_read_skipped = false;
         }
 
@@ -700,34 +677,32 @@ impl FileWatcher {
             FilePosition,
             bool,
         ) = if gzipped {
-            if self.gzip_read_skipped || self.file_position != 0 {
-                // Either this gzip stream was deliberately left unread (e.g. `read_from: end`
-                // skipped it entirely, leaving `file_position` at `0`) rather than actually
-                // decoded up to `file_position` -- a mtime/size change alone doesn't make it safe
-                // to resume, since gzip streams can't be resumed from an arbitrary offset
-                // regardless, which is exactly why this was skipped in the first place -- or
-                // `file_position` is genuinely non-zero, which is the pre-existing "can't resume
-                // a gzip stream from an arbitrary byte offset" case. Either way, behave like the
-                // "already read, ignore" case `FileWatcher::new` uses for gzip + checkpoint.
+            if self.gzip_read_skipped {
+                // Deliberately unread (e.g. `read_from: end`): no decoded prefix to resume from.
                 (Box::new(null_reader()), self.file_position, true)
-            } else {
+            } else if self.file_position == 0 {
                 (
                     Box::new(BufReader::new(gzip_multiple_decoder(reader))),
                     0,
                     false,
                 )
+            } else {
+                // `GzipDecoder` can't seek to a decompressed offset, so resume by redecoding from
+                // the start and discarding the already-emitted prefix via `SkipPrefixReader`.
+                // This also naturally picks up any member appended after `file_position`.
+                let skip = self.file_position;
+                (
+                    Box::new(BufReader::new(SkipPrefixReader::new(
+                        gzip_multiple_decoder(reader),
+                        skip,
+                    ))),
+                    skip,
+                    false,
+                )
             }
         } else {
-            // Propagate a seek failure instead of pretending it succeeded: swallowing it (an
-            // earlier version of this used `.unwrap_or(self.file_position)`) would report the
-            // stale checkpoint offset as the new position while the reader's actual cursor stays
-            // wherever `is_gzipped`'s `fill_buf` peek left it -- typically near the start of the
-            // file, not `self.file_position` -- so the watcher would go `Active` and immediately
-            // start reading from the wrong place: duplicating old content under the wrong
-            // offsets, or skipping data, depending on which is larger. Letting this error surface
-            // instead leaves the watcher `Idle` (this function's caller, `poll_idle_watchers`,
-            // already retries via `invalidate_idle_bookkeeping` on any `Err`), which is a strictly
-            // safer outcome than silently reading from an unknown position.
+            // Propagate seek errors instead of guessing the position; the caller retries from
+            // `Idle` on `Err`, which is safer than reading from an unknown offset.
             let pos = reader.seek(SeekFrom::Start(self.file_position)).await?;
             (Box::new(reader), pos, false)
         };
@@ -1143,4 +1118,74 @@ async fn peek_is_gzipped(path: &std::path::Path) -> Option<bool> {
 
 fn null_reader() -> impl AsyncBufRead {
     io::Cursor::new(Vec::new())
+}
+
+/// Scratch chunk size for discarding skipped bytes, and also the max bytes discarded per
+/// `poll_read` call before yielding back to the executor -- see `SkipPrefixReader::poll_read`.
+const SKIP_CHUNK_BYTES: usize = 64 * 1024;
+
+/// Discards the first `skip` bytes read from `inner`, lazily via normal `poll_read` calls.
+/// Used to resume a gzip decoder from the start while dropping the already-emitted prefix.
+struct SkipPrefixReader<R> {
+    inner: R,
+    remaining_to_skip: u64,
+    scratch: Box<[u8; SKIP_CHUNK_BYTES]>,
+}
+
+impl<R> SkipPrefixReader<R> {
+    fn new(inner: R, skip: u64) -> Self {
+        Self {
+            inner,
+            remaining_to_skip: skip,
+            scratch: Box::new([0u8; SKIP_CHUNK_BYTES]),
+        }
+    }
+}
+
+impl<R: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for SkipPrefixReader<R> {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        use std::task::Poll;
+
+        // A large `remaining_to_skip` (a big already-decoded gzip prefix) could otherwise keep
+        // this loop spinning on synchronously-available data for a long time without ever
+        // returning to the executor, starving other tasks on the same worker thread. Cap the
+        // work done per call and yield (wake + `Pending`) once the budget is spent, rather than
+        // relying on the inner reader's own polls to eventually do that for us.
+        let mut budget = 4;
+        while self.remaining_to_skip > 0 {
+            if budget == 0 {
+                cx.waker().wake_by_ref();
+                return Poll::Pending;
+            }
+            budget -= 1;
+
+            let chunk = self.remaining_to_skip.min(SKIP_CHUNK_BYTES as u64) as usize;
+            let this = &mut *self;
+            let mut discard_buf = tokio::io::ReadBuf::new(&mut this.scratch[..chunk]);
+            match std::pin::Pin::new(&mut this.inner).poll_read(cx, &mut discard_buf) {
+                Poll::Ready(Ok(())) => {
+                    let filled = discard_buf.filled().len();
+                    if filled == 0 {
+                        // The underlying stream ended before we finished skipping. This can only
+                        // mean the file was truncated to something shorter than what was already
+                        // decoded and emitted before the watcher went idle -- `reactivate`'s own
+                        // truncation handling is expected to have already reset `file_position`
+                        // (and thus never construct this reader) in that case, so reaching this
+                        // is unexpected, but returning a clean EOF here rather than looping
+                        // forever is the safe fallback either way.
+                        return Poll::Ready(Ok(()));
+                    }
+                    self.remaining_to_skip -= filled as u64;
+                }
+                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+
+        std::pin::Pin::new(&mut self.inner).poll_read(cx, buf)
+    }
 }
