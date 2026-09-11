@@ -6,7 +6,9 @@ use tokio::task::JoinError;
 use tokio::task::JoinHandle;
 
 use crate::config::{ComponentKey, ConfigBuilder};
-use crate::signal::{SignalRx, SignalTo, SignalTx, recv_shutdown, try_recv_shutdown};
+use crate::signal::{
+    ShutdownReceiver, SignalRx, SignalTo, SignalTx, recv_shutdown, try_recv_shutdown,
+};
 
 /// Marker for a phase being interrupted by a shutdown signal.
 pub(crate) struct Interrupted;
@@ -33,7 +35,6 @@ impl PendingReloads {
             }
             SignalTo::ReloadFromConfigBuilder(builder) => self.from_builder = Some(builder),
             SignalTo::ReloadEnrichmentTables => self.enrichment_tables = true,
-            _ => {}
         }
     }
 
@@ -61,22 +62,29 @@ impl PendingReloads {
 /// task), which races the phase against `recv_shutdown` with the signal branch biased first, so
 /// a phase cannot run unraced by construction. Reload signals received along the way are
 /// coalesced into a `PendingReloads` set and re-broadcast via `signal_tx` by
-/// [`Bootstrap::replay_reloads`]; cleanups registered via [`Bootstrap::guard`] run on interrupt
-/// or completion.
+/// [`Bootstrap::replay_reloads`]; shutdown signals arrive on a dedicated channel, so a burst
+/// of reloads can never overflow and drop one; cleanups registered via [`Bootstrap::guard`]
+/// run on interrupt or completion.
 pub(crate) struct Bootstrap<'a> {
     signal_rx: &'a mut SignalRx,
+    shutdown_rx: &'a mut ShutdownReceiver,
     signal_tx: SignalTx,
     pending_reloads: PendingReloads,
     guards: Vec<Box<dyn FnOnce()>>,
 }
 
 impl<'a> Bootstrap<'a> {
-    pub(crate) fn new(signal_rx: &'a mut SignalRx, signal_tx: SignalTx) -> Self {
+    pub(crate) fn new(
+        signal_rx: &'a mut SignalRx,
+        shutdown_rx: &'a mut ShutdownReceiver,
+        signal_tx: SignalTx,
+    ) -> Self {
         Self {
             signal_rx,
+            shutdown_rx,
             signal_tx,
-            pending_reloads: PendingReloads::default(),
-            guards: Vec::new(),
+            pending_reloads: Default::default(),
+            guards: Default::default(),
         }
     }
 
@@ -93,7 +101,7 @@ impl<'a> Bootstrap<'a> {
             // A shutdown signal (or a closed signal channel) arrived while the phase was still
             // in progress. Reload signals received along the way are retained by the sink so
             // they can be re-broadcast once the phase completes.
-            _ = recv_shutdown(self.signal_rx, |reload| self.pending_reloads.push(reload)) => {
+            _ = recv_shutdown(self.signal_rx, self.shutdown_rx, |reload| self.pending_reloads.push(reload)) => {
                 self.run_guards();
                 Err(Interrupted)
             }
@@ -113,7 +121,7 @@ impl<'a> Bootstrap<'a> {
             // A shutdown signal (or a closed signal channel) arrived while the spawned phase
             // was still running. Cancel it and report the interrupt; the process exits
             // immediately on this path, so any detached blocking work dies with it.
-            _ = recv_shutdown(self.signal_rx, |reload| self.pending_reloads.push(reload)) => {
+            _ = recv_shutdown(self.signal_rx, self.shutdown_rx, |reload| self.pending_reloads.push(reload)) => {
                 handle.abort();
                 self.run_guards();
                 Err(Interrupted)
@@ -145,6 +153,9 @@ impl<'a> Bootstrap<'a> {
     /// Non-blocking check for a queued shutdown signal, coalescing any reload signals into the
     /// pending set.
     pub(crate) fn pending_shutdown(&mut self) -> bool {
-        try_recv_shutdown(self.signal_rx, |reload| self.pending_reloads.push(reload)).is_some()
+        try_recv_shutdown(self.signal_rx, self.shutdown_rx, |reload| {
+            self.pending_reloads.push(reload)
+        })
+        .is_some()
     }
 }

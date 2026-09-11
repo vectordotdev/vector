@@ -16,7 +16,7 @@ use crate::{
         loading::ConfigBuilderLoader,
     },
     schema::Definition,
-    signal::SignalRx,
+    signal::{ShutdownReceiver, SignalRx},
     topology::{
         self,
         builder::{TopologyPieces, TopologyPiecesBuilder},
@@ -173,12 +173,13 @@ pub async fn validate(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
     signal_rx: &mut SignalRx,
+    shutdown_rx: &mut ShutdownReceiver,
     color: bool,
 ) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let signal_tx = signal_handler.clone_tx();
-    let mut bootstrap = Bootstrap::new(signal_rx, signal_tx);
+    let mut bootstrap = Bootstrap::new(signal_rx, shutdown_rx, signal_tx);
 
     let mut validated = true;
 
@@ -224,6 +225,11 @@ pub async fn validate(
     // between (e.g. while transforms or sinks are being validated) would otherwise be silently
     // dropped, so drain the receiver once more before reporting the result. Reload signals and
     // lagged receivers don't affect the result and are consumed along the way.
+    //
+    // Yield to the executor first: validation can run synchronously without ever yielding
+    // (e.g. `--threads 1`), so the OS-signal forwarding task may not have had a chance to
+    // enqueue a shutdown that arrived during that time.
+    tokio::task::yield_now().await;
     if bootstrap.pending_shutdown() {
         // An interrupted validation is not a successful one; report a distinct non-zero code so
         // scripts don't mistake it for a valid configuration.

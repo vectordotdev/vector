@@ -11,7 +11,7 @@ use windows_service::{
     service_dispatcher,
 };
 
-use crate::{app::Application, signal::SignalTo};
+use crate::{app::Application, signal::ShutdownSignal};
 
 const SERVICE_NAME: &str = "vector";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
@@ -384,7 +384,7 @@ pub fn run() -> Result<i32> {
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
     match Application::prepare_start(Default::default()) {
         Ok((runtime, app)) => {
-            let signal_tx = app.signals.handler.clone_tx();
+            let handler = app.signals.handler.clone();
             let event_handler = move |control_event| -> ServiceControlHandlerResult {
                 match control_event {
                     // Notifies a service to report its current status information to the service
@@ -393,7 +393,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
 
                     // Handle stop
                     ServiceControl::Stop => {
-                        while signal_tx.send(SignalTo::Shutdown(None)).is_err() {}
+                        handler.send_shutdown(ShutdownSignal::Graceful(None));
                         ServiceControlHandlerResult::NoError
                     }
 

@@ -5,12 +5,12 @@ use vector_lib::{
     tap::{EventFormatter, OutputChannel, TapRunner},
 };
 
-use crate::signal::{SignalRx, SignalTo};
+use crate::signal::ShutdownReceiver;
 
 /// CLI command func for issuing 'tap' queries, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets.
 #[allow(clippy::print_stderr)]
-pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode {
+pub(crate) async fn cmd(opts: &super::Opts, shutdown_rx: ShutdownReceiver) -> exitcode::ExitCode {
     let url = opts.url();
     let Ok(uri) = url.as_str().parse() else {
         eprintln!("Invalid API URL: {url}");
@@ -34,17 +34,18 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
         return exitcode::UNAVAILABLE;
     }
 
-    tap_internal(opts, signal_rx, Some(client)).await
+    tap_internal(opts, shutdown_rx, Some(client)).await
 }
 
 /// Observe event flow from specified components
-pub async fn tap(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::ExitCode {
-    tap_internal(opts, signal_rx, None).await
+pub async fn tap(opts: &super::Opts, shutdown_rx: ShutdownReceiver) -> exitcode::ExitCode {
+    tap_internal(opts, shutdown_rx, None).await
 }
 
+#[allow(clippy::print_stderr)]
 async fn tap_internal(
     opts: &super::Opts,
-    mut signal_rx: SignalRx,
+    mut shutdown_rx: ShutdownReceiver,
     mut client_opt: Option<Client>,
 ) -> exitcode::ExitCode {
     let url = opts.url();
@@ -59,7 +60,9 @@ async fn tap_internal(
     loop {
         tokio::select! {
             biased;
-            Ok(SignalTo::Shutdown(_) | SignalTo::Quit) = signal_rx.recv() => break,
+            // Lag/closed handling lives inside `ShutdownReceiver`, which escalates from
+            // graceful shutdown to quit on consecutive lag bursts; either way, tap exits.
+            _ = shutdown_rx.recv() => break,
             exec_result = async {
                 if let Some(client) = client_opt.take() {
                     tap_runner.run_tap_with_client(
