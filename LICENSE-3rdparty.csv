@@ -481,8 +481,7 @@ metrics-tracing-context,https://github.com/metrics-rs/metrics,MIT,MOZGIII <mike-
 metrics-util,https://github.com/metrics-rs/metrics,MIT,Toby Lawrence <toby@nuclearfurnace.com>
 mime,https://github.com/hyperium/mime,MIT OR Apache-2.0,Sean McArthur <sean@seanmonstar.com>
 mime_guess,https://github.com/abonander/mime_guess,MIT,Austin Bonander <austin.bonander@gmail.com>
-minicbor,https://gitlab.com/twittner/minicbor,BlueOak-1.0.0,Toralf Wittner <tw@dtex.org>
-minicbor-derive,https://github.com/twittner/minicbor,BlueOak-1.0.0,Toralf Wittner <tw@dtex.org>
+minicbor,https://github.com/twittner/minicbor,BlueOak-1.0.0,Toralf Wittner <tw@dtex.org>
 minimal-lexical,https://github.com/Alexhuszagh/minimal-lexical,MIT OR Apache-2.0,Alex Huszagh <ahuszagh@gmail.com>
 miniz_oxide,https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide,MIT OR Zlib OR Apache-2.0,"Frommi <daniil.liferenko@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>, Rich Geldreich richgel99@gmail.com"
 mio,https://github.com/tokio-rs/mio,MIT,"Carl Lerche <me@carllerche.com>, Thomas de Zeeuw <thomasdezeeuw@gmail.com>, Tokio Contributors <team@tokio.rs>"
