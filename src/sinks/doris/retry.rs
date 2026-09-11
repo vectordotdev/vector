@@ -65,7 +65,7 @@ impl RetryLogic for DorisRetryLogic {
                 }
 
                 return RetryAction::Retry(
-                    format!("Doris error: {} - {}", doris_resp.status, message).into(),
+                    format!("Doris error: {} - {message}", doris_resp.status).into(),
                 );
             } else {
                 // HTTP success but failed to parse response
@@ -85,7 +85,7 @@ impl RetryLogic for DorisRetryLogic {
                 message = "Server error encountered, will retry.",
                 status_code = %status
             );
-            return RetryAction::Retry(format!("Server error from Doris: {}", status).into());
+            return RetryAction::Retry(format!("Server error from Doris: {status}").into());
         }
 
         // Don't retry for client errors (4xx) and other cases
@@ -93,6 +93,6 @@ impl RetryLogic for DorisRetryLogic {
             message = "Client error encountered, not retrying.",
             status_code = %status
         );
-        RetryAction::DontRetry(format!("Client error from Doris: {}", status).into())
+        RetryAction::DontRetry(format!("Client error from Doris: {status}").into())
     }
 }

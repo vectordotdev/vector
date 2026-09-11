@@ -1,33 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ensure_active_toolchain_is_installed() {
-  if ! command -v rustup >/dev/null 2>&1; then
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-  fi
-
-  # Ensure cargo/rustup are on PATH even if rustup was preinstalled in the image
-  if [ -f "${HOME}/.cargo/env" ]; then
-    # shellcheck source=/dev/null
-    source "${HOME}/.cargo/env"
-  fi
-
-  # Determine desired toolchain and ensure it's installed.
-  ACTIVE_TOOLCHAIN="$(rustup show active-toolchain 2>/dev/null || true)"
-  ACTIVE_TOOLCHAIN="${ACTIVE_TOOLCHAIN%% *}"  # keep only the first token
-  if [ -z "${ACTIVE_TOOLCHAIN}" ]; then
-    # No active toolchain yet: fall back to env override or ultimately to stable.
-    ACTIVE_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
-    rustup default "${ACTIVE_TOOLCHAIN}"
-  fi
-
-  rustup toolchain install "${ACTIVE_TOOLCHAIN}"
-  rustup show
-}
-
 SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 
-# Tool version definitions - update versions here
+# Tool versions. Keep pins here so CI and local setup use the same versions.
 CARGO_DEB_VERSION="2.9.3"
 CROSS_VERSION="0.2.5"
 CARGO_NEXTEST_VERSION="0.9.95"
@@ -37,10 +13,12 @@ CARGO_HACK_VERSION="0.6.43"
 DD_RUST_LICENSE_TOOL_VERSION="1.0.6"
 CARGO_LLVM_COV_VERSION="0.8.4"
 WASM_PACK_VERSION="0.15.0"
-# npm tool versions are defined in scripts/environment/npm-tools/package.json
-# and pinned (including transitive deps) in npm-tools/package-lock.json.
+CUE_VERSION="0.17.1"
+MOLD_VERSION="2.40.4"
 
-ALL_MODULES=(
+# The no-argument default remains workstation-safe. CI requests system-level
+# dependencies explicitly through .github/actions/setup/action.yml.
+DEFAULT_MODULES=(
   rustup
   protoc
   cargo-deb
@@ -58,68 +36,123 @@ ALL_MODULES=(
   vdev
 )
 
-# By default, install everything
-MODULES=( "${ALL_MODULES[@]}" )
+SYSTEM_MODULES=(
+  libsasl2
+  cmark-gfm
+  cross-binutils
+  rpm
+  lcov
+  bc
+)
 
-# Helper to join an array by comma
-join_by() { local IFS="$1"; shift; echo "$*"; }
+SUPPORTED_MODULES=(
+  "${DEFAULT_MODULES[@]}"
+  cue
+  mold
+  "${SYSTEM_MODULES[@]}"
+)
 
-# If the INSTALL_MODULES env var is set, override MODULES
-if [[ -n "${INSTALL_MODULES:-}" ]]; then
-  IFS=',' read -r -a MODULES <<< "$INSTALL_MODULES"
-fi
+MODULES=("${DEFAULT_MODULES[@]}")
 
-# Parse CLI args for --modules or -m
-for arg in "$@"; do
-  case $arg in
-    --modules=*|-m=*)
-      val="${arg#*=}"
-      IFS=',' read -r -a MODULES <<< "$val"
-      shift
-      ;;
-    --help|-h)
-      cat <<EOF
-Usage: $0 [--modules=mod1,mod2,...]
+# General helpers
 
-Modules:
-  rustup
-  protoc
-  cargo-deb
-  cross
-  cargo-nextest
-  cargo-deny
-  cargo-msrv
-  cargo-hack
-  cargo-llvm-cov
-  dd-rust-license-tool
-  wasm-pack
-  markdownlint-cli2
-  prettier
-  datadog-ci
-  vdev
-
-If a module requires rust then rustup will be automatically installed.
-By default, all modules are installed. To install only a subset:
-  INSTALL_MODULES=cargo-deb,cross    # via env var
-  $0 --modules=cargo-deb,cross       # via CLI
-EOF
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $arg"
-      exit 1
-      ;;
-  esac
-done
-
-echo "Installing modules: $(join_by ', ' "${MODULES[@]}")"
+join_by() {
+  local IFS="$1"
+  shift
+  echo "$*"
+}
 
 contains_module() {
   local needle="$1"
+  local item
   for item in "${MODULES[@]}"; do
     [[ "$item" == "$needle" ]] && return 0
   done
   return 1
+}
+
+is_supported_module() {
+  local needle="$1"
+  local item
+  for item in "${SUPPORTED_MODULES[@]}"; do
+    [[ "$item" == "$needle" ]] && return 0
+  done
+  return 1
+}
+
+print_usage() {
+  cat <<EOF
+Usage: $0 [--modules=mod1,mod2,...]
+
+Supported modules:
+EOF
+  printf '  %s\n' "${SUPPORTED_MODULES[@]}"
+  cat <<EOF
+
+If a module requires Rust, rustup is installed automatically.
+By default, developer tooling is installed without system packages. To install
+only a subset:
+  INSTALL_MODULES=cargo-deb,cross    # via environment variable
+  $0 --modules=cargo-deb,cross       # via CLI
+EOF
+}
+
+parse_args() {
+  if [[ -n "${INSTALL_MODULES:-}" ]]; then
+    IFS=',' read -r -a MODULES <<<"$INSTALL_MODULES"
+  fi
+
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --modules=*|-m=*)
+        IFS=',' read -r -a MODULES <<<"${arg#*=}"
+        ;;
+      --help|-h)
+        print_usage
+        exit 0
+        ;;
+      *)
+        echo "Unknown option: $arg" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  local module
+  for module in "${MODULES[@]}"; do
+    if ! is_supported_module "$module"; then
+      echo "Unknown module: $module" >&2
+      exit 1
+    fi
+  done
+}
+
+# Rust and Cargo tooling
+
+ensure_active_toolchain_is_installed() {
+  if ! command -v rustup >/dev/null 2>&1; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+  fi
+
+  # Ensure cargo/rustup are on PATH even if rustup was preinstalled in the image
+  if [ -f "${HOME}/.cargo/env" ]; then
+    # shellcheck source=/dev/null
+    source "${HOME}/.cargo/env"
+  fi
+
+  # Determine desired toolchain and ensure it's installed.
+  local active_toolchain
+  active_toolchain="$(rustup show active-toolchain 2>/dev/null || true)"
+  active_toolchain="${active_toolchain%% *}" # keep only the first token
+  if [[ -z "$active_toolchain" ]]; then
+    # No active toolchain yet: fall back to env override or ultimately to stable.
+    active_toolchain="${RUSTUP_TOOLCHAIN:-stable}"
+    rustup default "$active_toolchain"
+  fi
+
+  rustup toolchain install "$active_toolchain"
+  rustup show
 }
 
 # Helper function to check version and install if needed
@@ -137,9 +170,9 @@ maybe_install_cargo_tool() {
   fi
 
   # For cargo-* tools, invoke as "cargo <subcommand>" not "cargo-<subcommand>"
-  local version_cmd="$tool"
+  local version_cmd=("$tool")
   if [[ "$tool" == cargo-* ]]; then
-    version_cmd="cargo ${tool#cargo-}"
+    version_cmd=(cargo "${tool#cargo-}")
   fi
 
   # vdev: binstall reads the version and pkg-url from vdev/Cargo.toml via
@@ -151,10 +184,10 @@ maybe_install_cargo_tool() {
   # code of an unmerged checkout. If no prebuilt binary exists, build the
   # current checkout instead.
   if [[ "$tool" == "vdev" ]]; then
-    local installer=("${install[@]}")
-    if [[ "${installer[0]}" == "binstall" ]]; then
-      installer+=(--force --disable-strategies compile)
-      if ! cargo "${installer[@]}" --manifest-path vdev/Cargo.toml vdev; then
+    local vdev_installer=("${cargo_tool_installer[@]}")
+    if [[ "${vdev_installer[0]}" == "binstall" ]]; then
+      vdev_installer+=(--force --disable-strategies compile)
+      if ! cargo "${vdev_installer[@]}" --manifest-path vdev/Cargo.toml vdev; then
         echo "binstall failed; building vdev from the working tree..."
         cargo install -f --path vdev --locked
       fi
@@ -167,13 +200,13 @@ maybe_install_cargo_tool() {
     return 0
   fi
 
-  if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
+  if ! "${version_cmd[@]}" --version 2>/dev/null | grep -q "^${version_pattern}"; then
     local should_install=true
     # Outside CI, preserve a newer-than-pin version the user already has.
     # `cargo install --force` would otherwise silently downgrade them.
     if [[ "${CI:-}" != "true" ]]; then
       local current
-      current=$($version_cmd --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+      current=$("${version_cmd[@]}" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
       if [[ -n "$current" ]] && [[ "$current" != "$version" ]]; then
         local newest
         newest=$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)
@@ -184,7 +217,7 @@ maybe_install_cargo_tool() {
       fi
     fi
     if [[ "$should_install" == "true" ]]; then
-      cargo "${install[@]}" "$tool" --version "$version" --force --locked
+      cargo "${cargo_tool_installer[@]}" "$tool" --version "$version" --force --locked
     fi
   fi
 
@@ -193,6 +226,164 @@ maybe_install_cargo_tool() {
     rustup component add llvm-tools-preview
   fi
 }
+
+# Standalone binaries
+
+install_bin_dir() {
+  if [[ "${CI:-}" == "true" ]]; then
+    echo "${RUNNER_TEMP:?RUNNER_TEMP must be set when CI is enabled}/vector-tools-bin"
+  else
+    echo "${HOME}/.local/bin"
+  fi
+}
+
+add_to_path() {
+  local dir="$1"
+  export PATH="${dir}:${PATH}"
+  if [[ -n "${GITHUB_PATH:-}" ]]; then
+    echo "$dir" >>"${GITHUB_PATH}"
+  fi
+}
+
+install_cue() {
+  contains_module cue || return 0
+
+  local current_version
+  current_version=$(cue version 2>/dev/null | sed -n '1p' || true)
+  if [[ "$current_version" == "cue version v${CUE_VERSION}" ]]; then
+    return 0
+  fi
+
+  local os arch
+  case "$(uname -s)" in
+    Linux) os=linux ;;
+    Darwin) os=darwin ;;
+    *)
+      echo "The cue module does not support this platform." >&2
+      return 1
+      ;;
+  esac
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    arm64 | aarch64) arch=arm64 ;;
+    *)
+      echo "The cue module does not support architecture $(uname -m)." >&2
+      return 1
+      ;;
+  esac
+
+  local archive="cue_v${CUE_VERSION}_${os}_${arch}.tar.gz"
+  local temp install_dir
+  temp=$(mktemp -d)
+  install_dir=$(install_bin_dir)
+  mkdir -p "$install_dir"
+
+  curl -fsSL "https://github.com/cue-lang/cue/releases/download/v${CUE_VERSION}/${archive}" \
+    --output "${temp}/${archive}"
+  tar -xzf "${temp}/${archive}" -C "$temp" cue
+  install -m 0755 "${temp}/cue" "${install_dir}/cue"
+  rm -rf "$temp"
+  add_to_path "$install_dir"
+}
+
+install_mold() {
+  contains_module mold || return 0
+
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    echo "The mold module is only supported on Linux." >&2
+    return 1
+  fi
+  if mold --version 2>/dev/null | grep -q "mold ${MOLD_VERSION}"; then
+    return 0
+  fi
+
+  local machine target
+  machine=$(uname -m)
+  target="mold-${MOLD_VERSION}-${machine}-linux"
+  local archive="${target}.tar.gz"
+  local temp install_dir
+  temp=$(mktemp -d)
+  install_dir=$(install_bin_dir)
+  mkdir -p "$install_dir"
+
+  curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${archive}" \
+    --output "${temp}/${archive}"
+  tar -xzf "${temp}/${archive}" -C "$temp"
+  install -m 0755 "${temp}/${target}/bin/mold" "${install_dir}/mold"
+  install -m 0755 "${temp}/${target}/lib/mold/mold-wrapper.so" "${install_dir}/mold-wrapper.so"
+  rm -rf "$temp"
+  add_to_path "$install_dir"
+}
+
+# System packages
+
+run_privileged_with_timeout() {
+  local cmd=("$@")
+  if [[ "$(id -u)" -ne 0 ]]; then
+    cmd=(sudo "${cmd[@]}")
+  fi
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 30m "${cmd[@]}"
+  else
+    "${cmd[@]}"
+  fi
+}
+
+install_system_packages() {
+  local os
+  os=$(uname -s)
+
+  case "$os" in
+    Linux)
+      local packages=()
+      contains_module libsasl2 && packages+=(libsasl2-dev)
+      contains_module cmark-gfm && packages+=(cmark-gfm)
+      contains_module cross-binutils && packages+=(binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu)
+      contains_module rpm && packages+=(rpm)
+      contains_module lcov && packages+=(lcov)
+      contains_module bc && packages+=(bc)
+
+      if [[ "${#packages[@]}" -eq 0 ]]; then
+        return 0
+      fi
+      if ! command -v apt-get >/dev/null 2>&1; then
+        echo "Requested system modules require apt-get on Linux." >&2
+        return 1
+      fi
+
+      run_privileged_with_timeout apt-get update
+      run_privileged_with_timeout apt-get install -y --no-install-recommends "${packages[@]}"
+      ;;
+    Darwin)
+      local packages=()
+      contains_module libsasl2 && packages+=(cyrus-sasl)
+      contains_module cmark-gfm && packages+=(cmark-gfm)
+      contains_module rpm && packages+=(rpm)
+      contains_module lcov && packages+=(lcov)
+      contains_module bc && packages+=(bc)
+
+      if contains_module cross-binutils; then
+        echo "The cross-binutils module is only supported on Linux." >&2
+        return 1
+      fi
+      if [[ "${#packages[@]}" -gt 0 ]]; then
+        brew install "${packages[@]}"
+      fi
+      ;;
+    *)
+      local module
+      for module in "${SYSTEM_MODULES[@]}"; do
+        if contains_module "$module"; then
+          echo "System module $module does not support this platform." >&2
+          return 1
+        fi
+      done
+      ;;
+  esac
+}
+
+# npm tooling
 
 # Install npm tools from the committed package-lock.json so that every
 # transitive dependency version is pinned (no live registry resolution).
@@ -259,49 +450,50 @@ maybe_install_npm_tools() {
   done
 }
 
-# Set git safe.directory in CI where the repo may be checked out by a different
-# uid than the user running git. Skipped on workstations: the contributor owns
-# the checkout and a global config write is unnecessary.
-if [[ "${CI:-}" == "true" ]]; then
-  git config --global --add safe.directory "$(pwd)"
-fi
+# Installation orchestration
 
 REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
 REQUIRES_BINSTALL=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack cargo-llvm-cov wasm-pack vdev)
 require_binstall=false
+cargo_tool_installer=(install)
 
-for tool in "${REQUIRES_BINSTALL[@]}"; do
-  if contains_module "$tool"; then
-    require_binstall=true
-    MODULES=(rustup "${MODULES[@]}")
-    break
-  fi
-done
-
-if [ "${require_binstall}" = "false" ] && ! contains_module rustup; then
-  for tool in "${REQUIRES_RUSTUP[@]}"; do
+resolve_rust_dependencies() {
+  local tool
+  for tool in "${REQUIRES_BINSTALL[@]}"; do
     if contains_module "$tool"; then
-      MODULES=(rustup "${MODULES[@]}")
+      require_binstall=true
       break
     fi
   done
-fi
 
-install=(install)
-if contains_module rustup; then
+  if contains_module rustup; then
+    return 0
+  fi
+  for tool in "${REQUIRES_RUSTUP[@]}"; do
+    if contains_module "$tool"; then
+      MODULES=(rustup "${MODULES[@]}")
+      return 0
+    fi
+  done
+}
+
+prepare_rust_installer() {
+  contains_module rustup || return 0
+
   ensure_active_toolchain_is_installed
-
-  if [ "${require_binstall}" = "true" ]; then
+  if [[ "$require_binstall" == "true" ]]; then
     if cargo binstall -V &>/dev/null || "${SCRIPT_DIR}"/binstall.sh; then
-      install=(binstall -y)
+      cargo_tool_installer=(binstall -y)
     else
       echo "Failed to install cargo binstall, defaulting to cargo install"
     fi
   fi
-fi
-set -e -o verbose
+}
 
-if contains_module protoc; then
+install_protoc() {
+  contains_module protoc || return 0
+
+  local protoc_dir
   if [[ "${CI:-}" == "true" ]]; then
     protoc_dir="${RUNNER_TEMP:?RUNNER_TEMP must be set when CI is enabled}/protoc-bin"
   else
@@ -314,17 +506,38 @@ if contains_module protoc; then
   if [[ -n "${GITHUB_PATH:-}" ]]; then
     echo "${protoc_dir}" >> "${GITHUB_PATH}"
   fi
-fi
+}
 
-maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
-maybe_install_cargo_tool cross "${CROSS_VERSION}"
-maybe_install_cargo_tool cargo-nextest "${CARGO_NEXTEST_VERSION}"
-maybe_install_cargo_tool cargo-deny "${CARGO_DENY_VERSION}"
-maybe_install_cargo_tool cargo-msrv "${CARGO_MSRV_VERSION}"
-maybe_install_cargo_tool cargo-hack "${CARGO_HACK_VERSION}"
-maybe_install_cargo_tool cargo-llvm-cov "${CARGO_LLVM_COV_VERSION}"
-maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
-maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
-maybe_install_cargo_tool vdev
+install_cargo_tools() {
+  maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
+  maybe_install_cargo_tool cross "${CROSS_VERSION}"
+  maybe_install_cargo_tool cargo-nextest "${CARGO_NEXTEST_VERSION}"
+  maybe_install_cargo_tool cargo-deny "${CARGO_DENY_VERSION}"
+  maybe_install_cargo_tool cargo-msrv "${CARGO_MSRV_VERSION}"
+  maybe_install_cargo_tool cargo-hack "${CARGO_HACK_VERSION}"
+  maybe_install_cargo_tool cargo-llvm-cov "${CARGO_LLVM_COV_VERSION}"
+  maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
+  maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
+  maybe_install_cargo_tool vdev
+}
 
-maybe_install_npm_tools
+main() {
+  parse_args "$@"
+  resolve_rust_dependencies
+  echo "Installing modules: $(join_by ', ' "${MODULES[@]}")"
+
+  # The checkout may be owned by another uid in CI containers.
+  if [[ "${CI:-}" == "true" ]]; then
+    git config --global --add safe.directory "$(pwd)"
+  fi
+
+  install_system_packages
+  install_mold
+  install_cue
+  prepare_rust_installer
+  install_protoc
+  install_cargo_tools
+  maybe_install_npm_tools
+}
+
+main "$@"

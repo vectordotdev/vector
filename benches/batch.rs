@@ -51,7 +51,7 @@ fn benchmark_batch(c: &mut Criterion) {
                         PartitionedBuffer::new(batch.size, *compression),
                         Duration::from_secs(1),
                     )
-                    .sink_map_err(|error| panic!("{}", error));
+                    .sink_map_err(|error| panic!("{error}"));
 
                     (
                         rt,
@@ -81,7 +81,7 @@ fn benchmark_batch(c: &mut Criterion) {
                         Buffer::new(batch.size, *compression),
                         Duration::from_secs(1),
                     )
-                    .sink_map_err(|error| panic!("{}", error));
+                    .sink_map_err(|error| panic!("{error}"));
 
                     (
                         rt,

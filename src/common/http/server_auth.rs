@@ -275,7 +275,7 @@ impl HttpServerAuthMatcher {
 
         let result = Runtime::default().resolve(&mut target, program, &timezone);
         match result.map_err(|e| {
-            warn!("Handling auth failed: {}", e);
+            warn!("Handling auth failed: {e}");
             ErrorMessage::new(StatusCode::UNAUTHORIZED, "Auth failed".to_owned())
         })? {
             vrl::core::Value::Boolean(true) => {

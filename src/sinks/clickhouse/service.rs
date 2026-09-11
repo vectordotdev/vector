@@ -129,12 +129,12 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
 
 fn append_param<T: ToString>(uri: &mut String, key: &str, value: Option<T>) {
     if let Some(val) = value {
-        uri.push_str(&format!("{}={}&", key, val.to_string()));
+        uri.push_str(&format!("{key}={}&", val.to_string()));
     }
 }
 fn append_param_bool(uri: &mut String, key: &str, value: Option<bool>) {
     if let Some(val) = value {
-        uri.push_str(&format!("{}={}&", key, if val { 1 } else { 0 }));
+        uri.push_str(&format!("{key}={}&", if val { 1 } else { 0 }));
     }
 }
 
@@ -154,10 +154,7 @@ fn set_uri_query(
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
-            &format!(
-                "INSERT INTO {{database:Identifier}}.{{table:Identifier}} FORMAT {}",
-                format
-            ),
+            &format!("INSERT INTO {{database:Identifier}}.{{table:Identifier}} FORMAT {format}"),
         )
         .append_pair("param_database", database)
         .append_pair("param_table", table)

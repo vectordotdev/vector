@@ -120,18 +120,16 @@ impl WindowsEventLogError {
         match self {
             Self::AccessDeniedError { channel } => {
                 format!(
-                    "Access denied to event log channel '{}'. Try running Vector as Administrator.",
-                    channel
+                    "Access denied to event log channel '{channel}'. Try running Vector as Administrator."
                 )
             }
             Self::ChannelNotFoundError { channel } => {
                 format!(
-                    "Event log channel '{}' not found. Check the channel name and ensure the service is installed.",
-                    channel
+                    "Event log channel '{channel}' not found. Check the channel name and ensure the service is installed."
                 )
             }
             Self::InvalidXPathQuery { query, .. } => {
-                format!("Invalid XPath query '{}'. Check the query syntax.", query)
+                format!("Invalid XPath query '{query}'. Check the query syntax.")
             }
             Self::ResourceExhaustedError { .. } => {
                 "System resources exhausted. Consider reducing batch_size or poll_interval_secs."
@@ -139,8 +137,7 @@ impl WindowsEventLogError {
             }
             Self::TimeoutError { timeout_secs } => {
                 format!(
-                    "Operation timed out after {} seconds. Consider increasing timeout values.",
-                    timeout_secs
+                    "Operation timed out after {timeout_secs} seconds. Consider increasing timeout values."
                 )
             }
             _ => self.to_string(),
@@ -181,8 +178,7 @@ mod tests {
         for error in recoverable_errors {
             assert!(
                 error.is_recoverable(),
-                "Error should be recoverable: {}",
-                error
+                "Error should be recoverable: {error}"
             );
         }
 
@@ -205,8 +201,7 @@ mod tests {
         for error in non_recoverable_errors {
             assert!(
                 !error.is_recoverable(),
-                "Error should not be recoverable: {}",
-                error
+                "Error should not be recoverable: {error}"
             );
         }
     }

@@ -227,9 +227,7 @@ impl StreamSink<Event> for UnitTestSink {
                     let actual = output_events.len();
                     if actual != expected {
                         result.test_errors.push(format!(
-                            "expected {} events from transforms {:?}, but received {}",
-                            expected, self.transform_ids, actual
-                        ));
+                            "expected {expected} events from transforms {:?}, but received {actual}", self.transform_ids));
                     }
                 }
 
@@ -260,8 +258,8 @@ impl StreamSink<Event> for UnitTestSink {
                             check_errors.insert(
                                 0,
                                 format!(
-                                    "check[{}] for transforms {:?} failed conditions:",
-                                    i, self.transform_ids
+                                    "check[{i}] for transforms {:?} failed conditions:",
+                                    self.transform_ids
                                 ),
                             );
                         }
