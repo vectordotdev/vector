@@ -497,8 +497,13 @@ async fn run_command(
     'outer: loop {
         tokio::select! {
             _ = &mut shutdown => {
-                if !shutdown_child(&mut child, &command) {
-                        break 'outer; // couldn't signal, exit early
+                #[cfg(unix)]
+                let shutdown_succeeded = shutdown_child(&mut child, &command);
+                #[cfg(windows)]
+                let shutdown_succeeded = shutdown_child(&mut child, &command).await;
+
+                if !shutdown_succeeded {
+                    break 'outer; // couldn't signal, exit early
                 }
             }
             v = receiver.recv() => {
