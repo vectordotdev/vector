@@ -326,6 +326,8 @@ impl RootOpts {
 
     pub fn init_global(&self) {
         if !self.openssl_no_probe {
+            // SAFETY: Global initialization runs before Vector starts worker threads, so OpenSSL's
+            // environment variables cannot be concurrently read or modified here.
             unsafe {
                 openssl_probe::init_openssl_env_vars();
             }

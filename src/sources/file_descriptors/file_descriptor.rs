@@ -94,7 +94,22 @@ pub(crate) fn null_fd() -> crate::Result<RawFd> {
 #[typetag::serde(name = "file_descriptor")]
 impl SourceConfig for FileDescriptorSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
-        let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });
+        let fd = RawFd::try_from(self.fd)
+            .map_err(|_| format!("File descriptor {} is out of range", self.fd))?;
+        // SAFETY: `fcntl` accepts any integer descriptor and either duplicates it or returns an
+        // error; it does not dereference pointers supplied by the caller.
+        let duplicated_fd = unsafe { libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 0) };
+        if duplicated_fd == -1 {
+            return Err(format!(
+                "Could not duplicate file descriptor {}: {}",
+                self.fd,
+                io::Error::last_os_error()
+            )
+            .into());
+        }
+
+        // SAFETY: `F_DUPFD_CLOEXEC` returned a new descriptor owned exclusively by this source.
+        let pipe = io::BufReader::new(unsafe { File::from_raw_fd(duplicated_fd) });
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         self.source(pipe, cx.shutdown, cx.out, log_namespace)
@@ -147,7 +162,7 @@ mod tests {
                 host_key: Default::default(),
                 framing: None,
                 decoding: default_decoding(),
-                fd: read_fd.into_raw_fd() as u32,
+                fd: read_fd.as_raw_fd() as u32,
                 log_namespace: None,
             };
 
@@ -188,7 +203,7 @@ mod tests {
                 host_key: Default::default(),
                 framing: None,
                 decoding: default_decoding(),
-                fd: read_fd.into_raw_fd() as u32,
+                fd: read_fd.as_raw_fd() as u32,
                 log_namespace: Some(true),
             };
 
@@ -245,10 +260,6 @@ mod tests {
             let mut stream = rx;
 
             write(&write_fd, b"hello world\nhello world again\n").unwrap();
-            // Consume the OwnedFd without closing it to avoid double-close
-            // with the File created in build().
-            _ = write_fd.into_raw_fd();
-
             let context = SourceContext::new_test(tx, None);
             config.build(context).await.unwrap().await.unwrap();
 
@@ -258,5 +269,21 @@ mod tests {
             assert!(event.is_none());
         })
         .await;
+    }
+
+    #[tokio::test]
+    async fn file_descriptor_rejects_out_of_range_fd() {
+        let (tx, _rx) = SourceSender::new_test();
+        let config = FileDescriptorSourceConfig {
+            max_length: crate::serde::default_max_length(),
+            host_key: Default::default(),
+            framing: None,
+            decoding: default_decoding(),
+            fd: u32::MAX,
+            log_namespace: None,
+        };
+
+        let context = SourceContext::new_test(tx, None);
+        assert!(config.build(context).await.is_err());
     }
 }

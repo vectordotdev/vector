@@ -981,6 +981,8 @@ mod tests {
         // cannot write it yet since we don't know the size of the
         // encoded message
         buf.reserve(GRPC_HEADER_SIZE);
+        // SAFETY: The capacity for the complete header was reserved immediately above, and the
+        // header bytes are initialized before the buffer is read.
         unsafe {
             buf.advance_mut(GRPC_HEADER_SIZE);
         }

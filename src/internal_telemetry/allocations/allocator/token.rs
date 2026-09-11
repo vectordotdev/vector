@@ -27,7 +27,7 @@ impl AllocationGroupId {
     pub const ROOT: Self = AllocationGroupId::from_raw(1);
 
     pub(super) const fn from_raw(raw_group_id: u8) -> Self {
-        unsafe { Self(NonZeroU8::new_unchecked(raw_group_id)) }
+        Self(NonZeroU8::new(raw_group_id).expect("allocation group IDs are nonzero"))
     }
 
     /// Gets the integer representation of this group ID.
@@ -47,13 +47,13 @@ impl AllocationGroupId {
     pub fn register() -> Option<AllocationGroupId> {
         static GROUP_ID: AtomicU8 = AtomicU8::new(AllocationGroupId::ROOT.0.get() + 1);
 
-        let group_id = GROUP_ID.fetch_add(1, Ordering::Relaxed);
+        let group_id = GROUP_ID
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |group_id| {
+                group_id.checked_add(1)
+            })
+            .ok()?;
 
-        if group_id != u8::MAX {
-            Some(AllocationGroupId::from_raw(group_id))
-        } else {
-            None
-        }
+        Some(AllocationGroupId::from_raw(group_id))
     }
 
     /// Attaches this allocation group to a [`Span`][tracing::Span].
