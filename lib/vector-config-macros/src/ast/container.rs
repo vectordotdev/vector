@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use darling::{FromAttributes, error::Accumulator, util::Flag};
+use proc_macro2::Span;
 use serde_derive_internals::{Ctxt, Derive, ast as serde_ast};
 use syn::{
     DeriveInput, ExprPath, GenericArgument, Generics, Ident, PathArguments, PathSegment, Type,
@@ -41,7 +42,12 @@ impl<'a> Container<'a> {
         // We can't do anything unless `serde` can also handle this container. We specifically only care about
         // deserialization here, because the schema tells us what we can _give_ to Vector.
         let context = Ctxt::new();
-        let serde = match serde_ast::Container::from_ast(&context, input, Derive::Deserialize) {
+        let serde = match serde_ast::Container::from_ast(
+            &context,
+            input,
+            Derive::Deserialize,
+            &Ident::new("__private", Span::call_site()),
+        ) {
             Some(serde) => {
                 // This `serde_derive_internals` helper will panic if `check` isn't _always_ called, so we also have to
                 // call it on the success path.
