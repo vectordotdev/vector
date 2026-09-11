@@ -121,7 +121,12 @@ pub struct SampleConfig {
     /// independently per rendered group value.
     #[configurable(metadata(
         docs::examples = "{{ service }}",
-        docs::examples = "{{ hostname }}-{{ service }}"
+        docs::examples = "{{ hostname }}-{{ service }}",
+        docs::warnings = "Prefer grouping by fields with a small, stable set of values, such as \
+        `service` or `host`. When the template interpolates event content (for example \
+        `{{ message }}` or `{{ request_id }}`), every distinct rendered value creates a new \
+        group: exceeding `max_groups` then evicts the least recently used groups' sampling \
+        state, and the retained group values consume memory in proportion to their size."
     ))]
     pub group_by: Option<UnconfinedTemplate>,
     /// The maximum number of distinct group values whose sampling state is retained.
