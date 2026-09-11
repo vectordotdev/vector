@@ -26,34 +26,34 @@ const showCodeFilename = () => {
   }
 };
 
-// Animate the open/close of `embed` shortcode <details> elements so the
-// content height transitions in sync with the chevron rotation, instead of
-// the native instant show/hide. Duration scales with content height so tall
-// embeds don't feel like they snap open/closed.
-const EMBED_PX_PER_MS = 3;
-const EMBED_MIN_DURATION = 200;
-const EMBED_MAX_DURATION = 1500;
+// Animate the open/close of collapsible <details> elements so the content
+// height transitions in sync with the chevron rotation, instead of using the
+// native instant show/hide. Duration scales with content height so tall
+// disclosures don't feel like they snap open or closed.
+const DISCLOSURE_PX_PER_MS = 3;
+const DISCLOSURE_MIN_DURATION = 200;
+const DISCLOSURE_MAX_DURATION = 1500;
 
-const embedTransitionDuration = (height) => {
-  const duration = height / EMBED_PX_PER_MS;
-  return Math.min(EMBED_MAX_DURATION, Math.max(EMBED_MIN_DURATION, duration));
+const disclosureTransitionDuration = (height) => {
+  const duration = height / DISCLOSURE_PX_PER_MS;
+  return Math.min(DISCLOSURE_MAX_DURATION, Math.max(DISCLOSURE_MIN_DURATION, duration));
 };
 
-const animateEmbedDetails = () => {
+const animateDisclosureDetails = () => {
   document.addEventListener("click", (e) => {
-    const summary = e.target.closest(".embed-details > summary");
+    const summary = e.target.closest(".disclosure-details > summary");
     if (!summary) return;
     if (e.target.closest("a")) return;
 
     e.preventDefault();
 
     const details = summary.parentElement;
-    const content = details.querySelector(".embed-content");
-    const chevron = details.querySelector(".embed-chevron");
+    const content = details.querySelector(".disclosure-content");
+    const chevron = details.querySelector(".disclosure-chevron");
 
     if (details.open) {
       const startHeight = content.scrollHeight;
-      const duration = embedTransitionDuration(startHeight);
+      const duration = disclosureTransitionDuration(startHeight);
       content.style.transitionDuration = `${duration}ms`;
       if (chevron) chevron.style.transitionDuration = `${duration}ms`;
       content.style.height = `${startHeight}px`;
@@ -77,7 +77,7 @@ const animateEmbedDetails = () => {
     } else {
       details.open = true;
       const endHeight = content.scrollHeight;
-      const duration = embedTransitionDuration(endHeight);
+      const duration = disclosureTransitionDuration(endHeight);
       content.style.transitionDuration = `${duration}ms`;
       if (chevron) chevron.style.transitionDuration = `${duration}ms`;
       content.style.height = "0px";
@@ -106,5 +106,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   tableOfContents();
   showCodeFilename();
-  animateEmbedDetails();
+  animateDisclosureDetails();
 });

@@ -20,7 +20,7 @@
   {{ $open = false }}
 {{ end }}
 
-{{ $chevron := `<svg class="embed-chevron w-4 h-4 mr-2 flex-none" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>` }}
+{{ $chevron := `<svg class="disclosure-chevron w-4 h-4 mr-2 flex-none" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>` }}
 
 {{ $header := printf `<div class="flex justify-between items-center px-4 py-2 text-sm">
     <span class="flex items-center">%s<code class="text-gray-600 dark:text-gray-400">%s</code></span>
@@ -29,14 +29,9 @@
     </a>
   </div>` $chevron $label $githubUrl }}
 
-<style>
-  .embed-chevron { transition: transform 300ms ease; }
-  details[open] > summary .embed-chevron { transform: rotate(90deg); }
-  .embed-content { overflow: hidden; transition: height 300ms ease; }
-</style>
-<details class="embed-details no-prose mb-4 border dark:border-gray-700 rounded-md"{{ if $open }} open{{ end }}>
+<details class="disclosure-details no-prose mb-4 border dark:border-gray-700 rounded-md"{{ if $open }} open{{ end }}>
   <summary class="list-none cursor-pointer marker:content-none [&::-webkit-details-marker]:hidden">{{ $header | safeHTML }}</summary>
-  <div class="embed-content">
+  <div class="disclosure-content">
     {{ highlight $content $lang "" }}
   </div>
 </details>

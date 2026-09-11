@@ -1,0 +1,18 @@
+{{ $title := .Get "title" | default "Details" }}
+{{ $open := true }}
+{{ if eq (.Get "open") "false" }}
+  {{ $open = false }}
+{{ end }}
+<details class="disclosure-details no-prose my-8 rounded-md border border-gray-300 dark:border-gray-700"{{ if $open }} open{{ end }}>
+  <summary class="list-none cursor-pointer marker:content-none [&::-webkit-details-marker]:hidden px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">
+    <span class="flex items-center">
+      <svg class="disclosure-chevron w-4 h-4 mr-2 flex-none" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+      {{ $title }}
+    </span>
+  </summary>
+  <div class="disclosure-content">
+    <div class="border-t border-gray-300 px-4 py-3 prose dark:prose-invert max-w-none dark:border-gray-700">
+      {{ .Inner | .Page.RenderString }}
+    </div>
+  </div>
+</details>

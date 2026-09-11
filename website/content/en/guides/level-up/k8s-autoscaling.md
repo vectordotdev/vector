@@ -320,6 +320,11 @@ its recommendation up to a whole pod. See [Why the HPA can stabilize at six
 pods](#deep-dive-why-the-hpa-can-stabilize-at-six-pods) for the algorithm and
 an example run that settles at six pods.
 
+{{< collapsible title="Deep dive: Why the HPA can stabilize at six pods" open="false" >}}
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua.
+{{< /collapsible >}}
+
 ## Results comparison
 
 | | 1 pod | 3 pods | 8 pods | HPA |
