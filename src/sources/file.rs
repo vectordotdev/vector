@@ -14,7 +14,7 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
     file_source::{
-        file_server::{FileServer, Line, calculate_ignore_before},
+        file_server::{FileDiscoveryMode, FileServer, Line, calculate_ignore_before},
         paths_provider::{Glob, MatchOptions},
     },
     file_source_common::{
@@ -36,7 +36,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileInternalMetricsConfig, FileOpen,
-        FileSourceInternalEventsEmitter, StreamClosedError,
+        FileSourceInternalEventsEmitter, FilesIdle, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
@@ -237,6 +237,89 @@ pub struct FileConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     pub rotate_wait: Duration,
+
+    /// The mechanism used to discover new files, detect renames, and wake up reads of existing
+    /// files.
+    ///
+    /// `polling` (the default) re-scans the `include` glob patterns on a fixed interval
+    /// (`glob_minimum_cooldown_ms`) and keeps an open file handle for every matched file for as
+    /// long as it exists on disk, even files excluded from reading by `ignore_older`. This is
+    /// simple and works identically everywhere, but can be expensive when a very large number of
+    /// files match `include`.
+    ///
+    /// `notify` uses OS-level file system event notifications (inotify on Linux, FSEvents on
+    /// macOS, `ReadDirectoryChangesW` on Windows) to discover files and wake up reads promptly,
+    /// without needing to re-scan or hold a handle open for inactive files. A much less frequent
+    /// periodic reconciliation pass (`reconcile_interval_secs`) still runs as a correctness
+    /// backstop, since OS-level notification queues can silently overflow. This mode is newer
+    /// and has had less production exposure than `polling`.
+    #[serde(default)]
+    pub file_discovery_mode: FileDiscoveryModeConfig,
+
+    /// How often to run the full glob+fingerprint reconciliation pass when
+    /// `file_discovery_mode` is `notify`. This exists purely as a correctness backstop for
+    /// OS-level file watch events that were dropped (e.g. due to queue overflow) or that
+    /// occurred before the watch was established. Ignored when `file_discovery_mode` is
+    /// `polling`.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(
+        default = "default_reconcile_interval_secs",
+        rename = "reconcile_interval_secs"
+    )]
+    pub reconcile_interval: Duration,
+
+    /// How long to wait, after a file has been fully read (reached EOF) and stops receiving new
+    /// data, before closing its file handle.
+    ///
+    /// Vector keeps polling the file's metadata (size and modification time) cheaply, without
+    /// holding the handle open, and transparently reopens the file if new data arrives. This
+    /// avoids holding a large number of open file handles for files that are being watched (for
+    /// example, due to `ignore_older_secs` not yet excluding them, or simply because they haven't
+    /// rotated out of the `include` glob yet) but are not actively being written to. Applies
+    /// regardless of `file_discovery_mode`: `notify` makes *discovering* files fast, but doesn't
+    /// by itself stop an already-discovered file from holding a handle open indefinitely -- this
+    /// option is what does that.
+    ///
+    /// This also applies at startup: a file that also matches `ignore_older_secs` is never opened
+    /// in the first place, as long as Vector can determine without opening it that there is no
+    /// new data to read (either because its on-disk size already matches its stored checkpoint
+    /// position, or because it isn't gzip-compressed, in which case an old file is never read
+    /// from regardless of checkpoint).
+    ///
+    /// Defaults to 60 seconds. Set this explicitly to `null` to disable idle-timeout-based closing
+    /// entirely, so that active file handles are only ever closed by other means (for example,
+    /// rotation via `rotate_wait_secs`), matching Vector's behavior prior to this option's
+    /// introduction.
+    #[serde(default = "default_idle_timeout_secs")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 60))]
+    #[configurable(metadata(docs::human_name = "Idle Timeout"))]
+    pub idle_timeout_secs: Option<u64>,
+}
+
+/// The mechanism `file` uses to discover new files, detect renames, and wake up reads of
+/// existing files.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum FileDiscoveryModeConfig {
+    /// Re-scan the `include` glob patterns on a fixed interval (`glob_minimum_cooldown_ms`).
+    #[default]
+    Polling,
+    /// Use OS-level file system event notifications to discover files and wake up reads
+    /// promptly, falling back to a periodic reconciliation pass (`reconcile_interval_secs`) as a
+    /// correctness backstop.
+    Notify,
+}
+
+impl From<FileDiscoveryModeConfig> for FileDiscoveryMode {
+    fn from(config: FileDiscoveryModeConfig) -> FileDiscoveryMode {
+        match config {
+            FileDiscoveryModeConfig::Polling => FileDiscoveryMode::PollingOnly,
+            FileDiscoveryModeConfig::Notify => FileDiscoveryMode::Notify,
+        }
+    }
 }
 
 fn default_max_line_bytes() -> usize {
@@ -269,6 +352,27 @@ fn default_line_delimiter() -> String {
 
 const fn default_rotate_wait() -> Duration {
     Duration::from_secs(u64::MAX / 2)
+}
+
+/// Justification: this is meant to be a correctness backstop, not the primary discovery
+/// mechanism, when `file_discovery_mode = notify`. It only needs to be frequent enough to
+/// recover promptly from a dropped/overflowed OS event queue or a missed pre-watch change,
+/// not frequent enough to serve as the main polling loop the way `glob_minimum_cooldown_ms`
+/// did. Five minutes bounds the worst-case "silently missed a file" window to something
+/// operators can reason about, while keeping the reconciliation pass (a full glob + fingerprint
+/// scan over every matched file) rare enough that it doesn't reintroduce the cost this mode
+/// exists to avoid.
+const fn default_reconcile_interval_secs() -> Duration {
+    Duration::from_secs(300)
+}
+
+/// Default `idle_timeout_secs`: 60 seconds of no new data after reaching EOF before a file's
+/// handle is closed. This is deliberately much longer than the read backoff (which tops out at
+/// 250ms) so that ordinary, bursty log writers don't cause handles to be repeatedly closed and
+/// reopened; it is deliberately not "no limit" (unlike `rotate_wait`) because the entire point of
+/// this option is to bound the number of concurrently open handles by default.
+const fn default_idle_timeout_secs() -> Option<u64> {
+    Some(60)
 }
 
 /// Configuration for how files should be identified.
@@ -377,6 +481,9 @@ impl Default for FileConfig {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
+            file_discovery_mode: FileDiscoveryModeConfig::default(),
+            reconcile_interval: default_reconcile_interval_secs(),
+            idle_timeout_secs: default_idle_timeout_secs(),
         }
     }
 }
@@ -539,6 +646,9 @@ pub fn file_source(
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
         rotate_wait: config.rotate_wait,
+        discovery_mode: FileDiscoveryMode::from(config.file_discovery_mode),
+        reconcile_interval: config.reconcile_interval,
+        idle_timeout: config.idle_timeout_secs.map(Duration::from_secs),
     };
 
     let event_metadata = EventMetadata {
@@ -679,6 +789,7 @@ pub fn file_source(
             let result =
                 rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
             emit!(FileOpen { count: 0 });
+            emit!(FilesIdle { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -2502,6 +2613,315 @@ mod tests {
         }
     }
 
+    // --- Idle-watching tests ---------------------------------------------
+    //
+    // These exercise the fix for https://github.com/vectordotdev/vector/issues/3567:
+    // Vector previously held an open file handle for every matched file for
+    // as long as it existed on disk, even files excluded by `ignore_older`
+    // or long past EOF with no new writes. `idle_timeout_secs` (runtime) and
+    // the startup fast-path in `FileWatcher::new` (see
+    // lib/file-source/src/file_watcher/mod.rs) address this, independently
+    // of `file_discovery_mode` -- these tests use the default `polling`
+    // discovery mode (see the separate `notify_discovery` module below for
+    // tests specifically covering the `notify` discovery mode, which is an
+    // orthogonal concern: `notify` speeds up *finding* files, idle_timeout
+    // stops *already-found* files from holding a handle open). These are
+    // end-to-end tests through the full `file_source`/`FileServer` pipeline,
+    // asserting on observable behavior (events received, and correct
+    // resumption) rather than internal `FileWatcher` state, complementing
+    // the lower-level state-transition tests in
+    // lib/file-source/src/file_watcher/tests/mod.rs.
+
+    #[tokio::test]
+    async fn idle_timeout_closes_handle_and_resumes_on_new_data() {
+        let n = 3;
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            // Aggressively short idle timeout so the watcher goes idle
+            // quickly within the test's time budget.
+            idle_timeout_secs: Some(0),
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let counter = Arc::new(AtomicUsize::new(0));
+        let received = run_file_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(Arc::clone(&counter)),
+            async {
+                let mut file = File::create(&path).unwrap();
+                for i in 0..n {
+                    writeln!(&mut file, "first-batch {i}").unwrap();
+                }
+                file.flush().unwrap();
+
+                // Wait for the first batch to be received...
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= n, 5_000).await;
+
+                // ...then wait long enough for the watcher to reach EOF, sit
+                // idle past `idle_timeout_secs: 0`, and be deactivated
+                // (handle closed) by `FileServer`. A few glob-rescan/read
+                // cycles at the 100ms `glob_minimum_cooldown_ms` used by
+                // `test_default_file_config` is more than enough.
+                sleep(Duration::from_millis(750)).await;
+
+                // Now write more data. If the idle->active transition and
+                // checkpoint-resume work correctly, this must be picked up
+                // and read starting from exactly where we left off (no
+                // duplicate replay of the first batch, no gap).
+                for i in 0..n {
+                    writeln!(&mut file, "second-batch {i}").unwrap();
+                }
+                file.flush().unwrap();
+
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 2 * n, 5_000).await;
+            },
+        )
+        .await;
+
+        let lines = extract_messages_string(received);
+        assert_eq!(lines.len(), 2 * n);
+        for i in 0..n {
+            assert_eq!(lines[i], format!("first-batch {i}"));
+        }
+        for i in 0..n {
+            assert_eq!(lines[n + i], format!("second-batch {i}"));
+        }
+    }
+
+    #[tokio::test]
+    async fn idle_old_fully_read_file_is_not_reread_on_restart() {
+        // A file that is: (a) older than `ignore_older_secs`, and (b) whose
+        // on-disk size already matches its stored checkpoint (nothing new to
+        // read) must, per the startup fast-path in `FileWatcher::new`, be
+        // tracked without ever being opened. Observably: it must produce no
+        // events on a restart, and the data dir's checkpoint must be
+        // unaffected (no re-read from the beginning).
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+        writeln!(&mut file, "only line").unwrap();
+        file.flush().unwrap();
+
+        // First run: read the one line and checkpoint it.
+        {
+            let received =
+                run_file_source(&config, true, Acks, LogNamespace::Legacy, None, async {
+                    sleep_500_millis().await;
+                })
+                .await;
+            let lines = extract_messages_string(received);
+            assert_eq!(lines, vec!["only line"]);
+        }
+
+        // Second run: `ignore_older_secs` set aggressively low so `file`
+        // (unmodified since the first run, so at least a little bit old by
+        // now) is excluded. Combined with the checkpoint from the first run
+        // matching its actual size, `file` must take the idle fast-path at
+        // startup and yield no new events for it -- but must NOT lose its
+        // checkpoint or get treated as newly-discovered. A second, freshly
+        // written file is included in the same run so the harness's
+        // component-compliance check (which requires at least one event) has
+        // something to observe, letting us assert on `file` specifically
+        // being absent from the output rather than the run producing nothing
+        // at all.
+        {
+            let other_path = dir.path().join("other_file");
+            let config = file::FileConfig {
+                include: vec![dir.path().join("*")],
+                ignore_older_secs: Some(1),
+                ..test_default_file_config(&dir)
+            };
+            let counter = Arc::new(AtomicUsize::new(0));
+            let received = run_file_source(
+                &config,
+                true,
+                Acks,
+                LogNamespace::Legacy,
+                Some(Arc::clone(&counter)),
+                async {
+                    let mut other_file = File::create(&other_path).unwrap();
+                    writeln!(&mut other_file, "fresh line").unwrap();
+                    other_file.flush().unwrap();
+                    wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 1, 5_000).await;
+                },
+            )
+            .await;
+            let lines = extract_messages_string(received);
+            assert_eq!(
+                lines,
+                vec!["fresh line"],
+                "old, fully-checkpointed `file` must not be re-read, \
+                 only the newly written `other_file` should produce events"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn idle_file_deletion_is_handled_without_reopening() {
+        // A file that goes idle (handle closed) and is then deleted must be
+        // unwatched just like an actively-open file that gets deleted --
+        // without ever needing to reopen it to notice the deletion.
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            idle_timeout_secs: Some(0),
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let counter = Arc::new(AtomicUsize::new(0));
+        let received = run_file_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(Arc::clone(&counter)),
+            async {
+                let mut file = File::create(&path).unwrap();
+                writeln!(&mut file, "hello").unwrap();
+                file.flush().unwrap();
+                drop(file);
+
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 1, 5_000).await;
+
+                // Give it time to go idle (handle closed) before deleting.
+                sleep(Duration::from_millis(750)).await;
+
+                std::fs::remove_file(&path).unwrap();
+
+                // Give the glob-rescan loop a chance to notice the deletion
+                // and unwatch the file; there's no new event to wait on
+                // here, so just sleep a bit past a few rescan cycles.
+                sleep(Duration::from_millis(750)).await;
+            },
+        )
+        .await;
+
+        let lines = extract_messages_string(received);
+        assert_eq!(lines, vec!["hello"]);
+    }
+
+    #[tokio::test]
+    async fn idle_file_rotation_reads_new_file_not_stale_offset() {
+        // A file that goes idle, then gets rotated (renamed away, replaced
+        // by a new file at the same path) must pick up the *new* file's
+        // content from the correct (fresh) position, not silently resume
+        // reading into the new file from the old file's stale offset. This
+        // relies on fingerprint-based identity in `FileServer` plus
+        // `FileWatcher::update_path`'s dev/inode re-verification on
+        // reactivation.
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            idle_timeout_secs: Some(0),
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let archive_path = dir.path().join("file.1");
+        let counter = Arc::new(AtomicUsize::new(0));
+        let received = run_file_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(Arc::clone(&counter)),
+            async {
+                let mut file = File::create(&path).unwrap();
+                writeln!(&mut file, "old file content").unwrap();
+                file.flush().unwrap();
+
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 1, 5_000).await;
+
+                // Let it go idle.
+                sleep(Duration::from_millis(750)).await;
+
+                // Rotate: move the old file aside, create a new,
+                // content-different file at the same path.
+                fs::rename(&path, &archive_path).expect("could not rename");
+                let mut new_file = File::create(&path).unwrap();
+                writeln!(&mut new_file, "brand new file content").unwrap();
+                new_file.flush().unwrap();
+
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 2, 5_000).await;
+            },
+        )
+        .await;
+
+        let lines = extract_messages_string(received);
+        assert_eq!(lines, vec!["old file content", "brand new file content"]);
+    }
+
+    #[tokio::test]
+    async fn idle_file_rotation_behind_narrow_glob_reads_new_file_not_stale_offset() {
+        // Same scenario as `idle_file_rotation_reads_new_file_not_stale_offset`,
+        // but with an `include` glob narrow enough that the archived file left
+        // behind by rotation does *not* match it (a common real-world setup,
+        // e.g. `*.log` with rotated files renamed to `*.log.1`). In that case
+        // the old watcher never gets an `update_path` call pointing it at the
+        // archive -- its fingerprint simply isn't found under any matched path
+        // during the glob rescan -- so it's marked unfindable and left exactly
+        // where it was: watching the *original path*, which now refers to a
+        // brand new file on disk. An `Idle` watcher holds no handle, so unlike
+        // an `Active` one it has no OS-level pin on the specific inode it was
+        // watching; if `FileServer`'s idle-poll pass doesn't also check
+        // findability before stat-ing and reactivating, it will observe the
+        // new file's size/mtime differing from what it last knew, reactivate
+        // by reopening the (new) file at the *old* checkpoint offset, and
+        // silently skip or corrupt the new file's content.
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*.log")],
+            idle_timeout_secs: Some(0),
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("app.log");
+        let archive_path = dir.path().join("app.log.1"); // does NOT match `*.log`
+        let counter = Arc::new(AtomicUsize::new(0));
+        let received = run_file_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(Arc::clone(&counter)),
+            async {
+                let mut file = File::create(&path).unwrap();
+                writeln!(&mut file, "old file content").unwrap();
+                file.flush().unwrap();
+
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 1, 5_000).await;
+
+                // Let it go idle (handle closed).
+                sleep(Duration::from_millis(750)).await;
+
+                // Rotate: move the old file to a path outside the `include`
+                // glob, then create a new, content-different file at the
+                // original path.
+                fs::rename(&path, &archive_path).expect("could not rename");
+                let mut new_file = File::create(&path).unwrap();
+                writeln!(&mut new_file, "brand new file content").unwrap();
+                new_file.flush().unwrap();
+
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&counter), |c| c >= 2, 5_000).await;
+            },
+        )
+        .await;
+
+        let lines = extract_messages_string(received);
+        assert_eq!(lines, vec!["old file content", "brand new file content"]);
+    }
+
     #[derive(Clone, Copy, Eq, PartialEq)]
     enum AckingMode {
         NoAcks,      // No acknowledgement handling and no finalization
@@ -2620,5 +3040,223 @@ mod tests {
             .map(Event::into_log)
             .map(|log| log.get_message().unwrap().clone())
             .collect()
+    }
+
+    /// Tests covering `file_discovery_mode: notify`, the OS-level filesystem-event-driven
+    /// discovery mode. These reuse `run_file_source`/`test_default_file_config` from above but
+    /// set a very long `glob_minimum_cooldown_ms`/`reconcile_interval_secs`, so that the
+    /// periodic backstop reconciliation pass cannot plausibly fire within the test's timeout.
+    /// If a test still observes prompt discovery/read behavior under those settings, that
+    /// behavior must be coming from the notify event path, not the polling fallback -- this is
+    /// what distinguishes these tests from the equivalent polling-mode tests above.
+    mod notify_discovery {
+        use super::*;
+
+        fn test_notify_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
+            file::FileConfig {
+                file_discovery_mode: FileDiscoveryModeConfig::Notify,
+                // Deliberately huge: if the backstop reconciliation pass were doing the work in
+                // these tests, they would time out (the tests use short, second-scale timeouts)
+                // well before this interval ever elapses.
+                reconcile_interval: Duration::from_secs(3600),
+                // Likewise huge and, in `Notify` mode, unused for discovery timing: set high to
+                // double-check no code path (including the notify-event debounce window, which
+                // is its own fixed, small constant -- NOTIFY_EVENT_DEBOUNCE -- specifically so it
+                // can't inherit an unrelated-in-intent large value like this one) is silently
+                // relying on it as a polling or debounce interval.
+                glob_minimum_cooldown_ms: Duration::from_secs(3600),
+                ..test_default_file_config(dir)
+            }
+        }
+
+        /// (a) A new file appearing after startup is picked up promptly via a create event, not
+        /// a fixed polling interval that -- per `test_notify_file_config` -- is set to an hour.
+        #[tokio::test]
+        async fn new_file_discovered_promptly_via_event() {
+            let dir = tempdir().unwrap();
+            let config = file::FileConfig {
+                include: vec![dir.path().join("*")],
+                ..test_notify_file_config(&dir)
+            };
+
+            let path = dir.path().join("new_file");
+            let event_count = Arc::new(AtomicUsize::new(0));
+            let received = run_file_source(
+                &config,
+                false,
+                NoAcks,
+                LogNamespace::Legacy,
+                Some(Arc::clone(&event_count)),
+                async {
+                    // The file doesn't exist yet at FileServer startup.
+                    let mut file = File::create(&path).unwrap();
+                    writeln!(&mut file, "hello from a brand new file").unwrap();
+                    file.flush().unwrap();
+
+                    // If this resolves, discovery + read happened well within the (hour-long)
+                    // fallback reconcile interval, i.e. via the notify event path.
+                    wait_for_atomic_usize_timeout_ms(Arc::clone(&event_count), |n| n >= 1, 5_000)
+                        .await;
+                },
+            )
+            .await;
+
+            let lines = extract_messages_string(received);
+            assert_eq!(lines, vec!["hello from a brand new file"]);
+        }
+
+        /// (b) A write to an already-tracked file triggers a prompt read via a modify event.
+        #[tokio::test]
+        async fn write_to_existing_file_triggers_prompt_read() {
+            let dir = tempdir().unwrap();
+            let config = file::FileConfig {
+                include: vec![dir.path().join("*")],
+                ..test_notify_file_config(&dir)
+            };
+
+            let path = dir.path().join("existing_file");
+            File::create(&path).unwrap();
+
+            let event_count = Arc::new(AtomicUsize::new(0));
+            let received = run_file_source(
+                &config,
+                false,
+                NoAcks,
+                LogNamespace::Legacy,
+                Some(Arc::clone(&event_count)),
+                async {
+                    // Give the file server a brief moment to complete startup and establish its
+                    // watch before we write, but well under the reconcile interval.
+                    sleep(Duration::from_millis(200)).await;
+
+                    let mut file = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open(&path)
+                        .unwrap();
+                    writeln!(&mut file, "a new line was written").unwrap();
+                    file.flush().unwrap();
+
+                    wait_for_atomic_usize_timeout_ms(Arc::clone(&event_count), |n| n >= 1, 5_000)
+                        .await;
+                },
+            )
+            .await;
+
+            let lines = extract_messages_string(received);
+            assert_eq!(lines, vec!["a new line was written"]);
+        }
+
+        /// (d) Rotation (rename) is still handled correctly under notify-based discovery: the
+        /// fingerprint (not the path) identifies the file being tailed, and post-rotation writes
+        /// to the recreated path are picked up as a new file.
+        #[tokio::test]
+        async fn rotation_handled_correctly() {
+            let n = 5;
+            let dir = tempdir().unwrap();
+            let config = file::FileConfig {
+                include: vec![dir.path().join("*")],
+                ..test_notify_file_config(&dir)
+            };
+
+            let path = dir.path().join("file");
+            let archive_path = dir.path().join("file.old");
+            let received =
+                run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
+                    for i in 0..n {
+                        writeln!(&mut file, "prerot {i}").unwrap();
+                    }
+                    file.flush().unwrap();
+                    sleep(Duration::from_millis(500)).await;
+
+                    fs::rename(&path, &archive_path).expect("could not rename");
+                    file.sync_all().unwrap();
+
+                    let mut file = File::create(&path).unwrap();
+                    file.sync_all().unwrap();
+                    sleep(Duration::from_millis(500)).await;
+
+                    for i in 0..n {
+                        writeln!(&mut file, "postrot {i}").unwrap();
+                    }
+                    file.flush().unwrap();
+                    sleep(Duration::from_millis(500)).await;
+                })
+                .await;
+
+            let mut i = 0;
+            let mut pre_rot = true;
+            for event in received {
+                let line = event.as_log()[log_schema().message_key().unwrap().to_string()]
+                    .to_string_lossy();
+                if pre_rot {
+                    assert_eq!(line, format!("prerot {}", i));
+                } else {
+                    assert_eq!(line, format!("postrot {}", i));
+                }
+                i += 1;
+                if i == n {
+                    i = 0;
+                    pre_rot = false;
+                }
+            }
+        }
+
+        /// (c) No file handle is held for files that never receive any activity: unlike the
+        /// polling model (which re-fingerprints, and therefore re-opens, every matched file on
+        /// every cooldown tick), notify-driven discovery only opens files at startup (for the
+        /// initial scan) or in response to a create/modify event. A file that sits untouched
+        /// after being discovered is read to EOF once and then left alone -- the read loop does
+        /// not touch it again absent a new event, so no repeated open/fingerprint cost is paid.
+        ///
+        /// This test can't directly inspect the process's open file descriptor table in a
+        /// portable way, so instead it asserts on the behavior that open-handle-avoidance is
+        /// meant to buy us: a large number of untouched files do not prevent, or measurably
+        /// delay, prompt discovery and reading of one actively-written file. Under the old
+        /// polling design this same scenario would still work, but would pay an O(n) glob +
+        /// fingerprint cost on every single tick; here, with the reconcile interval set to an
+        /// hour, that cost structurally cannot be paid within the test, so a prompt result
+        /// demonstrates the write path isn't depending on scanning the inactive files at all.
+        #[tokio::test]
+        async fn inactive_files_do_not_block_prompt_discovery() {
+            let dir = tempdir().unwrap();
+            let config = file::FileConfig {
+                include: vec![dir.path().join("*")],
+                ..test_notify_file_config(&dir)
+            };
+
+            // Create a bunch of files that will never be written to again.
+            for i in 0..200 {
+                let mut f = File::create(dir.path().join(format!("inactive_{i}"))).unwrap();
+                writeln!(&mut f, "inactive content {i}").unwrap();
+                f.flush().unwrap();
+            }
+
+            let active_path = dir.path().join("active_file");
+            let event_count = Arc::new(AtomicUsize::new(0));
+            let received = run_file_source(
+                &config,
+                false,
+                NoAcks,
+                LogNamespace::Legacy,
+                Some(Arc::clone(&event_count)),
+                async {
+                    let mut file = File::create(&active_path).unwrap();
+                    writeln!(&mut file, "active line").unwrap();
+                    file.flush().unwrap();
+
+                    // 200 pre-existing untouched files + 1 new active file. All 201 lines
+                    // (200 inactive + 1 active) get read once during the startup scan / the
+                    // active file's create event; we just need to see them all arrive promptly.
+                    wait_for_atomic_usize_timeout_ms(Arc::clone(&event_count), |n| n >= 201, 5_000)
+                        .await;
+                },
+            )
+            .await;
+
+            let lines = extract_messages_string(received);
+            assert!(lines.contains(&"active line".to_string()));
+            assert_eq!(lines.len(), 201);
+        }
     }
 }
