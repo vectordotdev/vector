@@ -167,7 +167,13 @@ pub(crate) fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
                 debug!(
                     message = "HTTP response.",
                     %status,
-                    body = %String::from_utf8_lossy(response.http_response.body()),
+                    body = %String::from_utf8_lossy(
+                        &response.http_response.body()[..response
+                            .http_response
+                            .body()
+                            .len()
+                            .min(super::http::MAX_ERROR_BODY_BYTES)],
+                    ),
                 );
             }
             status
