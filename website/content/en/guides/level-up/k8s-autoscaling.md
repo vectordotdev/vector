@@ -320,7 +320,7 @@ its recommendation up to a whole pod. See [Why the HPA can stabilize at six
 pods](#deep-dive-why-the-hpa-can-stabilize-at-six-pods) for the algorithm and
 an example run that settles at six pods.
 
-## Results summary
+### Results comparison
 
 | | 1 pod | 3 pods | 8 pods | HPA |
 | - | ----------------- | ------------------ | ------------------ | ------------------ |
@@ -336,7 +336,7 @@ The HPA scales to five pods, matching the prediction
 and keeping CPU at its 70% target instead of
 leaving each pod with roughly 53% of unused CPU capacity.
 
-### Handling sudden bursts
+## Handling sudden bursts
 
 The HPA is a reactive controller. It can adjust capacity for sustained changes,
 but it cannot make new pods Ready immediately when a burst begins. It only
@@ -413,7 +413,7 @@ with representative traffic in a test environment, then verify traffic reaches
 added replicas before enabling the HPA. Test burst behavior as well as steady-state
 throughput; a stable replica count alone does not establish reliable delivery.
 
-## Replicating these results
+## Replicating
 
 The Helm values, charts, and scripts used throughout this guide live in
 [`k8s-autoscaling/`](https://github.com/vectordotdev/vector/tree/master/website/content/en/guides/level-up/k8s-autoscaling).
