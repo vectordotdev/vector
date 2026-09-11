@@ -48,6 +48,12 @@ pub struct PostgresConfig {
     /// as table names as parameters in prepared statements are not allowed in PostgreSQL.
     pub table: String,
 
+    /// The columns to insert data into. If not specified, all columns matching from the input data will be used and inserted into the table.
+    /// This allows you to exclude columns like serial/auto-increment columns that should be handled by PostgreSQL.
+    /// This parameter is vulnerable to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub columns: Vec<String>,
+
     /// The postgres connection pool size. See [this](https://docs.rs/sqlx/latest/sqlx/struct.Pool.html#why-use-a-pool) for more
     /// information about why a connection pool should be used.
     #[serde(default = "default_pool_size")]
@@ -82,6 +88,7 @@ impl GenerateConfig for PostgresConfig {
         serde_yaml::from_str(indoc::indoc! {
             r#"endpoint: "postgres://user:password@localhost/default"
             table: table
+            columns: ["column1", "column2"]
         "#,
         })
         .unwrap()
@@ -199,7 +206,12 @@ impl ValidatedSink for PostgresConfig {
 
         // The endpoint label must not carry credentials or query parameters.
         let endpoint = protocol_endpoint(endpoint_uri.uri.clone()).1;
-        let service = PostgresService::new(connection_pool, self.table.clone(), endpoint);
+        let service = PostgresService::new(
+            connection_pool,
+            self.table.clone(),
+            endpoint,
+            self.columns.clone(),
+        );
         let service = ServiceBuilder::new()
             .settings(request_settings, PostgresRetryLogic)
             .service(service);
@@ -229,10 +241,12 @@ mod tests {
         let cfg = serde_yaml::from_str::<PostgresConfig>(indoc::indoc! {r#"
             endpoint: "postgres://user:password@localhost/default"
             table: "mytable"
+            columns: ["column1", "column2"]
         "#})
         .unwrap();
         assert_eq!(cfg.endpoint, "postgres://user:password@localhost/default");
         assert_eq!(cfg.table, "mytable");
+        assert_eq!(cfg.columns, vec!["column1", "column2"]);
     }
 
     #[test]

@@ -28,6 +28,18 @@ generated: components: sinks: postgres: configuration: {
 		required: false
 		type:     _schemaDefinitions["vector::sinks::util::batch::BatchConfig<vector::sinks::util::batch::RealtimeSizeBasedDefaultBatchSettings>"]
 	}
+	columns: {
+		description: """
+			The columns to insert data into. If not specified, all columns matching from the input data will be used and inserted into the table.
+			This allows you to exclude columns like serial/auto-increment columns that should be handled by PostgreSQL.
+			This parameter is vulnerable to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: {}
+		}
+	}
 	endpoint: {
 		description: """
 			The PostgreSQL server connection string. It can contain the username and password.
