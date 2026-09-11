@@ -241,6 +241,7 @@ vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", defaul
 zstd = { version = "0.13.0", default-features = false }
 mock_instant = { version = "0.6" }
 serial_test = { version = "4.0" }
+similar-asserts = "2.0.0"
 strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
@@ -529,7 +530,7 @@ quickcheck.workspace = true
 reqwest.workspace = true
 rstest = { version = "0.26.1" }
 serial_test.workspace = true
-similar-asserts = "1.7.0"
+similar-asserts.workspace = true
 tempfile.workspace = true
 test-generator = "0.3.1"
 tokio = { workspace = true, features = ["test-util"] }
