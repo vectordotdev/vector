@@ -1,5 +1,6 @@
 use std::{
     iter,
+    num::NonZeroU64,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -8,13 +9,14 @@ use std::{
 
 use futures::{StreamExt, future, stream};
 use tokio::{
+    sync::{Barrier, Semaphore},
     task::yield_now,
     time::{Duration, sleep},
 };
 use vector_lib::{
     buffers::{BufferConfig, BufferType, WhenFull},
     config::{ComponentKey, OutputId},
-    source_sender::SourceSenderItem,
+    source_sender::{SourceSender, SourceSenderItem},
 };
 
 use crate::{
@@ -25,11 +27,11 @@ use crate::{
         mock::{
             basic_sink, basic_sink_failing_healthcheck, basic_sink_with_data, basic_source,
             basic_source_with_data, basic_source_with_event_counter, basic_transform,
-            error_definition_transform,
+            error_definition_transform, error_sink,
         },
         start_topology, trace_init,
     },
-    topology::{ReloadError::*, RunningTopology, builder::TopologyPiecesBuilder},
+    topology::{ReloadError, ReloadError::*, RunningTopology, builder::TopologyPiecesBuilder},
 };
 
 mod backpressure;
@@ -71,6 +73,38 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
     config.add_source("in1", basic_source().1);
     config.add_sink("out1", &["in1"], basic_sink_failing_healthcheck(10).1);
     config.build().unwrap()
+}
+
+fn disk_buffer() -> BufferConfig {
+    BufferConfig::Single(BufferType::DiskV2 {
+        max_size: NonZeroU64::new(268435488).unwrap(),
+        when_full: WhenFull::Block,
+    })
+}
+
+const ASYNC_TEST_TIMEOUT: Duration = Duration::from_secs(5);
+
+async fn send_test_event(input: &mut SourceSender, timeout_message: &'static str) {
+    tokio::time::timeout(
+        ASYNC_TEST_TIMEOUT,
+        input.send_event(Event::Log(LogEvent::from("event"))),
+    )
+    .await
+    .expect(timeout_message)
+    .unwrap();
+}
+
+async fn reload_with_timeout(
+    topology: &mut RunningTopology,
+    config: Config,
+    timeout_message: &'static str,
+) -> Result<(), ReloadError> {
+    tokio::time::timeout(
+        ASYNC_TEST_TIMEOUT,
+        topology.reload_config_and_respawn(config, Default::default()),
+    )
+    .await
+    .expect(timeout_message)
 }
 
 fn into_message(event: Event) -> String {
@@ -153,6 +187,47 @@ async fn topology_shutdown_while_active() {
     // We expect the pump to fail with an error since we shut down the source it was sending to
     // while it was running.
     assert!(pump_handle.await.unwrap().is_err());
+}
+
+#[tokio::test]
+async fn dropping_shutdown_future_aborts_component_tasks() {
+    trace_init();
+
+    let (mut input, source) = basic_source();
+    let (mut output, sink) = basic_sink(1);
+    let entered = Arc::new(Barrier::new(2));
+    let release = Arc::new(Semaphore::new(0));
+
+    let mut config = Config::builder();
+    config.add_source("in", source);
+    config.add_sink(
+        "out",
+        &["in"],
+        sink.with_event_gate(Arc::clone(&entered), Arc::clone(&release)),
+    );
+
+    let (topology, _) = start_topology(config.build().unwrap(), false).await;
+    tokio::time::timeout(
+        ASYNC_TEST_TIMEOUT,
+        input.send_event(Event::Log(LogEvent::from("event"))),
+    )
+    .await
+    .expect("sending event to gated sink timed out")
+    .unwrap();
+    tokio::time::timeout(ASYNC_TEST_TIMEOUT, entered.wait())
+        .await
+        .expect("sink did not reach event gate");
+
+    let shutdown = topology.stop();
+    drop(shutdown);
+    drop(input);
+
+    assert!(
+        tokio::time::timeout(ASYNC_TEST_TIMEOUT, output.next())
+            .await
+            .expect("aborted sink did not close its output")
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -362,6 +437,176 @@ async fn topology_remove_one_sink() {
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
+}
+
+#[tokio::test]
+async fn shutdown_waits_for_removed_disk_buffered_sink() {
+    trace_init();
+
+    let tmpdir = tempfile::tempdir().expect("no tmpdir");
+    let (mut input, source) = basic_source();
+    let (mut output, sink) = basic_sink(1);
+    let entered = Arc::new(Barrier::new(2));
+    let release = Arc::new(Semaphore::new(0));
+
+    let mut config = Config::builder();
+    config.set_data_dir(tmpdir.path());
+    config.add_source("in", source);
+    config.add_sink(
+        "out",
+        &["in"],
+        sink.with_event_gate(Arc::clone(&entered), Arc::clone(&release)),
+    );
+    config.sinks[&ComponentKey::from("out")].buffer = disk_buffer();
+
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
+    send_test_event(&mut input, "sending event to gated sink timed out").await;
+    tokio::time::timeout(ASYNC_TEST_TIMEOUT, entered.wait())
+        .await
+        .expect("sink did not reach event gate");
+    drop(input);
+
+    let mut config = Config::builder();
+    config.set_data_dir(tmpdir.path());
+    config.allow_empty = true;
+    reload_with_timeout(
+        &mut topology,
+        config.clone().build().unwrap(),
+        "removing gated disk sink stalled reload",
+    )
+    .await
+    .unwrap();
+    reload_with_timeout(
+        &mut topology,
+        config.build().unwrap(),
+        "active retired disk sink stalled subsequent reload",
+    )
+    .await
+    .unwrap();
+
+    let mut shutdown = Box::pin(topology.stop());
+    assert!(futures::poll!(shutdown.as_mut()).is_pending());
+
+    release.add_permits(1);
+    assert!(
+        tokio::time::timeout(ASYNC_TEST_TIMEOUT, shutdown)
+            .await
+            .expect("topology did not stop after releasing sink")
+    );
+    assert!(
+        tokio::time::timeout(ASYNC_TEST_TIMEOUT, output.next())
+            .await
+            .expect("sink did not emit gated event")
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn shutdown_deadline_aborts_retired_disk_buffered_sink() {
+    trace_init();
+
+    let tmpdir = tempfile::tempdir().expect("no tmpdir");
+    let (mut input, source) = basic_source();
+    let (mut output, sink) = basic_sink(1);
+    let entered = Arc::new(Barrier::new(2));
+    let release = Arc::new(Semaphore::new(0));
+    let graceful_shutdown_duration = Duration::from_secs(30);
+
+    let mut config = Config::builder();
+    config.set_data_dir(tmpdir.path());
+    config.graceful_shutdown_duration = Some(graceful_shutdown_duration);
+    config.add_source("in", source);
+    config.add_sink(
+        "out",
+        &["in"],
+        sink.with_event_gate(Arc::clone(&entered), Arc::clone(&release)),
+    );
+    config.sinks[&ComponentKey::from("out")].buffer = disk_buffer();
+
+    let (mut topology, _) = start_topology(config.build().unwrap(), false).await;
+    send_test_event(&mut input, "sending event to gated sink timed out").await;
+    tokio::time::timeout(ASYNC_TEST_TIMEOUT, entered.wait())
+        .await
+        .expect("sink did not reach event gate");
+    drop(input);
+
+    let mut config = Config::builder();
+    config.set_data_dir(tmpdir.path());
+    config.graceful_shutdown_duration = Some(graceful_shutdown_duration);
+    config.allow_empty = true;
+    reload_with_timeout(
+        &mut topology,
+        config.build().unwrap(),
+        "removing gated disk sink stalled reload",
+    )
+    .await
+    .unwrap();
+
+    tokio::time::pause();
+    let mut shutdown = Box::pin(topology.stop());
+    assert!(futures::poll!(shutdown.as_mut()).is_pending());
+    tokio::time::advance(graceful_shutdown_duration).await;
+    tokio::time::resume();
+
+    assert!(
+        !tokio::time::timeout(ASYNC_TEST_TIMEOUT, shutdown)
+            .await
+            .expect("topology did not stop after graceful shutdown deadline")
+    );
+    assert!(
+        tokio::time::timeout(ASYNC_TEST_TIMEOUT, output.next())
+            .await
+            .expect("aborted sink did not close its output")
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn completed_retired_disk_sink_tasks_are_reaped_without_losing_failures() {
+    trace_init();
+
+    let tmpdir = tempfile::tempdir().expect("no tmpdir");
+    let (mut input, source) = basic_source();
+
+    let mut config = Config::builder();
+    config.set_data_dir(tmpdir.path());
+    config.add_source("in", source);
+    config.add_sink("out", &["in"], error_sink());
+    config.sinks[&ComponentKey::from("out")].buffer = disk_buffer();
+
+    let (mut topology, mut errors) = start_topology(config.build().unwrap(), false).await;
+    send_test_event(&mut input, "sending event to failing sink timed out").await;
+    tokio::time::timeout(ASYNC_TEST_TIMEOUT, errors.recv())
+        .await
+        .expect("sink task failure timed out")
+        .expect("sink task did not fail");
+    drop(input);
+
+    let mut config = Config::builder();
+    config.set_data_dir(tmpdir.path());
+    config.allow_empty = true;
+    reload_with_timeout(
+        &mut topology,
+        config.clone().build().unwrap(),
+        "removing failed disk sink stalled reload",
+    )
+    .await
+    .unwrap();
+    assert_eq!(topology.retired_disk_sink_task_count(), 1);
+
+    reload_with_timeout(
+        &mut topology,
+        config.build().unwrap(),
+        "reaping failed disk sink stalled reload",
+    )
+    .await
+    .unwrap();
+    assert_eq!(topology.retired_disk_sink_task_count(), 0);
+    assert!(
+        !tokio::time::timeout(ASYNC_TEST_TIMEOUT, topology.stop())
+            .await
+            .expect("topology did not stop after retired sink failure")
+    );
 }
 
 #[tokio::test]
