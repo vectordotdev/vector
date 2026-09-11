@@ -24,12 +24,23 @@ _schemaDefinitions: "core::option::Option<vector::common::http::server_auth::Htt
 
 				[base64]: https://en.wikipedia.org/wiki/Base64
 				"""
+			bearer: """
+				Bearer authentication.
+
+				The token is matched against the `Authorization` header using the `Bearer` scheme.
+				"""
 			custom: """
 				Custom authentication using VRL code.
 
 				Takes in request and validates it using VRL code. The VRL program must return a boolean.
 				"""
 		}
+	}
+	token: {
+		description:   "The bearer token to match against incoming requests."
+		relevant_when: "strategy = \"bearer\""
+		required:      true
+		type: string: examples: ["${TOKEN}", "my-secret-token"]
 	}
 	username: {
 		description:   "The basic authentication username."
