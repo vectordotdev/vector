@@ -54,7 +54,7 @@ impl ZerobusSink {
                     let metadata = RequestMetadataBuilder::from_events(&events)
                         .with_request_size(NonZeroUsize::MIN);
                     ZerobusRequest {
-                        events: Arc::from(events),
+                        events: Arc::new(events),
                         metadata,
                         finalizers,
                     }
