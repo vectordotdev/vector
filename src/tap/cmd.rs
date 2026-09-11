@@ -60,8 +60,9 @@ async fn tap_internal(
     loop {
         tokio::select! {
             biased;
-            // Lag/closed handling lives inside `ShutdownReceiver`, which escalates from
-            // graceful shutdown to quit on consecutive lag bursts; either way, tap exits.
+            // Lag/closed handling lives inside `ShutdownReceiver`: any lag means multiple
+            // shutdowns were sent, which by the shutdown contract quits immediately;
+            // either way, tap exits.
             _ = shutdown_rx.recv() => break,
             exec_result = async {
                 if let Some(client) = client_opt.take() {

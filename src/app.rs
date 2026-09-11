@@ -417,8 +417,9 @@ impl StartedApplication {
                 ).await {
                     break signal;
                 },
-                // Lag/closed handling lives inside `ShutdownReceiver`, which escalates
-                // from graceful shutdown to quit on consecutive lag bursts.
+                // Lag/closed handling lives inside `ShutdownReceiver`: any lag means
+                // multiple shutdowns were sent, which by the shutdown contract quits
+                // immediately.
                 shutdown = shutdown_rx.recv() => break shutdown,
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
                 error = graceful_crash.next() => break ShutdownSignal::Graceful(error),

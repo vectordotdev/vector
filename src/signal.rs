@@ -267,79 +267,55 @@ impl SignalHandler {
     }
 }
 
-/// Wrapper around the raw shutdown receiver that escalates on lag.
+/// Wrapper around the raw shutdown receiver that enforces the shutdown contract.
 ///
-/// The tokio broadcast receiver reports lag when more shutdowns arrive than the channel
-/// holds while the receiver is busy; the dropped messages are indistinguishable, so
-/// something has gone wrong. The first two lags resolve to a graceful shutdown (the
-/// process can still drain), but a third lag escalates to an immediate quit: whoever is
-/// sending shutdowns that fast clearly wants the process gone. Any receive that is not a
-/// lag resets the counter, so escalation only applies to bursts of consecutive lags.
+/// A second shutdown signal means force-quit. The tokio broadcast receiver reports lag
+/// when more shutdowns arrive than the channel holds while the receiver is busy, so any
+/// lag means multiple shutdowns were sent and dropped — at least a second one. By the
+/// contract, that resolves to an immediate quit rather than a graceful shutdown.
 pub struct ShutdownReceiver {
     rx: ShutdownSignalRx,
-    lags: u32,
 }
 
 impl ShutdownReceiver {
-    /// First two lags are tolerated with a graceful shutdown; a third escalates to quit.
-    const LAG_GRACE_LIMIT: u32 = 2;
-
     pub const fn new(rx: ShutdownSignalRx) -> Self {
-        Self { rx, lags: 0 }
+        Self { rx }
     }
 
     /// Receives the next shutdown signal, resolving when one arrives. A closed channel
-    /// resolves to a graceful shutdown; lag is handled per the escalation policy above, and
-    /// any successful receive resets the lag counter.
+    /// resolves to a graceful shutdown; lag resolves to a quit per the contract above.
     pub async fn recv(&mut self) -> ShutdownSignal {
-        let result = self.rx.recv().await;
-        if result.is_ok() {
-            self.lags = 0;
-        }
-        match result {
+        match self.rx.recv().await {
             Ok(shutdown) => shutdown,
             Err(RecvError::Closed) => ShutdownSignal::Graceful(None),
-            Err(RecvError::Lagged(amt)) => self.on_lag(amt),
+            Err(RecvError::Lagged(amt)) => Self::on_lag(amt),
         }
     }
 
     /// Non-blocking counterpart of [`ShutdownReceiver::recv`], returning `None` when no
-    /// shutdown is queued. Any successful receive resets the lag counter.
+    /// shutdown is queued.
     pub fn try_recv(&mut self) -> Option<ShutdownSignal> {
-        let result = self.rx.try_recv();
-        if result.is_ok() {
-            self.lags = 0;
-        }
-        match result {
+        match self.rx.try_recv() {
             Ok(shutdown) => Some(shutdown),
             Err(TryRecvError::Closed) => Some(ShutdownSignal::Graceful(None)),
-            Err(TryRecvError::Lagged(amt)) => Some(self.on_lag(amt)),
+            Err(TryRecvError::Lagged(amt)) => Some(Self::on_lag(amt)),
             Err(TryRecvError::Empty) => None,
         }
     }
 
-    fn on_lag(&mut self, amt: u64) -> ShutdownSignal {
-        self.lags += 1;
-        if self.lags <= Self::LAG_GRACE_LIMIT {
-            warn!(
-                message = "Overflow, dropped {} shutdown signals; shutting down gracefully.",
-                amt
-            );
-            ShutdownSignal::Graceful(None)
-        } else {
-            error!(
-                message = "Overflow, dropped {} shutdown signals; quitting immediately.",
-                amt
-            );
-            ShutdownSignal::Quit
-        }
+    fn on_lag(amt: u64) -> ShutdownSignal {
+        error!(
+            message = "Overflow, dropped {} shutdown signals; quitting immediately.",
+            amt
+        );
+        ShutdownSignal::Quit
     }
 }
 
 /// Resolves when a shutdown signal (or a closed shutdown channel) is received. Reload
 /// signals received along the way are forwarded to `on_reload` (e.g. so startup can
 /// re-broadcast them once it completes). Lag on the reload channel is logged; lag on the
-/// shutdown channel is handled by [`ShutdownReceiver`]'s escalation policy.
+/// shutdown channel means multiple shutdowns were sent, which quits immediately.
 pub async fn recv_shutdown(
     rx: &mut SignalRx,
     shutdown_rx: &mut ShutdownReceiver,
@@ -361,8 +337,8 @@ pub async fn recv_shutdown(
 
 /// Non-blocking counterpart of [`recv_shutdown`]: drains the signal receiver, returning the
 /// shutdown signal if one is queued (consuming reload signals along the way), or `None`
-/// once the queue is empty. Shutdown-channel lag is handled by [`ShutdownReceiver`]'s
-/// escalation policy.
+/// once the queue is empty. Shutdown-channel lag means multiple shutdowns were sent,
+/// which quits immediately.
 pub fn try_recv_shutdown(
     rx: &mut SignalRx,
     shutdown_rx: &mut ShutdownReceiver,
@@ -472,32 +448,20 @@ mod tests {
     }
 
     #[test]
-    fn shutdown_lag_escalates_then_resets() {
+    fn shutdown_lag_quits_immediately() {
         let (handler, _rx, shutdown_rx) = SignalHandler::new();
         let mut shutdown_rx = ShutdownReceiver::new(shutdown_rx);
 
-        fn flood(handler: &SignalHandler) {
-            // Exceed the shutdown channel capacity while the receiver is idle.
-            for _ in 0..(CHANNEL_CAPACITY + 1) {
-                handler.send_shutdown(ShutdownSignal::Graceful(None));
-            }
+        // Exceed the shutdown channel capacity while the receiver is idle. Lag means
+        // multiple shutdowns were sent and dropped — at least a second one — which by
+        // the shutdown contract is an immediate quit, not a graceful shutdown.
+        for _ in 0..(CHANNEL_CAPACITY + 1) {
+            handler.send_shutdown(ShutdownSignal::Graceful(None));
         }
-
-        // Two consecutive lag bursts stay graceful; the third consecutive one quits.
-        flood(&handler);
-        assert_eq!(shutdown_rx.try_recv(), Some(ShutdownSignal::Graceful(None)));
-        flood(&handler);
-        assert_eq!(shutdown_rx.try_recv(), Some(ShutdownSignal::Graceful(None)));
-        flood(&handler);
         assert_eq!(shutdown_rx.try_recv(), Some(ShutdownSignal::Quit));
 
-        // A successful (non-lag) receive resets the escalation counter.
+        // The queued (non-dropped) shutdowns remain graceful when received individually.
         assert_eq!(shutdown_rx.try_recv(), Some(ShutdownSignal::Graceful(None)));
-        flood(&handler);
         assert_eq!(shutdown_rx.try_recv(), Some(ShutdownSignal::Graceful(None)));
-        flood(&handler);
-        assert_eq!(shutdown_rx.try_recv(), Some(ShutdownSignal::Graceful(None)));
-        flood(&handler);
-        assert_eq!(shutdown_rx.try_recv(), Some(ShutdownSignal::Quit));
     }
 }
