@@ -154,7 +154,7 @@ todo = "warn"
 
 [workspace.dependencies]
 antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }
-antithesis_sdk = { version = "0.2", default-features = false, features = [] }
+antithesis_sdk = { version = "0.3", default-features = false, features = [] }
 anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
 arc-swap = { version = "1.8.2", default-features = false }
 async-compression = { version = "0.4.42", default-features = false, features = ["tokio", "gzip"] }
@@ -170,7 +170,7 @@ clap = { version = "4.5.60", default-features = false, features = ["derive", "er
 clap_complete = "4.6.5"
 colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.1.0", default-features = false }
-convert_case = { version = "0.10", default-features = false }
+convert_case = { version = "0.12", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 cuckoo-clock = { version = "0.2.7" , default-features = false }
@@ -244,7 +244,7 @@ vector-lib = { path = "lib/vector-lib", default-features = false }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
-zstd = { version = "0.13.0", default-features = false }
+zstd = { version = "0.14.0", default-features = false }
 mock_instant = { version = "0.6" }
 serial_test = { version = "4.0" }
 similar-asserts = "2.0.0"
