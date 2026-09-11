@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Read, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use http_body::Body as _;
 
@@ -10,7 +10,6 @@ use axum::{
     routing::{get, post},
 };
 use chrono::Utc;
-use flate2::read::GzDecoder;
 use indoc::indoc;
 use rmp_serde;
 use serde::Serialize;
@@ -18,6 +17,7 @@ use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     time::{Duration, sleep},
 };
+use vector_common::decompression::CappedDecoder;
 
 use crate::{
     config::ConfigBuilder,
@@ -81,7 +81,7 @@ async fn run_server(name: String, port: u16, tx: Sender<StatsPayload>) {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
-    info!("HTTP server for `{}` listening on {}", name, addr);
+    info!("HTTP server for `{name}` listening on {addr}");
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -110,10 +110,7 @@ async fn process_traces(Extension(_state): Extension<Arc<AppState>>, request: Re
 /// Process a POST request from the stats endpoint.
 /// De-compresses and De-serializes the payload, then forwards it on the Sender channel.
 async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: Request<Body>) {
-    debug!(
-        "`{}` server process_stats request: {:?}",
-        state.name, request
-    );
+    debug!("`{}` server process_stats request: {request:?}", state.name);
 
     let content_type_header = request.headers().get(CONTENT_TYPE);
     let content_type = content_type_header.and_then(|value| value.to_str().ok());
@@ -130,9 +127,8 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
             .expect("could not decode body into bytes")
             .to_bytes();
 
-        let mut gz = GzDecoder::new(compressed_body_bytes.as_ref());
-        let mut decompressed_body_bytes = vec![];
-        gz.read_to_end(&mut decompressed_body_bytes)
+        let decompressed_body_bytes = CappedDecoder::gzip(compressed_body_bytes.as_ref())
+            .decompress()
             .expect("unable to decompress gzip stats payload");
 
         let payload: StatsPayload = rmp_serde::from_slice(&decompressed_body_bytes).unwrap();
@@ -141,7 +137,7 @@ async fn process_stats(Extension(state): Extension<Arc<AppState>>, mut request: 
             "`{}` server received and deserialized stats payload.",
             state.name
         );
-        debug!("{:?}", payload);
+        debug!("{payload:?}");
 
         state.tx.send(payload).await.unwrap();
     }
@@ -205,10 +201,10 @@ async fn send_agent_traces(urls: &Vec<String>, start: i64, duration: i64, span_i
                 .unwrap();
 
             if res.status() != hyper::StatusCode::OK {
-                error!("Error sending traces to {}, res: {:?}.", url, res);
+                error!("Error sending traces to {url}, res: {res:?}.");
                 return false;
             }
-            info!("Sent a trace to the Agent at {}.", url);
+            info!("Sent a trace to the Agent at {url}.");
         }
         true
     }
@@ -295,8 +291,8 @@ fn validate_stats(agent_stats: &StatsPayload, vector_stats: &StatsPayload) {
     let agent_s = agent_bucket.stats.first().unwrap();
     let vector_s = vector_bucket.stats.first().unwrap();
 
-    info!("\nagent_stats : {:?}", agent_s);
-    info!("\nvector_stats : {:?}", vector_s);
+    info!("\nagent_stats : {agent_s:?}");
+    info!("\nvector_stats : {vector_s:?}");
 
     assert!(agent_s.service == vector_s.service);
     assert!(agent_s.name == vector_s.name);

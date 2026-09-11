@@ -11,8 +11,8 @@ use vector_config_common::validation::Validation;
 use super::{
     LazyCustomAttribute, Metadata,
     util::{
-        err_field_implicit_transparent, err_field_missing_description,
-        find_delegated_serde_deser_ty, get_serde_default_value, try_extract_doc_title_description,
+        err_field_implicit_transparent, find_delegated_serde_deser_ty, get_serde_default_value,
+        try_extract_doc_title_description,
     },
 };
 
@@ -28,7 +28,6 @@ impl<'a> Field<'a> {
     /// Creates a new `Field<'a>` from the `serde`-derived information about the given field.
     pub fn from_ast(
         serde: &serde_ast::Field<'a>,
-        is_virtual_newtype: bool,
         is_newtype_wrapper_field: bool,
     ) -> darling::Result<Field<'a>> {
         let original = serde.original;
@@ -37,14 +36,7 @@ impl<'a> Field<'a> {
         let default_value = get_serde_default_value(&serde.ty, serde.attrs.default());
 
         Attributes::from_attributes(&original.attrs)
-            .and_then(|attrs| {
-                attrs.finalize(
-                    serde,
-                    &original.attrs,
-                    is_virtual_newtype,
-                    is_newtype_wrapper_field,
-                )
-            })
+            .and_then(|attrs| attrs.finalize(serde, &original.attrs, is_newtype_wrapper_field))
             .map(|attrs| Field {
                 original,
                 name,
@@ -226,6 +218,20 @@ impl<'a> Field<'a> {
         self.attrs.flatten
     }
 
+    /// Whether this field is marked `#[serde(skip_deserializing)]`.
+    pub fn skip_deserializing(&self) -> bool {
+        self.attrs.skip_deserializing
+    }
+
+    /// The `required_one_of` group name, if any.
+    ///
+    /// When set, this field is part of a named group where exactly one member must be provided.
+    /// The generated JSON Schema expresses this as an `allOf: [{ oneOf: [{ required: [...] }] }]`
+    /// constraint on the parent struct.
+    pub fn required_one_of(&self) -> Option<&str> {
+        self.attrs.required_one_of.as_deref()
+    }
+
     /// Metadata (custom attributes) for the field, if any.
     ///
     /// Attributes can take the shape of flags (`#[configurable(metadata(im_a_teapot))]`) or
@@ -251,19 +257,21 @@ impl ToTokens for Field<'_> {
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
-    derived: SpannedValue<Flag>,
     transparent: SpannedValue<Flag>,
     deprecated: Option<Override<String>>,
     #[darling(skip)]
     visible: bool,
     #[darling(skip)]
     flatten: bool,
+    #[darling(skip)]
+    skip_deserializing: bool,
     #[darling(multiple)]
     metadata: Vec<Metadata>,
     #[darling(multiple)]
     validation: Vec<Validation>,
     #[darling(skip)]
     delegated_ty: Option<syn::Type>,
+    required_one_of: Option<String>,
 }
 
 impl Attributes {
@@ -271,12 +279,12 @@ impl Attributes {
         mut self,
         field: &serde_ast::Field<'_>,
         forwarded_attrs: &[syn::Attribute],
-        is_virtual_newtype: bool,
         is_newtype_wrapper_field: bool,
     ) -> darling::Result<Self> {
         // Derive any of the necessary fields from the `serde` side of things.
         self.visible = !field.attrs.skip_deserializing() || !field.attrs.skip_serializing();
         self.flatten = field.attrs.flatten();
+        self.skip_deserializing = field.attrs.skip_deserializing();
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in
@@ -291,59 +299,18 @@ impl Attributes {
         // We do this because the container -- struct or enum variant -- will itself be required to
         // have a description. We never show the description of unnamed fields, anyways, as we defer
         // to using the description of the container. Simply marking this field as transparent will
-        // keep the schema generation happy and avoid having to constantly specify `derived` or
-        // `transparent` all over the place.
+        // keep the schema generation happy and avoid having to constantly specify `transparent`
+        // all over the place.
         if is_newtype_wrapper_field {
-            // We additionally check here to see if transparent/derived as already set, as we want
-            // to throw an error if they are. As we're going to forcefully mark the field as
-            // transparent, there's no reason to allow setting derived/transparent manually, as it
-            // only leads to boilerplate and potential confusion.
+            // We additionally check here to see if transparent is already set, as we want to throw
+            // an error if it is. As we're going to forcefully mark the field as transparent,
+            // there's no reason to allow setting it manually, as it only leads to boilerplate and
+            // potential confusion.
             if self.transparent.is_present() {
                 return Err(err_field_implicit_transparent(&self.transparent.span()));
             }
 
-            if self.derived.is_present() {
-                return Err(err_field_implicit_transparent(&self.derived.span()));
-            }
-
             self.transparent = SpannedValue::new(Flag::present(), Span::call_site());
-        }
-
-        // If no description was provided for the field, it is typically an error. There are few situations when this is
-        // fine/valid, though:
-        //
-        // - the field is derived (`#[configurable(derived)]`)
-        // - the field is transparent (`#[configurable(transparent)]`)
-        // - the field is not visible (`#[serde(skip)]`, or `skip_serializing` plus `skip_deserializing`)
-        // - the field is flattened (`#[serde(flatten)]`)
-        // - the field is part of a virtual newtype
-        // - the field is part of a newtype wrapper (struct/enum variant with a single unnamed field)
-        //
-        // If the field is derived, it means we're taking the description/title from the `Configurable` implementation of
-        // the field type, which we can only do at runtime so we ignore it here. Similarly, if a field is transparent,
-        // we're explicitly saying that our container is meant to essentially take on the schema of the field, rather
-        // than the container being defined by the fields, if that makes sense. Derived and transparent fields are most
-        // common in newtype structs and newtype variants in enums, where they're a `(T)`, and so the container acts
-        // much like `T` itself.
-        //
-        // If the field is not visible, well, then, we're not inserting it in the schema and so requiring a description
-        // or title makes no sense. Similarly, if a field is flattened, that field also won't exist in the schema as
-        // we're lifting up all the fields from the type of the field itself, so again, requiring a description or title
-        // makes no sense.
-        //
-        // If the field is part of a virtual newtype, this means the container has instructed `serde` to
-        // (de)serialize it as some entirely different type. This means the original field will never show up in a
-        // schema, because the schema of the thing being (de)serialized is some `T`, not `ContainerType`. Simply put,
-        // like a field that is flattened or not visible, it makes no sense to require a description or title for fields
-        // in a virtual newtype.
-        if self.description.is_none()
-            && !self.derived.is_present()
-            && !self.transparent.is_present()
-            && self.visible
-            && !self.flatten
-            && !is_virtual_newtype
-        {
-            return Err(err_field_missing_description(&field.original));
         }
 
         // Try and find the delegated (de)serialization type for this field, if it exists.

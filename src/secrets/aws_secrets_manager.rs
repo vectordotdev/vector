@@ -29,20 +29,17 @@ pub struct AwsSecretsManagerBackend {
     pub secret_id: String,
 
     #[serde(flatten)]
-    #[configurable(derived)]
     pub region: RegionOrEndpoint,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 }
 
 impl GenerateConfig for AwsSecretsManagerBackend {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(AwsSecretsManagerBackend {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(AwsSecretsManagerBackend {
             secret_id: String::from("secret-id"),
             region: Default::default(),
             auth: Default::default(),
@@ -89,16 +86,16 @@ impl SecretBackend for AwsSecretsManagerBackend {
             if let Some(secret) = output.get(&k) {
                 if secret.is_empty() {
                     return Err(format!(
-                        "value for key '{}' in secret with id '{}' was empty",
-                        k, &self.secret_id
+                        "value for key '{k}' in secret with id '{}' was empty",
+                        &self.secret_id
                     )
                     .into());
                 }
                 secrets.insert(k.to_string(), secret.to_string());
             } else {
                 return Err(format!(
-                    "key '{}' in secret with id '{}' does not exist",
-                    k, &self.secret_id
+                    "key '{k}' in secret with id '{}' does not exist",
+                    &self.secret_id
                 )
                 .into());
             }

@@ -36,7 +36,6 @@ components: _kafka: {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 
@@ -49,7 +48,6 @@ components: _kafka: {
 			}
 		}
 		librdkafka_options: {
-			common:      false
 			description: "Advanced options. See [librdkafka documentation](\(urls.librdkafka_config)) for details.\n"
 			required:    false
 			type: object: {
@@ -64,7 +62,6 @@ components: _kafka: {
 			}
 		}
 		socket_timeout_ms: {
-			common:      false
 			description: "Default timeout for network requests.\n"
 			required:    false
 			type: uint: {

@@ -24,7 +24,7 @@ vector-lookup = { path = "../vector-lookup", features = ["test"] }
 vector-stream = { path = "../vector-stream" }
 vector-tap = { path = "../vector-tap" }
 vector-top = { path = "../vector-top", optional = true }
-vrl = { workspace = true, optional = true }
+vrl.workspace = true
 
 [features]
 antithesis-disk-asserts = ["vector-buffers/antithesis-disk-asserts"]
@@ -39,4 +39,3 @@ prometheus = ["dep:prometheus-parser"]
 proptest = ["vector-lookup/proptest", "vrl/proptest"]
 syslog = ["codecs/syslog"]
 test = ["codecs/test", "vector-core/test"]
-vrl = ["vector-core/vrl", "dep:vrl"]

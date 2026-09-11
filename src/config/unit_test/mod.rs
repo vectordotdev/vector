@@ -93,9 +93,7 @@ fn init_log_schema_from_paths(
     config_paths: &[ConfigPath],
     deny_if_set: bool,
 ) -> Result<(), Vec<String>> {
-    let builder = ConfigBuilderLoader::default()
-        .interpolate_env(true)
-        .load_from_paths(config_paths)?;
+    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
@@ -105,17 +103,14 @@ pub async fn build_unit_tests_main(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     init_log_schema_from_paths(paths, false)?;
-    let secrets_backends_loader = loading::loader_from_paths(
-        loading::SecretBackendLoader::default().interpolate_env(true),
-        paths,
-    )?;
+    let secrets_backends_loader =
+        loading::loader_from_paths(loading::SecretBackendLoader::default(), paths)?;
     let secrets = secrets_backends_loader
         .retrieve_secrets(signal_handler)
         .await
         .map_err(|e| vec![e])?;
 
     let config_builder = ConfigBuilderLoader::default()
-        .interpolate_env(true)
         .secrets(secrets)
         .load_from_paths(paths)?;
 
@@ -185,7 +180,7 @@ impl UnitTestBuildMetadata {
 
         let source_ids = available_insert_targets
             .iter()
-            .map(|key| (key.clone(), format!("{}-{}-{}", key, "source", random_id)))
+            .map(|key| (key.clone(), format!("{key}-{}-{random_id}", "source")))
             .collect::<HashMap<_, _>>();
 
         // Map a test source to every transform
@@ -219,10 +214,9 @@ impl UnitTestBuildMetadata {
                 (
                     key.clone(),
                     format!(
-                        "{}-{}-{}",
+                        "{}-{}-{random_id}",
                         key.to_string().replace('.', "-"),
-                        "sink",
-                        random_id
+                        "sink"
                     ),
                 )
             })
@@ -557,8 +551,8 @@ fn build_and_validate_inputs(
             }
         } else {
             errors.push(format!(
-                "inputs[{}]: unable to locate target transform '{}'",
-                index, input.insert_at
+                "inputs[{index}]: unable to locate target transform '{}'",
+                input.insert_at
             ))
         }
     }
@@ -615,9 +609,8 @@ fn build_outputs(
                 {
                     if prev != new {
                         errors.push(format!(
-                            "conflicting expected_event_count for extract_from {:?}: {} vs {}",
-                            output.extract_from, prev, new
-                        ));
+                            "conflicting expected_event_count for extract_from {:?}: {prev} vs {new}",
+                            output.extract_from));
                     }
                 } else if existing.expected_event_count.is_none() {
                     existing.expected_event_count = expected_event_count;

@@ -99,7 +99,6 @@ pub struct FileConfig {
     pub ignore_checkpoints: Option<bool>,
 
     #[serde(default = "default_read_from")]
-    #[configurable(derived)]
     pub read_from: ReadFromConfig,
 
     /// Ignore files with a data modification date older than the specified number of seconds.
@@ -162,7 +161,6 @@ pub struct FileConfig {
     #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     pub glob_minimum_cooldown_ms: Duration,
 
-    #[configurable(derived)]
     #[serde(alias = "fingerprinting", default)]
     fingerprint: FingerprintConfig,
 
@@ -187,7 +185,6 @@ pub struct FileConfig {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
-    #[configurable(derived)]
     #[serde(default)]
     pub multiline: Option<MultilineConfig>,
 
@@ -220,11 +217,9 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = "\r\n"))]
     pub line_delimiter: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub encoding: Option<EncodingConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -233,7 +228,6 @@ pub struct FileConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     internal_metrics: FileInternalMetricsConfig,
 
@@ -402,17 +396,13 @@ impl SourceConfig for FileConfig {
             // source are only global, name can be used for subdir
             .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
-        // Clippy rule, because async_trait?
-        #[allow(clippy::suspicious_else_formatting)]
-        {
-            if let Some(ref config) = self.multiline {
-                let _: line_agg::Config = config.try_into()?;
-            }
+        if let Some(ref config) = self.multiline {
+            let _: line_agg::Config = config.try_into()?;
+        }
 
-            if let Some(ref indicator) = self.message_start_indicator {
-                Regex::new(indicator)
-                    .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
-            }
+        if let Some(ref indicator) = self.message_start_indicator {
+            Regex::new(indicator)
+                .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
         }
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
@@ -1195,14 +1185,14 @@ mod tests {
             let line =
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
             if line.starts_with("hello") {
-                assert_eq!(line, format!("hello {}", hello_i));
+                assert_eq!(line, format!("hello {hello_i}"));
                 assert_eq!(
                     event.as_log()["file"].to_string_lossy(),
                     path1.to_str().unwrap()
                 );
                 hello_i += 1;
             } else {
-                assert_eq!(line, format!("goodbye {}", goodbye_i));
+                assert_eq!(line, format!("goodbye {goodbye_i}"));
                 assert_eq!(
                     event.as_log()["file"].to_string_lossy(),
                     path2.to_str().unwrap()
@@ -1291,9 +1281,9 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
 
             if pre_trunc {
-                assert_eq!(line, format!("pretrunc {}", i));
+                assert_eq!(line, format!("pretrunc {i}"));
             } else {
-                assert_eq!(line, format!("posttrunc {}", i));
+                assert_eq!(line, format!("posttrunc {i}"));
             }
 
             i += 1;
@@ -1356,9 +1346,9 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
 
             if pre_rot {
-                assert_eq!(line, format!("prerot {}", i));
+                assert_eq!(line, format!("prerot {i}"));
             } else {
-                assert_eq!(line, format!("postrot {}", i));
+                assert_eq!(line, format!("postrot {i}"));
             }
 
             i += 1;
@@ -2415,14 +2405,14 @@ mod tests {
             // Event 1: Position \r\n to split at first boundary
             let event1_prefix = "Event 1: ";
             let padding1_len = buffer_size - event1_prefix.len() - 1; // -1 for the \r
-            write!(&mut file, "{}", event1_prefix).unwrap();
+            write!(&mut file, "{event1_prefix}").unwrap();
             file.write_all(&vec![b'X'; padding1_len]).unwrap();
             write!(&mut file, "\r\n").unwrap(); // \r at byte 8191, \n at byte 8192
 
             // Event 2: Position \r\n to split at second boundary
             let event2_prefix = "Event 2: ";
             let padding2_len = buffer_size - event2_prefix.len() - 1;
-            write!(&mut file, "{}", event2_prefix).unwrap();
+            write!(&mut file, "{event2_prefix}").unwrap();
             file.write_all(&vec![b'Y'; padding2_len]).unwrap();
             write!(&mut file, "\r\n").unwrap(); // \r at byte 16383, \n at byte 16384
 
@@ -2449,13 +2439,11 @@ mod tests {
 
         assert!(
             msg0.starts_with("Event 1: "),
-            "First event should start with 'Event 1: ', got: {}",
-            msg0
+            "First event should start with 'Event 1: ', got: {msg0}"
         );
         assert!(
             msg1.starts_with("Event 2: "),
-            "Second event should start with 'Event 2: ', got: {}",
-            msg1
+            "Second event should start with 'Event 2: ', got: {msg1}"
         );
         assert_eq!(msg2, "Event 3: Final");
 
@@ -2464,13 +2452,11 @@ mod tests {
             let msg_str = msg.to_string_lossy();
             assert!(
                 !msg_str.contains('\r'),
-                "Event {} should not contain embedded \\r",
-                i
+                "Event {i} should not contain embedded \\r"
             );
             assert!(
                 !msg_str.contains('\n'),
-                "Event {} should not contain embedded \\n",
-                i
+                "Event {i} should not contain embedded \\n"
             );
         }
     }

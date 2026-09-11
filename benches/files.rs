@@ -55,6 +55,8 @@ fn build_file_benchmark_environment(
             timezone: Default::default(),
             internal_metrics: Default::default(),
             truncate: Default::default(),
+            base_dir: None,
+            confinement: Default::default(),
         },
     );
 
@@ -125,6 +127,8 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                         timezone: Default::default(),
                         internal_metrics: Default::default(),
                         truncate: Default::default(),
+                        base_dir: None,
+                        confinement: Default::default(),
                     },
                 );
 

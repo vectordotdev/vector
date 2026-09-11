@@ -261,7 +261,7 @@ impl EventLogSubscription {
                 query = %query,
                 has_valid_checkpoint = has_valid_checkpoint,
                 read_existing = config.read_existing_events,
-                flags = format!("{:#x}", subscription_flags)
+                flags = format!("{subscription_flags:#x}")
             );
 
             // EvtSubscribe with signal event and NULL callback = pull mode
@@ -285,7 +285,7 @@ impl EventLogSubscription {
                                 message = "Strict bookmark subscribe failed, retrying without bookmark. Potential re-delivery of events.",
                                 channel = %channel,
                                 error = %e,
-                                fallback_flags = format!("{:#x}", fallback_flags)
+                                fallback_flags = format!("{fallback_flags:#x}")
                             );
                             EvtSubscribe(
                                 None,
@@ -853,7 +853,7 @@ impl EventLogSubscription {
                             message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
                             channel = %channel_sub.channel,
                             error = %e,
-                            fallback_flags = format!("{:#x}", fallback_flags)
+                            fallback_flags = format!("{fallback_flags:#x}")
                         );
                         EvtSubscribe(
                             None,
@@ -1352,10 +1352,9 @@ mod tests {
         for event in &events {
             assert!(
                 event.time_created >= earliest_allowed,
-                "Event timestamp {} is before subscription start time {} (minus tolerance). \
+                "Event timestamp {} is before subscription start time {subscription_start_time} (minus tolerance). \
                  read_existing_events=false may not be respected. Event ID: {}, Record ID: {}",
                 event.time_created,
-                subscription_start_time,
                 event.event_id,
                 event.record_id
             );

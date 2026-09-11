@@ -19,11 +19,14 @@ generated: components: transforms: lua: configuration: {
 					cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
 					"""
 				required: false
-				type: string: examples: ["""
-					function (emit)
-					\t-- Custom Lua code here
-					end
-					""", "init"]
+				type: string: {
+					examples: ["""
+						function (emit)
+						\t-- Custom Lua code here
+						end
+						""", "init"]
+					syntax: "lua"
+				}
 			}
 			process: {
 				description: """
@@ -36,15 +39,18 @@ generated: components: transforms: lua: configuration: {
 					while the second parameter, `emit`, is a reference to a function for emitting events.
 					"""
 				required: true
-				type: string: examples: ["""
-					function (event, emit)
-					\tevent.log.field = "value" -- set value of a field
-					\tevent.log.another_field = nil -- remove field
-					\tevent.log.first, event.log.second = nil, event.log.first -- rename field
-					\t-- Very important! Emit the processed event.
-					\temit(event)
-					end
-					""", "process"]
+				type: string: {
+					examples: ["""
+						function (event, emit)
+						\tevent.log.field = "value" -- set value of a field
+						\tevent.log.another_field = nil -- remove field
+						\tevent.log.first, event.log.second = nil, event.log.first -- rename field
+						\t-- Very important! Emit the processed event.
+						\temit(event)
+						end
+						""", "process"]
+					syntax: "lua"
+				}
 			}
 			shutdown: {
 				description: """
@@ -56,11 +62,14 @@ generated: components: transforms: lua: configuration: {
 					cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
 					"""
 				required: false
-				type: string: examples: ["""
-					function (emit)
-					\t-- Custom Lua code here
-					end
-					""", "shutdown"]
+				type: string: {
+					examples: ["""
+						function (emit)
+						\t-- Custom Lua code here
+						end
+						""", "shutdown"]
+					syntax: "lua"
+				}
 			}
 		}
 	}
@@ -107,38 +116,41 @@ generated: components: transforms: lua: configuration: {
 			hooks can be configured directly with inline Lua source for each respective hook.
 			"""
 		required: false
-		type: string: examples: ["""
-			function init()
-			\tcount = 0
-			end
+		type: string: {
+			examples: ["""
+				function init()
+				\tcount = 0
+				end
 
-			function process()
-			\tcount = count + 1
-			end
+				function process()
+				\tcount = count + 1
+				end
 
-			function timer_handler(emit)
-			\temit(make_counter(counter))
-			\tcounter = 0
-			end
+				function timer_handler(emit)
+				\temit(make_counter(counter))
+				\tcounter = 0
+				end
 
-			function shutdown(emit)
-			\temit(make_counter(counter))
-			end
+				function shutdown(emit)
+				\temit(make_counter(counter))
+				end
 
-			function make_counter(value)
-			\treturn metric = {
-			\t\tname = "event_counter",
-			\t\tkind = "incremental",
-			\t\ttimestamp = os.date("!*t"),
-			\t\tcounter = {
-			\t\t\tvalue = value
-			\t\t}
-			 \t}
-			end
-			""", """
-			-- external file with hooks and timers defined
-			require('custom_module')
-			"""]
+				function make_counter(value)
+				\treturn metric = {
+				\t\tname = "event_counter",
+				\t\tkind = "incremental",
+				\t\ttimestamp = os.date("!*t"),
+				\t\tcounter = {
+				\t\t\tvalue = value
+				\t\t}
+				 \t}
+				end
+				""", """
+				-- external file with hooks and timers defined
+				require('custom_module')
+				"""]
+			syntax: "lua"
+		}
 	}
 	timers: {
 		description: "A list of timers which should be configured and executed periodically."

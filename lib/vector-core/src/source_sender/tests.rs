@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use futures::StreamExt as _;
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
@@ -19,7 +19,7 @@ use crate::{
 async fn emits_lag_time_for_log() {
     emit_and_test(|timestamp| {
         let mut log = LogEvent::from("Log message");
-        log.insert("timestamp", timestamp);
+        log.insert(event_path!("timestamp"), timestamp);
         Event::Log(log)
     })
     .await;
@@ -91,9 +91,8 @@ async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
             assert_eq!(*count, 1);
             assert!(
                 (*sum - expected).abs() <= 0.002,
-                "Histogram sum does not match expected sum: {} vs {}",
+                "Histogram sum does not match expected sum: {} vs {expected}",
                 *sum,
-                expected,
             );
         }
         _ => panic!("source_lag_time_seconds has invalid type"),

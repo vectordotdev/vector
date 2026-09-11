@@ -92,7 +92,7 @@ All changes to Vector must go through a pull request review process.
 
 All pull requests must be reviewed by at least one Vector team member. The
 review process takes into account many factors, all of which are detailed in
-our [Reviewing guide](REVIEWING.md). In exceptional circumstances, this
+our [Reviewing guide](docs/REVIEWING.md). In exceptional circumstances, this
 approval can be retroactive.
 
 
@@ -125,7 +125,7 @@ linear history with a Vector team member's co-sign.
 ### Education
 
 Vector team members are required to review this security document as well as
-the [contributing](CONTRIBUTING.md) and [reviewing](REVIEWING.md) documents.
+the [contributing](CONTRIBUTING.md) and [reviewing](docs/REVIEWING.md) documents.
 
 ### Policies
 
@@ -176,7 +176,7 @@ documentation always defaults to non-`root` use.
 
 Vector aims to reduce the number of dependencies it relies on. If a dependency
 is added it goes through a comprehensive review process that is detailed in
-the [Reviewing guide](REVIEWING.md#dependencies).
+the [Reviewing guide](docs/REVIEWING.md#dependencies).
 
 ### Automated Checks
 
@@ -259,7 +259,7 @@ it, we will periodically update you with the status of the fix.
 
 Due to the nature of an open-source project, Vector deployments are fully managed by users. Thus vulnerabilities in Vector deployments could
 potentially be exploited by malicious actors who already have access to the user’s infrastructure. We encourage responsible disclosure
-via opening an [open an issue][urls.new_security_report] so that risks can be properly assessed and mitigated.
+by emailing security@datadoghq.com so that risks can be properly assessed and mitigated.
 
 For us to best investigate your request, please include any of the
 following when reporting:
@@ -276,7 +276,6 @@ following when reporting:
 [urls.git]: https://git-scm.com/
 [urls.github_protected_branches]: https://help.github.com/en/github/administering-a-repository/about-protected-branches
 [urls.least_privilege]: https://en.wikipedia.org/wiki/Principle_of_least_privilege
-[urls.new_security_report]: https://github.com/vectordotdev/vector/issues/new?labels=domain%3A+security
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_sec]: https://rustsec.org/
 [urls.vector_chat]: https://chat.vector.dev

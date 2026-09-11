@@ -38,6 +38,7 @@ fn generate_sink_config(url: &str, subject: &str) -> NatsSinkConfig {
         auth: None,
         request: Default::default(),
         jetstream: false.into(),
+        confinement: Default::default(),
     }
 }
 
@@ -48,7 +49,15 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     // successfully published.
 
     // Create Sink
-    let sink = NatsSink::new(conf.clone()).await?;
+    let confined_subject = conf
+        .subject
+        .clone()
+        .confine(&conf.confinement, "nats", "subject")
+        .expect("subject should confine");
+    let server_addresses = conf
+        .parse_server_addresses()
+        .expect("server addresses should parse");
+    let sink = NatsSink::new(conf.clone(), confined_subject, server_addresses.clone()).await?;
     let sink = VectorSink::from_event_streamsink(sink);
 
     // Establish the consumer subscription.
@@ -56,7 +65,7 @@ async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), NatsError> {
     let options: async_nats::ConnectOptions = (&conf).try_into().context(ConfigSnafu)?;
     let consumer = conf
         .clone()
-        .connect(options)
+        .connect(options, server_addresses)
         .await
         .expect("failed to connect with test consumer");
     let mut sub = consumer
@@ -459,7 +468,7 @@ async fn nats_jetstream_message_id_valid() {
     conf.encoding = JsonSerializerConfig::default().into();
 
     let header_config = NatsHeaderConfig {
-        message_id: Some(Template::try_from("{{ id }}").unwrap()),
+        message_id: Some(UnconfinedTemplate::try_from("{{ id }}").unwrap()),
     };
 
     conf.jetstream = JetStreamConfig {
@@ -467,7 +476,17 @@ async fn nats_jetstream_message_id_valid() {
         headers: Some(header_config),
     };
 
-    let sink = NatsSink::new(conf.clone()).await.unwrap();
+    let confined_subject = conf
+        .subject
+        .clone()
+        .confine(&conf.confinement, "nats", "subject")
+        .expect("subject should confine");
+    let server_addresses = conf
+        .parse_server_addresses()
+        .expect("server addresses should parse");
+    let sink = NatsSink::new(conf.clone(), confined_subject, server_addresses)
+        .await
+        .unwrap();
     let sink = VectorSink::from_event_streamsink(sink);
 
     let event_id = "123";

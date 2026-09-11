@@ -7,7 +7,7 @@ use std::{
 use super::{
     WebSocketListenerSinkConfig,
     buffering::MessageBufferingConfig,
-    config::{ExtraMetricTagsConfig, SubProtocolConfig},
+    config::{ExtraMetricTagsConfig, SubProtocolConfig, ValidatedWebSocketListenerSink},
 };
 use crate::{
     codecs::{Encoder, Transformer},
@@ -22,6 +22,9 @@ use crate::{
         websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
     },
 };
+
+#[cfg(test)]
+use crate::config::ValidatedSink;
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
@@ -62,20 +65,33 @@ pub struct WebSocketListenerSink {
 }
 
 impl WebSocketListenerSink {
+    #[cfg(test)]
     pub fn new(config: WebSocketListenerSinkConfig, cx: SinkContext) -> crate::Result<Self> {
+        let validated = config.validate()?;
         let tls = MaybeTlsSettings::from_config(config.tls.as_ref(), true)?;
-        let transformer = config.encoding.transformer();
-        let serializer = config.encoding.build()?;
-        let encoder = Encoder::<()>::new(serializer);
+        Self::from_validated(config, &validated, tls, cx)
+    }
+
+    /// Constructs the sink from the validated state, performing only the
+    /// context-dependent work: building the auth matcher from the enrichment
+    /// tables / metrics storage.
+    pub(crate) fn from_validated(
+        config: WebSocketListenerSinkConfig,
+        validated: &ValidatedWebSocketListenerSink,
+        tls: MaybeTlsSettings,
+        cx: SinkContext,
+    ) -> crate::Result<Self> {
         let auth = config
             .auth
             .map(|config| config.build(&cx.enrichment_tables, &cx.metrics_storage))
             .transpose()?;
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
             tls,
             address: config.address,
-            transformer,
+            transformer: validated.transformer.clone(),
             encoder,
             auth,
             extra_tags_config: config.internal_metrics.extra_tags,
@@ -157,7 +173,7 @@ impl WebSocketListenerSink {
         // Base url for parsing request URLs that may be relative
         let base_url = Url::parse("ws://localhost").ok();
         let addr = stream.peer_addr();
-        debug!("Incoming TCP connection from: {}", addr);
+        debug!("Incoming TCP connection from: {addr}");
 
         let mut extra_tags: Vec<(String, String)> = extra_tags_config
             .iter()
@@ -239,7 +255,7 @@ impl WebSocketListenerSink {
                     let mut response = ErrorResponse::default();
                     *response.status_mut() = StatusCode::UNAUTHORIZED;
                     *response.body_mut() = Some(message.message().to_string());
-                    debug!("Websocket handshake auth validation failed: {}", message);
+                    debug!("Websocket handshake auth validation failed: {message}");
                     Err(response)
                 }
             }
@@ -248,7 +264,7 @@ impl WebSocketListenerSink {
         let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
             .await
             .map_err(|err| {
-                debug!("Error during websocket handshake: {}", err);
+                debug!("Error during websocket handshake: {err}");
                 emit!(WebSocketListenerConnectionFailedError {
                     error: Box::new(err),
                     extra_tags: extra_tags.clone()
@@ -273,7 +289,7 @@ impl WebSocketListenerSink {
                 },
             );
 
-            debug!("WebSocket connection established: {}", addr);
+            debug!("WebSocket connection established: {addr}");
 
             peers.insert(addr, tx);
             emit!(WebSocketListenerConnectionEstablished {
@@ -876,7 +892,7 @@ mod tests {
                 )
                 .unwrap();
                 // Removing message_id from message, since it is not part of the event
-                base_msg.remove("message_id", true);
+                base_msg.remove(vrl::path!("message_id"), true);
                 let msg_text = serde_json::to_string(&base_msg).unwrap();
                 let expected = serde_json::to_string(expected.clone().into_log().value()).unwrap();
                 assert_eq!(expected, msg_text);

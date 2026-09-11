@@ -183,6 +183,7 @@ mod tests {
 
     use super::*;
     use crate::event::LogEvent;
+    use vrl::event_path;
 
     fn hash<H: Hash>(hash: H) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -193,10 +194,13 @@ mod tests {
     #[test]
     fn equal() {
         let mut event_1 = LogEvent::default();
-        event_1.insert("hostname", "localhost");
-        event_1.insert("irrelevant", "not even used");
+        event_1.insert(event_path!("hostname"), "localhost");
+        event_1.insert(event_path!("irrelevant"), "not even used");
         let mut event_2 = event_1.clone();
-        event_2.insert("irrelevant", "does not matter if it's different");
+        event_2.insert(
+            event_path!("irrelevant"),
+            "does not matter if it's different",
+        );
 
         let discriminant_fields = vec!["hostname".to_string(), "container_id".to_string()];
 
@@ -210,10 +214,10 @@ mod tests {
     #[test]
     fn not_equal() {
         let mut event_1 = LogEvent::default();
-        event_1.insert("hostname", "localhost");
-        event_1.insert("container_id", "abc");
+        event_1.insert(event_path!("hostname"), "localhost");
+        event_1.insert(event_path!("container_id"), "abc");
         let mut event_2 = event_1.clone();
-        event_2.insert("container_id", "def");
+        event_2.insert(event_path!("container_id"), "def");
 
         let discriminant_fields = vec!["hostname".to_string(), "container_id".to_string()];
 
@@ -227,11 +231,11 @@ mod tests {
     #[test]
     fn field_order() {
         let mut event_1 = LogEvent::default();
-        event_1.insert("a", "a");
-        event_1.insert("b", "b");
+        event_1.insert(event_path!("a"), "a");
+        event_1.insert(event_path!("b"), "b");
         let mut event_2 = LogEvent::default();
-        event_2.insert("b", "b");
-        event_2.insert("a", "a");
+        event_2.insert(event_path!("b"), "b");
+        event_2.insert(event_path!("a"), "a");
 
         let discriminant_fields = vec!["a".to_string(), "b".to_string()];
 
@@ -245,11 +249,11 @@ mod tests {
     #[test]
     fn map_values_key_order() {
         let mut event_1 = LogEvent::default();
-        event_1.insert("nested.a", "a");
-        event_1.insert("nested.b", "b");
+        event_1.insert(event_path!("nested", "a"), "a");
+        event_1.insert(event_path!("nested", "b"), "b");
         let mut event_2 = LogEvent::default();
-        event_2.insert("nested.b", "b");
-        event_2.insert("nested.a", "a");
+        event_2.insert(event_path!("nested", "b"), "b");
+        event_2.insert(event_path!("nested", "a"), "a");
 
         let discriminant_fields = vec!["nested".to_string()];
 
@@ -263,11 +267,11 @@ mod tests {
     #[test]
     fn array_values_insertion_order() {
         let mut event_1 = LogEvent::default();
-        event_1.insert("array[0]", "a");
-        event_1.insert("array[1]", "b");
+        event_1.insert(event_path!("array", 0isize), "a");
+        event_1.insert(event_path!("array", 1isize), "b");
         let mut event_2 = LogEvent::default();
-        event_2.insert("array[1]", "b");
-        event_2.insert("array[0]", "a");
+        event_2.insert(event_path!("array", 1isize), "b");
+        event_2.insert(event_path!("array", 0isize), "a");
 
         let discriminant_fields = vec!["array".to_string()];
 
@@ -281,7 +285,7 @@ mod tests {
     #[test]
     fn map_values_matter_1() {
         let mut event_1 = LogEvent::default();
-        event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
+        event_1.insert(event_path!("nested", "a"), "a"); // `nested` is a `Value::Map`
         let event_2 = LogEvent::default(); // empty event
 
         let discriminant_fields = vec!["nested".to_string()];
@@ -296,9 +300,9 @@ mod tests {
     #[test]
     fn map_values_matter_2() {
         let mut event_1 = LogEvent::default();
-        event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
+        event_1.insert(event_path!("nested", "a"), "a"); // `nested` is a `Value::Map`
         let mut event_2 = LogEvent::default();
-        event_2.insert("nested", "x"); // `nested` is a `Value::String`
+        event_2.insert(event_path!("nested"), "x"); // `nested` is a `Value::String`
 
         let discriminant_fields = vec!["nested".to_string()];
 
@@ -316,15 +320,15 @@ mod tests {
 
         let event_stream_1 = {
             let mut event = LogEvent::default();
-            event.insert("hostname", "a.test");
-            event.insert("container_id", "abc");
+            event.insert(event_path!("hostname"), "a.test");
+            event.insert(event_path!("container_id"), "abc");
             event
         };
 
         let event_stream_2 = {
             let mut event = LogEvent::default();
-            event.insert("hostname", "b.test");
-            event.insert("container_id", "def");
+            event.insert(event_path!("hostname"), "b.test");
+            event.insert(event_path!("container_id"), "def");
             event
         };
 
@@ -342,40 +346,40 @@ mod tests {
 
         {
             let mut event = event_stream_1.clone();
-            event.insert("message", "a");
+            event.insert(event_path!("message"), "a");
             assert_eq!(process_event(event), 0);
         }
 
         {
             let mut event = event_stream_1.clone();
-            event.insert("message", "b");
-            event.insert("irrelevant", "c");
+            event.insert(event_path!("message"), "b");
+            event.insert(event_path!("irrelevant"), "c");
             assert_eq!(process_event(event), 1);
         }
 
         {
             let mut event = event_stream_2.clone();
-            event.insert("message", "d");
+            event.insert(event_path!("message"), "d");
             assert_eq!(process_event(event), 0);
         }
 
         {
             let mut event = event_stream_2.clone();
-            event.insert("message", "e");
-            event.insert("irrelevant", "d");
+            event.insert(event_path!("message"), "e");
+            event.insert(event_path!("irrelevant"), "d");
             assert_eq!(process_event(event), 1);
         }
 
         {
             let mut event = event_stream_3.clone();
-            event.insert("message", "f");
+            event.insert(event_path!("message"), "f");
             assert_eq!(process_event(event), 0);
         }
 
         {
             let mut event = event_stream_3.clone();
-            event.insert("message", "g");
-            event.insert("irrelevant", "d");
+            event.insert(event_path!("message"), "g");
+            event.insert(event_path!("irrelevant"), "d");
             assert_eq!(process_event(event), 1);
         }
 
@@ -388,8 +392,8 @@ mod tests {
     #[test]
     fn test_display() {
         let mut event = LogEvent::default();
-        event.insert("hostname", "localhost");
-        event.insert("container_id", 1);
+        event.insert(event_path!("hostname"), "localhost");
+        event.insert(event_path!("container_id"), 1);
 
         let discriminant = Discriminant::from_log_event(
             &event,

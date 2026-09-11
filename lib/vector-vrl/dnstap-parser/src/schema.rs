@@ -184,6 +184,7 @@ impl DnstapEventSchema {
                 Kind::integer(),
                 None,
             )
+            .optional_field(&DNSTAP_VALUE_PATHS.http_protocol, Kind::bytes(), None)
     }
 
     /// The schema definition for a dns tap message.
@@ -223,6 +224,7 @@ pub struct DnstapPaths {
     pub response_message: OwnedValuePath,
     pub request_message_size: OwnedValuePath,
     pub response_message_size: OwnedValuePath,
+    pub http_protocol: OwnedValuePath,
 
     // DnsQueryMessageSchema
     pub response_code: OwnedValuePath,
@@ -325,6 +327,7 @@ pub static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPa
     response_message: owned_value_path!("responseData"),
     request_message_size: owned_value_path!("requestMessageSize"),
     response_message_size: owned_value_path!("responseMessageSize"),
+    http_protocol: owned_value_path!("httpProtocol"),
     response_code: owned_value_path!("fullRcode"),
     response: owned_value_path!("rcodeName"),
     header: owned_value_path!("header"),

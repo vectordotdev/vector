@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
-use lookup::{PathPrefix, event_path, lookup_v2::ConfigValuePath};
+use lookup::{PathPrefix, lookup_v2::ConfigValuePath};
 use ordered_float::NotNan;
 use serde::{Deserialize, Deserializer};
 use vector_config::configurable_component;
@@ -197,7 +197,7 @@ impl Transformer {
                 None
             };
             if let Some(ts) = timestamp {
-                log.insert(event_path!(), ts.into());
+                log.insert(&vrl::path::OwnedTargetPath::event_root(), ts.into());
             }
         }
     }
@@ -265,7 +265,7 @@ mod tests {
     use std::{collections::BTreeMap, sync::Arc};
 
     use indoc::indoc;
-    use lookup::path::parse_target_path;
+    use lookup::{event_path, path::parse_target_path};
     use vector_core::{
         config::{LogNamespace, log_schema},
         schema,
@@ -303,29 +303,29 @@ mod tests {
             toml::from_str(r#"except_fields = ["a.b.c", "b", "c[0].y", "d.z", "e"]"#).unwrap();
         let mut log = LogEvent::default();
         {
-            log.insert("a", 1);
-            log.insert("a.b", 1);
-            log.insert("a.b.c", 1);
-            log.insert("a.b.d", 1);
-            log.insert("b[0]", 1);
-            log.insert("b[1].x", 1);
-            log.insert("c[0].x", 1);
-            log.insert("c[0].y", 1);
-            log.insert("d.z", 1);
-            log.insert("e.a", 1);
-            log.insert("e.b", 1);
+            log.insert(event_path!("a"), 1);
+            log.insert(event_path!("a", "b"), 1);
+            log.insert(event_path!("a", "b", "c"), 1);
+            log.insert(event_path!("a", "b", "d"), 1);
+            log.insert(event_path!("b", 0isize), 1);
+            log.insert(event_path!("b", 1isize, "x"), 1);
+            log.insert(event_path!("c", 0isize, "x"), 1);
+            log.insert(event_path!("c", 0isize, "y"), 1);
+            log.insert(event_path!("d", "z"), 1);
+            log.insert(event_path!("e", "a"), 1);
+            log.insert(event_path!("e", "b"), 1);
         }
         let mut event = Event::from(log);
         transformer.transform(&mut event);
-        assert!(!event.as_mut_log().contains("a.b.c"));
-        assert!(!event.as_mut_log().contains("b"));
-        assert!(!event.as_mut_log().contains("b[1].x"));
-        assert!(!event.as_mut_log().contains("c[0].y"));
-        assert!(!event.as_mut_log().contains("d.z"));
-        assert!(!event.as_mut_log().contains("e.a"));
+        assert!(!event.as_mut_log().contains(event_path!("a", "b", "c")));
+        assert!(!event.as_mut_log().contains(event_path!("b")));
+        assert!(!event.as_mut_log().contains(event_path!("b", 1isize, "x")));
+        assert!(!event.as_mut_log().contains(event_path!("c", 0isize, "y")));
+        assert!(!event.as_mut_log().contains(event_path!("d", "z")));
+        assert!(!event.as_mut_log().contains(event_path!("e", "a")));
 
-        assert!(event.as_mut_log().contains("a.b.d"));
-        assert!(event.as_mut_log().contains("c[0].x"));
+        assert!(event.as_mut_log().contains(event_path!("a", "b", "d")));
+        assert!(event.as_mut_log().contains(event_path!("c", 0isize, "x")));
     }
 
     #[test]
@@ -334,38 +334,38 @@ mod tests {
             toml::from_str(r#"only_fields = ["a.b.c", "b", "c[0].y", "\"g.z\""]"#).unwrap();
         let mut log = LogEvent::default();
         {
-            log.insert("a", 1);
-            log.insert("a.b", 1);
-            log.insert("a.b.c", 1);
-            log.insert("a.b.d", 1);
-            log.insert("b[0]", 1);
-            log.insert("b[1].x", 1);
-            log.insert("c[0].x", 1);
-            log.insert("c[0].y", 1);
-            log.insert("d.y", 1);
-            log.insert("d.z", 1);
-            log.insert("e[0]", 1);
-            log.insert("e[1]", 1);
-            log.insert("\"f.z\"", 1);
-            log.insert("\"g.z\"", 1);
-            log.insert("h", BTreeMap::new());
-            log.insert("i", Vec::<Value>::new());
+            log.insert(event_path!("a"), 1);
+            log.insert(event_path!("a", "b"), 1);
+            log.insert(event_path!("a", "b", "c"), 1);
+            log.insert(event_path!("a", "b", "d"), 1);
+            log.insert(event_path!("b", 0isize), 1);
+            log.insert(event_path!("b", 1isize, "x"), 1);
+            log.insert(event_path!("c", 0isize, "x"), 1);
+            log.insert(event_path!("c", 0isize, "y"), 1);
+            log.insert(event_path!("d", "y"), 1);
+            log.insert(event_path!("d", "z"), 1);
+            log.insert(event_path!("e", 0isize), 1);
+            log.insert(event_path!("e", 1isize), 1);
+            log.insert(event_path!("f.z"), 1);
+            log.insert(event_path!("g.z"), 1);
+            log.insert(event_path!("h"), BTreeMap::new());
+            log.insert(event_path!("i"), Vec::<Value>::new());
         }
         let mut event = Event::from(log);
         transformer.transform(&mut event);
-        assert!(event.as_mut_log().contains("a.b.c"));
-        assert!(event.as_mut_log().contains("b"));
-        assert!(event.as_mut_log().contains("b[1].x"));
-        assert!(event.as_mut_log().contains("c[0].y"));
-        assert!(event.as_mut_log().contains("\"g.z\""));
+        assert!(event.as_mut_log().contains(event_path!("a", "b", "c")));
+        assert!(event.as_mut_log().contains(event_path!("b")));
+        assert!(event.as_mut_log().contains(event_path!("b", 1isize, "x")));
+        assert!(event.as_mut_log().contains(event_path!("c", 0isize, "y")));
+        assert!(event.as_mut_log().contains(event_path!("g.z")));
 
-        assert!(!event.as_mut_log().contains("a.b.d"));
-        assert!(!event.as_mut_log().contains("c[0].x"));
-        assert!(!event.as_mut_log().contains("d"));
-        assert!(!event.as_mut_log().contains("e"));
-        assert!(!event.as_mut_log().contains("f"));
-        assert!(!event.as_mut_log().contains("h"));
-        assert!(!event.as_mut_log().contains("i"));
+        assert!(!event.as_mut_log().contains(event_path!("a", "b", "d")));
+        assert!(!event.as_mut_log().contains(event_path!("c", 0isize, "x")));
+        assert!(!event.as_mut_log().contains(event_path!("d")));
+        assert!(!event.as_mut_log().contains(event_path!("e")));
+        assert!(!event.as_mut_log().contains(event_path!("f")));
+        assert!(!event.as_mut_log().contains(event_path!("h")));
+        assert!(!event.as_mut_log().contains(event_path!("i")));
     }
 
     #[test]
@@ -378,7 +378,7 @@ mod tests {
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
         base.as_mut_log()
-            .insert("another", Value::Timestamp(*timestamp));
+            .insert(event_path!("another"), Value::Timestamp(*timestamp));
 
         let cases = [
             ("unix", Value::from(timestamp.timestamp())),
@@ -405,7 +405,7 @@ mod tests {
                 log.get((PathPrefix::Event, log_schema().timestamp_key().unwrap()))
                     .unwrap(),
                 // second key
-                log.get("another").unwrap(),
+                log.get(event_path!("another")).unwrap(),
             ] {
                 // type matches
                 assert_eq!(expected.kind_str(), actual.kind_str());
@@ -441,8 +441,8 @@ mod tests {
         let transformer: Transformer = toml::from_str(r#"only_fields = ["message"]"#).unwrap();
         let mut log = LogEvent::default();
         {
-            log.insert("message", 1);
-            log.insert("thing.service", "carrot");
+            log.insert(event_path!("message"), 1);
+            log.insert(event_path!("thing", "service"), "carrot");
         }
 
         let schema = schema::Definition::new_with_default_metadata(
@@ -463,10 +463,10 @@ mod tests {
             .set_schema_definition(&Arc::new(schema));
 
         transformer.transform(&mut event);
-        assert!(event.as_mut_log().contains("message"));
+        assert!(event.as_mut_log().contains(event_path!("message")));
 
         // Event no longer contains the service field.
-        assert!(!event.as_mut_log().contains("thing.service"));
+        assert!(!event.as_mut_log().contains(event_path!("thing", "service")));
 
         // But we can still get the service by meaning.
         assert_eq!(
@@ -481,8 +481,8 @@ mod tests {
             toml::from_str(r#"except_fields = ["thing.service"]"#).unwrap();
         let mut log = LogEvent::default();
         {
-            log.insert("message", 1);
-            log.insert("thing.service", "carrot");
+            log.insert(event_path!("message"), 1);
+            log.insert(event_path!("thing", "service"), "carrot");
         }
 
         let schema = schema::Definition::new_with_default_metadata(
@@ -503,10 +503,10 @@ mod tests {
             .set_schema_definition(&Arc::new(schema));
 
         transformer.transform(&mut event);
-        assert!(event.as_mut_log().contains("message"));
+        assert!(event.as_mut_log().contains(event_path!("message")));
 
         // Event no longer contains the service field.
-        assert!(!event.as_mut_log().contains("thing.service"));
+        assert!(!event.as_mut_log().contains(event_path!("thing", "service")));
 
         // But we can still get the service by meaning.
         assert_eq!(

@@ -8,7 +8,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let files: Vec<String> = git::get_modified_files()?;
+        let files: Vec<String> = git::get_files_changed_from_head()?;
         let dirty_component_files: Vec<String> = files
             .into_iter()
             .filter(|file| file.starts_with("website/cue/reference"))

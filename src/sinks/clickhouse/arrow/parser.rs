@@ -115,8 +115,7 @@ impl ClickHouseType {
                     7..=9 => TimeUnit::Nanosecond,
                     _ => {
                         return Err(format!(
-                            "Unsupported DateTime64 precision {}. Must be 0-9",
-                            precision
+                            "Unsupported DateTime64 precision {precision}. Must be 0-9"
                         ));
                     }
                 };

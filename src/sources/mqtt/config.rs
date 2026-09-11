@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rand::Rng;
+use rand::RngExt;
 use rumqttc::{MqttOptions, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_lib::{
@@ -33,17 +33,14 @@ pub struct MqttSourceConfig {
     pub common: MqttCommonConfig,
 
     /// MQTT topic or topics from which messages are to be read.
-    #[configurable(derived)]
     #[serde(default = "default_topic")]
     #[derivative(Default(value = "default_topic()"))]
     pub topic: OneOrMany<String>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
@@ -149,11 +146,20 @@ impl MqttSourceConfig {
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
             let client_auth = tls.identity_pem();
-            let alpn = Some(vec!["mqtt".into()]);
+            // Honor the user-configured `tls.alpn_protocols` (e.g. `x-amzn-mqtt-ca`, required to
+            // reach AWS IoT Core over port 443), falling back to `mqtt` when it is not set.
+            let alpn = self
+                .common
+                .tls
+                .as_ref()
+                .and_then(|tls| tls.options.alpn_protocols.as_ref())
+                .filter(|protocols| !protocols.is_empty())
+                .map(|protocols| protocols.iter().map(|p| p.clone().into_bytes()).collect())
+                .unwrap_or_else(|| vec![b"mqtt".to_vec()]);
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,
                 client_auth,
-                alpn,
+                alpn: Some(alpn),
             }));
         }
 

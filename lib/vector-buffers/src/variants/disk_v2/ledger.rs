@@ -15,13 +15,20 @@ use fslock::LockFile;
 use futures::StreamExt;
 use rkyv::{Archive, Serialize, with::Atomic};
 use snafu::{ResultExt, Snafu};
-use tokio::{fs, io::AsyncWriteExt, sync::Notify};
+use tokio::{
+    fs,
+    io::AsyncWriteExt,
+    sync::{Mutex, MutexGuard, Notify},
+};
 use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
     Filesystem,
     backed_archive::BackedArchive,
-    common::{DiskBufferConfig, MAX_FILE_ID, align16},
+    common::{
+        DEFAULT_DATA_FILE_CLEANUP_INTERVAL, DiskBufferConfig, MAX_FILE_ID, align16,
+        data_file_id_in_range, data_file_name, parse_data_file_id,
+    },
     io::{AsyncFile, WritableMemoryMap},
     ser::SerializeError,
 };
@@ -106,6 +113,39 @@ pub struct LedgerState {
     reader_last_record: AtomicU64,
 }
 
+/// Runtime-only coordination state for stale data file cleanup.
+///
+/// This deliberately lives outside [`LedgerState`]: it is derived from the durable checkpoint at
+/// startup and updated only after successful checkpoint flushes, but it is not part of the on-disk
+/// ledger format.
+struct DataFileCleanupState {
+    // Coordinates asynchronous stale-file cleanup with reader/writer file ID transitions.
+    guard: Mutex<()>,
+    // Last reader file ID whose checkpoint is known to have been flushed successfully.
+    reader_file_id: AtomicU16,
+}
+
+impl DataFileCleanupState {
+    fn new(reader_file_id: u16) -> Self {
+        Self {
+            guard: Mutex::new(()),
+            reader_file_id: AtomicU16::new(reader_file_id),
+        }
+    }
+
+    async fn lock(&self) -> MutexGuard<'_, ()> {
+        self.guard.lock().await
+    }
+
+    fn reader_file_id(&self) -> u16 {
+        self.reader_file_id.load(Ordering::Acquire)
+    }
+
+    fn publish_reader_checkpoint(&self, reader_file_id: u16) {
+        self.reader_file_id.store(reader_file_id, Ordering::Release);
+    }
+}
+
 impl Default for LedgerState {
     fn default() -> Self {
         Self {
@@ -140,7 +180,7 @@ impl ArchivedLedgerState {
 
     pub(super) fn increment_next_writer_record_id(&self, amount: u64) -> u64 {
         let previous = self.writer_next_record.fetch_add(amount, Ordering::AcqRel);
-        previous.wrapping_add(amount)
+        previous + amount
     }
 
     fn get_current_reader_file_id(&self) -> u16 {
@@ -185,22 +225,6 @@ impl ArchivedLedgerState {
         // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
         self.writer_next_record.store(id, Ordering::Release);
     }
-
-    #[cfg(test)]
-    pub unsafe fn unsafe_set_reader_last_record_id(&self, id: u64) {
-        // UNSAFETY:
-        // The atomic operation itself is inherently safe, but adjusting the record IDs manually is
-        // _unsafe_ because it messes with the continuity of record IDs from the perspective of the
-        // reader.
-        //
-        // This is exclusively used under test to make it possible to check certain edge cases, as
-        // writing enough records to actually increment it to the maximum value would take longer
-        // than any of us will be alive.
-        //
-        // Despite it being test-only, we're really amping up the "this is only for testing!" factor
-        // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
-        self.reader_last_record.store(id, Ordering::Release);
-    }
 }
 
 /// Tracks the internal state of the buffer.
@@ -227,6 +251,8 @@ where
     pending_acks: AtomicU64,
     // The file ID offset of the reader past the acknowledged reader file ID.
     unacked_reader_file_id_offset: AtomicU16,
+    // Runtime-only coordination and durable-boundary state for stale data file cleanup.
+    data_file_cleanup: DataFileCleanupState,
     // Last flush of all unflushed files: ledger, data file, etc.
     last_flush: AtomicCell<Instant>,
     // Tracks usage data about the buffer.
@@ -263,14 +289,13 @@ where
         let next_writer_id = self.state().get_next_writer_record_id();
         let last_reader_id = self.state().get_last_reader_record_id();
 
-        // The wrapped id difference is always >= 1. A 0 makes the `- 1` below
-        // underflow to ~2^64 and report a bogus record count.
+        // The writer is always ahead of the reader by at least one ID. Record ID exhaustion is
+        // not supported, so this ordinary difference cannot underflow.
         #[cfg(feature = "antithesis-disk-asserts")]
         {
             #![allow(clippy::disallowed_types)] // once_cell::Lazy
-            antithesis_sdk::assert_always_greater_than_or_equal_to!(
-                next_writer_id.wrapping_sub(last_reader_id),
-                1u64,
+            antithesis_sdk::assert_always!(
+                next_writer_id > last_reader_id,
                 "ledger get_total_records never underflows on a drained buffer",
                 &serde_json::json!({
                     "next_writer_id": next_writer_id,
@@ -278,7 +303,7 @@ where
                 })
             );
         }
-        next_writer_id.wrapping_sub(last_reader_id) - 1
+        next_writer_id - last_reader_id - 1
     }
 
     /// Gets the total number of bytes for all unread records in the buffer.
@@ -322,6 +347,16 @@ where
             new_buffer_size = last_total_buffer_size - amount,
             "Updated buffer size.",
         );
+    }
+
+    /// Initializes the total number of bytes for all unread records in the buffer.
+    ///
+    /// Installs the authoritatively recovered buffer size once the reader has established its
+    /// resume position. Unlike the incremental `increment`/`decrement` paths, this is an absolute
+    /// store, so it is only sound to call during synchronous buffer initialization, before the
+    /// reader and writer are handed out.
+    pub(super) fn initialize_total_buffer_size(&self, amount: u64) {
+        self.total_buffer_size.store(amount, Ordering::Release);
     }
 
     /// Gets the current reader file ID.
@@ -375,9 +410,85 @@ where
 
     /// Gets the data file path for an arbitrary file ID.
     pub fn get_data_file_path(&self, file_id: u16) -> PathBuf {
-        self.config
-            .data_dir
-            .join(format!("buffer-data-{file_id}.dat"))
+        self.config.data_dir.join(data_file_name(file_id))
+    }
+
+    pub(super) async fn lock_data_file_cleanup(&self) -> MutexGuard<'_, ()> {
+        self.data_file_cleanup.lock().await
+    }
+
+    fn get_cleanup_reader_file_id(&self) -> u16 {
+        self.data_file_cleanup.reader_file_id()
+    }
+
+    fn publish_cleanup_reader_file_id(&self) {
+        let reader_file_id = self.state().get_current_reader_file_id();
+        self.data_file_cleanup
+            .publish_reader_checkpoint(reader_file_id);
+    }
+
+    #[cfg(test)]
+    pub(super) fn publish_cleanup_reader_file_id_for_test(&self) {
+        self.publish_cleanup_reader_file_id();
+    }
+
+    pub(super) fn flush_reader_file_checkpoint(&self) -> io::Result<()> {
+        self.flush()?;
+        self.publish_cleanup_reader_file_id();
+
+        Ok(())
+    }
+
+    /// Deletes data files that are outside the durable reader/writer checkpoint window.
+    ///
+    /// The reader advances the durable reader file checkpoint as soon as a data file's records are
+    /// fully acknowledged. Physical deletion can then happen asynchronously: if deletion fails or
+    /// the process exits first, this scan will retry later.
+    pub(super) async fn cleanup_stale_data_files(&self) -> io::Result<usize> {
+        let _cleanup_guard = self.lock_data_file_cleanup().await;
+        let reader_file_id = self.get_cleanup_reader_file_id();
+        let writer_file_id = self.state().get_current_writer_file_id();
+        let data_files = self.filesystem().list_files(&self.config.data_dir).await?;
+        let mut deleted_files = 0;
+
+        for data_file_path in data_files {
+            let Some(data_file_id) = parse_data_file_id(&data_file_path) else {
+                continue;
+            };
+
+            if data_file_id_in_range(data_file_id, reader_file_id, writer_file_id) {
+                continue;
+            }
+
+            match self.filesystem().delete_file(&data_file_path).await {
+                Ok(()) => {
+                    deleted_files += 1;
+                    debug!(
+                        data_file_path = data_file_path.to_string_lossy().as_ref(),
+                        "Deleted stale data file outside checkpoint window."
+                    );
+                }
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                    debug!(
+                        data_file_path = data_file_path.to_string_lossy().as_ref(),
+                        "Stale data file was already deleted."
+                    );
+                }
+                Err(error) => {
+                    warn!(
+                        data_file_path = data_file_path.to_string_lossy().as_ref(),
+                        error = %error,
+                        "Failed to delete stale data file; will retry."
+                    );
+                }
+            }
+        }
+
+        if deleted_files > 0 {
+            self.notify_reader_waiters();
+        }
+
+        Ok(deleted_files)
     }
 
     /// Waits for a signal from the reader that progress has been made.
@@ -392,6 +503,8 @@ where
     /// Waits for a signal from the writer that progress has been made.
     ///
     /// This will occur when a record is written, or when a new data file is created.
+    ///
+    /// Writer progress is published before this notification is sent.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub async fn wait_for_writer(&self) {
         self.writer_notify.notified().await;
@@ -404,16 +517,35 @@ where
     }
 
     /// Notifies all tasks waiting on progress by the writer.
+    ///
+    /// Callers must publish their shared state before notifying.
     #[cfg_attr(test, instrument(skip(self), level = "trace"))]
     pub fn notify_writer_waiters(&self) {
         self.writer_notify.notify_one();
     }
 
-    /// Tracks the statistics of a successful write.
-    pub fn track_write(&self, event_count: u64, record_size: u64) {
+    /// Publishes flushed writer progress and then wakes the reader.
+    pub fn publish_writer_progress(&self, event_count: u64, record_size: u64) -> u64 {
+        let next_record_id = self.state().increment_next_writer_record_id(event_count);
         self.increment_total_buffer_size(record_size);
         self.usage_handle
             .increment_received_event_count_and_byte_size(event_count, record_size);
+        self.notify_writer_waiters();
+        next_record_id
+    }
+
+    /// Tracks events that arrived at the buffer but were rejected before being
+    /// persisted (e.g. `Bufferable::filter_unencodable` dropping over-budget
+    /// sub-items). Bumps both `received` and the unintentional-`dropped` counter
+    /// on the usage handle so `buffer_size = received - sent - dropped` stays
+    /// consistent and operators can see the rejection in buffer-usage metrics.
+    /// `total_buffer_size` is intentionally left alone — these events never
+    /// reached disk.
+    pub fn track_dropped(&self, event_count: u64, byte_size: u64) {
+        self.usage_handle
+            .increment_received_event_count_and_byte_size(event_count, byte_size);
+        self.usage_handle
+            .increment_dropped_event_count_and_byte_size(event_count, byte_size, false);
     }
 
     /// Tracks the statistics of multiple successful reads.
@@ -421,6 +553,15 @@ where
         self.decrement_total_buffer_size(total_record_size);
         self.usage_handle
             .increment_sent_event_count_and_byte_size(event_count, total_record_size);
+    }
+
+    /// Tracks the known byte size of a record that the reader consumed but could not decode.
+    pub fn track_dropped_record_bytes(&self, total_record_size: u64) {
+        self.decrement_total_buffer_size(total_record_size);
+        // The corrupt payload cannot provide a trustworthy event count, but its framing still
+        // provides the exact byte span that has left the buffer.
+        self.usage_handle
+            .increment_dropped_event_count_and_byte_size(0, total_record_size, false);
     }
 
     /// Marks the writer as finished.
@@ -471,8 +612,8 @@ where
     ///
     /// Instead, we allow the reader to move ahead of the latest acknowledged record by tracking
     /// their current file ID and acknowledged file ID separately.  Once all records in a file have
-    /// been acknowledged, the data file can be deleted and the reader file ID can be durably
-    /// stored in the ledger.
+    /// been acknowledged, the reader file ID can be durably stored in the ledger and the data file
+    /// can be deleted.
     ///
     /// Callers use [`increment_unacked_reader_file_id`] to move to the next data file without
     /// tracking that the previous data file has been durably processed and can be deleted, and
@@ -562,6 +703,15 @@ where
         self.usage_handle
             .increment_dropped_event_count_and_byte_size(count, 0, false);
     }
+
+    /// Records that a record was dropped because it could never be written to the buffer (e.g. it
+    /// exceeds the maximum record size).
+    pub fn track_unwritable_dropped_record(&self, count: u64, byte_size: u64) {
+        self.usage_handle
+            .increment_received_event_count_and_byte_size(count, byte_size);
+        self.usage_handle
+            .increment_dropped_event_count_and_byte_size(count, byte_size, false);
+    }
 }
 
 impl<FS> Ledger<FS>
@@ -645,21 +795,23 @@ where
             .open_mmap_writable(&ledger_path)
             .await
             .context(IoSnafu)?;
-        let ledger_state = match BackedArchive::from_backing(ledger_mmap) {
-            // Deserialized the ledger state without issue from an existing file.
-            Ok(backed) => backed,
-            // Either invalid data, or the buffer doesn't represent a valid ledger structure.
-            Err(e) => {
-                return Err(LedgerLoadCreateError::FailedToDeserialize {
-                    reason: e.into_inner(),
-                });
-            }
-        };
+        let ledger_state: BackedArchive<_, LedgerState> =
+            match BackedArchive::from_backing(ledger_mmap) {
+                // Deserialized the ledger state without issue from an existing file.
+                Ok(backed) => backed,
+                // Either invalid data, or the buffer doesn't represent a valid ledger structure.
+                Err(e) => {
+                    return Err(LedgerLoadCreateError::FailedToDeserialize {
+                        reason: e.into_inner(),
+                    });
+                }
+            };
 
         // Create the ledger object, and synchronize the buffer statistics with the buffer usage
         // handle.  This handles making sure we account for the starting size of the buffer, and
         // what not.
-        let mut ledger = Ledger {
+        let cleanup_reader_file_id = ledger_state.get_archive_ref().get_current_reader_file_id();
+        let ledger = Ledger {
             config,
             lock,
             state: ledger_state,
@@ -669,72 +821,22 @@ where
             writer_done: AtomicBool::new(false),
             pending_acks: AtomicU64::new(0),
             unacked_reader_file_id_offset: AtomicU16::new(0),
+            data_file_cleanup: DataFileCleanupState::new(cleanup_reader_file_id),
             last_flush: AtomicCell::new(Instant::now()),
             usage_handle,
         };
-        ledger.update_buffer_size().await?;
+
+        // NOTE: We deliberately do not seed `total_buffer_size` here. Historically, the ledger
+        // summed the on-disk data file sizes at load and then had the reader "draw that total down"
+        // record-by-record as it sought to its persisted read position. That mixed two values
+        // captured at different moments -- the directory's file sizes versus the ledger's persisted
+        // read position, which are flushed independently -- so a crash between their flushes could
+        // let the draw-down subtract past zero, wrapping the counter to a near-max value and
+        // wedging the writer. The authoritative value (the size of the *unread* records only) is
+        // now computed in a single consistent snapshot by `BufferReader::seek_to_next_record` once
+        // it has established the resume position.
 
         Ok(ledger)
-    }
-
-    async fn update_buffer_size(&mut self) -> Result<(), LedgerLoadCreateError> {
-        // Under normal operation, the reader and writer maintain a consistent state within the
-        // ledger.  However, due to the nature of how we update the ledger, process crashes could
-        // lead to missed updates as we execute reads and writes as non-atomic units of execution:
-        // update a field, do the read/write, update some more fields depending on success or
-        // failure, etc.
-        //
-        // This is an issue because we depend on knowing the total buffer size (the total size of
-        // unread records, specifically) so that we can correctly limit writes when we've reached
-        // the configured maximum buffer size.
-        //
-        // While it's not terribly efficient, and I'd like to eventually formulate a better design,
-        // this approach is absolutely correct: get the file size of every data file on disk,
-        // and set the "total buffer size" to the sum of all of those file sizes.
-        //
-        // When the reader does any necessary seeking to get to the record it left off on, it will
-        // adjust the "total buffer size" downwards for each record it runs through, leaving "total
-        // buffer size" at the correct value.
-        let mut dat_reader = fs::read_dir(&self.config.data_dir).await.context(IoSnafu)?;
-
-        let mut total_buffer_size = 0;
-        while let Some(dir_entry) = dat_reader.next_entry().await.context(IoSnafu)? {
-            if let Some(file_name) = dir_entry.file_name().to_str() {
-                // I really _do_ want to only find files with a .dat extension, as that's what the
-                // code generates, and having them be .dAt or .Dat or whatever would indicate that
-                // the file is not related to our buffer.  If we had to cope with case-sensitivity
-                // of filenames from another program/OS, then it would be a different story.
-                #[allow(clippy::case_sensitive_file_extension_comparisons)]
-                if file_name.ends_with(".dat") {
-                    let metadata = dir_entry.metadata().await.context(IoSnafu)?;
-                    total_buffer_size += metadata.len();
-
-                    debug!(
-                        data_file = file_name,
-                        file_size = metadata.len(),
-                        total_buffer_size,
-                        "Found existing data file."
-                    );
-                }
-            }
-        }
-
-        // A non-zero sum means the buffer reopened on top of records left on disk by
-        // a previous run, the reseed path whose value the reader later draws down and
-        // the one most exposed to the buffer-size underflow.
-        #[cfg(feature = "antithesis-disk-asserts")]
-        {
-            #![allow(clippy::disallowed_types)] // once_cell::Lazy
-            antithesis_sdk::assert_sometimes!(
-                total_buffer_size > 0,
-                "the buffer reopens with pre-existing on-disk records",
-                &serde_json::json!({ "total_buffer_size": total_buffer_size })
-            );
-        }
-
-        self.increment_total_buffer_size(total_buffer_size);
-
-        Ok(())
     }
 
     #[must_use]
@@ -747,6 +849,31 @@ where
             }
         });
         finalizer
+    }
+
+    pub(super) fn spawn_data_file_cleanup(self: &Arc<Self>)
+    where
+        FS: 'static,
+    {
+        let ledger = Arc::downgrade(self);
+        vector_common::spawn_in_current_span(async move {
+            loop {
+                tokio::time::sleep(DEFAULT_DATA_FILE_CLEANUP_INTERVAL).await;
+
+                let Some(ledger) = ledger.upgrade() else {
+                    break;
+                };
+
+                if let Err(error) = ledger.cleanup_stale_data_files().await {
+                    debug!(
+                        error = %error,
+                        "Failed to scan stale data files; will retry."
+                    );
+                }
+
+                drop(ledger);
+            }
+        });
     }
 }
 

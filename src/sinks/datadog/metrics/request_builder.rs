@@ -233,7 +233,8 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
         let (ddmetrics_metadata, request_metadata) = metadata;
         let uri = self
             .endpoint_configuration
-            .get_uri_for_endpoint(ddmetrics_metadata.endpoint);
+            .get_uri_for_endpoint(ddmetrics_metadata.endpoint)
+            .into_uri();
 
         DatadogMetricsRequest {
             api_key: ddmetrics_metadata.api_key,

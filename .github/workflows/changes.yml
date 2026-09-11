@@ -126,6 +126,8 @@ on:
         value: ${{ jobs.int_tests.outputs.nats }}
       nginx:
         value: ${{ jobs.int_tests.outputs.nginx }}
+      opensearch:
+        value: ${{ jobs.int_tests.outputs.opensearch }}
       opentelemetry:
         value: ${{ jobs.int_tests.outputs.opentelemetry }}
       postgres:
@@ -220,7 +222,7 @@ jobs:
               - 'rust-toolchain.toml'
               - 'Makefile'
               - 'scripts/cross/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             deny:
               - '**/Cargo.toml'
@@ -229,15 +231,25 @@ jobs:
             deprecations:
               - 'deprecation.d/**'
               - 'website/data/deprecations.json'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/deprecation.yaml"
               - ".github/workflows/changes.yml"
             cue:
               - 'website/cue/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
+              - 'vdev/src/commands/build/docs_json.rs'
               - ".github/workflows/changes.yml"
             component_docs:
-              - "vdev/**"
+              - 'Makefile'
+              - "vdev/Cargo.toml"
+              - 'website/Makefile'
+              - 'website/package.json'
+              - 'website/yarn.lock'
+              - 'website/generated/example-configs/**'
+              - 'vdev/src/commands/build/component_docs/**'
+              - 'vdev/src/commands/build/component_examples.rs'
+              - 'vdev/src/commands/build/docs_json.rs'
+              - 'vdev/src/commands/check/component_examples.rs'
               - 'website/cue/**/*.cue'
               - 'docs/generated/**'
               # If changes to the VRL sha is made the combined generated cue file will change which
@@ -246,18 +258,18 @@ jobs:
               - ".github/workflows/changes.yml"
             markdown:
               - '**/**.md'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             scripts:
               - '**/**.sh'
               - ".github/workflows/changes.yml"
             internal_events:
               - 'src/internal_events/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             docker:
               - 'distribution/docker/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             install:
               - ".github/workflows/install-sh.yml"
@@ -290,21 +302,29 @@ jobs:
               - ".github/workflows/test.yml"
               - ".github/workflows/unit-tests.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             integration-yml:
               - ".github/workflows/integration.yml"
               - ".github/workflows/changes.yml"
             test-make-command-yml:
               - ".github/workflows/test-make-command.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             msrv-yml:
               - ".github/workflows/msrv.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             cross-yml:
               - ".github/workflows/cross.yml"
               - ".github/workflows/changes.yml"
             unit_mac-yml:
               - ".github/workflows/unit_mac.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             unit_windows-yml:
               - ".github/workflows/unit_windows.yml"
               - ".github/workflows/changes.yml"
@@ -346,6 +366,7 @@ jobs:
       mqtt: ${{ steps.filter.outputs.mqtt }}
       nats: ${{ steps.filter.outputs.nats }}
       nginx: ${{ steps.filter.outputs.nginx }}
+      opensearch: ${{ steps.filter.outputs.opensearch }}
       opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
       postgres: ${{ steps.filter.outputs.postgres }}
       prometheus: ${{ steps.filter.outputs.prometheus }}
@@ -361,7 +382,6 @@ jobs:
         with:
           vdev: true
           mold: false
-          cargo-cache: false
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
@@ -412,6 +432,7 @@ jobs:
             "mqtt": ${{ steps.filter.outputs.mqtt }},
             "nats": ${{ steps.filter.outputs.nats }},
             "nginx": ${{ steps.filter.outputs.nginx }},
+            "opensearch": ${{ steps.filter.outputs.opensearch }},
             "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
             "postgres": ${{ steps.filter.outputs.postgres }},
             "prometheus": ${{ steps.filter.outputs.prometheus }},
@@ -447,6 +468,7 @@ jobs:
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
       opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
+      opentelemetry-metrics-native: ${{ steps.filter.outputs.opentelemetry-metrics-native }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -455,7 +477,6 @@ jobs:
         with:
           vdev: true
           mold: false
-          cargo-cache: false
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which
@@ -480,7 +501,8 @@ jobs:
             "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
             "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
             "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }},
-            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }}
+            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }},
+            "opentelemetry-metrics-native": ${{ steps.filter.outputs.opentelemetry-metrics-native }}
           }
           EOF
           )

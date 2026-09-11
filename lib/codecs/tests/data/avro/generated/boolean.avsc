@@ -1,1 +1,1 @@
-{"name":"test","type":"record","fields":[{"name":"bool_field","type":"boolean"}]}
+{"type":"record","name":"test","fields":[{"name":"bool_field","type":"boolean","default":false}]}

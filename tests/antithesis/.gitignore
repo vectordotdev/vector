@@ -1,0 +1,4 @@
+/.launch/
+
+# Preserve but ignore generated output left by the old per-scenario layout.
+/scenarios/*/.launch/

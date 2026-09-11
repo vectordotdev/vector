@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: gcp_cloud_storage
+    inputs:
+      - my-source-or-transform-id
+    bucket: my-bucket
+    encoding:
+      codec: json

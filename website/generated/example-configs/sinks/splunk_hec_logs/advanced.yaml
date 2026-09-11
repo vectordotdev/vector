@@ -1,0 +1,19 @@
+sinks:
+  my_sink_id:
+    type: splunk_hec_logs
+    inputs:
+      - my-source-or-transform-id
+    auto_extract_timestamp: false
+    compression: none
+    dangerously_allow_unconfined_template_resolution: false
+    default_token: SECRET[splunk_secrets.token]
+    encoding:
+      codec: json
+    endpoint: https://http-inputs-hec.splunkcloud.com
+    endpoint_target: event
+    index: index-{{ host }}
+    indexed_fields:
+      - field1
+    source: source-{{ file }}
+    sourcetype: sourcetype-{{ sourcetype }}
+    timestamp_key: timestamp

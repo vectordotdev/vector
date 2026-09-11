@@ -1,10 +1,13 @@
 use std::path::{Path, PathBuf};
 
-use serde_toml_merge::merge_into_table;
-use toml::value::{Table, Value};
+use serde_json::Value;
 
-use super::{Format, component_name, open_file, read_dir};
-use crate::config::format;
+use super::{
+    Format, component_name, open_file, read_dir,
+    representation::{
+        ConfigMap, deserialize_config, deserialize_config_value, merge_into_map, merge_values,
+    },
+};
 
 /// Provides a hint to the loading system of the type of components that should be found
 /// when traversing an explicitly named directory.
@@ -61,17 +64,17 @@ pub(super) mod process {
         where
             T: serde::de::DeserializeOwned,
         {
-            let value = self.prepare(input)?;
+            let content = self.prepare(input)?;
 
-            format::deserialize(&value, format)
+            deserialize_config(&content, format)
         }
 
         /// Helper method used by other methods to recursively handle file/dir loading, merging
-        /// values against a provided TOML `Table`.
+        /// values against a provided configuration map.
         fn load_dir_into(
             &mut self,
             path: &Path,
-            result: &mut Table,
+            result: &mut ConfigMap,
             recurse: bool,
         ) -> Result<(), Vec<String>> {
             let mut errors = Vec::new();
@@ -121,7 +124,7 @@ pub(super) mod process {
 
                 match loaded {
                     Ok(Some((name, inner))) => {
-                        if let Err(errs) = merge_with_value(result, name, Value::Table(inner)) {
+                        if let Err(errs) = merge_with_value(result, name, Value::Object(inner)) {
                             errors.extend(errs);
                         }
                     }
@@ -139,8 +142,8 @@ pub(super) mod process {
                         && !result.contains_key(&name)
                     {
                         match self.load_dir(&entry, true) {
-                            Ok(table) => {
-                                result.insert(name, Value::Table(table));
+                            Ok(map) => {
+                                result.insert(name, Value::Object(map));
                             }
                             Err(errs) => {
                                 errors.extend(errs);
@@ -157,12 +160,12 @@ pub(super) mod process {
             }
         }
 
-        /// Loads and deserializes a file into a TOML `Table`.
+        /// Loads and deserializes a file into a configuration map.
         fn load_file(
             &mut self,
             path: &Path,
             format: Format,
-        ) -> Result<Option<(String, Table)>, Vec<String>> {
+        ) -> Result<Option<(String, ConfigMap)>, Vec<String>> {
             match (component_name(path), open_file(path)) {
                 (Ok(name), Some(file)) => self.load(file, format).map(|value| Some((name, value))),
                 _ => Ok(None),
@@ -170,37 +173,38 @@ pub(super) mod process {
         }
 
         /// Loads a file, and if the path provided contains a sub-folder by the same name as the
-        /// component, descend into it recursively, returning a TOML `Table`.
+        /// component, descend into it recursively, returning a configuration map.
         fn load_file_recursive(
             &mut self,
             path: &Path,
             format: Format,
-        ) -> Result<Option<(String, Table)>, Vec<String>> {
-            if let Some((name, mut table)) = self.load_file(path, format)? {
+        ) -> Result<Option<(String, ConfigMap)>, Vec<String>> {
+            if let Some((name, mut map)) = self.load_file(path, format)? {
                 if let Some(subdir) = path.parent().map(|p| p.join(&name))
                     && subdir.is_dir()
                     && subdir.exists()
                 {
-                    self.load_dir_into(&subdir, &mut table, true)?;
+                    self.load_dir_into(&subdir, &mut map, true)?;
                 }
-                Ok(Some((name, table)))
+                Ok(Some((name, map)))
             } else {
                 Ok(None)
             }
         }
 
-        /// Loads a directory (optionally, recursively), returning a TOML `Table`. This will
-        /// create an initial `Table` and pass it into `load_dir_into` for recursion handling.
-        fn load_dir(&mut self, path: &Path, recurse: bool) -> Result<Table, Vec<String>> {
-            let mut result = Table::new();
+        /// Loads a directory (optionally, recursively), returning a configuration map. This will
+        /// create an initial map and pass it into `load_dir_into` for recursion handling.
+        fn load_dir(&mut self, path: &Path, recurse: bool) -> Result<ConfigMap, Vec<String>> {
+            let mut result = ConfigMap::new();
             self.load_dir_into(path, &mut result, recurse)?;
             Ok(result)
         }
 
-        /// Merge a provided TOML `Table` in an implementation-specific way. Contains an
+        /// Merge a provided configuration map in an implementation-specific way. Contains an
         /// optional component hint, which may affect how components are merged. Takes a `&mut self`
         /// with the intention of merging an inner value that can be `take`n by a `Loader`.
-        fn merge(&mut self, table: Table, hint: Option<ComponentHint>) -> Result<(), Vec<String>>;
+        fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>)
+        -> Result<(), Vec<String>>;
     }
 }
 
@@ -218,8 +222,8 @@ where
         input: R,
         format: Format,
     ) -> Result<(), Vec<String>> {
-        if let Some(table) = self.load(input, format)? {
-            self.merge(table, None)?;
+        if let Some(map) = self.load(input, format)? {
+            self.merge(map, None)?;
         }
         Ok(())
     }
@@ -227,8 +231,8 @@ where
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     fn load_from_file(&mut self, path: &Path, format: Format) -> Result<(), Vec<String>> {
-        if let Some((_, table)) = self.load_file(path, format)? {
-            self.merge(table, None)?;
+        if let Some((_, map)) = self.load_file(path, format)? {
+            self.merge(map, None)?;
             Ok(())
         } else {
             Ok(())
@@ -253,14 +257,14 @@ where
 
         // Get files from the root of the folder. These represent top-level config settings,
         // and need to merged down first to represent a more 'complete' config.
-        let mut root = Table::new();
-        let table = self.load_dir(path, false)?;
+        let mut root = ConfigMap::new();
+        let map = self.load_dir(path, false)?;
 
         // Discard the named part of the path, since these don't form any component names.
-        for (_, value) in table {
+        for (_, value) in map {
             // All files should contain key/value pairs.
-            if let Value::Table(table) = value {
-                merge_into_table(&mut root, table).map_err(|e| vec![e.to_string()])?;
+            if let Value::Object(map) = value {
+                merge_into_map(&mut root, map)?;
             }
         }
 
@@ -274,9 +278,9 @@ where
             if path.exists() && path.is_dir() {
                 // Transforms are treated differently from other component types; they can be
                 // arbitrarily nested.
-                let table = self.load_dir(&path, matches!(hint, ComponentHint::Transform))?;
+                let map = self.load_dir(&path, matches!(hint, ComponentHint::Transform))?;
 
-                self.merge(table, Some(hint))?;
+                self.merge(map, Some(hint))?;
             }
         }
 
@@ -284,13 +288,8 @@ where
     }
 }
 
-/// Merge two TOML `Value`s, returning a new `Value`.
-fn merge_values(value: toml::Value, other: toml::Value) -> Result<toml::Value, Vec<String>> {
-    serde_toml_merge::merge(value, other).map_err(|e| vec![e.to_string()])
-}
-
-/// Updates a TOML `Table` with the merged values of a named key. Inserts if it doesn't exist.
-fn merge_with_value(res: &mut Table, name: String, value: toml::Value) -> Result<(), Vec<String>> {
+/// Updates a configuration map with the merged values of a named key. Inserts if absent.
+fn merge_with_value(res: &mut ConfigMap, name: String, value: Value) -> Result<(), Vec<String>> {
     if let Some(existing) = res.remove(&name) {
         res.insert(name, merge_values(existing, value)?);
     } else {
@@ -299,11 +298,9 @@ fn merge_with_value(res: &mut Table, name: String, value: toml::Value) -> Result
     Ok(())
 }
 
-/// Deserialize a TOML `Table` into a `T`.
-pub(super) fn deserialize_table<T: serde::de::DeserializeOwned>(
-    table: Table,
+/// Deserialize a configuration map into a `T`.
+pub(super) fn deserialize_config_map<T: serde::de::DeserializeOwned>(
+    map: ConfigMap,
 ) -> Result<T, Vec<String>> {
-    Value::Table(table)
-        .try_into()
-        .map_err(|e| vec![e.to_string()])
+    deserialize_config_value(Value::Object(map))
 }

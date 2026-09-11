@@ -1,0 +1,7 @@
+sources:
+  my_source_id:
+    type: splunk_hec
+    address: 0.0.0.0:8088
+    store_hec_token: false
+    valid_tokens:
+      - A94A8FE5CCB19BA61C4C08

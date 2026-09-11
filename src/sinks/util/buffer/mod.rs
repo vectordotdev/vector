@@ -162,10 +162,7 @@ impl Batch for Buffer {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        io::Read,
-        sync::{Arc, Mutex},
-    };
+    use std::sync::{Arc, Mutex};
 
     use bytes::{Buf, BytesMut};
     use futures::{SinkExt, StreamExt, future, stream};
@@ -177,7 +174,7 @@ mod test {
 
     #[tokio::test]
     async fn gzip() {
-        use flate2::read::MultiGzDecoder;
+        use vector_common::decompression::CappedDecoder;
 
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
@@ -222,13 +219,9 @@ mod test {
         assert!(output.len() > 1);
         assert!(output.iter().map(|o| o.len()).sum::<usize>() < 80_000);
 
-        let decompressed = output.into_iter().flat_map(|batch| {
-            let mut decompressed = vec![];
-            MultiGzDecoder::new(batch.reader())
-                .read_to_end(&mut decompressed)
-                .unwrap();
-            decompressed
-        });
+        let decompressed = output
+            .into_iter()
+            .flat_map(|batch| CappedDecoder::gzip(batch.reader()).decompress().unwrap());
 
         assert!(
             decompressed.eq(std::iter::repeat_n(

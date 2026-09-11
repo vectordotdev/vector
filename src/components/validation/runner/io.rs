@@ -165,6 +165,7 @@ pub fn spawn_grpc_server<S>(
         let server = run_grpc_server(
             listen_addr.as_socket_addr(),
             tls_settings,
+            None,
             service,
             GrpcKeepaliveConfig::default(),
             shutdown_signal,

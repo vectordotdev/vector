@@ -82,7 +82,7 @@ fn write_vrl_constants(lockfile: &Lockfile, output_file: &mut File) {
                 )
             }
             SourceKind::Path => (vrl_dep.version.to_string(), None),
-            kind => unimplemented!("unhandled source kind: {:?}", kind),
+            kind => unimplemented!("unhandled source kind: {kind:?}"),
         }
     } else {
         (vrl_dep.version.to_string(), None)

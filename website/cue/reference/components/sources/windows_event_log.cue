@@ -39,7 +39,6 @@ components: sources: windows_event_log: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	installation: {

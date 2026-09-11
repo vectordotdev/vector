@@ -1,4 +1,5 @@
 CUE = ../scripts/cue.sh
+VDEV ?= cargo vdev
 
 export CI ?= false
 
@@ -10,7 +11,12 @@ export SERVER_PORT ?= 1313
 clean:
 	rm -rf public resources data/cargo-lock.toml data/docs.json
 
-setup:
+.PHONY: setup-vdev
+setup-vdev:
+	cd .. && scripts/environment/prepare.sh --modules=vdev,prettier
+
+.PHONY: setup
+setup: setup-vdev
 	yarn
 
 # Copy Cargo data such as the dependency information file
@@ -18,13 +24,18 @@ cargo-data:
 	cp -f ../Cargo.lock data/cargo-lock.toml
 
 # Build JSON from CUE sources with `make cue-build`. Run other commands with `make cue-*`
+cue-build:
+	$(VDEV) build docs-json
+
 cue-%:
 	${CUE} $*
 
-config-examples:
-	yarn config-examples
+.PHONY: component-examples
+component-examples: setup-vdev
+	$(VDEV) build component-examples website/generated/example-configs
 
-VDEV ?= cargo vdev
+.PHONY: config-examples
+config-examples: component-examples
 
 generate-vrl-docs:
 	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
@@ -33,23 +44,30 @@ generate-vrl-docs:
 generate-deprecations-json:
 	$(VDEV) deprecation generate
 
-structured-data: generate-vrl-docs generate-deprecations-json cue-build config-examples
+structured-data: generate-vrl-docs generate-deprecations-json component-examples
 
 serve: clean setup cargo-data structured-data
-	hugo server \
-	--bind $(SERVER_BIND) \
-	--port $(SERVER_PORT) \
+	$(MAKE) serve-development
+
+.PHONY: serve-development
+serve-development:
+	hugo \
 	--buildDrafts \
 	--buildFuture \
 	--environment "development"
+	$(MAKE) pagefind
+	yarn concurrently --kill-others --success first --names hugo,pagefind \
+		"hugo server --bind $(SERVER_BIND) --port $(SERVER_PORT) --buildDrafts --buildFuture --environment development" \
+		"yarn pagefind:watch"
 
 # Live site
 production-build:
 	hugo \
 	--environment "production" \
 	--minify
+	$(MAKE) pagefind
 
-ci-production-build: setup cargo-data structured-data production-build typesense-production
+ci-production-build: setup cargo-data structured-data production-build
 
 # Preview site
 preview-build:
@@ -59,8 +77,9 @@ preview-build:
 	--environment "preview" \
 	--minify
 	cp ./custom-headers/_preview ./public/_headers
+	$(MAKE) pagefind
 
-ci-preview-build: setup cargo-data structured-data preview-build typesense-preview
+ci-preview-build: setup cargo-data structured-data preview-build
 
 run-link-checker:
 	htmltest
@@ -72,13 +91,8 @@ run-external-link-checker:
 check-links: production-build run-link-checker
 
 # Search
-typesense-preview:
-	yarn typesense-index
-	yarn typesense-sync:preview
-
-typesense-production:
-	yarn typesense-index
-	yarn typesense-sync:production
+pagefind:
+	yarn pagefind --site public
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:

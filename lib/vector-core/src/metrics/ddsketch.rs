@@ -284,17 +284,6 @@ impl AgentDDSketch {
         })
     }
 
-    /// Overrides `sum` and `avg` with arbitrary values.
-    ///
-    /// Only available under the `generate-fixtures` feature, where we need to
-    /// produce sketches with independently-randomized summary statistics to
-    /// exercise round-trip serialization of those fields.
-    #[cfg(feature = "generate-fixtures")]
-    pub fn set_sum_avg(&mut self, sum: f64, avg: f64) {
-        self.sum = sum;
-        self.avg = avg;
-    }
-
     pub fn gamma(&self) -> f64 {
         self.config.gamma_v
     }
@@ -1374,12 +1363,7 @@ mod tests {
             let _err = (estimated - actual).abs() / actual;
             assert!(
                 err <= relative_accuracy,
-                "relative accuracy out of bounds: q={}, estimate={}, actual={}, target-rel-acc={}, actual-rel-acc={}, bin-count={}",
-                q,
-                estimated,
-                actual,
-                relative_accuracy,
-                err,
+                "relative accuracy out of bounds: q={q}, estimate={estimated}, actual={actual}, target-rel-acc={relative_accuracy}, actual-rel-acc={err}, bin-count={}",
                 sketch.bin_count()
             );
         }
@@ -1641,10 +1625,9 @@ mod tests {
             let actual = round_to_even(*input);
             assert!(
                 alike(actual, *expected),
-                "input -> {}, expected {}, got {}",
+                "input -> {}, expected {}, got {actual}",
                 *input,
-                *expected,
-                actual
+                *expected
             );
         }
     }

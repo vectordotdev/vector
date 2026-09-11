@@ -26,6 +26,7 @@ jobs:
           rust: true
           cargo-nextest: true
           protoc: true
+          cargo-cache: true
 
       # Some tests e.g. `reader_exits_cleanly_when_writer_done_and_in_flight_acks` are flaky.
       - name: Run tests

@@ -9,11 +9,13 @@ publish = false
 workspace = true
 
 [dependencies]
+arc-swap = { workspace = true }
 async-trait.workspace = true
 bitmask-enum = { version = "2.2.5", default-features = false }
 bytes = { workspace = true, features = ["serde"] }
 chrono.workspace = true
 chrono-tz.workspace = true
+cidr = { version = "0.3.1", default-features = false, features = ["std"] }
 crossbeam-utils.workspace = true
 derivative.workspace = true
 dyn-clone = { version = "1.0.20", default-features = false }
@@ -32,9 +34,8 @@ metrics.workspace = true
 metrics-tracing-context.workspace = true
 metrics-util.workspace = true
 mlua = { workspace = true, optional = true }
-no-proxy = { version = "0.3.6", default-features = false, features = ["serialize"] }
 ordered-float.workspace = true
-openssl = { version = "0.10.80", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.81", default-features = false, features = ["vendored"] }
 parking_lot = { version = "0.12.5", default-features = false }
 pin-project.workspace = true
 proptest = { workspace = true, optional = true }
@@ -65,7 +66,6 @@ vector-config = { path = "../vector-config" }
 vector-config-common = { path = "../vector-config-common" }
 vrl.workspace = true
 cfg-if.workspace = true
-quickcheck = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "3.6.0"
@@ -77,7 +77,7 @@ schannel = "0.1.29"
 prost-build.workspace = true
 
 [dev-dependencies]
-base64 = "0.22.1"
+base64 = "0.23.0"
 strum.workspace = true
 chrono-tz.workspace = true
 criterion = { workspace = true, features = ["html_reports"] }
@@ -85,29 +85,21 @@ env-test-util = "1.0.1"
 quickcheck.workspace = true
 quickcheck_macros = "1"
 proptest.workspace = true
-similar-asserts = "1.7.0"
+similar-asserts = "2.0.0"
 tokio-test.workspace = true
 toml.workspace = true
-ndarray = "0.16.1"
-ndarray-stats = "0.6.0"
+ndarray = "0.17.2"
+ndarray-stats = "0.7.0"
 noisy_float = "0.2.1"
 rand.workspace = true
 rand_distr.workspace = true
 serde_yaml = { version = "0.9.34", default-features = false }
-tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector-common = { path = "../vector-common", default-features = false, features = ["test"] }
 
 [features]
 default = []
 lua = ["dep:mlua", "dep:tokio-stream", "vrl/lua"]
-vrl = []
 test = ["vector-common/test", "proptest"]
-generate-fixtures = ["vrl/generate-fixtures", "dep:quickcheck"]
-
-[[bin]]
-name = "generate-fixtures"
-path = "src/bin/generate_fixtures.rs"
-required-features = ["generate-fixtures"]
 
 [[bench]]
 name = "event"

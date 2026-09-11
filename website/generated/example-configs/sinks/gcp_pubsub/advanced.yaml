@@ -1,0 +1,10 @@
+sinks:
+  my_sink_id:
+    type: gcp_pubsub
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    endpoint: https://pubsub.googleapis.com/
+    project: vector-123456
+    topic: this-is-a-topic

@@ -1,0 +1,15 @@
+sinks:
+  my_sink_id:
+    type: humio_metrics
+    inputs:
+      - my-source-or-transform-id
+    compression: none
+    dangerously_allow_unconfined_template_resolution: false
+    endpoint: https://cloud.humio.com/
+    event_type: json
+    host_key: host
+    host_tag: host
+    index: index-{{ host }}
+    metric_tag_values: single
+    timezone: local
+    token: ${HUMIO_TOKEN}

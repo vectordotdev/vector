@@ -14,6 +14,7 @@ use vector_core::{
     event::{Event, LogEvent, Value},
     schema,
 };
+use vrl::event_path;
 use vrl::value::ObjectMap;
 
 /// Config used to build a `SyslogSerializer`.
@@ -161,7 +162,7 @@ impl<'a> ConfigDecanter<'a> {
 
     fn get_structured_data(&self) -> Option<StructuredData> {
         self.log
-            .get("structured_data")
+            .get(event_path!("structured_data"))
             .and_then(|v| v.clone().into_object())
             .map(StructuredData::from)
     }
@@ -400,7 +401,7 @@ struct Tag {
 impl Tag {
     fn encode_rfc_3164(&self) -> String {
         let mut tag = if let Some(proc_id) = self.proc_id.as_deref() {
-            format!("{}[{}]:", self.app_name, proc_id)
+            format!("{}[{proc_id}]:", self.app_name)
         } else {
             format!("{}:", self.app_name)
         };
@@ -417,7 +418,7 @@ impl Tag {
     fn encode_rfc_5424(&self) -> String {
         let proc_id_str = self.proc_id.as_deref().unwrap_or(NIL_VALUE);
         let msg_id_str = self.msg_id.as_deref().unwrap_or(NIL_VALUE);
-        format!("{} {} {}", self.app_name, proc_id_str, msg_id_str)
+        format!("{} {proc_id_str} {msg_id_str}", self.app_name)
     }
 }
 
@@ -501,7 +502,7 @@ fn flatten_object(obj: ObjectMap, prefix: String, result: &mut BTreeMap<String, 
                 if let Ok(json) = serde_json::to_string(&arr) {
                     result.insert(full_key, json);
                 } else {
-                    result.insert(full_key, format!("{:?}", arr));
+                    result.insert(full_key, format!("{arr:?}"));
                 }
             }
             scalar => {
@@ -993,7 +994,7 @@ mod tests {
         .unwrap();
 
         let mut log = LogEvent::default();
-        log.insert("syslog.service", "meaning-app");
+        log.insert(event_path!("syslog", "service"), "meaning-app");
 
         let schema = schema::Definition::new_with_default_metadata(
             Kind::object(btreemap! {
@@ -1171,7 +1172,7 @@ mod tests {
 
         let output = run_encode(config, Event::Log(log));
         let expected_id = "a".repeat(32);
-        assert!(output.contains(&format!("[{}", expected_id)));
+        assert!(output.contains(&format!("[{expected_id}")));
         assert!(!output.contains(&format!("[{}", "a".repeat(50))));
     }
 
@@ -1213,7 +1214,7 @@ mod tests {
         assert!(output.contains("app_"));
 
         let expected_sd_id: String = "_".repeat(32);
-        assert!(output.contains(&format!("[{}", expected_sd_id)));
+        assert!(output.contains(&format!("[{expected_sd_id}")));
     }
 
     #[test]

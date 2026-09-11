@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: file
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    path: /var/log/vector/vector-%Y-%m-%d.log

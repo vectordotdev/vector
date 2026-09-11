@@ -36,7 +36,6 @@ components: _amqp: {
 		}
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: {

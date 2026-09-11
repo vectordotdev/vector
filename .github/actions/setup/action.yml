@@ -8,18 +8,24 @@ branding:
 inputs:
   cargo-cache:
     required: false
-    default: true
+    default: false
     description: "Cache Cargo registry, index, and git DB. Enabled automatically if any Rust tools are requested."
+
+  cache-save:
+    required: false
+    default: "false"
+    description: "Whether this job is allowed to write the shared cache. Only warm-cache.yml opts in."
 
   mold:
     required: false
     default: true
     description: "Install mold linker and configure a rustc wrapper to speed up linking. Avoid enabling with cross."
 
+  # prepare.sh - standalone and system dependencies
   protoc:
     required: false
     default: false
-    description: "Install protoc (uses scripts/environment/install-protoc.sh)."
+    description: "Install protoc."
   cue:
     required: false
     default: false
@@ -28,6 +34,22 @@ inputs:
     required: false
     default: false
     description: "Install libsasl2." # Required to fully build Vector
+  cmark-gfm:
+    required: false
+    default: false
+    description: "Install cmark-gfm."
+  cross-binutils:
+    required: false
+    default: false
+    description: "Install ARM cross-compilation binutils."
+  rpm:
+    required: false
+    default: false
+    description: "Install rpm."
+  lcov:
+    required: false
+    default: false
+    description: "Install lcov."
 
   # prepare.sh - rust
   rust: # rustup module
@@ -97,11 +119,12 @@ runs:
       shell: bash
       run: |
         rust="false"
+        mold="${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}"
 
         # If any rust-related inputs are true, enable rust.
         # vdev itself does not compile, but cargo binstall is a cargo subcommand
         # and needs the rust toolchain on PATH to install it.
-        for val in "${{ inputs.mold }}" \
+        for val in "$mold" \
                    "${{ inputs.rust }}" \
                    "${{ inputs.cargo-deb }}" \
                    "${{ inputs.cross }}" \
@@ -120,6 +143,7 @@ runs:
         done
 
         echo "NEEDS_RUST=$rust" >> "$GITHUB_ENV"
+        echo "INSTALL_MOLD=$mold" >> "$GITHUB_ENV"
 
         if [[ "$rust" == "true" ]]; then
           echo "RUST_BACKTRACE=full" >> "$GITHUB_ENV"
@@ -134,61 +158,16 @@ runs:
       run: echo "::add-matcher::.github/matchers/rust.json"
       shell: bash
 
-    # Two steps so that the actions/cache post-step (which saves the cache) runs
-    # directly from this composite, not a nested one — nested composites break
-    # post-step input resolution (actions/runner#3514, #2030).
-    - name: Cache Cargo registry, index, and git DB
-      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref == 'refs/heads/master' }}
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
-
-    - name: Restore Cargo registry, index, and git DB
-      if: ${{ (inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true') && github.ref != 'refs/heads/master' }}
-      uses: actions/cache/restore@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-      with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
-
-    - name: Install mold
-      if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && inputs.mold == 'true' }}
+    - name: Configure mold
+      if: ${{ env.INSTALL_MOLD == 'true' }}
       shell: bash
       run: |
-        echo "Installing mold"
-
         CARGO_OVERRIDE_DIR="${HOME}/.cargo"
         CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
 
-        # Install mold, because the system linker wastes a bunch of time.
-        #
         # Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
         # configuration from the host system and ships it over...  which isn't good when we're overriding the `rustc-wrapper`
         # and all of that.
-
-        # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
-        # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
-        TEMP=$(mktemp -d)
-        MOLD_VERSION=2.40.4
-        MOLD_TARGET=mold-${MOLD_VERSION}-$(uname -m)-linux
-        curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
-        --output "$TEMP/${MOLD_TARGET}.tar.gz"
-        tar \
-            -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
-            -C "${TEMP}"
-        sudo cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
-        sudo cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
-        rm -rf "$TEMP"
 
         # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
         # anything linking calls to use `mold` instead of `ld`, etc.
@@ -208,37 +187,6 @@ runs:
         rustc-wrapper = "$RUSTC_WRAPPER"
         EOF
 
-    - name: Install protoc
-      if: ${{ inputs.protoc == 'true' }}
-      shell: bash
-      run: |
-        echo "Installing protoc"
-        if [[ "${{ runner.os }}" == "macOS" ]]; then
-          sudo bash ./scripts/environment/install-protoc.sh /usr/local/bin
-        else
-          sudo bash ./scripts/environment/install-protoc.sh
-        fi
-
-    - name: Install cue
-      if: ${{ inputs.cue == 'true' }}
-      shell: bash
-      run: |
-        echo "Installing cue"
-        TEMP=$(mktemp -d)
-        curl \
-          -L https://github.com/cue-lang/cue/releases/download/v0.16.1/cue_v0.16.1_linux_amd64.tar.gz \
-          -o "${TEMP}/cue_v0.16.1_linux_amd64.tar.gz"
-        tar \
-          -xvf "${TEMP}/cue_v0.16.1_linux_amd64.tar.gz" \
-          -C "${TEMP}"
-        sudo cp "${TEMP}/cue" /usr/bin/cue
-        rm -rf "$TEMP"
-
-    - name: Install libsasl2
-      if: ${{ inputs.libsasl2 == 'true' }}
-      shell: bash
-      run: timeout 30m sudo apt-get update && timeout 30m sudo apt-get install -y libsasl2-dev
-
     - name: Cache cargo binaries
       id: cache-cargo-binaries
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
@@ -253,8 +201,7 @@ runs:
           ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
-          ~/.cargo/bin/vdev
-        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh', 'vdev/Cargo.toml') }}
+        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
         restore-keys: |
           ${{ runner.os }}-cargo-binaries-
 
@@ -271,7 +218,15 @@ runs:
         GITHUB_TOKEN: ${{ github.token }}
       run: |
         mods=()
+        [[ "$INSTALL_MOLD" == "true" ]] && mods+=("mold")
         [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
+        [[ "${{ inputs.protoc }}" == "true" ]] && mods+=("protoc")
+        [[ "${{ inputs.cue }}" == "true" ]] && mods+=("cue")
+        [[ "${{ inputs.libsasl2 }}" == "true" ]] && mods+=("libsasl2")
+        [[ "${{ inputs.cmark-gfm }}" == "true" ]] && mods+=("cmark-gfm")
+        [[ "${{ inputs.cross-binutils }}" == "true" ]] && mods+=("cross-binutils")
+        [[ "${{ inputs.rpm }}" == "true" ]] && mods+=("rpm")
+        [[ "${{ inputs.lcov }}" == "true" ]] && mods+=("lcov")
         [[ "${{ inputs.cargo-deb }}" == "true" ]] && mods+=("cargo-deb")
         [[ "${{ inputs.cross }}" == "true" ]] && mods+=("cross")
         [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
@@ -299,3 +254,18 @@ runs:
       if: ${{ inputs.vdev == 'true' }}
       shell: bash
       run: echo "VDEV=$(which vdev)" >> "$GITHUB_ENV"
+
+    # Runs after prepare.sh so Swatinem can invoke rustc/cargo (fresh
+    # self-hosted runners install rustup there). Only warm-cache.yml
+    # opts in to saving; other master-ref workflows may dispatch with
+    # a user-supplied ref and must not poison the shared cache.
+    - name: Cache Cargo + target/
+      if: ${{ inputs.cargo-cache == 'true' && env.NEEDS_RUST == 'true' }}
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      with:
+        prefix-key: "v1-vector"
+        shared-key: "workspace"
+        # Rotate the key when cache mechanics change so the warmer can save a fresh entry.
+        key: ${{ hashFiles('.github/actions/setup/action.yml', '.github/workflows/warm-cache.yml') }}
+        cache-bin: "false"
+        save-if: ${{ inputs.cache-save == 'true' && github.ref == 'refs/heads/master' }}

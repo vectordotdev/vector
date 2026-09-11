@@ -17,6 +17,7 @@ use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, ddtrace_proto
 use crate::{
     common::http::ErrorMessage,
     event::{Event, ObjectMap, TraceEvent, Value},
+    sources::util::http::capped_body,
 };
 
 pub(super) fn build_warp_filter(
@@ -42,7 +43,7 @@ fn build_trace_filter(
             "X-Datadog-Reported-Languages",
         ))
         .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,

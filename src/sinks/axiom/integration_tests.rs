@@ -42,14 +42,14 @@ async fn axiom_logs_put_data() {
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
     let mut event1 = LogEvent::from("message_1").with_batch_notifier(&batch);
-    event1.insert("host", "aws.cloud.eur");
-    event1.insert("source_type", "file");
-    event1.insert("test_id", test_id.clone());
+    event1.insert(vrl::event_path!("host"), "aws.cloud.eur");
+    event1.insert(vrl::event_path!("source_type"), "file");
+    event1.insert(vrl::event_path!("test_id"), test_id.clone());
 
     let mut event2 = LogEvent::from("message_2").with_batch_notifier(&batch);
-    event2.insert("host", "aws.cloud.eur");
-    event2.insert("source_type", "file");
-    event2.insert("test_id", test_id.clone());
+    event2.insert(vrl::event_path!("host"), "aws.cloud.eur");
+    event2.insert(vrl::event_path!("source_type"), "file");
+    event2.insert(vrl::event_path!("test_id"), test_id.clone());
 
     drop(batch);
 

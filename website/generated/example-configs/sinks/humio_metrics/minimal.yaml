@@ -1,0 +1,6 @@
+sinks:
+  my_sink_id:
+    type: humio_metrics
+    inputs:
+      - my-source-or-transform-id
+    token: ${HUMIO_TOKEN}

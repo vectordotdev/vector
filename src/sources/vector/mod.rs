@@ -25,7 +25,10 @@ use crate::{
     serde::bool_or_struct,
     sources::{
         Source,
-        util::grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        util::{
+            decompression::max_decompressed_size_bytes,
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -130,15 +133,12 @@ pub struct VectorConfig {
     /// It _must_ include a port.
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: GrpcKeepaliveConfig,
 
@@ -172,8 +172,8 @@ impl Default for VectorConfig {
 }
 
 impl GenerateConfig for VectorConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(VectorConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(VectorConfig::default()).unwrap()
     }
 }
 
@@ -195,8 +195,10 @@ impl SourceConfig for VectorConfig {
             acknowledgements,
             log_namespace,
         })
-        // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
-        .max_decoding_message_size(usize::MAX);
+        // Tonic added a default of 4MB in 0.9. Bound this by the global decompressed-size
+        // cap rather than `usize::MAX` so a single oversized message cannot drive unbounded
+        // allocation on this unauthenticated listener.
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         // Create the standard gRPC health service
         let (mut health_reporter, health_service) = health_reporter();
@@ -215,6 +217,7 @@ impl SourceConfig for VectorConfig {
         let source = run_grpc_server_with_routes(
             self.address,
             tls_settings,
+            None,
             builder.routes(),
             self.keepalive.clone(),
             cx.shutdown,

@@ -33,6 +33,7 @@ Events and metrics are namespaces as one of:
 - `Component`
 - `Buffer`
 - `Topology`
+- `Security`
 
 Depending on where they are emitted.
 

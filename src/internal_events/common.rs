@@ -3,10 +3,44 @@ use std::time::Instant;
 use vector_lib::NamedInternalEvent;
 pub use vector_lib::internal_event::EventsReceived;
 use vector_lib::internal_event::{
-    ComponentEventsDropped, CounterName, HistogramName, InternalEvent, UNINTENTIONAL, error_stage,
-    error_type,
+    ComponentEventsDropped, CounterName, HistogramName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
+    error_stage, error_type,
 };
 use vector_lib::{counter, histogram};
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct KeyOutsideBasePrefixError<'a> {
+    /// Bounded preview of the rejected key — never the full rendered value,
+    /// so attacker-controlled input can't amplify into logs and secrets in
+    /// templated header/query fields don't leak.
+    pub key_preview: &'a str,
+    /// Full byte length of the rejected rendered value.
+    pub key_len: usize,
+    pub message: &'a str,
+}
+
+impl InternalEvent for KeyOutsideBasePrefixError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Rendered key is outside the configured base prefix; dropping event.",
+            key_preview = self.key_preview,
+            key_len = self.key_len,
+            error = self.message,
+            error_type = error_type::CONFINEMENT_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::CONFINEMENT_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason: "Rendered key outside base prefix.",
+        });
+    }
+}
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct EndpointBytesReceived<'a> {

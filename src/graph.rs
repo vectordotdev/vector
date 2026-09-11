@@ -61,13 +61,14 @@ pub struct Opts {
     #[arg(id = "format", long, default_value = "dot")]
     pub format: OutputFormat,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,7 +120,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    let config = match config::load_from_paths(&paths, !opts.disable_env_var_interpolation) {
+    let config = match config::load_from_paths(&paths) {
         Ok(config) => config,
         Err(errs) => {
             #[allow(clippy::print_stderr)]
@@ -149,8 +150,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
     {
         writeln!(
             dot,
-            "  \"{}\" [{}]",
-            id,
+            "  \"{id}\" [{}]",
             node_attributes_to_string(&table.graph.node_attributes, "cylinder")
         )
         .expect("write to String never fails");
@@ -165,8 +165,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
         if !written_tables.contains(&id) {
             writeln!(
                 dot,
-                "  \"{}\" [{}]",
-                id,
+                "  \"{id}\" [{}]",
                 node_attributes_to_string(&table.graph.node_attributes, "cylinder")
             )
             .expect("write to String never fails");
@@ -180,8 +179,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
     for (id, source) in config.sources() {
         writeln!(
             dot,
-            "  \"{}\" [{}]",
-            id,
+            "  \"{id}\" [{}]",
             node_attributes_to_string(&source.graph.node_attributes, "trapezium")
         )
         .expect("write to String never fails");
@@ -190,8 +188,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
     for (id, transform) in config.transforms() {
         writeln!(
             dot,
-            "  \"{}\" [{}]",
-            id,
+            "  \"{id}\" [{}]",
             node_attributes_to_string(&transform.graph.node_attributes, "diamond")
         )
         .expect("write to String never fails");
@@ -204,8 +201,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
     for (id, sink) in config.sinks() {
         writeln!(
             dot,
-            "  \"{}\" [{}]",
-            id,
+            "  \"{id}\" [{}]",
             node_attributes_to_string(&sink.graph.node_attributes, "invtrapezium")
         )
         .expect("write to String never fails");
@@ -279,9 +275,9 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
 
         for input in table.inputs.iter() {
             if let Some(port) = &input.port {
-                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
             } else {
-                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} --> {id}", input.component).unwrap();
             }
         }
     }
@@ -297,9 +293,9 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
 
         for input in transform.inputs.iter() {
             if let Some(port) = &input.port {
-                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
             } else {
-                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} --> {id}", input.component).unwrap();
             }
         }
     }
@@ -310,9 +306,9 @@ fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
 
         for input in &sink.inputs {
             if let Some(port) = &input.port {
-                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} -->|{port}| {id}", input.component).unwrap();
             } else {
-                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
+                writeln!(mermaid, "  {} --> {id}", input.component).unwrap();
             }
         }
     }

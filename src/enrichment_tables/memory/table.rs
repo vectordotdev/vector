@@ -1,6 +1,8 @@
 #![allow(unsafe_op_in_unsafe_fn)] // TODO review ShallowCopy usage code and fix properly.
 
 use std::{
+    num::NonZeroU64,
+    pin::Pin,
     sync::{Arc, Mutex, MutexGuard},
     time::{Duration, Instant},
 };
@@ -12,7 +14,10 @@ use evmap::{
     {self},
 };
 use evmap_derive::ShallowCopy;
-use futures::{StreamExt, stream::BoxStream};
+use futures::{
+    Stream, StreamExt,
+    stream::{self, BoxStream},
+};
 use thread_local::ThreadLocal;
 use tokio::{
     sync::broadcast::{Receiver, Sender},
@@ -424,12 +429,15 @@ impl StreamSink<Event> for Memory {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         let events_sent = register!(EventsSent::from(Output(None)));
         let bytes_sent = register!(BytesSent::from(Protocol("memory_enrichment_table".into(),)));
-        let mut flush_interval = IntervalStream::new(interval(
-            self.config
-                .flush_interval
-                .map(Duration::from_secs)
-                .unwrap_or(Duration::MAX),
-        ));
+        let mut flush_interval: Pin<Box<dyn Stream<Item = tokio::time::Instant> + Send>> = self
+            .config
+            .flush_interval
+            .map(NonZeroU64::get)
+            .map(Duration::from_secs)
+            .map::<Pin<Box<dyn Stream<Item = tokio::time::Instant> + Send>>, _>(|d| {
+                Box::pin(IntervalStream::new(interval(d)))
+            })
+            .unwrap_or(Box::pin(stream::empty()));
         let mut scan_interval = IntervalStream::new(interval(Duration::from_secs(
             self.config.scan_interval.into(),
         )));
@@ -707,7 +715,7 @@ mod tests {
         let ttl = 100;
         let memory = Memory::new(build_memory_config(|c| {
             c.ttl = ttl;
-            c.flush_interval = Some(10);
+            c.flush_interval = NonZeroU64::new(10);
         }));
         memory.handle_value(ObjectMap::from([("test_key".into(), Value::from(5))]));
 
@@ -946,7 +954,7 @@ mod tests {
         )])));
 
         let memory = Memory::new(build_memory_config(|c| {
-            c.flush_interval = Some(1);
+            c.flush_interval = NonZeroU64::new(1);
         }));
 
         run_and_assert_sink_compliance(

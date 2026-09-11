@@ -1,0 +1,12 @@
+sinks:
+  my_sink_id:
+    type: databricks_zerobus
+    inputs:
+      - my-source-or-transform-id
+    auth:
+      client_id: ${DATABRICKS_CLIENT_ID}
+      client_secret: ${DATABRICKS_CLIENT_SECRET}
+      strategy: oauth
+    ingestion_endpoint: https://1234567890123456.zerobus.us-west-2.cloud.databricks.com
+    table_name: main.default.logs
+    unity_catalog_endpoint: https://dbc-a1b2c3d4-e5f6.cloud.databricks.com

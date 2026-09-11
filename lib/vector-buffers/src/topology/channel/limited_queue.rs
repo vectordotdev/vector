@@ -499,7 +499,7 @@ pub fn limited<T: InMemoryBufferable + fmt::Debug>(
 mod tests {
     use std::num::NonZeroUsize;
 
-    use rand::{Rng as _, SeedableRng as _, rngs::SmallRng};
+    use rand::{RngExt as _, SeedableRng as _, rngs::SmallRng};
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use vector_common::byte_size_of::ByteSizeOf;
 

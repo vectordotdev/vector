@@ -259,7 +259,7 @@ mod tests {
             events[0]
                 .clone()
                 .as_log()
-                .get(".")
+                .get(vrl::event_path!())
                 .unwrap()
                 .to_string_lossy(),
             message

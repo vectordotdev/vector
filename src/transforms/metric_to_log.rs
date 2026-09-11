@@ -60,6 +60,7 @@ pub struct MetricToLogConfig {
     /// When set to `single`, only the last non-bare value of tags is displayed with the
     /// metric.  When set to `full`, all metric tags are exposed as separate assignments as
     /// described by [the `native_json` codec][vector_native_json].
+    /// When set to `auto`, tag values are encoded using their underlying shape.
     ///
     /// [vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
     #[serde(default)]
@@ -78,8 +79,8 @@ impl MetricToLogConfig {
 }
 
 impl GenerateConfig for MetricToLogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             host_tag: Some("host-tag".to_string()),
             timezone: None,
             log_namespace: None,
@@ -683,7 +684,7 @@ mod tests {
             ));
             // The resulting tag must be either a single string value or not present.
             let value = values.into_single().map(|value| Value::Bytes(value.into()));
-            assert_eq!(tags.get(&*name), value.as_ref());
+            assert_eq!(tags.get(vrl::path!(&*name)), value.as_ref());
         }
 
         #[test]
@@ -695,7 +696,7 @@ mod tests {
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
             ));
-            let tag = tags.get(&*name);
+            let tag = tags.get(vrl::path!(&*name));
             match values.len() {
                 // Empty tag set => missing tag
                 0 => assert_eq!(tag, None),

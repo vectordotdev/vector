@@ -1,1 +1,0 @@
-{"metric":{"name":"q","interval_ms":4294967295,"kind":"absolute","aggregated_histogram":{"buckets":[{"upper_limit":132672.0,"count":16087148302334643412}],"count":12468798368538116898,"sum":-546560.0}}}

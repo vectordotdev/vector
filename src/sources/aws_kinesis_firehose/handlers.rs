@@ -1,10 +1,8 @@
 use std::collections::HashMap;
-use std::io::Read;
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
 use chrono::Utc;
-use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use vector_common::constants::GZIP_MAGIC;
@@ -39,8 +37,11 @@ use crate::{
     internal_events::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, EventsReceived, StreamClosedError,
     },
-    sources::aws_kinesis_firehose::AwsKinesisFirehoseConfig,
-    sources::http_server::HttpConfigParamKind,
+    sources::{
+        aws_kinesis_firehose::AwsKinesisFirehoseConfig,
+        http_server::HttpConfigParamKind,
+        util::decompression::{CappedDecoder, is_decompressed_size_limit_error},
+    },
 };
 
 #[derive(Clone)]
@@ -242,6 +243,14 @@ fn decode_record(
         Compression::Auto => {
             if is_gzip(&buf) {
                 decode_gzip(&buf[..]).or_else(|error| {
+                    // An exceeded size cap means the magic bytes really were gzip and the payload
+                    // is oversized, so reject it. Only fall back to forwarding the raw bytes when
+                    // auto-detection guessed wrong (valid-looking magic, but not actually gzip).
+                    if is_decompressed_size_limit_error(&error) {
+                        return Err(error).with_context(|_| DecompressionSnafu {
+                            compression: Compression::Gzip,
+                        });
+                    }
                     emit!(AwsKinesisFirehoseAutomaticRecordDecodeError {
                         compression: Compression::Gzip,
                         error
@@ -267,12 +276,8 @@ fn is_gzip(data: &[u8]) -> bool {
 }
 
 fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
-    let mut decoded = Vec::new();
-
-    let mut gz = MultiGzDecoder::new(data);
-    gz.read_to_end(&mut decoded)?;
-
-    Ok(Bytes::from(decoded))
+    // Cap the decompressed output so a gzip-bomb record cannot drive unbounded allocation.
+    CappedDecoder::gzip(data).decompress().map(Bytes::from)
 }
 
 fn build_common_attributes_map(

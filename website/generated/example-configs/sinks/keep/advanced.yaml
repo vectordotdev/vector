@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: keep
+    inputs:
+      - my-source-or-transform-id
+    api_key: ${KEEP_API_KEY}
+    endpoint: http://localhost:8080/alerts/event/vectordev?provider_id=test

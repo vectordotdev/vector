@@ -31,13 +31,7 @@ extern crate tracing;
 #[macro_use]
 extern crate vector_lib;
 
-#[cfg(all(
-    target_os = "linux",
-    any(
-        feature = "antithesis-scenario-memory",
-        feature = "antithesis-scenario-disk"
-    )
-))]
+#[cfg(all(target_os = "linux", feature = "antithesis-scenario-disk"))]
 extern crate antithesis_instrumentation as _;
 
 pub use indoc::indoc;
@@ -211,7 +205,7 @@ pub fn get_version() -> String {
     let pkg_version = vector_version();
     let build_desc = built_info::VECTOR_BUILD_DESC;
     let build_string = match build_desc {
-        Some(desc) => format!("{} {}", built_info::TARGET, desc),
+        Some(desc) => format!("{} {desc}", built_info::TARGET),
         None => built_info::TARGET.into(),
     };
 

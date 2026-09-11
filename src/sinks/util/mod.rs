@@ -9,9 +9,11 @@ pub mod compressor;
 pub mod datagram;
 pub mod encoding;
 pub mod http;
+pub(crate) mod http_v1;
 pub mod metadata;
 pub mod normalizer;
 pub mod partitioner;
+pub mod path_confinement;
 pub mod processed_event;
 pub mod request_builder;
 pub mod retries;
@@ -53,7 +55,7 @@ pub use service::{
 };
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
-pub use uri::UriSerde;
+pub use uri::{HttpEndpoint, HttpEndpointError, UriSerde};
 use vector_lib::{TimeZone, json_size::JsonSize};
 
 use crate::event::EventFinalizers;

@@ -1,0 +1,13 @@
+sources:
+  my_source_id:
+    type: exec
+    clear_environment: false
+    command:
+      - echo
+    environment:
+      LANG: es_ES.UTF-8
+      PATH: /bin:/usr/bin:/usr/local/bin
+      TZ: Etc/UTC
+    include_stderr: true
+    maximum_buffer_size_bytes: 1000000
+    mode: scheduled

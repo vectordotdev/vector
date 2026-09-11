@@ -110,7 +110,7 @@ async fn okta_compliance() {
     let log_event = events[0].as_log();
     assert_eq!(
         log_event
-            .get("data")
+            .get(vrl::event_path!("data"))
             .expect("data must be available")
             .as_str()
             .unwrap(),

@@ -7,6 +7,7 @@ use chrono::Duration;
 use futures::{StreamExt, stream};
 use similar_asserts::assert_eq;
 use vector_lib::{codecs::TextSerializerConfig, lookup};
+use vrl::event_path;
 
 use super::*;
 use crate::{
@@ -14,7 +15,7 @@ use crate::{
     config::{ProxyConfig, SinkConfig, SinkContext, log_schema},
     event::{Event, LogEvent, Value},
     sinks::{aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder, util::BatchConfig},
-    template::Template,
+    template::{Template, UnconfinedTemplate},
     test_util::{
         components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines, random_lines_with_stream, random_string, trace_init,
@@ -49,7 +50,7 @@ async fn cloudwatch_insert_log_event() {
 
     let stream_name = gen_name();
     let config = CloudwatchLogsSinkConfig {
-        stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+        stream_name: UnconfinedTemplate::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
@@ -65,6 +66,7 @@ async fn cloudwatch_insert_log_event() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -102,7 +104,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
     let stream_name = gen_name();
     let config = CloudwatchLogsSinkConfig {
-        stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+        stream_name: UnconfinedTemplate::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
@@ -118,6 +120,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -180,7 +183,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
 
     let stream_name = gen_name();
     let config = CloudwatchLogsSinkConfig {
-        stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+        stream_name: UnconfinedTemplate::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
@@ -196,6 +199,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -259,7 +263,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let group_name = gen_name();
 
     let config = CloudwatchLogsSinkConfig {
-        stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+        stream_name: UnconfinedTemplate::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
@@ -275,6 +279,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -312,7 +317,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
     let group_name = gen_name();
 
     let config = CloudwatchLogsSinkConfig {
-        stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+        stream_name: UnconfinedTemplate::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
@@ -343,6 +348,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation_with_kms_key_and_tags() {
             "key".to_string(),
             "value".to_string(),
         )])),
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -401,7 +407,7 @@ async fn cloudwatch_insert_log_event_batched() {
     batch.max_events = Some(2);
 
     let config = CloudwatchLogsSinkConfig {
-        stream_name: Template::try_from(stream_name.as_str()).unwrap(),
+        stream_name: UnconfinedTemplate::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
@@ -417,6 +423,7 @@ async fn cloudwatch_insert_log_event_batched() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -455,7 +462,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let stream_name = gen_name();
     let config = CloudwatchLogsSinkConfig {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        stream_name: Template::try_from(format!("{stream_name}-{{{{key}}}}")).unwrap(),
+        stream_name: UnconfinedTemplate::try_from(format!("{stream_name}-{{{{key}}}}")).unwrap(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
@@ -470,6 +477,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let (sink, _) = config.build(SinkContext::default()).await.unwrap();
@@ -485,7 +493,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .map(|(i, e)| {
             let mut event = LogEvent::from(e);
             let stream = (i % 2).to_string();
-            event.insert("key", stream);
+            event.insert(event_path!("key"), stream);
             Event::Log(event)
         })
         .collect::<Vec<_>>();
@@ -549,7 +557,7 @@ async fn cloudwatch_healthcheck() {
     ensure_group().await;
 
     let config = CloudwatchLogsSinkConfig {
-        stream_name: Template::try_from("test-stream").unwrap(),
+        stream_name: UnconfinedTemplate::try_from("test-stream").unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
@@ -565,6 +573,7 @@ async fn cloudwatch_healthcheck() {
         acknowledgements: Default::default(),
         kms_key: None,
         tags: None,
+        confinement: Default::default(),
     };
 
     let client = config.create_client(&ProxyConfig::default()).await.unwrap();

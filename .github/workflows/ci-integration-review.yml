@@ -64,7 +64,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR review author
         id: comment
-        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
+        uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
           team: "Vector"
@@ -134,11 +134,13 @@ jobs:
             "mongodb",
             "nats",
             "nginx",
+            "opensearch",
             "opentelemetry",
             "postgres",
             "prometheus",
             "pulsar",
             "redis",
+            "splunk",
             "webhdfs"
           ]
     steps:
@@ -182,9 +184,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: |
-            bash scripts/environment/prepare.sh --modules=datadog-ci
-            bash scripts/run-integration-test.sh int ${{ matrix.service }}
+          command: vdev integration run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   e2e-tests:
     needs:
@@ -199,7 +199,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: ["datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"]
+        service:
+          [
+            "datadog-logs",
+            "datadog-metrics",
+            "opentelemetry-logs",
+            "opentelemetry-metrics",
+            "opentelemetry-metrics-native"
+          ]
     steps:
       - name: Evaluate run condition
         id: run_condition
@@ -241,9 +248,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: |
-            bash scripts/environment/prepare.sh --modules=datadog-ci
-            bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+          command: vdev e2e run ${{ matrix.service }} ${{ runner.debug == '1' && '--always-show-logs' || '' }}
 
   update-pr-status:
     name: Signal result to PR
@@ -267,7 +272,7 @@ jobs:
 
       - name: Validate issue comment
         if: github.event_name == 'pull_request_review'
-        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
+        uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4.0.2
         with:
           username: ${{ github.actor }}
           team: "Vector"

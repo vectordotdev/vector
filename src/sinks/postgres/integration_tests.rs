@@ -36,11 +36,11 @@ fn timestamp() -> DateTime<Utc> {
 
 fn create_event(id: i64) -> Event {
     let mut event = LogEvent::from("raw log line");
-    event.insert("id", id);
-    event.insert("host", "example.com");
+    event.insert(event_path!("id"), id);
+    event.insert(event_path!("host"), "example.com");
     let event_payload = event.clone().into_parts().0;
-    event.insert("payload", event_payload);
-    event.insert("timestamp", timestamp());
+    event.insert(event_path!("payload"), event_payload);
+    event.insert(event_path!("timestamp"), timestamp());
     event.into()
 }
 

@@ -1,6 +1,6 @@
 pub mod request_limiter;
 
-use std::{io, mem::drop, net::SocketAddr, time::Duration};
+use std::{io, mem::drop, net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt, future::BoxFuture};
@@ -26,7 +26,10 @@ use vector_lib::{
     shutdown::ShutdownSignal,
     source_sender::SourceSender,
     tcp::TcpKeepaliveConfig,
-    tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
+    tls::{
+        CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings,
+        TlsAcceptorReloader,
+    },
 };
 use vrl::value::ObjectMap;
 
@@ -37,7 +40,7 @@ use crate::{
     internal_events::{
         ConnectionOpen, OpenGauge, SocketBindError, SocketEventsReceived, SocketMode,
         SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
-        TcpSocketTlsConnectionError, TcpSourceConnectionClosed,
+        TcpSocketTlsConnectionError, TcpSocketTlsHandshakeTimeout, TcpSourceConnectionClosed,
     },
     net::is_graceful_tls_shutdown,
     sources::util::{AfterReadExt, LenientFramedRead},
@@ -49,10 +52,14 @@ pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
     tls: &MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
     allowlist: Option<Vec<IpNet>>,
 ) -> crate::Result<MaybeTlsListener> {
     match addr {
-        SocketListenAddr::SocketAddr(addr) => tls.bind(&addr).await.map_err(Into::into),
+        SocketListenAddr::SocketAddr(addr) => tls
+            .bind_reloadable(&addr, tls_reloader)
+            .await
+            .map_err(Into::into),
         SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset)? {
             Some(listener) => TcpListener::from_std(listener)
                 .map(Into::into)
@@ -115,9 +122,11 @@ where
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: Duration,
         tls: MaybeTlsSettings,
+        tls_reloader: Option<TlsAcceptorReloader>,
         tls_client_metadata_key: Option<OwnedValuePath>,
         receive_buffer_bytes: Option<usize>,
         max_connection_duration_secs: Option<u64>,
+        tls_handshake_timeout_secs: Option<NonZeroU64>,
         cx: SourceContext,
         acknowledgements: SourceAcknowledgementsConfig,
         max_connections: Option<u32>,
@@ -129,7 +138,7 @@ where
 
         Ok(Box::pin(async move {
             let listenfd = ListenFd::from_env();
-            let listener = try_bind_tcp_listener(addr, listenfd, &tls, allowlist)
+            let listener = try_bind_tcp_listener(addr, listenfd, &tls, tls_reloader, allowlist)
                 .await
                 .map_err(|error| {
                     emit!(SocketBindError {
@@ -207,6 +216,7 @@ where
                                 keepalive,
                                 receive_buffer_bytes,
                                 max_connection_duration_secs,
+                                tls_handshake_timeout_secs,
                                 source,
                                 tripwire,
                                 peer_addr,
@@ -247,6 +257,7 @@ async fn handle_stream<T>(
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
     max_connection_duration_secs: Option<u64>,
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
     peer_addr: SocketAddr,
@@ -260,12 +271,26 @@ async fn handle_stream<T>(
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
 {
+    let handshake_timeout = OptionFuture::from(
+        tls_handshake_timeout_secs.map(|secs| tokio::time::sleep(Duration::from_secs(secs.get()))),
+    );
+    tokio::pin!(handshake_timeout);
+
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
                 emit!(TcpSocketTlsConnectionError { error });
                 return;
             }
+        },
+        Some(_) = &mut handshake_timeout => {
+            emit!(TcpSocketTlsHandshakeTimeout {
+                peer_addr,
+                timeout: Duration::from_secs(
+                    tls_handshake_timeout_secs.map_or(0, NonZeroU64::get),
+                ),
+            });
+            return;
         },
         _ = &mut shutdown_signal => {
             return;

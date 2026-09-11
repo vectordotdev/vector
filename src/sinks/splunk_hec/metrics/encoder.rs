@@ -46,10 +46,14 @@ impl<'a> HecData<'a> {
     }
 }
 
-pub struct HecMetricsEncoder;
+/// Encoder for Splunk HEC metrics events.
+///
+pub struct HecMetricsEncoder {
+    pub(super) templated_field_keys: Box<[String]>,
+}
 
 impl HecMetricsEncoder {
-    pub fn encode_event(processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
+    pub fn encode_event(&self, processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
         let metadata = processed_event.metadata;
         let metric = processed_event.event;
 
@@ -58,7 +62,7 @@ impl HecMetricsEncoder {
             .into_iter()
             .flat_map(|tags| tags.iter_single())
             // skip the metric tags used for templating
-            .filter(|(k, _)| !metadata.templated_field_keys.iter().any(|f| f == k))
+            .filter(|(k, _)| !self.templated_field_keys.iter().any(|f| f == k))
             .map(|(k, v)| (k, HecFieldValue::Str(v)))
             .chain(iter::once((
                 "metric_name",
@@ -106,7 +110,7 @@ impl Encoder<Vec<HecProcessedEvent>> for HecMetricsEncoder {
 
         let encoded_input: Vec<u8> = input
             .into_iter()
-            .filter_map(Self::encode_event)
+            .filter_map(|e| self.encode_event(e))
             .flatten()
             .collect();
         let encoded_size = encoded_input.len();

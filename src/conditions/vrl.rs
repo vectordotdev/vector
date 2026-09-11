@@ -11,7 +11,7 @@ use vrl::{
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
     config::LogNamespace,
-    event::{Event, TargetEvents, VrlTarget},
+    event::{Event, MetricTagMode, TargetEvents, VrlTarget},
     format_vrl_diagnostics,
     internal_events::VrlConditionExecutionError,
 };
@@ -23,7 +23,7 @@ pub struct VrlConfig {
     /// The VRL boolean expression.
     pub(crate) source: String,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(crate) runtime: VrlRuntime,
 }
@@ -92,7 +92,7 @@ impl Vrl {
             .maybe_as_log()
             .map(|log| log.namespace())
             .unwrap_or(LogNamespace::Legacy);
-        let mut target = VrlTarget::new(event, self.program.info(), false);
+        let mut target = VrlTarget::new(event, self.program.info(), MetricTagMode::Single);
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 

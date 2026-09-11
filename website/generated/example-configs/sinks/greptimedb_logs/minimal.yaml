@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: greptimedb_logs
+    inputs:
+      - my-source-or-transform-id
+    endpoint: http://localhost:4000
+    table: mytable

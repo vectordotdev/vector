@@ -253,6 +253,7 @@ fn encoder_framing_to_decoding_framer(framing: encoding::FramingConfig) -> decod
                 character_delimited: decoding::CharacterDelimitedDecoderOptions {
                     delimiter: config.character_delimited.delimiter,
                     max_length: None,
+                    oversized_action: Default::default(),
                 },
             })
         }

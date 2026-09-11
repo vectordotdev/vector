@@ -20,10 +20,12 @@ components: transforms: throttle: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
-	configuration: generated.components.transforms.throttle.configuration
+	configuration: generated.components.transforms.throttle.configuration & {
+		threshold: type: uint: examples: [100]
+		window_secs: type: float: examples: [1.0]
+	}
 
 	input: {
 		logs:    true

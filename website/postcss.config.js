@@ -1,64 +1,26 @@
-import postcssImport from "postcss-import";
-import tailwindCss from "tailwindcss";
-import autoprefixer from "autoprefixer";
-import purgecssPlugin from "@fullhuman/postcss-purgecss";
+import tailwindcss from "@tailwindcss/postcss";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
-// These are classes for things that are applied by JS, and thus missed by Hugo.
-// See assets/js/*.js for places where this happens.
-const safeClasses = {
-  standard: [
-    "search-input",
-    "search-results-list",
-    "search-result",
-    "code-sample-filename",
-    "type",
-    // All Algolia-specific classes
-    /^ais-/,
-    /^aa-/,
-    /^DocSearch/,
-    // Search widgets (TODO: improve this by consolidating these into higher classes)
-    "block",
-    "border-gray-200",
-    "border-gray-300",
-    "border-r",
-    "border-t",
-    "font-medium",
-    "h-2",
-    "h-3",
-    "h-full",
-    "inline",
-    "leading-relaxed",
-    "mb-1",
-    "ml-1",
-    "mr-1",
-    "p-2",
-    "p-4",
-    "pl-2",
-    "py-4",
-    "text-gray-600",
-    "text-gray-800",
-    "text-md",
-    "text-sm",
-    "w-2",
-    "w-3"
-  ]
-};
+// Generate .hugo-classes from hugo_stats.json so Tailwind can detect dynamically-
+// constructed class names (e.g. `text-{{ $color }}`) that static file scanning misses.
+// This file is written at PostCSS startup time, before style.css is processed.
+const ROOT = dirname(fileURLToPath(import.meta.url));
+const statsPath = join(ROOT, "hugo_stats.json");
+const classesPath = join(ROOT, ".hugo-classes");
 
-const purgecss = purgecssPlugin({
-  content: ["./hugo_stats.json"],
-  safelist: safeClasses,
-  defaultExtractor: (content) => {
-    const broadMatches = content.match(/[^<>"'`\s]*[^<>"'`\s:]/g) || [];
-    const innerMatches = content.match(/[^<>"'`\s.()]*[^<>"'`\s.():]/g) || [];
-    return broadMatches.concat(innerMatches);
+try {
+  if (existsSync(statsPath)) {
+    const { htmlElements: { classes = [] } = {} } = JSON.parse(readFileSync(statsPath, "utf8"));
+    writeFileSync(classesPath, classes.join("\n"));
+  } else {
+    writeFileSync(classesPath, "");
   }
-});
+} catch {
+  writeFileSync(classesPath, "");
+}
 
 export default {
-  plugins: [
-    postcssImport,
-    tailwindCss,
-    autoprefixer,
-    ...(process.env.HUGO_ENVIRONMENT === "production" ? [purgecss] : [])
-  ]
+  plugins: [tailwindcss]
 };

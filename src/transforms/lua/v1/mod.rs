@@ -1,6 +1,3 @@
-// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt, stream};
@@ -84,14 +81,13 @@ impl LuaConfig {
 // after each transform would have significant footprint on the performance.
 const GC_INTERVAL: usize = 16;
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(derive_more::Debug)]
 pub struct Lua {
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     source: String,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     search_dirs: Vec<String>,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     lua: mlua::Lua,
     vector_func: mlua::RegistryKey,
     invocations_after_gc: usize,
@@ -324,6 +320,8 @@ pub fn format_error(error: &mlua::Error) -> String {
 mod tests {
     use std::sync::Arc;
 
+    use vrl::event_path;
+
     use super::*;
     use crate::{
         config::ComponentKey,
@@ -361,7 +359,7 @@ mod tests {
     #[test]
     fn lua_remove_field() {
         let mut log = LogEvent::default();
-        log.insert("name", "Bob");
+        log.insert(event_path!("name"), "Bob");
         let event = transform_one(
             r#"
               event["name"] = nil
@@ -370,13 +368,13 @@ mod tests {
         )
         .unwrap();
 
-        assert!(event.as_log().get("name").is_none());
+        assert!(event.as_log().get(event_path!("name")).is_none());
     }
 
     #[test]
     fn lua_drop_event() {
         let mut log = LogEvent::default();
-        log.insert("name", "Bob");
+        log.insert(event_path!("name"), "Bob");
         let event = transform_one(
             r"
               event = nil
@@ -449,7 +447,7 @@ mod tests {
             LogEvent::default(),
         )
         .unwrap();
-        assert_eq!(event.as_log().get("junk"), None);
+        assert_eq!(event.as_log().get(event_path!("junk")), None);
     }
 
     #[test]
@@ -468,8 +466,7 @@ mod tests {
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
-            "{}",
-            err
+            "{err}"
         );
     }
 
@@ -489,8 +486,7 @@ mod tests {
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
-            "{}",
-            err
+            "{err}"
         );
     }
 
@@ -508,7 +504,7 @@ mod tests {
 
         let err = transform.process(LogEvent::default().into()).unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("this is an error"), "{}", err);
+        assert!(err.contains("this is an error"), "{err}");
     }
 
     #[test]
@@ -525,7 +521,7 @@ mod tests {
         .unwrap_err()
         .to_string();
 
-        assert!(err.contains("syntax error:"), "{}", err);
+        assert!(err.contains("syntax error:"), "{err}");
     }
 
     #[test]
@@ -566,8 +562,8 @@ mod tests {
     #[test]
     fn lua_pairs() {
         let mut event = LogEvent::default();
-        event.insert("name", "Bob");
-        event.insert("friend", "Alice");
+        event.insert(event_path!("name"), "Bob");
+        event.insert(event_path!("friend"), "Alice");
 
         let event = transform_one(
             r"

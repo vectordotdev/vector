@@ -2,7 +2,6 @@ use std::{convert::TryFrom, num::NonZeroU32};
 
 use chrono::Utc;
 use futures::{future::ready, stream};
-use serde::Deserialize;
 use serde_json::{json, to_value};
 use vector_lib::config::{Tags, Telemetry, init_telemetry};
 use vrl::value;
@@ -11,6 +10,7 @@ use super::*;
 use crate::{
     config::{GenerateConfig, SinkConfig, SinkContext},
     event::{Event, LogEvent, Metric, MetricKind, MetricValue},
+    sinks::util::HttpEndpoint,
     test_util::{
         components::{
             DATA_VOLUME_SINK_TAGS, SINK_TAGS, run_and_assert_data_volume_sink_compliance,
@@ -28,12 +28,9 @@ fn generate_config() {
 async fn sink() -> (VectorSink, Event) {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
-    let config = NewRelicConfig::generate_config().to_string();
-    let mut config = NewRelicConfig::deserialize(
-        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
-    )
-    .expect("config should be valid");
-    config.override_uri = Some(mock_endpoint);
+    let mut config: NewRelicConfig =
+        serde_json::from_value(NewRelicConfig::generate_config()).expect("config should be valid");
+    config.override_uri = Some(HttpEndpoint::new(mock_endpoint).unwrap());
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();

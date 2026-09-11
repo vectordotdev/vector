@@ -1711,8 +1711,8 @@ per_tag_limits:
 // ============================================================================
 
 /// cache_size_per_key on a global per-tag entry in exact mode is a build error.
-#[tokio::test]
-async fn validation_rejects_cache_size_in_global_exact_mode() {
+#[test]
+fn validation_rejects_cache_size_in_global_exact_mode() {
     let config = make_transform_with_global_per_tag_limits(
         500,
         LimitExceededAction::DropTag,
@@ -1727,12 +1727,12 @@ async fn validation_rejects_cache_size_in_global_exact_mode() {
             },
         )]),
     );
-    assert!(config.build(&TransformContext::default()).await.is_err());
+    assert!(config.validate_structure().is_err());
 }
 
 /// cache_size_per_key on a per-metric per-tag entry in exact mode is a build error.
-#[tokio::test]
-async fn validation_rejects_cache_size_in_per_metric_exact_mode() {
+#[test]
+fn validation_rejects_cache_size_in_per_metric_exact_mode() {
     let config = make_transform_hashset_with_per_metric_limits(
         500,
         LimitExceededAction::DropTag,
@@ -1753,12 +1753,12 @@ async fn validation_rejects_cache_size_in_per_metric_exact_mode() {
             ),
         )]),
     );
-    assert!(config.build(&TransformContext::default()).await.is_err());
+    assert!(config.validate_structure().is_err());
 }
 
 /// cache_size_per_key on a per-metric per-tag entry in excluded mode is a build error.
-#[tokio::test]
-async fn validation_rejects_cache_size_in_per_metric_excluded_mode() {
+#[test]
+fn validation_rejects_cache_size_in_per_metric_excluded_mode() {
     let config = make_transform_hashset_with_per_metric_limits(
         500,
         LimitExceededAction::DropTag,
@@ -1775,7 +1775,7 @@ async fn validation_rejects_cache_size_in_per_metric_excluded_mode() {
             )])),
         )]),
     );
-    assert!(config.build(&TransformContext::default()).await.is_err());
+    assert!(config.validate_structure().is_err());
 }
 
 /// cache_size_per_key in probabilistic mode is valid.

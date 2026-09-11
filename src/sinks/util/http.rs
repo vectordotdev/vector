@@ -9,6 +9,9 @@ use http::{HeaderValue, Request, Response, StatusCode, header};
 use http_body::Body as _;
 use tracing::debug;
 
+/// Maximum number of response body bytes to include in a non-retriable error's reason.
+const MAX_ERROR_BODY_BYTES: usize = 1024;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
 
@@ -75,7 +78,6 @@ use crate::{
     http::{HttpClient, HttpError},
     internal_events::{EndpointBytesSent, SinkRequestBuildError},
     sinks::prelude::*,
-    template::Template,
 };
 
 pub trait HttpEventEncoder<Output> {
@@ -719,36 +721,70 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
 /// A more generic version of `HttpRetryLogic` that accepts anything that can be converted
 /// to a status code
 #[derive(Debug)]
-pub struct HttpStatusRetryLogic<F, Req, Res> {
+pub struct HttpStatusRetryLogic<F, Req, Res, E = HttpError> {
     func: F,
     request: PhantomData<Req>,
     response: PhantomData<Res>,
+    error: PhantomData<E>,
     retry_strategy: RetryStrategy,
 }
 
-impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res>
+// TODO: Remove this compatibility trait, the generic error parameter on
+// `HttpStatusRetryLogic`, and `new_with_error` once the HTTP v1 migration is complete:
+// https://github.com/vectordotdev/vector/issues/19179
+pub trait HttpErrorClassify {
+    fn is_retriable(&self) -> bool;
+}
+
+impl HttpErrorClassify for HttpError {
+    fn is_retriable(&self) -> bool {
+        HttpError::is_retriable(self)
+    }
+}
+
+impl<F, Req, Res> HttpStatusRetryLogic<F, Req, Res, HttpError>
 where
     F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
 {
-    pub const fn new(func: F, retry_strategy: RetryStrategy) -> HttpStatusRetryLogic<F, Req, Res> {
+    pub const fn new(func: F, retry_strategy: RetryStrategy) -> Self {
         HttpStatusRetryLogic {
             func,
             request: PhantomData,
             response: PhantomData,
+            error: PhantomData,
             retry_strategy,
         }
     }
 }
 
-impl<F, Req, Res> RetryLogic for HttpStatusRetryLogic<F, Req, Res>
+impl<F, Req, Res, E> HttpStatusRetryLogic<F, Req, Res, E>
 where
     F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
     Req: Send + Sync + 'static,
     Res: Send + Sync + 'static,
+    E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
 {
-    type Error = HttpError;
+    pub const fn new_with_error(func: F, retry_strategy: RetryStrategy) -> Self {
+        HttpStatusRetryLogic {
+            func,
+            request: PhantomData,
+            response: PhantomData,
+            error: PhantomData,
+            retry_strategy,
+        }
+    }
+}
+
+impl<F, Req, Res, E> RetryLogic for HttpStatusRetryLogic<F, Req, Res, E>
+where
+    F: Fn(&Res) -> StatusCode + Clone + Send + Sync + 'static,
+    Req: Send + Sync + 'static,
+    Res: Send + Sync + 'static,
+    E: HttpErrorClassify + std::error::Error + Send + Sync + 'static,
+{
+    type Error = E;
     type Request = Req;
     type Response = Res;
 
@@ -770,7 +806,7 @@ where
     }
 }
 
-impl<F, Req, Res> Clone for HttpStatusRetryLogic<F, Req, Res>
+impl<F, Req, Res, E> Clone for HttpStatusRetryLogic<F, Req, Res, E>
 where
     F: Clone,
 {
@@ -779,6 +815,7 @@ where
             func: self.func.clone(),
             request: PhantomData,
             response: PhantomData,
+            error: PhantomData,
             retry_strategy: self.retry_strategy.clone(),
         }
     }
@@ -810,6 +847,7 @@ fn headers_examples() -> BTreeMap<String, String> {
 }
 
 impl RequestConfig {
+    /// Split headers into static (non-dynamic) and template (dynamic) maps.
     pub fn split_headers(&self) -> (BTreeMap<String, String>, BTreeMap<String, Template>) {
         let mut static_headers = BTreeMap::new();
         let mut template_headers = BTreeMap::new();
@@ -954,7 +992,19 @@ pub fn http_response_retry_logic<Request: Clone + Send + Sync + 'static>(
     HttpResponse,
 > {
     HttpStatusRetryLogic::new(
-        |req: &HttpResponse| req.http_response.status(),
+        |req: &HttpResponse| {
+            let status = req.http_response.status();
+            let body = req.http_response.body();
+            let truncated = &body[..body.len().min(MAX_ERROR_BODY_BYTES)];
+            if !status.is_success() {
+                debug!(
+                    message = "HTTP response.",
+                    %status,
+                    body = %String::from_utf8_lossy(truncated),
+                );
+            }
+            status
+        },
         retry_strategy,
     )
 }

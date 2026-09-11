@@ -13,12 +13,11 @@ pub use vector_common::{
     Error, NamedInternalEvent, Result, TimeZone, assert_event_data_eq, atomic, btreemap,
     byte_size_of, byte_size_of::ByteSizeOf, conversion, counter, encode_logfmt, finalization,
     finalizer, gauge, histogram, id, impl_event_data_eq, internal_event, json_size,
-    registered_event, request_metadata, sensitive_string, shutdown, spawn_in_current_span, stats,
-    trigger,
+    registered_event, request_metadata, sampling, sensitive_string, shutdown,
+    spawn_in_current_span, stats, trigger,
 };
 pub use vector_config as configurable;
 pub use vector_config::impl_generate_config_from_default;
-#[cfg(feature = "vrl")]
 pub use vector_core::compile_vrl;
 pub use vector_core::{
     EstimatedJsonEncodedSizeOf, SpanField, buckets, default_data_dir, emit, event, fanout,
@@ -31,7 +30,6 @@ pub use vector_stream as stream;
 pub use vector_tap as tap;
 #[cfg(feature = "vector-top")]
 pub use vector_top as top;
-#[cfg(feature = "vrl")]
 pub use vrl;
 
 pub mod config {
