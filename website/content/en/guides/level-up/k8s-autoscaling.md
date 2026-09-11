@@ -111,21 +111,22 @@ first, the in-flight request's events are lost along with it.
                                                            +----------------------------------+
 ```
 
-### Why HTTP with L7 load balancing?
+### Load balancing with NGINX Ingress Controller
 
-A plain TCP connection has no request boundary: Once a client is connected to
-a pod, a Kubernetes ClusterIP Service (which load-balances at L4) cannot
-redistribute that traffic to a newly created pod. By contrast, HTTP
-defines a request boundary, so an L7 load balancer such as the NGINX Ingress Controller can route
-each request independently. As new pods become Ready, they can pick up load immediately.
+To distribute traffic across available pods as replicas are created and
+removed, this architecture uses the NGINX Ingress Controller as an HTTP
+layer 7 (L7) load balancer. It routes each request independently, so new pods
+can receive traffic as soon as they become Ready.
 
-A similar setup using [HAProxy](https://www.haproxy.org/) in TCP mode has the same limitation as a Kubernetes ClusterIP Service: It
-load-balances at the connection level, so a single producer's connection stays
-pinned to one consumer for its lifetime and can leave some consumers starved
-of data entirely.
+Layer 7 routing is necessary because a TCP connection has no request boundary.
+A Kubernetes ClusterIP Service load-balances at layer 4 (L4), so after a client
+connects to a pod, the Service cannot redistribute that connection to a new
+replica. HAProxy in TCP mode has the same limitation: a producer's connection
+remains pinned to one consumer for its lifetime and can leave other consumers
+without traffic.
 
-This is why we installed an NGINX Ingress Controller in front of Vector instead of exposing
-Vector through a ClusterIP Service.
+For this reason, the experiments place the NGINX Ingress Controller in front
+of Vector instead of exposing Vector directly through a ClusterIP Service.
 
 ## Methodology
 
