@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::TimeZone;
 use ordered_float::NotNan;
+use snafu::Snafu;
 use uuid::Uuid;
 
 use super::{MetricTags, WithMetadata};
@@ -19,6 +20,32 @@ use vrl::value::{ObjectMap, Value as VrlValue};
 use super::EventFinalizers;
 use super::metadata::{Inner, default_schema_definition};
 use super::{EventMetadata, array, metric::MetricSketch};
+
+/// Failure converting a structurally valid internal event protobuf into Vector's in-memory types.
+///
+/// Distinct from a `prost` decode failure: the bytes parsed as protobuf, but a required event
+/// variant was absent/unrecognized or a value could not be represented.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+pub enum EventProtoError {
+    #[snafu(display(
+        "event protobuf was structurally valid but an event or metric variant was absent or unrecognized; this often indicates a version mismatch"
+    ))]
+    UnrecognizedEventVariant,
+    #[snafu(display(
+        "event protobuf contained a NaN float, which cannot be represented in Vector's event model"
+    ))]
+    NanFloat,
+    #[snafu(display("event protobuf contained an invalid timestamp"))]
+    InvalidTimestamp,
+    #[snafu(display(
+        "event protobuf contained an AgentDDSketch whose k and n bin lists have different lengths"
+    ))]
+    MismatchedSketchBins,
+}
+
+fn require_variant<T>(value: Option<T>) -> Result<T, EventProtoError> {
+    value.ok_or(EventProtoError::UnrecognizedEventVariant)
+}
 
 impl event_array::Events {
     // We can't use the standard `From` traits here because the actual
@@ -50,20 +77,31 @@ impl From<array::EventArray> for EventArray {
     }
 }
 
-impl From<EventArray> for array::EventArray {
-    fn from(events: EventArray) -> Self {
-        let events = events.events.unwrap();
+impl TryFrom<EventArray> for array::EventArray {
+    type Error = EventProtoError;
 
-        match events {
-            event_array::Events::Logs(logs) => {
-                array::EventArray::Logs(logs.logs.into_iter().map(Into::into).collect())
-            }
-            event_array::Events::Metrics(metrics) => {
-                array::EventArray::Metrics(metrics.metrics.into_iter().map(Into::into).collect())
-            }
-            event_array::Events::Traces(traces) => {
-                array::EventArray::Traces(traces.traces.into_iter().map(Into::into).collect())
-            }
+    fn try_from(events: EventArray) -> Result<Self, Self::Error> {
+        match require_variant(events.events)? {
+            event_array::Events::Logs(logs) => Ok(Self::Logs(
+                logs.logs
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, _>>()?,
+            )),
+            event_array::Events::Metrics(metrics) => Ok(Self::Metrics(
+                metrics
+                    .metrics
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, _>>()?,
+            )),
+            event_array::Events::Traces(traces) => Ok(Self::Traces(
+                traces
+                    .traces
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<_, _>>()?,
+            )),
         }
     }
 }
@@ -92,62 +130,56 @@ impl From<Trace> for Event {
     }
 }
 
-impl From<Log> for super::LogEvent {
+impl TryFrom<Log> for super::LogEvent {
+    type Error = EventProtoError;
+
     #[allow(deprecated)]
-    fn from(log: Log) -> Self {
-        let metadata = log
-            .metadata_full
-            .map(Into::into)
-            .or_else(|| {
-                log.metadata
-                    .and_then(decode_value)
-                    .map(EventMetadata::default_with_value)
-            })
-            .unwrap_or_default();
+    fn try_from(log: Log) -> Result<Self, Self::Error> {
+        let metadata = decode_event_metadata(log.metadata_full, log.metadata)?;
 
         if let Some(value) = log.value {
-            Self::from_parts(decode_value(value).unwrap_or(VrlValue::Null), metadata)
+            Ok(Self::from_parts(
+                decode_value(value)?.unwrap_or(VrlValue::Null),
+                metadata,
+            ))
         } else {
             // This is for backwards compatibility. Only `value` should be set
-            let fields = log
-                .fields
-                .into_iter()
-                .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
-                .collect::<ObjectMap>();
+            let mut fields = ObjectMap::new();
+            for (k, v) in log.fields {
+                if let Some(value) = decode_value(v)? {
+                    fields.insert(k.into(), value);
+                }
+            }
 
-            Self::from_map(fields, metadata)
+            Ok(Self::from_map(fields, metadata))
         }
     }
 }
 
-impl From<Trace> for super::TraceEvent {
-    fn from(trace: Trace) -> Self {
+impl TryFrom<Trace> for super::TraceEvent {
+    type Error = EventProtoError;
+
+    fn try_from(trace: Trace) -> Result<Self, Self::Error> {
         #[allow(deprecated)]
-        let metadata = trace
-            .metadata_full
-            .map(Into::into)
-            .or_else(|| {
-                trace
-                    .metadata
-                    .and_then(decode_value)
-                    .map(EventMetadata::default_with_value)
-            })
-            .unwrap_or_default();
+        let metadata = decode_event_metadata(trace.metadata_full, trace.metadata)?;
 
-        let fields = trace
-            .fields
-            .into_iter()
-            .filter_map(|(k, v)| decode_value(v).map(|value| (k.into(), value)))
-            .collect::<ObjectMap>();
+        let mut fields = ObjectMap::new();
+        for (k, v) in trace.fields {
+            if let Some(value) = decode_value(v)? {
+                fields.insert(k.into(), value);
+            }
+        }
 
-        Self::from(super::LogEvent::from_map(fields, metadata))
+        Ok(Self::from(super::LogEvent::from_map(fields, metadata)))
     }
 }
 
-impl From<MetricValue> for super::MetricValue {
+impl TryFrom<MetricValue> for super::MetricValue {
+    type Error = EventProtoError;
+
     #[allow(deprecated)]
-    fn from(value: MetricValue) -> Self {
-        match value {
+    fn try_from(value: MetricValue) -> Result<Self, Self::Error> {
+        Ok(match value {
             MetricValue::Counter(counter) => Self::Counter {
                 value: counter.value,
             },
@@ -196,18 +228,20 @@ impl From<MetricValue> for super::MetricValue {
                 count: summary.count,
                 sum: summary.sum,
             },
-            MetricValue::Sketch(sketch) => match sketch.sketch.unwrap() {
+            MetricValue::Sketch(sketch) => match require_variant(sketch.sketch)? {
                 sketch::Sketch::AgentDdSketch(ddsketch) => Self::Sketch {
-                    sketch: ddsketch.into(),
+                    sketch: ddsketch.try_into()?,
                 },
             },
-        }
+        })
     }
 }
 
-impl From<Metric> for super::Metric {
+impl TryFrom<Metric> for super::Metric {
+    type Error = EventProtoError;
+
     #[allow(deprecated)]
-    fn from(metric: Metric) -> Self {
+    fn try_from(metric: Metric) -> Result<Self, Self::Error> {
         let kind = match metric.kind() {
             metric::Kind::Incremental => super::MetricKind::Incremental,
             metric::Kind::Absolute => super::MetricKind::Absolute,
@@ -217,14 +251,11 @@ impl From<Metric> for super::Metric {
 
         let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
 
-        // Sign can never be lost as ts.nanos is always non negative (per proto spec)
-        #[allow(clippy::cast_sign_loss)]
-        let timestamp = metric.timestamp.map(|ts| {
-            chrono::Utc
-                .timestamp_opt(ts.seconds, ts.nanos as u32)
-                .single()
-                .expect("invalid timestamp")
-        });
+        let timestamp = metric
+            .timestamp
+            .as_ref()
+            .map(decode_timestamp)
+            .transpose()?;
 
         let mut tags = MetricTags(
             metric
@@ -252,35 +283,26 @@ impl From<Metric> for super::Metric {
         }
         let tags = (!tags.is_empty()).then_some(tags);
 
-        let value = super::MetricValue::from(metric.value.unwrap());
+        let value = require_variant(metric.value)?.try_into()?;
 
-        let metadata = metric
-            .metadata_full
-            .map(Into::into)
-            .or_else(|| {
-                metric
-                    .metadata
-                    .and_then(decode_value)
-                    .map(EventMetadata::default_with_value)
-            })
-            .unwrap_or_default();
+        let metadata = decode_event_metadata(metric.metadata_full, metric.metadata)?;
 
-        Self::new_with_metadata(name, kind, value, metadata)
+        Ok(Self::new_with_metadata(name, kind, value, metadata)
             .with_namespace(namespace)
             .with_tags(tags)
             .with_timestamp(timestamp)
-            .with_interval_ms(std::num::NonZeroU32::new(metric.interval_ms))
+            .with_interval_ms(std::num::NonZeroU32::new(metric.interval_ms)))
     }
 }
 
-impl From<EventWrapper> for super::Event {
-    fn from(proto: EventWrapper) -> Self {
-        let event = proto.event.unwrap();
+impl TryFrom<EventWrapper> for super::Event {
+    type Error = EventProtoError;
 
-        match event {
-            Event::Log(proto) => Self::Log(proto.into()),
-            Event::Metric(proto) => Self::Metric(proto.into()),
-            Event::Trace(proto) => Self::Trace(proto.into()),
+    fn try_from(proto: EventWrapper) -> Result<Self, Self::Error> {
+        match require_variant(proto.event)? {
+            Event::Log(proto) => Ok(Self::Log(proto.try_into()?)),
+            Event::Metric(proto) => Ok(Self::Metric(proto.try_into()?)),
+            Event::Trace(proto) => Ok(Self::Trace(proto.try_into()?)),
         }
     }
 }
@@ -540,8 +562,10 @@ impl From<AgentDDSketch> for Sketch {
     }
 }
 
-impl From<sketch::AgentDdSketch> for MetricSketch {
-    fn from(sketch: sketch::AgentDdSketch) -> Self {
+impl TryFrom<sketch::AgentDdSketch> for MetricSketch {
+    type Error = EventProtoError;
+
+    fn try_from(sketch: sketch::AgentDdSketch) -> Result<Self, Self::Error> {
         // These safe conversions are annoying because the Datadog Agent internally uses i16/u16,
         // but the proto definition uses i32/u32, so we have to jump through these hoops.
         let keys = sketch
@@ -558,7 +582,7 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
             .into_iter()
             .map(|n| n.try_into().unwrap_or(u16::MAX))
             .collect::<Vec<_>>();
-        MetricSketch::AgentDDSketch(
+        Ok(MetricSketch::AgentDDSketch(
             AgentDDSketch::from_raw(
                 sketch.count,
                 sketch.min,
@@ -568,8 +592,8 @@ impl From<sketch::AgentDdSketch> for MetricSketch {
                 &keys,
                 &counts,
             )
-            .expect("keys/counts were unexpectedly mismatched"),
-        )
+            .ok_or(EventProtoError::MismatchedSketchBins)?,
+        ))
     }
 }
 
@@ -654,8 +678,10 @@ impl From<EventMetadata> for Metadata {
     }
 }
 
-impl From<Metadata> for EventMetadata {
-    fn from(value: Metadata) -> Self {
+impl TryFrom<Metadata> for EventMetadata {
+    type Error = EventProtoError;
+
+    fn try_from(value: Metadata) -> Result<Self, Self::Error> {
         let Metadata {
             value: metadata_value,
             source_id,
@@ -666,7 +692,10 @@ impl From<Metadata> for EventMetadata {
             source_event_id,
         } = value;
 
-        let metadata_value = metadata_value.and_then(decode_value);
+        let metadata_value = match metadata_value {
+            Some(value) => decode_value(value)?,
+            None => None,
+        };
         let source_id = source_id.map(|s| Arc::new(s.into()));
         let upstream_id = upstream_id.map(|id| Arc::new(id.into()));
         let secrets = secrets.map(Into::into);
@@ -687,7 +716,7 @@ impl From<Metadata> for EventMetadata {
             }
         };
 
-        EventMetadata {
+        Ok(EventMetadata {
             inner: Arc::new(Inner {
                 value: metadata_value
                     .unwrap_or_else(|| vrl::value::Value::Object(ObjectMap::new())),
@@ -702,48 +731,78 @@ impl From<Metadata> for EventMetadata {
                 source_event_id,
             }),
             last_transform_timestamp: None,
-        }
+        })
     }
 }
 
-fn decode_value(input: Value) -> Option<super::Value> {
+fn decode_event_metadata(
+    metadata_full: Option<Metadata>,
+    metadata: Option<Value>,
+) -> Result<EventMetadata, EventProtoError> {
+    if let Some(full) = metadata_full {
+        full.try_into()
+    } else if let Some(value) = metadata {
+        Ok(decode_value(value)?
+            .map(EventMetadata::default_with_value)
+            .unwrap_or_default())
+    } else {
+        Ok(EventMetadata::default())
+    }
+}
+
+fn decode_timestamp(
+    ts: &prost_types::Timestamp,
+) -> Result<chrono::DateTime<chrono::Utc>, EventProtoError> {
+    // Sign is never lost as ts.nanos is always non negative (per proto spec)
+    #[allow(clippy::cast_sign_loss)]
+    chrono::Utc
+        .timestamp_opt(ts.seconds, ts.nanos as u32)
+        .single()
+        .ok_or(EventProtoError::InvalidTimestamp)
+}
+
+fn decode_value(input: Value) -> Result<Option<super::Value>, EventProtoError> {
     match input.kind {
-        Some(value::Kind::RawBytes(data)) => Some(super::Value::Bytes(data)),
-        // Sign is never lost as ts.nanos is always non negative (per proto spec)
-        #[allow(clippy::cast_sign_loss)]
-        Some(value::Kind::Timestamp(ts)) => Some(super::Value::Timestamp(
-            chrono::Utc
-                .timestamp_opt(ts.seconds, ts.nanos as u32)
-                .single()
-                .expect("invalid timestamp"),
-        )),
-        Some(value::Kind::Integer(value)) => Some(super::Value::Integer(value)),
-        Some(value::Kind::Float(value)) => Some(super::Value::Float(NotNan::new(value).unwrap())),
-        Some(value::Kind::Boolean(value)) => Some(super::Value::Boolean(value)),
+        Some(value::Kind::RawBytes(data)) => Ok(Some(super::Value::Bytes(data))),
+        Some(value::Kind::Timestamp(ts)) => {
+            Ok(Some(super::Value::Timestamp(decode_timestamp(&ts)?)))
+        }
+        Some(value::Kind::Integer(value)) => Ok(Some(super::Value::Integer(value))),
+        Some(value::Kind::Float(value)) => {
+            let value = NotNan::new(value).map_err(|_| EventProtoError::NanFloat)?;
+            Ok(Some(super::Value::Float(value)))
+        }
+        Some(value::Kind::Boolean(value)) => Ok(Some(super::Value::Boolean(value))),
         Some(value::Kind::Map(map)) => decode_map(map.fields),
         Some(value::Kind::Array(array)) => decode_array(array.items),
-        Some(value::Kind::Null(_)) => Some(super::Value::Null),
+        Some(value::Kind::Null(_)) => Ok(Some(super::Value::Null)),
         None => {
             error!("Encoded event contains unknown value kind.");
-            None
+            Ok(None)
         }
     }
 }
 
-fn decode_map(fields: BTreeMap<String, Value>) -> Option<super::Value> {
-    fields
-        .into_iter()
-        .map(|(key, value)| decode_value(value).map(|value| (key.into(), value)))
-        .collect::<Option<ObjectMap>>()
-        .map(event::Value::Object)
+fn decode_map(fields: BTreeMap<String, Value>) -> Result<Option<super::Value>, EventProtoError> {
+    let mut map = ObjectMap::new();
+    for (key, value) in fields {
+        let Some(decoded) = decode_value(value)? else {
+            return Ok(None);
+        };
+        map.insert(key.into(), decoded);
+    }
+    Ok(Some(event::Value::Object(map)))
 }
 
-fn decode_array(items: Vec<Value>) -> Option<super::Value> {
-    items
-        .into_iter()
-        .map(decode_value)
-        .collect::<Option<Vec<_>>>()
-        .map(super::Value::Array)
+fn decode_array(items: Vec<Value>) -> Result<Option<super::Value>, EventProtoError> {
+    let mut decoded_items = Vec::with_capacity(items.len());
+    for item in items {
+        let Some(decoded) = decode_value(item)? else {
+            return Ok(None);
+        };
+        decoded_items.push(decoded);
+    }
+    Ok(Some(super::Value::Array(decoded_items)))
 }
 
 fn encode_value(value: super::Value) -> Value {
@@ -883,7 +942,9 @@ mod tests {
         let decoded = metrics
             .metrics
             .into_iter()
-            .map(crate::event::Metric::from)
+            .map(|metric| {
+                crate::event::Metric::try_from(metric).expect("legacy metric should decode")
+            })
             .map(|metric| metric.value().clone())
             .collect::<Vec<_>>();
 
@@ -894,7 +955,8 @@ mod tests {
     fn decodes_pre_v27_single_valued_metric_tags() {
         let encoded = Metric::decode(PRE_V27_TAGS).unwrap();
 
-        let decoded = crate::event::Metric::from(encoded);
+        let decoded =
+            crate::event::Metric::try_from(encoded).expect("legacy metric tags should decode");
 
         assert_eq!(decoded.tag_value("service").as_deref(), Some("api"));
     }
@@ -916,7 +978,8 @@ mod tests {
         )
         .with_tags(Some(tags));
 
-        let decoded = crate::event::Metric::from(Metric::from(event));
+        let decoded = crate::event::Metric::try_from(Metric::from(event))
+            .expect("encoded metric should decode");
         let values = decoded
             .tags()
             .unwrap()
@@ -932,9 +995,14 @@ mod tests {
     fn decodes_pre_v34_metadata_for_all_event_types() {
         let expected = VrlValue::from("legacy metadata");
 
-        let log = crate::event::LogEvent::from(Log::decode(PRE_V34_LOG_METADATA).unwrap());
-        let trace = crate::event::TraceEvent::from(Trace::decode(PRE_V34_TRACE_METADATA).unwrap());
-        let metric = crate::event::Metric::from(Metric::decode(PRE_V34_METRIC_METADATA).unwrap());
+        let log = crate::event::LogEvent::try_from(Log::decode(PRE_V34_LOG_METADATA).unwrap())
+            .expect("legacy log metadata should decode");
+        let trace =
+            crate::event::TraceEvent::try_from(Trace::decode(PRE_V34_TRACE_METADATA).unwrap())
+                .expect("legacy trace metadata should decode");
+        let metric =
+            crate::event::Metric::try_from(Metric::decode(PRE_V34_METRIC_METADATA).unwrap())
+                .expect("legacy metric metadata should decode");
 
         assert_eq!(log.metadata().value(), &expected);
         assert_eq!(trace.metadata().value(), &expected);
@@ -943,9 +1011,145 @@ mod tests {
 
     #[test]
     fn decodes_pre_v41_metadata_without_source_event_id() {
-        let decoded = EventMetadata::from(Metadata::decode(PRE_V41_METADATA).unwrap());
+        let decoded = EventMetadata::try_from(Metadata::decode(PRE_V41_METADATA).unwrap())
+            .expect("legacy metadata should decode");
 
         assert_eq!(decoded.source_event_id(), None);
         assert_eq!(decoded.source_type(), Some("legacy"));
+    }
+
+    #[test]
+    fn missing_event_array_variant_is_an_error() {
+        let proto = EventArray { events: None };
+        assert_eq!(
+            array::EventArray::try_from(proto),
+            Err(EventProtoError::UnrecognizedEventVariant)
+        );
+    }
+
+    #[test]
+    fn missing_event_wrapper_variant_is_an_error() {
+        let proto = EventWrapper { event: None };
+        assert_eq!(
+            crate::event::Event::try_from(proto),
+            Err(EventProtoError::UnrecognizedEventVariant)
+        );
+    }
+
+    #[test]
+    fn missing_metric_value_variant_is_an_error() {
+        let proto = Metric {
+            name: "requests".into(),
+            value: None,
+            ..Metric::default()
+        };
+        assert_eq!(
+            crate::event::Metric::try_from(proto),
+            Err(EventProtoError::UnrecognizedEventVariant)
+        );
+    }
+
+    #[test]
+    fn missing_sketch_variant_is_an_error() {
+        let proto = Metric {
+            name: "requests".into(),
+            value: Some(MetricValue::Sketch(Sketch { sketch: None })),
+            ..Metric::default()
+        };
+        assert_eq!(
+            crate::event::Metric::try_from(proto),
+            Err(EventProtoError::UnrecognizedEventVariant)
+        );
+    }
+
+    #[test]
+    fn mismatched_sketch_bins_is_an_error() {
+        let proto = Metric {
+            name: "requests".into(),
+            value: Some(MetricValue::Sketch(Sketch {
+                sketch: Some(sketch::Sketch::AgentDdSketch(sketch::AgentDdSketch {
+                    count: 1,
+                    min: 0.0,
+                    max: 1.0,
+                    sum: 1.0,
+                    avg: 1.0,
+                    k: vec![1],
+                    n: vec![1, 2],
+                })),
+            })),
+            ..Metric::default()
+        };
+        assert_eq!(
+            crate::event::Metric::try_from(proto),
+            Err(EventProtoError::MismatchedSketchBins)
+        );
+    }
+
+    #[test]
+    fn nan_float_value_is_an_error() {
+        let value = Value {
+            kind: Some(value::Kind::Float(f64::NAN)),
+        };
+        assert_eq!(decode_value(value), Err(EventProtoError::NanFloat));
+    }
+
+    #[test]
+    fn nan_float_in_event_data_rejects_the_record() {
+        let proto = EventWrapper {
+            event: Some(Event::Log(Log {
+                value: Some(Value {
+                    kind: Some(value::Kind::Float(f64::NAN)),
+                }),
+                ..Log::default()
+            })),
+        };
+        assert_eq!(
+            crate::event::Event::try_from(proto),
+            Err(EventProtoError::NanFloat)
+        );
+    }
+
+    #[test]
+    fn nan_float_in_metadata_rejects_the_record() {
+        let proto = EventWrapper {
+            event: Some(Event::Log(Log {
+                metadata_full: Some(Metadata {
+                    value: Some(Value {
+                        kind: Some(value::Kind::Float(f64::NAN)),
+                    }),
+                    ..Metadata::default()
+                }),
+                ..Log::default()
+            })),
+        };
+        assert_eq!(
+            crate::event::Event::try_from(proto),
+            Err(EventProtoError::NanFloat)
+        );
+    }
+
+    #[test]
+    fn unknown_event_array_oneof_tag_is_unrecognized_variant() {
+        // Field 4 is not a member of `EventArray.events` (logs=1, metrics=2, traces=3).
+        // Tag = (4 << 3) | 2 (length-delimited).
+        let bytes = bytes::Bytes::from_static(&[34, 0]);
+        let proto = EventArray::decode(bytes).expect("unknown field is valid protobuf");
+        assert!(proto.events.is_none());
+        assert_eq!(
+            array::EventArray::try_from(proto),
+            Err(EventProtoError::UnrecognizedEventVariant)
+        );
+    }
+
+    #[test]
+    fn unknown_event_wrapper_oneof_tag_is_unrecognized_variant() {
+        // Field 4 is not a member of `EventWrapper.event` (log=1, metric=2, trace=3).
+        let bytes = bytes::Bytes::from_static(&[34, 0]);
+        let proto = EventWrapper::decode(bytes).expect("unknown field is valid protobuf");
+        assert!(proto.event.is_none());
+        assert_eq!(
+            crate::event::Event::try_from(proto),
+            Err(EventProtoError::UnrecognizedEventVariant)
+        );
     }
 }

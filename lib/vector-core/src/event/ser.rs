@@ -158,12 +158,18 @@ pub enum EncodeError {
 #[derive(Debug, Snafu)]
 pub enum DecodeError {
     #[snafu(display(
-        "the provided buffer could not be decoded as a valid Protocol Buffers payload"
+        "the provided buffer could not be decoded as EventArray ({event_array}) or as EventWrapper ({event_wrapper})"
     ))]
-    InvalidProtobufPayload,
+    InvalidProtobufPayload {
+        event_array: prost::DecodeError,
+        event_wrapper: prost::DecodeError,
+    },
     #[snafu(display("unsupported encoding metadata for this context"))]
     UnsupportedEncodingMetadata,
+    #[snafu(transparent)]
+    InvalidEvent { source: proto::EventProtoError },
 }
+
 /// Flags for describing the encoding scheme used by our primary event types that flow through buffers.
 ///
 /// # Stability
@@ -266,13 +272,18 @@ impl Encodable for EventArray {
         B: Buf + Clone,
     {
         if metadata.contains(EventEncodableMetadataFlags::DiskBufferV1CompatibilityMode) {
-            proto::EventArray::decode(buffer.clone())
-                .map(Into::into)
-                .or_else(|_| {
-                    proto::EventWrapper::decode(buffer)
-                        .map(|pe| EventArray::from(Event::from(pe)))
-                        .map_err(|_| DecodeError::InvalidProtobufPayload)
-                })
+            match proto::EventArray::decode(buffer.clone()) {
+                Ok(array) => array.try_into().map_err(DecodeError::from),
+                Err(event_array) => match proto::EventWrapper::decode(buffer) {
+                    Ok(wrapper) => Event::try_from(wrapper)
+                        .map(EventArray::from)
+                        .map_err(DecodeError::from),
+                    Err(event_wrapper) => Err(DecodeError::InvalidProtobufPayload {
+                        event_array,
+                        event_wrapper,
+                    }),
+                },
+            }
         } else {
             Err(DecodeError::UnsupportedEncodingMetadata)
         }
