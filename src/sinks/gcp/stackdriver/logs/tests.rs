@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{future::ready, stream};
-use http::Uri;
 use indoc::indoc;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::{event_path, value};
@@ -28,9 +27,8 @@ use crate::{
         },
         prelude::*,
         util::{
-            HttpEndpoint,
-            encoding::Encoder as _,
-            http::{HttpRequest, HttpServiceRequestBuilder},
+            HttpEndpoint, encoding::Encoder as _, http::HttpRequest,
+            http_v1::HttpServiceRequestBuilder,
         },
     },
     template::{ConfinementConfig, Template, UnconfinedTemplate},
@@ -222,8 +220,6 @@ fn severity_remaps_strings() {
 
 #[tokio::test]
 async fn correct_request() {
-    let uri: Uri = default_endpoint().into_uri();
-
     let transformer = Transformer::default();
     let encoder = StackdriverLogsEncoder::new(
         transformer,
@@ -251,7 +247,7 @@ async fn correct_request() {
     let body = Bytes::copy_from_slice(&writer);
 
     let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
-        uri: uri.clone(),
+        endpoint: default_endpoint(),
         auth: GcpAuthenticator::None,
     };
 
