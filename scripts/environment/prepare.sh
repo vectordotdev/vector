@@ -38,6 +38,7 @@ DEFAULT_MODULES=(
 
 SYSTEM_MODULES=(
   libsasl2
+  unixodbc
   cmark-gfm
   cross-binutils
   rpm
@@ -338,6 +339,7 @@ install_system_packages() {
     Linux)
       local packages=()
       contains_module libsasl2 && packages+=(libsasl2-dev)
+      contains_module unixodbc && packages+=(unixodbc-dev)
       contains_module cmark-gfm && packages+=(cmark-gfm)
       contains_module cross-binutils && packages+=(binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu)
       contains_module rpm && packages+=(rpm)
@@ -358,6 +360,7 @@ install_system_packages() {
     Darwin)
       local packages=()
       contains_module libsasl2 && packages+=(cyrus-sasl)
+      contains_module unixodbc && packages+=(unixodbc)
       contains_module cmark-gfm && packages+=(cmark-gfm)
       contains_module rpm && packages+=(rpm)
       contains_module lcov && packages+=(lcov)
@@ -369,6 +372,27 @@ install_system_packages() {
       fi
       if [[ "${#packages[@]}" -gt 0 ]]; then
         brew install "${packages[@]}"
+      fi
+      if contains_module unixodbc; then
+        # odbc-sys also probes `brew --prefix`, but these keep the linker,
+        # headers, and pkg-config consistent for Intel and Apple Silicon.
+        local prefix lib_dir include_dir pkgconfig_dir
+        prefix="$(brew --prefix unixodbc)"
+        lib_dir="${prefix}/lib"
+        include_dir="${prefix}/include"
+        pkgconfig_dir="${prefix}/lib/pkgconfig"
+        export LIBRARY_PATH="${lib_dir}${LIBRARY_PATH:+:$LIBRARY_PATH}"
+        export CPATH="${include_dir}${CPATH:+:$CPATH}"
+        export PKG_CONFIG_PATH="${pkgconfig_dir}${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+        export DYLD_FALLBACK_LIBRARY_PATH="${lib_dir}${DYLD_FALLBACK_LIBRARY_PATH:+:$DYLD_FALLBACK_LIBRARY_PATH}"
+        if [[ -n "${GITHUB_ENV:-}" ]]; then
+          {
+            echo "LIBRARY_PATH=${LIBRARY_PATH}"
+            echo "CPATH=${CPATH}"
+            echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
+            echo "DYLD_FALLBACK_LIBRARY_PATH=${DYLD_FALLBACK_LIBRARY_PATH}"
+          } >>"${GITHUB_ENV}"
+        fi
       fi
       ;;
     *)

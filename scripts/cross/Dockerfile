@@ -3,10 +3,14 @@ ARG CROSS_DIGEST
 
 FROM ghcr.io/cross-rs/${TARGET}@${CROSS_DIGEST}
 
+# Re-declare after FROM so the target triple is available to the build steps
+# below (e.g. bootstrap-ubuntu.sh installs target-arch specific dev libraries).
+ARG TARGET
+
 # Common steps for all targets
 COPY scripts/cross/bootstrap-ubuntu.sh /
 COPY scripts/environment/install-protoc.sh /
-RUN /bootstrap-ubuntu.sh && bash /install-protoc.sh
+RUN TARGET="${TARGET}" /bootstrap-ubuntu.sh && bash /install-protoc.sh
 
 # Allow cmake to find pre-built dependencies (e.g. curl from curl-sys) that
 # land in CMAKE_PREFIX_PATH rather than the cross sysroot.  The cross-rs

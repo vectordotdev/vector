@@ -126,6 +126,8 @@ jobs:
             "mqtt",
             "nats",
             "nginx",
+            "odbc-mariadb",
+            "odbc-postgresql",
             "opensearch",
             "opentelemetry",
             "postgres",

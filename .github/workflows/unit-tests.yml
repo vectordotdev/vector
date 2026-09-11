@@ -81,6 +81,7 @@ jobs:
           protoc: true
           libsasl2: true
           cargo-cache: true
+          unixodbc: true
 
       - name: Run tests
         run: |

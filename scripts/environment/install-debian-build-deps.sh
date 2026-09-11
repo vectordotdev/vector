@@ -15,8 +15,13 @@ apt-get install -y --no-install-recommends \
   libssl-dev \
   libxxhash-dev \
   mold \
+  odbcinst \
+  odbc-mariadb \
+  odbc-postgresql \
   perl \
   pkg-config \
+  unixodbc \
+  unixodbc-dev \
   unzip \
   zlib1g-dev
 rm -rf /var/lib/apt/lists/*

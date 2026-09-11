@@ -34,6 +34,10 @@ inputs:
     required: false
     default: false
     description: "Install libsasl2." # Required to fully build Vector
+  unixodbc:
+    required: false
+    default: false
+    description: "Install unixODBC headers/libs (apt unixodbc-dev or brew unixodbc). Required when sources-odbc is enabled."
   cmark-gfm:
     required: false
     default: false
@@ -223,6 +227,7 @@ runs:
         [[ "${{ inputs.protoc }}" == "true" ]] && mods+=("protoc")
         [[ "${{ inputs.cue }}" == "true" ]] && mods+=("cue")
         [[ "${{ inputs.libsasl2 }}" == "true" ]] && mods+=("libsasl2")
+        [[ "${{ inputs.unixodbc }}" == "true" ]] && mods+=("unixodbc")
         [[ "${{ inputs.cmark-gfm }}" == "true" ]] && mods+=("cmark-gfm")
         [[ "${{ inputs.cross-binutils }}" == "true" ]] && mods+=("cross-binutils")
         [[ "${{ inputs.rpm }}" == "true" ]] && mods+=("rpm")

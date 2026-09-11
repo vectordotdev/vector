@@ -126,6 +126,10 @@ on:
         value: ${{ jobs.int_tests.outputs.nats }}
       nginx:
         value: ${{ jobs.int_tests.outputs.nginx }}
+      odbc-mariadb:
+        value: ${{ jobs.int_tests.outputs.odbc-mariadb }}
+      odbc-postgresql:
+        value: ${{ jobs.int_tests.outputs.odbc-postgresql }}
       opensearch:
         value: ${{ jobs.int_tests.outputs.opensearch }}
       opentelemetry:
@@ -366,6 +370,8 @@ jobs:
       mqtt: ${{ steps.filter.outputs.mqtt }}
       nats: ${{ steps.filter.outputs.nats }}
       nginx: ${{ steps.filter.outputs.nginx }}
+      odbc-mariadb: ${{ steps.filter.outputs.odbc-mariadb }}
+      odbc-postgresql: ${{ steps.filter.outputs.odbc-postgresql }}
       opensearch: ${{ steps.filter.outputs.opensearch }}
       opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
       postgres: ${{ steps.filter.outputs.postgres }}
@@ -432,6 +438,8 @@ jobs:
             "mqtt": ${{ steps.filter.outputs.mqtt }},
             "nats": ${{ steps.filter.outputs.nats }},
             "nginx": ${{ steps.filter.outputs.nginx }},
+            "odbc-mariadb": ${{ steps.filter.outputs.odbc-mariadb }},
+            "odbc-postgresql": ${{ steps.filter.outputs.odbc-postgresql }},
             "opensearch": ${{ steps.filter.outputs.opensearch }},
             "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
             "postgres": ${{ steps.filter.outputs.postgres }},

@@ -1,0 +1,19 @@
+sources:
+  my_source_id:
+    type: odbc
+    connection_string: driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>
+    connection_string_filepath: /path/to/connection_string.txt
+    last_run_metadata_path: /path/to/tracking.json
+    login_timeout: 3
+    odbc_batch_size: 100
+    odbc_default_timezone: UTC
+    odbc_max_str_limit: 4096
+    schedule: "*/5 * * * * *"
+    schedule_timezone: UTC
+    statement: SELECT * FROM users WHERE id > ? ORDER BY id ASC
+    statement_init_params:
+      - name: id
+        value: "0"
+    statement_timeout: 3
+    tracking_columns:
+      - id

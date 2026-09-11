@@ -91,7 +91,7 @@ jobs:
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             gcc gcc-c++ make cmake perl perl-IPC-Cmd \
-            openssl-devel cyrus-sasl-devel zlib-devel \
+            openssl-devel cyrus-sasl-devel zlib-devel unixODBC-devel \
             pkgconfig clang \
             rpm-build sudo \
             git tar gzip xz which findutils \
@@ -126,6 +126,7 @@ jobs:
           rust: true
           cargo-deb: true
           protoc: true
+          unixodbc: true
       - name: Build Vector
         run: make NATIVE=true package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish

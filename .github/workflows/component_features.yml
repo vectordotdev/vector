@@ -49,6 +49,7 @@ jobs:
           cargo-nextest: true
           protoc: true
           libsasl2: true
+          unixodbc: true
           cargo-hack: true
           cargo-cache: true
 
