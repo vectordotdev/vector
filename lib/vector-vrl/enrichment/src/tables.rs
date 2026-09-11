@@ -115,9 +115,16 @@ impl TableRegistry {
     ///
     /// Panics if the Mutex is poisoned.
     pub fn finish_load(&self) {
-        let mut tables_lock = self.loading.lock().unwrap();
-        let tables = tables_lock.take();
-        *self.tables.lock().unwrap_or_else(PoisonError::into_inner) = Arc::new(tables);
+        let tables = {
+            let mut loading = self.loading.lock().unwrap();
+            loading.take()
+        };
+        let tables = Arc::new(tables);
+        let previous = {
+            let mut current = self.tables.lock().unwrap_or_else(PoisonError::into_inner);
+            std::mem::replace(&mut *current, tables)
+        };
+        drop(previous);
     }
 
     /// Return a list of the available tables that we can write to.
@@ -310,10 +317,73 @@ fn table_snapshot(tables: &Arc<Mutex<Arc<Option<TableMap>>>>) -> Arc<Option<Tabl
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        Weak,
+        atomic::{AtomicBool, Ordering},
+    };
+
     use vrl::value::Value;
 
     use super::*;
     use crate::test_util::DummyEnrichmentTable;
+
+    #[derive(Clone)]
+    struct DropCheckTable {
+        inner: DummyEnrichmentTable,
+        tables: Weak<Mutex<Arc<Option<TableMap>>>>,
+        dropped: Arc<AtomicBool>,
+        dropped_after_unlock: Arc<AtomicBool>,
+    }
+
+    impl Drop for DropCheckTable {
+        fn drop(&mut self) {
+            let dropped_after_unlock = self
+                .tables
+                .upgrade()
+                .is_none_or(|tables| tables.try_lock().is_ok());
+            self.dropped_after_unlock
+                .store(dropped_after_unlock, Ordering::SeqCst);
+            self.dropped.store(true, Ordering::SeqCst);
+        }
+    }
+
+    impl Table for DropCheckTable {
+        fn find_table_row<'a>(
+            &self,
+            case: Case,
+            condition: &'a [Condition<'a>],
+            select: Option<&[String]>,
+            wildcard: Option<&Value>,
+            index: Option<IndexHandle>,
+        ) -> Result<ObjectMap, Error> {
+            self.inner
+                .find_table_row(case, condition, select, wildcard, index)
+        }
+
+        fn find_table_rows<'a>(
+            &self,
+            case: Case,
+            condition: &'a [Condition<'a>],
+            select: Option<&[String]>,
+            wildcard: Option<&Value>,
+            index: Option<IndexHandle>,
+        ) -> Result<Vec<ObjectMap>, Error> {
+            self.inner
+                .find_table_rows(case, condition, select, wildcard, index)
+        }
+
+        fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
+            self.inner.add_index(case, fields)
+        }
+
+        fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+            self.inner.index_fields()
+        }
+
+        fn needs_reload(&self) -> bool {
+            self.inner.needs_reload()
+        }
+    }
 
     #[test]
     fn tables_loaded() {
@@ -440,6 +510,33 @@ mod tests {
         table_ids.sort();
 
         assert_eq!(vec!["dummy1".to_string(), "dummy2".to_string()], table_ids,);
+    }
+
+    #[test]
+    fn drops_replaced_snapshot_after_unlocking() {
+        let registry = TableRegistry::default();
+        let dropped = Arc::new(AtomicBool::new(false));
+        let dropped_after_unlock = Arc::new(AtomicBool::new(false));
+        let mut tables: TableMap = HashMap::new();
+        tables.insert(
+            "dummy".to_string(),
+            Box::new(DropCheckTable {
+                inner: DummyEnrichmentTable::new(),
+                tables: Arc::downgrade(&registry.tables),
+                dropped: Arc::clone(&dropped),
+                dropped_after_unlock: Arc::clone(&dropped_after_unlock),
+            }),
+        );
+        registry.load(tables);
+        registry.finish_load();
+
+        let mut replacement: TableMap = HashMap::new();
+        replacement.insert("dummy".to_string(), Box::new(DummyEnrichmentTable::new()));
+        registry.load(replacement);
+        registry.finish_load();
+
+        assert!(dropped.load(Ordering::SeqCst));
+        assert!(dropped_after_unlock.load(Ordering::SeqCst));
     }
 
     #[test]
