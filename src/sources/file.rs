@@ -1839,6 +1839,8 @@ mod tests {
             };
             let after_times = [after_time, after_time];
 
+            // SAFETY: Both file descriptors remain open for these calls and both arrays contain
+            // the two `timeval` entries required by `futimes`.
             unsafe {
                 libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
                 libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());

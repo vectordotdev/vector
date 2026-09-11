@@ -1152,7 +1152,7 @@ async fn decode_sketches() {
         };
 
         sketch_payload.encode(&mut buf).unwrap();
-        let body = unsafe { String::from_utf8_unchecked(buf) };
+        let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
         let events = send_and_collect(
             addr,
             body,
@@ -1304,7 +1304,7 @@ async fn decode_traces() {
                     200,
                     send_with_path(
                         addr,
-                        unsafe { str::from_utf8_unchecked(&buf_v1) },
+                        str::from_utf8(&buf_v1).expect("encoded protobuf should be valid UTF-8"),
                         headers.clone(),
                         DD_API_TRACES_PATH
                     )
@@ -1314,7 +1314,7 @@ async fn decode_traces() {
                     200,
                     send_with_path(
                         addr,
-                        unsafe { str::from_utf8_unchecked(&buf_v2) },
+                        str::from_utf8(&buf_v2).expect("encoded protobuf should be valid UTF-8"),
                         headers,
                         DD_API_TRACES_PATH
                     )
@@ -2192,7 +2192,7 @@ async fn decode_series_endpoint_v2() {
 
         let mut buf = Vec::new();
         series_payload.encode(&mut buf).unwrap();
-        let body = unsafe { String::from_utf8_unchecked(buf) };
+        let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
         let events = send_and_collect(
             addr,
             body,
@@ -2653,7 +2653,7 @@ async fn test_series_v2_split_metric_namespace_impl(
 
     let mut buf = Vec::new();
     series_payload.encode(&mut buf).unwrap();
-    let body = unsafe { String::from_utf8_unchecked(buf) };
+    let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
     let events = send_and_collect(
         addr,
         body,
@@ -2729,7 +2729,7 @@ async fn series_v2_resources_preserved_as_tags() {
         let series_payload = ddmetric_proto::MetricPayload { series };
         let mut buf = Vec::new();
         series_payload.encode(&mut buf).unwrap();
-        let body = unsafe { String::from_utf8_unchecked(buf) };
+        let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
 
         let events = send_and_collect(
             addr,
@@ -2800,7 +2800,7 @@ async fn test_sketches_split_metric_namespace_impl(
     };
 
     sketch_payload.encode(&mut buf).unwrap();
-    let body = unsafe { String::from_utf8_unchecked(buf) };
+    let body = String::from_utf8(buf).expect("encoded protobuf should be valid UTF-8");
     let events = send_and_collect(
         addr,
         body,

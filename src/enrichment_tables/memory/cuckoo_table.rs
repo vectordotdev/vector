@@ -171,19 +171,19 @@ impl From<&CuckooLruAgingStrategy> for LruAgingStrategy {
 }
 
 const fn default_cuckoo_fingerprint_bits() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(8) }
+    NonZeroUsize::new(8).expect("the default fingerprint size is nonzero")
 }
 
 const fn default_cuckoo_bucket_size() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(4) }
+    NonZeroUsize::new(4).expect("the default bucket size is nonzero")
 }
 
 const fn default_cuckoo_ttl_bits() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(8) }
+    NonZeroUsize::new(8).expect("the default TTL size is nonzero")
 }
 
 const fn default_cuckoo_lru_bits() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(8) }
+    NonZeroUsize::new(8).expect("the default LRU size is nonzero")
 }
 
 const fn default_cuckoo_lru_starting_value() -> u32 {
@@ -195,7 +195,7 @@ const fn default_cuckoo_lru_increment() -> u32 {
 }
 
 const fn default_cuckoo_counter_bits() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(8) }
+    NonZeroUsize::new(8).expect("the default counter size is nonzero")
 }
 
 const fn default_cuckoo_counter_insertion_increment() -> i32 {

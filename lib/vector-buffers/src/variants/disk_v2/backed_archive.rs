@@ -86,6 +86,8 @@ where
 
     /// Gets a reference to the archived value.
     pub fn get_archive_ref(&self) -> &T::Archived {
+        // SAFETY: Constructors either validate the backing bytes or serialize `T` into them, so
+        // the backing store contains a properly aligned, valid archived `T`.
         unsafe { archived_root::<T>(self.backing.as_ref()) }
     }
 }
@@ -139,6 +141,8 @@ where
         use rkyv::archived_root_mut;
 
         let pinned = Pin::new(self.backing.as_mut());
+        // SAFETY: Constructors establish that the backing bytes contain a valid archived `T`, and
+        // `&mut self` guarantees exclusive access for the lifetime of the returned projection.
         unsafe { archived_root_mut::<T>(pinned) }
     }
 }

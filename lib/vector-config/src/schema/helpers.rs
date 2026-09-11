@@ -617,11 +617,15 @@ where
     let schema_gen = RefCell::new(schema_settings.into_generator());
 
     // Set env variable to enable generating all schemas, including platform-specific ones.
+    // SAFETY: Schema generation is run by single-threaded tooling before worker threads start, so
+    // no other thread can concurrently read or modify the process environment.
     unsafe { env::set_var("VECTOR_GENERATE_SCHEMA", "true") };
 
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
 
+    // SAFETY: This restores the environment under the same single-threaded conditions described
+    // above.
     unsafe { env::remove_var("VECTOR_GENERATE_SCHEMA") };
 
     Ok(schema_gen.into_inner().into_root_schema(schema))
