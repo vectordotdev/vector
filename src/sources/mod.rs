@@ -9,6 +9,8 @@ pub mod apache_metrics;
 pub mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub mod aws_kinesis_firehose;
+#[cfg(feature = "sources-aws_kinesis_streams")]
+pub mod aws_kinesis_streams;
 #[cfg(feature = "sources-aws_s3")]
 pub mod aws_s3;
 #[cfg(feature = "sources-aws_sqs")]
