@@ -9,7 +9,6 @@ publish = false
 workspace = true
 
 [dependencies]
-arc-swap.workspace = true
 chrono.workspace = true
 const-str.workspace = true
 dyn-clone = { version = "1.0.20", default-features = false }
