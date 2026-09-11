@@ -325,8 +325,8 @@ impl StringCollector {
 
         for character in help.chars() {
             match character {
-                '\\' => result.push_str("\\\\"),
-                '\n' => result.push_str("\\n"),
+                '\\' => result.push_str(r"\\"),
+                '\n' => result.push_str(r"\n"),
                 character => result.push(character),
             }
         }
@@ -342,9 +342,9 @@ impl StringCollector {
 
         for character in value.chars() {
             match character {
-                '\\' => result.push_str("\\\\"),
-                '"' => result.push_str("\\\""),
-                '\n' => result.push_str("\\n"),
+                '\\' => result.push_str(r"\\"),
+                '"' => result.push_str(r#"\""#),
+                '\n' => result.push_str(r"\n"),
                 character => result.push(character),
             }
         }
