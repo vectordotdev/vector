@@ -28,7 +28,7 @@ impl SecretBackend for FileBackend {
     async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
-        _: &mut signal::SignalRx,
+        _: &mut signal::ShutdownReceiver,
     ) -> crate::Result<HashMap<String, String>> {
         let contents = tokio::fs::read_to_string(&self.path).await?;
         let output = serde_json::from_str::<HashMap<String, String>>(&contents)?;

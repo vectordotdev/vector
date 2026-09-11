@@ -506,11 +506,20 @@ impl SubCommand {
             #[cfg(windows)]
             Self::Service(s) => service::cmd(s),
             #[cfg(feature = "api-client")]
-            Self::Tap(t) => tap::cmd(t, signals.receiver).await,
+            Self::Tap(t) => tap::cmd(t, signals.shutdown_receiver).await,
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
-            Self::Validate(v) => validate::validate(v, &mut signals.handler, color).await,
+            Self::Validate(v) => {
+                validate::validate(
+                    v,
+                    &mut signals.handler,
+                    &mut signals.receiver,
+                    &mut signals.shutdown_receiver,
+                    color,
+                )
+                .await
+            }
             Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }
