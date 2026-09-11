@@ -1605,7 +1605,7 @@ mod tests {
             "GET",
             StatusCode::OK,
             Some(HttpServerAuthConfig::Bearer {
-                token: "my-token".into(),
+                token: "my-token".to_string().into(),
             }),
             true,
             EventStatus::Delivered,
@@ -1630,7 +1630,7 @@ mod tests {
             "POST",
             StatusCode::OK,
             Some(HttpServerAuthConfig::Bearer {
-                token: "my-token".into(),
+                token: "my-token".to_string().into(),
             }),
             true,
             EventStatus::Delivered,
@@ -1660,7 +1660,7 @@ mod tests {
             "POST",
             StatusCode::OK,
             Some(HttpServerAuthConfig::Bearer {
-                token: "my-token".into(),
+                token: "my-token".to_string().into(),
             }),
             true,
             EventStatus::Delivered,

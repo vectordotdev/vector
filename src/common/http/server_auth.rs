@@ -59,7 +59,7 @@ pub enum HttpServerAuthConfig {
     /// The token is matched against the `Authorization` header using the `Bearer` scheme.
     Bearer {
         /// The bearer token to match against incoming requests.
-        #[configurable(metadata(docs::examples = "${TOKEN}"))]
+        #[configurable(metadata(docs::examples = "SECRET[backend.token]"))]
         #[configurable(metadata(docs::examples = "my-secret-token"))]
         token: SensitiveString,
     },
@@ -169,9 +169,8 @@ impl HttpServerAuthConfig {
                 ))
             }
             HttpServerAuthConfig::Bearer { token } => {
-                let auth = Authorization::bearer(token.inner()).map_err(|e| {
-                    format!("Invalid bearer token: {e}")
-                })?;
+                let auth = Authorization::bearer(token.inner())
+                    .map_err(|e| format!("Invalid bearer token: {e}"))?;
                 Ok(HttpServerAuthMatcher::AuthHeader(
                     auth.0.encode(),
                     "Invalid token",
@@ -500,7 +499,7 @@ mod tests {
     #[test]
     fn bearer_auth_matcher_should_return_401_when_missing_auth_header() {
         let bearer_auth = HttpServerAuthConfig::Bearer {
-            token: "my-token".into(),
+            token: "my-token".to_string().into(),
         };
 
         let matcher = bearer_auth
@@ -519,7 +518,7 @@ mod tests {
     #[test]
     fn bearer_auth_matcher_should_return_401_with_wrong_token() {
         let bearer_auth = HttpServerAuthConfig::Bearer {
-            token: "my-token".into(),
+            token: "my-token".to_string().into(),
         };
 
         let matcher = bearer_auth
@@ -527,7 +526,10 @@ mod tests {
             .unwrap();
 
         let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer wrong-token"));
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer wrong-token"),
+        );
         let (_guard, addr) = next_addr();
         let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
@@ -541,7 +543,7 @@ mod tests {
     fn bearer_auth_matcher_should_return_ok_for_correct_token() {
         let token = "my-secret-token";
         let bearer_auth = HttpServerAuthConfig::Bearer {
-            token: token.into(),
+            token: token.to_string().into(),
         };
 
         let matcher = bearer_auth

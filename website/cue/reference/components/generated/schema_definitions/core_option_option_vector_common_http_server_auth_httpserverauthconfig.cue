@@ -40,7 +40,7 @@ _schemaDefinitions: "core::option::Option<vector::common::http::server_auth::Htt
 		description:   "The bearer token to match against incoming requests."
 		relevant_when: "strategy = \"bearer\""
 		required:      true
-		type: string: examples: ["${TOKEN}", "my-secret-token"]
+		type: string: examples: ["SECRET[backend.token]", "my-secret-token"]
 	}
 	username: {
 		description:   "The basic authentication username."
