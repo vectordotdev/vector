@@ -14,11 +14,12 @@ use vector_lib::{
 };
 
 use super::{
-    service::{PostgresRetryLogic, PostgresService},
+    service::{PostgresAction, PostgresRetryLogic, PostgresService},
     sink::PostgresSink,
 };
 use crate::{
     config::{Input, SinkConfig, SinkContext, ValidatedSink},
+    serde::OneOrMany,
     sinks::{
         Healthcheck,
         util::{
@@ -27,6 +28,65 @@ use crate::{
         },
     },
 };
+
+/// Action used to put data into a table.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ActionKindConfig {
+    /// Inserts an event into a table.
+    ///
+    /// This is the default.
+    #[derivative(Default)]
+    Insert,
+
+    /// Upserts an event into a table.
+    ///
+    /// When an event's insert conflicts with a table's primary key,
+    /// an update will be performed instead of an insert.
+    ///
+    /// **Note**: This only handles **primary key conflicts**. Other
+    /// constraint violations when inserting will cause an error and
+    /// fail the entire batch.
+    ///
+    /// **Note**: If multiple events in a single batch will update the
+    /// same row, only the first event will be used to update the row.
+    /// To avoid this, use a *dedupe* transform long enough for the
+    /// batch size.
+    Upsert,
+}
+
+/// Upsert-specific options
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
+#[serde(rename_all = "lowercase")]
+pub struct UpsertOption {
+    /// Column(s) part of the table's primary key.
+    ///
+    /// This parameter is vulnerable to SQL injection attacks as it
+    /// is used directly in an SQL query and cannot be injected as a
+    /// parameter to a prepared statement. Only use trusted inputs/values
+    /// for this field.
+    ///
+    /// **Note**: If a column name needs to be quoted, you must place
+    /// double quotes around the column name here.
+    #[serde(alias = "primary_keys")]
+    pub primary_key: OneOrMany<String>,
+
+    /// Column(s) to update when an insert conflicts with a table's
+    /// primary key.
+    ///
+    /// This parameter is vulnerable to SQL injection attacks as it
+    /// is used directly in an SQL query and cannot be injected as a
+    /// parameter to a prepared statement. Only use trusted inputs/values
+    /// for this field.
+    ///
+    /// **Note**: If a column name needs to be quoted, you must place
+    /// double quotes around the column name here.
+    #[serde(alias = "update_columns")]
+    pub update_column: OneOrMany<String>,
+}
 
 const fn default_pool_size() -> u32 {
     5
@@ -47,6 +107,13 @@ pub struct PostgresConfig {
     /// This parameter will be directly interpolated in the SQL query statement,
     /// as table names as parameters in prepared statements are not allowed in PostgreSQL.
     pub table: String,
+
+    #[serde(default)]
+    pub action: ActionKindConfig,
+
+    #[serde(default)]
+    #[serde(alias = "upsert")]
+    pub upsert_option: Option<UpsertOption>,
 
     /// The postgres connection pool size. See [this](https://docs.rs/sqlx/latest/sqlx/struct.Pool.html#why-use-a-pool) for more
     /// information about why a connection pool should be used.
@@ -105,6 +172,7 @@ pub struct ValidatedPostgres {
     batch_settings: BatcherSettings,
     request_settings: TowerRequestSettings,
     endpoint_uri: UriSerde,
+    action: PostgresAction,
 }
 
 /// PostgreSQL endpoints may carry credentials as userinfo or as a `password`
@@ -168,10 +236,70 @@ impl ValidatedSink for PostgresConfig {
         let endpoint_uri: UriSerde = self.endpoint.parse()?;
         validate_pg_endpoint(&self.endpoint)?;
 
+        let action = match self.action {
+            ActionKindConfig::Insert => PostgresAction::Insert,
+            ActionKindConfig::Upsert => {
+                let Some(ref options) = self.upsert_option else {
+                    return Err("`upsert` must be defined when using the upsert action.".into());
+                };
+
+                match &options.primary_key {
+                    OneOrMany::One(item) => {
+                        if item.is_empty() {
+                            return Err("`primary_key` cannot be empty.".into());
+                        }
+                    }
+                    OneOrMany::Many(items) => {
+                        if items.is_empty() {
+                            return Err("`primary_key` must contain at least one column.".into());
+                        }
+
+                        for item in items {
+                            if item.is_empty() {
+                                return Err("`primary_key` cannot be empty.".into());
+                            }
+                        }
+                    }
+                };
+
+                match &options.update_column {
+                    OneOrMany::One(item) => {
+                        if item.is_empty() {
+                            return Err("`update_column` cannot be empty.".into());
+                        }
+                    }
+                    OneOrMany::Many(items) => {
+                        if items.is_empty() {
+                            return Err("`update_column` must contain at least one column.".into());
+                        }
+
+                        for item in items {
+                            if item.is_empty() {
+                                return Err("`update_column` cannot be empty.".into());
+                            }
+                        }
+                    }
+                };
+
+                PostgresAction::Upsert {
+                    primary_keys: options.primary_key.clone().to_vec().join(","),
+                    update_columns: options
+                        .update_column
+                        .clone()
+                        .to_vec()
+                        .iter()
+                        .map(|column| format!("{column}=EXCLUDED.{column}"))
+                        .collect::<Vec<String>>()
+                        .join(","),
+                }
+            }
+        };
+
         Ok(ValidatedPostgres {
             batch_settings,
             request_settings,
             endpoint_uri,
+            action,
         })
     }
 
@@ -184,6 +312,7 @@ impl ValidatedSink for PostgresConfig {
             batch_settings,
             request_settings,
             endpoint_uri,
+            action,
         } = validated.clone();
 
         // `PgConnectOptions::from_str` may read `$PGPASSFILE` or `~/.pgpass`
@@ -199,7 +328,7 @@ impl ValidatedSink for PostgresConfig {
 
         // The endpoint label must not carry credentials or query parameters.
         let endpoint = protocol_endpoint(endpoint_uri.uri.clone()).1;
-        let service = PostgresService::new(connection_pool, self.table.clone(), endpoint);
+        let service = PostgresService::new(connection_pool, self.table.clone(), endpoint, action);
         let service = ServiceBuilder::new()
             .settings(request_settings, PostgresRetryLogic)
             .service(service);

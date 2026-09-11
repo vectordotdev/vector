@@ -12,6 +12,35 @@ generated: components: sinks: postgres: configuration: {
 		required: false
 		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
 	}
+	action: {
+		description: "Action used to put data into a table."
+		required:    false
+		type: string: {
+			default: "insert"
+			enum: {
+				insert: """
+					Inserts an event into a table.
+
+					This is the default.
+					"""
+				upsert: """
+					Upserts an event into a table.
+
+					When an event's insert conflicts with a table's primary key,
+					an update will be performed instead of an insert.
+
+					**Note**: This only handles **primary key conflicts**. Other
+					constraint violations when inserting will cause an error and
+					fail the entire batch.
+
+					**Note**: If multiple events in a single batch will update the
+					same row, only the first event will be used to update the row.
+					To avoid this, use a *dedupe* transform long enough for the
+					batch size.
+					"""
+			}
+		}
+	}
 	batch: {
 		description: """
 			Event batching behavior.
@@ -65,5 +94,42 @@ generated: components: sinks: postgres: configuration: {
 			"""
 		required: true
 		type: string: {}
+	}
+	upsert_option: {
+		description: "Upsert-specific options"
+		required:    false
+		type: object: options: {
+			primary_key: {
+				description: """
+					Column(s) part of the table's primary key.
+
+					This parameter is vulnerable to SQL injection attacks as it
+					is used directly in an SQL query and cannot be injected as a
+					parameter to a prepared statement. Only use trusted inputs/values
+					for this field.
+
+					**Note**: If a column name needs to be quoted, you must place
+					double quotes around the column name here.
+					"""
+				required: true
+				type: string: {}
+			}
+			update_column: {
+				description: """
+					Column(s) to update when an insert conflicts with a table's
+					primary key.
+
+					This parameter is vulnerable to SQL injection attacks as it
+					is used directly in an SQL query and cannot be injected as a
+					parameter to a prepared statement. Only use trusted inputs/values
+					for this field.
+
+					**Note**: If a column name needs to be quoted, you must place
+					double quotes around the column name here.
+					"""
+				required: true
+				type: string: {}
+			}
+		}
 	}
 }
