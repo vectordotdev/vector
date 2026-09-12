@@ -252,9 +252,8 @@ async fn metric_dimensions(metric_name: &str) -> Vec<JsonValue> {
 
     let res = client
         .get(format!(
-            "{}/services/catalog/metricstore/dimensions?output_mode=json&metric_name={}",
-            splunk_api_address(),
-            metric_name
+            "{}/services/catalog/metricstore/dimensions?output_mode=json&metric_name={metric_name}",
+            splunk_api_address()
         ))
         .form(&vec![("filter", "index=*")])
         .basic_auth(USERNAME, Some(PASSWORD))

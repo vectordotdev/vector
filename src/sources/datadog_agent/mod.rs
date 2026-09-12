@@ -268,7 +268,7 @@ impl SourceConfig for DatadogAgentConfig {
                 .with_graceful_shutdown(shutdown.map(|_| ()))
                 .await
                 .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
+                    error!("An error occurred: {err:?}.");
                 })?;
 
             Ok(())
@@ -525,7 +525,7 @@ impl DatadogAgentSource {
         }
 
         if !config.disable_llmobs {
-            let llmobs_filter = llmobs::build_warp_filter(handler.clone(), self.clone());
+            let llmobs_filter = llmobs::build_warp_filter(handler, self.clone());
             filters = filters
                 .map(|f| f.or(llmobs_filter.clone()).unify().boxed())
                 .or(Some(llmobs_filter));

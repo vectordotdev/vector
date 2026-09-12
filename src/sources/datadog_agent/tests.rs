@@ -2147,7 +2147,7 @@ fn test_config_outputs() {
                 .remove(&name.map(ToOwned::to_owned))
                 .expect("output exists");
 
-            assert_eq!(got, want, "{}", title);
+            assert_eq!(got, want, "{title}");
         }
     }
 }

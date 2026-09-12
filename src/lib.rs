@@ -205,7 +205,7 @@ pub fn get_version() -> String {
     let pkg_version = vector_version();
     let build_desc = built_info::VECTOR_BUILD_DESC;
     let build_string = match build_desc {
-        Some(desc) => format!("{} {}", built_info::TARGET, desc),
+        Some(desc) => format!("{} {desc}", built_info::TARGET),
         None => built_info::TARGET.into(),
     };
 
@@ -231,7 +231,7 @@ pub mod built_info {
 /// The hostname can be overridden by setting the VECTOR_HOSTNAME environment variable.
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(if let Ok(hostname) = std::env::var("VECTOR_HOSTNAME") {
-        hostname.to_string()
+        hostname
     } else {
         hostname::get()?.to_string_lossy().into_owned()
     })

@@ -144,6 +144,13 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)', 'cfg(dds
 string_slice = "warn"
 await_holding_lock = "warn"
 let_underscore_must_use = "warn"
+redundant_clone = "warn"
+uninlined_format_args = "warn"
+borrow_as_ptr = "warn"
+checked_conversions = "warn"
+ptr_as_ptr = "warn"
+rc_buffer = "warn"
+todo = "warn"
 
 [workspace.dependencies]
 antithesis-instrumentation = { version = "0.1", default-features = false, features = [] }
@@ -167,10 +174,10 @@ convert_case = { version = "0.10", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 cuckoo-clock = { version = "0.2.7" , default-features = false }
-darling = { version = "0.23.0", default-features = false, features = ["suggestions"] }
+darling = { version = "0.24.1", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
-derive_more = { version = "2.1.1", default-features = false, features = ["display"] }
+derive_more = { version = "2.1.1", default-features = false, features = ["display", "debug"] }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.32", default-features = false, features = ["std"] }
@@ -184,8 +191,8 @@ inventory = { version = "0.3" }
 itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
 libc = { version = "0.2", default-features = false, features = ["std"] }
 metrics = "0.24.2"
-metrics-tracing-context = { version = "0.17.0", default-features = false }
-metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
+metrics-tracing-context = { version = "0.18.1", default-features = false }
+metrics-util = { version = "0.20.4", default-features = false, features = ["registry"] }
 mlua = { version = "0.11", default-features = false, features = ["lua54", "send", "vendored"] }
 nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "5.3.0", default-features = false }
@@ -218,7 +225,7 @@ tokio-test = "0.4.5"
 tokio-tungstenite = { version = "0.20.1", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 quote = { version = "1", default-features = false }
-syn = { version = "3", default-features = false }
+syn = { version = "3", default-features = false, features = ["full", "visit", "extra-traits"] }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip", "zstd"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
@@ -240,6 +247,7 @@ vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", defaul
 zstd = { version = "0.13.0", default-features = false }
 mock_instant = { version = "0.6" }
 serial_test = { version = "4.0" }
+similar-asserts = "2.0.0"
 strum = { version = "0.28", features = ["derive"] }
 
 [dependencies]
@@ -290,35 +298,35 @@ metrics.workspace = true
 metrics-tracing-context.workspace = true
 
 # AWS - Official SDK
-aws-runtime = { version = "1.5.9", optional = true }
-aws-config = { version = "1.8.17", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
-aws-credential-types = { version = "1.2.4", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sdk-cloudwatch = { version = "1.102.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "1.116.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-elasticsearch = { version = "1.96.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-firehose = { version = "1.101.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-kinesis = { version = "1.99.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-kms = { version = "1.99.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-s3 = { version = "1.122.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-secretsmanager = { version = "1.99.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-sns = { version = "1.94.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-sdk-sqs = { version = "1.93.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
-aws-types = { version = "1.3.8", default-features = false, optional = true }
+aws-runtime = { version = "1.9.2", optional = true }
+aws-config = { version = "1.12.0", default-features = false, features = ["behavior-version-latest", "credentials-process", "sso", "rt-tokio"], optional = true }
+aws-credential-types = { version = "1.3.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sdk-cloudwatch = { version = "1.128.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "1.150.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-elasticsearch = { version = "1.117.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-firehose = { version = "1.118.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-kinesis = { version = "1.119.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-kms = { version = "1.118.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-s3 = { version = "1.146.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-secretsmanager = { version = "1.115.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-sns = { version = "1.111.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-sqs = { version = "1.109.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-types = { version = "1.6.0", default-features = false, optional = true }
 
 # The sts crate is needed despite not being referred to anywhere in the code because we need to set the
 # `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication
 # is configured.
-aws-sdk-sts = { version = "1.73.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
+aws-sdk-sts = { version = "1.114.0", default-features = false, features = ["behavior-version-latest", "rt-tokio"], optional = true }
 
 # The `aws-sdk-sts` crate is needed despite not being referred to anywhere in the code because we need to set the
 # `behavior-version-latest` feature. Without this we get a runtime panic when `auth.assume_role` authentication is configured.
-aws-sigv4 = { version = "1.3.2", default-features = false, features = ["sign-http"], optional = true }
+aws-sigv4 = { version = "1.5.1", default-features = false, features = ["sign-http"], optional = true }
 
-aws-smithy-async = { version = "1.2.5", default-features = false, features = ["rt-tokio"], optional = true }
-aws-smithy-http = { version = "0.63", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
-aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
-aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional = true }
-aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
+aws-smithy-async = { version = "1.3.0", default-features = false, features = ["rt-tokio"], optional = true }
+aws-smithy-http = { version = "0.64", default-features = false, features = ["event-stream", "rt-tokio"], optional = true }
+aws-smithy-runtime = { version = "1.14.0", default-features = false, features = ["client", "connector-hyper-0-14-x", "rt-tokio"], optional = true }
+aws-smithy-runtime-api = { version = "1.16.0", default-features = false, optional = true }
+aws-smithy-types = { version = "1.6.3", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
 azure_core = { version = "1.0", default-features = false, features = ["reqwest", "hmac_openssl"], optional = true }
@@ -528,7 +536,7 @@ quickcheck.workspace = true
 reqwest.workspace = true
 rstest = { version = "0.26.1" }
 serial_test.workspace = true
-similar-asserts = "1.7.0"
+similar-asserts.workspace = true
 tempfile.workspace = true
 test-generator = "0.3.1"
 tokio = { workspace = true, features = ["test-util"] }

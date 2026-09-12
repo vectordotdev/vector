@@ -1688,8 +1688,7 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         MetricValue::Counter { value } => {
             assert!(
                 *value > 0.0,
-                "component_received_events_total should be > 0, got {}",
-                value
+                "component_received_events_total should be > 0, got {value}"
             );
         }
         _ => panic!("component_received_events_total should be a counter"),

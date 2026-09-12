@@ -346,6 +346,8 @@ impl ValidatedSink for KafkaSinkConfig {
             .topic
             .clone()
             .confine(&self.confinement, Self::NAME, "topic")?;
+        self.encoding.validate()?;
+
         Ok(ValidatedKafkaSink { topic })
     }
 
@@ -356,7 +358,7 @@ impl ValidatedSink for KafkaSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let ValidatedKafkaSink { topic } = validated;
         let sink = KafkaSink::new(self.clone(), topic.clone())?;
-        let hc = healthcheck(self.clone(), topic.clone(), cx.healthcheck.clone()).boxed();
+        let hc = healthcheck(self.clone(), topic.clone(), cx.healthcheck).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }
 }
@@ -385,6 +387,49 @@ mod tests {
         .unwrap();
         let validated = config.validate().expect("validation should succeed");
         assert_eq!(validated.topic.to_string(), "test-topic");
+    }
+
+    #[test]
+    fn validate_assumes_protobuf_encoding_valid_without_disk_access() {
+        // The protobuf codec reads its descriptor set from `desc_file` on
+        // disk; pure validation must stay filesystem-free, so an unbuildable
+        // protobuf encoding is caught in the build phase instead.
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: protobuf
+                protobuf:
+                    desc_file: "/nonexistent/protobuf.desc"
+                    message_type: "package.Message"
+            "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.topic.to_string(), "test-topic");
+    }
+
+    #[test]
+    fn validate_rejects_unbuildable_encoding() {
+        let config: KafkaSinkConfig = serde_yaml::from_str(
+            r#"
+            bootstrap_servers: "localhost:9092"
+            topic: "test-topic"
+            encoding:
+                codec: avro
+                avro:
+                    schema: "not a valid avro schema"
+            "#,
+        )
+        .unwrap();
+        let error = config.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

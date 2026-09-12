@@ -645,7 +645,7 @@ mod test {
 
         {
             let mut merged = m2.clone();
-            merged.merge(m1.clone());
+            merged.merge(m1);
             assert_eq!(merged.source_event_id(), m2.source_event_id());
         }
     }

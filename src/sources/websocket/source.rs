@@ -150,8 +150,7 @@ impl WebSocketSource {
                     | WebSocketSourceError::InitialMessageTimeout
                     | WebSocketSourceError::ConnectionClosedPrematurely => {
                         unreachable!(
-                            "Encountered a connection-time error during runtime: {:?}",
-                            error
+                            "Encountered a connection-time error during runtime: {error:?}"
                         );
                     }
                 }

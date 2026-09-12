@@ -133,8 +133,7 @@ fn convert_config(
     let file_contents = fs::read_to_string(input_path).map_err(|e| vec![e.to_string()])?;
     let builder: ConfigBuilder = format::deserialize(&file_contents, input_format)?;
     let config = builder.build()?;
-    let output_string =
-        format::serialize(&config, output_format).map_err(|e| vec![e.to_string()])?;
+    let output_string = format::serialize(&config, output_format).map_err(|e| vec![e])?;
     fs::write(output_path, output_string).map_err(|e| vec![e.to_string()])?;
 
     #[allow(clippy::print_stdout)]

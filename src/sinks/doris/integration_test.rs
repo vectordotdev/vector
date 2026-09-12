@@ -69,13 +69,13 @@ fn assert_fields_match(
 
         // Build error message
         let error_msg = if let Some(table) = table_name {
-            format!("Field '{}' mismatch in table {}", field, table)
+            format!("Field '{field}' mismatch in table {table}")
         } else {
-            format!("Field '{}' mismatch", field)
+            format!("Field '{field}' mismatch")
         };
 
         // Compare string representations
-        assert_eq!(event_str, db_str, "{}", error_msg);
+        assert_eq!(event_str, db_str, "{error_msg}");
     }
 }
 
@@ -138,8 +138,8 @@ async fn insert_events() {
         headers: default_headers(),
         batch,
         auth: Some(crate::http::Auth::Basic {
-            user: config_auth().user.clone(),
-            password: SensitiveString::from(config_auth().password.clone()),
+            user: config_auth().user,
+            password: SensitiveString::from(config_auth().password),
         }),
         request: Default::default(),
         ..Default::default()
@@ -178,9 +178,9 @@ enum DbValue {
 impl std::fmt::Display for DbValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DbValue::String(s) => write!(f, "{}", s),
-            DbValue::Integer(i) => write!(f, "{}", i),
-            DbValue::Float(fl) => write!(f, "{}", fl),
+            DbValue::String(s) => write!(f, "{s}"),
+            DbValue::Integer(i) => write!(f, "{i}"),
+            DbValue::Float(fl) => write!(f, "{fl}"),
             DbValue::Null => write!(f, "null"),
         }
     }
@@ -231,7 +231,7 @@ impl DorisTestClient {
     async fn create_connection(&self) -> MySqlConnection {
         MySqlConnection::connect_with(&self.connect_options)
             .await
-            .unwrap_or_else(|e| panic!("Failed to connect to database: {}", e))
+            .unwrap_or_else(|e| panic!("Failed to connect to database: {e}"))
     }
 
     /// Execute a query that doesn't return data (DDL/DML operations)
@@ -264,7 +264,7 @@ impl DorisTestClient {
                     );
                     return;
                 }
-                panic!("SQL query execution failed: {} - {}", query, e);
+                panic!("SQL query execution failed: {query} - {e}");
             }
         }
         // Connection is automatically closed when it goes out of scope
@@ -291,7 +291,7 @@ impl DorisTestClient {
         // Connection is automatically closed when it goes out of scope
         conn.fetch_one(query)
             .await
-            .unwrap_or_else(|e| panic!("{} failed: {} - {}", operation_name, query, e))
+            .unwrap_or_else(|e| panic!("{operation_name} failed: {query} - {e}"))
     }
 
     /// Execute a query that returns multiple rows
@@ -317,36 +317,35 @@ impl DorisTestClient {
 
     /// Create database using the common execute pattern
     async fn create_database(&self, database: &str) {
-        let query = format!("CREATE DATABASE IF NOT EXISTS {}", database);
+        let query = format!("CREATE DATABASE IF NOT EXISTS {database}");
         self.execute_query(&query).await;
     }
 
     /// Create table using the common execute pattern
     async fn create_table(&self, database: &str, table: &str, schema: &str) {
         let query = format!(
-            "CREATE TABLE IF NOT EXISTS {}.{} ({}) ENGINE=OLAP
+            "CREATE TABLE IF NOT EXISTS {database}.{table} ({schema}) ENGINE=OLAP
              DISTRIBUTED BY HASH(`host`) BUCKETS 1
-             PROPERTIES(\"replication_num\" = \"1\")",
-            database, table, schema
+             PROPERTIES(\"replication_num\" = \"1\")"
         );
         self.execute_query(&query).await;
     }
 
     /// Drop table using the common execute pattern
     async fn drop_table(&self, database: &str, table: &str) {
-        let query = format!("DROP TABLE IF EXISTS {}.{}", database, table);
+        let query = format!("DROP TABLE IF EXISTS {database}.{table}");
         self.execute_query(&query).await;
     }
 
     /// Drop database using the common execute pattern
     async fn drop_database(&self, database: &str) {
-        let query = format!("DROP DATABASE IF EXISTS {}", database);
+        let query = format!("DROP DATABASE IF EXISTS {database}");
         self.execute_query(&query).await;
     }
 
     /// Count rows using the common fetch_one pattern
     async fn count_rows(&self, database: &str, table: &str) -> i64 {
-        let query = format!("SELECT COUNT(*) FROM {}.{}", database, table);
+        let query = format!("SELECT COUNT(*) FROM {database}.{table}");
         let row = self.fetch_one_query(&query, "Counting rows").await;
 
         let count: i64 = row.get(0);
@@ -361,8 +360,7 @@ impl DorisTestClient {
     /// Get column names using the common fetch_all pattern
     async fn get_column_names(&self, database: &str, table: &str) -> Vec<String> {
         let query = format!(
-            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{}' AND TABLE_NAME = '{}' ORDER BY ORDINAL_POSITION",
-            database, table
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '{database}' AND TABLE_NAME = '{table}' ORDER BY ORDINAL_POSITION"
         );
 
         let rows = self.fetch_all_query(&query, "Getting column names").await;
@@ -394,7 +392,7 @@ impl DorisTestClient {
 
     /// Get first row data using the refactored helper methods
     async fn get_first_row(&self, database: &str, table: &str) -> HashMap<String, DbValue> {
-        let query = format!("SELECT * FROM {}.{} LIMIT 1", database, table);
+        let query = format!("SELECT * FROM {database}.{table} LIMIT 1");
 
         // Get column names and row data using helper methods
         let columns = self.get_column_names(database, table).await;

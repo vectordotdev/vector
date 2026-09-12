@@ -164,11 +164,9 @@ jobs:
           cargo-deb: true
           protoc: true
           libsasl2: true
-      - name: Install cross-compilation tools
-        run: timeout 30m sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu cmark-gfm
-      - name: Install rpm
-        if: endsWith(matrix.target, '-linux-gnu') || matrix.target == 'armv7-unknown-linux-gnueabihf'
-        run: timeout 30m sudo apt-get install -y rpm
+          cmark-gfm: true
+          cross-binutils: true
+          rpm: ${{ endsWith(matrix.target, '-linux-gnu') || matrix.target == 'armv7-unknown-linux-gnueabihf' }}
       - name: Build Vector
         run: make package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish
@@ -291,7 +289,6 @@ jobs:
           - ubuntu:20.04
           - ubuntu:22.04
           - ubuntu:24.04
-          - debian:11
           - debian:12
           - debian:13
     container:

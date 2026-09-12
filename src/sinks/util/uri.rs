@@ -64,7 +64,6 @@ impl UriSerde {
         })
     }
 
-    #[allow(clippy::missing_const_for_fn)] // constant functions cannot evaluate destructors
     pub fn with_auth(mut self, auth: Option<Auth>) -> Self {
         self.auth = auth;
         self
@@ -390,6 +389,20 @@ impl HttpEndpoint {
     /// Consumes the endpoint, returning the underlying `Uri`.
     pub fn into_uri(self) -> Uri {
         self.0
+    }
+
+    /// Consumes the endpoint, returning the underlying `Uri` as an `http 1` `Uri`.
+    ///
+    /// The two `http` crate versions share no conversion traits, so the bridge
+    /// is a string round-trip. `Display` of a validated absolute `http(s)` URL
+    /// is always parseable back by `http 1` (the `http 1` parser descends from
+    /// the `http 0.2` parser and accepts the same absolute forms), so this
+    /// cannot fail — the same invariant `protocol_endpoint` relies on.
+    pub fn into_v1(self) -> http_1::Uri {
+        self.0
+            .to_string()
+            .parse()
+            .expect("a validated HTTP endpoint is a valid `http 1` URI")
     }
 
     /// Extracts basic-auth credentials embedded in the authority, returning a

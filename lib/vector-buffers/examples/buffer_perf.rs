@@ -268,8 +268,7 @@ where
     let variant = match buffer_type {
         "in-memory" => {
             info!(
-                "[buffer-perf] creating in-memory v2 buffer with max_events={}, in blocking mode",
-                max_size_events
+                "[buffer-perf] creating in-memory v2 buffer with max_events={max_size_events}, in blocking mode"
             );
             BufferType::Memory {
                 size: MemoryBufferSize::MaxEvents(max_size_events),
@@ -278,8 +277,7 @@ where
         }
         "disk-v2" => {
             info!(
-                "[buffer-perf] creating disk v2 buffer with max_size={}, in blocking mode",
-                max_size_bytes
+                "[buffer-perf] creating disk v2 buffer with max_size={max_size_bytes}, in blocking mode"
             );
             BufferType::DiskV2 {
                 max_size: max_size_bytes,
@@ -313,8 +311,7 @@ async fn main() {
     let write_total_records = config.write_total_records;
     let write_batch_size = config.write_batch_size;
     debug!(
-        "[buffer-perf] going to write {} records, with a write batch size of {} record(s), and read {} records",
-        write_total_records, write_batch_size, read_total_records
+        "[buffer-perf] going to write {write_total_records} records, with a write batch size of {write_batch_size} record(s), and read {read_total_records} records"
     );
 
     let record_cache = generate_record_cache(config.min_record_size, config.max_record_size);
@@ -342,9 +339,8 @@ async fn main() {
     let buffer_delta = buffer_start.elapsed();
 
     info!(
-        "[buffer-perf] {:?}s: created/loaded buffer in {:?}",
-        start.elapsed().as_secs(),
-        buffer_delta
+        "[buffer-perf] {:?}s: created/loaded buffer in {buffer_delta:?}",
+        start.elapsed().as_secs()
     );
 
     let (writer_tx, mut writer_rx) = oneshot::channel();
@@ -461,7 +457,7 @@ async fn main() {
                 let write_pos = write_position.load(Ordering::Relaxed);
                 let read_pos = read_position.load(Ordering::Relaxed);
 
-                info!("[buffer-perf] {:?}s: writer pos = {:11}, reader pos = {:11}", elapsed.as_secs(), write_pos, read_pos);
+                info!("[buffer-perf] {:?}s: writer pos = {write_pos:11}, reader pos = {read_pos:11}", elapsed.as_secs());
             },
             else => break,
         }
@@ -473,8 +469,7 @@ async fn main() {
     let write_pos = write_position.load(Ordering::Relaxed);
 
     info!(
-        "[buffer-perf] writer and reader done: {} records written and {} records read in {:?}",
-        write_pos, read_pos, total_time
+        "[buffer-perf] writer and reader done: {write_pos} records written and {read_pos} records read in {total_time:?}"
     );
 
     info!("[buffer-perf] writer summary:");
@@ -487,7 +482,7 @@ async fn main() {
     info!("       q=min -> {:?}", nanos_to_dur(writer_histo.min()));
     for q in &[0.5, 0.95, 0.99, 0.999, 0.9999] {
         let latency = writer_histo.value_at_quantile(*q);
-        info!("       q={} -> {:?}", q, nanos_to_dur(latency));
+        info!("       q={q} -> {:?}", nanos_to_dur(latency));
     }
     info!("       q=max -> {:?}", nanos_to_dur(writer_histo.max()));
 
@@ -501,7 +496,7 @@ async fn main() {
     info!("       q=min -> {:?}", nanos_to_dur(reader_histo.min()));
     for q in &[0.5, 0.95, 0.99, 0.999, 0.9999] {
         let latency = reader_histo.value_at_quantile(*q);
-        info!("       q={} -> {:?}", q, nanos_to_dur(latency));
+        info!("       q={q} -> {:?}", nanos_to_dur(latency));
     }
     info!("       q=max -> {:?}", nanos_to_dur(reader_histo.max()));
 }

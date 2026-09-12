@@ -1,8 +1,5 @@
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{any::Any, sync::Arc};
 
-use derivative::Derivative;
 use enum_dispatch::enum_dispatch;
 use serde::Serialize;
 use vector_lib::{
@@ -16,8 +13,7 @@ use crate::enrichment_tables::EnrichmentTables;
 
 /// Fully resolved enrichment table component.
 #[configurable_component]
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct EnrichmentTableOuter<T>
 where
     T: Configurable + Serialize + 'static + ToValue + Clone,
@@ -38,7 +34,7 @@ where
     /// never serialized or diffed, and is shared (via `Arc`) so `as_sink` can hand it to
     /// the derived `SinkOuter` without cloning the underlying value.
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 

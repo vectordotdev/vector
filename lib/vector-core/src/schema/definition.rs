@@ -384,7 +384,7 @@ impl Definition {
     /// This method panics if the provided path points to an unknown location in the collection.
     pub fn add_meaning(&mut self, target_path: OwnedTargetPath, meaning: &str) {
         self.try_with_meaning(target_path, meaning)
-            .unwrap_or_else(|err| panic!("{}", err));
+            .unwrap_or_else(|err| panic!("{err}"));
     }
 
     /// Register a semantic meaning for the definition.
@@ -554,8 +554,7 @@ mod test_utils {
                 let actual_kind = Kind::from(log.value());
                 if let Err(path) = self.event_kind.is_superset(&actual_kind) {
                     return Result::Err(format!(
-                        "Event value doesn't match at path: {}\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
-                        path,
+                        "Event value doesn't match at path: {path}\n\nEvent type at path = {:?}\n\nDefinition at path = {:?}",
                         actual_kind.at_path(&path).debug_info(),
                         self.event_kind.at_path(&path).debug_info()
                     ));
@@ -566,8 +565,7 @@ mod test_utils {
                     // return Result::Err(format!("Event metadata doesn't match definition.\n\nDefinition type=\n{:?}\n\nActual event metadata type=\n{:?}\n",
                     //                            self.metadata_kind.debug_info(), actual_metadata_kind.debug_info()));
                     return Result::Err(format!(
-                        "Event METADATA value doesn't match at path: {}\n\nMetadata type at path = {:?}\n\nDefinition at path = {:?}",
-                        path,
+                        "Event METADATA value doesn't match at path: {path}\n\nMetadata type at path = {:?}\n\nDefinition at path = {:?}",
                         actual_metadata_kind.at_path(&path).debug_info(),
                         self.metadata_kind.at_path(&path).debug_info()
                     ));

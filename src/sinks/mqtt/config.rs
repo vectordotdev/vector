@@ -150,6 +150,7 @@ impl ValidatedSink for MqttSinkConfig {
                 }));
             }
         }
+        self.encoding.validate()?;
         let topic = self
             .topic
             .clone()

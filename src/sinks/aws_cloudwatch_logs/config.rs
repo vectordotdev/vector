@@ -72,7 +72,7 @@ where
     if ALLOWED_VALUES.contains(&days) {
         Ok(days)
     } else {
-        let msg = format!("one of allowed values: {ALLOWED_VALUES:?}").to_owned();
+        let msg = format!("one of allowed values: {ALLOWED_VALUES:?}");
         let expected: &str = msg.as_str();
         Err(de::Error::invalid_value(
             de::Unexpected::Signed(days.into()),
@@ -235,6 +235,7 @@ impl ValidatedSink for CloudwatchLogsSinkConfig {
                 .confine(&self.confinement, Self::NAME, "group_name")?;
         let batcher_settings = self.batch.into_batcher_settings()?;
         let headers = validate_headers(&self.request.headers)?;
+        self.encoding.validate()?;
 
         Ok(ValidatedCloudwatchLogs {
             group_template,
