@@ -304,10 +304,24 @@ pub(crate) fn decode_ddseries_v3(
 ) -> crate::Result<Vec<Event>> {
     validate_v3_predecode_allocations(&frame)?;
     let payload = MetricPayloadV3::decode(frame)?;
+    // `metric_type` is reserved in the v2 Origin protobuf, so keep this v3-only flag out of
+    // the wire type and pass it alongside the translated series instead.
+    let metric_types = payload.metric_data.as_ref().map(|metric_data| {
+        metric_data
+            .types
+            .iter()
+            .map(|packed_type| (packed_type & 0x100 != 0).then_some(9))
+            .collect::<Vec<_>>()
+    });
     let series = payload.metric_data.map_or(Ok(Vec::new()), |metric_data| {
         decode_v3_metric_data(&metric_data, payload.metadata.as_ref())
     })?;
-    decode_ddseries(series, api_key, split_metric_namespace)
+    decode_ddseries(
+        series,
+        api_key,
+        split_metric_namespace,
+        metric_types.as_deref(),
+    )
 }
 
 pub(super) fn decode_v3_metric_data(
@@ -545,29 +559,18 @@ pub(super) fn decode_v3_metric_data(
             3 => metric_payload::MetricType::Gauge,
             _ => metric_payload::MetricType::Unspecified,
         };
-        let no_index = packed_type & 0x100 != 0;
-        let series_metadata = if origin_ref == 0 && !no_index {
+        let series_metadata = if origin_ref == 0 {
             None
         } else {
-            let (origin_product, origin_category, origin_service) = if origin_ref == 0 {
-                (0, 0, 0)
-            } else {
-                let offset = (origin_ref as usize - 1) * 3;
-                (
-                    u32::try_from(data.dict_origin_info[offset])
-                        .map_err(|_| "invalid Datadog v3 origin product")?,
-                    u32::try_from(data.dict_origin_info[offset + 1])
-                        .map_err(|_| "invalid Datadog v3 origin category")?,
-                    u32::try_from(data.dict_origin_info[offset + 2])
-                        .map_err(|_| "invalid Datadog v3 origin service")?,
-                )
-            };
+            let offset = (origin_ref as usize - 1) * 3;
             Some(Metadata {
                 origin: Some(super::ddmetric_proto::Origin {
-                    metric_type: if no_index { 9 } else { 0 },
-                    origin_product,
-                    origin_category,
-                    origin_service,
+                    origin_product: u32::try_from(data.dict_origin_info[offset])
+                        .map_err(|_| "invalid Datadog v3 origin product")?,
+                    origin_category: u32::try_from(data.dict_origin_info[offset + 1])
+                        .map_err(|_| "invalid Datadog v3 origin category")?,
+                    origin_service: u32::try_from(data.dict_origin_info[offset + 2])
+                        .map_err(|_| "invalid Datadog v3 origin service")?,
                 }),
             })
         };
@@ -1003,23 +1006,28 @@ fn checked_v3_string_bytes(total: usize, value: &str) -> crate::Result<usize> {
 
 /// Builds Vector's `EventMetadata` from the received metadata. Currently this is only
 /// utilized for passing through origin metadata set by the Agent.
-fn get_event_metadata(metadata: Option<&Metadata>) -> EventMetadata {
-    metadata
-        .and_then(|metadata| metadata.origin.as_ref())
-        .map_or_else(EventMetadata::default, |origin| {
-            trace!(
-                "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
-                origin.origin_product, origin.origin_category, origin.origin_service,
-            );
-            EventMetadata::default().with_origin_metadata(
-                DatadogMetricOriginMetadata::new(
+fn get_event_metadata(metadata: Option<&Metadata>, metric_type: Option<i32>) -> EventMetadata {
+    let origin = metadata.and_then(|metadata| metadata.origin.as_ref());
+    if origin.is_none() && metric_type.is_none() {
+        EventMetadata::default()
+    } else {
+        let (origin_product, origin_category, origin_service) =
+            origin.map_or((None, None, None), |origin| {
+                trace!(
+                    "Deserialized origin_product: `{}` origin_category: `{}` origin_service: `{}`.",
+                    origin.origin_product, origin.origin_category, origin.origin_service,
+                );
+                (
                     Some(origin.origin_product),
                     Some(origin.origin_category),
                     Some(origin.origin_service),
                 )
-                .with_metric_type((origin.metric_type != 0).then_some(origin.metric_type)),
-            )
-        })
+            });
+        EventMetadata::default().with_origin_metadata(
+            DatadogMetricOriginMetadata::new(origin_product, origin_category, origin_service)
+                .with_metric_type(metric_type),
+        )
+    }
 }
 
 pub(crate) fn decode_ddseries_v2(
@@ -1028,17 +1036,19 @@ pub(crate) fn decode_ddseries_v2(
     split_metric_namespace: bool,
 ) -> crate::Result<Vec<Event>> {
     let payload = MetricPayload::decode(frame)?;
-    decode_ddseries(payload.series, api_key, split_metric_namespace)
+    decode_ddseries(payload.series, api_key, split_metric_namespace, None)
 }
 
 fn decode_ddseries(
     series: Vec<metric_payload::MetricSeries>,
     api_key: &Option<Arc<str>>,
     split_metric_namespace: bool,
+    metric_types: Option<&[Option<i32>]>,
 ) -> crate::Result<Vec<Event>> {
     let decoded_metrics: Vec<Event> = series
         .into_iter()
-        .flat_map(|serie| {
+        .enumerate()
+        .flat_map(|(index, serie)| {
             let (namespace, name) = if split_metric_namespace {
                 namespace_name_from_dd_metric(&serie.metric)
             } else {
@@ -1046,7 +1056,11 @@ fn decode_ddseries(
             };
             let mut tags = into_metric_tags(serie.tags);
 
-            let mut event_metadata = get_event_metadata(serie.metadata.as_ref());
+            let metric_type = metric_types
+                .and_then(|metric_types| metric_types.get(index))
+                .copied()
+                .flatten();
+            let mut event_metadata = get_event_metadata(serie.metadata.as_ref(), metric_type);
             if !serie.unit.is_empty() {
                 event_metadata.set_datadog_metric_unit(serie.unit.clone());
             }
@@ -1377,7 +1391,7 @@ pub(crate) fn decode_ddsketch(
                 .host_key()
                 .and_then(|key| tags.replace(key.to_string(), sketch_series.host.clone()));
 
-            let event_metadata = get_event_metadata(sketch_series.metadata.as_ref());
+            let event_metadata = get_event_metadata(sketch_series.metadata.as_ref(), None);
 
             sketch_series.dogsketches.into_iter().map(move |sketch| {
                 let k: Vec<i16> = sketch.k.iter().map(|k| *k as i16).collect();

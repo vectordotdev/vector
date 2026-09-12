@@ -1174,7 +1174,6 @@ async fn decode_sketches() {
             }],
             metadata: Some(ddmetric_proto::Metadata {
                 origin: Some(ddmetric_proto::Origin {
-                    metric_type: 0,
                     origin_product: 10,
                     origin_category: 11,
                     origin_service: 9,
@@ -2217,7 +2216,6 @@ async fn decode_series_endpoint_v2() {
                 interval: 0,
                 metadata: Some(ddmetric_proto::Metadata {
                     origin: Some(ddmetric_proto::Origin {
-                        metric_type: 0,
                         origin_product: 10,
                         origin_category: 10,
                         origin_service: 42,
