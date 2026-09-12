@@ -1,6 +1,15 @@
 #!/bin/sh
 set -e
 
+VECTOR_CONF=/etc/vector/vector.yaml
+VECTOR_CONF_BACKUP=/etc/vector/.vector.yaml.pre-conffile
+
+# Restore a pre-existing, not-yet-tracked vector.yaml that preinst backed up
+# ahead of dpkg unpacking the (now-conffile) default. See preinst for why.
+if [ "$1" = "configure" ] && [ -e "$VECTOR_CONF_BACKUP" ]; then
+  mv "$VECTOR_CONF_BACKUP" "$VECTOR_CONF"
+fi
+
 # Add Vector to adm group to read /var/logs
 usermod --append --groups adm vector || true
 

@@ -20,8 +20,10 @@ RPM packaging is unaffected by this change.
 If you referenced the bundled sample configs at `/etc/vector/examples/` (in scripts,
 documentation, or tooling), update those references to `/usr/share/vector/examples/`.
 
-No action is required for `/etc/vector/vector.yaml` itself: existing files at that path
-are left untouched by the upgrade, whether or not they were previously tracked as a
-conffile.
+No action is required for `/etc/vector/vector.yaml` itself. If you already had a
+hand-created file there from before this change (when the package did not own that
+path), it is preserved across the upgrade: the package's maintainer scripts back it up
+before `dpkg` unpacks the new conffile default and restore it immediately after, so
+existing content is never overwritten by the placeholder.
 
 authors: yash1262
