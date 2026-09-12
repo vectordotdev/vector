@@ -456,8 +456,7 @@ mod error_tests {
         for error in recoverable_errors {
             assert!(
                 error.is_recoverable(),
-                "Error should be recoverable: {}",
-                error
+                "Error should be recoverable: {error}"
             );
         }
 
@@ -481,8 +480,7 @@ mod error_tests {
         for error in non_recoverable_errors {
             assert!(
                 !error.is_recoverable(),
-                "Error should not be recoverable: {}",
-                error
+                "Error should not be recoverable: {error}"
             );
         }
     }
@@ -897,16 +895,14 @@ mod security_tests {
             let result = config.validate();
             assert!(
                 result.is_err(),
-                "JavaScript injection '{}' should be blocked",
-                attack
+                "JavaScript injection '{attack}' should be blocked"
             );
             assert!(
                 result
                     .unwrap_err()
                     .to_string()
                     .contains("potentially unsafe pattern"),
-                "Error should mention unsafe pattern for: {}",
-                attack
+                "Error should mention unsafe pattern for: {attack}"
             );
         }
 
@@ -923,8 +919,7 @@ mod security_tests {
             let result = config.validate();
             assert!(
                 result.is_ok(),
-                "Valid XPath query '{}' should be allowed",
-                valid_query
+                "Valid XPath query '{valid_query}' should be allowed"
             );
         }
     }
@@ -1027,8 +1022,7 @@ mod security_tests {
             let result = config.validate();
             assert!(
                 result.is_ok(),
-                "Valid channel name '{}' should be allowed",
-                valid_channel
+                "Valid channel name '{valid_channel}' should be allowed"
             );
         }
     }
@@ -1096,11 +1090,11 @@ mod buffer_safety_tests {
         let mut nested_xml = "<Event>".to_string();
         for i in 0..100 {
             // Reduced from 1000
-            nested_xml.push_str(&format!("<Level{}>", i));
+            nested_xml.push_str(&format!("<Level{i}>"));
         }
         nested_xml.push_str("<EventData><Data Name='test'>value</Data></EventData>");
         for i in (0..100).rev() {
-            nested_xml.push_str(&format!("</Level{}>", i));
+            nested_xml.push_str(&format!("</Level{i}>"));
         }
         nested_xml.push_str("</Event>");
 
@@ -1124,8 +1118,7 @@ mod buffer_safety_tests {
         for i in 0..200 {
             // Reduced from 5000
             xml_with_attrs.push_str(&format!(
-                "<Data Name='attr{}' Value='value{}'>data{}</Data>",
-                i, i, i
+                "<Data Name='attr{i}' Value='value{i}'>data{i}</Data>"
             ));
         }
         xml_with_attrs.push_str("</EventData></Event>");
@@ -1459,8 +1452,7 @@ mod message_rendering_tests {
             let msg_str = message.to_string_lossy();
             assert!(
                 msg_str.contains("Event ID") || msg_str.contains(&event.event_id.to_string()),
-                "Fallback message should contain Event ID: got '{}'",
-                msg_str
+                "Fallback message should contain Event ID: got '{msg_str}'"
             );
         }
     }

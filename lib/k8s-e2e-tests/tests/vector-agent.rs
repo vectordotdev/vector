@@ -896,7 +896,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        debug!("Got line: {:?}", line);
+        debug!("Got line: {line:?}");
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -1119,7 +1119,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        debug!("Got line: {:?}", line);
+        debug!("Got line: {line:?}");
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -1300,7 +1300,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        debug!("Got line: {:?}", line);
+        debug!("Got line: {line:?}");
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -1486,7 +1486,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        debug!("Got line: {:?}", line);
+        debug!("Got line: {line:?}");
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -1640,7 +1640,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut test_pods = vec![];
     for ns in &expected_namespaces {
-        debug!("creating {}", ns);
+        debug!("creating {ns}");
         let test_pod = framework
             .test_pod(test_pod::Config::from_pod(&make_test_pod_with_affinity(
                 ns,

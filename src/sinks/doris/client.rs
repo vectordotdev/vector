@@ -94,10 +94,8 @@ impl DorisSinkClient {
     /// Generate a unique label for the stream load
     fn generate_label(&self, database: &str, table: &str) -> String {
         format!(
-            "{}_{}_{}_{}_{}",
+            "{}_{database}_{table}_{}_{}",
             self.label_prefix,
-            database,
-            table,
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -144,8 +142,7 @@ impl DorisSinkClient {
             let encoded_database = utf8_percent_encode(database, PATH_SEGMENT);
             let encoded_table = utf8_percent_encode(table, PATH_SEGMENT);
             let stream_load_url = format!(
-                "{}://{}/api/{}/{}/_stream_load",
-                scheme, authority, encoded_database, encoded_table
+                "{scheme}://{authority}/api/{encoded_database}/{encoded_table}/_stream_load"
             );
 
             stream_load_url.parse::<Uri>().map_err(|source| {
@@ -341,7 +338,7 @@ impl DorisSinkClient {
         // Use Doris bootstrap API endpoint for health check, GET method
         let scheme = endpoint.scheme_str().unwrap_or("http");
         let authority = endpoint.authority().map(|a| a.as_str()).unwrap_or("");
-        let uri_str = format!("{}://{}/api/bootstrap", scheme, authority);
+        let uri_str = format!("{scheme}://{authority}/api/bootstrap");
 
         let uri = uri_str.parse::<Uri>().map_err(|source| {
             debug!(
@@ -415,7 +412,7 @@ impl DorisSinkClient {
         );
 
         Err(HealthCheckError::HealthCheckFailed {
-            message: format!("HTTP status: {}", status),
+            message: format!("HTTP status: {status}"),
         }
         .into())
     }

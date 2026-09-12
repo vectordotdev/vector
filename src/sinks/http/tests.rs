@@ -29,6 +29,7 @@ use super::{
 use crate::{
     assert_downcast_matches,
     codecs::EncodingConfigWithFraming,
+    config::ProxyConfig,
     log_event,
     sinks::{
         prelude::*,
@@ -47,7 +48,9 @@ use crate::{
             self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, init_test, run_and_assert_sink_compliance,
             run_and_assert_sink_error_with_events,
         },
-        create_events_batch_with_fn, random_lines_with_stream,
+        create_events_batch_with_fn,
+        http::spawn_authenticated_http_proxy,
+        random_lines_with_stream,
     },
 };
 
@@ -1071,4 +1074,69 @@ async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::
 
     let (sink, _) = config.build(cx).await.unwrap();
     (in_addr, sink)
+}
+
+/// Events should be delivered through the configured authenticated HTTP proxy,
+/// which forwards the request to the origin without leaking the proxy credentials.
+#[tokio::test]
+async fn sends_through_authenticated_proxy() {
+    init_test();
+
+    let (_guard, in_addr) = next_addr();
+    let (origin_rx, trigger, origin) = build_test_server(in_addr);
+    tokio::spawn(origin);
+
+    let mut proxy = spawn_authenticated_http_proxy();
+    let proxy_config = ProxyConfig {
+        enabled: true,
+        http: Some(proxy.url().to_owned()),
+        https: None,
+        no_proxy: Default::default(),
+    };
+
+    let config = indoc::formatdoc! {r#"
+        uri: "http://{in_addr}/frames"
+        framing:
+          method: newline_delimited
+        encoding:
+          codec: json
+    "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
+
+    let cx = SinkContext {
+        proxy: proxy_config,
+        ..SinkContext::default()
+    };
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let event = Event::Log(LogEvent::from("simple message"));
+
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+
+    let observation = proxy.next_request().await;
+    assert_eq!(observation.method, Method::POST);
+    assert_eq!(
+        observation.uri.to_string(),
+        format!("http://{in_addr}/frames")
+    );
+    assert!(
+        observation
+            .headers
+            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+    );
+
+    // The proxy forwards the request to the origin without the proxy credentials,
+    // and the origin receives the encoded event.
+    let (parts, body) = origin_rx.into_future().await.0.unwrap();
+    assert_eq!(Method::POST, parts.method);
+    assert_eq!("/frames", parts.uri.path());
+    assert!(
+        !parts
+            .headers
+            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+    );
+    let event: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(event["message"], "simple message");
+
+    drop(trigger);
 }

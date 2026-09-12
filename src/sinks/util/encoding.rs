@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn test_encode_batch_protobuf_multiple() {
         let message_raw = std::fs::read(test_data_dir().join("test_proto.pb")).unwrap();
-        let messages = vec![message_raw.clone(), message_raw.clone()];
+        let messages = vec![message_raw.clone(), message_raw];
         let total_input_proto_size: usize = messages.iter().map(|m| m.len()).sum();
 
         let mut buf = BytesMut::with_capacity(128);

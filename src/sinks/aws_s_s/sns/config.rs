@@ -116,7 +116,7 @@ impl ValidatedSink for SnsSinkConfig {
     ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
         let publisher = SnsMessagePublisher::new(client.clone(), self.topic_arn.clone());
-        let healthcheck = Box::pin(healthcheck(client.clone(), self.topic_arn.clone()));
+        let healthcheck = Box::pin(healthcheck(client, self.topic_arn.clone()));
 
         let request_builder = SSRequestBuilder::new(
             validated.message_group_id.clone(),

@@ -225,7 +225,7 @@ impl CloudwatchLogsSvc {
         let retention = config.retention.clone();
 
         let kms_key = config.kms_key.clone();
-        let tags = config.tags.clone();
+        let tags = config.tags;
 
         CloudwatchLogsSvc {
             headers,

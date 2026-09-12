@@ -47,7 +47,7 @@ impl RetryLogic for TraceApiRetry {
             StatusCode::FORBIDDEN => RetryAction::Retry("forbidden".into()),
             StatusCode::REQUEST_TIMEOUT => RetryAction::Retry("request timeout".into()),
             _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(&response.body)).into(),
+                format!("{status}: {}", String::from_utf8_lossy(&response.body)).into(),
             ),
             _ if status.is_success() => RetryAction::Successful,
             _ => RetryAction::DontRetry(format!("response status: {status}").into()),

@@ -254,7 +254,7 @@ fn log_schema_multiple_config_files() {
         .arg("--dangerously-allow-env-var-interpolation")
         .env("VECTOR_CONFIG_DIR", config_dir)
         .env("VECTOR_DATA_DIR", create_directory())
-        .env("VECTOR_TEST_INPUT_FILE", input_file.clone());
+        .env("VECTOR_TEST_INPUT_FILE", input_file);
 
     // Run vector
     let vector = cmd.stdout(std::process::Stdio::piped()).spawn().unwrap();

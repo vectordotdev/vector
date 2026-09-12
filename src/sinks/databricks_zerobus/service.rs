@@ -47,7 +47,7 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
     // Validate the proxy URL once up-front so a malformed value surfaces at
     // sink startup rather than per-connection.
     ProxyConnector::new(&proxy_url).map_err(|e| ZerobusSinkError::ConfigError {
-        message: format!("Invalid proxy URL '{}': {}", proxy_url, e),
+        message: format!("Invalid proxy URL '{proxy_url}': {e}"),
     })?;
     let no_proxy = proxy.no_proxy.clone();
     Ok(Arc::new(move |host: &str| {
@@ -67,6 +67,7 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
 /// would be wasteful.
 #[derive(Clone)]
 pub struct ZerobusRequest {
+    #[allow(clippy::rc_buffer)]
     pub events: Arc<Vec<Event>>,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
@@ -327,12 +328,12 @@ impl ZerobusService {
             .application_name(config.user_agent_suffix());
         builder = builder.connector_factory(build_connector_factory(proxy)?);
         let sdk = builder.build().map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Failed to create Zerobus SDK: {}", e),
+            message: format!("Failed to create Zerobus SDK: {e}"),
         })?;
 
         let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
             ZerobusSinkError::ConfigError {
-                message: format!("Failed to create HTTP client: {}", e),
+                message: format!("Failed to create HTTP client: {e}"),
             }
         })?;
 
@@ -380,7 +381,7 @@ impl ZerobusService {
                 )
                 .build_batch_serializer()
                 .map_err(|e| ZerobusSinkError::ConfigError {
-                    message: format!("Failed to build batch serializer: {}", e),
+                    message: format!("Failed to build batch serializer: {e}"),
                 })?;
 
                 Ok(ResolvedSchema {
@@ -409,7 +410,7 @@ impl ZerobusService {
                 .encoder
                 .encode_batch(events)
                 .map_err(|e| ZerobusSinkError::EncodingError {
-                    message: format!("Failed to encode batch: {}", e),
+                    message: format!("Failed to encode batch: {e}"),
                 })?;
         Ok(batch)
     }
@@ -600,12 +601,12 @@ impl ZerobusService {
             )
             .build()
             .map_err(|e| ZerobusSinkError::ConfigError {
-                message: format!("Failed to create Zerobus SDK: {}", e),
+                message: format!("Failed to create Zerobus SDK: {e}"),
             })?;
 
         let http_client = HttpClient::new(TlsSettings::default(), &ProxyConfig::default())
             .map_err(|e| ZerobusSinkError::ConfigError {
-                message: format!("Failed to create HTTP client: {}", e),
+                message: format!("Failed to create HTTP client: {e}"),
             })?;
 
         Ok(Self {
