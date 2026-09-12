@@ -164,6 +164,10 @@ pub struct FileWatcher {
     gzip_raw_metadata: Option<(u64, Option<SystemTime>)>,
     is_dead: bool,
     last_seen: Instant,
+    /// When this watcher was first not matched by the current discovery pass. Unlike
+    /// `last_seen`, this is not refreshed by later successful matches and therefore gives an
+    /// unfindable watcher its full rename/reaping grace period.
+    unfindable_since: Option<Instant>,
     max_line_bytes: usize,
     line_delimiter: Bytes,
 }
@@ -257,6 +261,7 @@ impl FileWatcher {
                         gzip_raw_metadata: None,
                         is_dead: false,
                         last_seen: Instant::now(),
+                        unfindable_since: None,
                         max_line_bytes,
                         line_delimiter,
                     });
@@ -366,6 +371,7 @@ impl FileWatcher {
             gzip_raw_metadata,
             is_dead: false,
             last_seen: ts,
+            unfindable_since: None,
             max_line_bytes,
             line_delimiter,
         })
@@ -477,10 +483,16 @@ impl FileWatcher {
     }
 
     pub fn set_file_findable(&mut self, f: bool) {
-        self.findable = f;
         if f {
+            self.findable = true;
             self.last_seen = Instant::now();
+            self.unfindable_since = None;
             self.path_outside_glob = false;
+        } else {
+            self.findable = false;
+            if self.unfindable_since.is_none() {
+                self.unfindable_since = Some(Instant::now());
+            }
         }
     }
 
@@ -1218,6 +1230,12 @@ impl FileWatcher {
     #[inline]
     pub fn last_seen(&self) -> Instant {
         self.last_seen
+    }
+
+    #[inline]
+    pub fn unfindable_for(&self) -> Duration {
+        self.unfindable_since
+            .map_or(Duration::ZERO, |since| since.elapsed())
     }
 
     #[inline]

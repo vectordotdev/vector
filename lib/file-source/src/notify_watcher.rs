@@ -114,6 +114,10 @@ pub struct NotifyDiscovery {
     /// ancestor watch) rather than watching the ancestor forever. See `resync_watches` for
     /// details.
     fallback_watches: HashMap<PathBuf, PathBuf>,
+    /// Parent directories watched non-recursively to observe replacement of symlink components in
+    /// the logical path. These registrations are supplemental: they are retained even though
+    /// they are not themselves implied by an include directory.
+    symlink_parent_watches: HashSet<PathBuf>,
     receiver: mpsc::Receiver<NotifyMessage>,
     /// Set by `watcher`'s notify callback on a `BackendError`, regardless of whether the
     /// corresponding `NotifyMessage::BackendError` made it onto the (bounded) channel. A
@@ -376,6 +380,7 @@ impl NotifyDiscovery {
             watcher: Some(watcher),
             watched_dirs: WantedDirs::new(),
             fallback_watches: HashMap::new(),
+            symlink_parent_watches: HashSet::new(),
             receiver,
             backend_error_pending,
             overflow_pending,
@@ -438,6 +443,21 @@ impl NotifyDiscovery {
             .map(|p| crate::absolutize(p, cwd.as_deref()))
             .collect();
         let wanted = compute_watch_directories(&include_patterns);
+        self.fallback_watches
+            .retain(|path, _ancestor| wanted.contains_key(path));
+
+        // Watching a symlinked directory follows its current target. Replacing the symlink emits
+        // the relevant event in the symlink's parent instead of the old target, so keep a
+        // supplemental non-recursive watch on that parent. The helper also finds symlinks in a
+        // prefix of a not-yet-existing directory, where watching `wanted.parent()` would itself
+        // still follow the symlink and miss its replacement.
+        let mut symlink_parent_watches = HashSet::new();
+        for path in wanted.keys() {
+            if let Some(parent) = find_symlink_parent(path).await {
+                symlink_parent_watches.insert(parent);
+            }
+        }
+        self.symlink_parent_watches = symlink_parent_watches;
 
         // A watch opened through a symlink follows the target inode. If the symlink is retargeted,
         // the logical path and watch mode are unchanged, so the ordinary wanted-vs-watched diff
@@ -483,6 +503,11 @@ impl NotifyDiscovery {
             } else {
                 *mode
             };
+            let mode = if self.symlink_parent_watches.contains(path) {
+                mode.merge(WatchMode::NonRecursive)
+            } else {
+                mode
+            };
             if self.watched_dirs.get(path) == Some(&mode) {
                 continue;
             }
@@ -526,8 +551,44 @@ impl NotifyDiscovery {
             }
         }
 
-        self.fallback_watches
-            .retain(|path, _ancestor| wanted.contains_key(path));
+        // Install the parent registrations after direct/fallback watches have been reconciled, so
+        // a parent that is also wanted or used as a fallback gets the strongest required mode.
+        let symlink_parent_watches: Vec<PathBuf> =
+            self.symlink_parent_watches.iter().cloned().collect();
+        for parent in &symlink_parent_watches {
+            let mode = wanted
+                .get(parent)
+                .copied()
+                .unwrap_or(WatchMode::NonRecursive);
+            let mode = if self
+                .fallback_watches
+                .values()
+                .any(|fallback_ancestor| fallback_ancestor == parent)
+            {
+                mode.merge(WatchMode::Recursive)
+            } else {
+                mode
+            };
+            if self.watched_dirs.get(parent) == Some(&mode) {
+                continue;
+            }
+            match self.watcher_mut().watch(parent, mode.mode()) {
+                Ok(()) => {
+                    trace!(
+                        message = "Watching symlink parent for target replacement.",
+                        path = ?parent,
+                        ?mode,
+                    );
+                    self.watched_dirs.insert(parent.clone(), mode);
+                }
+                Err(error) => {
+                    warn!(message = "Failed to watch symlink parent.", path = ?parent, %error);
+                    emitter
+                        .emit_file_watch_backend_error(&std::io::Error::other(error.to_string()));
+                }
+            }
+        }
+
         // A directory stays watched if it's directly wanted, or if some still-wanted directory
         // depends on it as its fallback ancestor; anything else is stale. Do not call
         // `unwatch()` here: several notify backends synchronously wait for their worker thread,
@@ -535,10 +596,11 @@ impl NotifyDiscovery {
         // replacement gets the complete desired set below without any inline backend teardown.
         let ancestors_in_use: std::collections::HashSet<&PathBuf> =
             self.fallback_watches.values().collect();
-        let has_stale_watches = self
-            .watched_dirs
-            .keys()
-            .any(|path| !wanted.contains_key(path) && !ancestors_in_use.contains(path));
+        let has_stale_watches = self.watched_dirs.keys().any(|path| {
+            !wanted.contains_key(path)
+                && !ancestors_in_use.contains(path)
+                && !self.symlink_parent_watches.contains(path)
+        });
         if has_stale_watches {
             if !self.forget_watches() {
                 return false;
@@ -668,6 +730,7 @@ impl NotifyDiscovery {
                 self.overflow_pending = overflow_pending;
                 self.watched_dirs.clear();
                 self.fallback_watches.clear();
+                self.symlink_parent_watches.clear();
                 self.watched_dir_aliases.clear();
                 self.watched_dir_aliases_by_canonical.clear();
                 true
@@ -681,6 +744,8 @@ impl NotifyDiscovery {
 
     /// Forget bookkeeping for a single watched directory, without touching the underlying OS-level
     /// watcher, so the next `resync_watches` call re-`watch`es it if it's still (or again) wanted.
+    /// Use this only when the backend registration is already known to be invalid; removal/rename
+    /// handling uses `forget_watches` instead so a watch that follows a moved inode is detached.
     ///
     /// Call this when a [`NotifyMessage::PathsRemoved`] reports the removal of a path that is
     /// itself one of our watched directories (as opposed to a file inside one). On Linux/inotify,
@@ -773,6 +838,31 @@ async fn find_existing_ancestor(path: &Path) -> Option<PathBuf> {
             .is_ok_and(|metadata| metadata.is_dir())
         {
             return Some(ancestor.to_path_buf());
+        }
+    }
+    None
+}
+
+/// Return the parent directory of the first symlink component in `path`, if any. Checking the
+/// components individually matters for a path whose final directory does not exist yet: its
+/// canonical form can preserve the unresolved suffix, but the parent of that suffix would still
+/// be reached through the symlink and would not observe replacement of the symlink itself.
+async fn find_symlink_parent(path: &Path) -> Option<PathBuf> {
+    let mut prefix = PathBuf::new();
+    for component in path.components() {
+        prefix.push(component.as_os_str());
+        let metadata = match fs::symlink_metadata(&prefix).await {
+            Ok(metadata) => metadata,
+            Err(_) => break,
+        };
+        if metadata.file_type().is_symlink() {
+            return Some(
+                prefix
+                    .parent()
+                    .filter(|parent| !parent.as_os_str().is_empty())
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| PathBuf::from(".")),
+            );
         }
     }
     None
@@ -1642,6 +1732,11 @@ mod tests {
             .await
             .unwrap();
 
+        assert!(
+            discovery.symlink_parent_watches.contains(root.path()),
+            "retargetable symlinks must keep their parent directory watched"
+        );
+
         std::fs::remove_file(&logical_dir).unwrap();
         std::os::unix::fs::symlink(&second_target, &logical_dir).unwrap();
 
@@ -1655,6 +1750,38 @@ mod tests {
             discovery.watched_dir_aliases.get(&logical_dir),
             Some(&second_canonical)
         );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn symlink_parent_watch_reports_retargeting() {
+        let root = tempfile::tempdir().unwrap();
+        let first_target = root.path().join("first");
+        let second_target = root.path().join("second");
+        std::fs::create_dir(&first_target).unwrap();
+        std::fs::create_dir(&second_target).unwrap();
+        let logical_dir = root.path().join("logical");
+        std::os::unix::fs::symlink(&first_target, &logical_dir).unwrap();
+        let pattern = logical_dir.join("*.log");
+        let mut discovery = NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter)
+            .await
+            .unwrap();
+
+        std::fs::remove_file(&logical_dir).unwrap();
+        std::os::unix::fs::symlink(&second_target, &logical_dir).unwrap();
+
+        let message = tokio::time::timeout(std::time::Duration::from_secs(5), discovery.recv())
+            .await
+            .expect("replacing a watched symlink must wake discovery through its parent")
+            .expect("notify channel must stay open");
+
+        assert!(matches!(
+            message,
+            NotifyMessage::PathsCreated(paths)
+                | NotifyMessage::PathsChanged(paths)
+                | NotifyMessage::PathsRemoved(paths)
+                if !paths.is_empty()
+        ));
     }
 
     #[tokio::test]

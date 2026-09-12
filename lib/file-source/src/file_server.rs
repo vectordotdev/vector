@@ -801,7 +801,7 @@ where
                 if should_reap_unfindable_watcher(
                     watcher.is_idle(),
                     watcher.path_is_outside_glob(),
-                    watcher.last_seen().elapsed(),
+                    watcher.unfindable_for(),
                     discovery_interval,
                     self.rotate_wait,
                     rename_recovery_deadline
@@ -1015,18 +1015,15 @@ where
             }
             Some(NotifyMessage::PathsRemoved(paths)) => {
                 trace!(message = "Received file removal notification.", ?paths);
-                // If one of the removed paths is itself a directory we're watching (as opposed to
-                // a file inside one), the watch on it may have been invalidated at the OS level
-                // (this is inotify's behavior on Linux: removing a watched directory invalidates
-                // the watch on that inode, even if a new directory is later created at the same
-                // path). Forget our bookkeeping for it so the reconciliation pass's
-                // `resync_watches` call re-`watch`es it once it exists again, rather than
-                // wrongly believing it's still watched and skipping it forever. See
-                // `NotifyDiscovery::forget_watch` for details.
-                for path in &paths {
-                    if discovery.is_watched_dir(path) {
-                        discovery.forget_watch(path);
-                    }
+                // A removal or rename of a registered root can leave the backend watch attached
+                // to the old inode (Linux/inotify keeps it attached after a directory rename).
+                // Rebuild the whole watcher immediately so the old registration is detached
+                // before a recreated path is installed; bookkeeping-only invalidation would keep
+                // accumulating watches on renamed roots.
+                if paths.iter().any(|path| discovery.is_watched_dir(path))
+                    && !discovery.forget_watches()
+                {
+                    return false;
                 }
                 pending_notify_wakeup.add_removed_paths(paths);
             }

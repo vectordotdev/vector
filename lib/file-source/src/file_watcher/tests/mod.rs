@@ -371,9 +371,34 @@ fn watcher_for_timing() -> FileWatcher {
         gzip_raw_metadata: None,
         is_dead: false,
         last_seen: now,
+        unfindable_since: None,
         max_line_bytes: 1024,
         line_delimiter: Bytes::from_static(b"\n"),
     }
+}
+
+#[tokio::test]
+async fn unfindable_grace_starts_on_first_unfindable_pass() {
+    let mut watcher = watcher_for_timing();
+    watcher.set_file_findable(false);
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    let elapsed_after_first_pass = watcher.unfindable_for();
+
+    // Repeating the discovery pass must not restart the grace period. In particular, this is
+    // different from `last_seen`, which is refreshed whenever the glob finds the watcher again.
+    watcher.set_file_findable(false);
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    assert!(
+        watcher.unfindable_for() > elapsed_after_first_pass,
+        "an unfindable watcher must retain the timestamp of its first missed discovery"
+    );
+
+    watcher.set_file_findable(true);
+    assert_eq!(
+        watcher.unfindable_for(),
+        std::time::Duration::ZERO,
+        "a newly matched watcher must start a fresh unfindable grace period"
+    );
 }
 
 #[tokio::test]
