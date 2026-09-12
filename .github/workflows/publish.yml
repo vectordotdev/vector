@@ -383,7 +383,9 @@ jobs:
           path: target/artifacts
       - name: Verify install of RPM package.
         run: |
-          ./scripts/verify-install.sh "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.$(uname -m).rpm"
+          # package-rpm.sh replaces hyphens in prerelease versions with dots.
+          rpm_version="${VECTOR_VERSION//-/.}"
+          ./scripts/verify-install.sh "target/artifacts/vector-${rpm_version}-1.$(uname -m).rpm"
 
   macos-verify:
     name: Verify macOS Package

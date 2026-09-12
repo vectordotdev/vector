@@ -1,0 +1,9 @@
+name: Refresh release dependency files
+description: Regenerate the files affected by pinning or restoring VRL.
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/install-vrl-doc-builder
+    - name: Refresh licenses and VRL documentation
+      shell: bash
+      run: make build-licenses generate-vector-vrl-docs
