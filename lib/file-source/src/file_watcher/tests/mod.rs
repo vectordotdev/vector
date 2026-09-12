@@ -402,6 +402,25 @@ async fn unfindable_grace_starts_on_first_unfindable_pass() {
 }
 
 #[tokio::test]
+async fn unfindable_grace_starts_after_discovery_pass() {
+    let mut watcher = watcher_for_timing();
+    watcher.prepare_for_discovery();
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
+    assert_eq!(
+        watcher.unfindable_for(),
+        std::time::Duration::ZERO,
+        "a slow discovery pass must not consume the unfindable grace period"
+    );
+
+    watcher.finish_discovery();
+    assert!(
+        watcher.unfindable_for() < std::time::Duration::from_millis(100),
+        "the grace period must start when discovery finishes"
+    );
+}
+
+#[tokio::test]
 async fn identify_event_paths_ignores_non_regular_files() {
     let directory = tempfile::tempdir().unwrap();
     let paths = HashSet::from([directory.path().to_path_buf()]);

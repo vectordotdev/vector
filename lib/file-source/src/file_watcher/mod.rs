@@ -496,6 +496,20 @@ impl FileWatcher {
         }
     }
 
+    /// Mark the start of a discovery pass without starting the unfindable grace period yet.
+    /// The grace period begins only after the pass confirms that this watcher was not found.
+    pub fn prepare_for_discovery(&mut self) {
+        self.findable = false;
+    }
+
+    /// Start the unfindable grace period for a watcher still missing after discovery. Existing
+    /// timestamps are preserved so repeated passes do not extend the grace period.
+    pub fn finish_discovery(&mut self) {
+        if !self.findable && self.unfindable_since.is_none() {
+            self.unfindable_since = Some(Instant::now());
+        }
+    }
+
     /// Mark this watcher as still live at a path outside the configured include patterns. This
     /// is used after an idle watcher is found by identity following a rotation, so subsequent
     /// glob passes do not make `poll_idle_watchers` abandon the rotated inode.

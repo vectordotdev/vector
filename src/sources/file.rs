@@ -238,8 +238,8 @@ pub struct FileConfig {
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     pub rotate_wait: Duration,
 
-    /// The mechanism used to discover new files, detect renames, and wake up reads of existing
-    /// files.
+    /// The mechanism used to discover new files, detect renames, and wake up idle watchers when
+    /// existing files change.
     ///
     /// `polling` (the default) re-scans the `include` glob patterns on a fixed interval
     /// (`glob_minimum_cooldown_ms`) and keeps an open file handle for every matched file for as
@@ -270,9 +270,9 @@ pub struct FileConfig {
     pub reconcile_interval: Duration,
 
     /// How long to wait, after a file has been fully read (reached EOF) and stops receiving new
-    /// data, before closing its file handle.
+    /// data before closing its file handle.
     ///
-    /// Vector keeps polling the file's metadata (size and modification time) cheaply, without
+    /// Vector continues to poll the file's metadata (size and modification time) cheaply, without
     /// holding the handle open, and transparently reopens the file if new data arrives. This
     /// avoids holding a large number of open file handles for files that are being watched (for
     /// example, due to `ignore_older_secs` not yet excluding them, or simply because they haven't
@@ -312,9 +312,9 @@ pub enum FileDiscoveryModeConfig {
     /// Re-scan the `include` glob patterns on a fixed interval (`glob_minimum_cooldown_ms`).
     #[default]
     Polling,
-    /// Use OS-level file system event notifications to discover files and wake up reads
-    /// promptly, falling back to a periodic reconciliation pass (`reconcile_interval_secs`) as a
-    /// correctness backstop.
+    /// Use OS-level file system event notifications to discover files and promptly detect changes
+    /// to existing files, falling back to a periodic reconciliation pass (`reconcile_interval_secs`)
+    /// as a correctness backstop.
     Notify,
 }
 

@@ -1120,7 +1120,10 @@ where
         }
 
         for (_file_id, watcher) in &mut *fp_map {
-            watcher.set_file_findable(false); // assume not findable until found
+            // Do not start the unfindable grace period until the full glob/fingerprint pass has
+            // completed. A slow scan must not consume the watcher's grace period before absence
+            // has actually been established.
+            watcher.prepare_for_discovery();
         }
 
         // Computed once per pass (not once per file) and only when there's actually a pending
@@ -1201,6 +1204,10 @@ where
                     self.emit_open_and_idle_counts(fp_map);
                 }
             }
+        }
+
+        for watcher in fp_map.values_mut() {
+            watcher.finish_discovery();
         }
         keep_notify_discovery
     }
