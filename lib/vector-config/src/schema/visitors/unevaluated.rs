@@ -118,6 +118,18 @@ impl Visitor for DisallowUnevaluatedPropertiesVisitor {
 
                 unmark_or_flatten_schema(definitions, subschema);
             }
+
+            // `not` sees the entire JSON instance in the same way, so it needs the same treatment:
+            // if the negated schema is marked with `unevaluatedProperties: false`, then any
+            // property it doesn't itself evaluate makes it fail, which makes the `not` succeed and
+            // silently defeats the constraint it was expressing.
+            //
+            // Unlike the branches above, this doesn't count as relevant subschema validation. A
+            // schema whose only subschema is `not` evaluates none of the instance's properties, so
+            // marking *it* closed would fail for every property in exactly the same way.
+            if let Some(not) = subschema.not.as_mut().and_then(|not| not.as_object_mut()) {
+                unmark_or_flatten_schema(definitions, not);
+            }
         }
 
         // If we encountered any subschema validation, or if this schema itself is an object schema,
@@ -966,6 +978,72 @@ mod tests {
                     "properties": { "c": { "type": "boolean" } }
                 }
             },
+            "unevaluatedProperties": false
+        }));
+
+        assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    /// A `not` whose negated schema carries its own subschema validation must not be marked
+    /// closed. `unevaluatedProperties: false` on the negated schema makes it fail for any
+    /// property it does not itself evaluate, which makes the `not` succeed and silently defeats
+    /// the constraint.
+    ///
+    /// This is the shape a `mutually_exclusive` group generates: `not` over an `anyOf` of
+    /// simultaneously-set member pairs. Real configurations carry unrelated sibling fields, so
+    /// marking the inner `anyOf` closed would let `{a, b, unrelated}` pass.
+    #[test]
+    fn not_with_subschema_validation_is_not_marked() {
+        let mut actual_schema = as_schema(json!({
+            "type": "object",
+            "allOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "a": { "type": ["string", "null"] },
+                        "b": { "type": ["string", "null"] },
+                        "unrelated": { "type": ["string", "null"] }
+                    }
+                },
+                {
+                    "not": {
+                        "anyOf": [{
+                            "allOf": [
+                                { "required": ["a"], "properties": { "a": { "not": { "type": "null" } } } },
+                                { "required": ["b"], "properties": { "b": { "not": { "type": "null" } } } }
+                            ]
+                        }]
+                    }
+                }
+            ]
+        }));
+
+        let mut visitor = DisallowUnevaluatedPropertiesVisitor::default();
+        visitor.visit_root_schema(&mut actual_schema);
+
+        let expected_schema = as_schema(json!({
+            "type": "object",
+            "allOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "a": { "type": ["string", "null"] },
+                        "b": { "type": ["string", "null"] },
+                        "unrelated": { "type": ["string", "null"] }
+                    }
+                },
+                {
+                    "not": {
+                        "anyOf": [{
+                            "allOf": [
+                                { "required": ["a"], "properties": { "a": { "not": { "type": "null" } } } },
+                                { "required": ["b"], "properties": { "b": { "not": { "type": "null" } } } }
+                            ]
+                        }],
+                        "unevaluatedProperties": true
+                    }
+                }
+            ],
             "unevaluatedProperties": false
         }));
 

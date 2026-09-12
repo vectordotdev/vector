@@ -1023,6 +1023,43 @@ fn mutually_exclusive_forbids_every_pair() {
     );
 }
 
+/// The real shape a `mutually_exclusive` group appears in: the group members sit alongside
+/// unrelated fields, the way `url`/`region` sit alongside `dataset` and `token` on the Axiom sink.
+#[derive(Clone, Debug)]
+#[configurable_component]
+struct MutuallyExclusiveWithSiblingConfig {
+    /// First option.
+    #[configurable(mutually_exclusive = "group")]
+    url: Option<String>,
+
+    /// Second option.
+    #[configurable(mutually_exclusive = "group")]
+    region: Option<String>,
+
+    /// An unrelated field that a valid configuration also sets.
+    dataset: Option<String>,
+}
+
+#[test]
+fn mutually_exclusive_constraint_survives_sibling_fields() {
+    // The constraint negates "both members set". If the negated schema were closed with
+    // `unevaluatedProperties: false`, any property it does not itself evaluate -- `dataset` here --
+    // would make it fail, which would make the `not` succeed and let `{url, region, dataset}`
+    // validate. Assert against the unpruned schema, since `generate_test_schema` drops
+    // `unevaluatedProperties` and would hide exactly this.
+    let root = generate_root_schema::<MutuallyExclusiveWithSiblingConfig>()
+        .expect("should generate schema");
+    let schema = serde_json::to_value(root.schema).expect("serialize schema to JSON");
+
+    let constraint = &schema["allOf"][1];
+    assert_eq!(constraint["_mutually_exclusive_constraint"], json!(true));
+    assert_ne!(
+        constraint["not"]["unevaluatedProperties"],
+        json!(false),
+        "the negated schema must stay open, or a sibling field defeats the constraint"
+    );
+}
+
 #[test]
 fn mutually_exclusive_annotates_group_metadata() {
     let root = generate_root_schema::<MutuallyExclusiveConfig>().expect("should generate schema");
