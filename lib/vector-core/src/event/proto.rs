@@ -595,6 +595,7 @@ impl From<Secrets> for super::metadata::Secrets {
 impl From<super::DatadogMetricOriginMetadata> for DatadogOriginMetadata {
     fn from(value: super::DatadogMetricOriginMetadata) -> Self {
         Self {
+            metric_type: value.metric_type(),
             origin_product: value.product(),
             origin_category: value.category(),
             origin_service: value.service(),
@@ -609,6 +610,7 @@ impl From<DatadogOriginMetadata> for super::DatadogMetricOriginMetadata {
             value.origin_category,
             value.origin_service,
         )
+        .with_metric_type(value.metric_type)
     }
 }
 
@@ -636,6 +638,7 @@ impl From<EventMetadata> for Metadata {
             source_type,
             upstream_id,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
             ..
         } = value.into_owned();
@@ -650,6 +653,7 @@ impl From<EventMetadata> for Metadata {
             upstream_id: upstream_id.map(|id| id.as_ref().clone()).map(Into::into),
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
+            datadog_metric_unit,
         }
     }
 }
@@ -663,6 +667,7 @@ impl From<Metadata> for EventMetadata {
             upstream_id,
             secrets,
             datadog_origin_metadata,
+            datadog_metric_unit,
             source_event_id,
         } = value;
 
@@ -699,6 +704,7 @@ impl From<Metadata> for EventMetadata {
                 schema_definition: default_schema_definition(),
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
+                datadog_metric_unit,
                 source_event_id,
             }),
             last_transform_timestamp: None,

@@ -84,6 +84,10 @@ pub(super) struct Inner {
     #[serde(default)]
     pub(crate) datadog_origin_metadata: Option<DatadogMetricOriginMetadata>,
 
+    /// Datadog metric unit received from an upstream Agent payload.
+    #[serde(default)]
+    pub(crate) datadog_metric_unit: Option<String>,
+
     /// An internal vector id that can be used to identify this event across all components.
     #[derivative(PartialEq = "ignore")]
     pub(crate) source_event_id: Option<Uuid>,
@@ -92,6 +96,8 @@ pub(super) struct Inner {
 /// Metric Origin metadata for submission to Datadog.
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DatadogMetricOriginMetadata {
+    /// Datadog origin metric type.
+    metric_type: Option<i32>,
     /// `OriginProduct`
     product: Option<u32>,
     /// `OriginCategory`
@@ -109,10 +115,23 @@ impl DatadogMetricOriginMetadata {
     #[must_use]
     pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
         Self {
+            metric_type: None,
             product,
             category,
             service,
         }
+    }
+
+    /// Returns the Datadog origin metric type.
+    pub fn metric_type(&self) -> Option<i32> {
+        self.metric_type
+    }
+
+    /// Sets the Datadog origin metric type.
+    #[must_use]
+    pub fn with_metric_type(mut self, metric_type: Option<i32>) -> Self {
+        self.metric_type = metric_type;
+        self
     }
 
     /// Returns a reference to the `OriginProduct`.
@@ -247,6 +266,16 @@ impl EventMetadata {
         self.inner.datadog_origin_metadata.as_ref()
     }
 
+    /// Returns the Datadog metric unit.
+    pub fn datadog_metric_unit(&self) -> Option<&str> {
+        self.inner.datadog_metric_unit.as_deref()
+    }
+
+    /// Sets the Datadog metric unit.
+    pub fn set_datadog_metric_unit(&mut self, unit: String) {
+        self.get_mut().datadog_metric_unit = Some(unit);
+    }
+
     /// Returns a reference to the event id.
     pub fn source_event_id(&self) -> Option<Uuid> {
         self.inner.source_event_id
@@ -276,6 +305,7 @@ impl Default for Inner {
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
+            datadog_metric_unit: None,
             source_event_id: Some(Uuid::new_v4()),
         }
     }
@@ -357,6 +387,13 @@ impl EventMetadata {
         self
     }
 
+    /// Sets the Datadog metric unit.
+    #[must_use]
+    pub fn with_datadog_metric_unit(mut self, unit: String) -> Self {
+        self.get_mut().datadog_metric_unit = Some(unit);
+        self
+    }
+
     /// Replaces the existing `source_event_id` with the given one.
     #[must_use]
     pub fn with_source_event_id(mut self, source_event_id: Option<Uuid>) -> Self {
@@ -373,6 +410,12 @@ impl EventMetadata {
         let other = other.into_owned();
         inner.finalizers.merge(other.finalizers);
         inner.secrets.merge(other.secrets);
+        if inner.datadog_origin_metadata.is_none() {
+            inner.datadog_origin_metadata = other.datadog_origin_metadata;
+        }
+        if inner.datadog_metric_unit.is_none() {
+            inner.datadog_metric_unit = other.datadog_metric_unit;
+        }
 
         // Update `source_event_id` if necessary.
         if inner.source_event_id.is_none() {

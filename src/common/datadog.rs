@@ -62,6 +62,9 @@ pub struct DatadogSeriesMetric {
     /// device
     #[serde(skip_serializing_if = "Option::is_none")]
     pub device: Option<String>,
+    /// unit
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
     /// metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<DatadogSeriesMetricMetadata>,

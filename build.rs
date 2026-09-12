@@ -134,6 +134,7 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/third-party/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/third-party/google/rpc/status.proto");
         println!("cargo:rerun-if-changed=proto/vector/dd_metric.proto");
+        println!("cargo:rerun-if-changed=proto/vector/dd_metric_v3.proto");
         println!("cargo:rerun-if-changed=proto/vector/dd_trace.proto");
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
@@ -162,6 +163,7 @@ fn main() {
                     "lib/vector-core/proto/event.proto",
                     "proto/vector/ddsketch_full.proto",
                     "proto/vector/dd_metric.proto",
+                    "proto/vector/dd_metric_v3.proto",
                     "proto/vector/dd_trace.proto",
                     "proto/third-party/google/pubsub/v1/pubsub.proto",
                     "proto/third-party/google/rpc/status.proto",
