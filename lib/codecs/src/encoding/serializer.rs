@@ -5,7 +5,10 @@ use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
 #[cfg(feature = "arrow")]
-use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
+use super::format::{
+    ArrowStreamSerializer, ArrowStreamSerializerConfig, WireToArrowSerializer,
+    WireToArrowSerializerConfig,
+};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "parquet")]
@@ -165,6 +168,17 @@ pub enum BatchSerializerConfig {
     /// [apache_arrow]: https://arrow.apache.org/
     #[serde(rename = "arrow_stream")]
     ArrowStream(ArrowStreamSerializerConfig),
+    /// Decodes proto wire bytes from each event's `message` field directly
+    /// into an [Apache Arrow][apache_arrow] `RecordBatch`, bypassing the
+    /// generic `ProtobufDeserializer -> Event -> ArrowStreamSerializer`
+    /// chain.
+    ///
+    /// Requires a proto descriptor (`desc_file` + `message_type`) for the
+    /// incoming bytes; the sink injects the output Arrow `Schema`.
+    ///
+    /// [apache_arrow]: https://arrow.apache.org/
+    #[serde(rename = "wire_to_arrow")]
+    WireToArrow(WireToArrowSerializerConfig),
     /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
     ///
     /// [apache_parquet]: https://parquet.apache.org/
@@ -184,6 +198,10 @@ impl BatchSerializerConfig {
                 let serializer = ArrowStreamSerializer::new(arrow_config.clone())?;
                 Ok(super::BatchSerializer::Arrow(serializer))
             }
+            BatchSerializerConfig::WireToArrow(config) => {
+                let serializer = WireToArrowSerializer::new(config.clone())?;
+                Ok(super::BatchSerializer::WireToArrow(serializer))
+            }
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => {
                 let serializer = ParquetSerializer::new(parquet_config.clone())?;
@@ -196,6 +214,7 @@ impl BatchSerializerConfig {
     pub fn input_type(&self) -> DataType {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
+            BatchSerializerConfig::WireToArrow(config) => config.input_type(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.input_type(),
         }
@@ -205,6 +224,7 @@ impl BatchSerializerConfig {
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
+            BatchSerializerConfig::WireToArrow(config) => config.schema_requirement(),
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => parquet_config.schema_requirement(),
         }
