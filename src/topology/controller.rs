@@ -106,7 +106,9 @@ impl TopologyController {
             .reload_config_and_respawn(new_config, self.extra_context.clone())
             .await
         {
-            Ok(()) => {
+            // Ok(true): components rebuilt; Ok(false): unchanged, rebuild skipped (tables may still refresh).
+            // Emit VectorReloaded in both cases so successful reloads are always observed.
+            Ok(true) | Ok(false) => {
                 emit!(VectorReloaded {
                     config_paths: &self.config_paths
                 });

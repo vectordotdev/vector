@@ -65,6 +65,14 @@ impl ConfigDiff {
             || self.sinks.is_removed(key)
             || self.enrichment_tables.is_removed(key)
     }
+
+    /// True when no components need add/change/remove (forced reloads already in `to_change`).
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
+            && self.transforms.is_empty()
+            && self.sinks.is_empty()
+            && self.enrichment_tables.is_empty()
+    }
 }
 
 #[derive(Debug)]
@@ -143,6 +151,11 @@ impl EnrichmentTableDiff {
         self.tables.flip();
         self.sources.flip();
         self.sinks.flip();
+    }
+
+    /// True when no table configs or derived source/sink components changed.
+    pub fn is_empty(&self) -> bool {
+        self.tables.is_empty() && self.sources.is_empty() && self.sinks.is_empty()
     }
 }
 
@@ -240,6 +253,11 @@ impl Difference {
         }
     }
 
+    /// Returns true when there are no additions, changes, or removals.
+    pub fn is_empty(&self) -> bool {
+        self.to_add.is_empty() && self.to_change.is_empty() && self.to_remove.is_empty()
+    }
+
     /// Checks whether or not any components are being changed or added.
     pub fn any_changed_or_added(&self) -> bool {
         !(self.to_change.is_empty() && self.to_add.is_empty())
@@ -320,6 +338,237 @@ fn enrichment_table_sink_key(
     table
         .as_sink(table_key)
         .map(|(component_key, _)| component_key)
+}
+
+#[cfg(test)]
+mod is_empty_tests {
+    use crate::config::ConfigBuilder;
+    use indoc::indoc;
+
+    use super::*;
+
+    fn basic_config() -> Config {
+        serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap()
+    }
+
+    #[test]
+    fn is_empty_when_configs_are_identical() {
+        let config = basic_config();
+        let diff = ConfigDiff::new(&config, &config, HashSet::new());
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn is_not_empty_when_sink_added() {
+        let old = basic_config();
+        let new: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+              other_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff = ConfigDiff::new(&old, &new, HashSet::new());
+        assert!(!diff.is_empty());
+        assert!(diff.sinks.is_added(&ComponentKey::from("other_sink")));
+    }
+
+    #[test]
+    fn is_not_empty_when_sink_removed() {
+        let old: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+              other_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+        let new = basic_config();
+
+        let diff = ConfigDiff::new(&old, &new, HashSet::new());
+        assert!(!diff.is_empty());
+        assert!(diff.sinks.is_removed(&ComponentKey::from("other_sink")));
+    }
+
+    #[test]
+    fn is_not_empty_when_sink_inputs_changed() {
+        let old = basic_config();
+        let new: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+              test2:
+                type: "test_basic"
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test2"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff = ConfigDiff::new(&old, &new, HashSet::new());
+        assert!(!diff.is_empty());
+        assert!(diff.sinks.is_changed(&ComponentKey::from("test_sink")));
+        assert!(diff.sources.is_added(&ComponentKey::from("test2")));
+    }
+
+    #[test]
+    fn is_not_empty_when_source_added() {
+        let old = basic_config();
+        let new: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+              test2:
+                type: "test_basic"
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff = ConfigDiff::new(&old, &new, HashSet::new());
+        assert!(!diff.is_empty());
+        assert!(diff.sources.is_added(&ComponentKey::from("test2")));
+    }
+
+    #[test]
+    fn is_not_empty_when_transform_added() {
+        let old = basic_config();
+        let new: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            sources:
+              test:
+                type: "test_basic"
+            transforms:
+              xform:
+                type: "test_basic"
+                inputs: ["test"]
+                suffix: "-x"
+                increase: 0.0
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["xform"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff = ConfigDiff::new(&old, &new, HashSet::new());
+        assert!(!diff.is_empty());
+        assert!(diff.transforms.is_added(&ComponentKey::from("xform")));
+        assert!(diff.sinks.is_changed(&ComponentKey::from("test_sink")));
+    }
+
+    #[test]
+    fn is_not_empty_when_component_forced_to_reload() {
+        let config = basic_config();
+        let forced = HashSet::from([ComponentKey::from("test_sink")]);
+        let diff = ConfigDiff::new(&config, &config, forced);
+        assert!(!diff.is_empty());
+        assert!(diff.sinks.is_changed(&ComponentKey::from("test_sink")));
+    }
+
+    fn config_with_file_enrichment(path: &str) -> Config {
+        serde_yaml::from_str::<ConfigBuilder>(&format!(
+            r#"
+            sources:
+              test:
+                type: "test_basic"
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+            enrichment_tables:
+              geo:
+                type: "file"
+                file:
+                  path: "{path}"
+                  encoding:
+                    type: "csv"
+        "#
+        ))
+        .unwrap()
+        .build()
+        .unwrap()
+    }
+
+    #[test]
+    fn is_empty_when_standalone_file_enrichment_table_unchanged() {
+        let config = config_with_file_enrichment("/tmp/vector-enrichment-same.csv");
+        let diff = ConfigDiff::new(&config, &config, HashSet::new());
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn is_not_empty_when_standalone_file_enrichment_table_added() {
+        let old = basic_config();
+        let new = config_with_file_enrichment("/tmp/vector-enrichment-test.csv");
+
+        let diff = ConfigDiff::new(&old, &new, HashSet::new());
+        assert!(!diff.is_empty(), "file enrichment table add should not be empty");
+        assert!(diff.enrichment_tables.tables.is_added(&ComponentKey::from("geo")));
+    }
+
+    #[test]
+    fn is_not_empty_when_standalone_file_enrichment_table_changed() {
+        let old = config_with_file_enrichment("/tmp/vector-enrichment-old.csv");
+        let new = config_with_file_enrichment("/tmp/vector-enrichment-new.csv");
+
+        let diff = ConfigDiff::new(&old, &new, HashSet::new());
+        assert!(!diff.is_empty());
+        assert!(
+            diff.enrichment_tables
+                .tables
+                .is_changed(&ComponentKey::from("geo"))
+        );
+    }
+
+    #[test]
+    fn is_not_empty_when_standalone_file_enrichment_table_removed() {
+        let old = config_with_file_enrichment("/tmp/vector-enrichment-test.csv");
+        let new = basic_config();
+
+        let diff = ConfigDiff::new(&old, &new, HashSet::new());
+        assert!(!diff.is_empty());
+        assert!(
+            diff.enrichment_tables
+                .tables
+                .is_removed(&ComponentKey::from("geo"))
+        );
+    }
 }
 
 #[cfg(all(test, feature = "enrichment-tables-memory"))]
