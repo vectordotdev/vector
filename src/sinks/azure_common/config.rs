@@ -417,8 +417,7 @@ impl TokenCredential for MockTokenCredential {
             BASE64_STANDARD
                 .encode(serde_json::to_string(&jwt).unwrap())
                 .trim_end_matches("=")
-        )
-        .to_string();
+        );
 
         warn!(
             "Using mock token credential, JWT: {}, base64: {jwt_base64}",

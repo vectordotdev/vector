@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use goauth::scopes::Scope;
-use http::{Request, Uri, header::CONTENT_TYPE};
+use http_1::{Request, header::CONTENT_TYPE};
 use snafu::ResultExt;
 
 use super::{
@@ -10,16 +10,14 @@ use super::{
 use crate::{
     config::ValidatedSink,
     gcp::{GcpAuthConfig, GcpAuthenticator},
-    http::HttpClient,
+    http::client_v1::HttpClient,
     sinks::{
-        HTTPRequestBuilderSnafu, gcp,
+        HTTPV1RequestBuilderSnafu, gcp,
         prelude::*,
         util::{
             HttpEndpoint,
-            http::{
-                HttpRequest, HttpService, HttpServiceRequestBuilder, RetryStrategy,
-                http_response_retry_logic,
-            },
+            http::{HttpRequest, RetryStrategy},
+            http_v1::{HttpService, HttpServiceRequestBuilder, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
     },
@@ -138,7 +136,7 @@ impl ValidatedSink for StackdriverConfig {
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings.into(), cx.proxy())?;
 
         let request_builder = StackdriverMetricsRequestBuilder {
             encoder: StackdriverMetricsEncoder {
@@ -153,7 +151,7 @@ impl ValidatedSink for StackdriverConfig {
         auth.spawn_regenerate_token();
 
         let stackdriver_metrics_service_request_builder = StackdriverMetricsServiceRequestBuilder {
-            uri: uri.into_uri(),
+            endpoint: uri.clone(),
             auth,
         };
 
@@ -209,20 +207,21 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
 
 #[derive(Debug, Clone)]
 pub(super) struct StackdriverMetricsServiceRequestBuilder {
-    pub(super) uri: Uri,
+    pub(super) endpoint: HttpEndpoint,
     pub(super) auth: GcpAuthenticator,
 }
 
 impl HttpServiceRequestBuilder<()> for StackdriverMetricsServiceRequestBuilder {
     fn build(&self, mut request: HttpRequest<()>) -> Result<Request<Bytes>, crate::Error> {
-        let builder = Request::post(self.uri.clone()).header(CONTENT_TYPE, "application/json");
+        let builder =
+            Request::post(self.endpoint.clone().into_v1()).header(CONTENT_TYPE, "application/json");
 
         let mut request = builder
             .body(request.take_payload())
-            .context(HTTPRequestBuilderSnafu)
-            .map_err(Into::<crate::Error>::into)?;
+            .context(HTTPV1RequestBuilderSnafu)
+            .map_err(crate::Error::from)?;
 
-        self.auth.apply(&mut request);
+        self.auth.apply_v1(&mut request);
 
         Ok(request)
     }

@@ -111,7 +111,7 @@ impl RunningTopology {
     /// initializes the pending reload set.
     pub fn extend_reload_set(&mut self, new_set: HashSet<ComponentKey>) {
         match &mut self.pending_reload {
-            None => self.pending_reload = Some(new_set.clone()),
+            None => self.pending_reload = Some(new_set),
             Some(existing) => existing.extend(new_set),
         }
     }

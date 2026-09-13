@@ -67,6 +67,7 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
 /// would be wasteful.
 #[derive(Clone)]
 pub struct ZerobusRequest {
+    #[allow(clippy::rc_buffer)]
     pub events: Arc<Vec<Event>>,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,

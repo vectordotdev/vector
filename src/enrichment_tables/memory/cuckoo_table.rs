@@ -316,7 +316,7 @@ impl CuckooMemoryTable {
                     .into());
             }
             let built_config = Self::build_config(&config, &cuckoo_config)?;
-            let built_ttl = built_config.ttl_config().clone();
+            let built_ttl = built_config.ttl_config();
             if built_config.compatible_layout(&prev_memory.filter.get_configuration())
                 && let Ok(mut old_filter) =
                     prev_memory.filter.exporter().snapshot().map(VecDeque::from)
