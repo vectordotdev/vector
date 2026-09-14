@@ -223,8 +223,15 @@ impl SourceConfig for RedisSourceConfig {
                 &owned_value_path!("key"),
                 Kind::bytes(),
                 None,
-            );
+            )
+            .with_standard_vector_source_metadata();
 
+        // Add the matched-channel metadata after the standard metadata so the schema is built
+        // in the same order `handle_line` inserts fields at runtime. This matters for legacy
+        // namespacing: `handle_line` inserts the standard fields first and then the channel
+        // with `InsertIfEmpty`, so if `redis_channel` is pointed at an existing field (for
+        // example the timestamp), the standard field wins at runtime — and the schema must
+        // reflect that same precedence.
         if matches!(self.data_type, DataTypeConfig::Pchannel) {
             let redis_channel_path = self
                 .redis_channel
@@ -240,8 +247,6 @@ impl SourceConfig for RedisSourceConfig {
                 None,
             );
         }
-
-        let schema_definition = schema_definition.with_standard_vector_source_metadata();
 
         vec![SourceOutput::new_maybe_logs(
             self.decoding.output_type(),
