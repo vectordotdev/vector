@@ -1,7 +1,7 @@
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeSet, HashMap},
-    env, mem,
+    mem,
 };
 
 use indexmap::IndexMap;
@@ -608,21 +608,43 @@ where
     generate_root_schema_with_settings::<T>(default_schema_settings())
 }
 
+thread_local! {
+    static GENERATING_ROOT_SCHEMA: Cell<bool> = const { Cell::new(false) };
+}
+
+struct SchemaGeneration {
+    previous: bool,
+}
+
+impl SchemaGeneration {
+    fn enable() -> Self {
+        let previous = GENERATING_ROOT_SCHEMA.replace(true);
+        Self { previous }
+    }
+}
+
+impl Drop for SchemaGeneration {
+    fn drop(&mut self) {
+        GENERATING_ROOT_SCHEMA.set(self.previous);
+    }
+}
+
+/// Returns whether the current thread is generating a root configuration schema.
+pub fn is_generating_root_schema() -> bool {
+    GENERATING_ROOT_SCHEMA.get()
+}
+
 pub fn generate_root_schema_with_settings<T>(
     schema_settings: SchemaSettings,
 ) -> Result<RootSchema, GenerateError>
 where
     T: Configurable + 'static,
 {
+    let _generation = SchemaGeneration::enable();
     let schema_gen = RefCell::new(schema_settings.into_generator());
-
-    // Set env variable to enable generating all schemas, including platform-specific ones.
-    unsafe { env::set_var("VECTOR_GENERATE_SCHEMA", "true") };
 
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
-
-    unsafe { env::remove_var("VECTOR_GENERATE_SCHEMA") };
 
     Ok(schema_gen.into_inner().into_root_schema(schema))
 }
@@ -898,6 +920,26 @@ fn instance_type_for_value(value: &Value) -> InstanceType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn root_schema_generation_state_is_scoped_to_the_current_thread() {
+        assert!(!is_generating_root_schema());
+
+        let outer = SchemaGeneration::enable();
+        assert!(is_generating_root_schema());
+        std::thread::spawn(|| assert!(!is_generating_root_schema()))
+            .join()
+            .unwrap();
+
+        {
+            let _inner = SchemaGeneration::enable();
+            assert!(is_generating_root_schema());
+        }
+        assert!(is_generating_root_schema());
+
+        drop(outer);
+        assert!(!is_generating_root_schema());
+    }
 
     #[test]
     fn single_discriminant_is_not_ambiguous() {
