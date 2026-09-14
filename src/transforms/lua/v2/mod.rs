@@ -262,8 +262,7 @@ impl Lua {
     pub fn new(config: &LuaConfig, key: ComponentKey) -> crate::Result<Self> {
         // In order to support loading C modules in Lua, we need to create unsafe instance
         // without debug library.
-        // SAFETY: Only `ALL_SAFE` standard libraries are loaded initially; the unsafe constructor
-        // is required solely to permit explicitly configured native modules through `require`.
+        // SAFETY: Native modules loaded by Lua must be trusted not to violate memory safety.
         let lua = unsafe {
             mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
         };
