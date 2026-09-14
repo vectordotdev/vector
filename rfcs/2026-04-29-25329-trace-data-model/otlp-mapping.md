@@ -145,10 +145,18 @@ representable because it retains `TraceEvent.trace_id`.
 
 The OTLP legacy shim applies the same partitioning to every `ScopeSpans` it recovers. A
 pre-flip per-span OTLP event converts one-to-one into a typed event whose `spans` holds
-that span. A legacy event carrying several `ScopeSpans` groupings (for example
-`use_otlp_decoding` batch encoding) may fan out further by the distinct trace IDs in
-each grouping. Metadata, finalizers, and acknowledgements on the resulting sequence
-follow the parent RFC's conversion contract.
+that span. Today's default ingest flattens each `ScopeSpans` and does not store scope
+data, either schema URL, `Resource.dropped_attributes_count`, or span/link flags; those
+slots take their typed defaults and are not recovered after a buffer. A legacy event
+that still carries `ScopeSpans` groupings (for example `use_otlp_decoding` batch
+encoding) may fan out further by the distinct trace IDs in each grouping and can
+populate those slots. Metadata, finalizers, and acknowledgements on the resulting
+sequence follow the parent RFC's conversion contract.
+
+The `OTLP -> Vector -> OTLP` effective-equivalence guarantee is a mapping from decoded
+`ResourceSpans` / `ScopeSpans` through the typed model and back. It is not a claim that
+the default pre-flip source layout is lossless. Pipeline relay of the fields that
+layout drops waits until the source emits typed events.
 
 | OTLP                                                               | Internal                                      |
 | ------------------------------------------------------------------ | --------------------------------------------- |

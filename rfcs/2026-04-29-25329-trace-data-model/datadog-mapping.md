@@ -72,8 +72,9 @@ Trace Context, and other informational entries are defined in the
   `TracerPayload` / `TraceChunk` / `Span` messages.
 - The parent RFC's effective-equivalence round-trip guarantee, applied to
   `Datadog -> Vector -> Datadog`. Stable partitioning preserves span order within each
-  trace-ID group. For a non-conforming multi-trace chunk, the relative positions of
-  spans from distinct trace IDs and their resulting egress chunk grouping are details
+  `(trace_id, service)` group. The relative order of spans from distinct services in
+  one trace, and for a non-conforming multi-trace chunk the relative positions of
+  spans from distinct trace IDs and their resulting egress chunk grouping, are details
   the Datadog backend does not observe and so may differ.
 - The three Datadog span-attribute partitions (`meta`, `metrics`, `meta_struct`) and how
   the two scalar partitions map into `Span.attributes` by `AttrValue` variant while
@@ -239,9 +240,18 @@ unchanged. The shim splits
 the chunk's successfully converted spans by distinct reconstructed trace ID and
 `Span.service` pairs into the same typed events native ingest would have produced, in
 first-seen pair order.
+Today's ingest merges tracer tags into chunk tags and then agent tags into that same
+map, and does not store tracer hostname/environment separately from the agent envelope
+or `rareSamplerEnabled`. Those distinctions take typed defaults or the merged map and
+are not recovered after a buffer.
 Metadata, finalizers, and acknowledgements on the resulting sequence follow the
 parent RFC's conversion contract. An empty-spans
 legacy chunk converts to zero typed events, matching native ingest.
+
+The `Datadog -> Vector -> Datadog` effective-equivalence guarantee is a mapping from
+decoded `AgentPayload` through the typed model and back. It is not a claim that the
+default pre-flip source layout is lossless. Pipeline relay of the scopes that layout
+merges or omits waits until the source emits typed events.
 
 | Datadog                                                       | Internal                                              |
 | ------------------------------------------------------------- | ----------------------------------------------------- |
@@ -681,8 +691,10 @@ RFC 9862.
 - Round-trip shapes: a multi-service wire chunk that was split into multiple events on
   ingest re-coalesces into one chunk on egress; a non-conforming multi-trace chunk,
   including one with several services per trace, produces one egress chunk per
-  `trace_id`. Both shapes are equivalent to the input as observed by the Datadog
-  backend (see Scope).
+  `trace_id`. Re-coalescence concatenates partitions in first-seen pair order,
+  preserving span order within each partition; it does not restore original
+  cross-service interleaving. Both shapes are equivalent to the input as observed by
+  the Datadog backend (see Scope).
 
 #### Cross-format conformance: `OTLP -> Vector -> datadog_traces`
 
