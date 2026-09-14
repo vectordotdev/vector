@@ -408,6 +408,9 @@ impl StartedApplication {
         let signal = loop {
             let has_sources = !topology_controller.lock().await.topology.config.is_empty();
             tokio::select! {
+                biased;
+                // Handle shutdown before a queued reload that may block on config loading.
+                shutdown = shutdown_rx.recv() => break shutdown,
                 signal = signal_rx.recv() => if let Some(signal) = handle_signal(
                     signal,
                     &topology_controller,
@@ -417,10 +420,6 @@ impl StartedApplication {
                 ).await {
                     break signal;
                 },
-                // Lag/closed handling lives inside `ShutdownReceiver`: any lag means
-                // multiple shutdowns were sent, which by the shutdown contract quits
-                // immediately.
-                shutdown = shutdown_rx.recv() => break shutdown,
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
                 error = graceful_crash.next() => break ShutdownSignal::Graceful(error),
                 _ = TopologyController::sources_finished(topology_controller.clone()), if has_sources => {
