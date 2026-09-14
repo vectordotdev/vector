@@ -454,6 +454,9 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 #[derive(Debug)]
 pub(crate) struct FinalizerEntry {
     pub(crate) file_id: FileFingerprint,
+    /// The watcher that read the line, so a checkpoint written when this acknowledgement lands can
+    /// be matched against the reader that produced it rather than against the fingerprint alone.
+    pub(crate) generation: u64,
     pub(crate) offset: u64,
 }
 
@@ -692,7 +695,7 @@ pub fn file_source(
         crate::spawn_in_current_span(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
-                    checkpoints.update(entry.file_id, entry.offset);
+                    checkpoints.update(entry.file_id, entry.offset, entry.generation);
                 }
             }
             send_shutdown.send(())
@@ -766,12 +769,13 @@ pub fn file_source(
                 event = event.with_batch_notifier(&batch);
                 let entry = FinalizerEntry {
                     file_id: line.file_id,
+                    generation: line.generation,
                     offset: line.end_offset,
                 };
                 // checkpoints.update will be called from ack_stream's thread
                 finalizer.add(entry, receiver);
             } else {
-                checkpoints.update(line.file_id, line.end_offset);
+                checkpoints.update(line.file_id, line.end_offset, line.generation);
             }
             event
         });
@@ -845,20 +849,31 @@ fn wrap_with_line_agg(
                 (
                     line.filename,
                     line.text,
-                    (line.file_id, line.start_offset, line.end_offset),
+                    (
+                        line.file_id,
+                        line.start_offset,
+                        (line.end_offset, line.generation, line.file_id),
+                    ),
                 )
             }),
             logic,
         )
         .map(
-            |(filename, text, (file_id, start_offset, initial_end), lastline_context)| Line {
-                text,
-                filename,
-                file_id,
-                start_offset,
-                end_offset: lastline_context.map_or(initial_end, |(_, _, lastline_end_offset)| {
-                    lastline_end_offset
-                }),
+            |(filename, text, (_, start_offset, initial_end), lastline_context)| {
+                // Fingerprint, offset and generation all come from the same line -- the last one
+                // folded in, or the first when it stands alone. An aggregate that spans a rekey
+                // would otherwise mix one reader's identity with another's offset, and its
+                // checkpoint would be written against the wrong owner or refused outright.
+                let (end_offset, generation, file_id) =
+                    lastline_context.map_or(initial_end, |(_, _, lastline_end)| lastline_end);
+                Line {
+                    text,
+                    filename,
+                    file_id,
+                    generation,
+                    start_offset,
+                    end_offset,
+                }
             },
         ),
     )

@@ -48,47 +48,223 @@ pub struct Checkpointer {
     last: Mutex<Option<State>>,
 }
 
+/// Identifies *which* watcher a checkpoint belongs to.
+///
+/// A fingerprint names content, not a reader: the same value can be held by one watcher, retired by
+/// a rewrite, then held by a different file whose first lines happen to hash the same. An
+/// acknowledgement carries the fingerprint captured when its line was *read*, so without a second
+/// term there is no way to tell a live reader's progress from a previous owner's late arrival --
+/// and accepting the latter resumes a reader past content it never emitted.
+///
+/// Runtime-only, and deliberately not persisted: after a restart there are no acknowledgements in
+/// flight, so a loaded checkpoint has no owner until a watcher registers for it.
+pub type OwnerGeneration = u64;
+
+/// Hands out the generation numbers. Process-wide, so two watchers never share one.
+static NEXT_OWNER_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// Claim a generation for a watcher about to be installed on a fingerprint.
+pub fn next_owner_generation() -> OwnerGeneration {
+    NEXT_OWNER_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Who, if anyone, may move a checkpoint.
+///
+/// Liveness lives here rather than being inferred from the removal mark: that mark means what it
+/// meant upstream -- this file is gone, expire its entry -- and a reaped watcher's queued
+/// acknowledgement legitimately refutes it, while leaving the fingerprint just as claimable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Owner {
+    /// A watcher holds this fingerprint. Only it may write, and a rekey may not take it over.
+    Live(OwnerGeneration),
+    /// Its watcher has been reaped. Lines it read are still in flight, so its acknowledgements are
+    /// accepted, but the fingerprint is free for a rekey to claim.
+    Reaped(OwnerGeneration),
+    /// Loaded from disk and never claimed: a starting position with no reader behind it.
+    Unowned,
+}
+
+impl Owner {
+    /// The generation entitled to write, whether or not its watcher still exists.
+    fn writer(self) -> Option<OwnerGeneration> {
+        match self {
+            Self::Live(generation) | Self::Reaped(generation) => Some(generation),
+            Self::Unowned => None,
+        }
+    }
+
+    /// Whether a rekey may take this fingerprint over.
+    fn claimable(self) -> bool {
+        !matches!(self, Self::Live(_))
+    }
+}
+
+/// A checkpoint together with the watcher entitled to move it.
+#[derive(Debug, Clone, Copy)]
+struct Owned {
+    position: FilePosition,
+    owner: Owner,
+}
+
 /// A thread-safe handle for reading and writing checkpoints in-memory across
 /// multiple threads.
 #[derive(Debug, Default)]
 pub struct CheckpointsView {
-    checkpoints: DashMap<FileFingerprint, FilePosition>,
+    /// Position and owner in one entry, so a `DashMap` entry lock covers both: checking the owner
+    /// and writing the position must not be separate operations, or a rekey landing between them
+    /// recreates an entry under a fingerprint nothing owns any more.
+    checkpoints: DashMap<FileFingerprint, Owned>,
     modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
     removed_times: DashMap<FileFingerprint, DateTime<Utc>>,
 }
 
 impl CheckpointsView {
-    pub fn update(&self, fng: FileFingerprint, pos: FilePosition) {
-        self.checkpoints.insert(fng, pos);
+    /// Record a reader's progress, as reported by an acknowledgement or a direct read.
+    ///
+    /// Written only if `generation` still owns the fingerprint. An acknowledgement carries the
+    /// generation captured when its line was read, so one arriving after its watcher was rekeyed
+    /// away -- or after a different file took the fingerprint over -- is refused rather than
+    /// resuming that reader past content it never emitted.
+    pub fn update(&self, fng: FileFingerprint, pos: FilePosition, generation: OwnerGeneration) {
+        // One entry lock covers reading the owner and writing the position. Separate operations
+        // would let a rekey land in between and recreate an entry under a dead fingerprint.
+        let dashmap::mapref::entry::Entry::Occupied(mut entry) = self.checkpoints.entry(fng) else {
+            // Vacant: rekeyed away, reaped, or never registered. Nothing owns it.
+            return;
+        };
+        if entry.get().owner.writer() != Some(generation) {
+            return;
+        }
+        let owner = entry.get().owner;
+        entry.get_mut().position = pos;
+        self.modified_times.insert(fng, Utc::now());
+        if matches!(owner, Owner::Live(_)) {
+            // Progress from a live reader means the file is not gone after all. From a reaped one it
+            // means only that data it had already read got through, which says nothing about the
+            // file -- and clearing the mark there would both keep the entry from ever expiring and
+            // make it look live enough to refuse a rekey.
+            self.removed_times.remove(&fng);
+        }
+    }
+
+    /// Install `generation` as the owner of `fng`, starting at `pos`.
+    ///
+    /// Called by the file server, which is the authority on which watcher holds which fingerprint.
+    /// Until this runs, a checkpoint loaded from disk supplies a starting position but accepts no
+    /// updates, so a stale acknowledgement cannot be mistaken for a live reader's progress.
+    pub fn register(&self, fng: FileFingerprint, pos: FilePosition, generation: OwnerGeneration) {
+        self.checkpoints.insert(
+            fng,
+            Owned {
+                position: pos,
+                owner: Owner::Live(generation),
+            },
+        );
         self.modified_times.insert(fng, Utc::now());
         self.removed_times.remove(&fng);
     }
 
     pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
-        self.checkpoints.get(&fng).map(|r| *r.value())
+        self.checkpoints.get(&fng).map(|r| r.value().position)
     }
 
-    pub fn set_dead(&self, fng: FileFingerprint) {
+    /// The watcher `generation` owned `fng` and has been reaped; its checkpoint is kept for the
+    /// expiry window so a file that comes back can resume from it.
+    ///
+    /// Its right to write survives: lines it read are already on their way out when it is reaped,
+    /// and their acknowledgements arrive later still. Refusing those would leave the checkpoint
+    /// behind data that was genuinely emitted, and a restart would replay the last batch. The
+    /// fingerprint becomes claimable all the same, so a dead owner cannot lock out a rekey.
+    ///
+    /// Qualified by generation: a death notice for a watcher that has already been replaced must not
+    /// retire the replacement.
+    pub fn set_dead(&self, fng: FileFingerprint, generation: OwnerGeneration) {
+        // The mark goes with the transition, not beside it. A notice naming a watcher that has since
+        // been replaced retires nothing, so marking regardless would leave a live replacement
+        // carrying someone else's death sentence -- and `remove_expired` would delete its checkpoint
+        // if it happened to stay idle.
+        match self.checkpoints.get_mut(&fng) {
+            Some(mut entry) if entry.owner == Owner::Live(generation) => {
+                entry.owner = Owner::Reaped(generation);
+            }
+            // No entry at all: nothing to contradict the notice, and upstream marked it too.
+            None => {}
+            Some(_) => return,
+        }
         self.removed_times.insert(fng, Utc::now());
     }
 
-    pub fn update_key(&self, old: FileFingerprint, new: FileFingerprint) {
-        if let Some((_, value)) = self.checkpoints.remove(&old) {
-            self.checkpoints.insert(new, value);
+    /// Move a checkpoint onto the fingerprint its file now hashes to, under a new owner.
+    ///
+    /// `new_generation` is the rekeyed watcher's: the move is an ownership transition, and reusing
+    /// the old number would let acknowledgements already in flight for `old` write to `new`.
+    ///
+    /// The old key is *removed* rather than tombstoned, which is what makes those in-flight
+    /// acknowledgements harmless: they find a vacant entry and are dropped.
+    pub fn update_key(
+        &self,
+        old: FileFingerprint,
+        new: FileFingerprint,
+        new_generation: OwnerGeneration,
+    ) {
+        if old == new {
+            return;
         }
+        let Some((_, moved)) = self.checkpoints.remove(&old) else {
+            return;
+        };
+        // An entry a *live* watcher owns is left alone: two files can share a fingerprint, and the
+        // file server refuses such a rekey, but the maps must not depend on that check holding
+        // across an await.
+        //
+        // An unowned one is replaced. A checkpoint left behind by a reaped watcher, or loaded from
+        // disk and never claimed, describes a reader that no longer exists; skipping it would leave
+        // this watcher holding a fresh generation against a stale entry, and every checkpoint it
+        // ever writes would be refused.
+        // One entry lock covers the test and the write, like [`Self::update`]: reading the owner and
+        // replacing it must not be separate operations.
+        let claimed = Owned {
+            position: moved.position,
+            owner: Owner::Live(new_generation),
+        };
+        let taken_over = match self.checkpoints.entry(new) {
+            dashmap::mapref::entry::Entry::Vacant(entry) => {
+                entry.insert(claimed);
+                true
+            }
+            dashmap::mapref::entry::Entry::Occupied(mut entry) => {
+                // Never claimed, or claimed by a watcher that has since been reaped. The removal
+                // mark is read inside the entry lock, so a `set_dead` cannot land between the test
+                // and the write and leave this rekey locked out by an owner that just died.
+                let claimable = entry.get().owner.claimable();
+                if claimable {
+                    entry.insert(claimed);
+                }
+                claimable
+            }
+        };
 
         if let Some((_, value)) = self.modified_times.remove(&old) {
             self.modified_times.insert(new, value);
         }
 
-        if let Some((_, value)) = self.removed_times.remove(&old) {
+        let old_removal = self.removed_times.remove(&old).map(|(_, value)| value);
+        if taken_over {
+            // A live watcher now holds this fingerprint, so any death mark it carried is void --
+            // whether inherited from the old key or left by whoever held it before. Without this,
+            // `remove_expired` reaps a perfectly live checkpoint 60 seconds later.
+            self.removed_times.remove(&new);
+        } else if let Some(value) = old_removal {
             self.removed_times.insert(new, value);
         }
     }
 
     pub fn remove_expired(&self) {
-        let now = Utc::now();
+        self.remove_expired_before(Utc::now());
+    }
 
+    /// [`Self::remove_expired`] against a given instant, so a test need not wait out the window.
+    fn remove_expired_before(&self, now: DateTime<Utc>) {
         // Collect all of the expired keys. Removing them while iterating can
         // lead to deadlocks, the set should be small, and this is not a
         // performance-sensitive path.
@@ -111,8 +287,15 @@ impl CheckpointsView {
     }
 
     fn load(&self, checkpoint: Checkpoint) {
-        self.checkpoints
-            .insert(checkpoint.fingerprint, checkpoint.position);
+        // No generation: a loaded checkpoint supplies a starting position, but nothing owns it until
+        // a watcher registers, so no acknowledgement can move it.
+        self.checkpoints.insert(
+            checkpoint.fingerprint,
+            Owned {
+                position: checkpoint.position,
+                owner: Owner::Unowned,
+            },
+        );
         self.modified_times
             .insert(checkpoint.fingerprint, checkpoint.modified);
     }
@@ -139,10 +322,10 @@ impl CheckpointsView {
                 .iter()
                 .map(|entry| {
                     let fingerprint = entry.key();
-                    let position = entry.value();
+                    let position = entry.value().position;
                     Checkpoint {
                         fingerprint: *fingerprint,
-                        position: *position,
+                        position,
                         modified: self
                             .modified_times
                             .get(fingerprint)
@@ -174,7 +357,8 @@ impl Checkpointer {
 
     #[cfg(test)]
     pub fn update_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
-        self.checkpoints.update(fng, pos);
+        self.checkpoints
+            .register(fng, pos, crate::checkpointer::next_owner_generation());
     }
 
     #[cfg(test)]
@@ -292,9 +476,357 @@ mod test {
     use tokio::fs;
 
     use super::{
-        CHECKPOINT_FILE_NAME, Checkpoint, Checkpointer, FileFingerprint, FilePosition,
-        TMP_FILE_NAME,
+        CHECKPOINT_FILE_NAME, Checkpoint, Checkpointer, CheckpointsView, FileFingerprint,
+        FilePosition, TMP_FILE_NAME, next_owner_generation,
     };
+
+    /// Regression test for a bug found in review: with acknowledgements enabled, the acking task
+    /// holds the fingerprint captured when the line was read. One arriving after a rewrite rekeyed
+    /// the file recorded a checkpoint under the dead fingerprint, which nothing reaped.
+    #[test]
+    fn a_late_acknowledgement_from_a_previous_owner_is_dropped() {
+        let view = CheckpointsView::default();
+        let old = FileFingerprint::FirstLinesChecksum(1);
+        let new = FileFingerprint::FirstLinesChecksum(2);
+
+        let first = next_owner_generation();
+        view.register(old, 100, first);
+
+        // The rewrite rekeys the file and installs a new owner for the new identity.
+        let second = next_owner_generation();
+        view.update_key(old, new, second);
+        assert_eq!(view.get(new), Some(100), "the rekey carries the position");
+
+        // An acknowledgement for a line read before the rewrite, stamped with the old owner.
+        view.update(old, 150, first);
+        assert_eq!(
+            view.get(old),
+            None,
+            "a late acknowledgement must not recreate the rekeyed-away entry"
+        );
+        assert_eq!(
+            view.get(new),
+            Some(100),
+            "and must not move the new owner checkpoint"
+        );
+
+        // The new owner records its own progress.
+        view.update(new, 4200, second);
+        assert_eq!(view.get(new), Some(4200), "the live owner is accepted");
+    }
+
+    /// Regression test for a bug found in review: a genuinely *different* file whose first lines
+    /// hash to a value a rewrite had just retired was silenced for 60 seconds, so a restart in that
+    /// window reread it from the beginning.
+    #[test]
+    fn a_new_owner_of_a_reused_fingerprint_checkpoints_immediately() {
+        let view = CheckpointsView::default();
+        let old = FileFingerprint::FirstLinesChecksum(1);
+        let new = FileFingerprint::FirstLinesChecksum(2);
+
+        let first = next_owner_generation();
+        view.register(old, 100, first);
+        let second = next_owner_generation();
+        view.update_key(old, new, second);
+
+        // An unrelated file now hashes to the value the rewrite left behind.
+        let third = next_owner_generation();
+        view.register(old, 0, third);
+        view.update(old, 64, third);
+        assert_eq!(
+            view.get(old),
+            Some(64),
+            "a new owner of a reused fingerprint must record progress at once"
+        );
+
+        // The previous owner of that same value is still refused.
+        view.update(old, 150, first);
+        assert_eq!(
+            view.get(old),
+            Some(64),
+            "a previous owner must not move the new owner checkpoint"
+        );
+    }
+
+    /// Regression test for a bug found in review: a rekey onto a fingerprint that already had a
+    /// checkpoint -- left by a reaped watcher, or loaded from disk and never claimed -- skipped the
+    /// move, so the rekeyed watcher held a fresh generation against a stale entry and every
+    /// checkpoint it wrote was refused.
+    #[test]
+    fn a_rekey_onto_an_unowned_checkpoint_takes_it_over() {
+        let view = CheckpointsView::default();
+        let old = FileFingerprint::FirstLinesChecksum(1);
+        let new = FileFingerprint::FirstLinesChecksum(2);
+
+        // A checkpoint for `new` survives from a previous run, owned by nobody.
+        view.load(Checkpoint {
+            fingerprint: new,
+            position: 900,
+            modified: Utc::now(),
+        });
+
+        let first = next_owner_generation();
+        view.register(old, 100, first);
+        let second = next_owner_generation();
+        view.update_key(old, new, second);
+
+        view.update(new, 128, second);
+        assert_eq!(
+            view.get(new),
+            Some(128),
+            "the rekeyed watcher must own the fingerprint it moved onto"
+        );
+    }
+
+    /// Regression test for a bug found in review: a checkpoint kept after its watcher was reaped
+    /// still carried that watcher's generation, so it looked live. A rekey onto it during the
+    /// retention window was refused, and the rekeyed watcher could never persist progress.
+    #[test]
+    fn a_rekey_onto_a_dead_owners_checkpoint_takes_it_over() {
+        let view = CheckpointsView::default();
+        let old = FileFingerprint::FirstLinesChecksum(1);
+        let new = FileFingerprint::FirstLinesChecksum(2);
+
+        // A watcher owned `new`, then went away -- its position is retained for the expiry window.
+        let departed = next_owner_generation();
+        view.register(new, 900, departed);
+        view.set_dead(new, departed);
+
+        let first = next_owner_generation();
+        view.register(old, 100, first);
+        let second = next_owner_generation();
+        view.update_key(old, new, second);
+
+        view.update(new, 128, second);
+        assert_eq!(
+            view.get(new),
+            Some(128),
+            "a rekey must take over a fingerprint whose owner is gone"
+        );
+
+        // Only once the fingerprint has a new owner is the departed one refused.
+        view.update(new, 900, departed);
+        assert_eq!(
+            view.get(new),
+            Some(128),
+            "a replaced owner must not move the checkpoint it left behind"
+        );
+    }
+
+    /// Regression test for a bug found in review: taking over a dead owner's fingerprint left its
+    /// removal mark in place, so `remove_expired` reaped the live watcher's checkpoint 60 seconds
+    /// later and a restart reread or skipped data.
+    #[test]
+    fn a_rekey_clears_the_death_mark_it_inherits() {
+        let view = CheckpointsView::default();
+        let old = FileFingerprint::FirstLinesChecksum(1);
+        let new = FileFingerprint::FirstLinesChecksum(2);
+
+        let departed = next_owner_generation();
+        view.register(new, 900, departed);
+        view.set_dead(new, departed);
+
+        let first = next_owner_generation();
+        view.register(old, 100, first);
+        let second = next_owner_generation();
+        view.update_key(old, new, second);
+
+        // Past the retention window. The rekeyed entry is live and must survive it.
+        view.remove_expired_before(Utc::now() + chrono::Duration::seconds(120));
+        assert_eq!(
+            view.get(new),
+            Some(100),
+            "a rekey onto a dead owner must clear the death mark it inherits"
+        );
+    }
+
+    /// Regression test for a bug found in review: accepting a reaped owner's queued acknowledgement
+    /// also cleared the removal mark, which at the time was what made the fingerprint claimable. A
+    /// replacement could then never take it over, and the dead entry never expired either.
+    #[test]
+    fn a_late_acknowledgement_does_not_block_a_later_rekey() {
+        let view = CheckpointsView::default();
+        let old = FileFingerprint::FirstLinesChecksum(1);
+        let new = FileFingerprint::FirstLinesChecksum(2);
+
+        let departed = next_owner_generation();
+        view.register(new, 900, departed);
+        view.set_dead(new, departed);
+
+        // A line the reaped watcher had already read gets through.
+        view.update(new, 980, departed);
+        assert_eq!(
+            view.get(new),
+            Some(980),
+            "the queued acknowledgement must still commit"
+        );
+
+        // A replacement rekeys onto the same fingerprint afterwards.
+        let first = next_owner_generation();
+        view.register(old, 100, first);
+        let second = next_owner_generation();
+        view.update_key(old, new, second);
+        view.update(new, 128, second);
+        assert_eq!(
+            view.get(new),
+            Some(128),
+            "a late acknowledgement must not lock the fingerprint against a rekey"
+        );
+    }
+
+    /// The other half of the same rule: a reaped watcher's acknowledgement records progress but
+    /// says nothing about the file, so it must not cancel the expiry the reaping started. Otherwise
+    /// the entry for a file that is gone is kept alive indefinitely by its own trailing traffic.
+    #[test]
+    fn a_late_acknowledgement_does_not_keep_a_dead_entry_alive() {
+        let view = CheckpointsView::default();
+        let fng = FileFingerprint::FirstLinesChecksum(1);
+
+        let departed = next_owner_generation();
+        view.register(fng, 100, departed);
+        view.set_dead(fng, departed);
+        view.update(fng, 180, departed);
+
+        view.remove_expired_before(Utc::now() + chrono::Duration::seconds(120));
+        assert_eq!(
+            view.get(fng),
+            None,
+            "a dead entry must still expire, however late its own acknowledgements arrive"
+        );
+    }
+
+    /// A death notice names the watcher it is about, so one for a watcher that has already been
+    /// replaced cannot retire the replacement.
+    #[test]
+    fn a_stale_death_notice_does_not_retire_the_replacement() {
+        let view = CheckpointsView::default();
+        let fng = FileFingerprint::FirstLinesChecksum(1);
+
+        let departed = next_owner_generation();
+        view.register(fng, 100, departed);
+
+        // A different file takes the fingerprint over.
+        let replacement = next_owner_generation();
+        view.register(fng, 0, replacement);
+
+        // The previous watcher is only now reaped.
+        view.set_dead(fng, departed);
+
+        view.update(fng, 64, replacement);
+        assert_eq!(
+            view.get(fng),
+            Some(64),
+            "the replacement must still own its fingerprint"
+        );
+        view.update(fng, 900, departed);
+        assert_eq!(
+            view.get(fng),
+            Some(64),
+            "and the departed watcher must not write to it"
+        );
+    }
+
+    /// The same stale notice must not leave a death mark on the replacement: a watcher that then
+    /// stays idle -- writing nothing to clear it -- would have its live checkpoint expired away.
+    #[test]
+    fn a_stale_death_notice_does_not_expire_an_idle_replacement() {
+        let view = CheckpointsView::default();
+        let fng = FileFingerprint::FirstLinesChecksum(1);
+
+        let departed = next_owner_generation();
+        view.register(fng, 100, departed);
+        let replacement = next_owner_generation();
+        view.register(fng, 64, replacement);
+
+        // The previous watcher is reaped only now, and the replacement reads nothing afterwards.
+        view.set_dead(fng, departed);
+
+        view.remove_expired_before(Utc::now() + chrono::Duration::seconds(120));
+        assert_eq!(
+            view.get(fng),
+            Some(64),
+            "a stale death notice must not expire the replacement's checkpoint"
+        );
+    }
+
+    /// Lines a watcher read are already queued for output when it is reaped, and their
+    /// acknowledgements arrive later still. Refusing those would leave the checkpoint behind data
+    /// that was genuinely emitted, so a restart would replay the last batch.
+    #[test]
+    fn a_reaped_watcher_still_commits_its_queued_lines() {
+        let view = CheckpointsView::default();
+        let fng = FileFingerprint::FirstLinesChecksum(1);
+
+        let generation = next_owner_generation();
+        view.register(fng, 100, generation);
+        view.set_dead(fng, generation);
+
+        view.update(fng, 180, generation);
+        assert_eq!(
+            view.get(fng),
+            Some(180),
+            "an acknowledgement for a line read before the watcher died must still commit"
+        );
+    }
+
+    /// The other half of the same branch: a fingerprint a *live* watcher owns is never taken over,
+    /// since two files can share one and the rekey would evict a legitimate reader.
+    #[test]
+    fn a_rekey_onto_a_live_owner_leaves_it_alone() {
+        let view = CheckpointsView::default();
+        let old = FileFingerprint::FirstLinesChecksum(1);
+        let new = FileFingerprint::FirstLinesChecksum(2);
+
+        let live = next_owner_generation();
+        view.register(new, 900, live);
+
+        let first = next_owner_generation();
+        view.register(old, 100, first);
+        let second = next_owner_generation();
+        view.update_key(old, new, second);
+
+        assert_eq!(view.get(new), Some(900), "a live owner keeps its position");
+        view.update(new, 950, live);
+        assert_eq!(
+            view.get(new),
+            Some(950),
+            "and keeps writing its own checkpoints"
+        );
+    }
+
+    /// A checkpoint read from disk supplies a starting position but has no live reader, so nothing
+    /// may move it until a watcher registers -- otherwise a stale acknowledgement arriving early
+    /// would be mistaken for the new reader progress.
+    #[test]
+    fn a_loaded_checkpoint_accepts_no_update_until_a_watcher_registers() {
+        let data_dir = tempdir().unwrap();
+        let chkptr = Checkpointer::new(data_dir.path());
+        let view = chkptr.view();
+        let fng = FileFingerprint::FirstLinesChecksum(7);
+
+        view.load(Checkpoint {
+            fingerprint: fng,
+            position: 500,
+            modified: Utc::now(),
+        });
+        assert_eq!(view.get(fng), Some(500), "the loaded position is readable");
+
+        view.update(fng, 900, next_owner_generation());
+        assert_eq!(
+            view.get(fng),
+            Some(500),
+            "an unowned checkpoint must not be moved"
+        );
+
+        let generation = next_owner_generation();
+        view.register(fng, 500, generation);
+        view.update(fng, 900, generation);
+        assert_eq!(
+            view.get(fng),
+            Some(900),
+            "the registered owner moves it normally"
+        );
+    }
 
     #[test]
     fn test_checkpointer_basics() {

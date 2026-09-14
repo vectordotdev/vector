@@ -1,7 +1,6 @@
 use std::{
-    collections::HashMap,
     io::{ErrorKind, Result, SeekFrom},
-    path::{Path, PathBuf},
+    path::Path,
     time,
 };
 
@@ -146,10 +145,8 @@ async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
     while skipped_bytes < n {
         let chunk = reader.fill_buf().await?;
         if chunk.is_empty() {
-            return Err(std::io::Error::new(
-                ErrorKind::UnexpectedEof,
-                "EOF reached while skipping ignored header bytes",
-            ));
+            // Still inside the ignored header, so no prefix bytes were sampled at all.
+            return Err(incomplete_prefix_error(0));
         }
         let bytes_to_skip = std::cmp::min(chunk.len(), n - skipped_bytes);
         reader.consume(bytes_to_skip);
@@ -174,8 +171,25 @@ impl Fingerprinter {
         }
     }
 
-    /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
+    /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`.
+    #[cfg(test)]
     pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
+        self.fingerprint_observing_identity(path, &mut None, &mut None, PrefixWanted::Yes)
+            .await
+    }
+
+    /// The `FileFingerprint` of a file, also reporting the identity of the handle it read.
+    ///
+    /// The identity is taken from the descriptor the read already holds, so it costs no extra open
+    /// and describes the file the result actually came from -- re-stat-ing the path afterwards could
+    /// name a replacement. `identity` is left untouched when the file could not be opened.
+    async fn fingerprint_observing_identity(
+        &mut self,
+        path: &Path,
+        identity: &mut Option<(u64, u64)>,
+        prefix: &mut Option<PartialPrefix>,
+        want_prefix: PrefixWanted,
+    ) -> Result<FileFingerprint> {
         use FileFingerprint::*;
 
         match self.strategy {
@@ -184,6 +198,7 @@ impl Fingerprinter {
                 let file_info = file_handle.file_info().await?;
                 let dev = file_info.portable_dev();
                 let ino = file_info.portable_ino();
+                *identity = Some((dev, ino));
                 Ok(DevInode(dev, ino))
             }
             FingerprintStrategy::FirstLinesChecksum {
@@ -192,26 +207,68 @@ impl Fingerprinter {
             } => {
                 let buffer = self.buffer.resize_slice_mut(self.max_line_length);
                 let mut fp = open_regular_file(path).await?;
-                let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
 
-                skip_first_n_bytes(&mut reader, ignored_header_bytes).await?;
-                let bytes_read = fingerprinter_read_until(reader, b'\n', lines, buffer).await?;
-                let fingerprint = FINGERPRINT_CRC.checksum(&buffer[..bytes_read]);
-                Ok(FirstLinesChecksum(fingerprint))
+                // The compression probe is inside, not before: it reads the magic bytes, so it fails
+                // on a file shorter than they are -- exactly the short file whose identity the
+                // caller needs. Leaving it outside skipped the capture below for that case.
+                let read = async {
+                    let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
+                    skip_first_n_bytes(&mut reader, ignored_header_bytes).await?;
+                    fingerprinter_read_until(reader, b'\n', lines, buffer).await
+                }
+                .await;
+                match read {
+                    Ok(bytes_read) => {
+                        // The same bytes the checksum is taken over. A rewrite that has *grown* into
+                        // a complete fingerprint still begins with the partial prefix seen while it
+                        // was short, which is what tells it from a different rewrite that completed.
+                        if want_prefix == PrefixWanted::Yes {
+                            *prefix = Some(PartialPrefix(buffer[..bytes_read].into()));
+                        }
+                        Ok(FirstLinesChecksum(
+                            FINGERPRINT_CRC.checksum(&buffer[..bytes_read]),
+                        ))
+                    }
+                    Err(error) => {
+                        // Only once the read has failed, from the handle it already holds: on Windows
+                        // this duplicates the handle and issues a syscall, which must not be paid for
+                        // every file on every reconciliation just to serve the rare short-file branch.
+                        if let Ok(file_info) = fp.file_info().await {
+                            *identity = Some((file_info.portable_dev(), file_info.portable_ino()));
+                        }
+                        Err(error)
+                    }
+                }
             }
         }
     }
 
-    pub async fn fingerprint_or_emit(
+    /// [`Self::fingerprint_or_emit`], but distinguishing *why* no fingerprint was produced.
+    pub async fn fingerprint_or_emit_detailed(
         &mut self,
         path: &Path,
-        known_small_files: &mut HashMap<PathBuf, time::Instant>,
+        known_small_files: &mut crate::KnownSmallFiles,
         emitter: &impl FileSourceInternalEvents,
-    ) -> Option<FileFingerprint> {
+        want_prefix: PrefixWanted,
+    ) -> FingerprintOutcome {
+        // Taken from the stat this function already performs, so the common path pays nothing. The
+        // identity probe that would make this airtight costs an open per file per pass -- 20k opens
+        // on a real config -- and is deferred to the rare branch that actually needs it.
+        let mut stat_before = None;
+        let mut read_identity = None;
+        let mut read_prefix = None;
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
                 if metadata.is_file() {
-                    self.fingerprint(path).await.map(Some)
+                    stat_before = Some((metadata.len(), metadata.modified().ok()));
+                    self.fingerprint_observing_identity(
+                        path,
+                        &mut read_identity,
+                        &mut read_prefix,
+                        want_prefix,
+                    )
+                    .await
+                    .map(Some)
                 } else {
                     Ok(None)
                 }
@@ -219,19 +276,68 @@ impl Fingerprinter {
             Err(e) => Err(e),
         };
 
-        metadata
-            .inspect(|_| {
-                // Drop the path from the small files map if we've got enough data to fingerprint it.
-                known_small_files.remove(&path.to_path_buf());
-            })
-            .map_err(|error| {
+        // One entry per *file*, not per spelling. The glob pass can yield a relative path while
+        // notify reports an absolute one, and a glob over a symlinked directory can name a file the
+        // backend reports by its canonical target -- all of which must collapse to one key, or
+        // `remove_after` deletes a file that has become valid through a spelling nobody cleaned up.
+        //
+        // Canonicalizing resolves both, and is done once per call here rather than by sweeping the
+        // whole map on every success: that sweep was O(N^2) in syscalls for a burst of N short files.
+        // The lexical fallback covers a path that cannot be canonicalized (it may already be gone),
+        // where an absolute spelling is still better than none.
+        let key = match fs::canonicalize(path).await {
+            Ok(canonical) => canonical,
+            Err(_) => crate::normalize_path_key(path),
+        };
+
+        match metadata {
+            Ok(Some(fingerprint)) => {
+                // Enough data to fingerprint: forget it, under both the identity it was recorded as
+                // and this path -- the two can differ once a file has been replaced.
+                known_small_files.remove(&key, path);
+                FingerprintOutcome::Fingerprinted(fingerprint, read_prefix)
+            }
+            // Not a regular file: a directory or device now occupies the path.
+            Ok(None) => {
+                known_small_files.remove(&key, path);
+                FingerprintOutcome::Absent
+            }
+            Err(error) => {
+                let absent = error.kind() == ErrorKind::NotFound;
                 match error.kind() {
                     ErrorKind::UnexpectedEof => {
-                        if !known_small_files.contains_key(path) {
+                        // Best-effort: the fingerprint was read before `key` was resolved, so an
+                        // atomic replacement in between would file the old inode's incomplete result
+                        // under the replacement's identity -- and `remove_after` would then unlink a
+                        // complete file. Comparing the stat taken before the read catches the
+                        // replacements that change length or mtime; one that matches both within a
+                        // timestamp tick still slips through, which would need the fingerprinting
+                        // handle itself to close.
+                        let still_the_same_file = fs::metadata(path)
+                            .await
+                            .is_ok_and(|now| stat_before == Some((now.len(), now.modified().ok())));
+                        if still_the_same_file
+                            // Recorded under its canonical identity, but removable by the path the
+                            // configuration named: `remove_after` must not unlink a symlink's target.
+                            && known_small_files.insert(
+                                key,
+                                path,
+                                time::Instant::now(),
+                                read_identity,
+                            )
+                        {
                             emitter.emit_file_checksum_failed(path);
-                            known_small_files.insert(path.to_path_buf(), time::Instant::now());
                         }
-                        return;
+                        // Read from the buffer the strategy just filled, so no second read of the
+                        // file is needed.
+                        //
+                        // `None` when the EOF came from somewhere that did not report how much it
+                        // had sampled -- a decompressor, say. That is *unknown*, not empty: an empty
+                        // prefix is extended by every other prefix, so passing one off as a reading
+                        // would silently answer "same rewrite" to every comparison.
+                        let prefix = incomplete_prefix_len(&error)
+                            .map(|len| PartialPrefix(self.buffer[..len].into()));
+                        return FingerprintOutcome::Incomplete(prefix);
                     }
                     ErrorKind::NotFound => {
                         if !self.ignore_not_found {
@@ -243,10 +349,107 @@ impl Fingerprinter {
                     }
                 };
                 // For scenarios other than UnexpectedEOF, remove the path from the small files map.
-                known_small_files.remove(&path.to_path_buf());
-            })
-            .ok()
-            .flatten()
+                known_small_files.remove(&key, path);
+                if absent {
+                    FingerprintOutcome::Absent
+                } else {
+                    FingerprintOutcome::Failed
+                }
+            }
+        }
+    }
+
+    /// As [`Self::fingerprint_or_emit_detailed`], for callers that only need the fingerprint.
+    pub async fn fingerprint_or_emit(
+        &mut self,
+        path: &Path,
+        known_small_files: &mut crate::KnownSmallFiles,
+        emitter: &impl FileSourceInternalEvents,
+    ) -> Option<FileFingerprint> {
+        self.fingerprint_or_emit_detailed(path, known_small_files, emitter, PrefixWanted::No)
+            .await
+            .fingerprint()
+    }
+}
+
+/// Whether the caller will use the prefix of a *successful* fingerprint.
+///
+/// Copying the sampled bytes is wasted on the common path -- a stable file, fingerprinted every
+/// reconciliation, whose prefix is dropped unread. Only a path already tracked by a watcher can
+/// need one, to tell a rewrite still being written from a different one that completed.
+///
+/// An *incomplete* fingerprint always carries its prefix: that is the rewrite-in-progress case the
+/// comparison exists for, and it is rare by nature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrefixWanted {
+    /// Nothing tracks this path yet, so no comparison can be made against it.
+    No,
+    /// A watcher tracks this path and may need to compare what was read.
+    Yes,
+}
+
+/// The bytes read from a file that was too short to fingerprint.
+///
+/// Bounded by `max_line_length`, since that is all the strategy ever reads.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PartialPrefix(std::sync::Arc<[u8]>);
+
+impl PartialPrefix {
+    /// Whether `self` could be this prefix still being written, rather than a new rewrite.
+    ///
+    /// A rewrite that is still in progress only ever *extends* what was seen before, so anything
+    /// that is not an extension is different content. It cannot be conclusive: a second rewrite
+    /// beginning with the same bytes -- a shared log header -- is indistinguishable from growth by
+    /// content alone, which is why the caller also treats a shrink as a rewrite.
+    pub fn continues(&self, earlier: &Self) -> bool {
+        self.0.starts_with(&earlier.0)
+    }
+}
+
+/// Why [`Fingerprinter::fingerprint_or_emit_detailed`] did or did not produce a fingerprint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FingerprintOutcome {
+    Fingerprinted(FileFingerprint, Option<PartialPrefix>),
+    /// Fewer complete lines than the strategy needs. For an already-tracked path this is the
+    /// signature of an in-place rewrite, and the only case where rewinding a reader is correct.
+    ///
+    /// Carries the partial prefix that was read, which is what tells a *second* rewrite from the
+    /// first one still being written: the same rewrite only ever extends its prefix.
+    Incomplete(Option<PartialPrefix>),
+    /// The path is gone, or no longer a regular file. The watcher on it must be left unfindable so
+    /// the normal grace period reaps it.
+    Absent,
+    /// An I/O or decode error on a path that still exists -- the file may be readable and unchanged,
+    /// so neither rewrite recovery nor reaping may be inferred.
+    Failed,
+}
+
+impl FingerprintOutcome {
+    pub fn fingerprint(&self) -> Option<FileFingerprint> {
+        match self {
+            Self::Fingerprinted(fingerprint, _) => Some(*fingerprint),
+            Self::Incomplete(_) | Self::Absent | Self::Failed => None,
+        }
+    }
+
+    pub fn is_incomplete(&self) -> bool {
+        matches!(self, Self::Incomplete(_))
+    }
+
+    /// The partial prefix read from a file too short to fingerprint, which identifies *which*
+    /// rewrite is in progress.
+    pub fn partial_prefix(&self) -> Option<&PartialPrefix> {
+        match self {
+            Self::Incomplete(prefix) => prefix.as_ref(),
+            Self::Fingerprinted(_, prefix) => prefix.as_ref(),
+            Self::Absent | Self::Failed => None,
+        }
+    }
+
+    /// Whether the path is gone or is no longer a regular file, so a watcher on it must stay
+    /// unfindable rather than being kept alive on a dead inode.
+    pub fn is_absent(&self) -> bool {
+        matches!(self, Self::Absent)
     }
 }
 
@@ -273,6 +476,33 @@ async fn open_regular_file(path: &Path) -> Result<File> {
     Ok(file)
 }
 
+/// How many bytes of the partial prefix had been read when the file ran out.
+///
+/// Carried inside the error so the reader's signature stays `Result<usize>`: every other caller
+/// treats `UnexpectedEof` as "too short" and is unaffected.
+#[derive(Debug)]
+struct IncompletePrefix(usize);
+
+impl std::fmt::Display for IncompletePrefix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EOF reached after {} bytes", self.0)
+    }
+}
+
+impl std::error::Error for IncompletePrefix {}
+
+fn incomplete_prefix_error(read: usize) -> std::io::Error {
+    std::io::Error::new(ErrorKind::UnexpectedEof, IncompletePrefix(read))
+}
+
+/// The prefix length recorded by [`incomplete_prefix_error`], if this is such an error.
+fn incomplete_prefix_len(error: &std::io::Error) -> Option<usize> {
+    error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<IncompletePrefix>())
+        .map(|prefix| prefix.0)
+}
+
 async fn fingerprinter_read_until(
     mut r: impl AsyncRead + Unpin + Send,
     delim: u8,
@@ -282,7 +512,10 @@ async fn fingerprinter_read_until(
     let mut total_read = 0;
     'main: while !buf.is_empty() {
         let read = match r.read(buf).await {
-            Ok(0) => return Err(std::io::Error::new(ErrorKind::UnexpectedEof, "EOF reached")),
+            // `total_read` rides along on the error: the bytes already in the caller's buffer are
+            // the rewrite's partial prefix, which is how a *further* rewrite is told from this one
+            // still being written. Without it the caller cannot tell how much of the buffer is live.
+            Ok(0) => return Err(incomplete_prefix_error(total_read)),
             Ok(n) => n,
             Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
@@ -306,7 +539,7 @@ async fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, fs, io::Error, path::Path, time::Duration};
+    use std::{fs, io::Error, path::Path, time::Duration};
 
     use async_compression::tokio::bufread::GzipEncoder;
     use bytes::BytesMut;
@@ -315,6 +548,168 @@ mod test {
     use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
 
     use tokio::io::AsyncReadExt;
+
+    /// Regression test for a bug found in review: the key is a canonical identity, and for a symlink
+    /// that resolves to its *target*. If the target then disappears, canonicalization fails and the
+    /// key falls back to the link's own path -- so one configured path ends up with two entries, both
+    /// carrying it as `removal_path`, and `remove_after` could unlink a valid replacement appearing
+    /// there. Verified against `fs::canonicalize`: key `target.log` before, `link.log` after.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn stale_small_file_entry_is_dropped_when_the_key_changes() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("target.log");
+        let link = dir.path().join("link.log");
+        fs::write(&target, b"partial").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            true,
+        );
+        let mut known_small_files = crate::KnownSmallFiles::default();
+
+        // Recorded under the target's canonical identity.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&link, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_none()
+        );
+        assert_eq!(known_small_files.len(), 1);
+        assert!(
+            known_small_files.contains_identity(&target.canonicalize().unwrap()),
+            "test setup requires the key to be the canonical target: {known_small_files:?}"
+        );
+
+        // The link is retargeted at a *different* short file, so the key for the same configured
+        // path changes while the entry stays relevant. (Removing the target instead yields
+        // `NotFound`, which the existing error handling already cleans up.)
+        let other = dir.path().join("other.log");
+        fs::write(&other, b"short").unwrap();
+        fs::remove_file(&link).unwrap();
+        std::os::unix::fs::symlink(&other, &link).unwrap();
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&link, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_none()
+        );
+        assert_eq!(
+            known_small_files.len(),
+            1,
+            "one configured path must never hold two entries: {known_small_files:?}"
+        );
+    }
+
+    /// Regression test for a bug found in review: keying by canonical identity made the map key the
+    /// symlink's *target*, and `remove_after` unlinks the key -- so it would delete the target,
+    /// a file outside the configured include path and possibly shared with something else. The
+    /// configured path is carried alongside the identity for exactly this reason.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn small_file_records_the_configured_path_for_removal() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("target.log");
+        let link = dir.path().join("link.log");
+        fs::write(&target, b"partial").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            true,
+        );
+        let mut known_small_files = crate::KnownSmallFiles::default();
+
+        // Observed through the symlink, which is what the include pattern named.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&link, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_none()
+        );
+
+        let identity = target.canonicalize().unwrap();
+        assert!(
+            known_small_files.contains_identity(&identity),
+            "the entry is keyed by canonical identity, so every spelling collapses onto one"
+        );
+        assert_eq!(
+            known_small_files.removal_path(&identity),
+            Some(link.as_path()),
+            "removal must target the configured path, not the symlink's target"
+        );
+    }
+
+    /// Regression test for a bug found in review: `known_small_files` keys unified only lexical
+    /// spelling differences, so a glob including a symlinked path and a notify backend reporting the
+    /// canonical target produced two entries for one file. A completed fingerprint removed only the
+    /// entry it was called with, leaving the other to make `remove_after` delete a file that had
+    /// since become valid.
+    ///
+    /// Keys are canonical identities now, so the aliases never diverge in the first place.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn successful_fingerprint_clears_symlink_aliases() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("app.log");
+        let link = dir.path().join("link.log");
+        // Unterminated: this is what lands in `known_small_files`.
+        fs::write(&target, b"partial").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            true,
+        );
+        let mut known_small_files = crate::KnownSmallFiles::default();
+
+        // Both spellings fail to fingerprint, each recording its own entry.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&link, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_none()
+        );
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&target, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_none()
+        );
+        // The two spellings collapse onto one key rather than producing two entries: keying by
+        // canonical identity prevents the divergence instead of sweeping it up afterwards.
+        assert_eq!(
+            known_small_files.len(),
+            1,
+            "aliasing spellings must share one entry: {known_small_files:?}"
+        );
+
+        // Completing the line makes the file valid; every alias must go, not just the one named.
+        fs::write(&target, b"partial\n").unwrap();
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&target, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_some()
+        );
+        assert!(
+            known_small_files.is_empty(),
+            "a stale alias would let remove_after delete a now-valid file: {known_small_files:?}"
+        );
+    }
 
     pub async fn gzip(data: &[u8]) -> Vec<u8> {
         let mut encoder = GzipEncoder::new(data);
@@ -681,7 +1076,7 @@ mod test {
             false,
         );
 
-        let mut small_files = HashMap::new();
+        let mut small_files = crate::KnownSmallFiles::default();
         assert!(
             fingerprinter
                 .fingerprint_or_emit(target_dir.path(), &mut small_files, &NoErrors)
@@ -709,7 +1104,7 @@ mod test {
             1024,
             false,
         );
-        let mut small_files = HashMap::new();
+        let mut small_files = crate::KnownSmallFiles::default();
 
         let fingerprint = tokio::time::timeout(
             Duration::from_secs(1),
@@ -787,6 +1182,58 @@ mod test {
 
         fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {
             panic!()
+        }
+    }
+
+    /// Like `NoErrors`, but tolerates the checksum failure a deliberately short file produces.
+    /// Used only by the unix-gated symlink tests.
+    #[cfg(unix)]
+    #[derive(Clone)]
+    struct AllowsShortFiles;
+
+    #[cfg(unix)]
+    impl FileSourceInternalEvents for AllowsShortFiles {
+        // The one event a short file legitimately produces.
+        fn emit_file_checksum_failed(&self, _: &Path) {}
+
+        fn emit_file_added(&self, path: &Path) {
+            NoErrors.emit_file_added(path);
+        }
+        fn emit_file_resumed(&self, path: &Path, offset: u64) {
+            NoErrors.emit_file_resumed(path, offset);
+        }
+        fn emit_file_watch_error(&self, path: &Path, error: Error) {
+            NoErrors.emit_file_watch_error(path, error);
+        }
+        fn emit_file_unwatched(&self, path: &Path, reached_eof: bool) {
+            NoErrors.emit_file_unwatched(path, reached_eof);
+        }
+        fn emit_file_deleted(&self, path: &Path) {
+            NoErrors.emit_file_deleted(path);
+        }
+        fn emit_file_delete_error(&self, path: &Path, error: Error) {
+            NoErrors.emit_file_delete_error(path, error);
+        }
+        fn emit_file_fingerprint_read_error(&self, path: &Path, error: Error) {
+            NoErrors.emit_file_fingerprint_read_error(path, error);
+        }
+        fn emit_file_checkpointed(&self, count: usize, duration: Duration) {
+            NoErrors.emit_file_checkpointed(count, duration);
+        }
+        fn emit_file_checkpoint_write_error(&self, error: Error) {
+            NoErrors.emit_file_checkpoint_write_error(error);
+        }
+        fn emit_files_open(&self, count: usize) {
+            NoErrors.emit_files_open(count);
+        }
+        fn emit_files_idle(&self, count: usize) {
+            NoErrors.emit_files_idle(count);
+        }
+        fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
+            NoErrors.emit_path_globbing_failed(path, error);
+        }
+        fn emit_file_line_too_long(&self, buf: &BytesMut, max: usize, size: usize) {
+            NoErrors.emit_file_line_too_long(buf, max, size);
         }
     }
 }

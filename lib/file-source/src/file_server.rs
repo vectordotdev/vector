@@ -9,7 +9,8 @@ use std::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use file_source_common::{
-    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
+    FileFingerprint, FileSourceInternalEvents, Fingerprinter, OwnerGeneration, PrefixWanted,
+    ReadFrom,
     checkpointer::{Checkpointer, CheckpointsView},
 };
 use futures::{
@@ -213,6 +214,23 @@ impl NotifyWakeup {
         }
     }
 
+    /// Return paths from an ordinary change event. These events are safe to process directly:
+    /// create/remove/rename events retain `rename_paths` and use the full reconciliation path,
+    /// while a plain modification only needs to fingerprint the files it named.
+    fn targeted_change_paths(&self) -> Option<&HashSet<PathBuf>> {
+        if !self.rename_paths.is_empty() {
+            return None;
+        }
+        match &self.state {
+            NotifyWakeupState::Paths(paths) if !paths.is_empty() => Some(paths),
+            NotifyWakeupState::None | NotifyWakeupState::All | NotifyWakeupState::Paths(_) => None,
+        }
+    }
+
+    fn has_specific_paths(&self) -> bool {
+        matches!(&self.state, NotifyWakeupState::Paths(paths) if !paths.is_empty())
+    }
+
     fn named_paths(&self) -> Option<&HashSet<PathBuf>> {
         (!self.rename_paths.is_empty()).then_some(&self.rename_paths)
     }
@@ -265,6 +283,264 @@ fn should_reap_unfindable_watcher(
         || unfindable_for > rotate_wait
 }
 
+/// Move a tracked watcher from `old_key` to `new_key`, carrying its checkpoint with it.
+///
+/// A file's fingerprint is not stable: an in-place rewrite (`copytruncate`, or an application that
+/// truncates and rewrites its own log) changes the first line that `FirstLinesChecksum` hashes. The
+/// watcher is still the right reader for that path, but its `fp_map` key -- which is what
+/// `Line::file_id` carries downstream and what the checkpointer persists under -- now names a
+/// fingerprint the file no longer has. Left alone, two things go wrong: emitted lines are
+/// checkpointed under an identity that does not match the file, and the next full pass does not
+/// recognise the new fingerprint as tracked and starts a *second* watcher on the same path.
+///
+/// Returns `false` when `new_key` is already occupied, which means some other watcher legitimately
+/// owns that fingerprint (two files can share one, e.g. identical first lines); rekeying would
+/// evict it, so the caller must leave the collision to the full pass instead.
+/// The key a watcher for `path` is currently filed under, if any.
+///
+/// Extracted so the `IndexMap` iterator is dropped before the caller awaits anything: that iterator
+/// is not `Send`, and holding it across an `await` makes `FileServer::run`'s future non-`Send`.
+/// Resolves a discovered path to the watcher already tracking it, for the full pass.
+///
+/// Needed when a tracked file's fingerprint changes (an in-place rewrite), so `fp_map`'s own lookup
+/// misses. Scanning `fp_map` for each such path is quadratic in the number of rewritten files:
+/// measured at 185ms for 20k, string comparison alone, excluding the two `absolutize` allocations
+/// `matches_path` performs per comparison.
+///
+/// Built on the first miss, then maintained in place. Rebuilding after each mutation instead would be
+/// the same O(N^2) with more hashing, since a burst mutates on every path.
+#[derive(Default)]
+struct TrackedPathIndex {
+    keys_by_path: Option<HashMap<PathBuf, FileFingerprint>>,
+    /// The spellings filed under each key, so a rekey touches only its own entries.
+    ///
+    /// Without it, rekeying scans every value: measured at 935ms for 20k rewrites, *worse* than the
+    /// 185ms linear search this type replaces.
+    paths_by_key: HashMap<FileFingerprint, Vec<PathBuf>>,
+}
+
+impl TrackedPathIndex {
+    fn key_for_path(
+        &mut self,
+        fp_map: &IndexMap<FileFingerprint, FileWatcher>,
+        path: &Path,
+        canonical_path: Option<&Path>,
+        cwd: Option<&Path>,
+    ) -> Option<FileFingerprint> {
+        if self.keys_by_path.is_none() {
+            let mut index: HashMap<PathBuf, FileFingerprint> =
+                HashMap::with_capacity(fp_map.len() * 2);
+            let mut by_key: HashMap<FileFingerprint, Vec<PathBuf>> =
+                HashMap::with_capacity(fp_map.len());
+            for (&key, watcher) in fp_map {
+                let mut record = |spelling: PathBuf| {
+                    if index.entry(spelling.clone()).or_insert(key) == &key {
+                        by_key.entry(key).or_default().push(spelling);
+                    }
+                };
+                record(crate::absolutize(&watcher.path, cwd));
+                if let Some(canonical) = watcher.canonical_path() {
+                    record(canonical.to_path_buf());
+                }
+            }
+            self.keys_by_path = Some(index);
+            self.paths_by_key = by_key;
+        }
+        let keys_by_path = self
+            .keys_by_path
+            .as_ref()
+            .expect("just built above if it was absent");
+        // Both spellings, as the scan did: a candidate can itself be an alias (overlapping includes,
+        // or a glob through a symlink), and missing that adds a second reader for one inode.
+        keys_by_path
+            .get(&crate::absolutize(path, cwd))
+            .or_else(|| canonical_path.and_then(|canonical| keys_by_path.get(canonical)))
+            .copied()
+    }
+
+    /// A watcher moved from `old_key` to `new_key`; its paths are unchanged.
+    fn rekeyed(&mut self, old_key: FileFingerprint, new_key: FileFingerprint) {
+        let Some(index) = self.keys_by_path.as_mut() else {
+            return;
+        };
+        let Some(spellings) = self.paths_by_key.remove(&old_key) else {
+            return;
+        };
+        for spelling in &spellings {
+            if let Some(key) = index.get_mut(spelling) {
+                *key = new_key;
+            }
+        }
+        self.paths_by_key.insert(new_key, spellings);
+    }
+
+    /// A watcher's set of paths changed, or one was added or removed. Cheaper to rebuild on the next
+    /// miss than to reconcile every alias, and these are rare next to rewrites.
+    fn paths_changed(&mut self) {
+        self.keys_by_path = None;
+        self.paths_by_key.clear();
+    }
+}
+
+fn rekey_watcher(
+    fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
+    checkpoints: &CheckpointsView,
+    old_key: FileFingerprint,
+    new_key: FileFingerprint,
+) -> bool {
+    if old_key == new_key {
+        return true;
+    }
+    if fp_map.contains_key(&new_key) {
+        return false;
+    }
+    // `fp_map`'s iteration order is read priority under `oldest_first`: startup sorts by creation
+    // time and new watchers append. Removing and re-inserting would move a rewritten older file to
+    // the tail, letting a newer one drain first, so the entry goes back at the index it held.
+    let Some(position) = fp_map.get_index_of(&old_key) else {
+        return false;
+    };
+    let Some(mut watcher) = fp_map.shift_remove(&old_key) else {
+        return false;
+    };
+    // Asks the watcher whether its reader was repositioned onto different content, rather than
+    // inferring it from a zero offset: a watcher that simply has not read anything yet also sits at
+    // zero, and resetting its checkpoint would discard a resumed position.
+    let restarted = watcher.take_reader_restarted();
+    // A new owner for a new identity. Lines already in flight keep the old generation, so their
+    // acknowledgements find the old key gone and are dropped rather than moving this checkpoint.
+    let generation = watcher.take_new_generation();
+    fp_map.shift_insert(position, new_key, watcher);
+    // Carries the persisted position and the modified/removed bookkeeping onto the new identity.
+    checkpoints.update_key(old_key, new_key, generation);
+    if restarted {
+        // The reader was restarted at zero (an in-place rewrite), so the pre-rewrite offset must not
+        // survive: a restart would resume past the start of the rewritten file and skip its opening
+        // content. An appended-to file keeps its offset, and its checkpoint with it.
+        checkpoints.register(new_key, 0, generation);
+    }
+    true
+}
+
+/// Whether any component of `path` is a symlink.
+///
+/// Asked of the filesystem, because comparing a path against its canonical form does not answer it:
+/// canonicalization also rewrites paths with no symlink involved (a Windows 8.3 short name becomes
+/// the long name under a `\\?\` prefix; macOS `/var` becomes `/private/var`), and treating that as a
+/// symlink forces a full glob pass for every unrelated file in a watched directory.
+async fn path_contains_symlink(path: &Path) -> bool {
+    for ancestor in path.ancestors() {
+        if fs::symlink_metadata(ancestor)
+            .await
+            .is_ok_and(|metadata| metadata.file_type().is_symlink())
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether `canonical_path` can be reached from `directory` through a symlink at most `depth` levels
+/// below it.
+///
+/// A glob's wildcard component can traverse a symlink (`<root>/*/*.log` where `<root>/linked` points
+/// elsewhere), which no comparison of the pattern's literal prefix can detect.
+///
+/// `Some(false)` only when the tree was fully explored within `depth`. `None` when the bound stopped
+/// the walk with directories left, since a link may sit deeper -- the caller must then defer to the
+/// full glob pass rather than treat the event as excluded. Reached only for an untracked event path
+/// that matched no spelling, which is what keeps the walk off the hot path.
+async fn path_reachable_through_child_link(
+    directory: &Path,
+    canonical_path: &Path,
+    depth: usize,
+) -> Option<bool> {
+    // Breadth-first to `depth`, so a recursive `**` pattern finds a link nested below a real
+    // subdirectory while a single-`*` pattern still reads one level. Iterative rather than
+    // recursive: an `async fn` that awaits itself needs boxing, and the bound is the point.
+    let mut frontier = vec![directory.to_path_buf()];
+    for _ in 0..depth {
+        let mut next = Vec::new();
+        // Any traversal error makes the answer undecided rather than negative: a directory that is
+        // momentarily unreadable would otherwise leave `next` empty and be reported as "fully
+        // explored, no link", so the caller would skip the glob pass for a file it should have found.
+        for directory in &frontier {
+            let Ok(mut entries) = fs::read_dir(directory).await else {
+                return None;
+            };
+            loop {
+                let entry = match entries.next_entry().await {
+                    Ok(Some(entry)) => entry,
+                    Ok(None) => break,
+                    Err(_) => return None,
+                };
+                let Ok(file_type) = entry.file_type().await else {
+                    return None;
+                };
+                if file_type.is_symlink() {
+                    let Ok(target) = fs::canonicalize(entry.path()).await else {
+                        return None;
+                    };
+                    if canonical_path.starts_with(&target) {
+                        return Some(true);
+                    }
+                    // A link to a directory can hold further links, and the path may be reached
+                    // through one of those. Descending would need cycle protection, so the answer is
+                    // undecided instead -- the full pass settles it.
+                    if fs::metadata(&target)
+                        .await
+                        .is_ok_and(|metadata| metadata.is_dir())
+                    {
+                        return None;
+                    }
+                } else if file_type.is_dir() {
+                    // A real subdirectory cannot itself explain the path (the prefix comparison
+                    // already covers that), but a link may sit under it.
+                    next.push(entry.path());
+                }
+            }
+        }
+        if next.is_empty() {
+            // The tree under `directory` is fully explored: a definite "no link reaches this path".
+            return Some(false);
+        }
+        frontier = next;
+    }
+    // The cap stopped the walk with directories still unexplored, so a link may sit deeper. Undecided,
+    // not "no": reporting `false` here made the caller treat the event as excluded and skip the glob
+    // pass, leaving a file undiscovered until the backstop and losing a short-lived one outright.
+    None
+}
+
+/// How deep [`path_reachable_through_child_link`] should descend for `pattern`.
+///
+/// A `**` component matches any number of directories, so a link can sit arbitrarily deep; the walk
+/// is capped rather than unbounded, because this runs per event and an unbounded descent is the O(N)
+/// tree walk the targeted pass exists to avoid. Anything else needs only as many levels as the
+/// pattern has wildcard components. Hitting the cap is not a negative answer -- the walk reports it as
+/// undecided, so the event still reaches the full pass.
+fn symlink_search_depth(pattern: &Path, literal_root: &Path) -> usize {
+    /// Enough to cover the nesting real log layouts use (`<root>/<service>/<pod>/<container>`)
+    /// without letting one event walk a deep tree.
+    const RECURSIVE_DEPTH_CAP: usize = 4;
+
+    let wildcard_components = pattern
+        .strip_prefix(literal_root)
+        .unwrap_or(pattern)
+        .components()
+        .count();
+    if pattern
+        .components()
+        .any(|component| component.as_os_str() == "**")
+    {
+        wildcard_components.max(RECURSIVE_DEPTH_CAP)
+    } else {
+        // One level per wildcard component, and at least one: the component adjacent to the literal
+        // root is where a link most often sits.
+        wildcard_components.max(1)
+    }
+}
+
 fn idle_watcher_can_be_polled(
     file_findable: bool,
     path_outside_glob: bool,
@@ -307,6 +583,7 @@ fn salvage_final_partial_line(
         text: line.bytes,
         filename: watcher.path.to_str().expect("not a valid path").to_owned(),
         file_id,
+        generation: watcher.generation(),
         start_offset: line.offset,
         end_offset,
     });
@@ -444,7 +721,7 @@ where
 
         checkpointer.read_checkpoints(self.ignore_before).await;
 
-        let mut known_small_files = HashMap::new();
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
 
         // If we're using notify-driven discovery, establish the OS-level watch(es) *before*
         // doing the initial glob scan below. This closes (or at least drastically narrows) the
@@ -536,28 +813,14 @@ where
             self.emitter.clone(),
         ));
 
-        // Alright friends, how does this work?
+        // Sleeping after reads keeps CPU down; `backoff_cap` grows exponentially on empty reads up to
+        // a fixed limit. Re-globbing and checkpoint writes are deliberately not every iteration.
         //
-        // We want to avoid burning up users' CPUs. To do this we sleep after
-        // reading lines out of files. But! We want to be responsive as well. We
-        // keep track of a 'backoff_cap' to decide how long we'll wait in any
-        // given loop. This cap grows each time we fail to read lines in an
-        // exponential fashion to some hard-coded cap. To reduce time using glob,
-        // we do not re-scan for major file changes (new files, moves, deletes),
-        // or write new checkpoints, on every iteration.
-        //
-        // Discovery trigger, discovery_mode == PollingOnly: re-scan on a fixed interval
-        // (`glob_minimum_cooldown`), exactly as before.
-        //
-        // Discovery trigger, discovery_mode == Notify: re-scan is triggered by (a) an OS-level
-        // filesystem event arriving (in which case we still run the *same* full glob+fingerprint
-        // reconciliation logic below -- we deliberately don't try to interpret notify's event
-        // payload and update state incrementally, since that would duplicate/risk diverging from
-        // the already-correct reconciliation logic; a full reconcile pass is cheap enough to run
-        // on every event since it's no longer gated by a tiny fixed interval), or (b) the much
-        // longer `reconcile_interval` backstop timer firing, to catch anything notify missed
-        // (queue overflow, pre-watch-establishment changes, or platforms/paths where notify
-        // can't watch for some reason).
+        // `PollingOnly` re-scans on `glob_minimum_cooldown`. `Notify` re-scans on an OS event or on
+        // the much longer `reconcile_interval` backstop (for queue overflow, changes before the watch
+        // was established, and paths notify cannot watch). An event runs the *same* reconciliation
+        // rather than interpreting notify's payload incrementally, which would risk diverging from
+        // logic that is already correct.
         let mut next_glob_time = time::Instant::now();
         // The very first loop iteration always runs a discovery pass regardless of discovery
         // mode: `next_glob_time` was just set to `Instant::now()` above, and `now_time` inside the
@@ -661,6 +924,15 @@ where
                 };
                 self.poll_idle_watchers(&mut fp_map, &mut lines, idle_poll_wakeup)
                     .await;
+                // `reactivate` rewinds to zero when the file it reopens turns out to be a
+                // replacement or to have been truncated, so the persisted offset belongs to content
+                // that is gone. Swept here for the same reason the discovery passes sweep: a restart
+                // before the first new line is acknowledged would otherwise resume past its prefix.
+                for (&file_id, watcher) in &mut fp_map {
+                    if watcher.take_reader_restarted() {
+                        checkpoints.register(file_id, 0, watcher.take_new_generation());
+                    }
+                }
                 stats.record("idle-poll", start.elapsed());
             }
 
@@ -668,28 +940,43 @@ where
             if let Some(grace_period) = self.remove_after {
                 let mut set = JoinSet::new();
 
+                // Entries are keyed by canonical identity but unlinked by the path the
+                // configuration named: removing a symlink's canonical target would delete a file
+                // outside the watched path. The identity travels with the task so the entry can be
+                // dropped once the unlink succeeds.
                 let remove_file_tasks: HashMap<Id, PathBuf> = known_small_files
-                    .iter()
-                    .filter(|&(_path, last_time_open)| last_time_open.elapsed() >= grace_period)
-                    .map(|(path, _last_time_open)| path.clone())
-                    .map(|path| {
-                        let path_ = path.clone();
+                    .expired(grace_period)
+                    .into_iter()
+                    .map(|(identity, removal_path)| {
+                        let task_path = removal_path.clone();
                         let abort_handle =
-                            set.spawn(async move { (path_.clone(), remove_file(&path_).await) });
-                        (abort_handle.id(), path)
+                            set.spawn(async move { (identity, remove_file(&task_path).await) });
+                        (abort_handle.id(), removal_path)
                     })
                     .collect();
 
                 while let Some(res) = set.join_next().await {
                     match res {
-                        Ok((path, Ok(()))) => {
-                            let removed = known_small_files.remove(&path);
-
-                            if removed.is_some() {
-                                self.emitter.emit_file_deleted(&path);
+                        // The task reports the map *key* (a canonical identity); the event carries
+                        // the path that was actually unlinked, which is what the user configured.
+                        Ok((identity, Ok(()))) => {
+                            if let Some(removal_path) = known_small_files
+                                .removal_path(&identity)
+                                .map(Path::to_path_buf)
+                            {
+                                known_small_files.remove(&identity, &removal_path);
+                                self.emitter.emit_file_deleted(&removal_path);
                             }
                         }
-                        Ok((path, Err(err))) => {
+                        Ok((identity, Err(err))) => {
+                            let path = known_small_files
+                                .removal_path(&identity)
+                                .map(Path::to_path_buf)
+                                .unwrap_or_else(|| identity.clone());
+                            // A gone spelling must not be chosen again (see `forget_missing_spelling`).
+                            if err.kind() == std::io::ErrorKind::NotFound {
+                                known_small_files.forget_missing_spelling(&identity, &path);
+                            }
                             self.emitter.emit_file_delete_error(&path, err);
                         }
                         Err(join_err) => {
@@ -741,6 +1028,7 @@ where
                         text: line.bytes,
                         filename: watcher.path.to_str().expect("not a valid path").to_owned(),
                         file_id,
+                        generation: watcher.generation(),
                         start_offset: line.offset,
                         end_offset: watcher.get_file_position(),
                     });
@@ -818,7 +1106,7 @@ where
                 if watcher.dead() {
                     self.emitter
                         .emit_file_unwatched(&watcher.path, watcher.reached_eof());
-                    checkpoints.set_dead(*file_id);
+                    checkpoints.set_dead(*file_id, watcher.generation());
                     false
                 } else {
                     true
@@ -856,7 +1144,7 @@ where
             // call. Also since we are using block_on here and in the above code,
             // this should be run in its own thread. `spawn_blocking` fulfills
             // all of these requirements.
-            //
+
             // Capped at `next_notify_discovery_time` when a notify wakeup is already pending:
             // otherwise, once `backoff_cap` has grown large from a quiet spell, a pending wakeup
             // with no further events to cut the sleep short (see the `tokio::select!` below) would
@@ -865,6 +1153,7 @@ where
             // captured at the top of the loop: `discover`/reading files/sending downstream can
             // take a while, and computing the remaining time against a stale timestamp would
             // overstate it, adding back some of the latency this cap exists to remove.
+
             let sleep_duration = if pending_notify_wakeup.is_pending() {
                 Duration::from_millis(backoff as u64)
                     .min(next_notify_discovery_time.saturating_duration_since(time::Instant::now()))
@@ -1020,9 +1309,15 @@ where
                 // Rebuild the whole watcher immediately so the old registration is detached
                 // before a recreated path is installed; bookkeeping-only invalidation would keep
                 // accumulating watches on renamed roots.
-                if paths.iter().any(|path| discovery.is_watched_dir(path))
-                    && !discovery.forget_watches()
-                {
+                let teardown_failed = paths.iter().any(|path| discovery.is_watched_dir(path))
+                    && !discovery.forget_watches();
+                // Record the paths *before* reporting the failure: returning early dropped them, so
+                // the caller disabled notify with no pending wakeup and waited out
+                // `reconcile_interval` (300s by default) -- long enough to miss a recreated or
+                // rotated file entirely. A coarse wakeup is the right shape here, since a failed
+                // rebuild means the registrations are gone and nothing else will name those paths.
+                if teardown_failed {
+                    pending_notify_wakeup.mark_all();
                     return false;
                 }
                 pending_notify_wakeup.add_removed_paths(paths);
@@ -1064,43 +1359,22 @@ where
     /// patterns and detect new files, renames (a known fingerprint appearing at a new path), and
     /// duplicate-fingerprint conflicts (picking the most recently modified file).
     ///
-    /// This is the same logic that used to run unconditionally on every `glob_minimum_cooldown`
-    /// tick. It's now called either on a fixed interval (`PollingOnly` mode, or as the
-    /// `Notify`-mode backstop via `reconcile_interval`), or on-demand when the OS-level notify
-    /// watcher reports a change -- throttled to at most once per `MIN_NOTIFY_DISCOVERY_INTERVAL`
-    /// regardless of how often notify events arrive, since sustained writes to even a single file
-    /// would otherwise trigger this full pass on every `NOTIFY_EVENT_DEBOUNCE` window indefinitely
-    /// (see that constant's doc comment). We deliberately keep this as one unified, full pass
-    /// rather than writing a separate "apply this one notify event incrementally" code path:
-    /// reusing the already-correct logic avoids a second, potentially divergent implementation of
-    /// rename/duplicate-fingerprint handling, and the throttle above keeps its cost bounded
-    /// without needing that split.
+    /// Runs on a fixed interval (`glob_minimum_cooldown`, or `reconcile_interval` as the `Notify`
+    /// backstop) and for events that may create, remove, or rename. A plain modification takes the
+    /// targeted path instead, so sustained writes to one file do not rescan every matched file.
     ///
-    /// `notify_wakeup` distinguishes a pass triggered by an actual OS-level filesystem event from
-    /// one triggered by the periodic timer alone (`glob_minimum_cooldown` in `PollingOnly` mode,
-    /// or the `reconcile_interval` backstop in `Notify` mode): only for a watcher whose path
-    /// `notify_wakeup` actually names or when it's an `All` wakeup
-    /// (an event that didn't name specific paths, e.g. `Overflow`/`BackendError`, or more distinct
-    /// paths than `NOTIFY_WAKEUP_PATH_LIMIT`) does an already-tracked, still-`Active` watcher get
-    /// nudged past its own independent read-pacing timers (see the "same path" branch below and
-    /// `FileWatcher::mark_ready_to_read`) -- a concrete "this path changed" signal justifies
-    /// reading it sooner than those timers would otherwise allow, but the periodic timer firing on
-    /// its own doesn't, and nudging every watcher on every pass regardless (the pre-fix behavior)
-    /// meant a single notify event under a large `include` glob cost an O(N) sweep of every other
-    /// tracked file's read pacing too, not just the one path that actually changed.
-    ///
-    /// `notify_wakeup.names` compares the absolute event path with the path yielded by
-    /// `paths_provider.paths()`. It also compares the event's canonical path with the cached
-    /// canonical path of the watcher, so symlink aliases do not silently lose the low-latency
-    /// nudge. Canonicalization is done once per event path while building the bounded wakeup set,
-    /// not once per tracked file on every pass.
+    /// `notify_wakeup` says whether a real filesystem event triggered this pass. Only a watcher it
+    /// names -- or an `All` wakeup -- gets nudged past its read-pacing timers: the periodic timer
+    /// alone is no evidence that a given file changed, and nudging every watcher regardless cost an
+    /// O(N) sweep per event under a large `include`. Matching also compares canonical paths, so a
+    /// symlink alias keeps the low-latency nudge; canonicalization happens once per event path.
     /// Returns `false` if notify-based discovery must be disabled entirely (the watcher failed to
     /// rebuild after a backend error), `true` otherwise.
     #[must_use]
     async fn discover(
         &mut self,
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
-        known_small_files: &mut HashMap<PathBuf, time::Instant>,
+        known_small_files: &mut file_source_common::KnownSmallFiles,
         checkpoints: &CheckpointsView,
         notify_discovery: Option<&mut NotifyDiscovery>,
         notify_wakeup: &NotifyWakeup,
@@ -1113,10 +1387,33 @@ where
         // backend (inotify/FSEvents/ReadDirectoryChangesW) follows new subdirectories on its
         // own once a recursive watch is established on their ancestor.
         let mut keep_notify_discovery = true;
+        let mut full_scan_required = false;
         if let Some(discovery) = notify_discovery {
             keep_notify_discovery = discovery
                 .resync_watches(&self.paths_provider.watch_roots(), &self.emitter)
                 .await;
+            // A sticky overflow/backend-error flag is consumed inside `resync_watches`, and it is
+            // raised exactly when the channel was too full to carry even the coarse `Overflow`
+            // substitute. The pending wakeup can therefore still be a narrow `Paths` set while an
+            // unrelated creation event was dropped, so the targeted pass below must be skipped:
+            // only the glob pass can find a file nothing named.
+            full_scan_required = discovery.take_full_scan_required();
+        }
+
+        // A plain modification event names the only paths that need to be fingerprinted. Create,
+        // remove, and rename events retain `rename_paths` and use the full pass below, as do the
+        // periodic backstop and coarse overflow/backend-error wakeups.
+        if let Some(paths) = notify_wakeup
+            .targeted_change_paths()
+            .filter(|_| !full_scan_required)
+            && self
+                .discover_changed_paths(paths, fp_map, known_small_files, checkpoints)
+                .await
+        {
+            // Every named path belonged to a tracked file. Otherwise fall through to the full pass:
+            // an unaccounted path may be a new file the `include` globs cover, and only the glob
+            // pass can decide that -- waiting for the backstop would leave it unread.
+            return keep_notify_discovery;
         }
 
         for (_file_id, watcher) in &mut *fp_map {
@@ -1135,21 +1432,58 @@ where
             .then(|| std::env::current_dir().ok())
             .flatten();
 
+        let mut tracked_path_index = TrackedPathIndex::default();
         for path in self.paths_provider.paths().into_iter() {
-            if let Some(file_id) = self
+            let outcome = self
                 .fingerprinter
-                .fingerprint_or_emit(&path, known_small_files, &self.emitter)
-                .await
-            {
+                .fingerprint_or_emit_detailed(
+                    &path,
+                    known_small_files,
+                    &self.emitter,
+                    // Only a path some watcher already tracks can need the prefix: it is compared
+                    // against the one a pending rewind was taken for.
+                    if fp_map.is_empty() {
+                        PrefixWanted::No
+                    } else {
+                        PrefixWanted::Yes
+                    },
+                )
+                .await;
+            let rewrite_suspected = outcome.is_incomplete();
+            let path_absent = outcome.is_absent();
+            if let Some(file_id) = outcome.fingerprint() {
                 if let Some(watcher) = fp_map.get_mut(&file_id) {
                     // file fingerprint matches a watched file
                     let was_found_this_cycle = watcher.file_findable();
                     if watcher.path == path {
-                        watcher.set_file_findable(true);
+                        // A same-path replacement can fingerprint successfully and then vanish or
+                        // turn inaccessible before `update_path` reopens it. Marking it findable
+                        // regardless would leave the watcher on the old inode while suppressing the
+                        // unfindable grace period that recovers it.
+                        let mut refreshed = true;
+                        if !watcher.path_has_tracked_identity().await {
+                            let current_path = watcher.path.clone();
+                            if let Err(error) = watcher.update_path(current_path).await {
+                                self.emitter.emit_file_watch_error(&watcher.path, error);
+                                refreshed = false;
+                            }
+                            tracked_path_index.paths_changed();
+                        }
+                        if refreshed {
+                            watcher.set_file_findable(true);
+                        }
+                        // The file fingerprints again, so any rewrite it was mid-way through is over.
+                        watcher.fingerprint_completed();
                         trace!(
                             message = "Continue watching file.",
                             path = ?path,
                         );
+                        if watcher.is_idle() && !watcher.path_has_tracked_identity().await {
+                            // A same-name replacement can retain both its size and mtime. Force
+                            // the idle poll to reopen it so `reactivate` can compare identities
+                            // instead of seeking to an offset belonging to the old inode.
+                            watcher.invalidate_idle_bookkeeping();
+                        }
                         let absolutized_path =
                             crate::absolutize(&path, cwd_for_notify_comparison.as_deref());
                         if notify_wakeup.names(&absolutized_path, watcher.canonical_path()) {
@@ -1172,6 +1506,8 @@ where
                         // The path may disappear between fingerprinting and opening it.
                         if watcher.update_path(path).await.is_ok() {
                             watcher.set_file_findable(true);
+                            watcher.fingerprint_completed();
+                            tracked_path_index.paths_changed();
                         }
                     } else {
                         // This watcher was already matched by another path in this pass, so the
@@ -1194,22 +1530,635 @@ where
                                 new_modified_time = ?new_modified_time,
                                 old_modified_time = ?old_modified_time,
                             );
-                            watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                            // Failure is fine here: the next cycle retries. On success the file
+                            // fingerprinted, so any rewrite it was mid-way through is over.
+                            if watcher.update_path(path).await.is_ok() {
+                                watcher.fingerprint_completed();
+                                tracked_path_index.paths_changed();
+                            }
                         }
+                    }
+                } else if let Some(stale_key) = {
+                    // Resolved before the `if let` so no borrow of `fp_map` is live across the
+                    // `await`: that would make `FileServer::run`'s future non-`Send`.
+                    let canonical_candidate = fs::canonicalize(&path).await.ok();
+                    tracked_path_index.key_for_path(
+                        fp_map,
+                        &path,
+                        canonical_candidate.as_deref(),
+                        cwd_for_notify_comparison.as_deref(),
+                    )
+                } {
+                    // This path is already tracked, under a fingerprint it no longer has: an
+                    // in-place rewrite changed the hashed prefix. Rekey rather than calling
+                    // `watch_new_file`, which would add a *second* reader for one file and duplicate
+                    // its output while the first one stays alive.
+                    //
+                    // Restart the reader first, exactly as the targeted pass does: the offset and
+                    // buffered bytes describe content the rewrite discarded, so reading on would skip
+                    // the new prefix or splice it onto the old tail. A failed reopen leaves the
+                    // watcher under its old key so the next pass retries.
+                    // Borrows are taken and released around each `await`: `FileWatcher` holds a
+                    // `dyn AsyncBufRead` that is not `Sync`, so keeping even a shared reference
+                    // across one makes `FileServer::run`'s future non-`Send`.
+                    // The *candidate's* identity, not the watcher's own path: an alias that has since
+                    // disappeared would answer `false` while this spelling still resolves to the same
+                    // inode, and `update_path` would then preserve an offset into rewritten content.
+                    let identity_check = fp_map
+                        .get(&stale_key)
+                        .map(|watcher| watcher.candidate_has_tracked_identity(path.clone()));
+                    let same_inode = match identity_check {
+                        Some(check) => check.await,
+                        None => false,
+                    };
+                    let watcher_path = fp_map.get(&stale_key).map(|watcher| watcher.path.clone());
+
+                    // Two different situations reach here, and both must reposition the reader
+                    // before the watcher is filed under the new fingerprint:
+                    //
+                    // - Same inode: an in-place rewrite. `restart_after_rewrite` rewinds to zero.
+                    // - Different inode: a same-name replacement. `update_path` reopens the new
+                    //   file; rekeying without it would file the watcher under the replacement's
+                    //   fingerprint while its reader stayed attached to the old inode, so the
+                    //   replacement would never be read at all.
+                    // The collision is checked *before* the reader is touched. `rekey_watcher`
+                    // refuses a fingerprint another watcher already owns, and repositioning first
+                    // would leave that reader rewound onto the rewritten content while still filed
+                    // under the old key: it would emit those lines under the wrong identity, and the
+                    // full pass could hand the same fingerprint to the other file, duplicating them.
+                    if stale_key != file_id && fp_map.contains_key(&file_id) {
+                        trace!(
+                            message = "Fingerprint already owned by another watcher.",
+                            path = ?path,
+                        );
+                        continue;
+                    }
+                    let mut restart_failed = false;
+                    if let Some(tracked_path) = watcher_path {
+                        // The replacement is reopened at the *discovered* path, not the watcher's own:
+                        // with overlapping or symlinked includes the old alias can be gone while the
+                        // canonical path is still yielded, and reopening the alias then fails and
+                        // strands the watcher under a path that no longer exists.
+                        let reopen_path = path.clone();
+                        let reopened = match fp_map.get_mut(&stale_key) {
+                            Some(watcher) => {
+                                if !same_inode {
+                                    watcher.update_path(reopen_path).await
+                                } else {
+                                    // The fingerprint completed, which ends the rewrite. Whether the
+                                    // reader still needs repositioning is decided inside, so a
+                                    // further rewrite arriving before this one completed is not
+                                    // mistaken for the one already rewound for.
+                                    watcher
+                                        .reconcile_rewrite(true, outcome.partial_prefix())
+                                        .await
+                                }
+                            }
+                            None => Ok(()),
+                        };
+                        if let Err(error) = reopened {
+                            self.emitter.emit_file_watch_error(&tracked_path, error);
+                            restart_failed = true;
+                        }
+                        if !same_inode {
+                            // Only that arm reopened the watcher on a different path.
+                            tracked_path_index.paths_changed();
+                        }
+                    }
+                    if restart_failed {
+                        // Leave it for the next pass rather than rekeying a reader that is still
+                        // positioned in discarded content.
+                    } else if rekey_watcher(fp_map, checkpoints, stale_key, file_id) {
+                        tracked_path_index.rekeyed(stale_key, file_id);
+                        let watcher = fp_map
+                            .get_mut(&file_id)
+                            .expect("just rekeyed this watcher into place");
+                        watcher.set_file_findable(true);
+                        // Rekeyed under the fingerprint it now has, so the rewrite is over.
+                        watcher.fingerprint_completed();
+                    } else {
+                        // The new fingerprint belongs to another watcher (two files can share one),
+                        // so this path cannot be rekeyed onto it. Leave it to the next pass rather
+                        // than evicting a legitimate owner.
+                        trace!(
+                            message = "Fingerprint already owned by another watcher.",
+                            path = ?path,
+                        );
                     }
                 } else {
                     // untracked file fingerprint
+                    tracked_path_index.paths_changed();
                     self.watch_new_file(path, file_id, fp_map, checkpoints, false)
                         .await;
                     self.emit_open_and_idle_counts(fp_map);
                 }
+            } else if let Some(watcher) = fp_map
+                .values_mut()
+                .find(|watcher| watcher.matches_path(&path, cwd_for_notify_comparison.as_deref()))
+            {
+                // Fingerprinting can legitimately fail while a writer has only emitted a
+                // partial/short record. Active watchers are considered here too, not just idle
+                // ones: this pass has already marked every watcher unfindable, so skipping an
+                // active one leaves it `findable == false`, which `read_line` reads as "the file
+                // was deleted" -- and a later completed fingerprint then starts a *second* watcher
+                // on the same path, duplicating records.
+                // A path that is gone, or no longer a regular file, is left untouched: staying
+                // unfindable is what lets the grace period reap its watcher, and neither rewinding
+                // nor reopening it can succeed.
+                if path_absent {
+                    trace!(message = "Watched path is gone or not a regular file.", path = ?path);
+                } else if !rewrite_suspected {
+                    // A read error rather than an incomplete prefix: the file may be unchanged and
+                    // readable, so rewinding would replay what the reader has emitted.
+                    watcher.set_file_findable(true);
+                } else if watcher.path_has_tracked_identity().await {
+                    // Same inode with a prefix that no longer hashes: an in-place rewrite. Reset the
+                    // reader so it does not resume inside the new content, and keep the watcher
+                    // findable while its new fingerprint is still incomplete. Whether this is the
+                    // rewrite already rewound for, or a further one on top of it, is decided inside.
+                    match watcher
+                        .reconcile_rewrite(false, outcome.partial_prefix())
+                        .await
+                    {
+                        Ok(()) => watcher.set_file_findable(true),
+                        Err(error) => {
+                            // The reopen failed -- typically the file was removed or replaced between
+                            // the identity check and this open. Reporting it as found would keep a
+                            // stale descriptor active and could let `remove_after` delete the
+                            // replacement path; leave it unfindable for the normal recovery path.
+                            self.emitter.emit_file_watch_error(&watcher.path, error);
+                        }
+                    }
+                } else if fs::metadata(&path)
+                    .await
+                    .is_ok_and(|metadata| metadata.is_file())
+                {
+                    // A regular file is there but its identity does not match: the path was replaced.
+                    // An idle watcher re-verifies identity on its next poll, but an active one never
+                    // does -- left alone its reader stays on the old inode, missing the replacement
+                    // until the backstop and leaving `remove_after` free to delete it meanwhile.
+                    if watcher.is_idle() {
+                        watcher.set_file_findable(true);
+                        watcher.invalidate_idle_bookkeeping();
+                    } else {
+                        let replacement = path.clone();
+                        match watcher.update_path(replacement).await {
+                            Ok(()) => watcher.set_file_findable(true),
+                            Err(error) => {
+                                // Left unfindable so the grace period recovers it, as above.
+                                self.emitter.emit_file_watch_error(&watcher.path, error);
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        for watcher in fp_map.values_mut() {
+        for (&file_id, watcher) in &mut *fp_map {
             watcher.finish_discovery();
+            if watcher.take_reader_restarted() {
+                // Any reader repositioned onto different content during this pass -- an in-place
+                // rewrite, or a reopened same-name replacement -- must not leave the previous file's
+                // offset persisted: a restart before the first new line is acknowledged would resume
+                // past the new content's prefix. Swept here rather than after each individual
+                // reposition, so no branch can forget it.
+                checkpoints.register(file_id, 0, watcher.take_new_generation());
+            }
         }
         keep_notify_discovery
+    }
+
+    /// Fingerprint only paths named by an ordinary notify modification event. The periodic full
+    /// pass remains responsible for discovering creations, renames, removals, and dropped events.
+    ///
+    /// Returns `false` if some named path turned out to be neither a tracked fingerprint nor a
+    /// tracked path. Some backends report a brand-new file as `Modify(Data)` with no create event,
+    /// so that path may be an untracked file that belongs to the `include` set -- only the glob pass
+    /// can decide that, and the caller must run one rather than leave the file unread until the
+    /// reconciliation backstop.
+    async fn discover_changed_paths(
+        &mut self,
+        paths: &HashSet<PathBuf>,
+        fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
+        known_small_files: &mut file_source_common::KnownSmallFiles,
+        checkpoints: &CheckpointsView,
+    ) -> bool {
+        let mut all_paths_accounted_for = true;
+        let cwd = std::env::current_dir().ok();
+        // A watcher matches by its own path, or by this event path's canonical form: a file can be
+        // included through a symlink alias, so notify reports the alias while `fp_map` holds the
+        // real spelling and neither side of `matches_path` agrees. `NotifyWakeup::names` is
+        // deliberately not used here -- it answers "is this path anywhere in the batch", which for a
+        // multi-path batch would match every watcher against every path.
+        // Resolving an event path to its watcher must not scan `fp_map`: that made the common
+        // single-file write O(tracked files) per batch, the very sweep this targeted pass exists to
+        // avoid. An index over both spellings a watcher answers to (its own path, absolutized, and
+        // its cached canonical path) turns each resolution into a hash lookup.
+        //
+        // Built per pass rather than kept across passes: `fp_map` keys change under rekeying and
+        // `watcher.path` changes under every `update_path`, so a persistent index would have to stay
+        // in step with a dozen mutation sites including error paths, and silently resolves to the
+        // wrong watcher whenever it drifts. One pass over `fp_map` to build it, then O(1) per event,
+        // is the trade this makes -- and it borrows nothing from `fp_map`, which the loop below
+        // needs mutably.
+        let mut watcher_keys_by_path: HashMap<PathBuf, FileFingerprint> =
+            HashMap::with_capacity(fp_map.len() * 2);
+        for (&file_id, watcher) in &*fp_map {
+            watcher_keys_by_path
+                .entry(crate::absolutize(&watcher.path, cwd.as_deref()))
+                .or_insert(file_id);
+            if let Some(canonical) = watcher.canonical_path() {
+                watcher_keys_by_path
+                    .entry(canonical.to_path_buf())
+                    .or_insert(file_id);
+            }
+        }
+        let lookup_key = |canonical_event_path: Option<&Path>, path: &Path| {
+            let absolutized = crate::absolutize(path, cwd.as_deref());
+            watcher_keys_by_path
+                .get(&absolutized)
+                .or_else(|| canonical_event_path.and_then(|c| watcher_keys_by_path.get(c)))
+                .copied()
+        };
+
+        for path in paths {
+            // Resolved once per event path, not once per watcher. `None` when the path cannot be
+            // canonicalized (it may already be gone), which simply leaves raw-path comparison.
+            let canonical_event_path = fs::canonicalize(path).await.ok();
+            let canonical_event_path = canonical_event_path.as_deref();
+
+            // Notify watches whole *directories*, so an event names any file under them --
+            // including ones the `include`/`exclude` rules leave out. Fingerprinting such a path
+            // would add it to `known_small_files` when it is short or unterminated, and
+            // `remove_after` then deletes a file the user explicitly excluded.
+            //
+            // Decided by matching this one path against the provider's rules: enumerating
+            // `paths()` here would walk the whole include tree on every event, the very O(N) cost
+            // this targeted pass exists to avoid. An already-tracked watcher vouches for its own
+            // path, so a tracked file is never skipped if it briefly leaves the glob; a provider
+            // that cannot decide cheaply (`None`) defers to the full pass instead of guessing.
+            let tracked_key = lookup_key(canonical_event_path, path);
+            let is_tracked = tracked_key.is_some();
+            if !is_tracked {
+                // Both spellings are tried, and either one matching is enough: a backend may report
+                // the physical path (FSEvents resolves symlinks) while the include pattern is
+                // written against the symlink, or the reverse. Checking only one would classify a
+                // genuinely included file as excluded.
+                // Only genuinely distinct spellings are consulted, and a missing second spelling is
+                // *not* an undecided verdict: canonicalization usually returns the same path, and
+                // treating that as "undecided" forced a full glob pass for every unrelated change
+                // in a watched directory -- exactly the sweep this path exists to avoid.
+                let mut verdicts = vec![self.paths_provider.is_included(path)];
+                if let Some(canonical) = canonical_event_path.filter(|c| *c != path) {
+                    verdicts.push(self.paths_provider.is_included(canonical));
+                }
+                // A pattern written through a symlink (`/var/log/app` -> `/mnt/disk/app`) matches
+                // neither the physical path a backend like FSEvents reports nor its canonical form,
+                // so string matching alone would silently discard a genuinely included new file.
+                // Comparing canonical *roots* catches that without forcing a pass for every
+                // unrelated change: only an event under one of this provider's watch roots, by
+                // identity rather than by spelling, is handed to the full pass.
+                let reached_through_a_symlinked_root = !verdicts.contains(&Some(true))
+                    && match canonical_event_path {
+                        Some(canonical) => {
+                            let mut under_a_root = false;
+                            for root in self.paths_provider.watch_roots() {
+                                let root = crate::absolutize(&root, cwd.as_deref());
+                                // Patterns carry wildcards; their leading literal directory is what
+                                // can be canonicalized.
+                                // Reuses `compute_watch_directories`' metacharacter set: checking
+                                // only `*` and `?` picked `/link/[a-z]` as a "literal" root, which
+                                // cannot be canonicalized, so a symlinked root followed by a
+                                // bracket or brace component was never recognised.
+                                let literal_root = root
+                                    .ancestors()
+                                    .find(|ancestor| {
+                                        ancestor.to_str().is_some_and(|ancestor| {
+                                            !crate::notify_watcher::contains_glob_metachar(ancestor)
+                                        })
+                                    })
+                                    .map(Path::to_path_buf);
+                                let Some(literal_root) = literal_root else {
+                                    continue;
+                                };
+                                if let Ok(canonical_root) = fs::canonicalize(&literal_root).await
+                                    && canonical.starts_with(&canonical_root)
+                                    && path_contains_symlink(&literal_root).await
+                                {
+                                    // The literal prefix itself is reached through a symlink, so no
+                                    // spelling comparison can settle membership.
+                                    //
+                                    // Asked of the filesystem rather than by comparing the prefix
+                                    // against its canonical form: canonicalization rewrites a path
+                                    // with no symlink involved at all -- a Windows 8.3 short name
+                                    // (`6DB9~1`) becomes the long name under `\\?\`, macOS `/var`
+                                    // becomes `/private/var` -- so treating inequality as "symlink"
+                                    // made every excluded sibling in a watched directory force a
+                                    // full glob pass on those platforms.
+                                    under_a_root = true;
+                                    break;
+                                }
+                                // The symlink can instead sit in a *wildcard* component, and then
+                                // the event path need not be under the literal prefix at all: for
+                                // `<root>/*/*.log` where `<root>/linked` points outside the include
+                                // tree, a backend reporting physical paths (FSEvents) names a path
+                                // that matches no spelling and lies under no watch root. Testing
+                                // only the prefix dropped such an event as accounted for, leaving
+                                // the file unread until the reconciliation backstop.
+                                //
+                                // The walk is bounded by the pattern's shape (see
+                                // `symlink_search_depth`) and runs only for an untracked path that
+                                // matched no spelling, so it costs a bounded slice of the tree on an
+                                // event that was otherwise about to be discarded.
+                                if root != literal_root {
+                                    // `None` means the depth cap stopped the walk early, so a link may
+                                    // sit deeper. Treated like a hit: both hand the event to the full
+                                    // pass, which is the only thing that can settle it.
+                                    match path_reachable_through_child_link(
+                                        &literal_root,
+                                        canonical,
+                                        symlink_search_depth(&root, &literal_root),
+                                    )
+                                    .await
+                                    {
+                                        Some(true) | None => {
+                                            under_a_root = true;
+                                            break;
+                                        }
+                                        Some(false) => {}
+                                    }
+                                }
+                            }
+                            under_a_root
+                        }
+                        None => false,
+                    };
+                if verdicts.contains(&Some(true)) {
+                    // Included under at least one spelling.
+                } else if verdicts.contains(&None) || reached_through_a_symlinked_root {
+                    // Either the provider cannot decide membership cheaply, or the path reaches a
+                    // watch root only through a symlink, so no spelling comparison can settle it.
+                    // The path may well be a new file the provider would yield: let the full pass
+                    // decide rather than discarding the event.
+                    all_paths_accounted_for = false;
+                    continue;
+                } else {
+                    continue;
+                }
+            }
+
+            // Fingerprinted under the spelling the *configuration* named, not the event's. A backend
+            // like FSEvents reports a symlinked include's canonical target, and `KnownSmallFiles`
+            // takes its first spelling as the one `remove_after` may unlink -- so passing the event
+            // path here would let it delete the target, outside the include and possibly shared.
+            // Only for a tracked file: an untracked path has no configured spelling to prefer, and
+            // the glob pass records it under one when it runs.
+            let configured_spelling = tracked_key
+                .and_then(|key| fp_map.get(&key))
+                .map(|watcher| watcher.path.clone());
+            let fingerprint_path = configured_spelling.as_deref().unwrap_or(path);
+            let outcome = self
+                .fingerprinter
+                .fingerprint_or_emit_detailed(
+                    fingerprint_path,
+                    known_small_files,
+                    &self.emitter,
+                    if tracked_key.is_some() {
+                        PrefixWanted::Yes
+                    } else {
+                        PrefixWanted::No
+                    },
+                )
+                .await;
+            let rewrite_suspected = outcome.is_incomplete();
+            let Some(file_id) = outcome.fingerprint() else {
+                if let Some(watcher) = tracked_key.and_then(|key| fp_map.get_mut(&key)) {
+                    if watcher.is_idle() {
+                        // Preserve an idle watcher through a transient short/partial fingerprint
+                        // failure, and also allow a same-name replacement to be reopened safely:
+                        // `reactivate` verifies identity before deciding whether to reset offset.
+                        if !rewrite_suspected {
+                            // An I/O or decode error, not an incomplete prefix. The file may be
+                            // unchanged and readable, so rewinding would replay emitted lines.
+                            watcher.mark_found();
+                        } else if watcher.path_has_tracked_identity().await {
+                            // Same inode, yet its prefix no longer hashes: an in-place rewrite.
+                            // Rewinding resets the offset an idle watcher would otherwise seek to --
+                            // without it, reactivation sees no shrink (the partial prefix can
+                            // already exceed the old offset) and resumes inside the rewritten
+                            // content. Only a watcher that actually restarted counts as accounted
+                            // for: the gzip re-probe opens the file and can fail after the
+                            // fingerprint already did.
+                            match watcher
+                                .reconcile_rewrite(false, outcome.partial_prefix())
+                                .await
+                            {
+                                Ok(()) => watcher.mark_found(),
+                                Err(error) => {
+                                    self.emitter.emit_file_watch_error(&watcher.path, error);
+                                    all_paths_accounted_for = false;
+                                }
+                            }
+                        } else if fs::metadata(path)
+                            .await
+                            .is_ok_and(|metadata| metadata.is_file())
+                        {
+                            // A different file is at this path, or identity is indeterminate. Keep
+                            // the watcher alive through a transient short read, and let the idle poll
+                            // re-verify identity before deciding where to resume.
+                            watcher.mark_found();
+                            watcher.invalidate_idle_bookkeeping();
+                        } else {
+                            // The path is gone: neither identity nor a plain file remains. Removal
+                            // and rename recovery are the full pass's job, and leaving the watcher
+                            // findable here would defer both until the backstop.
+                            all_paths_accounted_for = false;
+                        }
+                    } else if crate::file_watcher::path_is_absent(path).await {
+                        // A queued event can be processed after its file is already gone. Marking
+                        // the watcher found here would claim the path is accounted for and skip the
+                        // full pass, leaving an active watcher attached to the old inode until the
+                        // backstop; removal and replacement recovery are the full pass's job.
+                        all_paths_accounted_for = false;
+                    } else {
+                        let mut refresh_failed = false;
+                        if !watcher.path_has_tracked_identity().await {
+                            let current_path = watcher.path.clone();
+                            if let Err(error) = watcher.update_path(current_path).await {
+                                self.emitter.emit_file_watch_error(&watcher.path, error);
+                                refresh_failed = true;
+                            }
+                        }
+                        if refresh_failed {
+                            // The reopen failed (typically `NotFound`: the file went away between
+                            // the checks). Claiming the path is accounted for would skip the full
+                            // pass and strand this watcher on the old inode until the backstop.
+                            all_paths_accounted_for = false;
+                        } else if rewrite_suspected && watcher.path_has_tracked_identity().await {
+                            // Same inode, yet its prefix no longer hashes: an in-place rewrite, so
+                            // the reader's offset and buffered bytes describe vanished content.
+                            // `rewrite_suspected` is required: a transient read error says nothing
+                            // about the content, and rewinding on one replays what was emitted.
+                            //
+                            // No size check: with a multi-line or header-skipping strategy the
+                            // partially rewritten prefix can already be *longer* than the reader's
+                            // offset while still being too short to hash, so requiring a shrink
+                            // missed exactly those rewrites and spliced the new content onto a
+                            // stale tail.
+                            if let Err(error) = watcher
+                                .reconcile_rewrite(false, outcome.partial_prefix())
+                                .await
+                            {
+                                self.emitter.emit_file_watch_error(&watcher.path, error);
+                            }
+                            // The full pass re-fingerprints this file once its prefix is complete,
+                            // which is what rekeys it.
+                            all_paths_accounted_for = false;
+                        } else {
+                            watcher.mark_found();
+                            watcher.mark_ready_to_read();
+                        }
+                    }
+                } else {
+                    // An unfingerprintable path nothing tracks: could be a short brand-new file.
+                    all_paths_accounted_for = false;
+                }
+                continue;
+            };
+
+            // The fingerprint can belong to a *different* file: two files whose fingerprinted
+            // prefixes are identical share one `FileFingerprint`. Only treat the hit as this
+            // path's watcher once the path agrees; otherwise fall through to the path lookup
+            // below, or the watcher that actually owns this path would not be woken until the
+            // next full backstop pass.
+            let fingerprint_matched_this_path = tracked_key == Some(file_id);
+
+            if fingerprint_matched_this_path {
+                let watcher = fp_map
+                    .get_mut(&file_id)
+                    .expect("just checked this fingerprint is present");
+                let mut refresh_failed = false;
+                if watcher.is_active() && !watcher.path_has_tracked_identity().await {
+                    let current_path = watcher.path.clone();
+                    if let Err(error) = watcher.update_path(current_path).await {
+                        self.emitter.emit_file_watch_error(&watcher.path, error);
+                        refresh_failed = true;
+                    }
+                } else if watcher.is_active() && watcher.shrank_below_reader().await {
+                    // Truncated and rewritten in place while keeping the same fingerprint -- the
+                    // rewrite reused the first line, so there is nothing to rekey, but the reader is
+                    // still positioned in content that no longer exists. This is the ordinary
+                    // `copytruncate` shape for a log whose header does not change.
+                    if let Err(error) = watcher.restart_after_rewrite().await {
+                        self.emitter.emit_file_watch_error(&watcher.path, error);
+                        refresh_failed = true;
+                    } else {
+                        // The reader restarted at zero, so the persisted position must not keep
+                        // pointing past the start of the rewritten file.
+                        checkpoints.register(file_id, 0, watcher.take_new_generation());
+                    }
+                }
+                if refresh_failed {
+                    // See above: a failed reopen must not be reported as accounted for.
+                    all_paths_accounted_for = false;
+                } else {
+                    watcher.mark_found();
+                    watcher.mark_ready_to_read();
+                }
+                // The file fingerprints again, so the rewrite is over. Left set, the *next* rewrite
+                // would be mistaken for this one and skip its repositioning.
+                watcher.fingerprint_completed();
+                if watcher.is_idle() && !watcher.path_has_tracked_identity().await {
+                    watcher.invalidate_idle_bookkeeping();
+                }
+            } else if let Some(stale_key) = tracked_key {
+                // Tracked, but under a fingerprint it no longer has: an in-place rewrite. Rekey so
+                // lines are checkpointed under the file's real identity and the next full pass does
+                // not start a second watcher on the same path.
+                //
+                // Occupancy first, before the reader is touched: `rekey_watcher` refuses a
+                // fingerprint another watcher owns, and restarting first would leave this reader
+                // rewound onto the new content while still filed under the stale key.
+                if stale_key != file_id && fp_map.contains_key(&file_id) {
+                    all_paths_accounted_for = false;
+                    continue;
+                }
+                let Some(watcher) = fp_map.get_mut(&stale_key) else {
+                    // Not `expect`: an earlier path in this batch may already have rekeyed it, since
+                    // two spellings of one inode both resolve to the now-removed key.
+                    continue;
+                };
+                // No size check: under `FirstLinesChecksum` a changed fingerprint on the same inode
+                // can only be an in-place rewrite, and requiring a shrink missed the rewrites larger
+                // than the reader's offset.
+                // The fingerprint completed, which ends the rewrite; whether the reader still needs
+                // repositioning is decided inside, so a further rewrite arriving before this one
+                // completed is not mistaken for the one already rewound for. The identity check
+                // gates only the reopen -- the guard must come down either way, or the *next*
+                // rewrite inherits it and skips its repositioning.
+                if !watcher.path_has_tracked_identity().await {
+                    watcher.fingerprint_completed();
+                } else if let Err(error) = watcher
+                    .reconcile_rewrite(true, outcome.partial_prefix())
+                    .await
+                {
+                    self.emitter.emit_file_watch_error(&watcher.path, error);
+                    all_paths_accounted_for = false;
+                    continue;
+                }
+                if !rekey_watcher(fp_map, checkpoints, stale_key, file_id) {
+                    all_paths_accounted_for = false;
+                    continue;
+                }
+                let watcher = fp_map
+                    .get_mut(&file_id)
+                    .expect("just rekeyed this watcher into place");
+                // The rewrite completed under its new fingerprint, so it is over.
+                watcher.fingerprint_completed();
+                if watcher.is_idle() {
+                    if watcher.path_has_tracked_identity().await
+                        || fs::metadata(path)
+                            .await
+                            .is_ok_and(|metadata| metadata.is_file())
+                    {
+                        watcher.mark_found();
+                        watcher.invalidate_idle_bookkeeping();
+                    }
+                } else {
+                    let mut refresh_failed = false;
+                    if watcher.is_active() && !watcher.path_has_tracked_identity().await {
+                        let current_path = watcher.path.clone();
+                        if let Err(error) = watcher.update_path(current_path).await {
+                            self.emitter.emit_file_watch_error(&watcher.path, error);
+                            refresh_failed = true;
+                        }
+                    }
+                    if refresh_failed {
+                        // See above: a failed reopen must not be reported as accounted for.
+                        all_paths_accounted_for = false;
+                    } else {
+                        watcher.mark_found();
+                        watcher.mark_ready_to_read();
+                    }
+                }
+            } else {
+                // Nothing tracks this path under either its fingerprint or its name. It may be a
+                // newly created file that the `include` globs cover, reported without a create
+                // event; only the glob pass can tell.
+                all_paths_accounted_for = false;
+            }
+        }
+
+        // Same sweep as at the end of the full pass, because this one returns before reaching it:
+        // a reader repositioned onto different content must not leave the previous file's offset
+        // persisted, or a restart resumes past the new content's prefix.
+        for (&file_id, watcher) in &mut *fp_map {
+            if watcher.take_reader_restarted() {
+                checkpoints.register(file_id, 0, watcher.take_new_generation());
+            }
+        }
+
+        all_paths_accounted_for
     }
 
     /// Cheaply poll `Idle` watchers (no open file handle) for new data by stat-ing them, reusing
@@ -1234,6 +2183,10 @@ where
             Some(paths) => Some(identify_event_paths(paths).await),
             None => None,
         };
+        let cwd_for_notify_comparison = notify_wakeup
+            .has_specific_paths()
+            .then(|| std::env::current_dir().ok())
+            .flatten();
         let mut tree_identities_by_root = HashMap::new();
 
         for (&file_id, watcher) in &mut *fp_map {
@@ -1287,6 +2240,19 @@ where
                         watcher.mark_path_outside_glob();
                         path_has_tracked_identity = true;
                     }
+                } else if path_outside_glob
+                    && !path_has_tracked_identity
+                    && watcher.tracked_file_is_gone().await
+                {
+                    // The previously identity-verified outside-glob path disappeared and no
+                    // replacement was found. It is no longer safe to keep this watcher on the
+                    // long rotate-wait grace; let the normal finite missing-path grace reap it.
+                    //
+                    // Absence is confirmed separately: `path_has_tracked_identity` is also false
+                    // when the identity read failed for a permission, sharing, or I/O reason, and
+                    // treating that as deletion would stop polling a rotated file and reap it after
+                    // `discovery_interval`, losing data appended while it was unreadable.
+                    watcher.clear_path_outside_glob();
                 }
             }
 
@@ -1297,6 +2263,12 @@ where
             ) {
                 continue;
             }
+
+            let notify_names_current_path = notify_wakeup.has_specific_paths()
+                && notify_wakeup.names(
+                    &crate::absolutize(&watcher.path, cwd_for_notify_comparison.as_deref()),
+                    watcher.canonical_path(),
+                );
 
             match watcher.check_for_new_data().await {
                 Ok(true) => {
@@ -1317,6 +2289,19 @@ where
                     }
                 }
                 Ok(false) => {
+                    if notify_names_current_path {
+                        // Size and mtime are not a complete replacement detector: a new inode can
+                        // coincidentally reuse both values. A concrete notify event for this exact
+                        // path justifies one safe reopen; `reactivate` verifies the identity and
+                        // resets the offset if the file was replaced.
+                        if let Err(error) = watcher.reactivate().await {
+                            if error.kind() != std::io::ErrorKind::NotFound {
+                                self.emitter.emit_file_watch_error(&watcher.path, error);
+                            }
+                            watcher.invalidate_idle_bookkeeping();
+                        }
+                        continue;
+                    }
                     // Still idle and still unchanged. Idle files are eligible for `remove_after`
                     // cleanup just like active ones, driven off how long they've sat unchanged
                     // rather than "time since last successful read" (which is meaningless for a
@@ -1352,18 +2337,18 @@ where
     }
 
     /// Emit the `files_open`/`files_idle` gauges from the current contents of `fp_map`.
-    /// `files_open` reflects only watchers that actually hold an open file handle (`Active`
-    /// state); `files_idle` reflects watchers that are tracked (checkpointed, polled) but hold no
-    /// handle (`Idle` state). Prior to the idle-watching feature these were always identical to
-    /// `fp_map.len()`; splitting them out is what makes the fix for
+    /// `files_open` reflects only watchers that actually hold an open file handle. This is not
+    /// identical to the logical `Active` state: a gzip watcher configured to skip its backlog is
+    /// active with a null reader and therefore belongs in `files_idle`. Prior to the idle-watching
+    /// feature these were always identical to `fp_map.len()`; splitting them out is what makes the fix for
     /// <https://github.com/vectordotdev/vector/issues/3567> observable.
     fn emit_open_and_idle_counts(&self, fp_map: &IndexMap<FileFingerprint, FileWatcher>) {
         let (mut open, mut idle) = (0usize, 0usize);
         for watcher in fp_map.values() {
-            if watcher.is_idle() {
-                idle += 1;
-            } else {
+            if watcher.holds_file_handle() {
                 open += 1;
+            } else {
+                idle += 1;
             }
         }
         self.emitter.emit_files_open(open);
@@ -1421,6 +2406,11 @@ where
                     self.emitter.emit_file_added(&path);
                 }
                 watcher.set_file_findable(true);
+                // Before the watcher can be read from, so its very first checkpoint is accepted. A
+                // checkpoint loaded from disk has no owner, and one left over from a previous owner
+                // of this fingerprint belongs to a different reader; either way every update would
+                // be refused until this runs.
+                checkpoints.register(file_id, watcher.get_file_position(), watcher.generation());
                 fp_map.insert(file_id, watcher);
             }
             Err(error) => self.emitter.emit_file_watch_error(&path, error),
@@ -1535,6 +2525,10 @@ pub struct Line {
     pub text: Bytes,
     pub filename: String,
     pub file_id: FileFingerprint,
+    /// Which watcher read this line, captured here rather than looked up when the checkpoint is
+    /// written: by then the file may have been rekeyed, and the fingerprint alone cannot tell a
+    /// live reader's progress from a previous owner's late acknowledgement.
+    pub generation: OwnerGeneration,
     pub start_offset: u64,
     pub end_offset: u64,
 }
@@ -1875,6 +2869,90 @@ mod tests {
         ));
     }
 
+    #[tokio::test]
+    async fn deleted_outside_glob_watcher_returns_to_finite_reaping() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        let archive = directory.path().join("app.log.1");
+        std::fs::write(&path, b"line\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+        assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+        watcher.deactivate().await;
+
+        std::fs::rename(&path, &archive).unwrap();
+        watcher.set_file_findable(false);
+        watcher.update_path(archive.clone()).await.unwrap();
+        watcher.mark_path_outside_glob();
+        assert!(watcher.path_is_outside_glob());
+
+        std::fs::remove_file(&archive).unwrap();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        let file_server = FileServer {
+            paths_provider,
+            max_read_bytes: 1024 * 1024,
+            ignore_checkpoints: true,
+            read_from: ReadFrom::Beginning,
+            ignore_before: None,
+            max_line_bytes: 1024,
+            line_delimiter: Bytes::from_static(b"\n"),
+            data_dir: directory.path().to_path_buf(),
+            glob_minimum_cooldown: Duration::from_secs(1),
+            fingerprinter: Fingerprinter::new(
+                file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                    ignored_header_bytes: 0,
+                    lines: 1,
+                },
+                1024,
+                true,
+            ),
+            oldest_first: false,
+            remove_after: None,
+            emitter: NoopEmitter,
+            rotate_wait: Duration::from_secs(3600),
+            discovery_mode: FileDiscoveryMode::PollingOnly,
+            reconcile_interval: Duration::from_secs(1),
+            idle_timeout: Some(Duration::from_secs(60)),
+        };
+        let mut fp_map = IndexMap::from([(FileFingerprint::DevInode(0, 0), watcher)]);
+        let mut lines = Vec::new();
+        file_server
+            .poll_idle_watchers(&mut fp_map, &mut lines, &NotifyWakeup::default())
+            .await;
+
+        let watcher = fp_map.values().next().unwrap();
+        assert!(
+            !watcher.path_is_outside_glob(),
+            "a deleted outside-glob path must no longer use the rotate-wait grace"
+        );
+        assert!(should_reap_unfindable_watcher(
+            true,
+            watcher.path_is_outside_glob(),
+            watcher.unfindable_for(),
+            Duration::from_millis(1),
+            Duration::from_secs(3600),
+            false,
+        ));
+    }
+
     #[test]
     fn notify_wakeup_matches_relative_include_path_once_absolutized() {
         // Regression test for a bug found in review: a notify event names an absolute path (as
@@ -1918,6 +2996,210 @@ mod tests {
         assert!(
             wakeup.names(&canonical_path, Some(&canonical_path)),
             "a canonical notify path must match a watcher reached through a symlink alias"
+        );
+    }
+
+    /// Regression test for a bug found in review: the full pass repositioned a rewritten file's
+    /// reader *before* `rekey_watcher` checked whether the new fingerprint was already owned. When it
+    /// was, the rekey was refused but the reader had already been rewound onto the rewritten content
+    /// while still filed under the old key -- it would emit those lines under the wrong identity, and
+    /// the full pass could hand the same fingerprint to the other file, duplicating them.
+    ///
+    /// Asserted as the ordering invariant the fix establishes: the occupancy test is a pure map
+    /// lookup, so it must be answerable before any reader is touched. Driving this through
+    /// `discover` cannot reach the branch -- a new fingerprint that is already tracked takes the
+    /// "already tracked" path instead, and the collision only arises when the other watcher acquires
+    /// that key later in the same pass.
+    #[tokio::test]
+    async fn an_occupied_fingerprint_is_detected_before_any_reader_is_touched() {
+        let directory = tempfile::tempdir().unwrap();
+        let owner = directory.path().join("owner.log");
+        let rewritten = directory.path().join("rewritten.log");
+        std::fs::write(&owner, b"owner\n").unwrap();
+        std::fs::write(&rewritten, b"rewritten\n").unwrap();
+
+        let occupied_key = FileFingerprint::DevInode(1, 1);
+        let stale_key = FileFingerprint::DevInode(2, 2);
+        let make = |path: PathBuf| async move {
+            FileWatcher::new(
+                path,
+                ReadFrom::Beginning,
+                None,
+                1024,
+                Bytes::from_static(b"\n"),
+                true,
+            )
+            .await
+            .unwrap()
+        };
+        let mut watcher = make(rewritten.clone()).await;
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let offset_before = watcher.get_file_position();
+        assert!(offset_before > 0, "test setup needs a consumed reader");
+
+        let mut fp_map = IndexMap::from([(occupied_key, make(owner).await), (stale_key, watcher)]);
+
+        // The guard the fix adds, evaluated against the same state the full pass would see.
+        let collision_is_known_upfront =
+            stale_key != occupied_key && fp_map.contains_key(&occupied_key);
+        assert!(
+            collision_is_known_upfront,
+            "the collision must be decidable from the map alone, before any I/O"
+        );
+
+        // With the collision known, no reader is repositioned and the refusal is what
+        // `rekey_watcher` independently reports.
+        assert!(
+            !rekey_watcher(
+                &mut fp_map,
+                &CheckpointsView::default(),
+                stale_key,
+                occupied_key
+            ),
+            "rekeying onto an occupied fingerprint must be refused"
+        );
+        assert_eq!(
+            fp_map
+                .get(&stale_key)
+                .expect("the refused watcher stays under its old key")
+                .get_file_position(),
+            offset_before,
+            "the refused watcher's reader must be exactly where it was"
+        );
+    }
+
+    /// Regression test for a bug found in review: the symlinked-root check required the symlink to
+    /// sit in the include pattern's leading *literal* prefix. An include like `*/**/*.log` has the
+    /// prefix `.`, which canonicalizes to itself, so a wildcard component traversing a symlink was
+    /// never recognised. A backend reporting physical paths (FSEvents) then matched no spelling and
+    /// no root, and the event was dropped as accounted for -- leaving the file unread until the
+    /// reconciliation backstop.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn targeted_pass_defers_for_a_symlink_under_a_wildcard_glob_component() {
+        let directory = tempfile::tempdir().unwrap();
+        // The physical tree the symlink points into, deliberately outside the include root.
+        let physical = directory.path().join("physical");
+        std::fs::create_dir(&physical).unwrap();
+        let physical_file = physical.join("app.log");
+        std::fs::write(&physical_file, b"line\n").unwrap();
+
+        // The include root, whose *wildcard* component is the symlink.
+        let include_root = directory.path().join("include");
+        std::fs::create_dir(&include_root).unwrap();
+        std::os::unix::fs::symlink(&physical, include_root.join("linked")).unwrap();
+
+        // `<include>/*/*.log`: the leading literal prefix is `<include>`, which is a real directory
+        // and canonicalizes to itself, so the old prefix-only test found no symlink.
+        let pattern = include_root.join("*").join("*.log");
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[pattern],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        // What FSEvents would report: the physical path, matching neither spelling of the include.
+        let mut fp_map = IndexMap::new();
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let accounted_for = file_server
+            .discover_changed_paths(
+                &HashSet::from([physical_file.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &CheckpointsView::default(),
+            )
+            .await;
+
+        assert!(
+            !accounted_for,
+            "a physical path reached through a symlinked wildcard component must defer to a full \
+             glob pass, not be discarded as accounted for"
+        );
+    }
+
+    /// Regression test for a bug found in review: the child-link search read only the literal root's
+    /// immediate entries, so a recursive `**` include whose symlink sits below a *real* subdirectory
+    /// was missed -- the event was discarded as accounted for and the file waited for the backstop.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn targeted_pass_defers_for_a_symlink_nested_under_a_recursive_glob() {
+        let directory = tempfile::tempdir().unwrap();
+        let physical = directory.path().join("physical");
+        std::fs::create_dir(&physical).unwrap();
+        let physical_file = physical.join("app.log");
+        std::fs::write(&physical_file, b"line\n").unwrap();
+
+        // The link sits two levels below the literal root, under a genuine directory.
+        let include_root = directory.path().join("include");
+        let real_subdirectory = include_root.join("service");
+        std::fs::create_dir_all(&real_subdirectory).unwrap();
+        std::os::unix::fs::symlink(&physical, real_subdirectory.join("linked")).unwrap();
+
+        let pattern = include_root.join("**").join("*.log");
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[pattern],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let mut fp_map = IndexMap::new();
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let accounted_for = file_server
+            .discover_changed_paths(
+                &HashSet::from([physical_file]),
+                &mut fp_map,
+                &mut known_small_files,
+                &CheckpointsView::default(),
+            )
+            .await;
+
+        assert!(
+            !accounted_for,
+            "a physical path reached through a symlink nested under a recursive wildcard must \
+             defer to a full glob pass"
+        );
+    }
+
+    /// The looser symlinked-root test must not make every unrelated file force a full pass: that
+    /// sweep is the O(N)-per-event cost the targeted pass exists to avoid.
+    #[tokio::test]
+    async fn targeted_pass_still_discards_an_excluded_sibling_without_a_full_pass() {
+        let directory = tempfile::tempdir().unwrap();
+        let included = directory.path().join("app.log");
+        std::fs::write(&included, b"line\n").unwrap();
+        // A sibling in the same watched directory that the include pattern does not match.
+        let excluded = directory.path().join("notes.txt");
+        std::fs::write(&excluded, b"text\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let mut fp_map = IndexMap::new();
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let accounted_for = file_server
+            .discover_changed_paths(
+                &HashSet::from([excluded]),
+                &mut fp_map,
+                &mut known_small_files,
+                &CheckpointsView::default(),
+            )
+            .await;
+
+        assert!(
+            accounted_for,
+            "an excluded sibling must be settled by spelling alone, without forcing a full pass"
         );
     }
 
@@ -1972,6 +3254,1805 @@ mod tests {
         fn emit_files_idle(&self, _count: usize) {}
         fn emit_path_globbing_failed(&self, _path: &Path, _error: &std::io::Error) {}
         fn emit_file_line_too_long(&self, _buf: &bytes::BytesMut, _max_size: usize, _size: usize) {}
+    }
+
+    fn watcher_position_after(
+        fp_map: &IndexMap<FileFingerprint, FileWatcher>,
+        key: FileFingerprint,
+    ) -> Option<u64> {
+        fp_map.get(&key).map(FileWatcher::get_file_position)
+    }
+
+    fn test_file_server(
+        paths_provider: crate::paths_provider::Glob<NoopEmitter>,
+        data_dir: PathBuf,
+    ) -> FileServer<crate::paths_provider::Glob<NoopEmitter>, NoopEmitter> {
+        FileServer {
+            paths_provider,
+            max_read_bytes: 1024 * 1024,
+            ignore_checkpoints: true,
+            read_from: ReadFrom::Beginning,
+            ignore_before: None,
+            max_line_bytes: 1024,
+            line_delimiter: Bytes::from_static(b"\n"),
+            data_dir,
+            glob_minimum_cooldown: Duration::from_secs(1),
+            fingerprinter: Fingerprinter::new(
+                file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                    ignored_header_bytes: 0,
+                    lines: 1,
+                },
+                1024,
+                true,
+            ),
+            oldest_first: false,
+            remove_after: None,
+            emitter: NoopEmitter,
+            rotate_wait: Duration::from_secs(3600),
+            discovery_mode: FileDiscoveryMode::PollingOnly,
+            reconcile_interval: Duration::from_secs(1),
+            idle_timeout: Some(Duration::from_secs(60)),
+        }
+    }
+
+    #[tokio::test]
+    async fn idle_watcher_survives_a_temporary_short_fingerprint_failure() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"complete\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+        assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+        watcher.deactivate().await;
+        assert!(watcher.is_idle());
+
+        // A writer can be observed between writing the bytes and writing their delimiter. The
+        // fingerprint fails with UnexpectedEof, but the existing idle watcher must remain alive.
+        std::fs::write(&path, b"partial").unwrap();
+        let mut fp_map = IndexMap::from([(FileFingerprint::DevInode(0, 0), watcher)]);
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let checkpoints = CheckpointsView::default();
+        assert!(
+            file_server
+                .discover(
+                    &mut fp_map,
+                    &mut known_small_files,
+                    &checkpoints,
+                    None,
+                    &NotifyWakeup::default(),
+                )
+                .await
+        );
+
+        let mut lines = Vec::new();
+        file_server
+            .poll_idle_watchers(&mut fp_map, &mut lines, &NotifyWakeup::default())
+            .await;
+        let watcher = fp_map.values_mut().next().unwrap();
+        assert!(
+            watcher.is_active(),
+            "the idle watcher must not be reaped on a short read"
+        );
+
+        use std::io::Write as _;
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap();
+        file.write_all(b"\n").unwrap();
+        file.flush().unwrap();
+
+        let line = watcher
+            .read_line()
+            .await
+            .unwrap()
+            .raw_line
+            .expect("the partial line should be completed after its delimiter arrives");
+        assert_eq!(line.bytes.as_ref(), b"partial");
+    }
+
+    #[tokio::test]
+    async fn full_pass_rekeys_rather_than_duplicating_a_rewritten_watcher() {
+        // Regression test for a bug found in review: the full pass looked a file up only by its
+        // *current* fingerprint. After an in-place rewrite changed the hashed prefix, the existing
+        // watcher stayed under the old key, the new fingerprint looked untracked, and
+        // `watch_new_file` added a second reader for the same file while the first stayed alive --
+        // duplicating every line.
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"original\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let original_key = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &path,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("app.log must fingerprint");
+        let watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        let mut fp_map = IndexMap::from([(original_key, watcher)]);
+
+        // Rewrite in place with a different first line: same path, new fingerprint.
+        std::fs::write(&path, b"rewritten\n").unwrap();
+        let new_key = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &path,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("the rewritten file must fingerprint");
+        assert_ne!(original_key, new_key);
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let checkpoints = CheckpointsView::default();
+        assert!(
+            file_server
+                .discover(
+                    &mut fp_map,
+                    &mut known_small_files,
+                    &checkpoints,
+                    None,
+                    &NotifyWakeup::default(),
+                )
+                .await
+        );
+
+        assert_eq!(
+            fp_map.len(),
+            1,
+            "the rewritten file must keep exactly one watcher, not gain a duplicate reader"
+        );
+        assert!(
+            fp_map.contains_key(&new_key),
+            "the surviving watcher must be keyed by the fingerprint the file now has"
+        );
+    }
+
+    #[tokio::test]
+    async fn full_pass_keeps_an_active_watcher_findable_during_a_partial_rewrite() {
+        // Regression test for a bug found in review: the full pass marks every watcher unfindable up
+        // front, and its fingerprint-failure handling only rescued *idle* watchers. An active file
+        // rewritten in place, observed before its new prefix hashes, therefore stayed
+        // `findable == false` -- which `read_line` reads as "deleted" -- and a later completed
+        // fingerprint started a second watcher on the same path, duplicating records.
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"original line\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &path,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("app.log must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        assert!(watcher.is_active(), "test setup requires an active watcher");
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+
+        // Truncate and rewrite with no complete line yet: fingerprinting fails with UnexpectedEof.
+        std::fs::write(&path, b"partial").unwrap();
+        assert_eq!(
+            file_server
+                .fingerprinter
+                .fingerprint_or_emit(
+                    &path,
+                    &mut file_source_common::KnownSmallFiles::default(),
+                    &NoopEmitter
+                )
+                .await,
+            None,
+            "test setup requires the rewritten prefix to be unfingerprintable"
+        );
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let checkpoints = CheckpointsView::default();
+        assert!(
+            file_server
+                .discover(
+                    &mut fp_map,
+                    &mut known_small_files,
+                    &checkpoints,
+                    None,
+                    &NotifyWakeup::default(),
+                )
+                .await
+        );
+
+        assert_eq!(fp_map.len(), 1, "no second watcher may be created");
+        let watcher = fp_map.values().next().unwrap();
+        assert!(
+            watcher.file_findable(),
+            "an active watcher whose rewrite has not hashed yet must stay findable, or read_line              treats the file as deleted"
+        );
+        assert_eq!(
+            watcher.get_file_position(),
+            0,
+            "the reader must have been reset, not left inside the discarded content"
+        );
+    }
+
+    #[tokio::test]
+    async fn duplicate_fingerprint_defers_an_untracked_path_to_the_full_pass() {
+        // Regression test for a bug found in review: `FirstLinesChecksum` gives two files with the
+        // same first line one `FileFingerprint`, and only one of them can occupy that key. An event
+        // for the *other* file used to resolve the fingerprint, find the first file's watcher, and
+        // silently do nothing -- the path lookup sat in an `else if` a fingerprint hit skipped.
+        //
+        // The map state here is the one the server can actually reach: a single `Fingerprinter` with
+        // one strategy means every key is of the same kind, so the colliding second file is simply
+        // not tracked. It must therefore be handed to the full glob pass, which is what discovers
+        // and inserts it -- not silently dropped.
+        let directory = tempfile::tempdir().unwrap();
+        let first = directory.path().join("first.log");
+        let second = directory.path().join("second.log");
+        // Identical fingerprinted prefix (one line), so both files fingerprint the same.
+        std::fs::write(&first, b"shared first line\n").unwrap();
+        std::fs::write(&second, b"shared first line\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let shared_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &first,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("first.log must fingerprint");
+        assert_eq!(
+            file_server
+                .fingerprinter
+                .fingerprint_or_emit(
+                    &second,
+                    &mut file_source_common::KnownSmallFiles::default(),
+                    &NoopEmitter
+                )
+                .await,
+            Some(shared_id),
+            "test setup requires both files to share one fingerprint"
+        );
+
+        // Only `first.log` is tracked; it owns the shared key.
+        let first_watcher = FileWatcher::new(
+            first.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        let mut fp_map = IndexMap::from([(shared_id, first_watcher)]);
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let checkpoints = CheckpointsView::default();
+
+        let accounted = file_server
+            .discover_changed_paths(
+                &HashSet::from([second.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+
+        assert!(
+            !accounted,
+            "an event for a file that collides on the fingerprint but is not tracked must demand              the full glob pass, not be silently dropped"
+        );
+        assert_eq!(
+            fp_map.len(),
+            1,
+            "the targeted pass must not attach the event to the colliding watcher"
+        );
+        assert_eq!(
+            fp_map.values().next().unwrap().path,
+            first,
+            "the tracked watcher must still be the one it was"
+        );
+    }
+
+    #[tokio::test]
+    async fn targeted_pass_defers_a_vanished_active_path_to_the_full_pass() {
+        // Regression test for a bug found in review (and explicitly noted as untested): a queued
+        // modification event can be processed after its file is gone. `fingerprint_or_emit` then
+        // returns `None` and `update_path` fails, but the branch still called `mark_found` and
+        // reported the path accounted for -- skipping the full pass and leaving the active watcher
+        // attached to the old inode until the backstop.
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &path,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("app.log must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        assert!(watcher.is_active(), "the watcher must still be active");
+
+        // The file disappears before the queued event is processed.
+        std::fs::remove_file(&path).unwrap();
+
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        assert!(
+            !file_server
+                .discover_changed_paths(
+                    &HashSet::from([path.clone()]),
+                    &mut fp_map,
+                    &mut known_small_files,
+                    &CheckpointsView::default(),
+                )
+                .await,
+            "a vanished path must demand the full pass rather than be marked found"
+        );
+    }
+
+    #[tokio::test]
+    async fn targeted_pass_rekeys_an_in_place_rewrite() {
+        // Regression test for a bug found in review: an in-place rewrite (`copytruncate`, or an app
+        // rewriting its own log) changes the first line `FirstLinesChecksum` hashes. The watcher
+        // stayed under its old `fp_map` key, so emitted lines were checkpointed under an identity the
+        // file no longer had, and the next full pass did not recognise the new fingerprint as tracked
+        // and started a second watcher on the same path.
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"original first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let original_key = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &path,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("app.log must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let mut fp_map = IndexMap::from([(original_key, watcher)]);
+
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register(original_key, 15, fp_map[&original_key].generation());
+
+        // Rewrite in place with a different first line: same path, new fingerprint.
+        std::fs::write(&path, b"rewritten first\n").unwrap();
+        let new_key = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &path,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("the rewritten file must fingerprint");
+        assert_ne!(
+            original_key, new_key,
+            "test setup requires the rewrite to change the fingerprint"
+        );
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([path.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+
+        assert!(
+            fp_map.contains_key(&new_key),
+            "the watcher must now be keyed by the fingerprint the file actually has"
+        );
+        assert!(
+            !fp_map.contains_key(&original_key),
+            "the stale key must be gone, or the full pass adds a second watcher for this path"
+        );
+        assert_eq!(
+            fp_map.len(),
+            1,
+            "exactly one watcher must remain for the one file"
+        );
+        assert_eq!(
+            checkpoints.get(new_key),
+            Some(0),
+            "an in-place rewrite restarts the reader, so the checkpoint must follow it to zero --              persisting the pre-rewrite offset would make a restart skip the rewritten content"
+        );
+        assert_eq!(
+            watcher_position_after(&fp_map, new_key),
+            Some(0),
+            "the reader itself must have restarted"
+        );
+    }
+
+    /// Regression test for a bug found in review: the second-rewrite check lived inside
+    /// `restart_after_rewrite`, but every discovery branch tested `rewind_pending()` first and
+    /// skipped the call, so it never ran in production. Driving `discover_changed_paths` is the
+    /// point of this test -- calling the watcher directly passes either way.
+    #[tokio::test]
+    async fn a_second_rewrite_before_the_first_fingerprints_rewinds_through_discovery() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\nsecond\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.fingerprinter = Fingerprinter::new(
+            file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 2,
+            },
+            1024,
+            true,
+        );
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the two-line file must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+        let checkpoints = CheckpointsView::default();
+
+        // First rewrite, still too short to fingerprint: the reader is rewound onto it and reads it.
+        std::fs::write(&path, b"alpha\n").unwrap();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([path.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+        let watcher = fp_map.values_mut().next().unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        assert!(
+            watcher.get_file_position() > 0,
+            "the first rewrite must have been read"
+        );
+
+        // A second rewrite lands before the first ever fingerprinted: different content, still too
+        // short, and deliberately LONGER than the first so no size comparison can see it. The
+        // prefix not continuing the one rewound for is the only remaining signal.
+        std::fs::write(&path, b"beta-is-longer\n").unwrap();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([path.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+
+        let watcher = fp_map.values_mut().next().unwrap();
+        assert_eq!(
+            watcher.get_file_position(),
+            0,
+            "a second rewrite must reposition the reader, or its content is spliced onto the first"
+        );
+        let line = watcher.read_line().await.unwrap().raw_line;
+        assert_eq!(
+            line.map(|line| line.bytes),
+            Some(Bytes::from_static(b"beta-is-longer")),
+            "the reader must be on the newest rewrite"
+        );
+    }
+
+    /// Regression test for a bug found in review: a *second* rewrite that arrives already complete
+    /// looks like the first one having grown -- both are "the fingerprint succeeded under a new
+    /// key". Only the prefix separates them, so the completed outcome must carry one too.
+    #[tokio::test]
+    async fn a_second_rewrite_that_completes_rewinds_rather_than_splicing() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\nsecond\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.fingerprinter = Fingerprinter::new(
+            file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 2,
+            },
+            1024,
+            true,
+        );
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the two-line file must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+        let checkpoints = CheckpointsView::default();
+
+        // First rewrite, too short to fingerprint: the reader is rewound onto it and reads it.
+        std::fs::write(&path, b"alpha\n").unwrap();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([path.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+        let watcher = fp_map.values_mut().next().unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        assert!(watcher.get_file_position() > 0, "the first rewrite is read");
+
+        // A different rewrite, arriving already long enough to fingerprint. Had `alpha\n` simply
+        // grown a second line the reader would be correctly positioned, so the distinction is
+        // exactly that this content does not begin with what was rewound for.
+        std::fs::write(&path, b"gamma\ndelta\n").unwrap();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([path.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+
+        let watcher = fp_map.values_mut().next().unwrap();
+        assert_eq!(
+            watcher.get_file_position(),
+            0,
+            "a different rewrite completing must reposition the reader, not splice onto the old tail"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_completed_rewrite_does_not_rewind_a_reader_that_already_restarted() {
+        // The reader is rewound while the rewrite is still incomplete, reads from it, and only then
+        // does the fingerprint complete. Rewinding again there replays what it emitted.
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\nsecond\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.fingerprinter = Fingerprinter::new(
+            file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 2,
+            },
+            1024,
+            true,
+        );
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the two-line file must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+        let checkpoints = CheckpointsView::default();
+
+        // Rewritten to one line: incomplete, so the reader is rewound.
+        std::fs::write(&path, b"new\n").unwrap();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([path.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+        let watcher = fp_map.values_mut().next().unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let position_after_reading = watcher.get_file_position();
+        assert!(
+            position_after_reading > 0,
+            "the rewritten line must be read"
+        );
+
+        // The author completes the second line: the fingerprint now succeeds under a new key.
+        std::fs::write(&path, b"new\nmore\n").unwrap();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([path.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+
+        let watcher = fp_map.values_mut().next().unwrap();
+        assert!(
+            watcher.get_file_position() >= position_after_reading,
+            "completing the rewrite rewound the reader again, replaying the line it already emitted"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_full_pass_reopens_an_active_watcher_whose_path_was_replaced() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"old\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        // Two lines required, so the short replacement below cannot fingerprint.
+        file_server.fingerprinter = Fingerprinter::new(
+            file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 2,
+            },
+            1024,
+            true,
+        );
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        std::fs::write(&path, b"old\nsecond\n").unwrap();
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the original must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        assert!(watcher.is_active(), "test setup requires an active watcher");
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+
+        // Atomically replaced by a *different* inode holding a too-short prefix.
+        let replacement = directory.path().join("replacement.tmp");
+        std::fs::write(&replacement, b"brand new\n").unwrap();
+        std::fs::rename(&replacement, &path).unwrap();
+
+        let _ = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &CheckpointsView::default(),
+                None,
+                &NotifyWakeup::default(),
+            )
+            .await;
+
+        let watcher = fp_map.values_mut().next().unwrap();
+        assert!(
+            watcher.path_has_tracked_identity().await,
+            "the watcher must have been reopened onto the replacement, not left on the old inode"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_repeatedly_failing_fingerprint_restarts_the_reader_only_once() {
+        // A file rewritten to fewer lines than `FirstLinesChecksum` needs fails to fingerprint on
+        // *every* discovery pass. Restarting the reader each time re-emits what it already consumed.
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\nsecond\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.fingerprinter = Fingerprinter::new(
+            file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 2,
+            },
+            1024,
+            true,
+        );
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the two-line file must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+        let checkpoints = CheckpointsView::default();
+
+        std::fs::write(&path, b"new\n").unwrap();
+
+        let _ = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+            )
+            .await;
+        let watcher = fp_map.values_mut().next().unwrap();
+        let mut lines = Vec::new();
+        while let Ok(RawLineResult {
+            raw_line: Some(line),
+            ..
+        }) = watcher.read_line().await
+        {
+            lines.push(line.bytes);
+        }
+        assert_eq!(lines.len(), 1, "the rewritten line is read once: {lines:?}");
+        let position_after_reading = watcher.get_file_position();
+
+        // Later passes must leave the reader where it is; the fingerprint still fails.
+        for pass in 0..3 {
+            let _ = file_server
+                .discover(
+                    &mut fp_map,
+                    &mut known_small_files,
+                    &checkpoints,
+                    None,
+                    &NotifyWakeup::default(),
+                )
+                .await;
+            let watcher = fp_map.values_mut().next().unwrap();
+            assert_eq!(
+                watcher.get_file_position(),
+                position_after_reading,
+                "pass {pass} rewound the reader, so the line it already emitted is emitted again"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn targeted_pass_restarts_the_reader_after_an_in_place_rewrite() {
+        // Regression test for a bug found in review: rekeying moved the map key and checkpoint but
+        // left the reader at its old offset with its old buffer. After a `copytruncate`-style rewrite
+        // the reader would seek past EOF -- losing everything until the file grew past the old
+        // offset -- or splice the rewritten bytes onto the tail of the discarded content.
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"old one\nold two\nold three\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let original_key = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &path,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("app.log must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        // Read the original content so the reader sits at a non-zero offset.
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        assert!(
+            watcher.get_file_position() > 0,
+            "test setup requires a non-zero read offset"
+        );
+        let mut fp_map = IndexMap::from([(original_key, watcher)]);
+
+        // Truncate and rewrite in place: same inode, new first line, and *shorter* than the old
+        // offset -- the case where resuming would seek past EOF and lose the rewrite entirely.
+        std::fs::write(&path, b"new\n").unwrap();
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let checkpoints = CheckpointsView::default();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([path.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+
+        let watcher = fp_map.values_mut().next().expect("one watcher remains");
+        assert_eq!(
+            watcher.get_file_position(),
+            0,
+            "the reader must start the rewritten file over"
+        );
+        assert_eq!(
+            watcher
+                .read_line()
+                .await
+                .unwrap()
+                .raw_line
+                .expect("the rewritten content must be readable")
+                .bytes,
+            "new",
+            "the rewritten content must be read, not skipped past"
+        );
+    }
+
+    #[tokio::test]
+    async fn rekey_watcher_moves_the_watcher_and_its_checkpoint() {
+        // `update_key` has existed on the checkpointer since #5215 (2020) but had no caller after
+        // its one-off checksum migration was removed. Rekeying needs exactly it: the `fp_map` key is
+        // what `Line::file_id` carries downstream and what the checkpointer persists under.
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"line\n").unwrap();
+
+        let old_key = FileFingerprint::DevInode(1, 1);
+        let new_key = FileFingerprint::DevInode(2, 2);
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        // Read so the position is non-zero: that marks this as a file that was *appended* to, whose
+        // reader stays where it is -- as opposed to one restarted by an in-place rewrite, covered by
+        // `rekey_watcher_zeroes_the_checkpoint_for_a_restarted_reader`.
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        assert!(watcher.get_file_position() > 0);
+        let mut fp_map = IndexMap::from([(old_key, watcher)]);
+
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register(old_key, 42, fp_map[&old_key].generation());
+
+        assert!(rekey_watcher(&mut fp_map, &checkpoints, old_key, new_key));
+        assert!(
+            fp_map.contains_key(&new_key),
+            "the watcher must be reachable under its new identity"
+        );
+        assert!(
+            !fp_map.contains_key(&old_key),
+            "the stale key must not keep a second entry for the same file"
+        );
+        assert_eq!(
+            checkpoints.get(new_key),
+            Some(42),
+            "an appended-to file keeps its reader position, so its checkpoint must follow unchanged"
+        );
+        assert_eq!(
+            checkpoints.get(old_key),
+            None,
+            "the stale checkpoint must not linger under the old identity"
+        );
+    }
+
+    #[tokio::test]
+    async fn targeted_pass_does_not_restart_a_gzip_reader_on_a_size_comparison() {
+        // Regression test for a bug found in review: the rewrite check compares the reader's
+        // position with the file's on-disk size, but for a gzip watcher the position counts
+        // *decoded* bytes while the size is *compressed* bytes. Any ordinary compressible file then
+        // looks truncated, and restarting it decodes from byte zero and re-emits every record
+        // already sent.
+        use async_compression::tokio::bufread::GzipEncoder;
+        use tokio::io::AsyncReadExt as _;
+
+        async fn encode(data: &[u8]) -> Vec<u8> {
+            let mut out = Vec::new();
+            GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+            out
+        }
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log.gz");
+        // Highly compressible: decoded length far exceeds the compressed size on disk, which is
+        // exactly the shape that tripped the comparison.
+        let decoded = "a".repeat(4096) + "\n";
+        std::fs::write(&path, encode(decoded.as_bytes()).await).unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.gz")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &path,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("the gzip file must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            8192,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(watcher.is_gzip(), "test setup requires a gzip watcher");
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let position_before = watcher.get_file_position();
+        assert!(
+            position_before > std::fs::metadata(&path).unwrap().len(),
+            "test setup requires the decoded position to exceed the compressed size"
+        );
+
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let checkpoints = CheckpointsView::default();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([path.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+            )
+            .await;
+
+        let watcher = fp_map.values().next().expect("the watcher remains");
+        assert_eq!(
+            watcher.get_file_position(),
+            position_before,
+            "a gzip watcher must not be restarted by a decoded-vs-compressed size comparison"
+        );
+    }
+
+    #[tokio::test]
+    async fn rekey_watcher_keeps_its_position_for_oldest_first() {
+        // Regression test for a bug found in review: `fp_map`'s order is read priority under
+        // `oldest_first`, and `shift_remove` + `insert` moved a rekeyed watcher to the tail -- so a
+        // newer file drained before an older one that happened to be rewritten.
+        let directory = tempfile::tempdir().unwrap();
+        let make = |name: &str| {
+            let path = directory.path().join(name);
+            std::fs::write(&path, b"x\n").unwrap();
+            async move {
+                FileWatcher::new(
+                    path,
+                    ReadFrom::Beginning,
+                    None,
+                    1024,
+                    Bytes::from_static(b"\n"),
+                    true,
+                )
+                .await
+                .unwrap()
+            }
+        };
+        let oldest = FileFingerprint::DevInode(1, 1);
+        let middle = FileFingerprint::DevInode(2, 2);
+        let newest = FileFingerprint::DevInode(3, 3);
+        let mut fp_map = IndexMap::from([
+            (oldest, make("a.log").await),
+            (middle, make("b.log").await),
+            (newest, make("c.log").await),
+        ]);
+
+        let rekeyed = FileFingerprint::DevInode(9, 9);
+        let checkpoints = CheckpointsView::default();
+        assert!(rekey_watcher(&mut fp_map, &checkpoints, middle, rekeyed));
+
+        let order: Vec<FileFingerprint> = fp_map.keys().copied().collect();
+        assert_eq!(
+            order,
+            vec![oldest, rekeyed, newest],
+            "a rekeyed watcher must keep its position, not move to the tail"
+        );
+    }
+
+    /// Regression test for a bug found in review: `watch_new_file` inserted a watcher without
+    /// registering it as the owner of its fingerprint, so `update` refused every checkpoint it
+    /// produced and a restart reread the whole file.
+    #[tokio::test]
+    async fn a_newly_watched_file_owns_its_checkpoint() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .clone()
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the file must fingerprint");
+
+        let mut fp_map = IndexMap::new();
+        let checkpoints = CheckpointsView::default();
+        file_server
+            .watch_new_file(path.clone(), file_id, &mut fp_map, &checkpoints, false)
+            .await;
+
+        let watcher = fp_map.get(&file_id).expect("the watcher must be installed");
+        checkpoints.update(file_id, 6, watcher.generation());
+        assert_eq!(
+            checkpoints.get(file_id),
+            Some(6),
+            "a newly watched file must be able to record its progress"
+        );
+    }
+
+    /// Regression test for a bug found in review: a reset to zero under an *unchanged* fingerprint
+    /// left the generation alone, so an acknowledgement sent before the reset still matched and
+    /// wound the checkpoint back past it -- resuming a restart inside content already discarded.
+    #[test]
+    fn a_reset_under_the_same_fingerprint_retires_the_previous_generation() {
+        let checkpoints = CheckpointsView::default();
+        let file_id = FileFingerprint::FirstLinesChecksum(1);
+
+        let before_reset = file_source_common::next_owner_generation();
+        checkpoints.register(file_id, 500, before_reset);
+
+        // The reader is repositioned onto new content under the same fingerprint, as a truncation
+        // or a same-name replacement does.
+        let after_reset = file_source_common::next_owner_generation();
+        checkpoints.register(file_id, 0, after_reset);
+
+        // An acknowledgement for a line read before the reset.
+        checkpoints.update(file_id, 500, before_reset);
+        assert_eq!(
+            checkpoints.get(file_id),
+            Some(0),
+            "an acknowledgement from before the reset must not wind the checkpoint back"
+        );
+
+        checkpoints.update(file_id, 12, after_reset);
+        assert_eq!(
+            checkpoints.get(file_id),
+            Some(12),
+            "the reader that owns the new content records normally"
+        );
+    }
+
+    #[tokio::test]
+    async fn rekey_watcher_zeroes_the_checkpoint_for_a_restarted_reader() {
+        // Regression test for a bug found in review: after an in-place rewrite the reader restarts at
+        // zero, but `update_key` carried the *pre-rewrite* offset onto the new fingerprint. A restart
+        // before new content arrived would then resume at that stale offset and skip the beginning of
+        // the rewritten file.
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"line\n").unwrap();
+
+        let old_key = FileFingerprint::DevInode(1, 1);
+        let new_key = FileFingerprint::DevInode(2, 2);
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        // A *genuine* restart, not merely a zero offset: an unread watcher also sits at zero, and
+        // `rekey_watcher` must carry its resumed checkpoint over rather than discarding it.
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        std::fs::write(&path, b"rewritten\n").unwrap();
+        watcher
+            .restart_after_rewrite()
+            .await
+            .expect("restart must succeed");
+        assert_eq!(watcher.get_file_position(), 0);
+        let mut fp_map = IndexMap::from([(old_key, watcher)]);
+
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register(old_key, 42, fp_map[&old_key].generation());
+
+        assert!(rekey_watcher(&mut fp_map, &checkpoints, old_key, new_key));
+        assert_eq!(
+            checkpoints.get(new_key),
+            Some(0),
+            "a restarted reader must not leave a pre-rewrite offset persisted"
+        );
+    }
+
+    #[tokio::test]
+    async fn rekey_watcher_refuses_to_evict_a_colliding_owner() {
+        // Two files can share one `FirstLinesChecksum` (identical first lines). Rekeying onto an
+        // occupied key would evict the watcher that legitimately owns it, losing its reader and its
+        // position, so the collision must be refused and left to the full pass.
+        let directory = tempfile::tempdir().unwrap();
+        let first = directory.path().join("first.log");
+        let second = directory.path().join("second.log");
+        std::fs::write(&first, b"a\n").unwrap();
+        std::fs::write(&second, b"b\n").unwrap();
+
+        let stale_key = FileFingerprint::DevInode(1, 1);
+        let occupied_key = FileFingerprint::DevInode(2, 2);
+        let make = |path: PathBuf| async move {
+            FileWatcher::new(
+                path,
+                ReadFrom::Beginning,
+                None,
+                1024,
+                Bytes::from_static(b"\n"),
+                true,
+            )
+            .await
+            .unwrap()
+        };
+        let mut fp_map = IndexMap::from([
+            (stale_key, make(first.clone()).await),
+            (occupied_key, make(second.clone()).await),
+        ]);
+        let checkpoints = CheckpointsView::default();
+
+        assert!(
+            !rekey_watcher(&mut fp_map, &checkpoints, stale_key, occupied_key),
+            "rekeying onto an occupied fingerprint must be refused"
+        );
+        assert_eq!(
+            fp_map
+                .get(&occupied_key)
+                .map(|watcher| watcher.path.clone()),
+            Some(second),
+            "the colliding owner must keep its entry"
+        );
+        assert!(
+            fp_map.contains_key(&stale_key),
+            "the refused watcher must be left where it was, not dropped"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn targeted_pass_records_the_configured_spelling_for_a_short_file() {
+        // A backend like FSEvents reports a symlinked include's canonical target. Fingerprinting under
+        // that spelling would make it the one `remove_after` may unlink -- a file outside the include,
+        // possibly shared -- so the watcher's configured path is used instead.
+        let directory = tempfile::tempdir().unwrap();
+        let target_dir = directory.path().join("physical");
+        std::fs::create_dir(&target_dir).unwrap();
+        let target = target_dir.join("app.log");
+        std::fs::write(&target, b"complete\n").unwrap();
+
+        let link_dir = directory.path().join("logs");
+        std::os::unix::fs::symlink(&target_dir, &link_dir).unwrap();
+        let configured = link_dir.join("app.log");
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[link_dir.join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        // Tracked under the configured (symlinked) spelling.
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(&configured, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the complete file must fingerprint");
+        let watcher = FileWatcher::new(
+            configured.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+
+        // Rewritten to an unterminated record, so it now lands in `known_small_files`.
+        std::fs::write(&target, b"partial").unwrap();
+
+        // The event names the *canonical target*, as FSEvents would.
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([target.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &CheckpointsView::default(),
+            )
+            .await;
+
+        let canonical_identity = target.canonicalize().unwrap();
+        if let Some(removal_path) = known_small_files.removal_path(&canonical_identity) {
+            assert_ne!(
+                removal_path,
+                canonical_identity.as_path(),
+                "remove_after must never be handed the canonical target of a symlinked include"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn targeted_pass_ignores_paths_outside_the_include_rules() {
+        // Regression test for a bug found in review: notify watches whole directories, so events
+        // name files the include/exclude rules leave out. Fingerprinting such a path put it into
+        // `known_small_files` when short or unterminated, and `remove_after` then deleted a file the
+        // user had explicitly excluded.
+        let directory = tempfile::tempdir().unwrap();
+        let included = directory.path().join("app.log");
+        let excluded = directory.path().join("secret.txt");
+        std::fs::write(&included, b"line\n").unwrap();
+        // No trailing delimiter: this is exactly the shape that lands in `known_small_files`.
+        std::fs::write(&excluded, b"short").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let mut fp_map = IndexMap::new();
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([excluded.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &CheckpointsView::default(),
+            )
+            .await;
+
+        assert!(
+            known_small_files.is_empty(),
+            "an excluded path must never enter known_small_files, or remove_after deletes it: {known_small_files:?}"
+        );
+
+        // The included file, by contrast, is still processed normally.
+        std::fs::write(&included, b"partial").unwrap();
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([included.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &CheckpointsView::default(),
+            )
+            .await;
+        assert_eq!(
+            known_small_files.len(),
+            1,
+            "an included short file must still be tracked"
+        );
+    }
+
+    #[tokio::test]
+    async fn targeted_pass_checks_each_batch_path_against_its_own_canonical_form() {
+        // Regression test for a bug found in review: a debounced batch carries several paths at once.
+        // Matching a watcher by asking "is this path anywhere in the batch" (`NotifyWakeup::names`)
+        // made any watcher match any path in the batch, so an untracked path B riding along with a
+        // tracked path A was treated as accounted for and the full glob pass was skipped -- leaving
+        // B unread until the reconciliation backstop.
+        let directory = tempfile::tempdir().unwrap();
+        let tracked = directory.path().join("tracked.log");
+        let untracked = directory.path().join("untracked.log");
+        std::fs::write(&tracked, b"tracked\n").unwrap();
+        std::fs::write(&untracked, b"brand new\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let tracked_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &tracked,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("tracked.log must fingerprint");
+        let watcher = FileWatcher::new(
+            tracked.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        let mut fp_map = IndexMap::from([(tracked_id, watcher)]);
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+
+        // Both paths in one batch: the tracked one must not vouch for the untracked one.
+        assert!(
+            !file_server
+                .discover_changed_paths(
+                    &HashSet::from([tracked.clone(), untracked.clone()]),
+                    &mut fp_map,
+                    &mut known_small_files,
+                    &CheckpointsView::default(),
+                )
+                .await,
+            "an untracked path in a multi-path batch must still demand a full glob pass"
+        );
+    }
+
+    #[tokio::test]
+    async fn targeted_pass_defers_to_a_full_pass_for_an_untracked_path() {
+        // Regression test for a bug found in review: some notify backends report a brand-new file as
+        // `Modify(Data)` with no create event. The targeted pass fingerprinted such a path, found it
+        // under neither a tracked fingerprint nor a tracked name, and did nothing -- leaving the file
+        // unread until `reconcile_interval` fired. It must instead report that a full glob pass is
+        // still owed.
+        let directory = tempfile::tempdir().unwrap();
+        let tracked = directory.path().join("tracked.log");
+        let untracked = directory.path().join("untracked.log");
+        std::fs::write(&tracked, b"tracked\n").unwrap();
+        std::fs::write(&untracked, b"brand new\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let tracked_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &tracked,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("tracked.log must fingerprint");
+        let watcher = FileWatcher::new(
+            tracked.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        let mut fp_map = IndexMap::from([(tracked_id, watcher)]);
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([tracked.clone()]);
+        wakeup.resolve_canonical_paths().await;
+        assert!(
+            file_server
+                .discover_changed_paths(
+                    &HashSet::from([tracked.clone()]),
+                    &mut fp_map,
+                    &mut known_small_files,
+                    &CheckpointsView::default(),
+                )
+                .await,
+            "a tracked path needs no full pass"
+        );
+
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([untracked.clone()]);
+        wakeup.resolve_canonical_paths().await;
+        assert!(
+            !file_server
+                .discover_changed_paths(
+                    &HashSet::from([untracked.clone()]),
+                    &mut fp_map,
+                    &mut known_small_files,
+                    &CheckpointsView::default(),
+                )
+                .await,
+            "an untracked path must demand a full glob pass so the new file is picked up"
+        );
+    }
+
+    #[tokio::test]
+    async fn targeted_pass_matches_a_watcher_through_its_canonical_alias() {
+        // Regression test for a bug found in review: the targeted notify pass compared only the raw
+        // event path, while the full pass also consults the canonical paths `NotifyWakeup` resolved.
+        // When a file is tracked under one spelling and notify reports another that canonicalizes to
+        // the same file, neither side of `matches_path` agreed and the watcher was never nudged --
+        // sustained events on the alias kept taking this targeted path, deferring appended data.
+        let directory = tempfile::tempdir().unwrap();
+        let real = directory.path().join("app.log");
+        std::fs::write(&real, b"first\n").unwrap();
+
+        // An alias spelling of the same file that `absolutize` alone cannot reconcile with the
+        // event path, so only canonical comparison connects the two. A symlink is the shape the bug
+        // was reported for; Windows needs elevation to create one, so a UNC-prefixed path -- the
+        // same situation of a distinct raw path with an identical canonical form -- is used there.
+        #[cfg(unix)]
+        let alias = {
+            let alias = directory.path().join("alias.log");
+            std::os::unix::fs::symlink(&real, &alias).unwrap();
+            alias
+        };
+        #[cfg(windows)]
+        let alias = PathBuf::from(format!(
+            r"\\?\{}",
+            real.to_str().expect("temp path must be valid UTF-8")
+        ));
+        assert_ne!(alias, real, "the alias must be a distinct raw path");
+        assert_eq!(
+            std::fs::canonicalize(&alias).unwrap(),
+            std::fs::canonicalize(&real).unwrap(),
+            "the alias must canonicalize to the same file"
+        );
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        // The watcher is created on the alias spelling, so `watcher.path` is the alias while the
+        // event below names the real path.
+        let mut watcher = FileWatcher::new(
+            alias.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        assert!(
+            !watcher.should_read(),
+            "test setup requires the watcher to be mid-EOF-backoff"
+        );
+
+        use std::io::Write as _;
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&real)
+            .unwrap();
+        file.write_all(b"second\n").unwrap();
+        file.flush().unwrap();
+
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(
+                &real,
+                &mut file_source_common::KnownSmallFiles::default(),
+                &NoopEmitter,
+            )
+            .await
+            .expect("app.log must fingerprint");
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([real.clone()]);
+        wakeup.resolve_canonical_paths().await;
+
+        file_server
+            .discover_changed_paths(
+                &HashSet::from([real.clone()]),
+                &mut fp_map,
+                &mut known_small_files,
+                &CheckpointsView::default(),
+            )
+            .await;
+
+        let watcher = fp_map.values_mut().next().unwrap();
+        assert!(
+            watcher.should_read(),
+            "a watcher held under an alias spelling must be nudged by an event naming the same file"
+        );
+    }
+
+    #[tokio::test]
+    async fn notify_event_reopens_same_name_replacement_with_unchanged_metadata() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"old line\nold tail\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+        assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+        assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+        watcher.deactivate().await;
+
+        let old_metadata = std::fs::metadata(&path).unwrap();
+        let replacement_path = directory.path().join("replacement.tmp");
+        // Keep the first fingerprint line, size, and mtime unchanged. Only the inode and the
+        // later line differ, which is exactly the collision that size/mtime-only polling misses.
+        std::fs::write(&replacement_path, b"old line\nnew tail\n").unwrap();
+        let replacement = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&replacement_path)
+            .unwrap();
+        replacement
+            .set_modified(old_metadata.modified().unwrap())
+            .unwrap();
+        std::fs::remove_file(&path).unwrap();
+        std::fs::rename(&replacement_path, &path).unwrap();
+        let new_metadata = std::fs::metadata(&path).unwrap();
+        assert_eq!(old_metadata.len(), new_metadata.len());
+        assert_eq!(
+            old_metadata.modified().unwrap(),
+            new_metadata.modified().unwrap()
+        );
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .unwrap();
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+        let checkpoints = CheckpointsView::default();
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([path.clone()]);
+        assert!(
+            file_server
+                .discover(
+                    &mut fp_map,
+                    &mut known_small_files,
+                    &checkpoints,
+                    None,
+                    &wakeup,
+                )
+                .await
+        );
+        let mut lines = Vec::new();
+        file_server
+            .poll_idle_watchers(&mut fp_map, &mut lines, &wakeup)
+            .await;
+
+        let watcher = fp_map.values_mut().next().unwrap();
+        assert!(watcher.is_active());
+        let line = watcher
+            .read_line()
+            .await
+            .unwrap()
+            .raw_line
+            .expect("replacement contents should be read after the notify event");
+        assert_eq!(line.bytes.as_ref(), b"old line");
+        let line = watcher
+            .read_line()
+            .await
+            .unwrap()
+            .raw_line
+            .expect("the replacement tail should also be read");
+        assert_eq!(line.bytes.as_ref(), b"new tail");
     }
 
     /// Like `NoopEmitter`, but records the most recent `files_open`/`files_idle` gauge values so
@@ -2143,6 +5224,11 @@ mod tests {
             );
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
+        assert_eq!(
+            emitter.open.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "a skipped gzip backlog must not be reported as an open file"
+        );
 
         // Append member 2 after the handle has been closed.
         let mut combined = encode(b"first\n").await;

@@ -352,6 +352,7 @@ fn watcher_for_timing() -> FileWatcher {
     let now = Instant::now();
 
     FileWatcher {
+        generation: file_source_common::next_owner_generation(),
         path: PathBuf::new(),
         canonical_path: None,
         findable: true,
@@ -363,9 +364,15 @@ fn watcher_for_timing() -> FileWatcher {
             last_read_success: now,
             read_retry_delay: EOF_READ_BACKOFF_MIN,
             buf: BytesMut::new(),
+            forced_read: false,
         },
         file_position: 0,
         identity: None,
+        reader_restarted: false,
+        content_epoch: 0,
+        last_rewind_epoch: None,
+        rewound_at_len: None,
+        rewound_for_prefix: None,
         gzip_read_skipped: false,
         is_gzip: false,
         gzip_raw_metadata: None,
@@ -398,6 +405,438 @@ async fn unfindable_grace_starts_on_first_unfindable_pass() {
         watcher.unfindable_for(),
         std::time::Duration::ZERO,
         "a newly matched watcher must start a fresh unfindable grace period"
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn path_is_absent_reports_a_dangling_symlink_as_gone() {
+    // Regression test for a bug found in review: this helper first used `symlink_metadata`, which
+    // succeeds for a symlink whose target was deleted. An outside-glob idle watcher reached through
+    // such a link would never have its exemption cleared, so polling kept skipping it and the stale
+    // watcher survived until the effectively unbounded `rotate_wait`.
+    use crate::file_watcher::path_is_absent;
+
+    let dir = tempdir().unwrap();
+    let target = dir.path().join("target.log");
+    let link = dir.path().join("link.log");
+    fs::write(&target, b"data\n").unwrap();
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+
+    assert!(!path_is_absent(&link).await, "a live symlink is not absent");
+
+    fs::remove_file(&target).unwrap();
+    assert!(
+        link.symlink_metadata().is_ok(),
+        "the link itself must still exist for this test to mean anything"
+    );
+    assert!(
+        path_is_absent(&link).await,
+        "a symlink whose target is gone must count as absent"
+    );
+}
+
+#[tokio::test]
+async fn restart_after_rewrite_rebases_the_gzip_size_baseline() {
+    // Regression test for a bug found in review: `shrank_below_reader` compares against the raw size
+    // recorded when the decoder was opened, and `restart_after_rewrite` left that baseline at the
+    // *pre-rewrite* size. Every later append that stayed below it then looked like another rewrite,
+    // restarting from byte zero and re-emitting the records in between.
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log.gz");
+    let big = "a".repeat(8192) + "\n";
+    fs::write(&path, encode(big.as_bytes()).await).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        16384,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_gzip());
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+
+    // Rewrite smaller: a genuine rewrite, which the watcher must notice and restart for.
+    fs::write(&path, encode(b"small\n").await).unwrap();
+    assert!(watcher.shrank_below_reader().await);
+    watcher
+        .restart_after_rewrite()
+        .await
+        .expect("restart must succeed");
+
+    // The baseline must now describe the *rewritten* file, so this smaller-than-original file is no
+    // longer reported as freshly rewritten on every subsequent event.
+    assert!(
+        !watcher.shrank_below_reader().await,
+        "the compressed-size baseline must be rebased, or every later event re-restarts the reader"
+    );
+}
+
+#[tokio::test]
+async fn restart_after_rewrite_reprobes_a_skipped_gzip_watcher() {
+    // Regression test for a bug found in review: a gzip watcher that deliberately skipped its
+    // backlog (`read_from: end`, a resumed checkpoint, `ignore_older`) returned early here without
+    // re-probing the format. If the rewrite replaced it with a *plain* file, the watcher kept
+    // `gzip_read_skipped` and its null reader, so it never consumed the new contents -- forever, when
+    // `idle_timeout` is disabled.
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log.gz");
+    fs::write(&path, encode(b"backlog\n").await).unwrap();
+
+    // `ReadFrom::End` is what makes a gzip watcher skip its backlog.
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::End,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(
+        watcher.gzip_read_skipped,
+        "test setup requires a watcher that skipped its compressed backlog"
+    );
+
+    // Still gzip: the skip must be preserved, or the backlog gets replayed.
+    fs::write(&path, encode(b"still gzip\n").await).unwrap();
+    watcher.restart_after_rewrite().await.expect("restart");
+    assert!(
+        watcher.gzip_read_skipped,
+        "a still-compressed rewrite must not clear the deliberate skip"
+    );
+
+    // Rewritten as a plain file: the skip no longer applies to anything.
+    fs::write(&path, b"now plain\n").unwrap();
+    watcher.restart_after_rewrite().await.expect("restart");
+    assert!(
+        !watcher.gzip_read_skipped,
+        "a rewrite to a plain file must clear the skip, or the watcher never reads again"
+    );
+    assert!(!watcher.is_gzip(), "the format must be re-probed");
+}
+
+#[tokio::test]
+async fn shrank_below_reader_uses_compressed_size_for_gzip() {
+    // Regression test for a bug found in review: guarding the rewrite check with `!is_gzip()` fixed
+    // the false positive on compressible files but disabled rewrite detection for gzip entirely, so
+    // an in-place rewrite of a gzip file left the decoder at the old compressed EOF and the new
+    // content was lost. The recorded raw (compressed) size is the right baseline.
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log.gz");
+    // Highly compressible, so the decoded position far exceeds the compressed size -- the shape
+    // that made a naive comparison report a phantom truncation.
+    let big = "a".repeat(8192) + "\n";
+    fs::write(&path, encode(big.as_bytes()).await).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        16384,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_gzip());
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+    assert!(
+        watcher.get_file_position() > fs::metadata(&path).unwrap().len(),
+        "test setup requires decoded position to exceed compressed size"
+    );
+    assert!(
+        !watcher.shrank_below_reader().await,
+        "an untouched compressible file must not look truncated"
+    );
+
+    // Rewrite in place with *less* compressed data: this is a genuine rewrite.
+    fs::write(&path, encode(b"small\n").await).unwrap();
+    assert!(
+        watcher.shrank_below_reader().await,
+        "a gzip file whose compressed size shrank has been rewritten and must be detected"
+    );
+}
+
+#[tokio::test]
+async fn reactivate_marks_a_replacement_as_a_restart() {
+    // Regression test for a bug found in review: `reactivate` rewinds to zero when the file it
+    // reopens turns out to be a replacement or to have been truncated, but never reported that, and
+    // `poll_idle_watchers` did not sweep checkpoints. A restart before the first line of the new
+    // content was acknowledged would then resume at the old offset and skip that content's prefix.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log");
+    fs::write(&path, b"old one\nold two\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+    assert!(watcher.get_file_position() > 0);
+    watcher.deactivate().await;
+    assert!(watcher.is_idle());
+    // Anything the earlier repositioning set is consumed, so the assertion below is about
+    // reactivation alone.
+    let _ = watcher.take_reader_restarted();
+
+    // Replace the file: a new inode at the same path.
+    fs::remove_file(&path).unwrap();
+    fs::write(&path, b"replacement\n").unwrap();
+
+    watcher.reactivate().await.expect("reactivate must succeed");
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "a replacement must be read from the start"
+    );
+    assert!(
+        watcher.take_reader_restarted(),
+        "reactivation onto a replacement must report a restart, or the stale checkpoint survives"
+    );
+}
+
+#[tokio::test]
+async fn restart_after_rewrite_is_idempotent_until_the_fingerprint_completes() {
+    // The guard lives here rather than in each discovery branch: four review rounds in a row found a
+    // branch that restarted without checking, replaying the lines read since the first rewind.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log");
+    std::fs::write(&path, b"first\nsecond\n").unwrap();
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .unwrap();
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+
+    std::fs::write(&path, b"rewritten\n").unwrap();
+    watcher.restart_after_rewrite().await.unwrap();
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+    let position = watcher.get_file_position();
+    assert!(position > 0, "the rewritten line must have been read");
+
+    // A second restart for the same rewrite must do nothing.
+    watcher.restart_after_rewrite().await.unwrap();
+    assert_eq!(
+        watcher.get_file_position(),
+        position,
+        "restarting twice for one rewrite replays what the reader already emitted"
+    );
+
+    // Once the fingerprint completes, the next rewrite is a new one and must restart.
+    watcher.fingerprint_completed();
+    std::fs::write(&path, b"again\n").unwrap();
+    watcher.restart_after_rewrite().await.unwrap();
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "a rewrite after a completed fingerprint must reposition the reader"
+    );
+}
+
+#[tokio::test]
+async fn restart_after_rewrite_reruns_for_a_rewrite_that_shrank_below_the_last() {
+    // A rewrite landing before the previous one grew enough to fingerprint. The inode never changed,
+    // so nothing raises the epoch on its own and the idempotence guard above would swallow it.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log");
+    std::fs::write(&path, b"first\nsecond\n").unwrap();
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .unwrap();
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+
+    std::fs::write(&path, b"rewritten once\n").unwrap();
+    watcher.restart_after_rewrite().await.unwrap();
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+    assert!(watcher.get_file_position() > 0, "the rewrite must be read");
+
+    // Shorter than the content just rewound for, and with no fingerprint in between.
+    std::fs::write(&path, b"two\n").unwrap();
+    watcher.restart_after_rewrite().await.unwrap();
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "a rewrite that shrank below the last one must reposition the reader"
+    );
+
+    let line = watcher.read_line().await.unwrap().raw_line;
+    assert_eq!(
+        line.map(|line| line.bytes),
+        Some(Bytes::from_static(b"two")),
+        "the reader must be reading the newest rewrite"
+    );
+}
+
+#[tokio::test]
+async fn restart_after_rewrite_resets_an_idle_offset() {
+    // Regression test for a bug found in review: for an idle watcher this only forced a recheck and
+    // kept the old offset. `reactivate` re-derives a reset solely from an inode change or an observed
+    // shrink, so a rewrite at least as large as that offset resumed *inside* the new content and lost
+    // or concatenated its prefix.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log");
+    fs::write(&path, b"old one\nold two\nold three\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+    let offset = watcher.get_file_position();
+    assert!(offset > 0, "test setup requires a non-zero offset");
+    watcher.deactivate().await;
+    assert!(watcher.is_idle(), "test setup requires an idle watcher");
+
+    // Rewrite in place, *larger* than the old offset: the case the shrink heuristic missed.
+    fs::write(&path, b"new\n".repeat(40)).unwrap();
+    assert!(
+        fs::metadata(&path).unwrap().len() > offset,
+        "test setup requires the rewrite to exceed the old offset"
+    );
+
+    watcher
+        .restart_after_rewrite()
+        .await
+        .expect("restart must succeed for an idle watcher");
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "an idle watcher must have its offset reset, or reactivation resumes inside the rewrite"
+    );
+}
+
+#[tokio::test]
+async fn tracked_file_is_gone_detects_a_replacement_at_the_same_path() {
+    // Regression test for a bug found in review: an idle watcher that followed a rotated file
+    // outside the glob kept its `path_outside_glob` exemption when a *different* regular file later
+    // occupied that path, because `path_is_absent` sees a regular file and says "still there". The
+    // watcher then could not be polled by identity and was retained until the very long
+    // `rotate_wait` instead of being reaped.
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log");
+    fs::write(&path, b"original\n").unwrap();
+
+    let watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(
+        !watcher.tracked_file_is_gone().await,
+        "the tracked file is still at its path"
+    );
+
+    // Replace with a different inode at the same path.
+    fs::remove_file(&path).unwrap();
+    fs::write(&path, b"replacement\n").unwrap();
+    assert!(
+        watcher.tracked_file_is_gone().await,
+        "a different inode at the path means the tracked file is gone, even though a regular          file is readable there"
+    );
+}
+
+#[tokio::test]
+async fn path_is_absent_reports_a_non_regular_entry_as_gone() {
+    // Regression test for a bug found in review: `metadata` succeeds for a directory, so replacing
+    // a tracked archive path with one left the watcher's `path_outside_glob` exemption set. It could
+    // then neither be polled by identity nor reaped by the normal missing-path grace, surviving
+    // until the effectively unbounded `rotate_wait`.
+    use crate::file_watcher::path_is_absent;
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log");
+    fs::write(&path, b"data\n").unwrap();
+    assert!(!path_is_absent(&path).await, "a regular file is not absent");
+
+    fs::remove_file(&path).unwrap();
+    fs::create_dir(&path).unwrap();
+    assert!(
+        path_is_absent(&path).await,
+        "a directory standing in for the tracked file must count as absent"
+    );
+}
+
+#[tokio::test]
+async fn mark_found_preserves_outside_glob_but_set_file_findable_clears_it() {
+    let mut watcher = watcher_for_timing();
+    watcher.set_file_findable(false);
+    watcher.mark_path_outside_glob();
+
+    watcher.mark_found();
+    assert!(
+        watcher.path_is_outside_glob(),
+        "notify discovery must not assert glob membership"
+    );
+    assert!(watcher.file_findable());
+    assert_eq!(watcher.unfindable_for(), std::time::Duration::ZERO);
+
+    watcher.set_file_findable(true);
+    assert!(
+        !watcher.path_is_outside_glob(),
+        "the glob pass must clear the outside-glob exemption"
     );
 }
 
@@ -527,6 +966,49 @@ fn mark_ready_to_read_overrides_eof_backoff() {
         watcher.should_read(),
         "mark_ready_to_read must override EOF backoff immediately"
     );
+}
+
+#[tokio::test]
+async fn mark_ready_to_read_does_not_depend_on_a_backdated_timestamp() {
+    // Regression test for a bug found in review: this used to clear the throttle by back-dating
+    // `last_read_attempt` by 11 seconds. `tokio`'s `Instant - Duration` panics on underflow, so the
+    // panic fix fell back to *now* when the monotonic clock was younger than that -- which happens
+    // when Vector starts during boot. `should_read` then rejected the very read the event forced,
+    // delaying it by another throttle window. The readiness is now an explicit flag, so it holds
+    // regardless of what the clock reads.
+    let mut watcher = watcher_for_timing();
+
+    // A quiet file whose last attempt is *now*: the one combination the throttle rejects, and the
+    // state a back-date-to-now fallback would leave behind.
+    if let WatcherState::Active {
+        last_read_success,
+        last_read_attempt,
+        ..
+    } = &mut watcher.state
+    {
+        *last_read_success = Instant::now() - std::time::Duration::from_secs(20);
+        *last_read_attempt = Instant::now();
+    } else {
+        unreachable!("watcher_for_timing() always returns an Active watcher");
+    }
+    assert!(!watcher.should_read(), "sanity check: throttled");
+
+    watcher.mark_ready_to_read();
+    assert!(
+        watcher.should_read(),
+        "the forced read must not depend on being able to back-date a timestamp"
+    );
+
+    // And the timestamp itself is left alone -- nothing is faked into the past.
+    if let WatcherState::Active {
+        last_read_attempt, ..
+    } = &watcher.state
+    {
+        assert!(
+            last_read_attempt.elapsed() < std::time::Duration::from_secs(1),
+            "mark_ready_to_read must not rewrite history to get past the throttle"
+        );
+    }
 }
 
 #[test]
@@ -786,6 +1268,7 @@ async fn new_old_uncompressed_file_without_checkpoint_starts_idle() {
         watcher.is_idle(),
         "an old, non-gzip file with no checkpoint should still start idle"
     );
+    assert!(!watcher.holds_file_handle());
     assert_eq!(watcher.get_file_position(), contents.len() as u64);
 
     // Regression coverage for a bug found in review: this watcher has never opened the file (it
@@ -858,6 +1341,10 @@ async fn new_old_gzip_file_without_checkpoint_starts_active() {
     assert!(
         watcher.is_active(),
         "gzip files must always go through the full open path, even when old"
+    );
+    assert!(
+        !watcher.holds_file_handle(),
+        "skipped gzip backlog uses a null reader"
     );
 }
 

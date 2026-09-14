@@ -3,42 +3,25 @@
 //!
 //! # Design
 //!
-//! [`FileServer`] traditionally re-globs its `include` patterns on a fixed interval
-//! (`glob_minimum_cooldown_ms`, historically defaulting to tens of milliseconds) in order to:
-//!   1. discover new files,
-//!   2. detect renames (a known fingerprint appearing at a new path),
-//!   3. wake up reads for files that have new data.
+//! Re-globbing `include` on a fixed interval is expensive with many matched files (see
+//! <https://github.com/vectordotdev/vector/issues/3567>): every rescan fingerprints every file, and
+//! each keeps an open handle for its whole lifetime, even when `ignore_older` excludes it from
+//! reading.
 //!
-//! On systems with a large number of matched files (see
-//! <https://github.com/vectordotdev/vector/issues/3567>), this is expensive: every rescan
-//! opens/fingerprints every matched file, and every matched file keeps an open handle for its
-//! entire lifetime on disk, even files excluded from reading by `ignore_older`.
-//!
-//! This module instead watches the *parent directories* of the configured `include` globs using
-//! the cross-platform [`notify`] crate (inotify on Linux, FSEvents on macOS,
-//! `ReadDirectoryChangesW` on Windows) and turns OS-level create/modify/rename/remove
-//! notifications into a stream of [`NotifyMessage`]s that [`FileServer::run`] selects on,
-//! alongside a much-less-frequent periodic reconciliation pass (a full glob+fingerprint pass,
-//! functionally identical to the old fixed-interval rescan) that exists purely as a correctness
-//! backstop: OS-level notification queues can silently overflow under heavy event bursts, and
-//! there is an inherent TOCTOU gap between an initial directory scan and when the watch on that
-//! directory is actually established.
+//! This module watches the *parent directories* instead, via [`notify`] (inotify, FSEvents,
+//! `ReadDirectoryChangesW`), turning OS events into [`NotifyMessage`]s. A much rarer reconciliation
+//! pass remains as a correctness backstop: notification queues can overflow silently, and there is a
+//! TOCTOU gap between scanning a directory and establishing its watch.
 //!
 //! # Directory selection
 //!
-//! `notify` watches directories (optionally recursively), not glob patterns. For each `include`
-//! pattern we compute the longest literal (non-glob) path prefix and watch that directory. If any
-//! glob metacharacter appears after that prefix in a path component *below* another path
-//! component (i.e. the pattern can match files nested arbitrarily deep, such as with `**`), we
-//! watch recursively; otherwise (e.g. a single trailing `*.log` segment) we watch
-//! non-recursively. This mirrors, approximately, how far the glob can "reach" beneath the
-//! literal prefix.
+//! `notify` watches directories, not patterns, so each `include` contributes its longest literal
+//! prefix. Recursive only when the pattern can reach arbitrarily deep (`**`), which approximates how
+//! far the glob reaches below that prefix.
 //!
-//! If that literal prefix doesn't exist on disk yet (e.g. `/var/log/newapp/*.log` before
-//! `newapp` has been created), it can't be `watch()`-ed directly; [`NotifyDiscovery`] instead
-//! watches the nearest existing ancestor recursively as a stand-in, so the prefix directory's
-//! eventual creation is still observed promptly. Once it exists, the next `resync_watches` call
-//! upgrades to watching it directly and drops the broader ancestor watch.
+//! A prefix that does not exist yet is stood in for by its nearest existing ancestor, so its creation
+//! is still seen without recursively watching a large tree; the next `resync_watches` upgrades to the
+//! real directory.
 //!
 //! # Bridging into async/tokio
 //!
@@ -108,11 +91,10 @@ pub struct NotifyDiscovery {
     watcher: Option<RecommendedWatcher>,
     watched_dirs: WantedDirs,
     /// For a wanted directory that doesn't exist yet (so it can't be `watch()`-ed directly),
-    /// tracks the nearest existing ancestor we're watching recursively instead, keyed by the
+    /// tracks the nearest existing ancestor we're watching non-recursively instead, keyed by the
     /// *wanted* directory. `resync_watches` uses this to notice once the wanted directory has
-    /// been created and upgrade to watching it directly (dropping the broader, more expensive
-    /// ancestor watch) rather than watching the ancestor forever. See `resync_watches` for
-    /// details.
+    /// been created and upgrade to watching it directly (dropping the temporary ancestor watch)
+    /// rather than watching the ancestor forever. See `resync_watches` for details.
     fallback_watches: HashMap<PathBuf, PathBuf>,
     /// Parent directories watched non-recursively to observe replacement of symlink components in
     /// the logical path. These registrations are supplemental: they are retained even though
@@ -143,6 +125,15 @@ pub struct NotifyDiscovery {
     /// Reverse index for `watched_dir_aliases`, so paths reported by notify can be matched to a
     /// watched logical directory without scanning every alias.
     watched_dir_aliases_by_canonical: HashMap<PathBuf, HashSet<PathBuf>>,
+    /// Set when a `resync_watches` call consumed a sticky recovery flag, meaning registrations were
+    /// rebuilt and arbitrary events may have been lost. Read (and cleared) by the caller via
+    /// `take_full_scan_required`, which must then run a full glob pass instead of a targeted one.
+    full_scan_required: bool,
+    /// Set when an already-watched directory needs a different recursive mode than it has.
+    ///
+    /// Handled by rebuilding the watcher rather than re-`watch()`-ing in place, which leaks a
+    /// directory handle on the Windows backend (see `watch_fallback_ancestor`).
+    mode_change_pending: bool,
 }
 
 impl Drop for NotifyDiscovery {
@@ -189,20 +180,13 @@ const WATCHER_INVARIANT: &str = "NotifyDiscovery::watcher must be Some outside f
 /// send) if the backend is already unhealthy -- which is exactly the situation this is usually
 /// called from (recovering after a `BackendError`, or a dead notify channel).
 ///
-/// A plain `move || drop(value)` closure would defeat this on the failure path: if
-/// `Builder::spawn` can't create the OS thread, it drops the closure (and therefore `value`)
-/// itself before returning `Err`, which runs the drop on the calling thread right here -- exactly
-/// what this function exists to avoid. Instead, `value` goes into a `Mutex` shared via `Arc` with
-/// the spawned closure: on the failure path, taking it back out of *this* handle and
-/// `mem::forget`-ing it guarantees the calling thread never runs `value`'s `Drop`, regardless of
-/// whether `spawn` already dropped the closure's own `Arc` clone (a no-op refcount decrement,
-/// since this handle still holds `value`) or never got that far.
+/// A plain `move || drop(value)` closure defeats this: a failed `Builder::spawn` drops the closure --
+/// and `value` with it -- on the calling thread. So `value` goes into an `Arc<Mutex<_>>`, and the
+/// failure path takes it back out and `mem::forget`s it.
 ///
-/// Returns `false` if the value could not be handed to a dedicated teardown thread. When the
-/// dedicated-thread limit is reached, it is handed to a bounded background reaper queue when
-/// possible; if that queue is full, the value is leaked rather than dropped on the caller. In
-/// either case callers should treat the result as notify recovery being unavailable for this
-/// generation.
+/// `false` means no dedicated teardown thread was available; past the thread limit the value goes to
+/// a bounded reaper queue, and if that is full it is leaked rather than dropped on the caller.
+/// Either way, notify recovery is unavailable for this generation.
 #[must_use]
 fn spawn_teardown<T: Send + 'static>(value: T) -> bool {
     let acquired = IN_FLIGHT_TEARDOWNS
@@ -386,6 +370,8 @@ impl NotifyDiscovery {
             overflow_pending,
             watched_dir_aliases: HashMap::new(),
             watched_dir_aliases_by_canonical: HashMap::new(),
+            full_scan_required: false,
+            mode_change_pending: false,
         };
         // Can't fail here: `backend_error_pending` is freshly `false`, so this can't hit the
         // rebuild-failure path.
@@ -405,11 +391,11 @@ impl NotifyDiscovery {
     ///
     /// If a wanted directory doesn't exist yet (e.g. an `include` pattern like
     /// `/var/log/newapp/*.log` where `newapp` hasn't been created yet), `watch()`-ing it directly
-    /// fails; this falls back to recursively watching the nearest existing ancestor instead, so
-    /// that creating the wanted directory (and anything under it) is still noticed promptly
-    /// rather than only on the next `reconcile_interval` backstop. Once the wanted directory
-    /// exists, a later call upgrades to watching it directly and drops the broader ancestor watch
-    /// (unless some other wanted directory still needs that same ancestor as its own fallback).
+    /// fails; this falls back to non-recursively watching the nearest existing ancestor instead,
+    /// so that creating the first missing path component is noticed promptly without watching an
+    /// unexpectedly large tree. Once the wanted directory exists, a later call upgrades to
+    /// watching it directly and drops the temporary ancestor watch (unless some other wanted
+    /// directory still needs that same ancestor as its own fallback).
     ///
     /// Returns `false` if a pending backend error forced a watcher rebuild that failed; callers
     /// should then stop using notify-based discovery entirely and fall back to polling.
@@ -428,8 +414,15 @@ impl NotifyDiscovery {
         if overflow_pending {
             emitter.emit_file_watch_events_overflowed();
         }
-        if (backend_error_pending || overflow_pending) && !self.forget_watches() {
-            return false;
+        if backend_error_pending || overflow_pending {
+            // These flags are the durable signal that events were lost -- they are set precisely
+            // when the bounded channel could not even carry the `Overflow` substitute, so the
+            // pending wakeup may name only a few paths while a creation event went missing. Record
+            // that a full glob pass is owed; a targeted pass would skip it (see `discover`).
+            self.full_scan_required = true;
+            if !self.forget_watches() {
+                return false;
+            }
         }
 
         // Absolutize first: `notify` always resolves the path it's asked to `watch()` to an
@@ -446,6 +439,25 @@ impl NotifyDiscovery {
         self.fallback_watches
             .retain(|path, _ancestor| wanted.contains_key(path));
 
+        // Which ancestors will stand in for a missing directory, and under which mode, resolved
+        // *before* any watch is installed. Deriving this from `fallback_watches` instead would read
+        // an empty map right after a rebuild cleared it, so the direct loop would install the
+        // narrower mode and the fallback would immediately ask for another rebuild -- measured at 4
+        // rebuilds across 6 reconciliations, each of which drops events and owes a full glob pass.
+        let mut fallback_modes: HashMap<PathBuf, WatchMode> = HashMap::new();
+        for path in wanted.keys() {
+            if fs::metadata(path).await.is_ok() {
+                continue;
+            }
+            if let Some(ancestor) = find_existing_ancestor(path).await {
+                let mode = fallback_watch_mode(path, &ancestor);
+                fallback_modes
+                    .entry(ancestor)
+                    .and_modify(|existing| *existing = existing.merge(mode))
+                    .or_insert(mode);
+            }
+        }
+
         // Watching a symlinked directory follows its current target. Replacing the symlink emits
         // the relevant event in the symlink's parent instead of the old target, so keep a
         // supplemental non-recursive watch on that parent. The helper also finds symlinks in a
@@ -453,22 +465,27 @@ impl NotifyDiscovery {
         // still follow the symlink and miss its replacement.
         let mut symlink_parent_watches = HashSet::new();
         for path in wanted.keys() {
-            if let Some(parent) = find_symlink_parent(path).await {
-                symlink_parent_watches.insert(parent);
-            }
+            symlink_parent_watches.extend(find_symlink_parents(path).await);
         }
         self.symlink_parent_watches = symlink_parent_watches;
 
-        // A watch opened through a symlink follows the target inode. If the symlink is retargeted,
-        // the logical path and watch mode are unchanged, so the ordinary wanted-vs-watched diff
-        // below would incorrectly keep the old target registered forever. Rebuild when a cached
-        // canonical target changes so the new watcher follows the new directory.
+        // A watch opened through a symlink follows the target inode, so retargeting the symlink
+        // leaves the old target registered while the logical path and watch mode look unchanged. The
+        // canonical path does change, so comparing it catches this; rebuild on a change.
+        //
+        // Directory *identity* cannot serve the same purpose for a deleted-and-recreated directory:
+        // on Linux the freed inode is routinely reused, and `dev`, `ino` and `created` can all be
+        // byte-identical (verified on overlayfs, birth time included).
         let watched_paths: Vec<PathBuf> = self.watched_dirs.keys().cloned().collect();
         for watched in watched_paths {
             let Some(previous_canonical) = self.watched_dir_aliases.get(&watched) else {
                 continue;
             };
             if *previous_canonical != canonicalize_watch_path(&watched).await {
+                // Files created under the new target while the watch still followed the old one
+                // were reported by nothing, so the caller owes a full glob pass. Set this before
+                // the recursive call, which returns straight to the caller.
+                self.full_scan_required = true;
                 if !self.forget_watches() {
                     return false;
                 }
@@ -476,40 +493,49 @@ impl NotifyDiscovery {
             }
         }
 
-        // Directories we're not already watching under the mode we now want. This also catches
-        // a directory that's currently watched `NonRecursive` but now needs `Recursive` (a
-        // second, overlapping `include` pattern started requiring it): re-`watch`-ing with a
-        // different mode replaces the previous registration in `notify`, it doesn't stack, so
-        // there's no need to `unwatch` first.
+        // No *periodic* rebuild of the registrations, deliberately. It would catch a silently
+        // dropped Windows registration, but each way of doing it costs more than that gap:
+        //
+        // - Re-`watch()`-ing in place leaks a handle per call: `notify` 8.2.0's Windows backend
+        //   overwrites the `WatchState` without `stop_watch` (windows.rs:238).
+        // - `forget_watches` drops events for every watched directory during teardown, so it owes an
+        //   immediate full glob pass -- fingerprinting everything on the rebuild interval, which is
+        //   what notify mode exists to avoid.
+        // - `unwatch()` can block the `FileServer` task: several backends wait on their worker
+        //   thread synchronously.
+        //
+        // The explicit signals remain, each forcing a rebuild and a full pass: `PathsRemoved` via
+        // `forget_watch`, a backend error or overflow via the sticky flags above, a retargeted
+        // symlink via the canonical comparison. `reconcile_interval` backstops the rest.
+
+        // Directories we're not already watching under the mode we now want. A *mode change* on an
+        // already-watched directory is deferred to a rebuild rather than re-`watch()`-ed in place:
+        // `notify` 8.2.0's Windows backend inserts the new `WatchState` over the old one without
+        // calling `stop_watch` (windows.rs:238), so the old directory handle and its pending read leak.
         for (path, mode) in &wanted {
-            // If some other not-yet-existing wanted directory already depends on `path` as its
-            // fallback ancestor (necessarily `Recursive`: see `watch_fallback_ancestor`), that
-            // requirement must be merged in here too. Without this, a directory that is *both* a
-            // directly-wanted `NonRecursive` directory *and* someone else's fallback ancestor
-            // could have its watch silently downgraded to `NonRecursive` below -- depending on
-            // this `HashMap`'s unspecified iteration order, `path` may be processed only after
-            // `watch_fallback_ancestor` already installed the `Recursive` watch it needs, and
-            // `self.watched_dirs.get(path) == Some(mode)` (comparing directly against the plain
-            // `NonRecursive` `wanted` for this path) would then be `false`, causing a re-`watch`
-            // that replaces the existing `Recursive` registration with a weaker `NonRecursive`
-            // one. That leaves creation of files nested under `path` unnoticed until the next
-            // `reconcile_interval` backstop, defeating the very purpose of the fallback watch.
-            let mode = if self
-                .fallback_watches
-                .values()
-                .any(|fallback_ancestor| fallback_ancestor == path)
-            {
-                mode.merge(WatchMode::Recursive)
-            } else {
-                *mode
-            };
+            // Fallback ancestors are deliberately watched non-recursively, so they do not widen
+            // a direct watch into a potentially very large subtree.
             let mode = if self.symlink_parent_watches.contains(path) {
                 mode.merge(WatchMode::NonRecursive)
             } else {
-                mode
+                *mode
             };
-            if self.watched_dirs.get(path) == Some(&mode) {
-                continue;
+            // A directly watched directory can also be a fallback ancestor; without merging, this
+            // loop downgrades the mode that fallback needs.
+            let mode = mode.merge(
+                fallback_modes
+                    .get(path)
+                    .copied()
+                    .unwrap_or(WatchMode::NonRecursive),
+            );
+            match self.watched_dirs.get(path) {
+                Some(existing) if *existing == mode => continue,
+                // Already watched, but under a different mode: defer to the rebuild below.
+                Some(_) => {
+                    self.mode_change_pending = true;
+                    continue;
+                }
+                None => {}
             }
             match self.watcher_mut().watch(path, mode.mode()) {
                 Ok(()) => {
@@ -556,21 +582,28 @@ impl NotifyDiscovery {
         let symlink_parent_watches: Vec<PathBuf> =
             self.symlink_parent_watches.iter().cloned().collect();
         for parent in &symlink_parent_watches {
+            // The fallback requirement is merged in, not just `wanted`: a parent that is also standing
+            // in for a deeper missing include was installed `Recursive` by the loops above, and taking
+            // only `wanted` here would overwrite that with `NonRecursive` -- leaving the missing levels
+            // unobserved until the backstop.
             let mode = wanted
                 .get(parent)
                 .copied()
-                .unwrap_or(WatchMode::NonRecursive);
-            let mode = if self
-                .fallback_watches
-                .values()
-                .any(|fallback_ancestor| fallback_ancestor == parent)
-            {
-                mode.merge(WatchMode::Recursive)
-            } else {
-                mode
-            };
-            if self.watched_dirs.get(parent) == Some(&mode) {
-                continue;
+                .unwrap_or(WatchMode::NonRecursive)
+                .merge(
+                    fallback_modes
+                        .get(parent)
+                        .copied()
+                        .unwrap_or(WatchMode::NonRecursive),
+                );
+            match self.watched_dirs.get(parent) {
+                Some(existing) if *existing == mode => continue,
+                // Changing the mode in place leaks a handle on Windows; defer to the rebuild.
+                Some(_) => {
+                    self.mode_change_pending = true;
+                    continue;
+                }
+                None => {}
             }
             match self.watcher_mut().watch(parent, mode.mode()) {
                 Ok(()) => {
@@ -602,6 +635,10 @@ impl NotifyDiscovery {
                 && !self.symlink_parent_watches.contains(path)
         });
         if has_stale_watches {
+            // Rebuilding drops every registration and re-adds them, so anything created in between
+            // is reported by nothing. The caller owes a full glob pass, exactly as for a retargeted
+            // symlink above -- set before the recursive call, which returns straight to the caller.
+            self.full_scan_required = true;
             if !self.forget_watches() {
                 return false;
             }
@@ -623,7 +660,20 @@ impl NotifyDiscovery {
             self.watched_dir_aliases
                 .insert(watched.clone(), canonicalize_watch_path(&watched).await);
         }
+
         self.rebuild_watched_dir_alias_index();
+
+        // Some watched directory needs a different mode than it has (set by any of the three loops
+        // above). Rebuild rather than re-`watch()` it in place, which leaks its directory handle on
+        // Windows; the rebuild loses events for its teardown window, so it also owes a full glob pass,
+        // exactly like the stale-watch path above.
+        if std::mem::take(&mut self.mode_change_pending) {
+            self.full_scan_required = true;
+            if !self.forget_watches() {
+                return false;
+            }
+            return Box::pin(self.resync_watches(&include_patterns, emitter)).await;
+        }
 
         emitter.emit_file_watch_directories(self.watched_dirs.len());
         true
@@ -639,35 +689,36 @@ impl NotifyDiscovery {
         }
     }
 
-    /// Watch `ancestor` (recursively, so creation of `wanted` underneath it is observed) as a
-    /// stand-in for the not-yet-existing `wanted` directory, recording the substitution in
-    /// `fallback_watches` so a later `resync_watches` call can detect once `wanted` exists and
-    /// upgrade to watching it directly.
+    /// Watch `ancestor` as a stand-in for the not-yet-existing `wanted` directory. A creation event
+    /// under it triggers a resync, which then watches `wanted` directly. See [`fallback_watch_mode`]
+    /// for why the mode depends on how many levels are missing.
     async fn watch_fallback_ancestor<E: FileSourceInternalEvents>(
         &mut self,
         wanted: &Path,
         ancestor: PathBuf,
         emitter: &E,
     ) {
-        if self.watched_dirs.get(&ancestor) == Some(&WatchMode::Recursive) {
-            // Some other wanted directory already caused us to watch this same ancestor
-            // recursively; nothing more to do beyond recording that this wanted directory now
-            // also depends on it.
+        let watch_mode = fallback_watch_mode(wanted, &ancestor);
+        let mode = watch_mode.mode();
+        if let Some(existing) = self.watched_dirs.get(&ancestor) {
+            // Some other wanted directory already caused us to watch this ancestor. Record the
+            // dependency and flag the widening for the rebuild at the end of `resync_watches`, rather
+            // than re-`watch()`-ing in place, which leaks a handle on Windows (windows.rs:238).
+            if watch_mode == WatchMode::Recursive && *existing == WatchMode::NonRecursive {
+                self.mode_change_pending = true;
+            }
             self.fallback_watches.insert(wanted.to_path_buf(), ancestor);
             return;
         }
-        match self
-            .watcher_mut()
-            .watch(&ancestor, RecursiveMode::Recursive)
-        {
+        match self.watcher_mut().watch(&ancestor, mode) {
             Ok(()) => {
                 debug!(
                     message = "Configured directory does not exist yet; watching nearest existing ancestor instead.",
                     wanted = ?wanted,
                     ancestor = ?ancestor,
+                    mode = ?watch_mode,
                 );
-                self.watched_dirs
-                    .insert(ancestor.clone(), WatchMode::Recursive);
+                self.watched_dirs.insert(ancestor.clone(), watch_mode);
                 self.fallback_watches.insert(wanted.to_path_buf(), ancestor);
             }
             Err(error) => {
@@ -687,26 +738,17 @@ impl NotifyDiscovery {
     /// isn't reliable cleanup on every backend, and can block if the backend is already
     /// unhealthy). Call this after a [`NotifyMessage::BackendError`] or [`NotifyMessage::Overflow`].
     ///
-    /// The old watcher is moved onto a detached thread and dropped there, without awaiting that
-    /// thread, since `notify`'s own `Drop` impls can themselves block or panic if the backend is
-    /// already wedged. This is a bounded compromise, not a complete fix: `notify` gives no way to
-    /// know when the old backend's thread actually exits, so one teardown can still retain its
-    /// fd/thread for an unbounded time, and the new watcher is built without waiting for that
-    /// teardown, so the two can briefly coexist under fd pressure. The number of detached teardown
-    /// threads is bounded; once the limit is reached the old watcher is retained by a background
-    /// reaper and this method returns `false`, so the caller falls back to polling. If the bounded
-    /// reaper queue is also full, the old watcher is leaked as the last-resort way to avoid
-    /// blocking or panicking in the FileServer task.
+    /// The old watcher is dropped on a detached thread without awaiting it, since `notify`'s `Drop`
+    /// can block or panic on a wedged backend. A bounded compromise, not a fix: the two can briefly
+    /// coexist under fd pressure, and there is no way to know when the old backend's thread exits.
+    /// Detached teardowns are capped; past the cap a background reaper holds the old watcher and
+    /// this returns `false`, and if that queue is also full the watcher is leaked rather than risk
+    /// blocking the `FileServer` task.
     ///
-    /// Each generation gets its own `backend_error_pending` flag (from `build_watcher`), not one
-    /// shared across generations: the old watcher's callback can still fire after the new one is
-    /// installed, and sharing the flag would let it wrongly mark the new, healthy watcher for
-    /// another (possibly endless) teardown.
+    /// Each generation gets its own `backend_error_pending` flag: the old callback can still fire
+    /// after the new watcher is installed, and a shared flag would condemn the healthy one.
     ///
-    /// Returns `false` if the new watcher could not be created, or if the old one could not be
-    /// handed off for asynchronous teardown. Callers should then stop using notify-based
-    /// discovery and fall back to polling, the same as any other unrecoverable resource
-    /// exhaustion here.
+    /// `false` means notify discovery must be abandoned for polling.
     #[must_use]
     pub fn forget_watches(&mut self) -> bool {
         let old_watcher_handed_off = match self.watcher.take() {
@@ -778,6 +820,20 @@ impl NotifyDiscovery {
         }
     }
 
+    /// Whether a full glob/fingerprint pass is owed, without consuming the demand. Used by the main
+    /// loop to schedule that pass immediately; `take_full_scan_required` then consumes it inside
+    /// `discover`.
+    pub fn full_scan_required(&self) -> bool {
+        self.full_scan_required
+    }
+
+    /// Whether a full glob/fingerprint pass is owed because registrations were rebuilt after a
+    /// lost-event signal, clearing the flag. A targeted notify pass only fingerprints the paths an
+    /// event named, so it cannot discover a file whose creation event was among the lost ones.
+    pub fn take_full_scan_required(&mut self) -> bool {
+        std::mem::take(&mut self.full_scan_required)
+    }
+
     /// Whether `path` is currently believed to be a watched directory (as opposed to, say, a file
     /// inside one). Used to decide whether a [`NotifyMessage::PathsRemoved`] path warrants
     /// `forget_watch`.
@@ -843,11 +899,18 @@ async fn find_existing_ancestor(path: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Return the parent directory of the first symlink component in `path`, if any. Checking the
-/// components individually matters for a path whose final directory does not exist yet: its
-/// canonical form can preserve the unresolved suffix, but the parent of that suffix would still
-/// be reached through the symlink and would not observe replacement of the symlink itself.
-async fn find_symlink_parent(path: &Path) -> Option<PathBuf> {
+/// Return the parent directory of every symlink component in `path`. Checking the components
+/// individually matters for a path whose final directory does not exist yet: its canonical form can
+/// preserve the unresolved suffix, but the parent of that suffix would still be reached through the
+/// symlink and would not observe replacement of the symlink itself.
+///
+/// Every one, not just the first: in `/a/link1/link2/*.log` each link can be retargeted
+/// independently, and a watch on `/a` alone sees nothing when `link2` is replaced. The walk keeps
+/// the logical spelling rather than canonicalizing as it goes, since `symlink_metadata` resolves
+/// every component but the last -- so a nested link is still reported as a link -- and the watch
+/// belongs on the path the configuration named.
+async fn find_symlink_parents(path: &Path) -> Vec<PathBuf> {
+    let mut parents = Vec::new();
     let mut prefix = PathBuf::new();
     for component in path.components() {
         prefix.push(component.as_os_str());
@@ -856,7 +919,7 @@ async fn find_symlink_parent(path: &Path) -> Option<PathBuf> {
             Err(_) => break,
         };
         if metadata.file_type().is_symlink() {
-            return Some(
+            parents.push(
                 prefix
                     .parent()
                     .filter(|parent| !parent.as_os_str().is_empty())
@@ -865,7 +928,7 @@ async fn find_symlink_parent(path: &Path) -> Option<PathBuf> {
             );
         }
     }
-    None
+    parents
 }
 
 /// Canonicalize a watched directory when it exists, while preserving the unresolved suffix for a
@@ -961,8 +1024,12 @@ fn compute_watch_directories(include_patterns: &[PathBuf]) -> WantedDirs {
         // If the whole pattern was literal (no glob at all), watch its parent directory
         // non-recursively so we notice the file itself being created/modified/removed.
         if !seen_glob {
+            // A bare relative filename (`foo.log`) has `parent() == Some("")`, not `None`, so
+            // filtering on emptiness is required as well: asking notify to watch "" registers
+            // nothing, leaving the pattern with no directory watch at all.
             let dir = literal_prefix
                 .parent()
+                .filter(|parent| !parent.as_os_str().is_empty())
                 .map(Path::to_path_buf)
                 .unwrap_or_else(|| PathBuf::from("."));
             insert_merging_mode(&mut result, dir, WatchMode::NonRecursive);
@@ -999,8 +1066,25 @@ fn insert_merging_mode(result: &mut WantedDirs, dir: PathBuf, mode: WatchMode) {
         .or_insert(mode);
 }
 
-fn contains_glob_metachar(component: &str) -> bool {
+pub(crate) fn contains_glob_metachar(component: &str) -> bool {
     component.contains(['*', '?', '[', '{'])
+}
+
+/// The mode a fallback watch on `ancestor` needs in order to see `wanted` appear.
+///
+/// Recursive beyond one missing level: a non-recursive watch reports only immediate children, so
+/// `mkdir -p <ancestor>/a/b` reports `a` alone and a file written into `b` waits for the backstop. At
+/// exactly one level the immediate child *is* `wanted`, where recursing would mean watching all of,
+/// say, `/var/log`.
+fn fallback_watch_mode(wanted: &Path, ancestor: &Path) -> WatchMode {
+    let missing_levels = wanted
+        .strip_prefix(ancestor)
+        .map_or(1, |remainder| remainder.components().count());
+    if missing_levels > 1 {
+        WatchMode::Recursive
+    } else {
+        WatchMode::NonRecursive
+    }
 }
 
 /// Collapse the wide variety of notify [`EventKind`]s we care about into the coarse
@@ -1178,6 +1262,23 @@ mod tests {
         assert_eq!(dirs.len(), 1);
         let (path, mode) = dirs.into_iter().next().unwrap();
         assert_eq!(path, PathBuf::from("/var/log"));
+        assert!(matches!(mode, WatchMode::NonRecursive));
+    }
+
+    #[test]
+    fn bare_relative_literal_watches_the_current_directory() {
+        // Regression test for a bug found in review: `Path::new("foo.log").parent()` is
+        // `Some("")`, not `None`, so the `unwrap_or_else(|| ".")` fallback never fired and notify
+        // was asked to watch an empty path -- registering nothing, and leaving the pattern with no
+        // directory watch, so new or idle files waited for the reconciliation backstop.
+        let dirs = compute_watch_directories(&[PathBuf::from("foo.log")]);
+        assert_eq!(dirs.len(), 1);
+        let (path, mode) = dirs.into_iter().next().unwrap();
+        assert_eq!(
+            path,
+            PathBuf::from("."),
+            "a bare relative filename must watch the current directory, not an empty path"
+        );
         assert!(matches!(mode, WatchMode::NonRecursive));
     }
 
@@ -1490,6 +1591,259 @@ mod tests {
         assert!(discovery.is_watched_dir(root.path()));
     }
 
+    /// Regression test for a bug found in review: when an include names two or more missing
+    /// directories (`<root>/a/b/*.log`), the fallback watch sat non-recursively on the nearest
+    /// existing ancestor. Creating `a` was observed, but creating `b` *inside* it was not -- so files
+    /// there stayed undiscovered until the reconciliation backstop, and a short-lived file could be
+    /// missed entirely.
+    #[tokio::test]
+    async fn a_fallback_watch_observes_a_nested_directory_appearing() {
+        let root = tempfile::tempdir().unwrap();
+        // Two missing levels: the fallback lands on `root`, two levels above the wanted directory.
+        let wanted = root.path().join("first").join("second");
+        let pattern = wanted.join("*.log");
+        let mut discovery = NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter)
+            .await
+            .unwrap();
+        assert!(
+            discovery.is_watched_dir(root.path()),
+            "test setup requires the fallback to land on the existing root"
+        );
+
+        // Create *both* levels at once, the way `mkdir -p` in a deployment would. The fallback sits
+        // on `root` non-recursively, so it reports `first` -- but the file landing in `second` is the
+        // event that matters, and nothing watches `first` yet to report it.
+        std::fs::create_dir_all(&wanted).unwrap();
+        std::fs::write(wanted.join("app.log"), b"line\n").unwrap();
+
+        // The nested creation must be observable: either the watch is recursive, or the event for
+        // `first` arrives so a resync can extend the watch downwards. Drain what the backend has.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut saw_first = false;
+        while std::time::Instant::now() < deadline && !saw_first {
+            while let Ok(message) = discovery.receiver.try_recv() {
+                let paths = match &message {
+                    NotifyMessage::PathsChanged(paths)
+                    | NotifyMessage::PathsCreated(paths)
+                    | NotifyMessage::PathsRemoved(paths) => paths.clone(),
+                    // A coarse wakeup also means "go look", which is enough for this test.
+                    NotifyMessage::Overflow | NotifyMessage::BackendError(_) => {
+                        saw_first = true;
+                        break;
+                    }
+                };
+                // The log file itself, or the directory holding it -- either tells the caller to
+                // look inside `second`. Seeing only `first` does not.
+                if paths
+                    .iter()
+                    .any(|path| path.ends_with("app.log") || path.ends_with("second"))
+                {
+                    saw_first = true;
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert!(
+            saw_first,
+            "creating the intermediate directory must be observed, or the wanted directory is \
+             never watched before the reconciliation backstop"
+        );
+
+        // The deeper level already exists (the setup created both), so a resync must now watch it
+        // directly rather than leaving the fallback in place.
+        assert!(discovery.resync_watches(&[pattern], &NoopEmitter).await);
+        assert!(
+            discovery.is_watched_dir(&wanted),
+            "once it exists, the wanted directory itself must be watched"
+        );
+    }
+
+    /// Widening a fallback ancestor must not re-`watch()` it in place: `notify` 8.2.0's Windows
+    /// backend overwrites the `WatchState` without `stop_watch`, leaking the directory handle -- the
+    /// very leak this branch exists to fix. The upgrade goes through a rebuild instead, which also
+    /// owes a full glob pass for its teardown window.
+    #[tokio::test]
+    async fn widening_a_fallback_ancestor_rebuilds_instead_of_rewatching() {
+        let root = tempfile::tempdir().unwrap();
+        // A directly watched root, plus a deeper missing include that needs it recursive.
+        let direct = root.path().join("*.log");
+        let nested = root.path().join("first").join("second").join("*.log");
+
+        let mut discovery = NotifyDiscovery::new(std::slice::from_ref(&direct), &NoopEmitter)
+            .await
+            .unwrap();
+        assert_eq!(
+            discovery.watched_dirs.get(root.path()),
+            Some(&WatchMode::NonRecursive),
+            "the direct include alone needs only a non-recursive watch"
+        );
+        discovery.take_full_scan_required();
+
+        // Adding the nested include upgrades the shared ancestor.
+        assert!(
+            discovery
+                .resync_watches(&[direct, nested], &NoopEmitter)
+                .await
+        );
+        assert_eq!(
+            discovery.watched_dirs.get(root.path()),
+            Some(&WatchMode::Recursive),
+            "the ancestor must end up recursive so the missing levels are observed"
+        );
+        assert!(
+            discovery.full_scan_required(),
+            "the rebuild drops events, so a full glob pass is owed -- and its presence is what \
+             shows the upgrade went through a rebuild rather than an in-place re-watch"
+        );
+        assert!(
+            !discovery.mode_change_pending,
+            "the pending flag must be consumed, or every later resync rebuilds again"
+        );
+    }
+
+    /// The same leak applies to a *directly* watched directory whose mode changes, which the main
+    /// reconciliation loop used to re-`watch()` in place.
+    #[tokio::test]
+    async fn changing_a_direct_watch_mode_rebuilds_instead_of_rewatching() {
+        let root = tempfile::tempdir().unwrap();
+        let nested = root.path().join("deep");
+        std::fs::create_dir(&nested).unwrap();
+
+        // `<root>/*.log` alone: non-recursive on `root`.
+        let shallow = root.path().join("*.log");
+        let mut discovery = NotifyDiscovery::new(std::slice::from_ref(&shallow), &NoopEmitter)
+            .await
+            .unwrap();
+        assert_eq!(
+            discovery.watched_dirs.get(root.path()),
+            Some(&WatchMode::NonRecursive)
+        );
+        discovery.take_full_scan_required();
+
+        // Adding `<root>/**/*.log` needs the same directory recursive.
+        let recursive = root.path().join("**").join("*.log");
+        assert!(
+            discovery
+                .resync_watches(&[shallow, recursive], &NoopEmitter)
+                .await
+        );
+        assert_eq!(
+            discovery.watched_dirs.get(root.path()),
+            Some(&WatchMode::Recursive),
+            "the mode must end up widened"
+        );
+        assert!(
+            discovery.full_scan_required(),
+            "the widening must go through a rebuild, which owes a full glob pass"
+        );
+    }
+
+    /// A directly watched directory that is also a fallback ancestor must keep the recursive mode the
+    /// fallback needs; the reconciliation loop used to downgrade it, depending on `HashMap` order.
+    #[tokio::test]
+    async fn a_shared_ancestor_settles_without_rebuilding_forever() {
+        // A direct include and a deeper missing one share `root`. The direct loop installs
+        // non-recursive, the fallback then wants recursive and asks for a rebuild -- which clears
+        // `fallback_watches`, so the next attempt repeats the same order. Left unguarded this never
+        // settles, hanging `NotifyDiscovery::new`.
+        let root = tempfile::tempdir().unwrap();
+        let patterns = [
+            root.path().join("*.log"),
+            root.path().join("first").join("second").join("*.log"),
+        ];
+
+        let mut discovery = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            NotifyDiscovery::new(&patterns, &NoopEmitter),
+        )
+        .await
+        .expect("construction must settle rather than rebuild forever")
+        .unwrap();
+
+        assert_eq!(
+            discovery.watched_dirs.get(root.path()),
+            Some(&WatchMode::Recursive),
+            "the shared ancestor must end up recursive for the missing levels"
+        );
+
+        // Repeated resyncs against a *populated* `watched_dirs`, where the "already watched under a
+        // different mode" branch is live and a disagreement would rebuild on every pass.
+        for pass in 0..5 {
+            assert!(
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(10),
+                    discovery.resync_watches(&patterns, &NoopEmitter),
+                )
+                .await
+                .unwrap_or_else(|_| panic!("resync {pass} never settled")),
+            );
+            assert_eq!(
+                discovery.watched_dirs.get(root.path()),
+                Some(&WatchMode::Recursive),
+                "pass {pass} downgraded the shared ancestor"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_resync_keeps_a_fallback_upgraded_ancestor_recursive() {
+        let root = tempfile::tempdir().unwrap();
+        // One include watches `root` directly; the other needs two missing levels under it.
+        let direct = root.path().join("*.log");
+        let nested = root.path().join("first").join("second").join("*.log");
+        let patterns = [direct, nested];
+
+        let mut discovery = NotifyDiscovery::new(&patterns, &NoopEmitter).await.unwrap();
+        assert_eq!(
+            discovery.watched_dirs.get(root.path()),
+            Some(&WatchMode::Recursive),
+            "the shared ancestor must be recursive to see the missing nested levels appear"
+        );
+
+        for _ in 0..3 {
+            assert!(discovery.resync_watches(&patterns, &NoopEmitter).await);
+            assert_eq!(
+                discovery.watched_dirs.get(root.path()),
+                Some(&WatchMode::Recursive),
+                "a resync must not downgrade an ancestor a fallback still needs recursive"
+            );
+        }
+    }
+
+    /// Rebuilding registrations because a watch went stale drops and re-adds every watch, so events
+    /// in between are reported by nothing. That owes the caller a full glob pass, like a retargeted
+    /// symlink does; without it a targeted pass could return having checked only its named paths.
+    #[tokio::test]
+    async fn a_stale_watch_rebuild_requires_a_full_scan() {
+        let root = tempfile::tempdir().unwrap();
+        let first = root.path().join("first");
+        let second = root.path().join("second");
+        std::fs::create_dir(&first).unwrap();
+        std::fs::create_dir(&second).unwrap();
+
+        let mut discovery = NotifyDiscovery::new(&[first.join("*.log")], &NoopEmitter)
+            .await
+            .unwrap();
+        assert!(discovery.is_watched_dir(&first));
+        // Consume the flag the initial build may have set, so the assertion below is about the rebuild.
+        discovery.take_full_scan_required();
+
+        // The include no longer covers `first`, so its watch is stale and triggers a rebuild.
+        assert!(
+            discovery
+                .resync_watches(&[second.join("*.log")], &NoopEmitter)
+                .await
+        );
+        assert!(
+            discovery.is_watched_dir(&second),
+            "the new directory must be watched after the rebuild"
+        );
+        assert!(
+            discovery.full_scan_required(),
+            "a rebuild loses events, so the caller must be told to run a full glob pass"
+        );
+    }
+
     #[tokio::test]
     async fn backend_error_pending_forces_forget_watches_even_without_the_channel_message() {
         // Regression test for a bug found in review: the notify channel is bounded
@@ -1662,6 +2016,103 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn lost_event_signal_leaves_a_full_scan_owed_for_the_caller() {
+        // Regression test for a bug found in review: re-registering a watch is not enough when
+        // events were actually lost -- files created in that window were reported by nothing, so
+        // only a glob pass finds them. The demand must be visible to the caller *without* being
+        // consumed, so the main loop can schedule that pass at once rather than leaving it to
+        // `reconcile_interval` (300s by default), long enough to miss a short-lived file.
+        //
+        // Note what does *not* demand it: the periodic re-registration on `WATCH_VERIFY_INTERVAL`
+        // (see `periodic_verification_reregisters_every_watched_directory`). Only a genuine
+        // lost-event signal does, which is what the sticky overflow flag represents here.
+        let root = tempfile::tempdir().unwrap();
+        let watched = root.path().join("logs");
+        std::fs::create_dir(&watched).unwrap();
+        let pattern = watched.join("*.log");
+        let mut discovery = NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter)
+            .await
+            .unwrap();
+        assert!(
+            !discovery.take_full_scan_required(),
+            "a clean startup owes no full scan"
+        );
+
+        discovery.overflow_pending.store(true, Ordering::Relaxed);
+        assert!(
+            discovery
+                .resync_watches(std::slice::from_ref(&pattern), &NoopEmitter)
+                .await
+        );
+
+        assert!(
+            discovery.full_scan_required(),
+            "a lost-event signal must leave a full scan owed"
+        );
+        assert!(
+            discovery.full_scan_required(),
+            "the non-consuming getter must not clear the demand -- `discover` consumes it"
+        );
+        assert!(
+            discovery.take_full_scan_required(),
+            "`discover` must still be able to consume the demand"
+        );
+        assert!(
+            !discovery.full_scan_required(),
+            "the demand is cleared once consumed"
+        );
+    }
+
+    #[tokio::test]
+    async fn sticky_recovery_flag_demands_a_full_scan() {
+        // Regression test for a bug found in review: the sticky overflow/backend-error flags are
+        // consumed inside `resync_watches` and nothing was reported to the caller. `discover` would
+        // then still take its targeted notify path, fingerprinting only the paths an event named --
+        // but those flags are raised exactly when the channel was too full to carry even the coarse
+        // `Overflow` substitute, so an unrelated file-creation event may have been among the lost
+        // ones. Only a full glob pass can discover a file that nothing named.
+        let dir = tempfile::tempdir().unwrap();
+        let pattern = dir.path().join("*.log");
+        let mut discovery = NotifyDiscovery::new(std::slice::from_ref(&pattern), &NoopEmitter)
+            .await
+            .unwrap();
+
+        // `new` performs a resync of its own; no recovery flag was pending during it.
+        assert!(
+            !discovery.take_full_scan_required(),
+            "an ordinary resync must not demand a full scan"
+        );
+
+        discovery.overflow_pending.store(true, Ordering::Relaxed);
+        assert!(
+            discovery
+                .resync_watches(std::slice::from_ref(&pattern), &NoopEmitter)
+                .await
+        );
+        assert!(
+            discovery.take_full_scan_required(),
+            "consuming a sticky recovery flag must demand a full glob pass"
+        );
+        assert!(
+            !discovery.take_full_scan_required(),
+            "the demand must be cleared once taken, so later passes stay targeted"
+        );
+
+        discovery
+            .backend_error_pending
+            .store(true, Ordering::Relaxed);
+        assert!(
+            discovery
+                .resync_watches(std::slice::from_ref(&pattern), &NoopEmitter)
+                .await
+        );
+        assert!(
+            discovery.take_full_scan_required(),
+            "a sticky backend error must demand a full glob pass too"
+        );
+    }
+
+    #[tokio::test]
     async fn resync_watches_absolutizes_relative_include_patterns() {
         // Regression test for a bug found in review: `watched_dirs` used to be keyed by whatever
         // form `include_patterns` came in, which can be relative (e.g. `include: ["logs/*.log"]`).
@@ -1784,6 +2235,33 @@ mod tests {
         ));
     }
 
+    /// Regression test for a bug found in review: only the first symlink component was watched, so
+    /// in `/a/link1/link2/*.log` retargeting `link2` was observed by nothing.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn every_symlink_parent_in_a_nested_path_is_watched() {
+        let root = tempfile::tempdir().unwrap();
+        let real_outer = root.path().join("real_outer");
+        let real_inner = real_outer.join("real_inner");
+        std::fs::create_dir_all(&real_inner).unwrap();
+
+        // /root/link1 -> /root/real_outer, and /root/real_outer/link2 -> real_inner
+        let link1 = root.path().join("link1");
+        std::os::unix::fs::symlink(&real_outer, &link1).unwrap();
+        let link2 = real_outer.join("link2");
+        std::os::unix::fs::symlink(&real_inner, &link2).unwrap();
+
+        let parents = find_symlink_parents(&link1.join("link2")).await;
+        assert!(
+            parents.contains(&root.path().to_path_buf()),
+            "the parent of the outer link must be watched, got {parents:?}"
+        );
+        assert!(
+            parents.contains(&link1),
+            "the parent of the inner link must be watched too, got {parents:?}"
+        );
+    }
+
     #[tokio::test]
     async fn missing_root_falls_back_to_watching_existing_ancestor() {
         // Regression test for a bug found in review: if the literal prefix of an `include`
@@ -1805,8 +2283,8 @@ mod tests {
         );
         assert_eq!(
             discovery.watched_dirs.get(root.path()),
-            Some(&WatchMode::Recursive),
-            "the nearest existing ancestor should be watched recursively as a stand-in"
+            Some(&WatchMode::NonRecursive),
+            "the nearest existing ancestor should be watched non-recursively as a stand-in"
         );
 
         // Once the directory is created, the next resync should upgrade to watching it directly
@@ -1846,20 +2324,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fallback_ancestor_that_is_also_directly_wanted_stays_recursive() {
-        // Regression test for a bug found in review: `root` is both (a) a fallback ancestor for
-        // `missing_dir`, which doesn't exist yet and needs `root` watched `Recursive` so its
-        // eventual creation is noticed, and (b) itself a directly-wanted directory from a second,
-        // unrelated `include` pattern that on its own would only need `NonRecursive`.
-        // `HashMap`'s unspecified iteration order means the main loop in `resync_watches` could
-        // process `root` (as the plain `NonRecursive`-wanted directory) either before or after
-        // `missing_dir` triggers the `Recursive` fallback watch on it. Before this fix, whichever
-        // order put the direct `NonRecursive` `watch()` call *last* would silently downgrade
-        // `root`'s registration from `Recursive` to `NonRecursive`, since the "already watched
-        // under the wanted mode" skip-check compared only against the plain per-pattern mode, not
-        // the merged requirement. That leaves file creation nested under `root` (which is what the
-        // `missing_dir` fallback exists to observe) unnoticed until the next `reconcile_interval`
-        // backstop.
+    async fn fallback_ancestor_that_is_also_directly_wanted_stays_non_recursive() {
+        // A missing nested root only needs its nearest existing ancestor to report creation of
+        // the missing first component. It must not upgrade a directly-wanted ancestor to a
+        // recursive watch, even when both relationships use the same directory.
         let root = tempfile::tempdir().unwrap();
         let missing_dir = root.path().join("newapp");
         let missing_pattern = missing_dir.join("*.log");
@@ -1873,14 +2341,11 @@ mod tests {
 
         assert_eq!(
             discovery.watched_dirs.get(root.path()),
-            Some(&WatchMode::Recursive),
-            "root must stay Recursive: it's both directly wanted (NonRecursive on its own) and \
-             a fallback ancestor (Recursive) for the not-yet-existing missing_dir"
+            Some(&WatchMode::NonRecursive),
+            "root must stay NonRecursive: the fallback watch must not widen the direct watch"
         );
 
-        // Re-running resync_watches (e.g. the periodic backstop, with nothing on disk having
-        // changed) must not downgrade it either, regardless of `wanted`'s iteration order on this
-        // second pass.
+        // Re-running resync_watches must not change that bounded mode either.
         assert!(
             discovery
                 .resync_watches(&[missing_pattern, direct_pattern], &NoopEmitter)
@@ -1888,8 +2353,8 @@ mod tests {
         );
         assert_eq!(
             discovery.watched_dirs.get(root.path()),
-            Some(&WatchMode::Recursive),
-            "root must remain Recursive across repeated resync_watches calls"
+            Some(&WatchMode::NonRecursive),
+            "root must remain NonRecursive across repeated resync_watches calls"
         );
     }
 }

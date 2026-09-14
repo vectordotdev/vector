@@ -15,13 +15,17 @@ use tracing::debug;
 use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
-    AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
+    AsyncFileInfo, FilePosition, OwnerGeneration, PartialPrefix, PortableFileExt, ReadFrom,
     buffer::{ReadResult, read_until_with_max_size},
 };
 use vector_common::compression::gzip_multiple_decoder;
 
 const EOF_READ_BACKOFF_MIN: Duration = Duration::from_millis(1);
 const EOF_READ_BACKOFF_MAX: Duration = Duration::from_millis(250);
+
+/// How long a file must have been quiet before `should_read`'s throttle paces it down, and how
+/// recently it must have been read to bypass that throttle. See `should_read`.
+const QUIET_FILE_THROTTLE: Duration = Duration::from_secs(10);
 
 #[cfg(test)]
 mod tests;
@@ -45,8 +49,9 @@ pub struct RawLineResult {
 
 /// The read-oriented state of a [`FileWatcher`].
 ///
-/// `Active` is the traditional, always-has-been state: an open file handle is
-/// held and reads are attempted against it.
+/// `Active` is the read state: normally an open file handle is held and reads are attempted
+/// against it. Gzip files whose backlog is deliberately skipped are the exception and use a null
+/// reader while remaining active for their existing read semantics.
 ///
 /// `Idle` is new: no file handle is held at all. This is used both for files
 /// which are old/fully-read at discovery time (so we never have to open them)
@@ -63,6 +68,11 @@ enum WatcherState {
         last_read_success: Instant,
         read_retry_delay: Duration,
         buf: BytesMut,
+        /// Set by `mark_ready_to_read` when a filesystem event named this file, and cleared by the
+        /// next read attempt. An explicit flag rather than a back-dated `last_read_attempt`: the
+        /// timestamp trick cannot express "read now" when the monotonic clock is younger than the
+        /// throttle window, which happens when Vector starts during boot.
+        forced_read: bool,
     },
     Idle {
         /// Last known size of the file, as of the last successful stat. `None` means the stat
@@ -151,6 +161,36 @@ pub struct FileWatcher {
     /// correct, safe behavior: it forces a fresh open rather than risking a
     /// stale-offset read against the wrong file.
     identity: Option<(u64, u64)>,
+    /// Set whenever the reader was repositioned to the start of a *different* file (an identity
+    /// change in `update_path`, or a restart after an in-place rewrite). The caller reads it with
+    /// `take_reader_restarted` to reset the persisted checkpoint, which otherwise keeps the old
+    /// offset until the first line of the new content is acknowledged -- long enough for a restart
+    /// to resume past the replacement's prefix.
+    reader_restarted: bool,
+    /// Bumped for every event that invalidates the content the reader was consuming: an in-place
+    /// rewrite, a replacement inode, a truncation.
+    ///
+    /// The rewind guard compares epochs rather than holding a bare flag, which was wrong in both
+    /// directions: a `reactivate` onto a replacement cleared the flag and let the next pass rewind
+    /// over emitted data, while a *second* rewrite before the first became fingerprintable was
+    /// suppressed as a repeat. Size cannot stand in for it -- a partial rewrite grows as its author
+    /// writes, and a later rewrite can land on the same length.
+    content_epoch: u64,
+    /// The epoch the reader was last rewound for, if it has not been fingerprinted since.
+    last_rewind_epoch: Option<u64>,
+    /// On-disk length when the reader was last rewound, so a rewrite landing *before* the previous
+    /// one became fingerprintable can still be detected.
+    ///
+    /// Only a shrink below this counts: an append and a second rewrite both grow the file and move
+    /// its mtime, so anything less conservative would replay what the first rewrite already emitted.
+    rewound_at_len: Option<u64>,
+    /// The partial prefix this watcher was last rewound for, when discovery supplied one.
+    ///
+    /// Complements the length: a rewrite that is still being written only ever *extends* its prefix,
+    /// so a prefix that is not an extension is new content -- including one of equal or greater
+    /// length, which no size comparison can catch. A second rewrite that happens to start with the
+    /// same bytes (a shared log header) remains indistinguishable from growth by content alone.
+    rewound_for_prefix: Option<PartialPrefix>,
     /// Whether the current gzip stream was deliberately left unread (e.g. `read_from: end`),
     /// as opposed to `file_position == 0` meaning "not decoded yet, about to start from zero."
     /// Lets `reactivate` tell the two apart instead of wrongly replaying a skipped backlog.
@@ -163,6 +203,10 @@ pub struct FileWatcher {
     /// forcing a full re-decode after every quiet idle period.
     gzip_raw_metadata: Option<(u64, Option<SystemTime>)>,
     is_dead: bool,
+    /// Identifies this watcher as the owner of its checkpoint. Stamped on every line it reads, so a
+    /// checkpoint write can be matched against the watcher that produced it; changes when the
+    /// watcher is rekeyed, which is an ownership transition.
+    generation: OwnerGeneration,
     last_seen: Instant,
     /// When this watcher was first not matched by the current discovery pass. Unlike
     /// `last_seen`, this is not refreshed by later successful matches and therefore gives an
@@ -182,24 +226,14 @@ impl FileWatcher {
     /// machine. A `FileWatcher` tracks _only one_ file. This function returns
     /// None if the path does not exist or is not readable by the current process.
     ///
-    /// If the file is old enough to be excluded by `ignore_before` and its size
-    /// on disk already matches the position we'd resume reading from (i.e.
-    /// there's no new data waiting), and `idle_on_startup` is `true`, the file
-    /// is only opened briefly for a gzip/identity probe: the watcher starts in
-    /// the `Idle` state and holds no file handle. This is the core of the fix for
-    /// https://github.com/vectordotdev/vector/issues/3567, where a large
-    /// number of `ignore_older`-excluded files would otherwise each hold open
-    /// an unused file handle for as long as they existed on disk.
+    /// A file excluded by `ignore_before` whose size already matches the resume position starts
+    /// `Idle`, opened only briefly for a gzip/identity probe and holding no handle. This is the core
+    /// of <https://github.com/vectordotdev/vector/issues/3567>, where such files each held an unused
+    /// handle for as long as they existed.
     ///
-    /// `idle_on_startup` should be `false` whenever `FileServer::idle_timeout`
-    /// is `None` (the user has explicitly opted out of idle-handle-closing
-    /// entirely): without gating this fast path on it too, an
-    /// `ignore_older`-excluded file would still start `Idle` at discovery
-    /// time regardless of `idle_timeout`, since this startup path is a
-    /// separate mechanism from the runtime `deactivate()` transition that
-    /// `idle_timeout` alone controls -- silently defeating the documented
-    /// promise that `idle_timeout: null` restores the prior always-open
-    /// behavior.
+    /// `idle_on_startup` must be `false` when `FileServer::idle_timeout` is `None`: this startup path
+    /// is separate from the runtime `deactivate()` transition, so without the gate `idle_timeout:
+    /// null` would not restore the documented always-open behaviour.
     pub async fn new(
         path: PathBuf,
         read_from: ReadFrom,
@@ -255,11 +289,17 @@ impl FileWatcher {
                         // The gzip probe already gave us the identity, but the handle was closed
                         // before returning, so this watcher still holds no file descriptor.
                         identity: Some(identity),
+                        reader_restarted: false,
+                        content_epoch: 0,
+                        last_rewind_epoch: None,
+                        rewound_at_len: None,
+                        rewound_for_prefix: None,
                         // Confirmed non-gzip by `gzip_check` above.
                         gzip_read_skipped: false,
                         is_gzip: false,
                         gzip_raw_metadata: None,
                         is_dead: false,
+                        generation: file_source_common::next_owner_generation(),
                         last_seen: Instant::now(),
                         unfindable_since: None,
                         max_line_bytes,
@@ -363,13 +403,20 @@ impl FileWatcher {
                 last_read_success: ts,
                 read_retry_delay: EOF_READ_BACKOFF_MIN,
                 buf: BytesMut::new(),
+                forced_read: false,
             },
             file_position,
             identity: Some((devno, ino)),
+            reader_restarted: false,
+            content_epoch: 0,
+            last_rewind_epoch: None,
+            rewound_at_len: None,
+            rewound_for_prefix: None,
             gzip_read_skipped,
             is_gzip: gzipped,
             gzip_raw_metadata,
             is_dead: false,
+            generation: file_source_common::next_owner_generation(),
             last_seen: ts,
             unfindable_since: None,
             max_line_bytes,
@@ -394,6 +441,129 @@ impl FileWatcher {
     /// while still guaranteeing we never resume reading a *different* file's
     /// content from a stale offset (the concern `update_path` exists to
     /// address in the first place).
+    /// Restart reading from the beginning after an in-place rewrite (`copytruncate`, or an app that
+    /// truncates and rewrites its own log).
+    ///
+    /// The inode is unchanged, so the offset survives while the contents do not: resuming at it
+    /// either seeks past EOF or splices new bytes onto the tail of the old content.
+    pub async fn restart_after_rewrite(&mut self) -> io::Result<()> {
+        self.restart_after_rewrite_for(None).await
+    }
+
+    /// [`Self::restart_after_rewrite`], told which rewrite discovery is currently looking at.
+    ///
+    /// `observed` is the partial prefix from this pass's fingerprint attempt, when there was one.
+    async fn restart_after_rewrite_for(
+        &mut self,
+        observed: Option<&PartialPrefix>,
+    ) -> io::Result<()> {
+        // Idempotent *per epoch*, so no caller has to ask first, while a genuine second rewrite --
+        // which bumps the epoch -- still repositions the reader.
+        if self.rewind_pending() {
+            if !self.rewritten_again_since_rewind(observed).await {
+                return Ok(());
+            }
+            // A rewrite on top of the one just rewound for, before it grew enough to fingerprint.
+            // Nothing raised the epoch -- the inode never changed -- so raise it here, or the rewind
+            // below would immediately re-arm the same guard it just escaped.
+            self.content_epoch += 1;
+        }
+        if self.gzip_read_skipped {
+            // A deliberately skipped backlog (`read_from: end`, a resumed checkpoint, `ignore_older`)
+            // must stay skipped while the file is still gzip, or restarting replays the history the
+            // configuration asked to ignore. But if the rewrite replaced it with a plain file, such a
+            // watcher holds a null reader and would never consume the new contents. Re-probe first.
+            let file_handle = open_regular_file(&self.path).await?;
+            let mut probe = BufReader::new(file_handle);
+            if is_gzipped(&mut probe).await? {
+                return Ok(());
+            }
+            self.gzip_read_skipped = false;
+        }
+
+        if !self.is_active() {
+            // An idle watcher holds no reader, but it does hold the offset `reactivate` will seek
+            // to. `reactivate` re-derives a reset only from an inode change or an observed shrink,
+            // so a rewrite at least as large as the old offset would resume inside the *new*
+            // content and lose or concatenate its prefix. Reset the offset here, where the rewrite
+            // is already established, rather than hoping `reactivate` infers it.
+            self.file_position = 0;
+            self.reader_restarted = true;
+            self.last_rewind_epoch = Some(self.content_epoch);
+            self.rewound_at_len = tokio::fs::metadata(&self.path)
+                .await
+                .ok()
+                .map(|metadata| metadata.len());
+            self.rewound_for_prefix = observed.cloned();
+            // The buffered tail belongs to the content this rewrite discarded. Left in place, reaping
+            // this watcher before it reactivates would emit those bytes as a record of the new file.
+            if let WatcherState::Idle {
+                pending_partial_line,
+                ..
+            } = &mut self.state
+            {
+                *pending_partial_line = None;
+            }
+            self.invalidate_idle_bookkeeping();
+            return Ok(());
+        }
+
+        let file_handle = open_regular_file(&self.path).await?;
+        // Identity is re-checked against the descriptor just opened, not against the path: the
+        // caller's check and this open are separate syscalls, and a rotation in between would
+        // otherwise attach this reader to the replacement while `self.identity` still describes the
+        // old inode -- reading the wrong file, and breaking later rename recovery.
+        let file_info = file_handle.file_info().await?;
+        let opened_identity = (file_info.portable_dev(), file_info.portable_ino());
+        if self
+            .identity
+            .is_some_and(|tracked| tracked != opened_identity)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "file was replaced while reopening it after an in-place rewrite",
+            ));
+        }
+
+        // Read from the descriptor already opened, not the path: this becomes the new baseline for
+        // `shrank_below_reader`, and re-stat-ing the path could pick up a different file.
+        let raw_metadata = file_handle.metadata().await.ok();
+
+        let mut reader = BufReader::new(file_handle);
+        let gzipped = is_gzipped(&mut reader).await?;
+        let reader: Box<dyn AsyncBufRead + Send + Unpin> = if gzipped {
+            Box::new(BufReader::new(gzip_multiple_decoder(reader)))
+        } else {
+            reader.seek(io::SeekFrom::Start(0)).await?;
+            Box::new(reader)
+        };
+
+        self.is_gzip = gzipped;
+        // From the descriptor just read, not a fresh stat of the path: this is the length the reader
+        // actually restarted on.
+        let rewound_at_len = raw_metadata.as_ref().map(|metadata| metadata.len());
+        // Rebase the compressed-size baseline, or every later append that stays below the
+        // *pre-rewrite* size is misread as another rewrite and re-emits the records in between.
+        self.gzip_raw_metadata = gzipped
+            .then(|| raw_metadata.map(|metadata| (metadata.len(), metadata.modified().ok())))
+            .flatten();
+        self.file_position = 0;
+        self.reader_restarted = true;
+        self.last_rewind_epoch = Some(self.content_epoch);
+        self.rewound_at_len = rewound_at_len;
+        self.rewound_for_prefix = observed.cloned();
+        self.state = WatcherState::Active {
+            reader,
+            reached_eof: false,
+            last_read_attempt: Instant::now(),
+            last_read_success: Instant::now(),
+            read_retry_delay: EOF_READ_BACKOFF_MIN,
+            buf: BytesMut::new(),
+            forced_read: false,
+        };
+        Ok(())
+    }
+
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let was_idle = self.is_idle();
 
@@ -430,6 +600,14 @@ impl FileWatcher {
             self.is_gzip = gzipped;
             self.gzip_raw_metadata = gzip_raw_metadata.flatten();
             self.file_position = 0;
+            // A different inode: the persisted checkpoint still names the old file's offset.
+            self.reader_restarted = true;
+            // The reader is already at the replacement's start. Without this, a fingerprint that only
+            // completes later is read as an in-place rewrite and rewinds it a second time, replaying
+            // whatever it emitted in between.
+            self.last_rewind_epoch = Some(self.content_epoch);
+            self.rewound_at_len = None;
+            self.rewound_for_prefix = None;
             self.state = WatcherState::Active {
                 reader: new_reader,
                 reached_eof: false,
@@ -437,6 +615,7 @@ impl FileWatcher {
                 last_read_success: Instant::now(),
                 read_retry_delay: EOF_READ_BACKOFF_MIN,
                 buf: BytesMut::new(),
+                forced_read: false,
             };
         } else if was_idle {
             // Same file (dev/inode unchanged), just renamed, and it was
@@ -471,10 +650,108 @@ impl FileWatcher {
         Ok(())
     }
 
-    /// Whether this watcher currently holds an open file handle.
+    /// Whether this watcher is in the active read state.
     #[inline]
     pub fn is_active(&self) -> bool {
         matches!(self.state, WatcherState::Active { .. })
+    }
+
+    /// Whether the active state currently owns a real file handle. A gzip watcher configured to
+    /// skip an already-compressed backlog is logically active but uses a null reader instead.
+    #[inline]
+    pub fn holds_file_handle(&self) -> bool {
+        self.is_active() && !self.gzip_read_skipped
+    }
+
+    /// Whether `path` denotes this watcher's logical path. Notify reports absolute paths while a
+    /// glob provider may retain a relative path, so compare both after applying the same CWD.
+    pub fn matches_path(&self, path: &Path, cwd: Option<&Path>) -> bool {
+        let path = crate::absolutize(path, cwd);
+        crate::absolutize(&self.path, cwd) == path
+            || self.canonical_path.as_deref() == Some(path.as_path())
+    }
+
+    /// Whether the file has shrunk below what this reader consumed -- an in-place rewrite rather than
+    /// an append.
+    ///
+    /// Gzip needs a different baseline: `file_position` counts *decoded* bytes against a *compressed*
+    /// size, so a direct comparison makes every compressible file look truncated. `false` when the
+    /// size cannot be read or a gzip watcher has no baseline; neither is evidence of a rewrite.
+    ///
+    /// Owned future: borrowing `&self` across the `await` makes `FileServer::run` non-`Send`.
+    pub fn shrank_below_reader(&self) -> impl std::future::Future<Output = bool> + Send + 'static {
+        let path = self.path.clone();
+        let is_gzip = self.is_gzip;
+        let gzip_raw_metadata = self.gzip_raw_metadata;
+        let file_position = self.file_position;
+        async move {
+            let Ok(metadata) = tokio::fs::metadata(&path).await else {
+                return false;
+            };
+            if is_gzip {
+                gzip_raw_metadata.is_some_and(|(raw_len, _)| metadata.len() < raw_len)
+            } else {
+                metadata.len() < file_position
+            }
+        }
+    }
+
+    /// Whether the file was rewritten *again* since the reader was rewound, so the rewind guard
+    /// must not suppress another restart.
+    ///
+    /// Two independent signals, because neither alone is enough:
+    ///
+    /// - the prefix is not an extension of the one rewound for. Catches a rewrite of any length,
+    ///   including a longer one, and works for gzip since the bytes compared are the decoded ones
+    ///   the strategy read. Only available when discovery supplied a prefix this pass.
+    /// - the file shrank below the length rewound at. Catches a rewrite whose prefix happens to
+    ///   start with the same bytes -- a shared log header -- which no content comparison can see.
+    ///   Skipped for gzip, where the recorded raw length and a compressed size are not comparable.
+    ///
+    /// A second rewrite that both starts with the same bytes and is no shorter is indistinguishable
+    /// from the first still being written, and is caught when the fingerprint completes instead.
+    /// Owned future for the same reason as [`Self::shrank_below_reader`]: borrowing `&self` across
+    /// the `await` makes `FileServer::run` non-`Send`.
+    fn rewritten_again_since_rewind(
+        &self,
+        observed: Option<&PartialPrefix>,
+    ) -> impl std::future::Future<Output = bool> + Send + 'static {
+        let prefix_differs = match (observed, self.rewound_for_prefix.as_ref()) {
+            (Some(observed), Some(rewound_for)) => !observed.continues(rewound_for),
+            _ => false,
+        };
+        let shrank = self.shrank_below_rewind();
+        async move { prefix_differs || shrank.await }
+    }
+
+    /// Whether the file shrank below the length it was last rewound at.
+    ///
+    /// `false` without a recorded length, when the size cannot be read, or for gzip: the recorded
+    /// length is raw bytes for a plain file, and mixing it with a compressed size would read a
+    /// well-compressing rewrite as a shrink.
+    ///
+    /// Owned future for the same reason as [`Self::shrank_below_reader`]: borrowing `&self` across
+    /// the `await` makes `FileServer::run` non-`Send`.
+    fn shrank_below_rewind(&self) -> impl std::future::Future<Output = bool> + Send + 'static {
+        let path = self.path.clone();
+        let rewound_at_len = (!self.is_gzip).then_some(self.rewound_at_len).flatten();
+        async move {
+            let Some(rewound_at_len) = rewound_at_len else {
+                return false;
+            };
+            tokio::fs::metadata(&path)
+                .await
+                .is_ok_and(|metadata| metadata.len() < rewound_at_len)
+        }
+    }
+
+    /// Whether this watcher reads through a gzip decoder. Callers comparing `get_file_position()`
+    /// against a file's on-disk size must check this first: the position counts *decoded* bytes while
+    /// the size is *compressed* bytes, so any compressible file looks "shrunk" without being
+    /// truncated.
+    #[inline]
+    pub fn is_gzip(&self) -> bool {
+        self.is_gzip
     }
 
     #[inline]
@@ -484,9 +761,9 @@ impl FileWatcher {
 
     pub fn set_file_findable(&mut self, f: bool) {
         if f {
-            self.findable = true;
-            self.last_seen = Instant::now();
-            self.unfindable_since = None;
+            self.mark_found();
+            // Only the glob pass passes `true`, and it visits only paths the `PathsProvider`
+            // yielded, so the tracked inode is back inside the include patterns.
             self.path_outside_glob = false;
         } else {
             self.findable = false;
@@ -494,6 +771,15 @@ impl FileWatcher {
                 self.unfindable_since = Some(Instant::now());
             }
         }
+    }
+
+    /// Record that the file was just observed, without asserting glob membership. Notify event
+    /// paths are not glob-filtered, so a rotated file still emitting events from outside the glob
+    /// must keep its `path_outside_glob` exemption.
+    pub fn mark_found(&mut self) {
+        self.findable = true;
+        self.last_seen = Instant::now();
+        self.unfindable_since = None;
     }
 
     /// Mark the start of a discovery pass without starting the unfindable grace period yet.
@@ -518,6 +804,12 @@ impl FileWatcher {
         self.last_seen = Instant::now();
     }
 
+    /// Stop treating this watcher as identity-verified outside the configured include patterns.
+    /// This is needed when the last known outside-glob path no longer contains the tracked file.
+    pub fn clear_path_outside_glob(&mut self) {
+        self.path_outside_glob = false;
+    }
+
     #[inline]
     pub fn path_is_outside_glob(&self) -> bool {
         self.path_outside_glob
@@ -527,16 +819,54 @@ impl FileWatcher {
     /// single-file check used to avoid rescanning an entire archive tree on every polling pass
     /// for an outside-glob idle watcher; a tree scan is only needed once this path disappears or
     /// resolves to a replacement.
+    /// Whether the tracked file is definitely no longer at this watcher's path -- either nothing is
+    /// there, or a different inode is. Distinguished from a merely *unreadable* path (permission,
+    /// sharing, or other I/O error), which leaves identity indeterminate: treating that as deletion
+    /// would abandon a rotated file that is only temporarily inaccessible.
+    pub fn tracked_file_is_gone(&self) -> impl std::future::Future<Output = bool> + Send + 'static {
+        let path = self.path.clone();
+        let identity = self.identity;
+        async move {
+            if path_is_absent(&path).await {
+                return true;
+            }
+            match (path_identity(&path).await, identity) {
+                (Some(current), Some(tracked)) => current != tracked,
+                _ => false,
+            }
+        }
+    }
+
+    /// Whether the reader was repositioned onto different content since this was last called,
+    /// clearing the flag. The caller resets the persisted checkpoint in response: it otherwise keeps
+    /// the pre-restart offset until the first new line is acknowledged, and a restart in that window
+    /// resumes past the new content's prefix.
+    pub fn take_reader_restarted(&mut self) -> bool {
+        std::mem::take(&mut self.reader_restarted)
+    }
+
     pub fn path_has_tracked_identity(
         &self,
     ) -> impl std::future::Future<Output = bool> + Send + 'static {
-        let path = self.path.clone();
+        self.candidate_has_tracked_identity(self.path.clone())
+    }
+
+    /// As [`Self::path_has_tracked_identity`], but for a path the caller discovered rather than the
+    /// one this watcher currently holds.
+    ///
+    /// The two differ when an alias disappears: the watcher's own spelling stops resolving while
+    /// another spelling of the same inode still does, and deciding on the wrong one preserves a
+    /// reader offset into content that was rewritten.
+    pub fn candidate_has_tracked_identity(
+        &self,
+        candidate: PathBuf,
+    ) -> impl std::future::Future<Output = bool> + Send + 'static {
         let identity = self.identity;
         async move {
             let Some(identity) = identity else {
                 return false;
             };
-            path_identity(&path).await == Some(identity)
+            path_identity(&candidate).await == Some(identity)
         }
     }
 
@@ -635,12 +965,75 @@ impl FileWatcher {
         self.findable
     }
 
+    /// The generation stamped on every line this watcher reads.
+    pub fn generation(&self) -> OwnerGeneration {
+        self.generation
+    }
+
+    /// Take a fresh generation, retiring the one lines already in flight were stamped with.
+    ///
+    /// Called wherever the reader is repositioned onto different content -- a rekey onto a new
+    /// fingerprint, or a reset to zero under the same one. Both discard what the reader had
+    /// consumed, so an acknowledgement still travelling for that content must not be allowed to
+    /// move the checkpoint back past the reset.
+    pub fn take_new_generation(&mut self) -> OwnerGeneration {
+        self.generation = file_source_common::next_owner_generation();
+        self.generation
+    }
+
     pub fn set_dead(&mut self) {
         self.is_dead = true;
     }
 
     pub fn dead(&self) -> bool {
         self.is_dead
+    }
+
+    /// Whether the reader was already restarted for the rewrite currently on disk.
+    ///
+    /// A fingerprint that keeps failing (a file rewritten to fewer lines than `FirstLinesChecksum`
+    /// needs returns `UnexpectedEof` on every pass) must not restart the reader again: it would
+    /// re-emit whatever was already consumed on each reconciliation.
+    fn rewind_pending(&self) -> bool {
+        self.last_rewind_epoch == Some(self.content_epoch)
+    }
+
+    /// Bring the reader into line with the rewrite discovery is currently looking at.
+    ///
+    /// The single entry point for all three discovery branches, so the decision cannot be made
+    /// differently in each: repairing one branch and missing its twin has been this code's most
+    /// persistent defect. `fingerprint_complete` says whether this pass produced a fingerprint --
+    /// which is what ends a rewrite -- and `observed` carries the partial prefix when it did not.
+    ///
+    /// Callers no longer test [`Self::rewind_pending`] first. That test is an early exit *inside*
+    /// the rewind, where it can also see that the content changed again; hoisting it into the
+    /// callers made the second-rewrite check unreachable.
+    pub async fn reconcile_rewrite(
+        &mut self,
+        fingerprint_complete: bool,
+        observed: Option<&PartialPrefix>,
+    ) -> io::Result<()> {
+        // The rewind first, while the guard still stands: it is what says the reader is already at
+        // the start of this content. Lowering the guard first makes the call below rewind a second
+        // time and replay everything emitted since.
+        let outcome = self.restart_after_rewrite_for(observed).await;
+        if fingerprint_complete {
+            self.fingerprint_completed();
+        }
+        outcome
+    }
+
+    /// The file fingerprinted again, which is what ends a rewrite.
+    ///
+    /// The only way the guard is lowered. Call it wherever a fingerprint succeeds *for this watcher*
+    /// -- not from a pass epilogue, since a targeted pass does not observe every watcher. Clearing is
+    /// tied to the epoch, so a completion that arrives after a further rewrite cannot release it.
+    pub fn fingerprint_completed(&mut self) {
+        if self.rewind_pending() {
+            self.last_rewind_epoch = None;
+            self.rewound_at_len = None;
+            self.rewound_for_prefix = None;
+        }
     }
 
     pub fn get_file_position(&self) -> FilePosition {
@@ -718,95 +1111,41 @@ impl FileWatcher {
         Ok(changed)
     }
 
-    /// Force the next `check_for_new_data` call to report a change, regardless of what it
-    /// actually observes.
+    /// Force the next `check_for_new_data` to report a change.
     ///
-    /// Call this after a failed `reactivate()` that followed a `check_for_new_data` reporting
-    /// `true`. `check_for_new_data` unconditionally records whatever size/mtime it just observed
-    /// (so that a subsequent truncate-then-refill is still detected relative to the most recent
-    /// state, not stale pre-truncation values) *before* the caller has had a chance to act on the
-    /// "changed" result. If the caller's `reactivate()` then fails (e.g. a transient permission
-    /// or I/O error) and the file doesn't change again in the meantime, the next poll would
-    /// compare against the size/mtime already recorded from the failed attempt, see no
-    /// difference, and never retry -- silently stranding the watcher `Idle` with unread data
-    /// sitting on disk. Setting `force_recheck` guarantees the next poll reports a change and
-    /// retries, no matter what it actually observes.
+    /// Call after a failed `reactivate()`: `check_for_new_data` has already recorded the size/mtime
+    /// it observed, so an unchanged file would compare equal on the next poll and never retry,
+    /// stranding the watcher `Idle` with unread data.
     ///
-    /// Deliberately does *not* touch `last_known_size`/`last_known_mtime` (an earlier version of
-    /// this clobbered `last_known_size` with an impossible `u64::MAX` sentinel instead of using a
-    /// separate flag). Destroying the real baseline that way meant a genuine truncation occurring
-    /// *after* this was called but *before* the next poll would be completely undetectable on
-    /// that poll: `check_for_new_data`'s shrink comparison has nothing real left to compare the
-    /// new, smaller size against, since the "last known size" it would be comparing against is
-    /// itself a fabricated value, not the file's actual prior size. Keeping the real baseline
-    /// intact and layering `force_recheck` on top instead lets `check_for_new_data` still
-    /// correctly detect a real shrink on the very poll that also honors this forced retry.
-    ///
-    /// No-op if the watcher isn't `Idle` (e.g. it was already promoted back to `Active` by the
-    /// time this is called).
+    /// A separate flag rather than clobbering `last_known_size`: a fabricated baseline would make a
+    /// genuine truncation before the next poll undetectable. No-op unless `Idle`.
     pub fn invalidate_idle_bookkeeping(&mut self) {
         if let WatcherState::Idle { force_recheck, .. } = &mut self.state {
             *force_recheck = true;
         }
     }
 
-    /// Promote an `Idle` watcher back to `Active`: (re)open the file and seek
-    /// to `file_position`. Also handles (re-)detecting gzip compression,
-    /// since that detection was deferred when we skipped the initial open.
+    /// Promote an `Idle` watcher back to `Active`: reopen, re-detect gzip, and seek to
+    /// `file_position`. No-op if already `Active`.
     ///
-    /// If the reopened file's identity (dev/inode) doesn't match what this watcher *previously
-    /// confirmed by having actually opened the file* (i.e. `self.identity` was `Some`, not
-    /// `None`), the file at this path has been replaced since we went idle: the same-path
-    /// rotation case (`discover`'s fingerprint-based rename detection only catches renames, i.e.
-    /// a path change; a rewrite-in-place under an unchanged path -- possible if the new content's
-    /// fingerprint happens to collide with the old one, since the default strategy only hashes
-    /// the first line -- looks identical to "nothing happened" from `discover`'s point of view).
-    /// In that case we must not seek to the stale `file_position`: it's a byte offset into a file
-    /// that no longer exists, so seeking to it on the new file would silently skip (if the new
-    /// file is longer) or read nothing until it grows past that point (if shorter) -- either way
-    /// losing the new file's opening bytes. Start over from position 0 instead.
+    /// The offset is reset to 0 in two cases, because seeking a stale offset into different content
+    /// either skips the new file's opening bytes or reads nothing until it grows past that point:
     ///
-    /// A `self.identity` of `None`, by contrast, means identity is still "unconfirmed" (for
-    /// example, if the short-lived startup probe could not complete). That's not evidence of a
-    /// replacement, so unlike a real identity mismatch, it must not reset `file_position`: doing
-    /// so would re-read a file's entire old content (which `ignore_older` deliberately skipped)
-    /// the first time it receives new data, since `file_position` holds the file's size as of
-    /// discovery rather than a checkpoint from a previous read.
+    /// - A confirmed identity (`self.identity` is `Some`) that no longer matches: the file was
+    ///   replaced in place, which `discover`'s rename detection cannot see.
+    /// - `truncated_while_idle`, a latch set by `check_for_new_data` across the whole idle period.
+    ///   It must be a latch: a truncate seen by one poll and a refill seen by a later one look
+    ///   exactly like ordinary growth by the time `reactivate` looks.
     ///
-    /// **Known limitation**: when identity is unavailable, this function cannot distinguish "an
-    /// `ignore_older`-excluded file received its first append" from "that file was replaced (not
-    /// renamed) by a different, larger file at the same path, whose content happens to fingerprint
-    /// identically to the old one under the default first-line-only strategy" before its first
-    /// reactivation. The former (by far the common case) requires resuming from the retained
-    /// `file_position`; the latter would need resuming from 0. Since a replacement can't be told
-    /// apart from growth here, this function assumes growth.
+    /// An identity of `None` is *unconfirmed*, not evidence of replacement, and must not reset:
+    /// `file_position` there holds the file's size as of discovery, so resetting re-reads all the
+    /// content `ignore_older` deliberately skipped.
     ///
-    /// Separately, even when the identity is unchanged (the same inode is still at this path --
-    /// no rename/replace happened), the file can still have been truncated in place while idle
-    /// (e.g. `logrotate`'s `copytruncate`, or an application that truncates and rewrites its own
-    /// log). A truncation must reset `file_position` to 0 just as a real identity change does --
-    /// seeking to a stale `file_position` on a file that's been truncated (whether or not it's
-    /// since grown back past that same offset with unrelated new content) means either seeking
-    /// past EOF (silently losing everything written until the file grows past the old position
-    /// again) or, worse, silently reading unrelated new bytes as if they were a continuation of
-    /// the old content. This is why `truncated_while_idle` is a latch set by `check_for_new_data`
-    /// across the *whole* idle period rather than something `reactivate` could reliably re-derive
-    /// from a single point-in-time size comparison of its own: a truncate observed by one poll,
-    /// followed by a refill past the old `file_position` observed by a later poll, would otherwise
-    /// look identical to ordinary growth by the time `reactivate` gets a chance to look.
-    ///
-    /// **Known limitation**: this still can't help if the truncate *and* the regrowth both happen
-    /// between two polls, with neither `check_for_new_data` call ever independently observing the
-    /// intermediate (truncated) state -- there is, at that point, no state left on disk to detect
-    /// it from after the fact. This is a fundamental limit of polling for changes, not something
-    /// specific to this idle-handle-closing mechanism: `file_discovery_mode: polling`'s pre-existing
-    /// handling of *active* (never-idle) files has the same blind spot for a within-one-interval
-    /// truncate-then-refill, and no polling-based approach (as opposed to synchronous OS-level
-    /// notification of every write, which isn't what `fs::metadata`-based polling provides even
-    /// under `file_discovery_mode: notify`, since that only wakes up the same poll sooner, it
-    /// doesn't add fidelity to what a single poll can observe) can close this gap.
-    ///
-    /// No-op if the watcher is already `Active`.
+    /// **Two limitations**, both inherent to polling rather than to idle-handle-closing. With no
+    /// identity available, a first append cannot be told from a same-path replacement whose content
+    /// fingerprints identically, so growth is assumed. And a truncate *and* regrowth landing between
+    /// two polls leaves nothing on disk to detect afterwards -- `polling` mode has the same blind
+    /// spot for active files.
     pub async fn reactivate(&mut self) -> io::Result<()> {
         if self.is_active() {
             return Ok(());
@@ -847,6 +1186,16 @@ impl FileWatcher {
             );
             file_position = 0;
             gzip_read_skipped = false;
+            // The persisted checkpoint still names the previous file's offset; the caller resets it
+            // once it sees this flag. Without that, a restart before the first line of the new
+            // content is acknowledged resumes past that content's prefix.
+            self.reader_restarted = true;
+            // A replacement inode is a new content epoch, and this reset *is* its rewind: clearing
+            // instead would let the next pass rewind again over what has been emitted.
+            self.content_epoch += 1;
+            self.last_rewind_epoch = Some(self.content_epoch);
+            self.rewound_at_len = None;
+            self.rewound_for_prefix = None;
         } else if truncated_while_idle || truncated_at_reactivation {
             debug!(
                 message = "Idle watcher's file was truncated in place while idle (same \
@@ -856,6 +1205,13 @@ impl FileWatcher {
             );
             file_position = 0;
             gzip_read_skipped = false;
+            // Same reasoning as above: the offset the checkpoint holds no longer exists.
+            self.reader_restarted = true;
+            // Truncation likewise starts a new epoch, and this reset is its rewind.
+            self.content_epoch += 1;
+            self.last_rewind_epoch = Some(self.content_epoch);
+            self.rewound_at_len = None;
+            self.rewound_for_prefix = None;
         }
 
         let (reader, file_position, gzip_read_skipped): (
@@ -906,6 +1262,7 @@ impl FileWatcher {
             last_read_success: Instant::now(),
             read_retry_delay: EOF_READ_BACKOFF_MIN,
             buf: BytesMut::new(),
+            forced_read: false,
         };
 
         debug!(
@@ -940,34 +1297,13 @@ impl FileWatcher {
         let idle_since = *last_read_success;
         let old_file_position = self.file_position;
 
-        // `buf` holds bytes already consumed from the reader (and counted
-        // into `file_position`) for a line that hasn't seen its delimiter
-        // yet -- `read_until_with_max_size` advances `position` for every
-        // byte it reads into `buf`, delimiter or not, on the assumption that
-        // the very next call will pick up exactly where it left off and
-        // eventually complete the line. Idle-izing throws `buf` away (it's
-        // part of the `Active` state we're about to replace), so unless we
-        // rewind `file_position` back behind those bytes here, `reactivate`
-        // would resume reading *after* them: the partial line would never be
-        // completed, and its bytes -- still sitting on disk -- would simply
-        // never be read. Rewinding means we'll read them again from disk
-        // once new data (including, at minimum, this file's own trailing
-        // delimiter) shows up, same as if we'd never buffered them at all.
-        // Saturating, not a bare subtraction: if the file was truncated out
-        // from under an `Active` read (a pre-existing sharp edge of file
-        // watching in general, not something this rewind introduces), the
-        // buffered byte count could in principle exceed `file_position`. In
-        // that case there's nothing meaningful to rewind to; clamping to 0
-        // is at least as safe as what an in-progress read would already be
-        // dealing with (`read_until_with_max_size` doesn't special-case
-        // mid-read truncation either).
+        // `buf` holds bytes already counted into `file_position` for a line with no delimiter yet.
+        // Going idle discards `buf`, so `file_position` is rewound behind them -- otherwise
+        // `reactivate` resumes *after* bytes that are still on disk and never reads them. Saturating,
+        // because a mid-read truncation can leave the buffer longer than the position.
         //
-        // Also clone the buffered bytes themselves (not just their count) before rewinding:
-        // `pending_partial_line` retains them, paired with the offset they started at (i.e.
-        // `file_position` *before* the rewind below), purely so `FileServer` can salvage them as
-        // a final record if this watcher is later reaped while still `Idle` -- see that field's
-        // doc comment for why an `Idle` watcher has no other way to flush them, unlike an
-        // `Active` one. A no-op clone (empty `Bytes`) when there's nothing buffered.
+        // The bytes themselves are kept in `pending_partial_line` with their starting offset, so
+        // `FileServer` can salvage them if this watcher is reaped while still `Idle`.
         let unterminated_bytes = buf.len() as u64;
         let rewound_file_position = self.file_position.saturating_sub(unterminated_bytes);
         let pending_partial_line = if buf.is_empty() {
@@ -1132,10 +1468,14 @@ impl FileWatcher {
     #[inline]
     fn track_read_attempt(&mut self) {
         if let WatcherState::Active {
-            last_read_attempt, ..
+            last_read_attempt,
+            forced_read,
+            ..
         } = &mut self.state
         {
             *last_read_attempt = Instant::now();
+            // The forced read has happened; further reads are paced normally again.
+            *forced_read = false;
         }
     }
 
@@ -1203,18 +1543,19 @@ impl FileWatcher {
     pub fn mark_ready_to_read(&mut self) {
         if let WatcherState::Active {
             reached_eof,
-            last_read_attempt,
             read_retry_delay,
+            forced_read,
             ..
         } = &mut self.state
         {
             *reached_eof = false;
             *read_retry_delay = EOF_READ_BACKOFF_MIN;
-            // Back-date rather than leaving as-is: `should_read`'s quiet-file throttle requires
-            // `last_read_attempt.elapsed() > 10s` as one of its two ways to pass, so simply
-            // clearing `reached_eof` isn't sufficient on its own to guarantee the very next check
-            // passes.
-            *last_read_attempt = Instant::now() - Duration::from_secs(11);
+            // An explicit flag, not a back-dated `last_read_attempt`. Clearing `reached_eof` alone
+            // does not get past `should_read`'s quiet-file throttle, and back-dating cannot express
+            // "read now" at all when the monotonic clock is younger than the throttle window --
+            // which is the case when Vector starts during boot. Worse, `checked_sub` then falls back
+            // to *now*, making the throttle reject the very read the event was supposed to force.
+            *forced_read = true;
         }
     }
 
@@ -1225,6 +1566,7 @@ impl FileWatcher {
             last_read_attempt,
             last_read_success,
             read_retry_delay,
+            forced_read,
             ..
         } = &self.state
         else {
@@ -1233,12 +1575,18 @@ impl FileWatcher {
             return false;
         };
 
+        // A filesystem event named this file, so neither the EOF backoff nor the quiet-file
+        // throttle applies: both exist to pace *unprompted* polling.
+        if *forced_read {
+            return true;
+        }
+
         if *reached_eof && last_read_attempt.elapsed() < *read_retry_delay {
             return false;
         }
 
-        last_read_success.elapsed() < Duration::from_secs(10)
-            || last_read_attempt.elapsed() > Duration::from_secs(10)
+        last_read_success.elapsed() < QUIET_FILE_THROTTLE
+            || last_read_attempt.elapsed() > QUIET_FILE_THROTTLE
     }
 
     #[inline]
@@ -1307,6 +1655,20 @@ impl FileWatcher {
                 Some(RawLine { offset, bytes })
             }
         }
+    }
+}
+
+/// Whether the file at `path` is known to be gone, as opposed to merely unreadable. A permission,
+/// sharing, or other I/O error leaves identity *indeterminate*, which must not be mistaken for
+/// deletion. `metadata` (not `symlink_metadata`) is used so that a symlink whose target was deleted
+/// counts as gone: the link itself still resolves as an entry, but the tracked file no longer exists.
+pub(crate) async fn path_is_absent(path: &std::path::Path) -> bool {
+    match tokio::fs::metadata(path).await {
+        Err(error) => error.kind() == io::ErrorKind::NotFound,
+        // A directory or other non-regular entry at this path means the tracked file is gone even
+        // though something still answers here, so the watcher must not keep its outside-glob
+        // exemption and the long `rotate_wait` grace that comes with it.
+        Ok(metadata) => !metadata.is_file(),
     }
 }
 
