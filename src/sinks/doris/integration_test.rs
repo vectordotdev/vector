@@ -109,7 +109,7 @@ async fn insert_events() {
     let database = format!("test_db_{}_point", random_string(5).to_lowercase());
     let table = format!("test_table_{}", random_string(5).to_lowercase());
 
-    let client = DorisTestClient::new(doris_mysql_address_port()).await;
+    let client = DorisTestClient::new(doris_mysql_address_port());
     info!(
         message = "DorisTestClient created successfully, creating database...",
         internal_log_rate_limit = true
@@ -192,7 +192,7 @@ struct DorisTestClient {
 }
 
 impl DorisTestClient {
-    async fn new(query_address_port: (String, u16)) -> Self {
+    fn new(query_address_port: (String, u16)) -> Self {
         let auth = config_auth();
         let (host, port) = query_address_port;
 
