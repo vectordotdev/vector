@@ -22,9 +22,13 @@ pub(crate) mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
 }
 
-#[allow(warnings)]
+#[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 pub(crate) mod dd_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
+    #[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
+    pub mod idx {
+        include!(concat!(env!("OUT_DIR"), "/datadog.trace.idx.rs"));
+    }
+    include!(concat!(env!("OUT_DIR"), "/datadog.trace.rs"));
 }
 
 pub use self::config::DatadogTracesConfig;

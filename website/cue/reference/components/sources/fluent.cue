@@ -43,7 +43,6 @@ components: sources: fluent: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

@@ -7,4 +7,4 @@ sinks:
     dangerously_allow_unconfined_template_resolution: false
     encoding:
       codec: json
-    endpoint: http://127.0.0.1:9870
+    endpoint: http://127.0.0.1:9870/

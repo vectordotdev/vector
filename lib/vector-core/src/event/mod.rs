@@ -24,7 +24,7 @@ pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::config::{LogNamespace, OutputId};
 
-#[cfg(any(test, feature = "generate-fixtures"))]
+#[cfg(test)]
 pub(crate) mod arbitrary_impl;
 pub mod array;
 pub mod discriminant;

@@ -175,21 +175,16 @@ elif [[ "$CHANNEL" == "release" ]]; then
     publish_release_artifacts legacy_aws "$LEGACY_BUCKET" "$i"
   done
 
-  # The COSE bucket exposes immutable exact releases and one floating stable
-  # channel. Only the mutable latest prefix is pruned when it is updated.
-  for i in "$VERSION_EXACT" "latest"; do
-    publish_release_artifacts cose_aws "$COSE_BUCKET" "$i"
-  done
+  # COSE exposes stable artifacts only under their immutable exact version.
+  publish_release_artifacts cose_aws "$COSE_BUCKET" "$VERSION_EXACT"
 
   echo "Add latest symlinks"
   find "$td" -maxdepth 1 -type f -print0 | while read -r -d $'\0' file ; do
     file=$(basename "$file")
     # vector-$version-amd64.deb -> vector-latest-amd64.deb
     echo -n "" | s3_copy legacy_aws - "s3://$LEGACY_BUCKET/vector/latest/${file/$VERSION_EXACT/latest}" --website-redirect "/vector/latest/$file"
-    s3_copy cose_aws "$td/$file" "s3://$COSE_BUCKET/vector/latest/${file/$VERSION_EXACT/latest}"
     # vector-$version-amd64.deb -> vector-amd64.deb
     echo -n "" | s3_copy legacy_aws - "s3://$LEGACY_BUCKET/vector/latest/${file/$VERSION_EXACT-/}" --website-redirect "/vector/latest/$file"
-    s3_copy cose_aws "$td/$file" "s3://$COSE_BUCKET/vector/latest/${file/$VERSION_EXACT-/}"
   done
   echo "Added latest symlinks"
 
@@ -201,16 +196,11 @@ elif [[ "$CHANNEL" == "release" ]]; then
       "https://packages.timber.io/vector/$i/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
       "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
   done
-  for i in "$VERSION_EXACT" "latest"; do
-    verify_artifact \
-      "$COSE_PUBLIC_URL/vector/$i/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
-      "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
-  done
+  verify_artifact \
+    "$COSE_PUBLIC_URL/vector/$VERSION_EXACT/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
+    "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
   verify_artifact \
     "https://packages.timber.io/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
-  verify_artifact \
-    "$COSE_PUBLIC_URL/vector/latest/vector-latest-x86_64-unknown-linux-gnu.tar.gz" \
     "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
 
 elif [[ "$CHANNEL" == "custom" ]]; then

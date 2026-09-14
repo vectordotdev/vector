@@ -114,13 +114,10 @@ impl OtlpDecodingConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
-    #[configurable(derived)]
     pub grpc: GrpcConfig,
 
-    #[configurable(derived)]
     pub http: HttpConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
@@ -173,11 +170,9 @@ pub struct GrpcConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:4317", docs::examples = "localhost:4317"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub keepalive: GrpcKeepaliveConfig,
 }
@@ -202,11 +197,9 @@ pub struct HttpConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:4318", docs::examples = "localhost:4318"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub keepalive: KeepaliveConfig,
 
@@ -271,7 +264,7 @@ impl OpentelemetryConfig {
 
 impl OpentelemetryConfig {
     /// Build the source serving runtime-swappable TLS acceptors for the gRPC and/or HTTP listeners.
-    pub async fn build_with_tls_reloaders(
+    pub fn build_with_tls_reloaders(
         &self,
         cx: SourceContext,
         grpc_tls_reloader: Option<TlsAcceptorReloader>,
@@ -383,7 +376,7 @@ impl OpentelemetryConfig {
 #[typetag::serde(name = "opentelemetry")]
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        self.build_with_tls_reloaders(cx, None, None).await
+        self.build_with_tls_reloaders(cx, None, None)
     }
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",
