@@ -128,12 +128,13 @@ impl EventSampleMode {
         }
     }
 
-    fn sample(&self, group_by_key: Option<&str>, counter: &mut u64) -> bool {
+    fn sample(&self, group_by_key: Option<&str>, is_new_group: bool, counter: &mut u64) -> bool {
         let old_counter_value = *counter;
         *counter += 1;
 
+        let sampling_key = if is_new_group { None } else { group_by_key };
         let mut hasher = seahash::SeaHasher::new();
-        group_by_key.hash(&mut hasher);
+        sampling_key.hash(&mut hasher);
         old_counter_value.hash(&mut hasher);
         let hash = hasher.finish();
 
@@ -252,10 +253,13 @@ impl Sample {
         }
     }
 
-    fn group_state(&mut self, group_by_key: &Option<String>) -> &mut GroupState {
+    fn group_state(&mut self, group_by_key: &Option<String>) -> (&mut GroupState, bool) {
+        let is_new_group = !self.group_states.contains(group_by_key);
         let next_group_state = &mut self.next_group_state;
-        self.group_states
-            .get_or_insert_mut_ref(group_by_key, || next_group_state.take_next())
+        let group_state = self
+            .group_states
+            .get_or_insert_mut_ref(group_by_key, || next_group_state.take_next());
+        (group_state, is_new_group)
     }
 
     #[cfg(test)]
@@ -371,10 +375,11 @@ impl FunctionTransform for Sample {
             .map(EventSampleMode::sample_rate_label)
             .unwrap_or_else(|| self.static_mode.to_string());
 
-        let group_state = self.group_state(&group_by_key);
+        let (group_state, is_new_group) = self.group_state(&group_by_key);
         let should_sample = match event_sample_mode {
             Some(mode) => mode.sample(
                 group_by_key.as_deref(),
+                is_new_group,
                 &mut group_state.dynamic_event_counter,
             ),
             None => {

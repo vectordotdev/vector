@@ -397,7 +397,7 @@ fn capacity_thrashing_does_not_bypass_static_sampling() {
 }
 
 #[test]
-fn capacity_thrashing_does_not_bypass_dynamic_sampling() {
+fn attacker_controlled_groups_do_not_bypass_dynamic_sampling() {
     for (name, fields) in [
         (
             "rate",
@@ -414,13 +414,13 @@ fn capacity_thrashing_does_not_bypass_dynamic_sampling() {
             },
         ),
     ] {
-        let make_sampler = |max_groups| {
+        let make_sampler = || {
             Sample::new_with_dynamic(
                 "sample".to_string(),
                 SampleMode::new_ratio(0.0),
                 fields.clone(),
                 Some(UnconfinedTemplate::try_from("{{ service }}").unwrap()),
-                max_groups,
+                std::num::NonZeroUsize::new(2).unwrap(),
                 None,
                 default_sample_rate_key(),
             )
@@ -436,23 +436,21 @@ fn capacity_thrashing_does_not_bypass_dynamic_sampling() {
             event.into()
         };
 
-        let passing_groups = (0..100)
-            .filter_map(|index| {
-                let service = format!("service-{index}");
-                let mut sampler = make_sampler(default_max_groups());
-                transform_one(&mut sampler, make_event(&service))
-                    .is_some()
-                    .then_some(service)
-            })
-            .take(3)
-            .collect::<Vec<_>>();
-        assert_eq!(passing_groups.len(), 3);
-
-        let mut sampler = make_sampler(std::num::NonZeroUsize::new(2).unwrap());
+        let mut sampler = make_sampler();
         let retained = (0..30)
             .filter(|index| {
-                let service = &passing_groups[index % passing_groups.len()];
-                transform_one(&mut sampler, make_event(service)).is_some()
+                let original = sampler.clone();
+                let service = (0..1000)
+                    .find_map(|attempt| {
+                        let service = format!("service-{index}-{attempt}");
+                        let mut candidate = original.clone();
+                        transform_one(&mut candidate, make_event(&service))
+                            .is_some()
+                            .then_some(service)
+                    })
+                    .unwrap_or_else(|| format!("service-{index}-miss"));
+
+                transform_one(&mut sampler, make_event(&service)).is_some()
             })
             .count();
 
