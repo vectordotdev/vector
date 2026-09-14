@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use derivative::Derivative;
+use prost_reflect::DeserializeOptions;
 use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::{
@@ -102,18 +103,25 @@ impl Deserializer for NativeJsonDeserializer {
         }
         .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
+        // Ignore fields added by newer Vector versions so additive Protobuf changes do not make
+        // older native JSON consumers reject an otherwise understandable event.
+        let protojson_options = DeserializeOptions::new().deny_unknown_fields(false);
         let decode = |value: serde_json::Value| {
             let is_protojson = value
                 .as_object()
                 .is_some_and(|object| object.contains_key("event"));
 
             if is_protojson {
-                prost_reflect::DynamicMessage::deserialize(descriptor(), value)
-                    .map_err(|error| error.to_string())
-                    .and_then(|message| {
-                        from_dynamic_message(message).map_err(|error| error.to_string())
-                    })
-                    .map_err(Into::into)
+                prost_reflect::DynamicMessage::deserialize_with_options(
+                    descriptor(),
+                    value,
+                    &protojson_options,
+                )
+                .map_err(|error| error.to_string())
+                .and_then(|message| {
+                    from_dynamic_message(message).map_err(|error| error.to_string())
+                })
+                .map_err(Into::into)
             } else {
                 // The legacy format uses an externally tagged Event with `log`, `metric`, or
                 // `trace` at the top level. Keeping that disjoint from the `event` envelope avoids
@@ -139,6 +147,8 @@ impl Deserializer for NativeJsonDeserializer {
 #[cfg(test)]
 mod test {
     use serde_json::json;
+    use uuid::Uuid;
+    use vector_core::event::{MetricValue, metric::MetricSketch};
 
     use super::*;
 
@@ -182,7 +192,38 @@ mod test {
     }
 
     #[test]
-    fn rejects_incomplete_protojson_without_panicking() {
+    fn ignores_additive_protojson_fields() {
+        let deserializer = NativeJsonDeserializerConfig::default().build();
+        let input = Bytes::from(
+            serde_json::to_vec(&json!({
+                "futureEnvelopeField": true,
+                "event": {
+                    "log": {
+                        "value": {"rawBytes": "a25vd24="},
+                        "futureLogField": true
+                    }
+                }
+            }))
+            .unwrap(),
+        );
+
+        let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
+        assert_eq!(
+            events[0].as_log().value(),
+            &vector_core::event::Value::from("known")
+        );
+
+        let unknown_event =
+            Bytes::from(serde_json::to_vec(&json!({"event": {"futureEvent": {}}})).unwrap());
+        assert!(
+            deserializer
+                .parse(unknown_event, LogNamespace::Legacy)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_protojson_without_panicking() {
         let deserializer = NativeJsonDeserializerConfig::default().build();
         let malformed = [
             json!({}),
@@ -223,6 +264,56 @@ mod test {
                     }
                 }
             }),
+            json!({"event": {"metric": {"name": "invalid-kind", "kind": 99, "counter": {}}}}),
+            json!({
+                "event": {
+                    "metric": {
+                        "name": "invalid-distribution1-statistic",
+                        "distribution1": {"statistic": 99}
+                    }
+                }
+            }),
+            json!({
+                "event": {
+                    "metric": {
+                        "name": "invalid-distribution2-statistic",
+                        "distribution2": {"statistic": 99}
+                    }
+                }
+            }),
+            json!({"event": {"log": {"value": {"null": 99}}}}),
+            json!({
+                "event": {
+                    "metric": {
+                        "name": "sketch-key-overflow",
+                        "sketch": {"agentDdSketch": {"k": [32768], "n": [1]}}
+                    }
+                }
+            }),
+            json!({
+                "event": {
+                    "metric": {
+                        "name": "sketch-key-underflow",
+                        "sketch": {"agentDdSketch": {"k": [-32769], "n": [1]}}
+                    }
+                }
+            }),
+            json!({
+                "event": {
+                    "metric": {
+                        "name": "sketch-count-overflow",
+                        "sketch": {"agentDdSketch": {"k": [0], "n": [65536]}}
+                    }
+                }
+            }),
+            json!({
+                "event": {
+                    "log": {
+                        "value": {"map": {}},
+                        "metadataFull": {"sourceEventId": "AQ=="}
+                    }
+                }
+            }),
             json!({"event": {"log": {"value": {"float": "NaN"}}}}),
         ];
 
@@ -233,5 +324,57 @@ mod test {
                 "malformed native JSON unexpectedly decoded: {value}"
             );
         }
+    }
+
+    #[test]
+    fn accepts_valid_protojson_boundaries() {
+        let deserializer = NativeJsonDeserializerConfig::default().build();
+        let sketch = Bytes::from(
+            serde_json::to_vec(&json!({
+                "event": {
+                    "metric": {
+                        "name": "sketch-boundaries",
+                        "sketch": {
+                            "agentDdSketch": {
+                                "count": 65536,
+                                "k": [-32768, 32767],
+                                "n": [1, 65535]
+                            }
+                        }
+                    }
+                }
+            }))
+            .unwrap(),
+        );
+        let mut events = deserializer.parse(sketch, LogNamespace::Legacy).unwrap();
+        let metric = events.pop().unwrap().into_metric();
+        let MetricValue::Sketch {
+            sketch: MetricSketch::AgentDDSketch(sketch),
+        } = metric.value()
+        else {
+            panic!("decoded metric did not contain an Agent DDSketch");
+        };
+        assert_eq!(
+            sketch.bin_map().into_parts(),
+            (vec![i16::MIN, i16::MAX], vec![1, u16::MAX])
+        );
+
+        let source_event_id = Bytes::from(
+            serde_json::to_vec(&json!({
+                "event": {
+                    "log": {
+                        "value": {"map": {}},
+                        "metadataFull": {
+                            "sourceEventId": "AAAAAAAAAAAAAAAAAAAAAA=="
+                        }
+                    }
+                }
+            }))
+            .unwrap(),
+        );
+        let events = deserializer
+            .parse(source_event_id, LogNamespace::Legacy)
+            .unwrap();
+        assert_eq!(events[0].metadata().source_event_id(), Some(Uuid::nil()));
     }
 }

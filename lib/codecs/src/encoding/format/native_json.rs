@@ -49,6 +49,7 @@ impl Encoder<Event> for NativeJsonSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::BytesMut;
+    use uuid::Uuid;
     use vector_core::{
         buckets,
         event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent, Value},
@@ -58,25 +59,26 @@ mod tests {
 
     use super::*;
 
+    fn with_fixed_source_event_id(mut event: Event) -> Event {
+        let metadata = std::mem::take(event.metadata_mut());
+        *event.metadata_mut() = metadata.with_source_event_id(Some(Uuid::nil()));
+        event
+    }
+
     #[test]
-    fn serialize_json() {
-        let event = Event::Log(LogEvent::from(btreemap! {
+    fn serialize_log_is_byte_stable() {
+        let event = with_fixed_source_event_id(Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
-        }));
+        })));
         let mut serializer = NativeJsonSerializer;
         let mut bytes = BytesMut::new();
 
         serializer.encode(event, &mut bytes).unwrap();
 
-        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(json.as_object().map(serde_json::Map::len), Some(1));
-        assert!(json.get("event").is_some());
         assert_eq!(
-            json.pointer("/event/log/value/map/fields/foo/rawBytes"),
-            Some(&serde_json::Value::String("YmFy".to_owned()))
+            bytes.as_ref(),
+            br#"{"event":{"log":{"metadataFull":{"sourceEventId":"AAAAAAAAAAAAAAAAAAAAAA==","value":{"map":{}}},"value":{"map":{"fields":{"foo":{"rawBytes":"YmFy"}}}}}}}"#
         );
-        assert!(json.pointer("/event/log/fields").is_none());
-        assert!(json.pointer("/event/log/metadata").is_none());
     }
 
     #[test]
@@ -96,7 +98,7 @@ mod tests {
 
     #[test]
     fn serialize_aggregated_histogram() {
-        let histogram_event = Event::from(
+        let histogram_event = with_fixed_source_event_id(Event::from(
             Metric::new(
                 "histogram",
                 MetricKind::Absolute,
@@ -107,37 +109,34 @@ mod tests {
                 },
             )
             .with_tags(Some(metric_tags!("service" => "api"))),
-        );
+        ));
 
         let mut serializer = NativeJsonSerializer;
         let mut bytes = BytesMut::new();
         serializer.encode(histogram_event, &mut bytes).unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(
-            json.pointer("/event/metric/aggregatedHistogram3/count"),
-            Some(&serde_json::Value::String("1".to_owned()))
+            bytes.as_ref(),
+            br#"{"event":{"metric":{"aggregatedHistogram3":{"buckets":[{"upperLimit":"-Infinity"},{"count":"1","upperLimit":2.0},{"upperLimit":"Infinity"}],"count":"1","sum":1.0},"kind":"Absolute","metadataFull":{"sourceEventId":"AAAAAAAAAAAAAAAAAAAAAA==","value":{"map":{}}},"name":"histogram","tagsV2":{"service":{"values":[{"value":"api"}]}}}}}"#
         );
-        assert!(json.pointer("/event/metric/aggregatedHistogram1").is_none());
-        assert!(json.pointer("/event/metric/aggregatedHistogram2").is_none());
-        assert!(json.pointer("/event/metric/tagsV1").is_none());
-        assert_eq!(
-            json.pointer("/event/metric/tagsV2/service/values/0/value"),
-            Some(&serde_json::Value::String("api".to_owned()))
-        );
-        assert!(json.pointer("/event/metric/metadata").is_none());
     }
 
     #[test]
-    fn serialize_trace_omits_deprecated_metadata() {
+    fn serialize_trace_is_byte_stable() {
         let mut serializer = NativeJsonSerializer;
         let mut bytes = BytesMut::new();
 
         serializer
-            .encode(Event::Trace(TraceEvent::default()), &mut bytes)
+            .encode(
+                with_fixed_source_event_id(Event::Trace(TraceEvent::from(btreemap! {
+                    "foo" => Value::from("bar")
+                }))),
+                &mut bytes,
+            )
             .unwrap();
 
-        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert!(json.pointer("/event/trace/metadata").is_none());
-        assert!(json.pointer("/event/trace/metadataFull").is_some());
+        assert_eq!(
+            bytes.as_ref(),
+            br#"{"event":{"trace":{"fields":{"foo":{"rawBytes":"YmFy"}},"metadataFull":{"sourceEventId":"AAAAAAAAAAAAAAAAAAAAAA==","value":{"map":{}}}}}}"#
+        );
     }
 }

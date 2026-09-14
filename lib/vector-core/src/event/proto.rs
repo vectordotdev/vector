@@ -940,6 +940,18 @@ mod tests {
     // This pins the expected default when decoding payloads created before event IDs existed.
     const PRE_V41_METADATA: &[u8] = &[34, 6, 108, 101, 103, 97, 99, 121];
 
+    // Current EventWrapper.metric containing:
+    // - name field 1 set to "requests", kind field 4 set to Absolute, and Counter field 5 set to 1.0;
+    // - namespace field 11 set to "production", with namespace_v2 field 22 absent;
+    // - the empty legacy metadata field 19 and current metadata_full field 21.
+    // This pins binary native to the legacy namespace field while native JSON uses the
+    // presence-aware field.
+    const CURRENT_NATIVE_NAMESPACE: &[u8] = &[
+        18, 47, 10, 8, 114, 101, 113, 117, 101, 115, 116, 115, 32, 1, 42, 9, 9, 0, 0, 0, 0, 0, 0,
+        240, 63, 90, 10, 112, 114, 111, 100, 117, 99, 116, 105, 111, 110, 154, 1, 2, 58, 0, 170, 1,
+        4, 10, 2, 58, 0,
+    ];
+
     #[test]
     fn decodes_pre_v23_log_fields() {
         let decoded = crate::event::LogEvent::from(Log::decode(PRE_V23_LOG_FIELDS).unwrap());
@@ -1066,28 +1078,68 @@ mod tests {
     }
 
     #[test]
-    fn native_json_metric_encoding_preserves_empty_namespace_presence() {
+    fn native_json_metric_encoding_preserves_namespace_presence() {
+        for namespace in [None, Some(""), Some("production")] {
+            let event = crate::event::Event::Metric(
+                crate::event::Metric::new(
+                    "requests",
+                    crate::event::MetricKind::Absolute,
+                    EventMetricValue::Counter { value: 1.0 },
+                )
+                .with_namespace(namespace.map(str::to_owned)),
+            );
+
+            let native = EventWrapper::from(event.clone()).event.unwrap();
+            let native_json = EventWrapper::from_event_for_native_json(event)
+                .event
+                .unwrap();
+            let (Event::Metric(native), Event::Metric(native_json)) = (native, native_json) else {
+                panic!("event wrappers did not contain metrics");
+            };
+
+            assert_eq!(native.namespace, namespace.unwrap_or_default());
+            assert_eq!(native.namespace_v2, None);
+            assert!(native_json.namespace.is_empty());
+            assert_eq!(native_json.namespace_v2.as_deref(), namespace);
+            assert_eq!(
+                crate::event::Metric::from(native_json).namespace(),
+                namespace
+            );
+        }
+    }
+
+    #[test]
+    fn namespace_v2_takes_precedence_over_legacy_namespace() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            namespace: "legacy".to_owned(),
+            namespace_v2: Some("current".to_owned()),
+            value: Some(MetricValue::Counter(Counter { value: 1.0 })),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            crate::event::Metric::from(metric).namespace(),
+            Some("current")
+        );
+    }
+
+    #[test]
+    fn binary_native_keeps_namespace_on_field_11() {
         let event = crate::event::Event::Metric(
-            crate::event::Metric::new(
+            crate::event::Metric::new_with_metadata(
                 "requests",
                 crate::event::MetricKind::Absolute,
                 EventMetricValue::Counter { value: 1.0 },
+                crate::event::EventMetadata::default().with_source_event_id(None),
             )
-            .with_namespace(Some(String::new())),
+            .with_namespace(Some("production".to_owned())),
         );
 
-        let native = EventWrapper::from(event.clone()).event.unwrap();
-        let native_json = EventWrapper::from_event_for_native_json(event)
-            .event
-            .unwrap();
-        let (Event::Metric(native), Event::Metric(native_json)) = (native, native_json) else {
-            panic!("event wrappers did not contain metrics");
-        };
-
-        assert!(native.namespace.is_empty());
-        assert_eq!(native.namespace_v2, None);
-        assert!(native_json.namespace.is_empty());
-        assert_eq!(native_json.namespace_v2, Some(String::new()));
+        assert_eq!(
+            EventWrapper::from(event).encode_to_vec(),
+            CURRENT_NATIVE_NAMESPACE
+        );
     }
 
     #[test]

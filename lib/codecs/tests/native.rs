@@ -71,21 +71,19 @@ fn value_strategy(leaf: BoxedStrategy<Value>) -> BoxedStrategy<Value> {
     .boxed()
 }
 
-fn json_safe_value() -> BoxedStrategy<Value> {
-    value_strategy(json_safe_leaf())
-}
-
 fn datetime() -> BoxedStrategy<DateTime<Utc>> {
     (-32_000_i64..=32_000, 0_u32..1_000_000_000)
         .prop_map(|(seconds, nanoseconds)| DateTime::from_timestamp(seconds, nanoseconds).unwrap())
         .boxed()
 }
 
-fn proto_value() -> BoxedStrategy<Value> {
+fn native_value() -> BoxedStrategy<Value> {
     value_strategy(
         prop_oneof![
             5 => json_safe_leaf(),
             1 => datetime().prop_map(Value::Timestamp),
+            1 => proptest::collection::vec(any::<u8>(), 0..16)
+                .prop_map(|bytes| Value::Bytes(bytes.into())),
         ]
         .boxed(),
     )
@@ -220,10 +218,13 @@ fn interval() -> BoxedStrategy<Option<NonZeroU32>> {
         .boxed()
 }
 
-fn event_strategy(value: BoxedStrategy<Value>) -> BoxedStrategy<Event> {
+fn event_strategy(
+    value: BoxedStrategy<Value>,
+    namespace: BoxedStrategy<Option<String>>,
+) -> BoxedStrategy<Event> {
     let metadata = event_metadata(value.clone());
-    let log = (object_map(value.clone()), metadata.clone())
-        .prop_map(|(fields, metadata)| Event::Log(LogEvent::from_map(fields, metadata)));
+    let log = (value.clone(), metadata.clone())
+        .prop_map(|(value, metadata)| Event::Log(LogEvent::from_parts(value, metadata)));
     let trace = (object_map(value), metadata.clone())
         .prop_map(|(fields, metadata)| Event::Trace(TraceEvent::from_parts(fields, metadata)));
     let metric = (
@@ -231,7 +232,7 @@ fn event_strategy(value: BoxedStrategy<Value>) -> BoxedStrategy<Event> {
         prop_oneof![Just(MetricKind::Absolute), Just(MetricKind::Incremental)],
         metric_value(),
         metric_tags(),
-        proptest::option::of(nonempty_bounded_string()),
+        namespace,
         timestamp(),
         interval(),
         metadata,
@@ -261,7 +262,12 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(PROPERTY_TESTS))]
 
     #[test]
-    fn native_proto_is_canonical_for_arbitrary_events(event in event_strategy(proto_value())) {
+    fn native_proto_is_canonical_for_arbitrary_events(
+        event in event_strategy(
+            native_value(),
+            proptest::option::of(nonempty_bounded_string()).boxed(),
+        )
+    ) {
         let expected = event.clone();
         let serializer = &mut NativeSerializerConfig.build();
         let mut encoded = BytesMut::new();
@@ -286,7 +292,12 @@ proptest! {
     }
 
     #[test]
-    fn native_json_is_canonical_for_arbitrary_events(event in event_strategy(json_safe_value())) {
+    fn native_json_is_canonical_for_arbitrary_events(
+        event in event_strategy(
+            native_value(),
+            proptest::option::of(bounded_string()).boxed(),
+        )
+    ) {
         let expected = event.clone();
         let serializer = &mut NativeJsonSerializerConfig.build();
         let mut encoded = BytesMut::new();
@@ -298,6 +309,10 @@ proptest! {
             .unwrap();
         prop_assert_eq!(decoded.len(), 1);
         let decoded = decoded.pop().unwrap();
+        prop_assert_eq!(
+            decoded.metadata().source_event_id(),
+            expected.metadata().source_event_id()
+        );
         prop_assert_eq!(&decoded, &expected);
 
         let mut reencoded = BytesMut::new();
@@ -396,4 +411,18 @@ fn native_json_decodes_events_without_metadata() {
         log.metadata().value(),
         &vector_core::event::Value::Object(Default::default())
     );
+}
+
+#[test]
+fn native_json_decodes_legacy_trace() {
+    let input = Bytes::from_static(br#"{"trace":{"sampled":true,"span_id":"abc"}}"#);
+
+    let mut events = NativeJsonDeserializerConfig::default()
+        .build()
+        .parse(input, LogNamespace::Legacy)
+        .unwrap();
+    let trace = events.pop().unwrap().into_trace();
+
+    assert_eq!(trace.get(event_path!("span_id")), Some(&Value::from("abc")));
+    assert_eq!(trace.get(event_path!("sampled")), Some(&Value::from(true)));
 }
