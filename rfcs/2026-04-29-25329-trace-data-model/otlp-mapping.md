@@ -144,14 +144,11 @@ RFC's all-spans-rejected rule. A typed event made empty by a transform remains
 representable because it retains `TraceEvent.trace_id`.
 
 The OTLP legacy shim applies the same partitioning to every `ScopeSpans` it recovers. A
-pre-flip per-span OTLP event converts one-to-one into a typed event whose `spans` holds
-that span. Today's default ingest flattens each `ScopeSpans` and does not store scope
-data, either schema URL, `Resource.dropped_attributes_count`, or span/link flags; those
-slots take their typed defaults and are not recovered after a buffer. A legacy event
-that still carries `ScopeSpans` groupings (for example `use_otlp_decoding` batch
-encoding) may fan out further by the distinct trace IDs in each grouping and can
-populate those slots. Metadata, finalizers, and acknowledgements on the resulting
-sequence follow the parent RFC's conversion contract.
+pre-flip per-span OTLP event converts one-to-one. Fields the current per-span layout
+does not carry take typed defaults and are not recovered. A legacy event that still
+carries `ScopeSpans` groupings may fan out by distinct trace IDs and can populate
+those slots. Metadata, finalizers, and acknowledgements follow the parent RFC's
+conversion contract.
 
 The `OTLP -> Vector -> OTLP` effective-equivalence guarantee is a mapping from decoded
 `ResourceSpans` / `ScopeSpans` through the typed model and back. It is not a claim that

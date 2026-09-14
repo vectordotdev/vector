@@ -200,6 +200,10 @@ with at least one span expands into one `TraceEvent` per distinct
 
 The grouping rules are:
 
+- Before partitioning, for a given `Span.traceID` low half, a well-formed `_dd.p.tid`
+  on any span in the chunk applies to every span with that low half. An absent tag is
+  zero only when no sibling with that low half supplied one. Conflicting high halves
+  for the same low ID: wire-order first wins.
 - Scan each `TraceChunk`'s successfully decoded spans in wire order. The first span for
   a `(trace_id, service)` pair creates a group at the end of the group sequence; later
   spans with that pair append to the existing group. Emit one `TraceEvent` per group in
@@ -231,19 +235,11 @@ The grouping rules are:
   RFC's canonical constructor.
 - `Scope` is left default; Datadog has no scope concept.
 
-The `datadog_agent` legacy shim applies the same grouping. Today's
-`convert_dd_tracer_payload` emits one `LegacyTraceEvent` per `TraceChunk`, including
-when that chunk contains spans with more than one `Span.service` or reconstructed wire
-trace ID.
-Pre-flip source output keeps that one-event-per-chunk shape so existing legacy VRL is
-unchanged. The shim splits
-the chunk's successfully converted spans by distinct reconstructed trace ID and
-`Span.service` pairs into the same typed events native ingest would have produced, in
-first-seen pair order.
-Today's ingest merges tracer tags into chunk tags and then agent tags into that same
-map, and does not store tracer hostname/environment separately from the agent envelope
-or `rareSamplerEnabled`. Those distinctions take typed defaults or the merged map and
-are not recovered after a buffer.
+The `datadog_agent` legacy shim applies the same grouping. Pre-flip source output is
+one event per `TraceChunk`, so existing legacy VRL is unchanged. The shim splits
+that chunk into the same typed events native ingest would have produced. The current
+layout merges or omits agent, tracer, and chunk distinctions; those slots are not
+recovered after a buffer.
 Metadata, finalizers, and acknowledgements on the resulting sequence follow the
 parent RFC's conversion contract. An empty-spans
 legacy chunk converts to zero typed events, matching native ingest.
@@ -343,26 +339,18 @@ round-trip exclusion above.
 
 #### `_dd.p.tid` (128-bit trace-ID high half)
 
-On ingress, `meta["_dd.p.tid"]` is consumed *before* the meta-merge step: the key is read from the
-wire `meta` map, parsed, and removed before the remaining `meta` entries flow into
-`Span.attributes`. It never appears in `Span.attributes` even transiently. The value is parsed as a
-hex-encoded `u64`. A value that cannot be parsed that way indicates a malformed span, and
-the span is dropped under the parent RFC's malformed-input rule even when the low half is
-non-zero, because trace identity cannot be reconstructed. A well-formed value contributes
-to the grouping key stored in `TraceEvent.trace_id`. An absent `_dd.p.tid`, or a key
-present with an empty value, is treated as equivalent to absent: the high half is zero and the span is not
-dropped, yielding a valid 64-bit trace ID. The accepted lexical forms are an
-implementation choice.
+On ingress, `meta["_dd.p.tid"]` is consumed into `TraceEvent.trace_id` and is not
+retained as a span attribute. A value that cannot be parsed as a hex-encoded `u64` is
+malformed and drops the span under the parent RFC's malformed-input rule even when the
+low half is non-zero. A well-formed value contributes to the grouping key stored in
+`TraceEvent.trace_id`. An absent `_dd.p.tid`, or a key present with an empty value, is
+equivalent to absent and does not drop the span.
 
 The tag is sink-owned: Datadog egress derives it exclusively from
-`TraceEvent.trace_id.high_u64()`, so the event-level ID is the single source of truth
-for trace identity. If the high half is non-zero, egress writes `meta["_dd.p.tid"]` as a zero-
-padded 16-character lowercase hex string to match the Datadog Agent's canonical form; if
-zero, the tag is omitted. Before writing the event-ID-derived value, any `_dd.p.tid`
-entry placed into `meta` by the attribute partition step is removed, so the
-event-ID-derived write is the sole source for this key regardless of what a transform
-may have written to `attributes["_dd.p.tid"]`. Removing such an entry is reported;
-Datadog has no wire dropped-attribute count to update.
+`TraceEvent.trace_id.high_u64()`. If the high half is non-zero, egress writes
+`meta["_dd.p.tid"]` as a zero-padded 16-character lowercase hex string; if zero, the
+tag is omitted. A transform-authored `attributes["_dd.p.tid"]` does not win. Removing
+such an entry is reported; Datadog has no wire dropped-attribute count to update.
 
 #### `SpanLink.traceID_high`
 
@@ -595,7 +583,9 @@ NaN payload and positive and negative zero remain distinct. This applies to norm
 envelope doubles and doubles nested in resource or chunk attributes.
 
 Datadog egress groups events into wire `AgentPayload` / `TracerPayload` / `TraceChunk`
-structures by nested grouping keys:
+structures by nested grouping keys. Request partition includes
+`EventMetadata.datadog_api_key` outside those keys, including for APM stats, so
+fan-in of different tenants cannot share a payload.
 
 **`AgentPayload` grouping.** Groups events by their effective envelope and emits one
 `AgentPayload` per group. `TraceEvent.datadog.agent = Some(...)` is authoritative
@@ -658,8 +648,9 @@ Grouping keys use that same effective priority, so `None` and
 `Some(DatadogChunkContext::default())` share an egress group as `AutoKeep`. Within each
 `TracerPayload`, group spans across events by the effective `DatadogChunkContext` plus
 `TraceEvent.trace_id`, and emit one `TraceChunk` per group. This
-re-coalesces the service partitions of a conforming chunk while keeping a
-non-conforming multi-trace chunk separated by ID. An explicit `Some(AutoReject)`,
+re-coalesces the service partitions of one source `TraceChunk` while keeping a
+non-conforming multi-trace chunk separated by ID. Distinct source chunks remain
+distinct even when their reconstructed context and trace ID match. An explicit `Some(AutoReject)`,
 including a Datadog-decoded all-default chunk whose wire priority was `0`, does not share
 that group.
 

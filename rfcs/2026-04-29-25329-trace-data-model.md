@@ -601,10 +601,8 @@ A present but unrecognized hint returns the same error without attempting detect
   it under normal acknowledgement semantics. There is no reverse conversion.
 - Pass-through transforms that emit traces (`sample`, `delay`, and similar) are
   representation-preserving: they emit the same variant they received and never convert
-  `Legacy` to `Typed`. Converting at `sample` would send `Typed` into a downstream
-  `remap` that still defaults to `legacy` and rejects typed input, so a common
-  `source -> sample -> remap` pipeline would enter the mapping-error path as soon as
-  `sample` migrated.
+  `Legacy` to `Typed`. On typed input, the default `.sample_rate` write has no carrier
+  and is omitted; `Legacy` still receives it.
 - Successful conversion clones the original `EventMetadata`, including its
   `EventFinalizers`, onto every resulting `TraceEvent`, so acknowledgements wait for
   every result as they do for Vector's existing fan-out. A conversion that yields no
@@ -718,13 +716,8 @@ today's inner map and `Typed` is the canonical `{trace_id, resource, scope, data
 object. `EventMetadata` is omitted. `native_json` still wraps the payload as `{"trace": ...}`.
 These codecs emit the representation they received and do not convert.
 
-JSON input does not carry `EventMetadata`, so the layout hint is unavailable. Decode
-autodetects with a typed-shape detector alongside the Datadog and OTLP detectors, using
-the same uniqueness rule: exactly one match selects `Typed` or `Legacy`; zero or
-multiple matches are a reported error. Do not derive the default externally tagged
-enum: that would wrap legacy payloads in `{"legacy": ...}` as soon as the
-compatibility enum exists, and `Serialize` would still compile after the
-untyped-forwarder gate.
+The generic `json` decoder remains log-only. Trace decode uses `native_json`, whose
+outer `{"trace": ...}` tag is the discriminator; the payload under that tag is untagged.
 
 ## Rationale
 
@@ -1187,7 +1180,7 @@ The work is organized into seven stages.
    survive those boundaries.
 4. **Integrate the validated mappings with coexistence.** Register the shared format
    converters and format-shape detectors from stage 2 as the two
-   `LegacyTraceEvent -> TraceEvent` shims, add the typed-shape detector for JSON /
+   `LegacyTraceEvent -> TraceEvent` shims, add the typed-shape detector for
    `native_json` input, and adapt the already-migrated protocol sinks to accept
    `TraceEventCompat` at every intake path. A `Typed` input passes through directly; a
    `Legacy` input uses the same conversion validated behind the sink buffer in stage 2.
