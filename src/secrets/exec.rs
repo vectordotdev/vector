@@ -255,7 +255,8 @@ mod tests {
     )]
     async fn test_exec_backend(protocol: ExecVersion) {
         let mut backend = make_test_backend(protocol);
-        let mut rx = crate::signal::ShutdownReceiver::new(broadcast::channel(1).1);
+        let (_shutdown_tx, shutdown_rx) = broadcast::channel(1);
+        let mut rx = crate::signal::ShutdownReceiver::new(shutdown_rx);
         // These fake secrets are statically contained in mock_secrets_exec.py
         let fake_secret_values: HashMap<String, String> = [
             ("fake_secret_1", "123456"),
@@ -283,7 +284,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_exec_backend_missing_secrets() {
         let mut backend = make_test_backend(ExecVersion::V1);
-        let mut rx = crate::signal::ShutdownReceiver::new(broadcast::channel(1).1);
+        let (_shutdown_tx, shutdown_rx) = broadcast::channel(1);
+        let mut rx = crate::signal::ShutdownReceiver::new(shutdown_rx);
         let query_secrets: HashSet<String> =
             ["fake_secret_900"].into_iter().map(String::from).collect();
         let fetched_keys = backend.retrieve(query_secrets.clone(), &mut rx).await;
