@@ -791,7 +791,7 @@ fn truncated_protobuf_is_invalid_payload() {
     assert!(
         matches!(
             error,
-            crate::event::ser::DecodeError::InvalidProtobufPayload { .. }
+            crate::event::DecodeError::InvalidProtobufPayload { .. }
         ),
         "truncated protobuf should be InvalidProtobufPayload, got {error:?}"
     );
@@ -809,12 +809,7 @@ fn unknown_event_array_variant_is_not_invalid_protobuf() {
     let buffer = bytes::Bytes::from_static(&[34, 0]);
     let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
     assert!(
-        matches!(
-            error,
-            crate::event::ser::DecodeError::InvalidEvent {
-                source: proto::EventProtoError::UnrecognizedEventVariant,
-            }
-        ),
+        matches!(error, crate::event::DecodeError::UnrecognizedEventVariant),
         "unknown oneof tag should be UnrecognizedEventVariant, got {error:?}"
     );
 }
@@ -836,12 +831,7 @@ fn nan_float_is_rejected_by_encodable_decode() {
 
     let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
     assert!(
-        matches!(
-            error,
-            crate::event::ser::DecodeError::InvalidEvent {
-                source: proto::EventProtoError::NanFloat,
-            }
-        ),
+        matches!(error, crate::event::DecodeError::NanFloat),
         "NaN float should be NanFloat, got {error:?}"
     );
 }

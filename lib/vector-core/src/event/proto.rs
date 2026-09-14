@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::TimeZone;
 use ordered_float::NotNan;
-use snafu::Snafu;
 use uuid::Uuid;
 
 use super::{MetricTags, WithMetadata};
@@ -19,32 +18,11 @@ use vrl::value::{ObjectMap, Value as VrlValue};
 
 use super::EventFinalizers;
 use super::metadata::{Inner, default_schema_definition};
+use super::ser::DecodeError;
 use super::{EventMetadata, array, metric::MetricSketch};
 
-/// Failure converting a structurally valid internal event protobuf into Vector's in-memory types.
-///
-/// Distinct from a `prost` decode failure: the bytes parsed as protobuf, but a required event
-/// variant was absent/unrecognized or a value could not be represented.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
-pub enum EventProtoError {
-    #[snafu(display(
-        "event protobuf was structurally valid but an event or metric variant was absent or unrecognized; this often indicates a version mismatch"
-    ))]
-    UnrecognizedEventVariant,
-    #[snafu(display(
-        "event protobuf contained a NaN float, which cannot be represented in Vector's event model"
-    ))]
-    NanFloat,
-    #[snafu(display("event protobuf contained an invalid timestamp"))]
-    InvalidTimestamp,
-    #[snafu(display(
-        "event protobuf contained an AgentDDSketch whose k and n bin lists have different lengths"
-    ))]
-    MismatchedSketchBins,
-}
-
-fn require_variant<T>(value: Option<T>) -> Result<T, EventProtoError> {
-    value.ok_or(EventProtoError::UnrecognizedEventVariant)
+fn require_variant<T>(value: Option<T>) -> Result<T, DecodeError> {
+    value.ok_or(DecodeError::UnrecognizedEventVariant)
 }
 
 impl event_array::Events {
@@ -78,7 +56,7 @@ impl From<array::EventArray> for EventArray {
 }
 
 impl TryFrom<EventArray> for array::EventArray {
-    type Error = EventProtoError;
+    type Error = DecodeError;
 
     fn try_from(events: EventArray) -> Result<Self, Self::Error> {
         match require_variant(events.events)? {
@@ -131,7 +109,7 @@ impl From<Trace> for Event {
 }
 
 impl TryFrom<Log> for super::LogEvent {
-    type Error = EventProtoError;
+    type Error = DecodeError;
 
     #[allow(deprecated)]
     fn try_from(log: Log) -> Result<Self, Self::Error> {
@@ -157,7 +135,7 @@ impl TryFrom<Log> for super::LogEvent {
 }
 
 impl TryFrom<Trace> for super::TraceEvent {
-    type Error = EventProtoError;
+    type Error = DecodeError;
 
     fn try_from(trace: Trace) -> Result<Self, Self::Error> {
         #[allow(deprecated)]
@@ -175,7 +153,7 @@ impl TryFrom<Trace> for super::TraceEvent {
 }
 
 impl TryFrom<MetricValue> for super::MetricValue {
-    type Error = EventProtoError;
+    type Error = DecodeError;
 
     #[allow(deprecated)]
     fn try_from(value: MetricValue) -> Result<Self, Self::Error> {
@@ -238,7 +216,7 @@ impl TryFrom<MetricValue> for super::MetricValue {
 }
 
 impl TryFrom<Metric> for super::Metric {
-    type Error = EventProtoError;
+    type Error = DecodeError;
 
     #[allow(deprecated)]
     fn try_from(metric: Metric) -> Result<Self, Self::Error> {
@@ -296,7 +274,7 @@ impl TryFrom<Metric> for super::Metric {
 }
 
 impl TryFrom<EventWrapper> for super::Event {
-    type Error = EventProtoError;
+    type Error = DecodeError;
 
     fn try_from(proto: EventWrapper) -> Result<Self, Self::Error> {
         match require_variant(proto.event)? {
@@ -563,7 +541,7 @@ impl From<AgentDDSketch> for Sketch {
 }
 
 impl TryFrom<sketch::AgentDdSketch> for MetricSketch {
-    type Error = EventProtoError;
+    type Error = DecodeError;
 
     fn try_from(sketch: sketch::AgentDdSketch) -> Result<Self, Self::Error> {
         // These safe conversions are annoying because the Datadog Agent internally uses i16/u16,
@@ -592,7 +570,7 @@ impl TryFrom<sketch::AgentDdSketch> for MetricSketch {
                 &keys,
                 &counts,
             )
-            .ok_or(EventProtoError::MismatchedSketchBins)?,
+            .ok_or(DecodeError::MismatchedSketchBins)?,
         ))
     }
 }
@@ -679,7 +657,7 @@ impl From<EventMetadata> for Metadata {
 }
 
 impl TryFrom<Metadata> for EventMetadata {
-    type Error = EventProtoError;
+    type Error = DecodeError;
 
     fn try_from(value: Metadata) -> Result<Self, Self::Error> {
         let Metadata {
@@ -738,7 +716,7 @@ impl TryFrom<Metadata> for EventMetadata {
 fn decode_event_metadata(
     metadata_full: Option<Metadata>,
     metadata: Option<Value>,
-) -> Result<EventMetadata, EventProtoError> {
+) -> Result<EventMetadata, DecodeError> {
     if let Some(full) = metadata_full {
         full.try_into()
     } else if let Some(value) = metadata {
@@ -752,16 +730,16 @@ fn decode_event_metadata(
 
 fn decode_timestamp(
     ts: &prost_types::Timestamp,
-) -> Result<chrono::DateTime<chrono::Utc>, EventProtoError> {
+) -> Result<chrono::DateTime<chrono::Utc>, DecodeError> {
     // Sign is never lost as ts.nanos is always non negative (per proto spec)
     #[allow(clippy::cast_sign_loss)]
     chrono::Utc
         .timestamp_opt(ts.seconds, ts.nanos as u32)
         .single()
-        .ok_or(EventProtoError::InvalidTimestamp)
+        .ok_or(DecodeError::InvalidTimestamp)
 }
 
-fn decode_value(input: Value) -> Result<Option<super::Value>, EventProtoError> {
+fn decode_value(input: Value) -> Result<Option<super::Value>, DecodeError> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Ok(Some(super::Value::Bytes(data))),
         Some(value::Kind::Timestamp(ts)) => {
@@ -769,7 +747,7 @@ fn decode_value(input: Value) -> Result<Option<super::Value>, EventProtoError> {
         }
         Some(value::Kind::Integer(value)) => Ok(Some(super::Value::Integer(value))),
         Some(value::Kind::Float(value)) => {
-            let value = NotNan::new(value).map_err(|_| EventProtoError::NanFloat)?;
+            let value = NotNan::new(value).map_err(|_| DecodeError::NanFloat)?;
             Ok(Some(super::Value::Float(value)))
         }
         Some(value::Kind::Boolean(value)) => Ok(Some(super::Value::Boolean(value))),
@@ -783,7 +761,7 @@ fn decode_value(input: Value) -> Result<Option<super::Value>, EventProtoError> {
     }
 }
 
-fn decode_map(fields: BTreeMap<String, Value>) -> Result<Option<super::Value>, EventProtoError> {
+fn decode_map(fields: BTreeMap<String, Value>) -> Result<Option<super::Value>, DecodeError> {
     let mut map = ObjectMap::new();
     for (key, value) in fields {
         let Some(decoded) = decode_value(value)? else {
@@ -794,7 +772,7 @@ fn decode_map(fields: BTreeMap<String, Value>) -> Result<Option<super::Value>, E
     Ok(Some(event::Value::Object(map)))
 }
 
-fn decode_array(items: Vec<Value>) -> Result<Option<super::Value>, EventProtoError> {
+fn decode_array(items: Vec<Value>) -> Result<Option<super::Value>, DecodeError> {
     let mut decoded_items = Vec::with_capacity(items.len());
     for item in items {
         let Some(decoded) = decode_value(item)? else {
@@ -1023,7 +1001,7 @@ mod tests {
         let proto = EventArray { events: None };
         assert_eq!(
             array::EventArray::try_from(proto),
-            Err(EventProtoError::UnrecognizedEventVariant)
+            Err(DecodeError::UnrecognizedEventVariant)
         );
     }
 
@@ -1032,7 +1010,7 @@ mod tests {
         let proto = EventWrapper { event: None };
         assert_eq!(
             crate::event::Event::try_from(proto),
-            Err(EventProtoError::UnrecognizedEventVariant)
+            Err(DecodeError::UnrecognizedEventVariant)
         );
     }
 
@@ -1045,7 +1023,7 @@ mod tests {
         };
         assert_eq!(
             crate::event::Metric::try_from(proto),
-            Err(EventProtoError::UnrecognizedEventVariant)
+            Err(DecodeError::UnrecognizedEventVariant)
         );
     }
 
@@ -1058,7 +1036,7 @@ mod tests {
         };
         assert_eq!(
             crate::event::Metric::try_from(proto),
-            Err(EventProtoError::UnrecognizedEventVariant)
+            Err(DecodeError::UnrecognizedEventVariant)
         );
     }
 
@@ -1081,7 +1059,7 @@ mod tests {
         };
         assert_eq!(
             crate::event::Metric::try_from(proto),
-            Err(EventProtoError::MismatchedSketchBins)
+            Err(DecodeError::MismatchedSketchBins)
         );
     }
 
@@ -1090,7 +1068,7 @@ mod tests {
         let value = Value {
             kind: Some(value::Kind::Float(f64::NAN)),
         };
-        assert_eq!(decode_value(value), Err(EventProtoError::NanFloat));
+        assert_eq!(decode_value(value), Err(DecodeError::NanFloat));
     }
 
     #[test]
@@ -1105,7 +1083,7 @@ mod tests {
         };
         assert_eq!(
             crate::event::Event::try_from(proto),
-            Err(EventProtoError::NanFloat)
+            Err(DecodeError::NanFloat)
         );
     }
 
@@ -1124,7 +1102,7 @@ mod tests {
         };
         assert_eq!(
             crate::event::Event::try_from(proto),
-            Err(EventProtoError::NanFloat)
+            Err(DecodeError::NanFloat)
         );
     }
 
@@ -1137,7 +1115,7 @@ mod tests {
         assert!(proto.events.is_none());
         assert_eq!(
             array::EventArray::try_from(proto),
-            Err(EventProtoError::UnrecognizedEventVariant)
+            Err(DecodeError::UnrecognizedEventVariant)
         );
     }
 
@@ -1149,7 +1127,7 @@ mod tests {
         assert!(proto.event.is_none());
         assert_eq!(
             crate::event::Event::try_from(proto),
-            Err(EventProtoError::UnrecognizedEventVariant)
+            Err(DecodeError::UnrecognizedEventVariant)
         );
     }
 }

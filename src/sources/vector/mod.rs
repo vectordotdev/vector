@@ -61,7 +61,7 @@ impl proto::Service for Service {
             match Event::try_from(wrapper) {
                 Ok(event) => events.push(event),
                 Err(error) => {
-                    emit!(GrpcEventDecodeError { error });
+                    emit!(GrpcEventDecodeError { error: &error });
                     return Err(Status::invalid_argument(error.to_string()));
                 }
             }
