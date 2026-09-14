@@ -1,6 +1,5 @@
 use std::{
     fmt,
-    hash::{Hash, Hasher},
     num::{NonZeroU64, NonZeroUsize},
 };
 
@@ -128,15 +127,10 @@ impl EventSampleMode {
         }
     }
 
-    fn sample(&self, group_by_key: Option<&str>, is_new_group: bool, counter: &mut u64) -> bool {
+    fn sample(&self, counter: &mut u64) -> bool {
         let old_counter_value = *counter;
         *counter += 1;
-
-        let sampling_key = if is_new_group { None } else { group_by_key };
-        let mut hasher = seahash::SeaHasher::new();
-        sampling_key.hash(&mut hasher);
-        old_counter_value.hash(&mut hasher);
-        let hash = hasher.finish();
+        let hash = seahash::hash(&old_counter_value.to_ne_bytes());
 
         match self {
             Self::Ratio(ratio) => hash <= hash_ratio_threshold(*ratio),
@@ -172,6 +166,14 @@ pub enum SampleKeySource {
         fields: DynamicSampleFields,
         group_by: Option<UnconfinedTemplate>,
     },
+}
+
+impl SampleKeySource {
+    const fn group_by(&self) -> Option<&UnconfinedTemplate> {
+        match self {
+            Self::Static { group_by, .. } | Self::Dynamic { group_by, .. } => group_by.as_ref(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -242,24 +244,26 @@ impl Sample {
             static_state: static_mode.new_state(),
             dynamic_event_counter: 0,
         };
+        let group_capacity = if key_source.group_by().is_some() {
+            max_groups
+        } else {
+            NonZeroUsize::MIN
+        };
         Self {
             name,
             static_mode,
             key_source,
             next_group_state,
-            group_states: LruCache::new(max_groups),
+            group_states: LruCache::new(group_capacity),
             exclude,
             sample_rate_key,
         }
     }
 
-    fn group_state(&mut self, group_by_key: &Option<String>) -> (&mut GroupState, bool) {
-        let is_new_group = !self.group_states.contains(group_by_key);
+    fn group_state(&mut self, group_by_key: &Option<String>) -> &mut GroupState {
         let next_group_state = &mut self.next_group_state;
-        let group_state = self
-            .group_states
-            .get_or_insert_mut_ref(group_by_key, || next_group_state.take_next());
-        (group_state, is_new_group)
+        self.group_states
+            .get_or_insert_mut_ref(group_by_key, || next_group_state.take_next())
     }
 
     #[cfg(test)]
@@ -318,10 +322,7 @@ impl Sample {
     }
 
     fn group_by_key(&self, event: &Event) -> Option<String> {
-        let group_by = match &self.key_source {
-            SampleKeySource::Static { group_by, .. } => group_by.as_ref()?,
-            SampleKeySource::Dynamic { group_by, .. } => group_by.as_ref()?,
-        };
+        let group_by = self.key_source.group_by()?;
 
         match event {
             Event::Log(event) => group_by.render_string(event),
@@ -375,13 +376,9 @@ impl FunctionTransform for Sample {
             .map(EventSampleMode::sample_rate_label)
             .unwrap_or_else(|| self.static_mode.to_string());
 
-        let (group_state, is_new_group) = self.group_state(&group_by_key);
+        let group_state = self.group_state(&group_by_key);
         let should_sample = match event_sample_mode {
-            Some(mode) => mode.sample(
-                group_by_key.as_deref(),
-                is_new_group,
-                &mut group_state.dynamic_event_counter,
-            ),
+            Some(mode) => mode.sample(&mut group_state.dynamic_event_counter),
             None => {
                 let threshold_exceeded = group_state.static_state.sample();
                 static_key_sample.unwrap_or(threshold_exceeded)
@@ -397,7 +394,7 @@ impl FunctionTransform for Sample {
                             event,
                             Some(LegacyKey::Overwrite(path)),
                             path,
-                            sample_rate.clone(),
+                            sample_rate,
                         );
                     }
                     Event::Trace(ref mut event) => {

@@ -444,12 +444,14 @@ fn attacker_controlled_groups_do_not_bypass_dynamic_sampling() {
                     .find_map(|attempt| {
                         let service = format!("service-{index}-{attempt}");
                         let mut candidate = original.clone();
+                        transform_one(&mut candidate, make_event(&service));
                         transform_one(&mut candidate, make_event(&service))
                             .is_some()
                             .then_some(service)
                     })
                     .unwrap_or_else(|| format!("service-{index}-miss"));
 
+                transform_one(&mut sampler, make_event(&service));
                 transform_one(&mut sampler, make_event(&service)).is_some()
             })
             .count();
