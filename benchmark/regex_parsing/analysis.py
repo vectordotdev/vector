@@ -30,6 +30,12 @@ print(f"  Sent in:     {total_written/1e6:7.1f} MB ({total_written/1e6/duration:
 print(f"  Sent out:    {total_received/1e6:7.1f} MB ({total_received/1e6/duration:6.1f} MB/s)")
 print(f"  Requests/s:  {total_requests/duration:.0f}")
 
+# Treat mapping failures as invalid benchmark data. Throughput from a workload
+# that forwards or drops unparsed input is not regex parsing throughput.
+with open(f"{run_dir}/vector.stdout") as f:
+    if any("Mapping failed with event." in line for line in f):
+        raise SystemExit("  Invalid run: Vector reported VRL mapping failures")
+
 # --- Remap CPU breakdown ---
 categories = defaultdict(int)
 total = 0
@@ -51,7 +57,7 @@ with open(f"{run_dir}/sample.folded") as f:
             if any(x in stack for x in ('get_slow', 'create_cache', 'init_cache')):
                 categories['regex: cache miss/init'] += count
             else:
-                categories['regex: DFA matching'] += count
+                categories['regex: matching'] += count
         elif 'capture_regex_to_map' in stack:
             categories['capture_regex_to_map'] += count
         elif 'BTreeMap' in stack and ('clone' in stack or 'dying' in stack):

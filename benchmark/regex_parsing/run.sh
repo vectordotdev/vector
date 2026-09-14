@@ -83,7 +83,7 @@ fi
 echo "  PID $VECTOR_PID"
 
 echo "==> Starting lading (${EXPERIMENT_SECONDS}s experiment)"
-lading \
+env -u LADING_CONFIG lading \
     --config-path "$LADING_CONFIG" \
     --no-target \
     --capture-path "$RUN_DIR/lading.captures" \
