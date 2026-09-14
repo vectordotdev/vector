@@ -18,6 +18,7 @@ sources:
     insert_namespace_fields: true
     kube_config_file: /path/to/.kube/config
     max_line_bytes: 32768
+    max_merged_line_action: drop
     max_read_bytes: 2048
     oldest_first: true
     read_from: beginning

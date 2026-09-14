@@ -26,6 +26,7 @@ pub enum ExecVersion {
         /// The configuration to pass to the secrets executable. This is the `config` field in the
         /// backend request. Refer to the documentation of your `backend_type `to see which options
         /// are required to be set.
+        #[configurable(metadata(docs::required = true))]
         backend_config: Value,
     },
 }
@@ -193,8 +194,8 @@ async fn query_backend(
             }
             Some(stderr) = stderr_stream.next() => {
                 match stderr {
-                    Ok(l) => warn!("An exec backend generated message on stderr: {}.", l),
-                    Err(e) => warn!("Error while reading from an exec backend stderr: {}.", e),
+                    Ok(l) => warn!("An exec backend generated message on stderr: {l}."),
+                    Err(e) => warn!("Error while reading from an exec backend stderr: {e}."),
                 }
             }
             stdout = stdout_stream.next() => {

@@ -444,10 +444,10 @@ enum TraceValue {
 impl fmt::Display for TraceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TraceValue::String(s) => write!(f, "{}", s),
-            TraceValue::Int(i) => write!(f, "{}", i),
-            TraceValue::Uint(u) => write!(f, "{}", u),
-            TraceValue::Bool(b) => write!(f, "{}", b),
+            TraceValue::String(s) => write!(f, "{s}"),
+            TraceValue::Int(i) => write!(f, "{i}"),
+            TraceValue::Uint(u) => write!(f, "{u}"),
+            TraceValue::Bool(b) => write!(f, "{b}"),
         }
     }
 }

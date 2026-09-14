@@ -7,10 +7,10 @@ sinks:
     dangerously_allow_unconfined_template_resolution: false
     encoding:
       codec: json
-    endpoint: https://cloud.humio.com
+    endpoint: https://cloud.humio.com/
     event_type: json
     host_key: .host
-    index: "{{ host }}"
+    index: index-{{ host }}
     timestamp_key: .timestamp
     timestamp_nanos_key: "@timestamp.nanos"
     token: ${HUMIO_TOKEN}

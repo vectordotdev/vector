@@ -40,7 +40,6 @@ use crate::{
 #[serde(deny_unknown_fields)]
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// List of IPv4 multicast groups to join on socket's binding process.
@@ -106,10 +105,8 @@ pub struct UdpConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     receive_buffer_bytes: Option<usize>,
 
-    #[configurable(derived)]
     pub(super) framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub(super) decoding: DeserializerConfig,
 

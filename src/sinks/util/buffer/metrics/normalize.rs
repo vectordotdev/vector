@@ -29,7 +29,6 @@ pub enum NormalizerError {
 /// Defines behavior for creating the MetricNormalizer
 #[serde_as]
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NormalizerConfig<D: NormalizerSettings + Clone> {
     /// The maximum size in bytes of the events in the metrics normalizer cache, excluding cache overhead.

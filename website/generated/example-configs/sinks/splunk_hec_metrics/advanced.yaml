@@ -9,6 +9,6 @@ sinks:
     default_token: ${SPLUNK_HEC_TOKEN}
     endpoint: https://http-inputs-hec.splunkcloud.com
     host_key: host
-    index: "{{ host }}"
-    source: "{{ file }}"
-    sourcetype: "{{ sourcetype }}"
+    index: index-{{ host }}
+    source: source-{{ file }}
+    sourcetype: sourcetype-{{ sourcetype }}

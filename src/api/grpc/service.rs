@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures::{StreamExt as FuturesStreamExt, stream};
-use rand::{Rng, SeedableRng as _, rngs::SmallRng};
+use rand::{RngExt, SeedableRng as _, rngs::SmallRng};
 use tokio::select;
 use tokio::sync::mpsc;
 use tokio::time::{self, interval};
@@ -412,7 +412,7 @@ impl observability::Service for ObservabilityService {
         &self,
         _request: Request<GetMetaRequest>,
     ) -> Result<Response<GetMetaResponse>, Status> {
-        let version = crate::get_version().to_string();
+        let version = crate::get_version();
         let hostname = hostname::get()
             .ok()
             .and_then(|h| h.into_string().ok())

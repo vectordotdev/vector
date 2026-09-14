@@ -15,16 +15,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 	internal_metrics: {
 		description: "Configuration of internal metrics for the TagCardinalityLimit transform."
 		required:    false
-		type: object: options: include_extended_tags: {
-			description: """
-				Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
-
-				This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
-				increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
-				"""
-			required: false
-			type: bool: default: false
-		}
+		type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::InternalMetricsConfig"]
 	}
 	limit_exceeded_action: {
 		description: """
@@ -104,16 +95,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				internal_metrics: {
 					description: "Configuration of internal metrics for the TagCardinalityLimit transform."
 					required:    false
-					type: object: options: include_extended_tags: {
-						description: """
-																				Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
-
-																				This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
-																				increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
-																				"""
-						required: false
-						type: bool: default: false
-					}
+					type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::InternalMetricsConfig"]
 				}
 				limit_exceeded_action: {
 					description: """
@@ -159,42 +141,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						Tags not listed here use the per-metric configuration.
 						"""
 					required: false
-					type: object: options: "*": {
-						description: "An individual tag configuration."
-						required:    true
-						type: object: options: {
-							cache_size_per_key: {
-								description: """
-																								Override the bloom filter cache size for this specific tag key.
-																								Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
-																								Inherits from the enclosing config when unset.
-																								"""
-								relevant_when: "mode = \"limit_override\""
-								required:      false
-								type: uint: {}
-							}
-							mode: {
-								description: "Controls how this tag key is handled."
-								required:    true
-								type: string: enum: {
-									excluded: """
-																											Opt this tag out of cardinality tracking entirely. All values pass through
-																											without being recorded or checked against any `value_limit`.
-																											"""
-									limit_override: """
-																											Track this tag with a per-tag value limit. All other settings are inherited from
-																											the enclosing config.
-																											"""
-								}
-							}
-							value_limit: {
-								description:   "Maximum number of distinct values to accept for this tag key."
-								relevant_when: "mode = \"limit_override\""
-								required:      true
-								type: uint: {}
-							}
-						}
-					}
+					type:     _schemaDefinitions["derived::9e26f78cee8a2ec00ecddfee"]
 				}
 				value_limit: {
 					description: "How many distinct values to accept for any given key. Ignored when `mode: excluded`."
@@ -214,42 +161,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			and the precedence rules.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "An individual tag configuration."
-			required:    true
-			type: object: options: {
-				cache_size_per_key: {
-					description: """
-						Override the bloom filter cache size for this specific tag key.
-						Only valid in `probabilistic` mode; setting this in `exact` mode is a configuration error.
-						Inherits from the enclosing config when unset.
-						"""
-					relevant_when: "mode = \"limit_override\""
-					required:      false
-					type: uint: {}
-				}
-				mode: {
-					description: "Controls how this tag key is handled."
-					required:    true
-					type: string: enum: {
-						excluded: """
-																			Opt this tag out of cardinality tracking entirely. All values pass through
-																			without being recorded or checked against any `value_limit`.
-																			"""
-						limit_override: """
-																			Track this tag with a per-tag value limit. All other settings are inherited from
-																			the enclosing config.
-																			"""
-					}
-				}
-				value_limit: {
-					description:   "Maximum number of distinct values to accept for this tag key."
-					relevant_when: "mode = \"limit_override\""
-					required:      true
-					type: uint: {}
-				}
-			}
-		}
+		type:     _schemaDefinitions["derived::9e26f78cee8a2ec00ecddfee"]
 	}
 	tracking_scope: {
 		description: "Controls how tag tracking state is partitioned across metrics."

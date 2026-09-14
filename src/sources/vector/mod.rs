@@ -133,15 +133,12 @@ pub struct VectorConfig {
     /// It _must_ include a port.
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: GrpcKeepaliveConfig,
 
@@ -428,7 +425,7 @@ mod tests {
             );
         }
 
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_event_data_eq!(events, output);
     }
 

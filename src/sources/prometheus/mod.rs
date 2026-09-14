@@ -1,19 +1,19 @@
 pub(crate) mod parser;
 
-#[cfg(feature = "kubernetes")]
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
 pub(crate) mod kubernetes_sd;
-#[cfg(feature = "sources-prometheus-pushgateway")]
+#[cfg(feature = "sources-prometheus_pushgateway")]
 mod pushgateway;
-#[cfg(feature = "sources-prometheus-remote-write")]
+#[cfg(feature = "sources-prometheus_remote_write")]
 mod remote_write;
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 mod scrape;
 
-#[cfg(feature = "sources-prometheus-pushgateway")]
+#[cfg(feature = "sources-prometheus_pushgateway")]
 pub use pushgateway::PrometheusPushgatewayConfig;
-#[cfg(feature = "sources-prometheus-remote-write")]
+#[cfg(feature = "sources-prometheus_remote_write")]
 pub use remote_write::PrometheusRemoteWriteConfig;
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 pub use scrape::PrometheusScrapeConfig;
 
 /// Merge an enrichment tag onto a metric, mirroring Prometheus' `honor_labels` semantics.
@@ -24,7 +24,7 @@ pub use scrape::PrometheusScrapeConfig;
 /// - If the metric does not have the tag, set it to the new value.
 ///
 /// Shared by `prometheus_scrape` and `prometheus_kubernetes_sd` to guarantee identical behavior.
-#[cfg(any(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+#[cfg(feature = "sources-prometheus_scrape")]
 pub(crate) fn merge_honor_label_tag(
     metric: &mut vector_lib::event::Metric,
     tag: &str,

@@ -1,11 +1,11 @@
 #![allow(dead_code)] // TODO requires optional feature compilation
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 use std::borrow::Cow;
 
-#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
 use vector_lib::internal_event::GaugeName;
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 use vector_lib::prometheus::parser::ParserError;
 use vector_lib::{
     NamedInternalEvent, counter,
@@ -14,7 +14,7 @@ use vector_lib::{
     },
 };
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 #[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusParseError<'a> {
     pub error: ParserError,
@@ -22,7 +22,7 @@ pub struct PrometheusParseError<'a> {
     pub body: Cow<'a, str>,
 }
 
-#[cfg(feature = "sources-prometheus-scrape")]
+#[cfg(feature = "sources-prometheus_scrape")]
 impl InternalEvent for PrometheusParseError<'_> {
     fn emit(self) {
         error!(
@@ -92,13 +92,13 @@ impl InternalEvent for PrometheusNormalizationError {
     }
 }
 
-#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
 #[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusKubernetesSdTargetsDiscovered {
     pub count: usize,
 }
 
-#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
 impl InternalEvent for PrometheusKubernetesSdTargetsDiscovered {
     fn emit(self) {
         debug!(
@@ -110,7 +110,7 @@ impl InternalEvent for PrometheusKubernetesSdTargetsDiscovered {
     }
 }
 
-#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
 #[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusKubernetesSdAnnotationParseError<'a> {
     pub pod: &'a str,
@@ -118,7 +118,7 @@ pub struct PrometheusKubernetesSdAnnotationParseError<'a> {
     pub error: &'a str,
 }
 
-#[cfg(all(feature = "sources-prometheus-scrape", feature = "kubernetes"))]
+#[cfg(all(feature = "sources-prometheus_scrape", feature = "kubernetes"))]
 impl InternalEvent for PrometheusKubernetesSdAnnotationParseError<'_> {
     fn emit(self) {
         warn!(
@@ -135,5 +135,26 @@ impl InternalEvent for PrometheusKubernetesSdAnnotationParseError<'_> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct PrometheusInvalidMetricError;
+
+impl InternalEvent for PrometheusInvalidMetricError {
+    fn emit(self) {
+        let reason = "Prometheus metric contains a line break in an identifier.";
+        error!(
+            message = reason,
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }
 }

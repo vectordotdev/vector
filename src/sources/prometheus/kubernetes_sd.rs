@@ -4,12 +4,7 @@
 //! target resolution (`prometheus.io/*` annotations). Used by the
 //! `prometheus_scrape` source when `targets` includes a `kubernetes` block.
 
-use std::{
-    collections::{BTreeMap, HashSet},
-    path::PathBuf,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::BTreeMap, net::IpAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use futures::{StreamExt, stream};
@@ -44,20 +39,12 @@ use crate::{
         HttpClientHttpResponseError, PrometheusKubernetesSdAnnotationParseError,
         PrometheusKubernetesSdTargetsDiscovered, PrometheusParseError, StreamClosedError,
     },
-    kubernetes::{custom_reflector, meta_cache::MetaCache},
     sources::util::http_client::build_url,
     tls::TlsSettings,
 };
 
 /// Env var consulted for the current node name when `use_self_node_only` is set.
 pub(crate) const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
-
-/// Default delay between observing a Pod deletion and removing it from the
-/// reflector store; matches `kubernetes_logs` and gives in-flight scrapes time
-/// to settle.
-const fn default_delay_deletion_ms() -> u64 {
-    60_000
-}
 
 const fn default_scheme() -> Scheme {
     Scheme::Http
@@ -171,10 +158,6 @@ pub struct KubernetesScrapeConfig {
     /// in-cluster service-account credentials.
     pub(crate) kube_config_file: Option<PathBuf>,
 
-    /// Delay between observing a Pod deletion event and removing the Pod from
-    /// the discovery store, in milliseconds.
-    pub(crate) delay_deletion_ms: u64,
-
     /// Default scheme when `<prefix>/scheme` is not set on a Pod.
     pub(crate) default_scheme: Scheme,
 
@@ -206,7 +189,6 @@ impl Default for KubernetesScrapeConfig {
             label_selector: String::new(),
             namespaces: Vec::new(),
             kube_config_file: None,
-            delay_deletion_ms: default_delay_deletion_ms(),
             default_scheme: default_scheme(),
             default_path: default_path(),
             pod_label_tags: Vec::new(),
@@ -301,47 +283,45 @@ pub(crate) async fn run(
     namespaces: Vec<String>,
     field_selector: Option<String>,
     label_selector: String,
-    delay_deletion: Duration,
     parser_cfg: AnnotationParserConfig,
     scrape_cfg: ScrapeConfig,
     static_targets: Vec<Target>,
     mut out: SourceSender,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let store_w = reflector::store::Writer::<Pod>::default();
-    let store_r = store_w.as_reader();
-
-    // We always run a single cluster-wide watcher feeding one shared store.
-    //
-    // When `namespaces` is non-empty, we apply the restriction in two ways:
-    //   * If exactly one namespace is configured, it is added as a server-side
-    //     `metadata.namespace=<ns>` field selector to minimize wire traffic.
-    //   * In all multi-namespace cases, we additionally filter client-side in
-    //     [`collect_targets`] using the `allowed_namespaces` set. Kubernetes
-    //     field selectors do not support `in` semantics, so client-side
-    //     filtering is the most reliable option.
-    let mut field_parts = field_selector.clone().map(|s| vec![s]).unwrap_or_default();
-    if namespaces.len() == 1 {
-        field_parts.push(format!("metadata.namespace={}", namespaces[0]));
-    }
     let watcher_cfg = watcher::Config {
-        field_selector: if field_parts.is_empty() {
-            None
-        } else {
-            Some(field_parts.join(","))
-        },
-        label_selector: Some(label_selector.clone()),
+        field_selector,
+        label_selector: Some(label_selector),
         ..Default::default()
     };
-
-    let api = Api::<Pod>::all(client.clone());
-    let stream = watcher(api, watcher_cfg).backoff(watcher::DefaultBackoff::default());
-    let reflector_handles = vec![crate::spawn_in_current_span(custom_reflector(
-        store_w,
-        MetaCache::new(),
-        stream,
-        delay_deletion,
-    ))];
+    let apis = if namespaces.is_empty() {
+        vec![Api::<Pod>::all(client.clone())]
+    } else {
+        namespaces
+            .iter()
+            .map(|namespace| Api::<Pod>::namespaced(client.clone(), namespace))
+            .collect()
+    };
+    let mut stores = Vec::with_capacity(apis.len());
+    let mut reflector_handles = Vec::with_capacity(apis.len());
+    for api in apis {
+        let store_w = reflector::store::Writer::<Pod>::default();
+        stores.push(store_w.as_reader());
+        let stream = watcher(api, watcher_cfg.clone()).backoff(watcher::DefaultBackoff::default());
+        let reflected = reflector::reflector(store_w, stream);
+        reflector_handles.push(crate::spawn_in_current_span(async move {
+            reflected
+                .for_each(|result| async move {
+                    if let Err(error) = result {
+                        warn!(
+                            message = "Watcher stream received an error. Retrying.",
+                            ?error
+                        );
+                    }
+                })
+                .await;
+        }));
+    }
 
     let http_client = match HttpClient::new(tls, &proxy) {
         Ok(c) => c,
@@ -356,42 +336,42 @@ pub(crate) async fn run(
 
     let parser_cfg = Arc::new(parser_cfg);
     let scrape_cfg = Arc::new(scrape_cfg);
-    let allowed_namespaces: HashSet<String> = namespaces.iter().cloned().collect();
-
-    let mut interval_stream =
+    let interval_stream =
         IntervalStream::new(tokio::time::interval(scrape_cfg.interval)).take_until(shutdown);
+    let mut events_stream = interval_stream
+        .map(move |_| {
+            let mut targets: Vec<_> = stores
+                .iter()
+                .flat_map(|store| collect_targets(store, &parser_cfg))
+                .collect();
+            targets.splice(..0, static_targets.clone());
+            emit!(PrometheusKubernetesSdTargetsDiscovered {
+                count: targets.len()
+            });
 
-    let result = loop {
-        if interval_stream.next().await.is_none() {
-            break Ok(());
-        }
+            let scrape_cfg = Arc::clone(&scrape_cfg);
+            let http_client = http_client.clone();
+            async move {
+                stream::iter(targets)
+                    .map(move |target| {
+                        let http_client = http_client.clone();
+                        let scrape_cfg = Arc::clone(&scrape_cfg);
+                        async move { scrape_target(&http_client, &scrape_cfg, target).await }
+                    })
+                    .buffer_unordered(usize::MAX)
+                    .flat_map(stream::iter)
+                    .collect::<Vec<_>>()
+                    .await
+            }
+        })
+        .buffer_unordered(usize::MAX)
+        .flat_map(stream::iter);
 
-        let mut targets = collect_targets(&store_r, &parser_cfg, &allowed_namespaces);
-        // Prepend static targets so they are scraped first.
-        if !static_targets.is_empty() {
-            let mut combined = static_targets.clone();
-            combined.append(&mut targets);
-            targets = combined;
-        }
-        emit!(PrometheusKubernetesSdTargetsDiscovered {
-            count: targets.len()
-        });
-
-        let scrape_cfg_outer = Arc::clone(&scrape_cfg);
-        let http_client = http_client.clone();
-        let mut events_stream = stream::iter(targets)
-            .map(move |target| {
-                let http_client = http_client.clone();
-                let scrape_cfg = Arc::clone(&scrape_cfg_outer);
-                async move { scrape_target(&http_client, &scrape_cfg, target).await }
-            })
-            .buffer_unordered(usize::MAX)
-            .flat_map(stream::iter);
-
-        if out.send_event_stream(&mut events_stream).await.is_err() {
-            emit!(StreamClosedError { count: 0 });
-            break Err(());
-        }
+    let result = if out.send_event_stream(&mut events_stream).await.is_err() {
+        emit!(StreamClosedError { count: 0 });
+        Err(())
+    } else {
+        Ok(())
     };
 
     for handle in reflector_handles {
@@ -403,16 +383,9 @@ pub(crate) async fn run(
 fn collect_targets(
     store: &reflector::store::Store<Pod>,
     parser_cfg: &AnnotationParserConfig,
-    allowed_namespaces: &HashSet<String>,
 ) -> Vec<Target> {
     let mut out = Vec::new();
     for pod in store.state() {
-        if !allowed_namespaces.is_empty() {
-            match pod.metadata.namespace.as_deref() {
-                Some(ns) if allowed_namespaces.contains(ns) => {}
-                _ => continue,
-            }
-        }
         match extract_targets(&pod, parser_cfg) {
             Ok(mut targets) => out.append(&mut targets),
             Err(error) => {
@@ -533,11 +506,8 @@ fn extract_targets(
     let namespace = pod.metadata.namespace.clone().unwrap_or_default();
     let node_name = pod.spec.as_ref().and_then(|s| s.node_name.clone());
 
-    let ports = resolve_ports(pod, port_annotation.as_deref()).map_err(|message| {
-        AnnotationError::PortResolution {
-            message: message.to_string(),
-        }
-    })?;
+    let ports = resolve_ports(pod, port_annotation.as_deref())
+        .map_err(|message| AnnotationError::PortResolution { message })?;
     if ports.is_empty() {
         return Ok(Vec::new());
     }
@@ -547,7 +517,7 @@ fn extract_targets(
     let mut targets = Vec::with_capacity(ports.len());
     for port_info in ports {
         let uri = build_target_uri(scheme, &pod_ip, port_info.port, &path, &query_pairs)?;
-        let instance = format!("{pod_ip}:{}", port_info.port);
+        let instance = format_host_port(&pod_ip, port_info.port);
         targets.push(Target {
             uri,
             instance,
@@ -700,10 +670,21 @@ fn build_target_uri(
     };
     Uri::builder()
         .scheme(scheme.as_str())
-        .authority(format!("{host}:{port}"))
+        .authority(format_host_port(host, port))
         .path_and_query(path_and_query)
         .build()
         .map_err(|source| AnnotationError::UriBuild { source })
+}
+
+pub(crate) fn format_host_port(host: &str, port: u16) -> String {
+    if host
+        .parse::<IpAddr>()
+        .is_ok_and(|address| address.is_ipv6())
+    {
+        format!("[{host}]:{port}")
+    } else {
+        format!("{host}:{port}")
+    }
 }
 
 /// Perform a single scrape and return the resulting events. Emits all the
@@ -1064,6 +1045,29 @@ mod tests {
             targets[0].uri.to_string(),
             "https://10.0.0.1:9100/custom/metrics"
         );
+    }
+
+    #[test]
+    fn ipv6_pod_ip_is_bracketed_in_uri_and_instance() {
+        let pod = make_pod(
+            "p",
+            "ns",
+            &[
+                ("prometheus.io/scrape", "true"),
+                ("prometheus.io/port", "9100"),
+            ],
+            &[],
+            vec![],
+            Some("fd00::1"),
+            None,
+        );
+
+        let target = extract_targets(&pod, &default_cfg())
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert_eq!(target.uri.to_string(), "http://[fd00::1]:9100/metrics");
+        assert_eq!(target.instance, "[fd00::1]:9100");
     }
 
     #[test]

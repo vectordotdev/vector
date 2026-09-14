@@ -94,13 +94,11 @@ pub struct PrometheusScrapeConfig {
     /// The tag name added to each event representing the scraped instance's `host:port`.
     ///
     /// The tag value is the host and port of the scraped instance.
-    #[configurable(metadata(docs::advanced))]
     instance_tag: Option<String>,
 
     /// The tag name added to each event representing the scraped instance's endpoint.
     ///
     /// The tag value is the endpoint of the scraped instance.
-    #[configurable(metadata(docs::advanced))]
     endpoint_tag: Option<String>,
 
     /// Controls how tag conflicts are handled if the scraped source has tags to be added.
@@ -110,7 +108,6 @@ pub struct PrometheusScrapeConfig {
     ///
     /// This matches Prometheus' `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
-    #[configurable(metadata(docs::advanced))]
     honor_labels: bool,
 
     /// Custom parameters for the scrape request query string.
@@ -123,11 +120,8 @@ pub struct PrometheusScrapeConfig {
     #[configurable(metadata(docs::examples = "query_example()"))]
     query: QueryParameters,
 
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     auth: Option<Auth>,
 }
 
@@ -191,14 +185,14 @@ impl SourceConfig for PrometheusScrapeConfig {
         let mut static_urls: Vec<Uri> = Vec::new();
         for s in &self.endpoints {
             let uri = s.parse::<Uri>().context(sources::UriParseSnafu)?;
-            static_urls.push(build_url(&uri, &self.query));
+            static_urls.push(uri);
         }
         for target in &self.targets {
             match target {
                 TargetConfig::Static { urls } => {
                     for s_url in urls {
                         let uri = s_url.parse::<Uri>().context(sources::UriParseSnafu)?;
-                        static_urls.push(build_url(&uri, &self.query));
+                        static_urls.push(uri);
                     }
                 }
                 #[cfg(feature = "kubernetes")]
@@ -272,34 +266,8 @@ impl SourceConfig for PrometheusScrapeConfig {
                     query: self.query.clone(),
                 };
 
-                let delay_deletion = Duration::from_millis(k8s_cfg.delay_deletion_ms);
-
                 // Convert static URLs to Target structs.
-                let static_targets: Vec<kubernetes_sd::Target> = static_urls
-                    .into_iter()
-                    .map(|uri| {
-                        let instance = format!(
-                            "{}:{}",
-                            uri.host().unwrap_or_default(),
-                            uri.port_u16().unwrap_or_else(|| match uri.scheme() {
-                                Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
-                                Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
-                                _ => 0,
-                            })
-                        );
-                        kubernetes_sd::Target {
-                            uri: uri.clone(),
-                            instance,
-                            is_static: true,
-                            namespace: String::new(),
-                            pod_name: String::new(),
-                            pod_uid: String::new(),
-                            node_name: None,
-                            container_name: None,
-                            extra_tags: std::collections::BTreeMap::new(),
-                        }
-                    })
-                    .collect();
+                let static_targets = static_urls.into_iter().map(static_target).collect();
 
                 return Ok(Box::pin(kubernetes_sd::run(
                     client,
@@ -308,7 +276,6 @@ impl SourceConfig for PrometheusScrapeConfig {
                     k8s_cfg.namespaces.clone(),
                     field_selector,
                     label_selector,
-                    delay_deletion,
                     parser_cfg,
                     scrape_cfg,
                     static_targets,
@@ -326,7 +293,10 @@ impl SourceConfig for PrometheusScrapeConfig {
         };
 
         let inputs = GenericHttpClientInputs {
-            urls: static_urls,
+            urls: static_urls
+                .iter()
+                .map(|uri| build_url(uri, &self.query))
+                .collect(),
             interval: self.interval,
             timeout: self.timeout,
             headers: HashMap::new(),
@@ -346,6 +316,27 @@ impl SourceConfig for PrometheusScrapeConfig {
 
     fn can_acknowledge(&self) -> bool {
         false
+    }
+}
+
+#[cfg(feature = "kubernetes")]
+fn static_target(uri: Uri) -> kubernetes_sd::Target {
+    let port = uri.port_u16().unwrap_or_else(|| match uri.scheme() {
+        Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
+        Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
+        _ => 0,
+    });
+    let instance = kubernetes_sd::format_host_port(uri.host().unwrap_or_default(), port);
+    kubernetes_sd::Target {
+        uri,
+        instance,
+        is_static: true,
+        namespace: String::new(),
+        pod_name: String::new(),
+        pod_uid: String::new(),
+        node_name: None,
+        container_name: None,
+        extra_tags: std::collections::BTreeMap::new(),
     }
 }
 
@@ -517,6 +508,19 @@ mod test {
         crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
     }
 
+    #[cfg(feature = "kubernetes")]
+    #[test]
+    fn mixed_static_target_applies_source_query_once() {
+        let target = static_target("http://localhost:9090/metrics".parse().unwrap());
+        let query = HashMap::from([(
+            "key".to_string(),
+            QueryParameterValue::MultiParams(vec![ParameterValue::String("value".to_string())]),
+        )]);
+
+        let url = build_url(&target.uri, &query);
+        assert_eq!(url.query(), Some("key=value"));
+    }
+
     #[tokio::test]
     async fn test_prometheus_sets_headers() {
         let (_guard, in_addr) = next_addr();
@@ -531,7 +535,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
@@ -566,7 +570,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
@@ -619,7 +623,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
@@ -686,7 +690,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
@@ -742,7 +746,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics?key1=val1")],
             targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
@@ -859,7 +863,7 @@ mod test {
         config.add_source(
             "in",
             PrometheusScrapeConfig {
-                endpoints: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{in_addr}")],
                 targets: vec![],
                 instance_tag: None,
                 endpoint_tag: None,

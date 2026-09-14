@@ -6,12 +6,12 @@ sinks:
     dangerously_allow_unconfined_template_resolution: false
     labels:
       label_1: value_1
-      label_2: "{{ template_value_2 }}"
+      label_2: label-{{ template_value_2 }}
     labels_key: logging.googleapis.com/labels
     log_id: my-log
     project_id: my-project
     resource:
       instanceId: Twilight
-      zone: "{{ zone }}"
+      zone: zone-{{ zone }}
       type: gce_instance
     severity_key: severity

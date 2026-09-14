@@ -16,7 +16,7 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
-    configurable::configurable_component,
+    configurable::{configurable_component, schema::is_generating_root_schema},
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
@@ -125,24 +125,19 @@ pub struct HostMetricsConfig {
     #[serde(default = "default_namespace")]
     pub namespace: Option<String>,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_cgroups_config()"))]
     #[serde(default = "default_cgroups_config")]
     pub cgroups: Option<CGroupsConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub disk: disk::DiskConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub filesystem: filesystem::FilesystemConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub network: network::NetworkConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub process: process::ProcessConfig,
 }
@@ -223,7 +218,7 @@ fn default_collectors() -> Option<Vec<Collector>> {
         collectors.push(Collector::TCP);
     }
     #[cfg(not(target_os = "linux"))]
-    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+    if is_generating_root_schema() {
         collectors.push(Collector::CGroups);
         collectors.push(Collector::TCP);
     }
@@ -271,8 +266,8 @@ fn example_cgroups() -> FilterList {
 }
 
 fn default_cgroups_config() -> Option<CGroupsConfig> {
-    // Check env variable to allow generating docs on non-linux systems.
-    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+    // Include the Linux-only default when generating docs on other platforms.
+    if is_generating_root_schema() {
         return Some(CGroupsConfig::default());
     }
 
@@ -406,7 +401,7 @@ impl HostMetrics {
             self.cpu_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Process) {
-            self.process_metrics(&mut buffer).await;
+            self.process_metrics(&mut buffer);
         }
         if self.config.has_collector(Collector::Disk) {
             self.disk_metrics(&mut buffer).await;
@@ -432,7 +427,7 @@ impl HostMetrics {
             self.tcp_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Temperature) {
-            self.temperature_metrics(&mut buffer).await;
+            self.temperature_metrics(&mut buffer);
         }
 
         let metrics = buffer.metrics;
@@ -560,7 +555,13 @@ where
     filter_result_sync(result, message)
 }
 
-#[allow(clippy::missing_const_for_fn)]
+#[cfg_attr(
+    not(target_os = "linux"),
+    expect(
+        clippy::missing_const_for_fn,
+        reason = "#[cfg(linux)] calls non-const methods"
+    )
+)]
 fn init_roots() {
     #[cfg(target_os = "linux")]
     {

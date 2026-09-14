@@ -405,8 +405,8 @@ fn macos_maxfilesperproc() -> Option<libc::rlim_t> {
     let ret = unsafe {
         libc::sysctlbyname(
             c"kern.maxfilesperproc".as_ptr(),
-            &mut maxfiles as *mut libc::c_int as *mut libc::c_void,
-            &mut len,
+            (&raw mut maxfiles).cast::<libc::c_void>(),
+            &raw mut len,
             std::ptr::null_mut(),
             0,
         )
@@ -510,7 +510,7 @@ impl SubCommand {
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
-            Self::Validate(v) => validate::validate(v, color).await,
+            Self::Validate(v) => validate::validate(v, &mut signals.handler, color).await,
             Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }

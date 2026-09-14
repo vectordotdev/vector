@@ -692,7 +692,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
         let trait_name = node
             .trait_
             .as_ref()
-            .and_then(|(_, path, _)| path.segments.last())
+            .and_then(|(path, _)| path.segments.last())
             .map(|s| s.ident.to_string());
         let event_name = match &*node.self_ty {
             Type::Path(tp) => tp.path.segments.last().map(|s| s.ident.to_string()),
@@ -767,12 +767,12 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             match name.as_str() {
                 "trace" | "debug" | "info" | "warn" | "error" => {
                     let parsed = parse_log_args(&node.tokens.to_string());
-                    let event = self.events.entry(ctx.event_name.clone()).or_default();
+                    let event = self.events.entry(ctx.event_name).or_default();
                     event.add_log(&name, &parsed.message, parsed.parameters);
                 }
                 "counter" | "gauge" | "histogram" => {
                     if let Some(metric) = parse_metric_args(&name, &node.tokens) {
-                        let event = self.events.entry(ctx.event_name.clone()).or_default();
+                        let event = self.events.entry(ctx.event_name).or_default();
                         event.add_metric(&metric.ty, &metric.name, metric.tags);
                     }
                 }
@@ -1136,7 +1136,7 @@ fn scan_file(path: &PathBuf, events: &mut HashMap<String, Event>) -> Result<usiz
 
     let mut scanner = Scanner {
         events,
-        path_str: path_str.clone(),
+        path_str,
         in_internal_events_dir: in_internal_events,
         skip_dropped_for_file: skip_dropped,
         text: &text,
