@@ -111,9 +111,7 @@ mod tests {
 
         let mut serializer = NativeJsonSerializer;
         let mut bytes = BytesMut::new();
-        serializer
-            .encode(histogram_event.clone(), &mut bytes)
-            .unwrap();
+        serializer.encode(histogram_event, &mut bytes).unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(
             json.pointer("/event/metric/aggregatedHistogram3/count"),

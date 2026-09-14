@@ -170,7 +170,7 @@ mod test {
             "metadataFull": {},
             "value": {"rawBytes": "still a legacy field"}
         });
-        let input = Bytes::from(serde_json::to_vec(&json!({"log": legacy_log.clone()})).unwrap());
+        let input = Bytes::from(serde_json::to_vec(&json!({"log": legacy_log})).unwrap());
 
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
 
