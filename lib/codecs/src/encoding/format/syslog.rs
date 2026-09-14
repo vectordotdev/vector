@@ -321,7 +321,7 @@ impl SyslogMessage {
     fn encode(&self, rfc: &SyslogRFC) -> String {
         let mut result = String::with_capacity(256);
 
-        result.push_str(&self.pri.encode().to_string());
+        result.push_str(&self.pri.encode());
 
         if *rfc == SyslogRFC::Rfc5424 {
             result.push_str(SYSLOG_V1);
@@ -821,7 +821,7 @@ mod tests {
         let mut log = create_simple_log();
         log.insert(event_path!("long_app_name"), long_string.clone());
         log.insert(event_path!("long_proc_id"), long_string.clone());
-        log.insert(event_path!("long_msg_id"), long_string.clone());
+        log.insert(event_path!("long_msg_id"), long_string);
 
         let config = toml::from_str::<SyslogSerializerConfig>(
             r#"
