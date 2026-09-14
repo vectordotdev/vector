@@ -379,14 +379,17 @@ mod integration_test {
 
     const REDIS_SERVER: &str = "redis://redis-primary:6379/0";
 
-    /// Returns the set of client ids currently in pub/sub mode on the Redis server.
+    /// Returns the ids of pub/sub connections currently selected onto database `db`.
     ///
     /// The redis integration tests run concurrently against a shared server, so a reconnect
-    /// test must drop only its own source's connection. Snapshotting these ids before and
-    /// after the source connects identifies that specific connection.
-    async fn pubsub_client_ids(
+    /// test can't safely issue a server-wide `CLIENT KILL`. Instead it points its source at a
+    /// dedicated database; because no other test uses that database, any pub/sub connection on
+    /// it is unambiguously this source's connection, regardless of test timing. (Redis Pub/Sub
+    /// is global across databases, so publishing on the default database still reaches it.)
+    async fn pubsub_client_ids_on_db(
         conn: &mut redis::aio::MultiplexedConnection,
-    ) -> std::collections::HashSet<u64> {
+        db: u32,
+    ) -> Vec<u64> {
         let list: String = redis::cmd("CLIENT")
             .arg("LIST")
             .arg("TYPE")
@@ -394,7 +397,9 @@ mod integration_test {
             .query_async(conn)
             .await
             .expect("CLIENT LIST should succeed");
+        let db_field = format!("db={db}");
         list.lines()
+            .filter(|line| line.split(' ').any(|field| field == db_field))
             .filter_map(|line| line.split(' ').next())
             .filter_map(|field| field.strip_prefix("id="))
             .filter_map(|id| id.parse::<u64>().ok())
@@ -679,10 +684,15 @@ mod integration_test {
         let text_before = "before reconnect";
         let text_after = "after reconnect";
 
+        // Point the source at a dedicated database (db 1) so its pub/sub connection can be
+        // identified unambiguously below; no other integration test uses this database.
+        const RECONNECT_DB: u32 = 1;
+        let source_url = "redis://redis-primary:6379/1";
+
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Pchannel,
             list: None,
-            url: REDIS_SERVER.to_owned(),
+            url: source_url.to_owned(),
             key: pattern.clone(),
             redis_key: None,
             redis_channel: Some(OptionalValuePath::from(owned_value_path!("channel"))),
@@ -697,11 +707,6 @@ mod integration_test {
             .await
             .expect("Failed to get redis async connection.");
 
-        // Snapshot the pub/sub connections that exist before our source connects, so we can
-        // later drop only this source's connection instead of every pub/sub client on the
-        // shared server (which would disrupt other tests running concurrently).
-        let ids_before = pubsub_client_ids(&mut admin).await;
-
         let (tx, mut rx) = SourceSender::new_test();
         let context = SourceContext::new_test(tx, None);
         let source = config
@@ -710,13 +715,12 @@ mod integration_test {
             .expect("source should not fail to build");
 
         // The initial connect + PSUBSCRIBE happens during `build()`, so this source's pub/sub
-        // connection now exists on the server: it is the id not present in the earlier
-        // snapshot.
-        let mut our_ids = pubsub_client_ids(&mut admin).await;
-        our_ids.retain(|id| !ids_before.contains(id));
+        // connection now exists on the server, selected onto the dedicated database. Since no
+        // other test uses that database, this identifies exactly this source's connection.
+        let our_ids = pubsub_client_ids_on_db(&mut admin, RECONNECT_DB).await;
         assert!(
             !our_ids.is_empty(),
-            "expected the source's pub/sub connection to appear after build()"
+            "expected the source's pub/sub connection on db {RECONNECT_DB}"
         );
 
         tokio::spawn(source);
