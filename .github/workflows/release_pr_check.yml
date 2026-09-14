@@ -1,0 +1,43 @@
+name: Validate release PR
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release state transition
+    # No path filter: even skipped jobs emit the required check for ordinary PRs.
+    if: >-
+      startsWith(github.head_ref, 'release/prepare-v') ||
+      startsWith(github.head_ref, 'release/housekeeping-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          rust: true
+          vdev: false
+
+      - name: Validate files, state, and versions
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: >-
+          cargo vdev release workflow pr-check
+          --base-sha "$BASE_SHA"
+          --head-ref "$HEAD_REF"
