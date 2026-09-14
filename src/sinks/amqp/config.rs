@@ -169,6 +169,7 @@ impl ValidatedSink for AmqpSinkConfig {
             .connection_string
             .parse::<AMQPUri>()
             .map_err(|e| format!("Invalid connection string: {e}"))?;
+        self.encoding.validate()?;
         let exchange = self
             .exchange
             .clone()
@@ -193,7 +194,7 @@ impl ValidatedSink for AmqpSinkConfig {
             exchange,
             routing_key,
         } = validated.clone();
-        let sink = AmqpSink::new(self.clone(), exchange, routing_key).await?;
+        let sink = AmqpSink::new(self.clone(), exchange, routing_key)?;
         let hc = healthcheck(sink.channels.clone()).boxed();
         Ok((VectorSink::from_event_streamsink(sink), hc))
     }

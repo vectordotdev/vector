@@ -247,7 +247,7 @@ async fn receive_grpc_logs_vector_namespace() {
             .unwrap();
         let req = create_test_logs_request();
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(env.output).await;
+        let mut output = test_util::collect_ready(env.output);
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let event = output.pop().unwrap();
@@ -350,7 +350,7 @@ async fn receive_grpc_logs_legacy_namespace() {
             .unwrap();
         let req = create_test_logs_request();
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(env.output).await;
+        let mut output = test_util::collect_ready(env.output);
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
@@ -461,7 +461,7 @@ async fn receive_sum_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(env.output).await;
+        let mut output = test_util::collect_ready(env.output);
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -553,7 +553,7 @@ async fn receive_sum_non_monotonic_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(env.output).await;
+        let mut output = test_util::collect_ready(env.output);
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -642,7 +642,7 @@ async fn receive_gauge_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(env.output).await;
+        let mut output = test_util::collect_ready(env.output);
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -740,7 +740,7 @@ async fn receive_histogram_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(env.output).await;
+        let mut output = test_util::collect_ready(env.output);
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -867,7 +867,7 @@ async fn receive_histogram_delta_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(env.output).await;
+        let mut output = test_util::collect_ready(env.output);
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -1003,7 +1003,7 @@ async fn receive_exponential_histogram_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(env.output).await;
+        let mut output = test_util::collect_ready(env.output);
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -1142,7 +1142,7 @@ async fn receive_summary_metric() {
             }],
         });
         _ = client.export(req).await;
-        let mut output = test_util::collect_ready(env.output).await;
+        let mut output = test_util::collect_ready(env.output);
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
 
@@ -1249,7 +1249,7 @@ async fn send_and_collect_otel_event(
         .await
         .expect("Failed to send request to OpenTelemetry source.");
 
-    let mut events = test_util::collect_ready(output).await;
+    let mut events = test_util::collect_ready(output);
     assert_eq!(events.len(), 1);
     events.pop().unwrap()
 }
@@ -1309,7 +1309,7 @@ async fn http_headers_logs_use_otlp_decoding_false() {
             .await
             .expect("Failed to send log to Opentelemetry Collector.");
 
-        let mut output = test_util::collect_ready(logs_output).await;
+        let mut output = test_util::collect_ready(logs_output);
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
         schema_definitions
@@ -1390,7 +1390,7 @@ async fn http_headers_logs_use_otlp_decoding_true() {
             .await
             .expect("Failed to send log to Opentelemetry Collector.");
 
-        let mut output = test_util::collect_ready(logs_output).await;
+        let mut output = test_util::collect_ready(logs_output);
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
         let log = actual_event.as_log();
@@ -1720,7 +1720,7 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         .await
         .expect("Failed to send log to Opentelemetry Collector.");
 
-    let mut output = test_util::collect_ready(logs_output).await;
+    let mut output = test_util::collect_ready(logs_output);
     assert_eq!(output.len(), 1);
     output.pop().unwrap();
 
@@ -1736,8 +1736,7 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         MetricValue::Counter { value } => {
             assert!(
                 *value > 0.0,
-                "component_received_events_total should be > 0, got {}",
-                value
+                "component_received_events_total should be > 0, got {value}"
             );
         }
         _ => panic!("component_received_events_total should be a counter"),

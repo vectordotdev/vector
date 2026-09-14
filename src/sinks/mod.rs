@@ -136,6 +136,8 @@ pub enum BuildError {
     UriParseError { source: ::http::uri::InvalidUri },
     #[snafu(display("HTTP request build error: {}", source))]
     HTTPRequestBuilderError { source: ::http::Error },
+    #[snafu(display("HTTP request build error: {}", source))]
+    HTTPV1RequestBuilderError { source: ::http_1::Error },
 }
 
 /// Common healthcheck errors

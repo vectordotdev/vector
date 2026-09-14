@@ -279,7 +279,7 @@ mod tests {
             values
                 .into_iter()
                 .map(|(id, value)| {
-                    let name = format!("{}-{}", value.as_name(), id);
+                    let name = format!("{}-{id}", value.as_name());
                     Metric::new(name, MetricKind::Incremental, value).with_timestamp(Some(ts))
                 })
                 // Filter out duplicates other than counters. We do this to prevent false positives. False positives would occur

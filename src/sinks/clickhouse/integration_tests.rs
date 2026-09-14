@@ -533,8 +533,8 @@ async fn insert_events_arrow_format() {
 
     let mut events: Vec<Event> = Vec::new();
     for i in 0..5 {
-        let mut event = LogEvent::from(format!("log message {}", i));
-        event.insert(event_path!("host"), format!("host{}.example.com", i));
+        let mut event = LogEvent::from(format!("log message {i}"));
+        event.insert(event_path!("host"), format!("host{i}.example.com"));
         event.insert(event_path!("count"), i as i64);
         events.push(event.into());
     }
@@ -598,15 +598,15 @@ async fn insert_events_arrow_with_schema_fetching() {
     // Create events with various types that should match the schema
     let mut events: Vec<Event> = Vec::new();
     for i in 0..3 {
-        let mut event = LogEvent::from(format!("Test message {}", i));
-        event.insert(event_path!("host"), format!("host{}.example.com", i));
+        let mut event = LogEvent::from(format!("Test message {i}"));
+        event.insert(event_path!("host"), format!("host{i}.example.com"));
         event.insert(event_path!("id"), i as i64);
-        event.insert(event_path!("name"), format!("user_{}", i));
+        event.insert(event_path!("name"), format!("user_{i}"));
         event.insert(event_path!("score"), 95.5 + i as f64);
         event.insert(event_path!("active"), i % 2 == 0);
         event.insert(
             event_path!("request_id"),
-            format!("550e8400-e29b-41d4-a716-44665544000{}", i),
+            format!("550e8400-e29b-41d4-a716-44665544000{i}"),
         );
         events.push(event.into());
     }
@@ -641,7 +641,7 @@ async fn insert_events_arrow_with_schema_fetching() {
             .expect("request_id should be present");
         assert_eq!(
             request_id,
-            format!("550e8400-e29b-41d4-a716-44665544000{}", i)
+            format!("550e8400-e29b-41d4-a716-44665544000{i}")
         );
     }
 }

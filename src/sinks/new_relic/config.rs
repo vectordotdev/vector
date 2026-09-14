@@ -1,11 +1,5 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::sync::Arc;
 
-use derivative::Derivative;
 use http::{Uri, header::HeaderValue};
 use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
@@ -138,14 +132,13 @@ impl SinkConfig for NewRelicConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedNewRelic {
     batcher_settings: BatcherSettings,
     request_limits: TowerRequestSettings,
     // The credentials contain the license key and account ID, so they are
     // intentionally omitted from diagnostics.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     credentials: Arc<NewRelicCredentials>,
 }
 
@@ -331,7 +324,7 @@ mod tests {
         config.account_id = SensitiveString::from("super-secret-account-id".to_string());
 
         let validated = config.validate().expect("validation should succeed");
-        let debug = format!("{:?}", validated);
+        let debug = format!("{validated:?}");
 
         assert!(!debug.contains("super-secret-license-key"));
         assert!(!debug.contains("super-secret-account-id"));

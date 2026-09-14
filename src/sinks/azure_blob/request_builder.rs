@@ -77,10 +77,8 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         };
 
         let extension = self.compression.extension();
-        azure_metadata.partition_key = format!(
-            "{}{}.{}",
-            azure_metadata.partition_key, blob_name, extension
-        );
+        azure_metadata.partition_key =
+            format!("{}{blob_name}.{extension}", azure_metadata.partition_key);
 
         let blob_data = payload.into_payload();
 
