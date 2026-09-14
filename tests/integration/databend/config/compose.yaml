@@ -3,6 +3,8 @@ version: "3"
 services:
   rustfs:
     image: docker.io/rustfs/rustfs@sha256:97171b3d72cd47dc81000f92ea84de25608bfc35a94c965501afaeb5d99f6035
+    # CI creates this bind mount as the runner user, so RustFS's UID 10001 cannot write it.
+    user: root
     environment:
       - RUSTFS_VOLUMES=/data
       - RUSTFS_ADDRESS=0.0.0.0:9000
