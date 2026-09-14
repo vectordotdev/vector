@@ -25,9 +25,13 @@ impl<A, T> GroupedTraceableAllocator<A, T> {
     }
 }
 
+// SAFETY: Allocation and deallocation are delegated to `A` with the same wrapped layout, while the
+// extra trailing byte is accessed only within that allocation.
 unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
     #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
+        // SAFETY: The caller upholds `GlobalAlloc::alloc`'s contract. Pointer arithmetic remains
+        // within the allocation described by `actual_layout`.
         unsafe {
             if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
                 return self.allocator.alloc(object_layout);
@@ -57,6 +61,8 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
     #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
+        // SAFETY: The caller provides a pointer previously returned by `alloc` with the matching
+        // layout, so the stored group byte and wrapped allocation are valid to read and free.
         unsafe {
             if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
                 self.allocator.dealloc(object_ptr, object_layout);
