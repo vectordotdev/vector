@@ -379,6 +379,28 @@ mod integration_test {
 
     const REDIS_SERVER: &str = "redis://redis-primary:6379/0";
 
+    /// Returns the set of client ids currently in pub/sub mode on the Redis server.
+    ///
+    /// The redis integration tests run concurrently against a shared server, so a reconnect
+    /// test must drop only its own source's connection. Snapshotting these ids before and
+    /// after the source connects identifies that specific connection.
+    async fn pubsub_client_ids(
+        conn: &mut redis::aio::MultiplexedConnection,
+    ) -> std::collections::HashSet<u64> {
+        let list: String = redis::cmd("CLIENT")
+            .arg("LIST")
+            .arg("TYPE")
+            .arg("pubsub")
+            .query_async(conn)
+            .await
+            .expect("CLIENT LIST should succeed");
+        list.lines()
+            .filter_map(|line| line.split(' ').next())
+            .filter_map(|field| field.strip_prefix("id="))
+            .filter_map(|id| id.parse::<u64>().ok())
+            .collect()
+    }
+
     #[tokio::test]
     async fn redis_source_list_rpop() {
         // Push some test data into a list object which we'll read from.
@@ -669,22 +691,38 @@ mod integration_test {
             log_namespace: Some(false),
         };
 
+        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let mut admin = client
+            .get_multiplexed_async_connection()
+            .await
+            .expect("Failed to get redis async connection.");
+
+        // Snapshot the pub/sub connections that exist before our source connects, so we can
+        // later drop only this source's connection instead of every pub/sub client on the
+        // shared server (which would disrupt other tests running concurrently).
+        let ids_before = pubsub_client_ids(&mut admin).await;
+
         let (tx, mut rx) = SourceSender::new_test();
         let context = SourceContext::new_test(tx, None);
         let source = config
             .build(context)
             .await
             .expect("source should not fail to build");
+
+        // The initial connect + PSUBSCRIBE happens during `build()`, so this source's pub/sub
+        // connection now exists on the server: it is the id not present in the earlier
+        // snapshot.
+        let mut our_ids = pubsub_client_ids(&mut admin).await;
+        our_ids.retain(|id| !ids_before.contains(id));
+        assert!(
+            !our_ids.is_empty(),
+            "expected the source's pub/sub connection to appear after build()"
+        );
+
         tokio::spawn(source);
 
-        // Wait for the initial subscription to be established.
+        // Wait for the source to be ready to receive.
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-        let client = redis::Client::open(REDIS_SERVER).unwrap();
-        let mut admin = client
-            .get_multiplexed_async_connection()
-            .await
-            .expect("Failed to get redis async connection.");
 
         // Deliver a message over the initial connection to confirm the source is live.
         let _: i32 = admin.publish(channel.clone(), text_before).await.unwrap();
@@ -694,16 +732,18 @@ mod integration_test {
             text_before.into()
         );
 
-        // Forcibly close the source's pub/sub connection server-side, simulating a Redis
-        // restart or a network blip. The reconnect loop should re-establish the pattern
-        // subscription automatically.
-        let _: redis::Value = redis::cmd("CLIENT")
-            .arg("KILL")
-            .arg("TYPE")
-            .arg("pubsub")
-            .query_async(&mut admin)
-            .await
-            .expect("CLIENT KILL should succeed");
+        // Forcibly close ONLY this source's pub/sub connection, simulating a Redis restart or
+        // a network blip. The reconnect loop should re-establish the pattern subscription
+        // automatically.
+        for id in &our_ids {
+            let _: redis::Value = redis::cmd("CLIENT")
+                .arg("KILL")
+                .arg("ID")
+                .arg(*id)
+                .query_async(&mut admin)
+                .await
+                .expect("CLIENT KILL ID should succeed");
+        }
 
         // Republish continuously while the source reconnects and re-subscribes. Pub/Sub drops
         // messages published while there is no subscriber, so keep publishing until one is
