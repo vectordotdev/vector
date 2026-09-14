@@ -20,6 +20,10 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
+fn hash_ratio_threshold(ratio: f64) -> u64 {
+    (ratio * (u64::MAX as u128) as f64) as u64
+}
+
 /// Exists only for backwards compatibility purposes so that the value of sample_rate_key is
 /// consistent after the internal implementation of the Sample class was modified to work in terms
 /// of percentages
@@ -49,7 +53,7 @@ impl SampleMode {
             // To do one option would be to convert the hash to a number between 0 and 1 and compare
             // to the ratio. However to address issues with precision, here the ratio is scaled to
             // meet the width of the type of the hash.
-            hash_ratio_threshold: (ratio * (u64::MAX as u128) as f64) as u64,
+            hash_ratio_threshold: hash_ratio_threshold(ratio),
         }
     }
 
@@ -121,6 +125,21 @@ impl EventSampleMode {
         match self {
             Self::Ratio(ratio) => ratio.to_string(),
             Self::Rate(rate) => rate.to_string(),
+        }
+    }
+
+    fn sample(&self, group_by_key: Option<&str>, counter: &mut u64) -> bool {
+        let old_counter_value = *counter;
+        *counter += 1;
+
+        let mut hasher = seahash::SeaHasher::new();
+        group_by_key.hash(&mut hasher);
+        old_counter_value.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        match self {
+            Self::Ratio(ratio) => hash <= hash_ratio_threshold(*ratio),
+            Self::Rate(rate) => hash.is_multiple_of(rate.get()),
         }
     }
 }
@@ -247,26 +266,6 @@ impl Sample {
         }
     }
 
-    fn dynamic_sample_hash(group_by_key: Option<&str>, counter: u64) -> u64 {
-        let mut hasher = seahash::SeaHasher::new();
-        group_by_key.hash(&mut hasher);
-        counter.hash(&mut hasher);
-        hasher.finish()
-    }
-
-    fn sample_with_dynamic_ratio(
-        ratio: f64,
-        group_by_key: Option<&str>,
-        counter: &mut u64,
-    ) -> bool {
-        let old_counter_value = *counter;
-        *counter += 1;
-
-        let hash = Self::dynamic_sample_hash(group_by_key, old_counter_value);
-        let hash_ratio_threshold = (ratio * (u64::MAX as u128) as f64) as u64;
-        hash <= hash_ratio_threshold
-    }
-
     fn event_ratio(&self, event: &Event) -> Option<f64> {
         let ratio_field = match &self.key_source {
             SampleKeySource::Dynamic { fields, .. } => fields.ratio_field.as_ref()?,
@@ -312,18 +311,6 @@ impl Sample {
         self.event_ratio(event)
             .map(EventSampleMode::Ratio)
             .or_else(|| self.event_rate(event).map(EventSampleMode::Rate))
-    }
-
-    fn sample_with_dynamic_rate(
-        rate: NonZeroU64,
-        group_by_key: Option<&str>,
-        counter: &mut u64,
-    ) -> bool {
-        let old_counter_value = *counter;
-        *counter += 1;
-        let hash = Self::dynamic_sample_hash(group_by_key, old_counter_value);
-
-        hash.is_multiple_of(rate.get())
     }
 
     fn group_by_key(&self, event: &Event) -> Option<String> {
@@ -386,13 +373,7 @@ impl FunctionTransform for Sample {
 
         let group_state = self.group_state(&group_by_key);
         let should_sample = match event_sample_mode {
-            Some(EventSampleMode::Ratio(ratio)) => Self::sample_with_dynamic_ratio(
-                ratio,
-                group_by_key.as_deref(),
-                &mut group_state.dynamic_event_counter,
-            ),
-            Some(EventSampleMode::Rate(rate)) => Self::sample_with_dynamic_rate(
-                rate,
+            Some(mode) => mode.sample(
                 group_by_key.as_deref(),
                 &mut group_state.dynamic_event_counter,
             ),
