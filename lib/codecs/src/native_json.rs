@@ -4,6 +4,8 @@ use chrono::{TimeZone, Utc};
 use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, ReflectMessage, Value};
 use vector_core::event::{Event, proto};
 
+const SOURCE_EVENT_ID_BYTES: usize = 16;
+
 static DESCRIPTOR_POOL: LazyLock<DescriptorPool> =
     LazyLock::new(
         || match DescriptorPool::decode(proto::FILE_DESCRIPTOR_SET) {
@@ -89,15 +91,20 @@ fn validate_event_wrapper(wrapper: &proto::EventWrapper) -> Result<(), &'static 
             validate_metadata(trace.metadata_full.as_ref())
         }
         proto::event_wrapper::Event::Metric(metric) => {
+            proto::metric::Kind::try_from(metric.kind).map_err(|_| "metric has invalid kind")?;
             if let Some(timestamp) = &metric.timestamp {
                 validate_timestamp(timestamp.seconds, timestamp.nanos)?;
             }
             let value = metric.value.as_ref().ok_or("metric is missing value")?;
             match value {
-                proto::metric::Value::Distribution1(distribution)
-                    if distribution.values.len() != distribution.sample_rates.len() =>
-                {
-                    return Err("distribution values and sample rates have different lengths");
+                proto::metric::Value::Distribution1(distribution) => {
+                    validate_statistic_kind(distribution.statistic)?;
+                    if distribution.values.len() != distribution.sample_rates.len() {
+                        return Err("distribution values and sample rates have different lengths");
+                    }
+                }
+                proto::metric::Value::Distribution2(distribution) => {
+                    validate_statistic_kind(distribution.statistic)?;
                 }
                 proto::metric::Value::AggregatedHistogram1(histogram)
                     if histogram.buckets.len() != histogram.counts.len() =>
@@ -115,6 +122,12 @@ fn validate_event_wrapper(wrapper: &proto::EventWrapper) -> Result<(), &'static 
                     if sketch.k.len() != sketch.n.len() {
                         return Err("sketch bin keys and counts have different lengths");
                     }
+                    if sketch.k.iter().any(|key| i16::try_from(*key).is_err()) {
+                        return Err("sketch contains an out-of-range bin key");
+                    }
+                    if sketch.n.iter().any(|count| u16::try_from(*count).is_err()) {
+                        return Err("sketch contains an out-of-range bin count");
+                    }
                 }
                 _ => {}
             }
@@ -127,8 +140,19 @@ fn validate_event_wrapper(wrapper: &proto::EventWrapper) -> Result<(), &'static 
 fn validate_metadata(metadata: Option<&proto::Metadata>) -> Result<(), &'static str> {
     if let Some(metadata) = metadata {
         validate_optional_value(metadata.value.as_ref())?;
+        if !metadata.source_event_id.is_empty()
+            && metadata.source_event_id.len() != SOURCE_EVENT_ID_BYTES
+        {
+            return Err("metadata has invalid source event ID");
+        }
     }
     Ok(())
+}
+
+fn validate_statistic_kind(statistic: i32) -> Result<(), &'static str> {
+    proto::StatisticKind::try_from(statistic)
+        .map(|_| ())
+        .map_err(|_| "distribution has invalid statistic kind")
 }
 
 fn validate_optional_value(value: Option<&proto::Value>) -> Result<(), &'static str> {
@@ -155,6 +179,9 @@ fn validate_value(value: &proto::Value) -> Result<(), &'static str> {
         proto::value::Kind::Float(value) if value.is_nan() => Err("value contains NaN"),
         proto::value::Kind::Map(map) => validate_values(map.fields.values()),
         proto::value::Kind::Array(array) => validate_values(&array.items),
+        proto::value::Kind::Null(value) => proto::ValueNull::try_from(*value)
+            .map(|_| ())
+            .map_err(|_| "value has invalid null kind"),
         _ => Ok(()),
     }
 }
