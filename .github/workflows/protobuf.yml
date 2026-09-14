@@ -34,3 +34,8 @@ jobs:
           push: false
           archive: false
           pr_comment: false
+      # Keep vendored protos in their upstream format.
+      - name: Check owned protobuf formatting
+        run: |
+          buf format proto/vector --diff --exit-code
+          buf format lib/vector-core/proto --diff --exit-code
