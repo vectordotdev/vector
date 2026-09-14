@@ -249,21 +249,23 @@ impl Sample {
         } else {
             NonZeroUsize::MIN
         };
+        let mut group_states = LruCache::unbounded();
+        group_states.resize(group_capacity);
         Self {
             name,
             static_mode,
             key_source,
             next_group_state,
-            group_states: LruCache::new(group_capacity),
+            group_states,
             exclude,
             sample_rate_key,
         }
     }
 
-    fn group_state(&mut self, group_by_key: &Option<String>) -> &mut GroupState {
+    fn group_state(&mut self, group_by_key: Option<String>) -> &mut GroupState {
         let next_group_state = &mut self.next_group_state;
         self.group_states
-            .get_or_insert_mut_ref(group_by_key, || next_group_state.take_next())
+            .get_or_insert_mut(group_by_key, || next_group_state.take_next())
     }
 
     #[cfg(test)]
@@ -376,7 +378,7 @@ impl FunctionTransform for Sample {
             .map(EventSampleMode::sample_rate_label)
             .unwrap_or_else(|| self.static_mode.to_string());
 
-        let group_state = self.group_state(&group_by_key);
+        let group_state = self.group_state(group_by_key);
         let should_sample = match event_sample_mode {
             Some(mode) => mode.sample(&mut group_state.dynamic_event_counter),
             None => {
