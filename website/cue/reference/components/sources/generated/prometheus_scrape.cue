@@ -25,18 +25,6 @@ generated: components: sources: prometheus_scrape: configuration: {
 		required:    true
 		type: array: items: type: string: examples: ["http://localhost:9090/metrics"]
 	}
-	honor_labels: {
-		description: """
-			Controls how tag conflicts are handled if the scraped source has tags to be added.
-
-			If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
-			is renamed by prepending `exported_` to the original name.
-
-			This matches Prometheus’ `honor_labels` configuration.
-			"""
-		required: false
-		type: bool: default: false
-	}
 	headers: {
 		description: """
 			Headers to apply to the scrape requests.
@@ -54,6 +42,18 @@ generated: components: sources: prometheus_scrape: configuration: {
 				type: array: items: type: string: {}
 			}
 		}
+	}
+	honor_labels: {
+		description: """
+			Controls how tag conflicts are handled if the scraped source has tags to be added.
+
+			If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
+			is renamed by prepending `exported_` to the original name.
+
+			This matches Prometheus’ `honor_labels` configuration.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	instance_tag: {
 		description: """
