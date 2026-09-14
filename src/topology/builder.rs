@@ -1274,7 +1274,7 @@ impl TransformNode {
 }
 
 struct Runner {
-    transform: Option<Box<dyn SyncTransform>>,
+    transform: Box<dyn SyncTransform>,
     input_rx: Option<BufferReceiver<EventArray>>,
     input_type: DataType,
     outputs: TransformOutputs,
@@ -1282,28 +1282,6 @@ struct Runner {
     latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
     cpu_ns: Option<Counter>,
-}
-
-struct SyncTransformPool {
-    prototype: Box<dyn SyncTransform>,
-    idle: Vec<Box<dyn SyncTransform>>,
-}
-
-impl SyncTransformPool {
-    fn new(prototype: Box<dyn SyncTransform>) -> Self {
-        Self {
-            prototype,
-            idle: Vec::new(),
-        }
-    }
-
-    fn take(&mut self) -> Box<dyn SyncTransform> {
-        self.idle.pop().unwrap_or_else(|| self.prototype.clone())
-    }
-
-    fn put(&mut self, transform: Box<dyn SyncTransform>) {
-        self.idle.push(transform);
-    }
 }
 
 impl Runner {
@@ -1317,7 +1295,7 @@ impl Runner {
         cpu_ns: Option<Counter>,
     ) -> Self {
         Self {
-            transform: Some(transform),
+            transform,
             input_rx: Some(input_rx),
             input_type,
             outputs,
@@ -1360,10 +1338,7 @@ impl Runner {
         self.timer_tx.try_send_start_wait();
         while let Some(events) = input_rx.next().await {
             self.on_events_received(&events);
-            self.transform
-                .as_mut()
-                .expect("can't run runner twice")
-                .transform_all(events, &mut outputs_buf);
+            self.transform.transform_all(events, &mut outputs_buf);
             self.send_outputs(&mut outputs_buf)
                 .await
                 .map_err(TaskError::wrapped)?;
@@ -1384,8 +1359,7 @@ impl Runner {
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, ready_array_capacity());
 
         let mut in_flight = FuturesOrdered::new();
-        let mut transforms =
-            SyncTransformPool::new(self.transform.take().expect("can't run runner twice"));
+        let mut idle_transforms = Vec::new();
         let mut shutting_down = false;
 
         self.timer_tx.try_send_start_wait();
@@ -1398,7 +1372,7 @@ impl Runner {
                         Some(Ok((transform, mut outputs_buf))) => {
                             self.send_outputs(&mut outputs_buf).await
                                 .map_err(TaskError::wrapped)?;
-                            transforms.put(transform);
+                            idle_transforms.push(transform);
                         }
                         _ => unreachable!("join error or bad poll"),
                     }
@@ -1413,7 +1387,9 @@ impl Runner {
                                 len += events.len();
                             }
 
-                            let mut transform = transforms.take();
+                            let mut transform = idle_transforms
+                                .pop()
+                                .unwrap_or_else(|| self.transform.clone());
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
                             // Hook CPU-time accounting onto the spawned task at
                             // the `Future::poll` boundary.
@@ -1445,47 +1421,5 @@ impl Runner {
         }
 
         Ok(TaskOutput::Transform)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    };
-
-    use super::*;
-
-    struct CountingTransform(Arc<AtomicUsize>);
-
-    impl Clone for CountingTransform {
-        fn clone(&self) -> Self {
-            self.0.fetch_add(1, Ordering::Relaxed);
-            Self(Arc::clone(&self.0))
-        }
-    }
-
-    impl SyncTransform for CountingTransform {
-        fn transform(&mut self, _: crate::event::Event, _: &mut TransformOutputsBuf) {}
-    }
-
-    #[test]
-    fn sync_transform_pool_lazily_clones_and_reuses_workers() {
-        let clones = Arc::new(AtomicUsize::new(0));
-        let mut pool = SyncTransformPool::new(Box::new(CountingTransform(Arc::clone(&clones))));
-
-        let first = pool.take();
-        assert_eq!(clones.load(Ordering::Relaxed), 1);
-
-        let second = pool.take();
-        assert_eq!(clones.load(Ordering::Relaxed), 2);
-
-        pool.put(first);
-        let reused = pool.take();
-        assert_eq!(clones.load(Ordering::Relaxed), 2);
-
-        pool.put(second);
-        pool.put(reused);
     }
 }
