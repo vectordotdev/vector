@@ -1,6 +1,27 @@
 #!/bin/sh
 set -e
 
+VECTOR_CONF=/etc/vector/vector.yaml
+VECTOR_CONF_BACKUP=/etc/vector/.vector.yaml.pre-conffile
+
+# vector.yaml becomes a dpkg conffile in this package version. Older versions
+# did not own this path at all -- administrators were told to create it
+# themselves -- so dpkg has no prior checksum on record for it. Without this,
+# dpkg would treat the file as brand new and unpack straight over it,
+# silently discarding any admin-created content on this one transition.
+#
+# Back up a not-yet-tracked file here, before dpkg unpacks the package's
+# conffile; postinst restores it afterwards. Skip this if the currently
+# installed version already owns the path as a conffile -- then it's a
+# normal upgrade and dpkg's own conffile handling must run unmodified.
+if [ "$1" = "install" ] || [ "$1" = "upgrade" ]; then
+  if [ -e "$VECTOR_CONF" ] && [ ! -L "$VECTOR_CONF" ]; then
+    if ! dpkg-query -W -f='${Conffiles}' vector 2>/dev/null | grep -qF " $VECTOR_CONF "; then
+      cp -a "$VECTOR_CONF" "$VECTOR_CONF_BACKUP"
+    fi
+  fi
+fi
+
 # Add vector:vector user & group
 id --user vector >/dev/null 2>&1 || \
   useradd --system --shell /sbin/nologin --home-dir /var/lib/vector --user-group \
