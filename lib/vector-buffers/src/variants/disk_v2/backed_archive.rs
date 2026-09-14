@@ -52,6 +52,7 @@ pub type DefaultSerializer = AllocSerializer<4096>;
 #[derive(Debug)]
 pub struct BackedArchive<B, T> {
     backing: B,
+    archive_len: usize,
     _archive: PhantomData<T>,
 }
 
@@ -69,12 +70,15 @@ where
     where
         for<'a> T::Archived: CheckBytes<DefaultValidator<'a>>,
     {
+        let archive_len = backing.as_ref().len();
+
         // Validate that the input is, well, valid.
         _ = check_archived_root::<T>(backing.as_ref())?;
 
         // Now that we know the buffer fits T, we're good to go!
         Ok(Self {
             backing,
+            archive_len,
             _archive: PhantomData,
         })
     }
@@ -86,7 +90,9 @@ where
 
     /// Gets a reference to the archived value.
     pub fn get_archive_ref(&self) -> &T::Archived {
-        unsafe { archived_root::<T>(self.backing.as_ref()) }
+        let archive = &self.backing.as_ref()[..self.archive_len];
+        // SAFETY: Both constructors validate this exact slice as an archived `T`.
+        unsafe { archived_root::<T>(archive) }
     }
 }
 
@@ -106,6 +112,7 @@ where
     pub fn from_value(mut backing: B, value: T) -> Result<BackedArchive<B, T>, SerializeError<T>>
     where
         T: Serialize<DefaultSerializer>,
+        for<'a> T::Archived: CheckBytes<DefaultValidator<'a>>,
     {
         // Serialize our value so we can shove it into the backing.
         let mut serializer = DefaultSerializer::default();
@@ -120,15 +127,20 @@ where
         // check for that.  As well, instead of using `archived_root_mut`, we use
         // `archived_value_mut`, because this lets us relax need the backing store to be sized
         // _identically_ to the serialized size.
+        let archive_len = src_buf.len();
         let dst_buf = backing.as_mut();
-        if dst_buf.len() < src_buf.len() {
-            return Err(SerializeError::BackingStoreTooSmall(value, src_buf.len()));
+        if dst_buf.len() < archive_len {
+            return Err(SerializeError::BackingStoreTooSmall(value, archive_len));
         }
 
-        dst_buf[..src_buf.len()].copy_from_slice(&src_buf);
+        let archive = &mut dst_buf[..archive_len];
+        archive.copy_from_slice(&src_buf);
+        _ = check_archived_root::<T>(archive)
+            .map_err(|error| SerializeError::FailedToSerialize(error.to_string()))?;
 
         Ok(Self {
             backing,
+            archive_len,
             _archive: PhantomData,
         })
     }
@@ -138,7 +150,36 @@ where
     pub fn get_archive_mut(&mut self) -> Pin<&mut T::Archived> {
         use rkyv::archived_root_mut;
 
-        let pinned = Pin::new(self.backing.as_mut());
+        let pinned = Pin::new(&mut self.backing.as_mut()[..self.archive_len]);
+        // SAFETY: Both constructors validate this exact slice, and `&mut self` guarantees
+        // exclusive access for the lifetime of the returned projection.
         unsafe { archived_root_mut::<T>(pinned) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rkyv::AlignedVec;
+
+    use super::{BackedArchive, SerializeError};
+
+    #[test]
+    fn from_value_preserves_archive_length_in_oversized_backing() {
+        let mut backing = AlignedVec::new();
+        backing.resize(16, 0);
+
+        let archive = BackedArchive::from_value(backing, 42_u64).unwrap();
+
+        assert_eq!(*archive.get_archive_ref(), 42);
+    }
+
+    #[test]
+    fn from_value_rejects_unaligned_backing() {
+        let mut backing = AlignedVec::new();
+        backing.resize(9, 0);
+
+        let result = BackedArchive::from_value(&mut backing[1..], 42_u64);
+
+        assert!(matches!(result, Err(SerializeError::FailedToSerialize(_))));
     }
 }
