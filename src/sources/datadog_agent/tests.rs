@@ -1151,6 +1151,7 @@ async fn decode_sketches() {
         };
 
         sketch_payload.encode(&mut buf).unwrap();
+        // SAFETY: This test fixture produces valid UTF-8.
         let body = unsafe { String::from_utf8_unchecked(buf) };
         let events = send_and_collect(
             addr,
@@ -1278,6 +1279,7 @@ async fn decode_traces() {
                     200,
                     send_with_path(
                         addr,
+                        // SAFETY: This test fixture produces valid UTF-8.
                         unsafe { str::from_utf8_unchecked(&buf) },
                         headers,
                         DD_API_TRACES_PATH
@@ -1403,6 +1405,7 @@ async fn decode_traces_span_links_and_events() {
                     200,
                     send_with_path(
                         addr,
+                        // SAFETY: This test fixture produces valid UTF-8.
                         unsafe { str::from_utf8_unchecked(&buf) },
                         headers,
                         DD_API_TRACES_PATH
@@ -1487,6 +1490,7 @@ async fn decode_traces_empty_tracer_payloads_emits_error() {
             200,
             send_with_path(
                 addr,
+                // SAFETY: This test fixture produces valid UTF-8.
                 unsafe { str::from_utf8_unchecked(&buf) },
                 dd_api_key_headers(),
                 DD_API_TRACES_PATH
@@ -1531,6 +1535,7 @@ async fn decode_traces_idx_only_payload_emits_error() {
             200,
             send_with_path(
                 addr,
+                // SAFETY: This test fixture produces valid UTF-8.
                 unsafe { str::from_utf8_unchecked(&buf) },
                 dd_api_key_headers(),
                 DD_API_TRACES_PATH
@@ -2295,6 +2300,7 @@ async fn decode_series_endpoint_v2() {
 
         let mut buf = Vec::new();
         series_payload.encode(&mut buf).unwrap();
+        // SAFETY: This test fixture produces valid UTF-8.
         let body = unsafe { String::from_utf8_unchecked(buf) };
         let events = send_and_collect(
             addr,
@@ -2756,6 +2762,7 @@ async fn test_series_v2_split_metric_namespace_impl(
 
     let mut buf = Vec::new();
     series_payload.encode(&mut buf).unwrap();
+    // SAFETY: This test fixture produces valid UTF-8.
     let body = unsafe { String::from_utf8_unchecked(buf) };
     let events = send_and_collect(
         addr,
@@ -2832,6 +2839,7 @@ async fn series_v2_resources_preserved_as_tags() {
         let series_payload = ddmetric_proto::MetricPayload { series };
         let mut buf = Vec::new();
         series_payload.encode(&mut buf).unwrap();
+        // SAFETY: This test fixture produces valid UTF-8.
         let body = unsafe { String::from_utf8_unchecked(buf) };
 
         let events = send_and_collect(
@@ -2903,6 +2911,7 @@ async fn test_sketches_split_metric_namespace_impl(
     };
 
     sketch_payload.encode(&mut buf).unwrap();
+    // SAFETY: This test fixture produces valid UTF-8.
     let body = unsafe { String::from_utf8_unchecked(buf) };
     let events = send_and_collect(
         addr,
