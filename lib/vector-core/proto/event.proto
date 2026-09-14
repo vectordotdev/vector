@@ -5,7 +5,8 @@ import "google/protobuf/timestamp.proto";
 
 // Deprecated fields remain declared for wire compatibility, which prevents
 // their field numbers from being reused. If a deprecated field is removed, its
-// number must be added to a reserved statement in the containing message.
+// number and name must be added to reserved statements in the containing message:
+// binary Protobuf identifies fields by number, while ProtoJSON identifies them by name.
 
 message EventArray {
   oneof events {
