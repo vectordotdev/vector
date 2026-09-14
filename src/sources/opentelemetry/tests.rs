@@ -1536,7 +1536,7 @@ async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
         _ = client
             .export(Request::new(create_test_traces_request()))
             .await;
-        let mut events = test_util::collect_ready(env.output).await;
+        let mut events = test_util::collect_ready(env.output);
         assert_eq!(events.len(), 1);
         let expected = if use_otlp_decoding {
             TRACE_LAYOUT_OTLP
