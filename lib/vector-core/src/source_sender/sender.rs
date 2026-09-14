@@ -16,7 +16,9 @@ use vector_common::internal_event::DEFAULT_OUTPUT;
 use vector_common::internal_event::{ComponentEventsDropped, EventsSent};
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    finalization::{AddBatchNotifier, BatchNotifier},
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizerGroups, EventFinalizers, Finalizable,
+    },
     json_size::JsonSize,
 };
 
@@ -54,6 +56,16 @@ pub struct SourceSenderItem {
 impl AddBatchNotifier for SourceSenderItem {
     fn add_batch_notifier(&mut self, notifier: BatchNotifier) {
         self.events.add_batch_notifier(notifier);
+    }
+}
+
+impl Finalizable for SourceSenderItem {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.events.take_finalizers()
+    }
+
+    fn take_finalizer_groups(&mut self) -> EventFinalizerGroups {
+        self.events.take_finalizer_groups()
     }
 }
 

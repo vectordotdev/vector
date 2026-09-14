@@ -14,6 +14,7 @@
     <a href="https://vector.dev/components/">Integrations</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://chat.vector.dev">Chat</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/releases/latest/download/">Download</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://github.com/vectordotdev/vector/pkgs/container/vector">Container Images</a>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://rust-doc.vector.dev/">Rust Crate Docs</a>
   </strong>
 </p>

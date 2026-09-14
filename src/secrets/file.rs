@@ -16,8 +16,8 @@ pub struct FileBackend {
 }
 
 impl GenerateConfig for FileBackend {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(FileBackend {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(FileBackend {
             path: PathBuf::from("/path/to/secret"),
         })
         .unwrap()

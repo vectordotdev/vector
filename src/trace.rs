@@ -484,7 +484,7 @@ mod tests {
                     .next()
                     .await
                     .expect("broadcast stream ended unexpectedly");
-                if let Some(msg) = event.get("message") {
+                if let Some(msg) = event.get(event_path!("message")) {
                     let msg = msg.to_string_lossy().into_owned();
                     if msg.contains("Rate limited broadcast message") {
                         collected.push(msg);

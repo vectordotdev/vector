@@ -109,10 +109,8 @@ impl TowerRequestConfigDefaults for GlobalTowerRequestConfigDefaults {}
 /// Note that the retry backoff policy follows the Fibonacci sequence.
 #[serde_as]
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequestConfigDefaults> {
-    #[configurable(derived)]
     #[serde(default = "default_concurrency::<D>")]
     #[serde(skip_serializing_if = "concurrency_is_default::<D>")]
     pub concurrency: Concurrency,
@@ -157,11 +155,9 @@ pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequest
     #[serde(default = "default_retry_initial_backoff_secs::<D>")]
     pub retry_initial_backoff_secs: NonZeroU64,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub retry_jitter_mode: JitterMode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 

@@ -1,9 +1,9 @@
 {{ $appJsPath := "js/app.js" }}
 {{ $ddLogsRumPath := "js/dd-browser-logs-rum.js" }}
 {{ $trackingMarketingPath := "js/tracking-marketing.js" }}
-{{ $appJsOptions := dict "targetPath" $appJsPath "minify" true "sourceMap" "inline" }}
-{{ $ddLogsRumJsOptions := dict "targetPath" $ddLogsRumPath "minify" true "sourceMap" "inline" }}
-{{ $trackingMarketingJsOptions := dict "targetPath" $trackingMarketingPath "minify" true "sourceMap" "inline" }}
+{{ $appJsOptions := dict "targetPath" $appJsPath "minify" true "sourceMap" "inline" "target" "es2020" }}
+{{ $ddLogsRumJsOptions := dict "targetPath" $ddLogsRumPath "minify" true "sourceMap" "inline" "target" "es2020" }}
+{{ $trackingMarketingJsOptions := dict "targetPath" $trackingMarketingPath "minify" true "sourceMap" "inline" "target" "es2020" }}
 
 {{ $app := resources.Get $appJsPath | resources.ExecuteAsTemplate $appJsPath . | js.Build $appJsOptions | fingerprint "sha256" }}
 {{ $ddLogsRum := resources.Get $ddLogsRumPath | resources.ExecuteAsTemplate $ddLogsRumPath . | js.Build $ddLogsRumJsOptions | fingerprint "sha256" }}

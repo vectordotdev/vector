@@ -36,8 +36,16 @@
           {{ $showOption = le $version $maxVersion }}
         {{ end }}
         {{ if $showOption }}
-        {{ $vector := cond (eq $version "nightly") "vector/nightly" "vector" }}
         {{ $url := .download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
+        {{ if and (ne $version "nightly") .legacy_download_url .legacy_max_minor }}
+          {{/* ARMv7 RPM releases through 0.32 used armv7 instead of armv7hl. */}}
+          {{ $versionParts := split $version "." }}
+          {{ $majorVersion := int (index $versionParts 0) }}
+          {{ $minorVersion := int (index $versionParts 1) }}
+          {{ if and (eq $majorVersion 0) (le $minorVersion .legacy_max_minor) }}
+            {{ $url = .legacy_download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
+          {{ end }}
+        {{ end }}
 
         <a
           type="button"
@@ -61,12 +69,4 @@
     </div>
   </div>
   {{ end }}
-</div>
-
-{{ $version = cond (eq $version "nightly") "nightly/latest" $version }}
-{{ $link := printf "https://packages.timber.io/vector/%s" $version }}
-<div class="mt-8">
-  <a href="{{ $link }}" class="text-sm dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary dark:text-primary text-secondary" rel="noopener" target="_blank">
-    browse all files...
-  </a>
 </div>

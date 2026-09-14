@@ -6,19 +6,21 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::stream;
 use headers::{Authorization, HeaderMapExt};
 use hyper::{Body, Method, Response, StatusCode};
 use serde::{Deserialize, de};
+use vector_common::decompression::CappedDecoder;
 use vector_lib::{
     codecs::{
         JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-        encoding::{Framer, FramingConfig},
+        encoding::FramingConfig,
     },
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
     finalization::AddBatchNotifier,
 };
+
+use vrl::event_path;
 
 use super::{
     config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
@@ -26,7 +28,8 @@ use super::{
 };
 use crate::{
     assert_downcast_matches,
-    codecs::{EncodingConfigWithFraming, SinkType},
+    codecs::EncodingConfigWithFraming,
+    config::ProxyConfig,
     log_event,
     sinks::{
         prelude::*,
@@ -45,7 +48,9 @@ use crate::{
             self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, init_test, run_and_assert_sink_compliance,
             run_and_assert_sink_error_with_events,
         },
-        create_events_batch_with_fn, random_lines_with_stream,
+        create_events_batch_with_fn,
+        http::spawn_authenticated_http_proxy,
+        random_lines_with_stream,
     },
 };
 
@@ -68,6 +73,7 @@ fn default_cfg(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
         tls: Default::default(),
         acknowledgements: Default::default(),
         retry_strategy: Default::default(),
+        confinement: Default::default(),
     }
 }
 
@@ -165,10 +171,21 @@ fn http_validates_payload_prefix_and_suffix() {
         payload_suffix: "}"
         "#};
     let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
-    let (framer, serializer) = config.encoding.build(SinkType::MessageBased).unwrap();
-    let encoder = Encoder::<Framer>::new(framer, serializer);
+    let serializer = config.encoding.config().1;
+    let framer = config.encoding.config().0.clone().unwrap_or_else(|| {
+        // Message-based default for JSON is comma-delimited framing.
+        FramingConfig::CharacterDelimited(vector_lib::codecs::CharacterDelimitedEncoderConfig::new(
+            b',',
+        ))
+    });
     assert!(
-        validate_payload_wrapper(&config.payload_prefix, &config.payload_suffix, &encoder).is_ok()
+        validate_payload_wrapper(
+            &config.payload_prefix,
+            &config.payload_suffix,
+            serializer,
+            &framer,
+        )
+        .is_ok()
     );
 }
 
@@ -182,10 +199,21 @@ fn http_validates_payload_prefix_and_suffix_fails_on_invalid_json() {
         payload_suffix: ""
         "#};
     let config: HttpSinkConfig = serde_yaml::from_str(config).unwrap();
-    let (framer, serializer) = config.encoding.build(SinkType::MessageBased).unwrap();
-    let encoder = Encoder::<Framer>::new(framer, serializer);
+    let serializer = config.encoding.config().1;
+    let framer = config.encoding.config().0.clone().unwrap_or_else(|| {
+        // Message-based default for JSON is comma-delimited framing.
+        FramingConfig::CharacterDelimited(vector_lib::codecs::CharacterDelimitedEncoderConfig::new(
+            b',',
+        ))
+    });
     assert!(
-        validate_payload_wrapper(&config.payload_prefix, &config.payload_suffix, &encoder).is_err()
+        validate_payload_wrapper(
+            &config.payload_prefix,
+            &config.payload_suffix,
+            serializer,
+            &framer,
+        )
+        .is_err()
     );
 }
 
@@ -289,14 +317,16 @@ async fn http_passes_template_headers() {
           headers:
             Static-Header: static-value
             Accept: "application/vnd.api+json"
-            X-Event-Level: "{{level}}"
-            X-Event-Message: "{{message}}"
+            X-Event-Level: "level-{{level}}"
+            X-Event-Message: "message-{{message}}"
             X-Static-Template: constant-value
         "#},
         || {
             let mut event = Event::Log(LogEvent::from("test message"));
-            event.as_mut_log().insert("level", "info");
-            event.as_mut_log().insert("message", "templated message");
+            event.as_mut_log().insert(event_path!("level"), "info");
+            event
+                .as_mut_log()
+                .insert(event_path!("message"), "templated message");
             event
         },
         10,
@@ -323,14 +353,14 @@ async fn http_passes_template_headers() {
             );
 
             assert_eq!(
-                Some("info"),
+                Some("level-info"),
                 parts
                     .headers
                     .get("X-Event-Level")
                     .map(|v| v.to_str().unwrap())
             );
             assert_eq!(
-                Some("templated message"),
+                Some("message-templated message"),
                 parts
                     .headers
                     .get("X-Event-Message")
@@ -347,18 +377,20 @@ async fn http_template_headers_missing_fields() {
         indoc::indoc! {r#"
         request:
           headers:
-            X-Required-Field: "{{required_field}}"
+            X-Required-Field: "required-{{required_field}}"
             X-Static: static-value
         "#},
         || {
             let mut event = Event::Log(LogEvent::from("good event"));
-            event.as_mut_log().insert("required_field", "present");
+            event
+                .as_mut_log()
+                .insert(event_path!("required_field"), "present");
             event
         },
         10,
         |parts| {
             assert_eq!(
-                Some("present"),
+                Some("required-present"),
                 parts
                     .headers
                     .get("X-Required-Field")
@@ -823,11 +855,16 @@ async fn templateable_uri_auth() {
     let another_user = "another_user";
     let another_pass = "another_pass";
     let (_guard, in_addr) = next_addr();
+    // Event-controlled credentials have no static URI authority, so they
+    // require the opt-out flag. This is intentional: an attacker who controls
+    // the `user` or `pass` fields could inject `@evil.com` as the username and
+    // redirect the request. Operators using this pattern accept that risk.
     let config = format!(
         r#"
         uri: "http://{{{{user}}}}:{{{{pass}}}}@{in_addr}/"
         encoding:
           codec: json
+        dangerously_allow_unconfined_template_resolution: true
         "#
     );
 
@@ -953,31 +990,16 @@ async fn http_uri_auth_conflict() {
 
     let cx = SinkContext::default();
 
-    let (sink, _) = config.build(cx).await.unwrap();
-    let (rx, trigger, server) = build_test_server(in_addr);
-
-    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let mut event = Event::Log(LogEvent::default());
-    event.add_batch_notifier(batch);
-
-    tokio::spawn(server);
-
-    let expected_emitted_error_events = ["CallError", "SinkRequestBuildError"];
-    run_and_assert_sink_error_with_events(
-        sink,
-        stream::once(ready(event)),
-        &expected_emitted_error_events,
-        &COMPONENT_ERROR_TAGS,
-    )
-    .await;
-
-    drop(trigger);
-
-    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
-
-    // No requests should have been made to the server
-    let requests = rx.collect::<Vec<_>>().await;
-    assert!(requests.is_empty());
+    // The URI embeds credentials that conflict with the explicit `auth`;
+    // validation now rejects this configuration up front instead of failing
+    // at request time.
+    match config.build(cx).await {
+        Err(err) => assert!(
+            err.to_string().contains("Two authorization credentials"),
+            "unexpected error: {err}"
+        ),
+        Ok(_) => panic!("build should reject the URI/auth credential conflict"),
+    }
 }
 
 fn parse_compressed_json<T>(compression: &str, buf: Bytes) -> T
@@ -985,9 +1007,10 @@ where
     T: de::DeserializeOwned,
 {
     match compression {
-        "gzip" => serde_json::from_reader(MultiGzDecoder::new(buf.reader())).unwrap(),
-        "zstd" => serde_json::from_reader(zstd::Decoder::new(buf.reader()).unwrap()).unwrap(),
-        "zlib" => serde_json::from_reader(ZlibDecoder::new(buf.reader())).unwrap(),
+        "gzip" => serde_json::from_reader(CappedDecoder::gzip(buf.reader()).into_reader()).unwrap(),
+        "zstd" => serde_json::from_reader(CappedDecoder::zstd(buf.reader()).unwrap().into_reader())
+            .unwrap(),
+        "zlib" => serde_json::from_reader(CappedDecoder::zlib(buf.reader()).into_reader()).unwrap(),
         _ => panic!("undefined compression: {compression}"),
     }
 }
@@ -1051,4 +1074,69 @@ async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::
 
     let (sink, _) = config.build(cx).await.unwrap();
     (in_addr, sink)
+}
+
+/// Events should be delivered through the configured authenticated HTTP proxy,
+/// which forwards the request to the origin without leaking the proxy credentials.
+#[tokio::test]
+async fn sends_through_authenticated_proxy() {
+    init_test();
+
+    let (_guard, in_addr) = next_addr();
+    let (origin_rx, trigger, origin) = build_test_server(in_addr);
+    tokio::spawn(origin);
+
+    let mut proxy = spawn_authenticated_http_proxy();
+    let proxy_config = ProxyConfig {
+        enabled: true,
+        http: Some(proxy.url().to_owned()),
+        https: None,
+        no_proxy: Default::default(),
+    };
+
+    let config = indoc::formatdoc! {r#"
+        uri: "http://{in_addr}/frames"
+        framing:
+          method: newline_delimited
+        encoding:
+          codec: json
+    "#};
+    let config: HttpSinkConfig = serde_yaml::from_str(&config).unwrap();
+
+    let cx = SinkContext {
+        proxy: proxy_config,
+        ..SinkContext::default()
+    };
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let event = Event::Log(LogEvent::from("simple message"));
+
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+
+    let observation = proxy.next_request().await;
+    assert_eq!(observation.method, Method::POST);
+    assert_eq!(
+        observation.uri.to_string(),
+        format!("http://{in_addr}/frames")
+    );
+    assert!(
+        observation
+            .headers
+            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+    );
+
+    // The proxy forwards the request to the origin without the proxy credentials,
+    // and the origin receives the encoded event.
+    let (parts, body) = origin_rx.into_future().await.0.unwrap();
+    assert_eq!(Method::POST, parts.method);
+    assert_eq!("/frames", parts.uri.path());
+    assert!(
+        !parts
+            .headers
+            .contains_key(hyper::header::PROXY_AUTHORIZATION)
+    );
+    let event: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(event["message"], "simple message");
+
+    drop(trigger);
 }

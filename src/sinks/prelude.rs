@@ -39,6 +39,8 @@ pub use crate::{
             service::{ServiceBuilderExt, Svc},
         },
     },
-    template::{Template, TemplateParseError, UnsignedIntTemplate},
+    template::{
+        ConfinedTemplate, Template, TemplateParseError, UnconfinedTemplate, UnsignedIntTemplate,
+    },
     tls::TlsConfig,
 };

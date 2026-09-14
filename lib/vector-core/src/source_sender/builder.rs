@@ -5,8 +5,8 @@ use vector_common::histogram;
 use vector_common::internal_event::DEFAULT_OUTPUT;
 
 use super::{
-    CHUNK_SIZE, LAG_TIME_NAME, Output, OutputMetrics, PostProcessor, SEND_BATCH_LATENCY_NAME,
-    SEND_LATENCY_NAME, SourceSender, SourceSenderItem,
+    LAG_TIME_NAME, Output, OutputMetrics, PostProcessor, SEND_BATCH_LATENCY_NAME,
+    SEND_LATENCY_NAME, SourceSender, SourceSenderItem, chunk_size_events,
 };
 use crate::config::{ComponentKey, OutputId, SourceOutput};
 
@@ -23,7 +23,7 @@ pub struct Builder {
 impl Default for Builder {
     fn default() -> Self {
         Self {
-            buf_size: CHUNK_SIZE,
+            buf_size: chunk_size_events(),
             default_output: None,
             named_outputs: Default::default(),
             output_metrics: OutputMetrics::new(

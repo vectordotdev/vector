@@ -121,6 +121,17 @@ cli: {
 			description: env_vars.VECTOR_ALLOW_EMPTY_CONFIG.description
 			env_var:     "VECTOR_ALLOW_EMPTY_CONFIG"
 		}
+		"dangerously-allow-env-var-interpolation": {
+			description: env_vars.VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION.description
+			env_var:     "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION"
+		}
+	}
+
+	_core_flags: {
+		"dangerously-allow-env-var-interpolation": {
+			description: env_vars.VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION.description
+			env_var:     "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION"
+		}
 	}
 
 	_core_config_options: {
@@ -192,6 +203,12 @@ cli: {
 			type:        "integer"
 			env_var:     "VECTOR_THREADS"
 		}
+		"chunk-size-events": {
+			description: env_vars.VECTOR_CHUNK_SIZE_EVENTS.description
+			default:     env_vars.VECTOR_CHUNK_SIZE_EVENTS.type.uint.default
+			type:        "integer"
+			env_var:     "VECTOR_CHUNK_SIZE_EVENTS"
+		}
 		"internal-log-rate-limit": {
 			_short:      "i"
 			description: env_vars.VECTOR_INTERNAL_LOG_RATE_LIMIT.description
@@ -225,6 +242,7 @@ cli: {
 
 			example: "vector graph --config /etc/vector/vector.yaml | dot -Tsvg > graph.svg"
 
+			flags:   _default_flags & _core_flags
 			options: _core_options
 		}
 		"generate": {
@@ -282,6 +300,7 @@ cli: {
 				out the [unit testing documentation](\(urls.vector_unit_tests)).
 				"""
 
+			flags: _default_flags & _core_flags
 			options: {
 				"config-toml": {
 					description: env_vars.VECTOR_CONFIG_TOML.description
@@ -452,7 +471,7 @@ cli: {
 					_short:      "d"
 					description: "Fail validation on warnings"
 				}
-			}
+			} & _core_flags
 
 			options: {
 				"config-yaml": {
@@ -665,6 +684,15 @@ cli: {
 				unit:    null
 			}
 		}
+		VECTOR_CHUNK_SIZE_EVENTS: {
+			description: """
+				The number of events batched per source send and used as the base for source output buffer sizing.
+				"""
+			type: uint: {
+				default: 1000
+				unit:    "events"
+			}
+		}
 		VECTOR_WATCH_CONFIG: {
 			description: "Watch for changes in the configuration file and reload accordingly"
 			type: bool: default: false
@@ -755,6 +783,14 @@ cli: {
 				warnings.
 				"""
 			type: bool: default: true
+		}
+		VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION: {
+			description: """
+				Allow interpolation of environment variables in configuration files. Environment variable
+				interpolation is disabled by default. Enabling this may expose environment secrets into your
+				Vector configuration.
+				"""
+			type: bool: default: false
 		}
 	}
 

@@ -1,4 +1,8 @@
-use std::{io, path::Path};
+use std::{
+    future::Future,
+    io,
+    path::{Path, PathBuf},
+};
 
 use tokio::{
     fs::OpenOptions,
@@ -78,13 +82,43 @@ pub trait Filesystem: Send + Sync {
     /// memory map the file, an error variant will be returned describing the underlying error.
     async fn open_mmap_writable(&self, path: &Path) -> io::Result<Self::MutableMemoryMap>;
 
+    /// Durably truncates a file to `size`, creating it when it does not exist.
+    ///
+    /// This is separate from [`Filesystem::open_file_writable`] because writable data files are
+    /// opened in append mode. On Windows, append-only handles cannot resize a file.
+    ///
+    /// # Errors
+    ///
+    /// If `size` is greater than the current file size, or an I/O error occurs while truncating or
+    /// synchronizing the file, an error is returned.
+    async fn truncate_file(&self, path: &Path, size: u64) -> io::Result<()>;
+
     /// Deletes a file.
     ///
     /// # Errors
     ///
     /// If an I/O error occurred when attempting to delete the file, an error variant will be
     /// returned describing the underlying error.
-    async fn delete_file(&self, path: &Path) -> io::Result<()>;
+    fn delete_file<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<()>> + Send + 'a;
+
+    /// Lists files in a directory.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error occurred when attempting to list the directory, an error variant will be
+    /// returned describing the underlying error.
+    fn list_files<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<Vec<PathBuf>>> + Send + 'a;
+
+    /// Returns whether the buffer should spawn its periodic stale data file cleanup task.
+    fn supports_background_cleanup(&self) -> bool {
+        true
+    }
 }
 
 pub trait AsyncFile: AsyncRead + AsyncWrite + Send + Sync {
@@ -95,6 +129,13 @@ pub trait AsyncFile: AsyncRead + AsyncWrite + Send + Sync {
     /// If an I/O error occurred when attempting to get the metadata for the file, an error variant
     /// will be returned describing the underlying error.
     async fn metadata(&self) -> io::Result<Metadata>;
+
+    /// Truncates the underlying file to the specified size.
+    ///
+    /// # Errors
+    /// If `size` is greater than the current file size, or an I/O error occurred when attempting to
+    /// truncate the file, an error variant will be returned describing the underlying error.
+    async fn truncate(&self, size: u64) -> io::Result<()>;
 
     /// Attempts to synchronize all OS-internal data, and metadata, to disk.
     ///
@@ -161,8 +202,38 @@ impl Filesystem for ProductionFilesystem {
         unsafe { memmap2::MmapMut::map_mut(&std_file) }
     }
 
-    async fn delete_file(&self, path: &Path) -> io::Result<()> {
-        tokio::fs::remove_file(path).await
+    async fn truncate_file(&self, path: &Path, size: u64) -> io::Result<()> {
+        // Windows append handles can write to a file, but cannot resize it. Open a separate
+        // read/write handle for truncation.
+        let file = create_writable_file_options(false).open(path).await?;
+        AsyncFile::truncate(&file, size).await?;
+        AsyncFile::sync_all(&file).await
+    }
+
+    fn delete_file<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<()>> + Send + 'a {
+        tokio::fs::remove_file(path)
+    }
+
+    #[allow(clippy::manual_async_fn)]
+    fn list_files<'a>(
+        &'a self,
+        path: &'a Path,
+    ) -> impl Future<Output = io::Result<Vec<PathBuf>>> + Send + 'a {
+        async move {
+            let mut entries = tokio::fs::read_dir(path).await?;
+            let mut files = Vec::new();
+
+            while let Some(entry) = entries.next_entry().await? {
+                if entry.file_type().await?.is_file() {
+                    files.push(entry.path());
+                }
+            }
+
+            Ok(files)
+        }
     }
 }
 
@@ -219,6 +290,18 @@ impl AsyncFile for tokio::fs::File {
         Ok(Metadata {
             len: metadata.len(),
         })
+    }
+
+    async fn truncate(&self, size: u64) -> io::Result<()> {
+        let current_size = self.metadata().await?.len();
+        if size > current_size {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot extend a file through the truncation API",
+            ));
+        }
+
+        self.set_len(size).await
     }
 
     async fn sync_all(&self) -> io::Result<()> {

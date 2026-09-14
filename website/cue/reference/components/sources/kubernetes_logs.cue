@@ -51,7 +51,6 @@ components: sources: kubernetes_logs: {
 				This source is only tested on Linux. Your mileage may vary for clusters on Windows.
 				""",
 		]
-		notices: []
 	}
 
 	installation: {
@@ -73,7 +72,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.container_id": {
 				description: "Container id."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["docker://f24c81dcd531c5d353751c77fe0556a4f602f7714c72b9a58f9b26c0628f1fa6"]
@@ -82,7 +80,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.container_image": {
 				description: "Container image."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["busybox:1.30"]
@@ -91,7 +88,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.container_image_id": {
 				description: "Container image ID."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["busybox@sha256:1e7b63c09af457b93c17d25ef4e6aee96b5bb95f087840cffd7c4bb2fe8ae5c6"]
@@ -100,7 +96,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.container_name": {
 				description: "Container name."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["coredns"]
@@ -109,7 +104,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.namespace_labels": {
 				description: "Set of labels attached to the Namespace."
 				required:    false
-				common:      true
 				type: object: {
 					examples: [{"mylabel": "myvalue"}]
 					options: {}
@@ -118,7 +112,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_ip": {
 				description: "Pod IPv4 address."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["192.168.1.1"]
@@ -127,7 +120,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_ips": {
 				description: "Pod IPv4 and IPv6 addresses."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["192.168.1.1", "::1"]
@@ -136,7 +128,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_labels": {
 				description: "Set of labels attached to the Pod."
 				required:    false
-				common:      true
 				type: object: {
 					examples: [{"mylabel": "myvalue"}]
 					options: {}
@@ -145,7 +136,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_annotations": {
 				description: "Set of annotations attached to the Pod."
 				required:    false
-				common:      true
 				type: object: {
 					examples: [{"myannotation": "myvalue"}]
 					options: {}
@@ -154,7 +144,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_name": {
 				description: "Pod name."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["coredns-qwertyuiop-qwert"]
@@ -163,7 +152,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_namespace": {
 				description: "Pod namespace."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["kube-system"]
@@ -172,7 +160,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_node_name": {
 				description: "Pod node name."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["minikube"]
@@ -181,7 +168,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_owner": {
 				description: "Pod owner."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["ReplicaSet/coredns-565d847f94"]
@@ -190,7 +176,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_uid": {
 				description: "Pod uid."
 				required:    false
-				common:      true
 				type: string: {
 					default: null
 					examples: ["ba46d8c9-9541-4f6b-bbf9-d23b36f2f136"]

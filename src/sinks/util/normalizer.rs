@@ -8,9 +8,7 @@ use futures_util::{Stream, StreamExt, stream::Fuse};
 use pin_project::pin_project;
 use vector_lib::event::Metric;
 
-use crate::sinks::util::buffer::metrics::{
-    DefaultNormalizerSettings, MetricNormalize, MetricNormalizer, NormalizerConfig,
-};
+use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricNormalizer};
 
 #[pin_project]
 pub struct Normalizer<St, N>
@@ -34,16 +32,9 @@ where
     }
 
     pub fn new_with_ttl(stream: St, normalizer: N, ttl: Duration) -> Self {
-        // Create a new MetricSetConfig with the proper settings type
-        let config = NormalizerConfig::<DefaultNormalizerSettings> {
-            time_to_live: Some(ttl.as_secs()),
-            max_bytes: None,
-            max_events: None,
-            _d: std::marker::PhantomData,
-        };
         Self {
             stream: stream.fuse(),
-            normalizer: MetricNormalizer::with_config(normalizer, config),
+            normalizer: MetricNormalizer::with_ttl(normalizer, ttl),
         }
     }
 }
@@ -67,5 +58,28 @@ where
                 None => return Poll::Ready(None),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures_util::stream;
+
+    use super::*;
+
+    #[test]
+    fn new_with_ttl_preserves_fractional_seconds() {
+        let mut normalizer =
+            Normalizer::new_with_ttl(stream::empty::<Metric>(), (), Duration::from_millis(500));
+
+        assert_eq!(
+            normalizer
+                .normalizer
+                .get_state_mut()
+                .ttl_policy()
+                .unwrap()
+                .ttl,
+            Duration::from_millis(500)
+        );
     }
 }

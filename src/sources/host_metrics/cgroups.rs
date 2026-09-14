@@ -462,7 +462,7 @@ mod tests {
         path::{Path, PathBuf},
     };
 
-    use rand::{Rng, rngs::ThreadRng};
+    use rand::{RngExt, rngs::ThreadRng};
     use similar_asserts::assert_eq;
     use tempfile::TempDir;
     use vector_lib::event::Metric;

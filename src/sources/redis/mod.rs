@@ -59,7 +59,6 @@ pub enum DataTypeConfig {
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct ListOption {
-    #[configurable(derived)]
     method: Method,
 }
 
@@ -98,11 +97,10 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
 #[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
-    /// The Redis data type (`list` or `channel`) to use.
+    /// The Redis data type (`list`, `channel`, or `pchannel`) to use.
     #[serde(default)]
     data_type: DataTypeConfig,
 
-    #[configurable(derived)]
     list: Option<ListOption>,
 
     /// The Redis URL to connect to.
@@ -132,12 +130,10 @@ pub struct RedisSourceConfig {
     #[configurable(metadata(docs::examples = "redis_channel"))]
     redis_channel: Option<OptionalValuePath>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
@@ -149,16 +145,17 @@ pub struct RedisSourceConfig {
 }
 
 impl GenerateConfig for RedisSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
             r#"
-            url = "redis://127.0.0.1:6379/0"
-            key = "vector"
-            data_type = "list"
-            list.method = "lpop"
-            redis_key = "redis_key"
+            url: "redis://127.0.0.1:6379/0"
+            key: vector
+            data_type: list
+            list:
+              method: lpop
+            redis_key: redis_key
             "#,
-        )
+        })
         .unwrap()
     }
 }
@@ -349,14 +346,14 @@ mod test {
 
     #[test]
     fn pchannel_config_parses() {
-        let config: RedisSourceConfig = toml::from_str(
+        let config: RedisSourceConfig = serde_yaml::from_str(indoc::indoc! {
             r#"
-            url = "redis://127.0.0.1:6379/0"
-            key = "news.*"
-            data_type = "pchannel"
-            redis_channel = "channel"
+            url: "redis://127.0.0.1:6379/0"
+            key: "news.*"
+            data_type: pchannel
+            redis_channel: channel
             "#,
-        )
+        })
         .unwrap();
 
         assert!(matches!(config.data_type, DataTypeConfig::Pchannel));
@@ -374,7 +371,7 @@ mod integration_test {
         SourceSender,
         config::log_schema,
         test_util::{
-            collect_n,
+            collect_n, collect_n_stream,
             components::{SOURCE_TAGS, run_and_assert_source_compliance_n},
             random_string,
         },
@@ -389,7 +386,7 @@ mod integration_test {
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
         let _: i32 = conn.rpush(&key, "2").await.unwrap();
@@ -433,7 +430,7 @@ mod integration_test {
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
 
@@ -473,7 +470,7 @@ mod integration_test {
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
         let _: i32 = conn.rpush(&key, "2").await.unwrap();
@@ -619,11 +616,16 @@ mod integration_test {
 
         let _: i32 = async_conn.publish(channel_a.clone(), text).await.unwrap();
         let _: i32 = async_conn.publish(channel_b.clone(), text).await.unwrap();
-        let _: i32 = async_conn.publish(channel_bin.clone(), text).await.unwrap();
+        let _: i32 = async_conn
+            .publish(channel_bin.clone(), text)
+            .await
+            .unwrap();
 
         let events = collect_n(rx, 3).await;
         assert_eq!(events.len(), 3);
 
+        // Collect the matched channel from each event as raw bytes so that the non-UTF-8
+        // channel can be compared exactly.
         let mut seen_channels: Vec<Vec<u8>> = Vec::new();
         for event in events {
             let log = event.as_log();
@@ -645,5 +647,95 @@ mod integration_test {
         assert!(seen_channels.contains(&channel_a.into_bytes()));
         assert!(seen_channels.contains(&channel_b.into_bytes()));
         assert!(seen_channels.contains(&channel_bin));
+    }
+
+    #[tokio::test]
+    async fn redis_source_pchannel_reconnect() {
+        let prefix = format!("test-pchannel-reconnect-{}", random_string(10));
+        let channel = format!("{prefix}-a");
+        let pattern = format!("{prefix}-*");
+        let text_before = "before reconnect";
+        let text_after = "after reconnect";
+
+        let config = RedisSourceConfig {
+            data_type: DataTypeConfig::Pchannel,
+            list: None,
+            url: REDIS_SERVER.to_owned(),
+            key: pattern.clone(),
+            redis_key: None,
+            redis_channel: Some(OptionalValuePath::from(owned_value_path!("channel"))),
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            log_namespace: Some(false),
+        };
+
+        let (tx, mut rx) = SourceSender::new_test();
+        let context = SourceContext::new_test(tx, None);
+        let source = config
+            .build(context)
+            .await
+            .expect("source should not fail to build");
+        tokio::spawn(source);
+
+        // Wait for the initial subscription to be established.
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        let client = redis::Client::open(REDIS_SERVER).unwrap();
+        let mut admin = client
+            .get_multiplexed_async_connection()
+            .await
+            .expect("Failed to get redis async connection.");
+
+        // Deliver a message over the initial connection to confirm the source is live.
+        let _: i32 = admin.publish(channel.clone(), text_before).await.unwrap();
+        let events = collect_n_stream(&mut rx, 1).await;
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key().unwrap().to_string()],
+            text_before.into()
+        );
+
+        // Forcibly close the source's pub/sub connection server-side, simulating a Redis
+        // restart or a network blip. The reconnect loop should re-establish the pattern
+        // subscription automatically.
+        let _: redis::Value = redis::cmd("CLIENT")
+            .arg("KILL")
+            .arg("TYPE")
+            .arg("pubsub")
+            .query_async(&mut admin)
+            .await
+            .expect("CLIENT KILL should succeed");
+
+        // Republish continuously while the source reconnects and re-subscribes. Pub/Sub drops
+        // messages published while there is no subscriber, so keep publishing until one is
+        // delivered rather than racing a single publish against the reconnect.
+        let publisher = {
+            let channel = channel.clone();
+            let mut conn = client
+                .get_multiplexed_async_connection()
+                .await
+                .expect("Failed to get redis async connection.");
+            tokio::spawn(async move {
+                loop {
+                    let _n: i32 = conn.publish(channel.clone(), text_after).await.unwrap_or(0);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+                }
+            })
+        };
+
+        // The source delivers this only once it has reconnected and re-subscribed.
+        let events = collect_n_stream(&mut rx, 1).await;
+        publisher.abort();
+
+        let log = events[0].as_log();
+        assert_eq!(
+            log[log_schema().message_key().unwrap().to_string()],
+            text_after.into()
+        );
+        // The matched channel metadata is still populated after reconnecting.
+        let channel_meta = log["channel"]
+            .as_bytes()
+            .expect("channel metadata should be bytes")
+            .to_vec();
+        assert_eq!(channel_meta, channel.into_bytes());
     }
 }

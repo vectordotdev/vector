@@ -7,7 +7,8 @@
 {{ $green := "text-green-800 bg-green-100 dark:text-lime-50 dark:bg-lime-600" }}
 {{ $indigo := "text-indigo-800 bg-indigo-100 dark:text-indigo-100 dark:bg-indigo-800" }}
 {{ $violet := "text-violet-800 bg-violet-100 dark:text-violet-100 dark:bg-violet-800" }}
-{{ $styles := dict "red" $red "blue" $blue "yellow" $yellow "gray" $gray "green" $green "indigo" $indigo "violet" $violet }}
+{{ $orange := "text-orange-800 bg-orange-100 dark:text-orange-100 dark:bg-orange-800" }}
+{{ $styles := dict "red" $red "blue" $blue "yellow" $yellow "gray" $gray "green" $green "indigo" $indigo "violet" $violet "orange" $orange }}
 {{ $color := index $styles .color }}
 {{ with .href }}<a href="{{ . }}">{{ end }}
     <span {{ with .show }} x-show="{{ . }}" {{ end }}
@@ -17,6 +18,7 @@
       {{ else }}
       {{ .word }}
       {{ end }}
+      {{- with .code }}<code class="ml-1 rounded px-1 font-mono{{ with $.code_class }} {{ . }}{{ end }}">{{ . }}</code>{{- end }}
     </span>
 {{ if .href }}</a>{{ end }}
 {{ end }}

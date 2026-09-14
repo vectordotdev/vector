@@ -34,7 +34,7 @@ use tracing::Span;
 use crate::{
     internal_events::{GrpcServerRequestReceived, GrpcServerResponseSent},
     shutdown::{ShutdownSignal, ShutdownSignalToken},
-    tls::{MaybeTlsIncomingStream, MaybeTlsSettings},
+    tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsAcceptorReloader},
 };
 use vector_lib::configurable::configurable_component;
 
@@ -356,6 +356,7 @@ where
 pub async fn run_grpc_server<S>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
     service: S,
     keepalive: GrpcKeepaliveConfig,
     shutdown: ShutdownSignal,
@@ -370,7 +371,7 @@ where
 {
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
-    let listener = tls_settings.bind(&address).await?;
+    let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
     let max_connection_lifetime = keepalive.max_connection_lifetime();
     let stream = listener
         .accept_stream()
@@ -405,13 +406,14 @@ where
 pub async fn run_grpc_server_with_routes(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
     routes: Routes,
     keepalive: GrpcKeepaliveConfig,
     shutdown: ShutdownSignal,
 ) -> crate::Result<()> {
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
-    let listener = tls_settings.bind(&address).await?;
+    let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
     let max_connection_lifetime = keepalive.max_connection_lifetime();
     let stream = listener
         .accept_stream()

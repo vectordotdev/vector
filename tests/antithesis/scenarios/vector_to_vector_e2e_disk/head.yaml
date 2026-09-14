@@ -19,6 +19,11 @@ sinks:
     inputs: [in]
     address: "tail:6000"
     compression: none
+    # Aggressive keepalive so the crash-and-recover path is exercised quickly: a pooled connection
+    # to a killed `tail` is probed while idle and evicted within seconds instead of being reused.
+    keepalive:
+      interval_secs: 5
+      timeout_secs: 5
     buffer:
       type: disk
       max_size: 8388608 # 8MiB (4 data files), small enough that a stalled reader fills it and blocks

@@ -14,6 +14,7 @@ use vector_core::{
     event::{Event, LogEvent, Value},
     schema,
 };
+use vrl::event_path;
 use vrl::value::ObjectMap;
 
 /// Config used to build a `SyslogSerializer`.
@@ -161,7 +162,7 @@ impl<'a> ConfigDecanter<'a> {
 
     fn get_structured_data(&self) -> Option<StructuredData> {
         self.log
-            .get("structured_data")
+            .get(event_path!("structured_data"))
             .and_then(|v| v.clone().into_object())
             .map(StructuredData::from)
     }
@@ -320,7 +321,7 @@ impl SyslogMessage {
     fn encode(&self, rfc: &SyslogRFC) -> String {
         let mut result = String::with_capacity(256);
 
-        result.push_str(&self.pri.encode().to_string());
+        result.push_str(&self.pri.encode());
 
         if *rfc == SyslogRFC::Rfc5424 {
             result.push_str(SYSLOG_V1);
@@ -400,7 +401,7 @@ struct Tag {
 impl Tag {
     fn encode_rfc_3164(&self) -> String {
         let mut tag = if let Some(proc_id) = self.proc_id.as_deref() {
-            format!("{}[{}]:", self.app_name, proc_id)
+            format!("{}[{proc_id}]:", self.app_name)
         } else {
             format!("{}:", self.app_name)
         };
@@ -417,7 +418,7 @@ impl Tag {
     fn encode_rfc_5424(&self) -> String {
         let proc_id_str = self.proc_id.as_deref().unwrap_or(NIL_VALUE);
         let msg_id_str = self.msg_id.as_deref().unwrap_or(NIL_VALUE);
-        format!("{} {} {}", self.app_name, proc_id_str, msg_id_str)
+        format!("{} {proc_id_str} {msg_id_str}", self.app_name)
     }
 }
 
@@ -501,7 +502,7 @@ fn flatten_object(obj: ObjectMap, prefix: String, result: &mut BTreeMap<String, 
                 if let Ok(json) = serde_json::to_string(&arr) {
                     result.insert(full_key, json);
                 } else {
-                    result.insert(full_key, format!("{:?}", arr));
+                    result.insert(full_key, format!("{arr:?}"));
                 }
             }
             scalar => {
@@ -588,19 +589,24 @@ pub enum Facility {
 #[configurable_component]
 pub enum Severity {
     /// Emergency
+    #[strum(serialize = "emergency", serialize = "emerg", serialize = "panic")]
     Emergency = 0,
     /// Alert
     Alert = 1,
     /// Critical
+    #[strum(serialize = "critical", serialize = "crit")]
     Critical = 2,
     /// Error
+    #[strum(serialize = "error", serialize = "err")]
     Error = 3,
     /// Warning
+    #[strum(serialize = "warning", serialize = "warn")]
     Warning = 4,
     /// Notice
     Notice = 5,
     /// Informational
     #[default]
+    #[strum(serialize = "informational", serialize = "info")]
     Informational = 6,
     /// Debug
     Debug = 7,
@@ -744,6 +750,40 @@ mod tests {
         assert_eq!(facility, Facility::Daemon);
         assert_eq!(severity, Severity::Critical);
 
+        //check short-form severity aliases
+        log.insert(event_path!("syslog_severity"), "crit");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Critical);
+
+        log.insert(event_path!("syslog_severity"), "emerg");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Emergency);
+
+        log.insert(event_path!("syslog_severity"), "err");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Error);
+
+        log.insert(event_path!("syslog_severity"), "info");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Informational);
+
+        log.insert(event_path!("syslog_severity"), "warn");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Warning);
+
+        log.insert(event_path!("syslog_severity"), "panic");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Emergency);
+
+        //check uppercase short-form aliases
+        log.insert(event_path!("syslog_severity"), "CRIT");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Critical);
+
+        log.insert(event_path!("syslog_severity"), "EMERG");
+        let decanter = ConfigDecanter::new(&log);
+        assert_eq!(decanter.get_severity(&config_sev), Severity::Emergency);
+
         //check defaults with empty config
         let empty_config =
             toml::from_str::<SyslogSerializerOptions>(r#"facility = ".missing_field""#).unwrap();
@@ -781,7 +821,7 @@ mod tests {
         let mut log = create_simple_log();
         log.insert(event_path!("long_app_name"), long_string.clone());
         log.insert(event_path!("long_proc_id"), long_string.clone());
-        log.insert(event_path!("long_msg_id"), long_string.clone());
+        log.insert(event_path!("long_msg_id"), long_string);
 
         let config = toml::from_str::<SyslogSerializerConfig>(
             r#"
@@ -954,7 +994,7 @@ mod tests {
         .unwrap();
 
         let mut log = LogEvent::default();
-        log.insert("syslog.service", "meaning-app");
+        log.insert(event_path!("syslog", "service"), "meaning-app");
 
         let schema = schema::Definition::new_with_default_metadata(
             Kind::object(btreemap! {
@@ -1132,7 +1172,7 @@ mod tests {
 
         let output = run_encode(config, Event::Log(log));
         let expected_id = "a".repeat(32);
-        assert!(output.contains(&format!("[{}", expected_id)));
+        assert!(output.contains(&format!("[{expected_id}")));
         assert!(!output.contains(&format!("[{}", "a".repeat(50))));
     }
 
@@ -1174,7 +1214,7 @@ mod tests {
         assert!(output.contains("app_"));
 
         let expected_sd_id: String = "_".repeat(32);
-        assert!(output.contains(&format!("[{}", expected_sd_id)));
+        assert!(output.contains(&format!("[{expected_sd_id}")));
     }
 
     #[test]

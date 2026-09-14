@@ -9,7 +9,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use databend_client::{APIClient as DatabendAPIClient, Error as DatabendError};
 use futures::future::BoxFuture;
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use rand_distr::Alphanumeric;
 use snafu::Snafu;
 use tower::Service;
@@ -129,7 +129,7 @@ impl DatabendService {
             .take(8)
             .map(char::from)
             .collect::<String>();
-        format!("@~/vector/{}/{}/{}-{}", database, self.table, now, suffix,)
+        format!("@~/vector/{database}/{}/{now}-{suffix}", self.table,)
     }
 
     pub(crate) async fn insert_with_stage(&self, data: Bytes) -> Result<(), DatabendError> {

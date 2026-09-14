@@ -103,7 +103,7 @@ mod test {
         mpsc::{Receiver, Sender},
     };
     use tokio_stream::wrappers::ReceiverStream;
-    use vrl::core::Value;
+    use vrl::{core::Value, event_path};
 
     use crate::{
         conditions::{AnyCondition, ConditionConfig, VrlConfig},
@@ -395,7 +395,7 @@ mod test {
     async fn assert_event(message: &str, event: Option<Event>) {
         assert_eq!(
             &Value::from(message),
-            event.unwrap().as_log().get("message").unwrap()
+            event.unwrap().as_log().get(event_path!("message")).unwrap()
         );
     }
 

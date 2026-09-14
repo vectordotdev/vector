@@ -8,6 +8,7 @@ crate::cli_subcommands! {
     "Manage the release process..."
     channel,
     docker,
+    generate_cue,
     github,
     homebrew,
     prepare,

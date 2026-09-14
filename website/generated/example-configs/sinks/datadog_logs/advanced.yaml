@@ -1,0 +1,10 @@
+sinks:
+  my_sink_id:
+    type: datadog_logs
+    inputs:
+      - my-source-or-transform-id
+    compression: zstd
+    conforms_as_agent: false
+    default_api_key: ${DATADOG_API_KEY_ENV_VAR}
+    endpoint: http://127.0.0.1:8080
+    site: us3.datadoghq.com

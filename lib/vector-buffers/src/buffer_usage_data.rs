@@ -305,7 +305,7 @@ impl BufferUsageData {
                 buffer_id: buffer_id.to_string(),
                 idx: self.idx,
                 intentional: false,
-                reason: "corrupted_events",
+                reason: "unprocessable_events",
                 count: dropped.event_count,
                 byte_size: dropped.event_byte_size,
                 total_count: current.event_count,
@@ -380,7 +380,8 @@ impl BufferUsage {
 
     /// Installs a reporter for the configured stages which periodically reports buffer usage metrics.
     ///
-    /// Metrics are reported every 2 seconds.
+    /// Metrics are reported every 2 seconds. Each stage is reported one last time after the buffer
+    /// drops it, and the reporter stops once every stage has had that final report.
     ///
     /// The `buffer_id` should be a unique name -- ideally the `component_id` of the sink using this buffer -- but is
     /// not used for anything other than reporting, and so has no _requirement_ to be unique.
@@ -398,24 +399,102 @@ impl BufferUsage {
         spawn_named(task, task_name.as_str());
     }
 
+    /// Reports usage for the given stages every 2 seconds until they have all been dropped.
     async fn report_buffer_usage(
         mut stages: Vec<(Arc<BufferUsageData>, ReporterCurrentMetrics)>,
         buffer_id: String,
     ) {
         let mut interval = interval(Duration::from_secs(2));
-        loop {
+        while !stages.is_empty() {
             interval.tick().await;
-
-            for (stage, current_metrics) in &mut stages {
-                stage.report(current_metrics, &buffer_id);
-            }
+            report_stages(&mut stages, &buffer_id);
         }
     }
+}
+
+/// Reports usage for the stage, returning whether it is still in use.
+///
+/// A stage stops being used once every handle for it has been dropped, which only happens when the
+/// buffer it belongs to is dropped. It is still reported one last time, to pick up the deltas
+/// recorded since the previous tick, and can then be discarded.
+fn report_stage(
+    stage: &Arc<BufferUsageData>,
+    current_metrics: &mut ReporterCurrentMetrics,
+    buffer_id: &str,
+) -> bool {
+    // Every handle for the stage has been dropped once the reporter holds the only remaining
+    // reference, and no new handle can appear from a count of one. Check this before reporting so
+    // a handle active at the start of the tick gets another tick to report any concurrent update.
+    let is_live = Arc::strong_count(stage) > 1;
+
+    stage.report(current_metrics, buffer_id);
+    is_live
+}
+
+/// Reports usage for every stage still being tracked, discarding those that have made their final
+/// report.
+fn report_stages(
+    stages: &mut Vec<(Arc<BufferUsageData>, ReporterCurrentMetrics)>,
+    buffer_id: &str,
+) {
+    stages.retain_mut(|(stage, current_metrics)| report_stage(stage, current_metrics, buffer_id));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stage_makes_a_final_report_once_it_is_no_longer_in_use() {
+        let stage = Arc::new(BufferUsageData::new(0));
+        // Stands in for the handle the buffer holds, leaving `stage` as the reporter's reference.
+        let handle = Arc::clone(&stage);
+        let mut current_metrics = ReporterCurrentMetrics::default();
+
+        stage.received.increment(10, 1000);
+        assert!(
+            report_stage(&stage, &mut current_metrics, "test"),
+            "a stage still in use must keep the reporter running"
+        );
+        assert_eq!(
+            current_metrics.current().event_count,
+            10,
+            "the report must pick up the deltas recorded before the tick"
+        );
+
+        stage.received.increment(5, 500);
+        drop(handle);
+
+        assert!(
+            !report_stage(&stage, &mut current_metrics, "test"),
+            "a stage must not be reported again once the buffer holding it is gone"
+        );
+        assert_eq!(
+            current_metrics.current().event_count,
+            15,
+            "the final report must pick up the deltas recorded since the previous tick"
+        );
+    }
+
+    #[test]
+    fn reporting_stops_once_every_stage_is_dropped() {
+        let stage = Arc::new(BufferUsageData::new(0));
+        let mut stages = vec![(Arc::clone(&stage), ReporterCurrentMetrics::default())];
+
+        report_stages(&mut stages, "test");
+        assert!(
+            !stages.is_empty(),
+            "a live stage must keep the reporter running"
+        );
+
+        drop(stage);
+
+        report_stages(&mut stages, "test");
+        assert!(
+            stages.is_empty(),
+            "the reporter must stop once the buffer it reports on is gone"
+        );
+    }
 
     #[test]
     fn reporter_current_usage_is_derived_from_entered_and_left_totals() {

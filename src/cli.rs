@@ -1,6 +1,9 @@
 #![allow(missing_docs)]
 
-use std::{num::NonZeroU64, path::PathBuf};
+use std::{
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+};
 
 use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 
@@ -129,6 +132,11 @@ pub struct RootOpts {
     #[arg(short, long, env = "VECTOR_THREADS")]
     pub threads: Option<usize>,
 
+    /// Number of events batched per source send and used as the base for source output buffer sizing
+    /// (source output buffer capacity is this value multiplied by the number of worker threads)
+    #[arg(long, env = "VECTOR_CHUNK_SIZE_EVENTS")]
+    pub chunk_size_events: Option<NonZeroUsize>,
+
     /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
@@ -137,13 +145,14 @@ pub struct RootOpts {
     #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
 
-    /// Disable interpolation of environment variables in configuration files.
+    /// Allow interpolation of environment variables in configuration files. Enabling this may
+    /// expose environment secrets into your Vector configuration.
     #[arg(
         long,
-        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        env = "VECTOR_DANGEROUSLY_ALLOW_ENV_VAR_INTERPOLATION",
         default_value = "false"
     )]
-    pub disable_env_var_interpolation: bool,
+    pub dangerously_allow_env_var_interpolation: bool,
 
     /// Set the logging format
     #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
@@ -396,8 +405,8 @@ fn macos_maxfilesperproc() -> Option<libc::rlim_t> {
     let ret = unsafe {
         libc::sysctlbyname(
             c"kern.maxfilesperproc".as_ptr(),
-            &mut maxfiles as *mut libc::c_int as *mut libc::c_void,
-            &mut len,
+            (&raw mut maxfiles).cast::<libc::c_void>(),
+            &raw mut len,
             std::ptr::null_mut(),
             0,
         )
@@ -440,10 +449,6 @@ pub enum SubCommand {
     #[command(hide = true)]
     Completion(completion::Opts),
 
-    /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
-    #[command(hide = true)]
-    Config(config::Opts),
-
     /// List available components, then exit.
     List(list::Opts),
 
@@ -471,6 +476,21 @@ pub enum SubCommand {
 }
 
 impl SubCommand {
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "the #[cfg(windows)] arm calls a non-const method"
+    )]
+    pub fn dangerously_allow_env_var_interpolation(&self) -> bool {
+        match self {
+            Self::Graph(g) => g.dangerously_allow_env_var_interpolation,
+            Self::Test(t) => t.dangerously_allow_env_var_interpolation,
+            Self::Validate(v) => v.dangerously_allow_env_var_interpolation,
+            #[cfg(windows)]
+            Self::Service(s) => s.dangerously_allow_env_var_interpolation(),
+            _ => false,
+        }
+    }
+
     pub async fn execute(
         &self,
         mut signals: signal::SignalPair,
@@ -478,7 +498,6 @@ impl SubCommand {
     ) -> exitcode::ExitCode {
         match self {
             Self::Completion(s) => completion::cmd(s),
-            Self::Config(c) => config::cmd(c),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
             Self::GenerateSchema(opts) => generate_schema::cmd(opts),
@@ -491,7 +510,7 @@ impl SubCommand {
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
-            Self::Validate(v) => validate::validate(v, color).await,
+            Self::Validate(v) => validate::validate(v, &mut signals.handler, color).await,
             Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }

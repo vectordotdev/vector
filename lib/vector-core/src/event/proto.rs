@@ -93,8 +93,8 @@ impl From<Trace> for Event {
 }
 
 impl From<Log> for super::LogEvent {
+    #[allow(deprecated)]
     fn from(log: Log) -> Self {
-        #[allow(deprecated)]
         let metadata = log
             .metadata_full
             .map(Into::into)
@@ -145,6 +145,7 @@ impl From<Trace> for super::TraceEvent {
 }
 
 impl From<MetricValue> for super::MetricValue {
+    #[allow(deprecated)]
     fn from(value: MetricValue) -> Self {
         match value {
             MetricValue::Counter(counter) => Self::Counter {
@@ -205,6 +206,7 @@ impl From<MetricValue> for super::MetricValue {
 }
 
 impl From<Metric> for super::Metric {
+    #[allow(deprecated)]
     fn from(metric: Metric) -> Self {
         let kind = match metric.kind() {
             metric::Kind::Incremental => super::MetricKind::Incremental,
@@ -215,6 +217,8 @@ impl From<Metric> for super::Metric {
 
         let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
 
+        // Sign can never be lost as ts.nanos is always non negative (per proto spec)
+        #[allow(clippy::cast_sign_loss)]
         let timestamp = metric.timestamp.map(|ts| {
             chrono::Utc
                 .timestamp_opt(ts.seconds, ts.nanos as u32)
@@ -239,14 +243,17 @@ impl From<Metric> for super::Metric {
                 .collect(),
         );
         // The current Vector encoding includes copies of the "single" values of tags in `tags_v2`
-        // above. This `extend` will re-add those values, forcing them to become the last added in
-        // the value set.
-        tags.extend(metric.tags_v1);
+        // above. Only re-add a v1 value when it disagrees with v2; inserting an already-selected
+        // value would reorder an otherwise canonical enhanced tag set.
+        for (tag, value) in metric.tags_v1 {
+            if tags.get(&tag) != Some(value.as_str()) {
+                tags.insert(tag, value);
+            }
+        }
         let tags = (!tags.is_empty()).then_some(tags);
 
         let value = super::MetricValue::from(metric.value.unwrap());
 
-        #[allow(deprecated)]
         let metadata = metric
             .metadata_full
             .map(Into::into)
@@ -422,6 +429,9 @@ impl From<super::Metric> for WithMetadata<Metric> {
         let name = series.name.name;
         let namespace = series.name.namespace.unwrap_or_default();
 
+        // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
+        // (as per chrono leap-second specs), which is below i32::MAX
+        #[allow(clippy::cast_possible_wrap)]
         let timestamp = data.time.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),
             nanos: ts.timestamp_subsec_nanos() as i32,
@@ -699,6 +709,8 @@ impl From<Metadata> for EventMetadata {
 fn decode_value(input: Value) -> Option<super::Value> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Some(super::Value::Bytes(data)),
+        // Sign is never lost as ts.nanos is always non negative (per proto spec)
+        #[allow(clippy::cast_sign_loss)]
         Some(value::Kind::Timestamp(ts)) => Some(super::Value::Timestamp(
             chrono::Utc
                 .timestamp_opt(ts.seconds, ts.nanos as u32)
@@ -739,6 +751,9 @@ fn encode_value(value: super::Value) -> Value {
         kind: match value {
             super::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
             super::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
+            // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
+            // (as per chrono leap-second specs), which is below i32::MAX
+            #[allow(clippy::cast_possible_wrap)]
             super::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
                 nanos: ts.timestamp_subsec_nanos() as i32,
@@ -765,5 +780,172 @@ fn encode_map(fields: ObjectMap) -> ValueMap {
 fn encode_array(items: Vec<super::Value>) -> ValueArray {
     ValueArray {
         items: items.into_iter().map(encode_value).collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use prost::Message as _;
+
+    use super::*;
+    use crate::event::{MetricValue as EventMetricValue, metric};
+
+    // These payloads are frozen to pin legacy protobuf field numbers on the wire. Do not
+    // regenerate them from the current Rust types; each payload's exact contents are documented
+    // below and mirrored by its test assertions.
+
+    // EventArray.metrics containing four pre-v24 metrics:
+    // - AggregatedHistogram1 (field 9): bucket 1.5/count 2, total count 2, sum 3.0.
+    // - AggregatedHistogram2 (field 13): bucket 1.5/count 2, total count 2, sum 3.0.
+    // - AggregatedSummary1 (field 10): quantile 0.5/value 1.5, count 2, sum 3.0.
+    // - AggregatedSummary2 (field 14): quantile 0.5/value 1.5, count 2, sum 3.0.
+    // These variants use the legacy u32 count representation.
+    const PRE_V24_METRICS: &[u8] = &[
+        18, 170, 1, 10, 38, 10, 10, 104, 105, 115, 116, 111, 103, 114, 97, 109, 49, 74, 24, 10, 8,
+        0, 0, 0, 0, 0, 0, 248, 63, 18, 1, 2, 24, 2, 33, 0, 0, 0, 0, 0, 0, 8, 64, 10, 38, 10, 10,
+        104, 105, 115, 116, 111, 103, 114, 97, 109, 50, 106, 24, 10, 11, 9, 0, 0, 0, 0, 0, 0, 248,
+        63, 16, 2, 16, 2, 25, 0, 0, 0, 0, 0, 0, 8, 64, 10, 43, 10, 8, 115, 117, 109, 109, 97, 114,
+        121, 49, 82, 31, 10, 8, 0, 0, 0, 0, 0, 0, 224, 63, 18, 8, 0, 0, 0, 0, 0, 0, 248, 63, 24, 2,
+        33, 0, 0, 0, 0, 0, 0, 8, 64, 10, 43, 10, 8, 115, 117, 109, 109, 97, 114, 121, 50, 114, 31,
+        10, 18, 9, 0, 0, 0, 0, 0, 0, 224, 63, 17, 0, 0, 0, 0, 0, 0, 248, 63, 16, 2, 25, 0, 0, 0, 0,
+        0, 0, 8, 64,
+    ];
+
+    // Pre-v27 Metric named "requests" with tags_v1 field 3 set to service="api" and a
+    // Counter value of 1.0. This pins the legacy single-valued metric-tag representation.
+    const PRE_V27_TAGS: &[u8] = &[
+        10, 8, 114, 101, 113, 117, 101, 115, 116, 115, 26, 14, 10, 7, 115, 101, 114, 118, 105, 99,
+        101, 18, 3, 97, 112, 105, 42, 9, 9, 0, 0, 0, 0, 0, 0, 240, 63,
+    ];
+
+    // Pre-v34 Log with deprecated metadata field 3 containing the bytes "legacy metadata".
+    const PRE_V34_LOG_METADATA: &[u8] = &[
+        26, 17, 10, 15, 108, 101, 103, 97, 99, 121, 32, 109, 101, 116, 97, 100, 97, 116, 97,
+    ];
+
+    // Pre-v34 Trace with deprecated metadata field 2 containing the bytes "legacy metadata".
+    const PRE_V34_TRACE_METADATA: &[u8] = &[
+        18, 17, 10, 15, 108, 101, 103, 97, 99, 121, 32, 109, 101, 116, 97, 100, 97, 116, 97,
+    ];
+
+    // Pre-v34 Metric named "requests" with a Counter value of 1.0 and deprecated metadata
+    // field 19 containing the bytes "legacy metadata".
+    const PRE_V34_METRIC_METADATA: &[u8] = &[
+        10, 8, 114, 101, 113, 117, 101, 115, 116, 115, 42, 9, 9, 0, 0, 0, 0, 0, 0, 240, 63, 154, 1,
+        17, 10, 15, 108, 101, 103, 97, 99, 121, 32, 109, 101, 116, 97, 100, 97, 116, 97,
+    ];
+
+    // Pre-v41 Metadata with source_type field 4 set to "legacy" and no source_event_id field 7.
+    // This pins the expected default when decoding payloads created before event IDs existed.
+    const PRE_V41_METADATA: &[u8] = &[34, 6, 108, 101, 103, 97, 99, 121];
+
+    #[test]
+    fn decodes_pre_v24_histogram_and_summary_variants() {
+        let expected = [
+            EventMetricValue::AggregatedHistogram {
+                buckets: vec![metric::Bucket {
+                    upper_limit: 1.5,
+                    count: 2,
+                }],
+                count: 2,
+                sum: 3.0,
+            },
+            EventMetricValue::AggregatedHistogram {
+                buckets: vec![metric::Bucket {
+                    upper_limit: 1.5,
+                    count: 2,
+                }],
+                count: 2,
+                sum: 3.0,
+            },
+            EventMetricValue::AggregatedSummary {
+                quantiles: vec![metric::Quantile {
+                    quantile: 0.5,
+                    value: 1.5,
+                }],
+                count: 2,
+                sum: 3.0,
+            },
+            EventMetricValue::AggregatedSummary {
+                quantiles: vec![metric::Quantile {
+                    quantile: 0.5,
+                    value: 1.5,
+                }],
+                count: 2,
+                sum: 3.0,
+            },
+        ];
+
+        let encoded = EventArray::decode(PRE_V24_METRICS).unwrap();
+        let Some(event_array::Events::Metrics(metrics)) = encoded.events else {
+            panic!("legacy payload did not contain metrics");
+        };
+        let decoded = metrics
+            .metrics
+            .into_iter()
+            .map(crate::event::Metric::from)
+            .map(|metric| metric.value().clone())
+            .collect::<Vec<_>>();
+
+        assert_eq!(decoded, expected);
+    }
+
+    #[test]
+    fn decodes_pre_v27_single_valued_metric_tags() {
+        let encoded = Metric::decode(PRE_V27_TAGS).unwrap();
+
+        let decoded = crate::event::Metric::from(encoded);
+
+        assert_eq!(decoded.tag_value("service").as_deref(), Some("api"));
+    }
+
+    #[test]
+    fn current_metric_tags_preserve_enhanced_value_order() {
+        let mut tags = metric::MetricTags::default();
+        tags.set_multi_value(
+            "service".to_owned(),
+            [
+                metric::TagValue::Value(String::new()),
+                metric::TagValue::Bare,
+            ],
+        );
+        let event = crate::event::Metric::new(
+            "requests",
+            crate::event::MetricKind::Absolute,
+            EventMetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags));
+
+        let decoded = crate::event::Metric::from(Metric::from(event));
+        let values = decoded
+            .tags()
+            .unwrap()
+            .iter_all()
+            .map(|(_, value)| value.map(str::to_owned))
+            .collect::<Vec<_>>();
+
+        assert_eq!(values, [Some(String::new()), None]);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn decodes_pre_v34_metadata_for_all_event_types() {
+        let expected = VrlValue::from("legacy metadata");
+
+        let log = crate::event::LogEvent::from(Log::decode(PRE_V34_LOG_METADATA).unwrap());
+        let trace = crate::event::TraceEvent::from(Trace::decode(PRE_V34_TRACE_METADATA).unwrap());
+        let metric = crate::event::Metric::from(Metric::decode(PRE_V34_METRIC_METADATA).unwrap());
+
+        assert_eq!(log.metadata().value(), &expected);
+        assert_eq!(trace.metadata().value(), &expected);
+        assert_eq!(metric.metadata().value(), &expected);
+    }
+
+    #[test]
+    fn decodes_pre_v41_metadata_without_source_event_id() {
+        let decoded = EventMetadata::from(Metadata::decode(PRE_V41_METADATA).unwrap());
+
+        assert_eq!(decoded.source_event_id(), None);
+        assert_eq!(decoded.source_type(), Some("legacy"));
     }
 }

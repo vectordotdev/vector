@@ -237,7 +237,7 @@ impl AwsAuthentication {
 
     /// Create the AssumeRoleProviderBuilder, ensuring we create the HTTP client with
     /// the correct proxy and TLS options.
-    fn assume_role_provider_builder(
+    async fn assume_role_provider_builder(
         proxy: &ProxyConfig,
         tls_options: Option<&TlsConfig>,
         region: &Region,
@@ -245,11 +245,16 @@ impl AwsAuthentication {
         external_id: Option<&str>,
         session_name: Option<&str>,
     ) -> crate::Result<AssumeRoleProviderBuilder> {
-        let connector = super::connector(proxy, tls_options)?;
+        let connector = super::AwsHttpClient {
+            http: super::connector(proxy, tls_options)?,
+            region: region.clone(),
+            emit_bytes_sent: false,
+        };
         let config = SdkConfig::builder()
             .http_client(connector)
             .region(region.clone())
             .time_source(SystemTimeSource::new())
+            .use_fips(resolve_use_fips().await.unwrap_or(false))
             .build();
 
         let mut builder = AssumeRoleProviderBuilder::new(assume_role)
@@ -298,7 +303,8 @@ impl AwsAuthentication {
                         assume_role,
                         external_id.as_deref(),
                         session_name.as_deref(),
-                    )?;
+                    )
+                    .await?;
 
                     let provider = builder.build_from_provider(provider).await;
 
@@ -311,8 +317,6 @@ impl AwsAuthentication {
                 profile,
                 region,
             } => {
-                let connector = super::connector(proxy, tls_options)?;
-
                 // The SDK uses the default profile out of the box, but doesn't provide an optional
                 // type in the builder. We can just hardcode it so that everything works.
                 let profile_files = EnvConfigFiles::builder()
@@ -320,6 +324,11 @@ impl AwsAuthentication {
                     .build();
 
                 let auth_region = region.clone().map(Region::new).unwrap_or(service_region);
+                let connector = super::AwsHttpClient {
+                    http: super::connector(proxy, tls_options)?,
+                    region: auth_region.clone(),
+                    emit_bytes_sent: false,
+                };
                 let provider_config = ProviderConfig::empty()
                     .with_region(Option::from(auth_region))
                     .with_http_client(connector);
@@ -347,7 +356,8 @@ impl AwsAuthentication {
                     assume_role,
                     external_id.as_deref(),
                     session_name.as_deref(),
-                )?;
+                )
+                .await?;
 
                 let provider = builder
                     .build_from_provider(
@@ -385,17 +395,31 @@ impl AwsAuthentication {
     }
 }
 
+/// Resolves the FIPS endpoint setting from the environment variable
+/// `AWS_USE_FIPS_ENDPOINT`.
+///
+/// Returns `Some(true)` if FIPS is enabled, `Some(false)` if explicitly
+/// disabled, or `None` if the environment variable is not set.
+async fn resolve_use_fips() -> Option<bool> {
+    aws_config::default_provider::use_fips::use_fips_provider(&ProviderConfig::empty()).await
+}
+
 async fn default_credentials_provider(
     region: Region,
     proxy: &ProxyConfig,
     tls_options: Option<&TlsConfig>,
     imds: ImdsAuthentication,
 ) -> crate::Result<SharedCredentialsProvider> {
-    let connector = super::connector(proxy, tls_options)?;
+    let connector = super::AwsHttpClient {
+        http: super::connector(proxy, tls_options)?,
+        region: region.clone(),
+        emit_bytes_sent: false,
+    };
 
     let provider_config = ProviderConfig::empty()
         .with_region(Some(region.clone()))
-        .with_http_client(connector);
+        .with_http_client(connector)
+        .with_use_fips(resolve_use_fips().await);
 
     let client = imds::Client::builder()
         .max_attempts(imds.max_attempts)

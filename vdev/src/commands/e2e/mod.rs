@@ -1,4 +1,5 @@
 mod ci_paths;
+mod run;
 mod show;
 mod start;
 mod stop;
@@ -15,5 +16,6 @@ These test setups are organized into a set of integrations, located in subdirect
     start,
     stop,
     test,
+    run,
     ci_paths,
 }

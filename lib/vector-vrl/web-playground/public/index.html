@@ -46,65 +46,89 @@
             </tr>
           </table>
         </div>
+        <div class="headers-grid-item theme-section">
+          <button id="theme-toggle-btn" type="button" title="Theme" aria-label="Toggle theme"></button>
+        </div>
       </div>
     </div>
     <div id="App">
       <div id="toolbar-section">
-        <button id="run-code-btn" class="btn btn-primary" onClick="vrlPlayground.handleRunCode()">Run program</button>
-        <button id="share-code-btn" class="btn btn-secondary" onClick="vrlPlayground.handleShareCode()">Share program</button>
-        <div class="timezone-container">
-          <label for="timezone-input" id="timezone-label">Select Timezone</label>
-          <input
-            type="text"
-            id="timezone-input"
-            name="timezone"
-            list="timezone-list"
-            placeholder="Default"
-          >
-          <datalist id="timezone-list">
-            <option value="Default"></option>
-            <option value="Etc/UTC"></option>
-            <option value="America/New_York"></option>
-            <option value="America/Chicago"></option>
-            <option value="America/Denver"></option>
-            <option value="America/Los_Angeles"></option>
-            <option value="Europe/London"></option>
-            <option value="Europe/Paris"></option>
-            <option value="Asia/Tokyo"></option>
-            <option value="Asia/Dubai"></option>
-            <option value="Australia/Sydney"></option>
-          </datalist>
+        <div class="toolbar-group">
+          <button id="run-code-btn" class="btn btn-primary" onClick="vrlPlayground.handleRunCode()" title="Run program (Shift+Enter)">
+            <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.3 4.3a1 1 0 011.55-.832l8 5.7a1 1 0 010 1.664l-8 5.7A1 1 0 016.3 15.7V4.3z"/></svg>
+            <span>Run program</span>
+          </button>
+          <button id="share-code-btn" class="btn btn-secondary" onClick="vrlPlayground.handleShareCode()">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg>
+            <span>Share program</span>
+          </button>
         </div>
-        </div>
-      <div id="input-section">
-        <div id="cell">
-          <div id="input-cell-title">
-            <p class="cell-title">Program</p>
+        <div id="toolbar-controls">
+          <div class="toolbar-group">
+            <input
+              type="text"
+              id="timezone-input"
+              name="timezone"
+              list="timezone-list"
+              placeholder="Timezone"
+              title="Select Timezone"
+            >
+            <datalist id="timezone-list">
+              <option value="Default"></option>
+              <option value="Etc/UTC"></option>
+              <option value="America/New_York"></option>
+              <option value="America/Chicago"></option>
+              <option value="America/Denver"></option>
+              <option value="America/Los_Angeles"></option>
+              <option value="Europe/London"></option>
+              <option value="Europe/Paris"></option>
+              <option value="Asia/Tokyo"></option>
+              <option value="Asia/Dubai"></option>
+              <option value="Australia/Sydney"></option>
+            </datalist>
           </div>
-          <div id="container-program"></div>
+          <div class="toolbar-group">
+            <select id="history-select" title="Run history (stored locally in your browser)">
+              <option value="" disabled selected>History</option>
+            </select>
+            <button id="clear-history-btn" type="button" title="Clear run history" onClick="vrlPlayground.handleClearHistory()" aria-label="Clear run history">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.7 6l-.5 9.4a2 2 0 01-2 1.9H7.8a2 2 0 01-2-1.9L5.3 6m10.7 0h-2.7m-6 0H5.3m2.7 0V4.5A1.5 1.5 0 019.5 3h1a1.5 1.5 0 011.5 1.5V6m-4 0h4"/></svg>
+            </button>
+          </div>
         </div>
-      </div>
+        </div>
+      <div id="main-split">
+        <div id="input-section">
+          <div id="cell">
+            <div id="input-cell-title">
+              <p class="cell-title">Program</p>
+            </div>
+            <div id="container-program"></div>
+          </div>
+        </div>
 
-      <div id="output-section">
-        <div id="event-cell">
-          <div id="event-cell-title">
-              <p class="cell-title">Input</p>
+        <div id="output-section">
+          <div id="event-cell">
+            <div id="event-cell-title">
+                <p class="cell-title">Input</p>
+            </div>
+            <div id="container-event"></div>
           </div>
-          <div id="container-event"></div>
-        </div>
 
-        <div id="output-cell">
-          <div id="output-cell-title">
-            <p class="cell-title">
-              <span>Output</span>
-              <code id="elapsed-time"></code>
-            </p>
+          <div id="output-cell">
+            <div id="output-cell-title">
+              <p class="cell-title">
+                <span>Output</span>
+                <code id="elapsed-time"></code>
+              </p>
+            </div>
+            <div id="container-output"></div>
           </div>
-          <div id="container-output"></div>
         </div>
       </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.5/split.min.js" integrity="sha384-q2ksSc8z6Q4ZUnxlfZj9AXZLpSdWmD3q/YrId1twTeNHh56fNh98YbJSpppzGUvL" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
 
     <script src="index.js" type="module"></script>

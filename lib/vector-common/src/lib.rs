@@ -12,6 +12,7 @@
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 
+pub use pastey; // Exported so that registered_event! doesn't need pastey in other crates
 pub use vector_common_macros::NamedInternalEvent;
 
 #[cfg(feature = "btreemap")]
@@ -25,6 +26,8 @@ pub mod json_size;
 pub mod config;
 
 pub mod constants;
+
+pub mod decompression;
 
 #[cfg(feature = "conversion")]
 pub use vrl::compiler::TimeZone;
@@ -53,6 +56,8 @@ pub mod id;
 pub mod internal_event;
 
 pub mod request_metadata;
+
+pub mod sampling;
 
 pub mod shutdown;
 

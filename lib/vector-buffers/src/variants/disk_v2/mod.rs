@@ -93,10 +93,9 @@
 //! ```
 //!
 //! As the disk buffer structure is meant to emulate a ring buffer, most of the bookkeeping resolves
-//! around the writer and reader being able to quickly figure out where they left off. Record and
-//! data file IDs are simply rolled over when they reach the maximum of their data type, and are
-//! incremented monotonically as new data files are created, rather than trying to always allocate
-//! from the lowest available ID.
+//! around the writer and reader being able to quickly figure out where they left off. Data file
+//! IDs roll over when they reach the maximum of their data type. Record IDs are strictly
+//! monotonic and must not reach `u64::MAX`; record-ID exhaustion is not supported.
 //!
 //! ## Buffer operation
 //!
@@ -180,9 +179,11 @@ use std::{
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
+use tracing::debug;
 use vector_common::finalization::Finalizable;
 
 mod backed_archive;
+mod checkpoint_recovery;
 pub(crate) mod common;
 mod io;
 mod ledger;
@@ -200,7 +201,7 @@ pub use self::{
     io::{Filesystem, ProductionFilesystem},
     ledger::LedgerLoadCreateError,
     reader::{BufferReader, ReaderError},
-    writer::{BufferWriter, WriterError},
+    writer::{BufferWriter, TryWriteOutcome, WriterError},
 };
 use crate::{
     Bufferable,
@@ -262,12 +263,51 @@ where
         let finalizer = Arc::clone(&ledger).spawn_finalizer();
 
         let mut reader = BufferReader::new(Arc::clone(&ledger), finalizer);
+        let mut unread_buffer_size = reader
+            .reconcile_checkpoint_window()
+            .await
+            .context(ReaderSeekFailedSnafu)?;
+        if writer
+            .align_with_reader_ahead_checkpoint(unread_buffer_size)
+            .await
+            .context(WriterSeekFailedSnafu)?
+        {
+            unread_buffer_size = reader
+                .reconcile_checkpoint_window()
+                .await
+                .context(ReaderSeekFailedSnafu)?;
+        }
         reader
             .seek_to_next_record()
             .await
             .context(ReaderSeekFailedSnafu)?;
 
+        // Install the authoritative buffer size now that the reader is positioned at the first
+        // unread record. Startup recovery treats the durable ledger checkpoint as the logical
+        // source of truth: physical files may contain stale or post-checkpoint bytes, but
+        // `reconcile_checkpoint_window` truncates those tails and counts only records inside the
+        // checkpointed reader/writer window.
+        #[cfg(feature = "antithesis-disk-asserts")]
+        {
+            #![allow(clippy::disallowed_types)] // once_cell::Lazy
+            antithesis_sdk::assert_sometimes!(
+                unread_buffer_size > 0,
+                "the buffer reopens with pre-existing on-disk records",
+                &serde_json::json!({ "total_buffer_size": unread_buffer_size })
+            );
+        }
+
+        ledger.initialize_total_buffer_size(unread_buffer_size);
+
+        debug!(
+            unread_buffer_size,
+            "Recalculated buffer size from checkpointed data file window."
+        );
+
         ledger.synchronize_buffer_usage();
+        if ledger.filesystem().supports_background_cleanup() {
+            ledger.spawn_data_file_cleanup();
+        }
 
         Ok((writer, reader, ledger))
     }

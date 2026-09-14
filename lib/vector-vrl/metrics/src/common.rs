@@ -201,7 +201,7 @@ pub(crate) fn resolve_tags(
 mod tests {
     use vector_core::{
         compile_vrl,
-        event::{Event, LogEvent, MetricKind, MetricTags, VrlTarget},
+        event::{Event, LogEvent, MetricKind, MetricTagMode, MetricTags, VrlTarget},
     };
     use vrl::{
         compiler::{
@@ -226,7 +226,7 @@ mod tests {
         let state = TypeState::default();
 
         let mut config = CompileConfig::default();
-        config.set_custom(storage.clone());
+        config.set_custom(storage);
         config.set_read_only();
 
         compile_vrl(vrl_source, &functions, &state, config)
@@ -239,7 +239,11 @@ mod tests {
             config: _,
         } = compile(storage, vrl_source).expect("compilation failed");
 
-        let mut target = VrlTarget::new(Event::Log(LogEvent::default()), program.info(), false);
+        let mut target = VrlTarget::new(
+            Event::Log(LogEvent::default()),
+            program.info(),
+            MetricTagMode::Single,
+        );
         Runtime::default().resolve(&mut target, &program, &TimeZone::default())
     }
 

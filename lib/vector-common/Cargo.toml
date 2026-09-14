@@ -38,6 +38,8 @@ tokenize = []
 
 [dependencies]
 async-compression.workspace = true
+flate2.workspace = true
+zstd.workspace = true
 async-stream = "0.3.6"
 bytes = { version = "1.11.1", default-features = false, optional = true }
 chrono.workspace = true
@@ -63,3 +65,5 @@ vector-common-macros.workspace = true
 [dev-dependencies]
 futures = { version = "0.3.31", default-features = false, features = ["async-await"] }
 tokio = { workspace = true, features = ["rt", "time"] }
+# `zdict_builder` exposes dictionary training, used only to build test fixtures.
+zstd = { workspace = true, features = ["zdict_builder"] }

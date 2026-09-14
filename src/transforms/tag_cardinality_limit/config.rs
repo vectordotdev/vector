@@ -25,7 +25,6 @@ pub struct Config {
     pub global: Inner,
 
     /// Controls how tag tracking state is partitioned across metrics.
-    #[configurable(derived)]
     #[serde(default)]
     pub tracking_scope: TrackingScope,
 
@@ -39,15 +38,13 @@ pub struct Config {
     /// When unset (default), there is no cap and the transform tracks all pairs it
     /// encounters. In `global` tracking scope mode, this limit still applies (the
     /// metric key is set to `None` unless there is a per-metric override).
-    #[configurable(derived)]
     #[serde(default)]
     pub max_tracked_keys: Option<usize>,
 
     /// Tag cardinality limits configuration per metric name.
-    #[configurable(
-        derived,
-        metadata(docs::additional_props_description = "An individual metric configuration.")
-    )]
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual metric configuration."
+    ))]
     #[serde(default)]
     pub per_metric_limits: HashMap<String, PerMetricConfig>,
 
@@ -57,10 +54,9 @@ pub struct Config {
     ///
     /// See the "Per-tag overrides" section under "How it works" for a worked example
     /// and the precedence rules.
-    #[configurable(
-        derived,
-        metadata(docs::additional_props_description = "An individual tag configuration.")
-    )]
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual tag configuration."
+    ))]
     #[serde(default)]
     pub per_tag_limits: HashMap<String, PerTagConfig>,
 }
@@ -89,14 +85,12 @@ pub struct Inner {
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
 
-    #[configurable(derived)]
     #[serde(default = "default_limit_exceeded_action")]
     pub limit_exceeded_action: LimitExceededAction,
 
     #[serde(flatten)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
 }
@@ -147,10 +141,9 @@ pub struct PerMetricConfig {
     /// are inherited from the enclosing per-metric configuration, except
     /// `cache_size_per_key`, which can be overridden per tag in probabilistic mode.
     /// Tags not listed here use the per-metric configuration.
-    #[configurable(
-        derived,
-        metadata(docs::additional_props_description = "An individual tag configuration.")
-    )]
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual tag configuration."
+    ))]
     #[serde(default)]
     pub per_tag_limits: HashMap<String, PerTagConfig>,
 
@@ -168,14 +161,12 @@ pub struct OverrideInner {
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
 
-    #[configurable(derived)]
     #[serde(default = "default_limit_exceeded_action")]
     pub limit_exceeded_action: LimitExceededAction,
 
     #[serde(flatten)]
     pub mode: OverrideMode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
 }
@@ -235,7 +226,6 @@ impl OverrideMode {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PerTagConfig {
-    #[configurable(derived)]
     #[serde(flatten)]
     pub mode: PerTagMode,
 }
@@ -336,8 +326,8 @@ pub(crate) const fn default_cache_size() -> usize {
 // =============================================================================
 
 impl GenerateConfig for Config {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             global: Inner {
                 mode: Mode::Exact,
                 value_limit: default_value_limit(),
@@ -362,50 +352,10 @@ pub enum BuildError {
     CacheSizeRequiresProbabilistic { tag_key: String },
 }
 
-impl Config {
-    fn validate(&self) -> crate::Result<()> {
-        // Global per_tag_limits: cache_size_per_key only applies in probabilistic mode.
-        if !matches!(self.global.mode, Mode::Probabilistic(_)) {
-            for (tag_key, tag_cfg) in &self.per_tag_limits {
-                if let PerTagMode::LimitOverride {
-                    cache_size_per_key: Some(_),
-                    ..
-                } = tag_cfg.mode
-                {
-                    return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
-                        tag_key: tag_key.clone(),
-                    }));
-                }
-            }
-        }
-
-        // Per-metric per_tag_limits: cache_size_per_key only applies when the per-metric
-        // mode is probabilistic.
-        for per_metric in self.per_metric_limits.values() {
-            if !matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)) {
-                for (tag_key, tag_cfg) in &per_metric.per_tag_limits {
-                    if let PerTagMode::LimitOverride {
-                        cache_size_per_key: Some(_),
-                        ..
-                    } = tag_cfg.mode
-                    {
-                        return Err(Box::new(BuildError::CacheSizeRequiresProbabilistic {
-                            tag_key: tag_key.clone(),
-                        }));
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for Config {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        self.validate()?;
         Ok(Transform::event_task(TagCardinalityLimit::new(
             self.clone(),
         )))
@@ -421,5 +371,54 @@ impl TransformConfig for Config {
         _: &[(OutputId, schema::Definition)],
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
+    }
+
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        // Global per_tag_limits: cache_size_per_key only applies in probabilistic mode.
+        if !matches!(self.global.mode, Mode::Probabilistic(_)) {
+            for (tag_key, tag_cfg) in &self.per_tag_limits {
+                if let PerTagMode::LimitOverride {
+                    cache_size_per_key: Some(_),
+                    ..
+                } = tag_cfg.mode
+                {
+                    errors.push(
+                        BuildError::CacheSizeRequiresProbabilistic {
+                            tag_key: tag_key.clone(),
+                        }
+                        .to_string(),
+                    );
+                }
+            }
+        }
+
+        // Per-metric per_tag_limits: cache_size_per_key only applies when the per-metric
+        // mode is probabilistic.
+        for per_metric in self.per_metric_limits.values() {
+            if !matches!(per_metric.config.mode, OverrideMode::Probabilistic(_)) {
+                for (tag_key, tag_cfg) in &per_metric.per_tag_limits {
+                    if let PerTagMode::LimitOverride {
+                        cache_size_per_key: Some(_),
+                        ..
+                    } = tag_cfg.mode
+                    {
+                        errors.push(
+                            BuildError::CacheSizeRequiresProbabilistic {
+                                tag_key: tag_key.clone(),
+                            }
+                            .to_string(),
+                        );
+                    }
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }

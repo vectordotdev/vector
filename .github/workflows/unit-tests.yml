@@ -80,6 +80,7 @@ jobs:
           datadog-ci: ${{ !inputs.coverage }}
           protoc: true
           libsasl2: true
+          cargo-cache: true
 
       - name: Run tests
         run: |
