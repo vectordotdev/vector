@@ -1494,7 +1494,7 @@ async fn decode_traces_empty_tracer_payloads_emits_error() {
             .await
         );
 
-        let events = crate::test_util::collect_ready(rx).await;
+        let events = crate::test_util::collect_ready(rx);
         assert!(events.is_empty());
 
         let metrics = Controller::get().unwrap().capture_metrics();
@@ -1538,7 +1538,7 @@ async fn decode_traces_idx_only_payload_emits_error() {
             .await
         );
 
-        let events = crate::test_util::collect_ready(rx).await;
+        let events = crate::test_util::collect_ready(rx);
         assert!(events.is_empty());
 
         let metrics = Controller::get().unwrap().capture_metrics();
