@@ -14,7 +14,6 @@ use toml_edit::DocumentMut;
 
 const KUBECLT_CUE_FILE: &str = "website/cue/reference/administration/interfaces/kubectl.cue";
 const INSTALL_SCRIPT: &str = "distribution/install.sh";
-const RELEASE_STATE_FILE: &str = ".github/release-state.json";
 
 /// Release preparations CLI options.
 #[derive(clap::Args, Debug)]
@@ -73,8 +72,8 @@ impl Cli {
 impl Prepare {
     pub fn run(&self) -> Result<()> {
         debug!("run");
-        let prepared_from = self.create_release_branches()?;
-        self.prepare_version_state(&prepared_from)?;
+        self.create_release_branches()?;
+        self.prepare_vector_version()?;
         self.pin_vrl_version()?;
 
         self.generate_release_cue()?;
@@ -88,6 +87,11 @@ impl Prepare {
             .check_run()?;
 
         if !self.dry_run {
+            git::add_files_in_current_dir()?;
+            git::commit(&format!(
+                "chore(releasing): Prepare version {}",
+                self.new_vector_version
+            ))?;
             self.open_release_pr()?;
         }
 
@@ -95,7 +99,7 @@ impl Prepare {
     }
 
     /// Steps 1 & 2
-    fn create_release_branches(&self) -> Result<String> {
+    fn create_release_branches(&self) -> Result<()> {
         debug!("create_release_branches");
 
         if self.dry_run {
@@ -115,10 +119,6 @@ impl Prepare {
             git::checkout_main_branch()?;
         }
 
-        let prepared_from = git::run_and_check_output(&["rev-parse", "HEAD"])?
-            .trim()
-            .to_string();
-
         git::checkout_or_create_branch(self.release_branch.as_str())?;
         if !self.dry_run {
             git::push_and_set_upstream(self.release_branch.as_str())?;
@@ -130,11 +130,11 @@ impl Prepare {
         if !self.dry_run {
             git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
         }
-        Ok(prepared_from)
+        Ok(())
     }
 
-    fn prepare_version_state(&self, prepared_from: &str) -> Result<()> {
-        debug!("prepare_version_state");
+    fn prepare_vector_version(&self) -> Result<()> {
+        debug!("prepare_vector_version");
 
         let cargo_toml_path = self.repo_root.join("Cargo.toml");
         let contents = fs::read_to_string(&cargo_toml_path).context("Failed to read Cargo.toml")?;
@@ -145,24 +145,6 @@ impl Prepare {
         fs::write(&cargo_toml_path, updated_contents).context("Failed to write Cargo.toml")?;
 
         run_command("cargo update -p vector");
-
-        let state = serde_json::json!({
-            "schema_version": 1,
-            "status": "prepared",
-            "version": release_version,
-            "prepared_from": prepared_from,
-        });
-        fs::write(
-            self.repo_root.join(RELEASE_STATE_FILE),
-            format!("{}\n", serde_json::to_string_pretty(&state)?),
-        )
-        .context("Failed to write release state")?;
-
-        git::add_files_in_current_dir()?;
-        git::commit(&format!(
-            "chore(releasing): Prepare version {}",
-            self.new_vector_version
-        ))?;
         Ok(())
     }
 
@@ -176,9 +158,6 @@ impl Prepare {
 
         fs::write(cargo_toml_path, updated_contents).context("Failed to write Cargo.toml")?;
         run_command("cargo update -p vrl");
-        git::commit(&format!(
-            "chore(releasing): Pinned VRL version to {vrl_version}"
-        ))?;
         Ok(())
     }
 
@@ -192,8 +171,6 @@ impl Prepare {
         generate_cue::retire_all_fragments()?;
 
         self.append_vrl_changelog_to_release_cue()?;
-        git::add_files_in_current_dir()?;
-        git::commit("chore(releasing): Generated release CUE file")?;
         debug!("Generated release CUE file");
         Ok(())
     }
@@ -223,10 +200,6 @@ impl Prepare {
 
         fs::write(file_path, updated_contents)
             .map_err(|e| anyhow!("Failed to write {}: {}", file_path.display(), e))?;
-        git::commit(&format!(
-            "chore(releasing): Updated {} vector version to {new_version}",
-            file_path.strip_prefix(&self.repo_root).unwrap().display(),
-        ))?;
 
         Ok(())
     }
