@@ -382,27 +382,41 @@ impl TrackedPathIndex {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct RekeyOutcome {
+    /// The last acknowledged position moved from the old fingerprint, before a restarted reader
+    /// is registered at zero under the replacement fingerprint.
+    acknowledged_position: Option<FilePosition>,
+}
+
 fn rekey_watcher(
     fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
     checkpoints: &CheckpointsView,
     old_key: FileFingerprint,
     new_key: FileFingerprint,
 ) -> bool {
+    rekey_watcher_with_outcome(fp_map, checkpoints, old_key, new_key).is_some()
+}
+
+fn rekey_watcher_with_outcome(
+    fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
+    checkpoints: &CheckpointsView,
+    old_key: FileFingerprint,
+    new_key: FileFingerprint,
+) -> Option<RekeyOutcome> {
     if old_key == new_key {
-        return true;
+        return Some(RekeyOutcome {
+            acknowledged_position: None,
+        });
     }
     if fp_map.contains_key(&new_key) {
-        return false;
+        return None;
     }
     // `fp_map`'s iteration order is read priority under `oldest_first`: startup sorts by creation
     // time and new watchers append. Removing and re-inserting would move a rewritten older file to
     // the tail, letting a newer one drain first, so the entry goes back at the index it held.
-    let Some(position) = fp_map.get_index_of(&old_key) else {
-        return false;
-    };
-    let Some(mut watcher) = fp_map.shift_remove(&old_key) else {
-        return false;
-    };
+    let position = fp_map.get_index_of(&old_key)?;
+    let mut watcher = fp_map.shift_remove(&old_key)?;
     // Asks the watcher whether its reader was repositioned onto different content, rather than
     // inferring it from a zero offset: a watcher that simply has not read anything yet also sits at
     // zero, and resetting its checkpoint would discard a resumed position.
@@ -412,14 +426,17 @@ fn rekey_watcher(
     let generation = watcher.take_new_generation();
     fp_map.shift_insert(position, new_key, watcher);
     // Carries the persisted position and the modified/removed bookkeeping onto the new identity.
-    checkpoints.update_key(old_key, new_key, generation);
+    let acknowledged_position =
+        checkpoints.update_key_and_get_position(old_key, new_key, generation);
     if restarted {
         // The reader was restarted at zero (an in-place rewrite), so the pre-rewrite offset must not
         // survive: a restart would resume past the start of the rewritten file and skip its opening
         // content. An appended-to file keeps its offset, and its checkpoint with it.
         checkpoints.register(new_key, 0, generation);
     }
-    true
+    Some(RekeyOutcome {
+        acknowledged_position,
+    })
 }
 
 /// Whether any component of `path` is a symlink.
@@ -1883,13 +1900,27 @@ where
                         // The old reader is still the owner of `stale_key`. The normal read loop can
                         // continue consuming it, and the next discovery pass will either finish
                         // the drain or apply the same bounded step again.
-                    } else if rekey_watcher(fp_map, checkpoints, stale_key, file_id) {
+                    } else if let Some(rekey_outcome) =
+                        rekey_watcher_with_outcome(fp_map, checkpoints, stale_key, file_id)
+                    {
                         if let Some((old_position, old_generation)) = drained_checkpoint {
                             // The old inode may be yielded later in this same glob pass as a
-                            // rotated archive. Keep its already-drained offset claimable so
-                            // `watch_new_file` resumes at the archive's tail instead of replaying
-                            // records that were just emitted before the rekey.
-                            checkpoints.register_reaped(stale_key, old_position, old_generation);
+                            // rotated archive. Keep its already-drained offset as an in-memory
+                            // resume point so `watch_new_file` avoids replaying records that were
+                            // just emitted, but persist only the position acknowledged before the
+                            // drain. `rekey_watcher` moved the current acknowledged position onto
+                            // `file_id`; read it back after that atomic handoff so acknowledgements
+                            // that raced with the drain are not lost. The old generation's later
+                            // acknowledgements advance the durable position after the lines reach
+                            // the sink.
+                            let acknowledged_position =
+                                rekey_outcome.acknowledged_position.unwrap_or_default();
+                            checkpoints.register_reaped(
+                                stale_key,
+                                acknowledged_position,
+                                old_position,
+                                old_generation,
+                            );
                         }
                         tracked_path_index.rekeyed(stale_key, file_id);
                         let watcher = fp_map
@@ -5073,10 +5104,22 @@ mod tests {
         let archive_watcher = fp_map
             .get(&old_file_id)
             .expect("the archive must get its own watcher");
+        let archive_position = archive_watcher.get_file_position();
         assert_eq!(
-            archive_watcher.get_file_position(),
+            archive_position,
             std::fs::metadata(&archive).unwrap().len(),
             "the archive watcher must resume after the drained tail"
+        );
+        assert_eq!(
+            checkpoints.get_acknowledged(old_file_id),
+            Some(old_position),
+            "the unacknowledged drain must not be persisted as already delivered"
+        );
+        checkpoints.update(old_file_id, archive_position, old_generation);
+        assert_eq!(
+            checkpoints.get_acknowledged(old_file_id),
+            Some(archive_position),
+            "the drained generation's acknowledgement must advance the durable position"
         );
     }
 

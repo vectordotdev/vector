@@ -99,11 +99,48 @@ impl Owner {
     }
 }
 
+/// Acknowledgements still outstanding for a reader that was drained before its watcher moved on.
+///
+/// The read position is useful for avoiding duplicate output if the rotated archive is discovered
+/// in the same process, but it is not safe to persist until the queued lines have been acknowledged.
+#[derive(Debug, Clone, Copy)]
+struct PendingAcknowledgement {
+    generation: OwnerGeneration,
+    target: FilePosition,
+}
+
 /// A checkpoint together with the watcher entitled to move it.
 #[derive(Debug, Clone, Copy)]
 struct Owned {
+    /// The last position known to be safe to persist after acknowledgements.
     position: FilePosition,
     owner: Owner,
+    /// Present during a rotation handoff. Until the old reader's acknowledgements reach `target`,
+    /// a new watcher in this process starts at `target`, while `position` remains the durable value.
+    pending_acknowledgement: Option<PendingAcknowledgement>,
+    /// The current live reader's latest acknowledged position while the old drained reader is still
+    /// pending. It becomes durable once the pending old acknowledgements catch up.
+    live_position: Option<FilePosition>,
+}
+
+impl Owned {
+    fn unowned(position: FilePosition) -> Self {
+        Self {
+            position,
+            owner: Owner::Unowned,
+            pending_acknowledgement: None,
+            live_position: None,
+        }
+    }
+
+    fn live(position: FilePosition, generation: OwnerGeneration) -> Self {
+        Self {
+            position,
+            owner: Owner::Live(generation),
+            pending_acknowledgement: None,
+            live_position: Some(position),
+        }
+    }
 }
 
 /// A thread-safe handle for reading and writing checkpoints in-memory across
@@ -125,6 +162,11 @@ impl CheckpointsView {
     /// generation captured when its line was read, so one arriving after its watcher was rekeyed
     /// away -- or after a different file took the fingerprint over -- is refused rather than
     /// resuming that reader past content it never emitted.
+    ///
+    /// A rotation handoff is the one exception to the single-owner rule: while a new watcher has
+    /// taken over the fingerprint, acknowledgements from the drained generation are still accepted
+    /// until they reach the drain target. The persisted position remains the last acknowledged one
+    /// until then, while progress from the new watcher is held separately.
     pub fn update(&self, fng: FileFingerprint, pos: FilePosition, generation: OwnerGeneration) {
         // One entry lock covers reading the owner and writing the position. Separate operations
         // would let a rekey land in between and recreate an entry under a dead fingerprint.
@@ -132,13 +174,39 @@ impl CheckpointsView {
             // Vacant: rekeyed away, reaped, or never registered. Nothing owns it.
             return;
         };
-        if entry.get().owner.writer() != Some(generation) {
+        let is_current_owner = entry.get().owner.writer() == Some(generation);
+        let is_pending_drained_owner = entry
+            .get()
+            .pending_acknowledgement
+            .is_some_and(|pending| pending.generation == generation);
+        if !is_current_owner && !is_pending_drained_owner {
             return;
         }
         let owner = entry.get().owner;
-        entry.get_mut().position = pos;
+        let owned = entry.get_mut();
+        if is_current_owner {
+            // Keep the current reader's progress separate while acknowledgements from the
+            // drained reader are still outstanding. Otherwise a checkpoint write could skip the
+            // old tail before the sink has confirmed it.
+            owned.live_position = Some(pos);
+            if owned.pending_acknowledgement.is_none() {
+                owned.position = pos;
+            }
+        }
+        if is_pending_drained_owner {
+            owned.position = owned.position.max(pos);
+            if owned
+                .pending_acknowledgement
+                .is_some_and(|pending| pos >= pending.target)
+            {
+                owned.pending_acknowledgement = None;
+                if let Some(live_position) = owned.live_position {
+                    owned.position = owned.position.max(live_position);
+                }
+            }
+        }
         self.modified_times.insert(fng, Utc::now());
-        if matches!(owner, Owner::Live(_)) {
+        if is_current_owner && matches!(owner, Owner::Live(_)) {
             // Progress from a live reader means the file is not gone after all. From a reaped one it
             // means only that data it had already read got through, which says nothing about the
             // file -- and clearing the mark there would both keep the entry from ever expiring and
@@ -159,43 +227,55 @@ impl CheckpointsView {
         // delete the checkpoint belonging to the new live watcher.
         match self.checkpoints.entry(fng) {
             dashmap::mapref::entry::Entry::Occupied(mut entry) => {
-                entry.insert(Owned {
-                    position: pos,
-                    owner: Owner::Live(generation),
-                });
+                if entry.get().pending_acknowledgement.is_some() {
+                    // The rotated archive is opened at its already-drained read position, but the
+                    // checkpoint must stay at the last acknowledged position until the old batch
+                    // reaches the sink. Keep both owners' progress under this entry lock.
+                    let owned = entry.get_mut();
+                    owned.owner = Owner::Live(generation);
+                    owned.live_position = Some(pos);
+                } else {
+                    entry.insert(Owned::live(pos, generation));
+                }
                 self.removed_times.remove(&fng);
             }
             dashmap::mapref::entry::Entry::Vacant(entry) => {
-                entry.insert(Owned {
-                    position: pos,
-                    owner: Owner::Live(generation),
-                });
+                entry.insert(Owned::live(pos, generation));
                 self.removed_times.remove(&fng);
             }
         }
         self.modified_times.insert(fng, Utc::now());
     }
 
-    /// Keep the final position of a reader that was drained before its watcher was repointed.
+    /// Keep a drained reader's acknowledged position and its in-memory resume position.
     ///
     /// The old fingerprint may be discovered again shortly afterwards when a rotated archive is
-    /// still inside the include patterns. Starting that watcher from zero would replay the tail
-    /// that the drain already emitted. The entry is deliberately Reaped: late acknowledgements from
-    /// the drained reader remain valid, while a newly registered watcher may take the fingerprint
-    /// over immediately.
+    /// still inside the include patterns. Starting that watcher from zero would replay the tail that
+    /// the drain already emitted, but persisting the drain's EOF before its lines are acknowledged
+    /// would lose them on a crash. The entry is deliberately Reaped: late acknowledgements from the
+    /// drained reader remain valid, while a newly registered watcher may take the fingerprint over
+    /// immediately without making the unacknowledged tail durable.
     pub fn register_reaped(
         &self,
         fng: FileFingerprint,
-        pos: FilePosition,
+        acknowledged_position: FilePosition,
+        resume_position: FilePosition,
         generation: OwnerGeneration,
     ) {
         let marked_at = Utc::now();
         let mut installed = false;
         match self.checkpoints.entry(fng) {
             dashmap::mapref::entry::Entry::Vacant(entry) => {
+                let pending_acknowledgement =
+                    (acknowledged_position < resume_position).then_some(PendingAcknowledgement {
+                        generation,
+                        target: resume_position,
+                    });
                 entry.insert(Owned {
-                    position: pos,
+                    position: acknowledged_position,
                     owner: Owner::Reaped(generation),
+                    pending_acknowledgement,
+                    live_position: None,
                 });
                 // Hold the checkpoint entry lock while installing the mark, so expiry cannot
                 // decide based on a half-installed state.
@@ -210,6 +290,16 @@ impl CheckpointsView {
     }
 
     pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
+        self.checkpoints.get(&fng).map(|r| {
+            r.value()
+                .pending_acknowledgement
+                .map_or(r.value().position, |pending| pending.target)
+        })
+    }
+
+    /// Return the last position that is safe to persist, excluding a rotation drain that is still
+    /// waiting for acknowledgements. This is used before repointing the old watcher.
+    pub fn get_acknowledged(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(&fng).map(|r| r.value().position)
     }
 
@@ -255,12 +345,23 @@ impl CheckpointsView {
         new: FileFingerprint,
         new_generation: OwnerGeneration,
     ) {
+        let _ = self.update_key_and_get_position(old, new, new_generation);
+    }
+
+    /// Move a checkpoint like [`Self::update_key`], returning the position that was safe to persist
+    /// immediately before the move. The file server uses that value to seed a separate reaped
+    /// checkpoint for the rotated archive after resetting the replacement reader to zero.
+    pub fn update_key_and_get_position(
+        &self,
+        old: FileFingerprint,
+        new: FileFingerprint,
+        new_generation: OwnerGeneration,
+    ) -> Option<FilePosition> {
         if old == new {
-            return;
+            return None;
         }
-        let Some((_, moved)) = self.checkpoints.remove(&old) else {
-            return;
-        };
+        let (_, moved) = self.checkpoints.remove(&old)?;
+        let acknowledged_position = moved.position;
         // An entry a *live* watcher owns is left alone: two files can share a fingerprint, and the
         // file server refuses such a rekey, but the maps must not depend on that check holding
         // across an await.
@@ -271,10 +372,7 @@ impl CheckpointsView {
         // ever writes would be refused.
         // One entry lock covers the test and the write, like [`Self::update`]: reading the owner and
         // replacing it must not be separate operations.
-        let claimed = Owned {
-            position: moved.position,
-            owner: Owner::Live(new_generation),
-        };
+        let claimed = Owned::live(moved.position, new_generation);
         let taken_over = match self.checkpoints.entry(new) {
             dashmap::mapref::entry::Entry::Vacant(entry) => {
                 entry.insert(claimed);
@@ -305,6 +403,7 @@ impl CheckpointsView {
         } else if let Some(value) = old_removal {
             self.removed_times.insert(new, value);
         }
+        Some(acknowledged_position)
     }
 
     pub fn remove_expired(&self) {
@@ -356,13 +455,8 @@ impl CheckpointsView {
     fn load(&self, checkpoint: Checkpoint) {
         // No generation: a loaded checkpoint supplies a starting position, but nothing owns it until
         // a watcher registers, so no acknowledgement can move it.
-        self.checkpoints.insert(
-            checkpoint.fingerprint,
-            Owned {
-                position: checkpoint.position,
-                owner: Owner::Unowned,
-            },
-        );
+        self.checkpoints
+            .insert(checkpoint.fingerprint, Owned::unowned(checkpoint.position));
         self.modified_times
             .insert(checkpoint.fingerprint, checkpoint.modified);
     }
@@ -544,7 +638,7 @@ mod test {
 
     use super::{
         CHECKPOINT_FILE_NAME, Checkpoint, Checkpointer, CheckpointsView, FileFingerprint,
-        FilePosition, TMP_FILE_NAME, next_owner_generation,
+        FilePosition, State, TMP_FILE_NAME, next_owner_generation,
     };
 
     /// Regression test for a bug found in review: with acknowledgements enabled, the acking task
@@ -833,6 +927,82 @@ mod test {
             view.get(fng),
             Some(180),
             "an acknowledgement for a line read before the watcher died must still commit"
+        );
+    }
+
+    /// A rotation drain must not become durable merely because its reader reached EOF. The
+    /// in-memory resume position may skip the already-queued batch when its archive is opened in
+    /// this process, while persistence stays at the last acknowledged offset.
+    #[test]
+    fn a_rotation_drain_persists_only_the_acknowledged_position() {
+        let view = CheckpointsView::default();
+        let fng = FileFingerprint::FirstLinesChecksum(1);
+        let generation = next_owner_generation();
+
+        view.register_reaped(fng, 100, 200, generation);
+        assert_eq!(
+            view.get(fng),
+            Some(200),
+            "new readers skip the drained tail"
+        );
+        assert_eq!(
+            view.get_acknowledged(fng),
+            Some(100),
+            "persistence must start at the last acknowledged position"
+        );
+
+        view.update(fng, 150, generation);
+        assert_eq!(view.get(fng), Some(200));
+        assert_eq!(
+            view.get_acknowledged(fng),
+            Some(150),
+            "a late acknowledgement advances the durable position"
+        );
+
+        let State::V1 { checkpoints } = view.get_state();
+        assert_eq!(checkpoints.len(), 1);
+        assert_eq!(
+            checkpoints.first().expect("checkpoint exists").position,
+            150
+        );
+
+        view.update(fng, 200, generation);
+        assert_eq!(view.get(fng), Some(200));
+        assert_eq!(view.get_acknowledged(fng), Some(200));
+    }
+
+    /// Once an archive watcher claims the old fingerprint, acknowledgements from the drained
+    /// generation still have to finish the old batch before the new reader's progress is persisted.
+    #[test]
+    fn an_archive_owner_keeps_the_drained_acknowledgements_pending() {
+        let view = CheckpointsView::default();
+        let fng = FileFingerprint::FirstLinesChecksum(1);
+        let drained_generation = next_owner_generation();
+        let archive_generation = next_owner_generation();
+
+        view.register_reaped(fng, 100, 200, drained_generation);
+        view.register(fng, 200, archive_generation);
+        view.update(fng, 220, archive_generation);
+        assert_eq!(
+            view.get_acknowledged(fng),
+            Some(100),
+            "archive progress must not skip the unacknowledged old tail"
+        );
+
+        view.update(fng, 150, drained_generation);
+        assert_eq!(view.get_acknowledged(fng), Some(150));
+        view.update(fng, 200, drained_generation);
+        assert_eq!(
+            view.get_acknowledged(fng),
+            Some(220),
+            "the new reader's acknowledged progress becomes durable once the drain completes"
+        );
+
+        view.update(fng, 300, drained_generation);
+        assert_eq!(
+            view.get_acknowledged(fng),
+            Some(220),
+            "the drained generation must be retired after reaching its target"
         );
     }
 
