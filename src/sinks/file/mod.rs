@@ -15,7 +15,7 @@ use futures::{
 use serde_with::serde_as;
 use tokio::{
     fs::{self, File},
-    io::AsyncWriteExt,
+    io::{AsyncSeekExt, AsyncWriteExt},
 };
 use tokio_util::{codec::Encoder as _, time::delay_queue::Expired};
 use vector_lib::{
@@ -202,6 +202,9 @@ enum OutFileInner {
     Regular(File),
     Gzip(GzipEncoder<File>),
     Zstd(ZstdEncoder<File>),
+    /// Transient placeholder used only inside `OutFile::reset` while the
+    /// inner file is being rewound and a fresh compression stream built.
+    Empty,
 }
 
 impl OutFile {
@@ -221,6 +224,7 @@ impl OutFile {
             OutFileInner::Regular(file) => file.sync_all().await,
             OutFileInner::Gzip(gzip) => gzip.get_mut().sync_all().await,
             OutFileInner::Zstd(zstd) => zstd.get_mut().sync_all().await,
+            OutFileInner::Empty => unreachable!("OutFileInner::Empty is transient"),
         }
     }
 
@@ -229,6 +233,7 @@ impl OutFile {
             OutFileInner::Regular(file) => file.shutdown().await,
             OutFileInner::Gzip(gzip) => gzip.shutdown().await,
             OutFileInner::Zstd(zstd) => zstd.shutdown().await,
+            OutFileInner::Empty => unreachable!("OutFileInner::Empty is transient"),
         }
     }
 
@@ -237,6 +242,7 @@ impl OutFile {
             OutFileInner::Regular(file) => file.write(src).await,
             OutFileInner::Gzip(gzip) => gzip.write(src).await,
             OutFileInner::Zstd(zstd) => zstd.write(src).await,
+            OutFileInner::Empty => unreachable!("OutFileInner::Empty is transient"),
         }
     }
 
@@ -245,6 +251,7 @@ impl OutFile {
             OutFileInner::Regular(file) => file.write_all(src).await,
             OutFileInner::Gzip(gzip) => gzip.write_all(src).await,
             OutFileInner::Zstd(zstd) => zstd.write_all(src).await,
+            OutFileInner::Empty => unreachable!("OutFileInner::Empty is transient"),
         }
     }
 
@@ -253,17 +260,31 @@ impl OutFile {
             OutFileInner::Regular(file) => file.metadata().await.map(|m| m.len()),
             OutFileInner::Gzip(gzip) => gzip.get_mut().metadata().await.map(|m| m.len()),
             OutFileInner::Zstd(zstd) => zstd.get_mut().metadata().await.map(|m| m.len()),
+            OutFileInner::Empty => unreachable!("OutFileInner::Empty is transient"),
         }
     }
 
-    async fn truncate(&mut self, size: u64) -> Result<(), std::io::Error> {
-        match &mut self.inner {
-            OutFileInner::Regular(file) => file.set_len(size).await,
-            OutFileInner::Gzip(_) | OutFileInner::Zstd(_) => Err(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                "truncate not supported for compressed files",
-            )),
+    async fn reset(&mut self, size: u64) -> Result<(), std::io::Error> {
+        let inner = std::mem::replace(&mut self.inner, OutFileInner::Empty);
+        enum Kind {
+            Regular,
+            Gzip,
+            Zstd,
         }
+        let (kind, mut file) = match inner {
+            OutFileInner::Regular(file) => (Kind::Regular, file),
+            OutFileInner::Gzip(gzip) => (Kind::Gzip, gzip.into_inner()),
+            OutFileInner::Zstd(zstd) => (Kind::Zstd, zstd.into_inner()),
+            OutFileInner::Empty => unreachable!("OutFileInner::Empty is transient"),
+        };
+        file.set_len(size).await?;
+        file.seek(std::io::SeekFrom::Start(size)).await?;
+        self.inner = match kind {
+            Kind::Regular => OutFileInner::Regular(file),
+            Kind::Gzip => OutFileInner::Gzip(GzipEncoder::new(file)),
+            Kind::Zstd => OutFileInner::Zstd(ZstdEncoder::new(file)),
+        };
+        Ok(())
     }
 
     const fn created_at(&self) -> Instant {
@@ -750,7 +771,8 @@ impl FileSink {
                 }
             };
 
-            let outfile = OutFile::new(file, self.compression);
+            let compression = self.compression;
+            let outfile = OutFile::new(file, compression);
             self.files.insert_at(path.clone(), outfile, next_deadline);
             emit!(FileOpen {
                 count: self.files.len()
@@ -803,7 +825,6 @@ impl FileSink {
         }
 
         let len = batch_buffer.len();
-        let file_start = file.len().await?;
         if len == 0 {
             for (_, finalizers, event_size) in encoded {
                 finalizers.update_status(EventStatus::Delivered);
@@ -816,6 +837,23 @@ impl FileSink {
             });
             return;
         }
+
+        let file_start = match file.len().await {
+            Ok(start) => start,
+            Err(error) => {
+                emit!(FileIoError {
+                    code: "failed_writing_file",
+                    message: "Failed to determine file length before writing.",
+                    error,
+                    path: &path,
+                    dropped_events: n_events,
+                });
+                encoded.into_iter().for_each(|(_, finalizers, _)| {
+                    finalizers.update_status(EventStatus::Errored);
+                });
+                return;
+            }
+        };
         let mut written = 0usize;
         let write_result: Result<(), std::io::Error> = loop {
             match file.write(&batch_buffer[written..]).await {
@@ -853,27 +891,62 @@ impl FileSink {
                     //
                     // If the write ended inside an event boundary the partially
                     // appended record would corrupt framed output on retry, so
-                    // truncate the file back to the last complete boundary.
+                    // the file must be rewound past it before those events are
+                    // re-admitted.
                     let last_complete = boundaries
                         .iter()
                         .filter(|&&b| b <= written)
                         .last()
                         .copied()
                         .unwrap_or(0);
-                    if last_complete < written {
-                        if let Ok(current_len) = file.len().await
-                            && current_len == file_start + written as u64
-                        {
-                            if let Err(e) = file.truncate(file_start + last_complete as u64).await {
-                                warn!(message = "Failed to truncate file after partial write.", error = ?e);
+
+                    // Rolling back a partial record only works for uncompressed
+                    // output, where we can truncate at the last complete record
+                    // boundary. A compressed stream cannot be rewound to a
+                    // record boundary: the partial record is already inside the
+                    // encoder, and feeding it the full record again would
+                    // duplicate it in the decompressed stream. Instead, rewind
+                    // the whole batch and reset the encoder so the partial
+                    // record is not retained and retries start a fresh stream.
+                    let delivered_up_to = if last_complete < written {
+                        // Only rewind when the file still ends where this batch
+                        // left it; rollback must never remove bytes appended by
+                        // another writer.
+                        let can_rewind = match file.len().await {
+                            Ok(current_len) if compression == Compression::None => {
+                                current_len == file_start + written as u64
+                            }
+                            Ok(current_len) => file
+                                .len()
+                                .await
+                                .is_ok_and(|again| again == current_len),
+                            Err(_) => false,
+                        };
+                        if can_rewind {
+                            let rewind_to = if compression == Compression::None {
+                                file_start + last_complete as u64
+                            } else {
+                                file_start
+                            };
+                            if let Err(e) = file.reset(rewind_to).await {
+                                warn!(message = "Failed to rewind file after partial write.", error = ?e);
                             }
                         } else {
-                            warn!(message = "File length changed since write started; cannot safely truncate after partial write.",);
+                            warn!(message = "File changed while writing; cannot safely rewind after partial write.",);
                         }
-                    }
-                    let dropped_events = boundaries.iter().filter(|&&b| b > last_complete).count();
+                        if compression == Compression::None {
+                            last_complete
+                        } else {
+                            0
+                        }
+                    } else {
+                        last_complete
+                    };
+
+                    let dropped_events =
+                        boundaries.iter().filter(|&&b| b > delivered_up_to).count();
                     for (i, (_buf, finalizers, event_size)) in encoded.into_iter().enumerate() {
-                        if boundaries[i] <= last_complete {
+                        if boundaries[i] <= delivered_up_to {
                             finalizers.update_status(EventStatus::Delivered);
                             self.events_sent.emit(CountByteSize(1, event_size));
                         } else {
@@ -887,9 +960,9 @@ impl FileSink {
                         path: &path,
                         dropped_events,
                     });
-                    if last_complete > 0 {
+                    if delivered_up_to > 0 {
                         emit!(FileBytesSent {
-                            byte_size: last_complete,
+                            byte_size: delivered_up_to,
                             file: String::from_utf8_lossy(&path),
                             include_file_metric_tag: self.include_file_metric_tag,
                         });
