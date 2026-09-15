@@ -322,7 +322,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of DEB package.
         run: |
-          ./scripts/verify-install.sh "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_$(dpkg --print-architecture).deb"
+          ./scripts/verify-install.sh target/artifacts/*.deb
 
   rpm-verify:
     name: Verify RPM Packages
@@ -383,7 +383,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of RPM package.
         run: |
-          ./scripts/verify-install.sh "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.$(uname -m).rpm"
+          ./scripts/verify-install.sh target/artifacts/*.rpm
 
   macos-verify:
     name: Verify macOS Package
