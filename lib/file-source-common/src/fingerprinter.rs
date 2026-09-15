@@ -202,9 +202,18 @@ impl Fingerprinter {
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
+        // Track whether the file is empty so we can suppress the "too small to
+        // fingerprint" warning for empty files. Empty files are common and
+        // transient (freshly-created log files, short-lived Kubernetes pods) and
+        // would otherwise flood logs with non-actionable warnings. Non-empty
+        // files that are still too small to fingerprint continue to warn, since
+        // those can genuinely surprise a user wondering why a file isn't tailed.
+        // See https://github.com/vectordotdev/vector/issues/1065.
+        let mut file_is_empty = false;
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
                 if !metadata.is_dir() {
+                    file_is_empty = metadata.len() == 0;
                     self.fingerprint(path).await.map(Some)
                 } else {
                     Ok(None)
@@ -222,7 +231,12 @@ impl Fingerprinter {
                 match error.kind() {
                     ErrorKind::UnexpectedEof => {
                         if !known_small_files.contains_key(path) {
-                            emitter.emit_file_checksum_failed(path);
+                            // Only warn about files that are too small to
+                            // fingerprint when they actually contain data;
+                            // empty files are expected and would just be noise.
+                            if !file_is_empty {
+                                emitter.emit_file_checksum_failed(path);
+                            }
                             known_small_files.insert(path.to_path_buf(), time::Instant::now());
                         }
                         return;
@@ -277,7 +291,17 @@ async fn fingerprinter_read_until(
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, fs, io::Error, path::Path, time::Duration};
+    use std::{
+        collections::HashMap,
+        fs,
+        io::Error,
+        path::Path,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
 
     use async_compression::tokio::bufread::GzipEncoder;
     use bytes::BytesMut;
@@ -638,6 +662,64 @@ mod test {
         );
     }
 
+    #[tokio::test]
+    async fn fingerprint_or_emit_only_warns_on_non_empty_small_files() {
+        // Regression test for https://github.com/vectordotdev/vector/issues/1065:
+        // an empty file is too small to fingerprint but must NOT emit the
+        // "too small to fingerprint" warning (it only creates log noise), while
+        // a non-empty file that is still too small SHOULD warn.
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            false,
+        );
+
+        let target_dir = tempdir().unwrap();
+        let empty_path = target_dir.path().join("empty.log");
+        let too_small_path = target_dir.path().join("too_small.log");
+        // Empty file (0 bytes).
+        fs::write(&empty_path, []).unwrap();
+        // Non-empty but with no newline, so it is too small to fingerprint.
+        fs::write(&too_small_path, vec![b'x'; 8]).unwrap();
+
+        let emitter = RecordingEmitter::default();
+        let mut small_files = HashMap::new();
+
+        // Empty file: returns nothing and emits no checksum-failed warning.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&empty_path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(
+            emitter.checksum_failed_count(),
+            0,
+            "empty file must not emit a checksum-failed warning"
+        );
+        // ...but the empty file is still tracked so it is retried once it grows.
+        assert!(
+            small_files.contains_key(&empty_path),
+            "empty file must still be tracked in known_small_files for retry"
+        );
+
+        // Non-empty-but-too-small file: returns nothing but does warn.
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&too_small_path, &mut small_files, &emitter)
+                .await
+                .is_none()
+        );
+        assert_eq!(
+            emitter.checksum_failed_count(),
+            1,
+            "non-empty file too small to fingerprint must emit a checksum-failed warning"
+        );
+    }
+
     #[test]
     fn test_monotonic_compression_algorithms() {
         // This test is necessary to handle an edge case where when assessing the magic header
@@ -697,5 +779,49 @@ mod test {
         fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {
             panic!()
         }
+    }
+
+    /// Test emitter that records how many times `emit_file_checksum_failed`
+    /// was called so tests can assert whether the "too small to fingerprint"
+    /// warning was emitted. All other events are treated as no-ops.
+    #[derive(Clone, Default)]
+    struct RecordingEmitter {
+        checksum_failed: Arc<AtomicUsize>,
+    }
+
+    impl RecordingEmitter {
+        fn checksum_failed_count(&self) -> usize {
+            self.checksum_failed.load(Ordering::SeqCst)
+        }
+    }
+
+    impl FileSourceInternalEvents for RecordingEmitter {
+        fn emit_file_added(&self, _: &Path) {}
+
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+
+        fn emit_file_watch_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_unwatched(&self, _: &Path, _: bool) {}
+
+        fn emit_file_deleted(&self, _: &Path) {}
+
+        fn emit_file_delete_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {}
+
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+
+        fn emit_file_checksum_failed(&self, _: &Path) {
+            self.checksum_failed.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn emit_file_checkpoint_write_error(&self, _: Error) {}
+
+        fn emit_files_open(&self, _: usize) {}
+
+        fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
+
+        fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {}
     }
 }
