@@ -341,13 +341,18 @@ async fn source_with_sender(
     (logs_output, metrics_output, address, guard)
 }
 
-async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
+async fn send_with_path(
+    address: SocketAddr,
+    body: impl Into<reqwest::Body> + Send + 'static,
+    headers: HeaderMap,
+    path: &str,
+) -> u16 {
     timeout(
         HTTP_REQUEST_TIMEOUT,
         reqwest::Client::new()
             .post(format!("http://{address}{path}"))
             .headers(headers)
-            .body(body.to_owned())
+            .body(body)
             .send(),
     )
     .await
@@ -359,7 +364,7 @@ async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, pat
 
 async fn send_and_collect(
     address: SocketAddr,
-    body: String,
+    body: impl Into<reqwest::Body> + Send + 'static,
     headers: HeaderMap,
     path: &'static str,
     rx: impl Stream<Item = Event> + Unpin,
@@ -367,7 +372,7 @@ async fn send_and_collect(
 ) -> Vec<Event> {
     spawn_collect_n(
         async move {
-            assert_eq!(200, send_with_path(address, &body, headers, path).await);
+            assert_eq!(200, send_with_path(address, body, headers, path).await);
         },
         rx,
         expected_count,
@@ -731,7 +736,7 @@ async fn delivery_failure() {
                 400,
                 send_with_path(
                     addr,
-                    &serde_json::to_string(&[LogMsg {
+                    serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
                         timestamp: Utc
                             .timestamp_opt(123, 0)
@@ -785,12 +790,12 @@ async fn send_timeout_returns_service_unavailable() {
 
     assert_eq!(
         200,
-        send_with_path(addr, &body, HeaderMap::new(), DD_API_LOGS_V1_PATH).await
+        send_with_path(addr, body.clone(), HeaderMap::new(), DD_API_LOGS_V1_PATH).await
     );
 
     assert_eq!(
         503,
-        send_with_path(addr, &body, HeaderMap::new(), DD_API_LOGS_V1_PATH).await
+        send_with_path(addr, body.clone(), HeaderMap::new(), DD_API_LOGS_V1_PATH).await
     );
     drop(rx);
 }
@@ -1151,16 +1156,8 @@ async fn decode_sketches() {
         };
 
         sketch_payload.encode(&mut buf).unwrap();
-        let body = unsafe { String::from_utf8_unchecked(buf) };
-        let events = send_and_collect(
-            addr,
-            body,
-            dd_api_key_headers(),
-            DD_API_SKETCHES_PATH,
-            rx,
-            1,
-        )
-        .await;
+        let events =
+            send_and_collect(addr, buf, dd_api_key_headers(), DD_API_SKETCHES_PATH, rx, 1).await;
 
         {
             let metric = events[0].as_metric();
@@ -1276,13 +1273,7 @@ async fn decode_traces() {
             async move {
                 assert_eq!(
                     200,
-                    send_with_path(
-                        addr,
-                        unsafe { str::from_utf8_unchecked(&buf) },
-                        headers,
-                        DD_API_TRACES_PATH
-                    )
-                    .await
+                    send_with_path(addr, buf.clone(), headers, DD_API_TRACES_PATH).await
                 );
             },
             rx,
@@ -1401,13 +1392,7 @@ async fn decode_traces_span_links_and_events() {
             async move {
                 assert_eq!(
                     200,
-                    send_with_path(
-                        addr,
-                        unsafe { str::from_utf8_unchecked(&buf) },
-                        headers,
-                        DD_API_TRACES_PATH
-                    )
-                    .await
+                    send_with_path(addr, buf.clone(), headers, DD_API_TRACES_PATH).await
                 );
             },
             rx,
@@ -1485,13 +1470,7 @@ async fn decode_traces_empty_tracer_payloads_emits_error() {
 
         assert_eq!(
             200,
-            send_with_path(
-                addr,
-                unsafe { str::from_utf8_unchecked(&buf) },
-                dd_api_key_headers(),
-                DD_API_TRACES_PATH
-            )
-            .await
+            send_with_path(addr, buf.clone(), dd_api_key_headers(), DD_API_TRACES_PATH).await
         );
 
         let events = crate::test_util::collect_ready(rx);
@@ -1529,13 +1508,7 @@ async fn decode_traces_idx_only_payload_emits_error() {
 
         assert_eq!(
             200,
-            send_with_path(
-                addr,
-                unsafe { str::from_utf8_unchecked(&buf) },
-                dd_api_key_headers(),
-                DD_API_TRACES_PATH
-            )
-            .await
+            send_with_path(addr, buf.clone(), dd_api_key_headers(), DD_API_TRACES_PATH).await
         );
 
         let events = crate::test_util::collect_ready(rx);
@@ -2295,10 +2268,9 @@ async fn decode_series_endpoint_v2() {
 
         let mut buf = Vec::new();
         series_payload.encode(&mut buf).unwrap();
-        let body = unsafe { String::from_utf8_unchecked(buf) };
         let events = send_and_collect(
             addr,
-            body,
+            buf,
             dd_api_key_headers(),
             DD_API_SERIES_V2_PATH,
             rx,
@@ -2756,10 +2728,9 @@ async fn test_series_v2_split_metric_namespace_impl(
 
     let mut buf = Vec::new();
     series_payload.encode(&mut buf).unwrap();
-    let body = unsafe { String::from_utf8_unchecked(buf) };
     let events = send_and_collect(
         addr,
-        body,
+        buf,
         dd_api_key_headers(),
         DD_API_SERIES_V2_PATH,
         rx,
@@ -2832,11 +2803,10 @@ async fn series_v2_resources_preserved_as_tags() {
         let series_payload = ddmetric_proto::MetricPayload { series };
         let mut buf = Vec::new();
         series_payload.encode(&mut buf).unwrap();
-        let body = unsafe { String::from_utf8_unchecked(buf) };
 
         let events = send_and_collect(
             addr,
-            body,
+            buf,
             dd_api_key_headers(),
             DD_API_SERIES_V2_PATH,
             rx,
@@ -2903,16 +2873,8 @@ async fn test_sketches_split_metric_namespace_impl(
     };
 
     sketch_payload.encode(&mut buf).unwrap();
-    let body = unsafe { String::from_utf8_unchecked(buf) };
-    let events = send_and_collect(
-        addr,
-        body,
-        dd_api_key_headers(),
-        DD_API_SKETCHES_PATH,
-        rx,
-        1,
-    )
-    .await;
+    let events =
+        send_and_collect(addr, buf, dd_api_key_headers(), DD_API_SKETCHES_PATH, rx, 1).await;
 
     let metric = events[0].as_metric();
     assert_eq!(metric.name(), expected_name);
