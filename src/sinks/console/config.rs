@@ -89,7 +89,7 @@ impl ValidatedSink for ConsoleSinkConfig {
     type Validated = ();
 
     fn validate(&self) -> crate::Result<()> {
-        Ok(())
+        self.encoding.validate()
     }
 
     async fn build(
@@ -104,12 +104,12 @@ impl ValidatedSink for ConsoleSinkConfig {
         let sink: VectorSink = match self.target {
             Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
                 output: io::stdout(),
-                transformer: transformer.clone(),
+                transformer,
                 encoder,
             }),
             Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
                 output: io::stderr(),
-                transformer: transformer.clone(),
+                transformer,
                 encoder,
             }),
         };

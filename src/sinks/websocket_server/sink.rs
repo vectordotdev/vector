@@ -173,7 +173,7 @@ impl WebSocketListenerSink {
         // Base url for parsing request URLs that may be relative
         let base_url = Url::parse("ws://localhost").ok();
         let addr = stream.peer_addr();
-        debug!("Incoming TCP connection from: {}", addr);
+        debug!("Incoming TCP connection from: {addr}");
 
         let mut extra_tags: Vec<(String, String)> = extra_tags_config
             .iter()
@@ -255,7 +255,7 @@ impl WebSocketListenerSink {
                     let mut response = ErrorResponse::default();
                     *response.status_mut() = StatusCode::UNAUTHORIZED;
                     *response.body_mut() = Some(message.message().to_string());
-                    debug!("Websocket handshake auth validation failed: {}", message);
+                    debug!("Websocket handshake auth validation failed: {message}");
                     Err(response)
                 }
             }
@@ -264,7 +264,7 @@ impl WebSocketListenerSink {
         let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
             .await
             .map_err(|err| {
-                debug!("Error during websocket handshake: {}", err);
+                debug!("Error during websocket handshake: {err}");
                 emit!(WebSocketListenerConnectionFailedError {
                     error: Box::new(err),
                     extra_tags: extra_tags.clone()
@@ -289,7 +289,7 @@ impl WebSocketListenerSink {
                 },
             );
 
-            debug!("WebSocket connection established: {}", addr);
+            debug!("WebSocket connection established: {addr}");
 
             peers.insert(addr, tx);
             emit!(WebSocketListenerConnectionEstablished {

@@ -425,7 +425,7 @@ mod tests {
             );
         }
 
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_event_data_eq!(events, output);
     }
 

@@ -47,7 +47,7 @@ pub fn env_var_interpolation_enabled() -> bool {
 pub(super) fn read_dir<P: AsRef<Path> + Debug>(path: P) -> Result<ReadDir, Vec<String>> {
     path.as_ref()
         .read_dir()
-        .map_err(|err| vec![format!("Could not read config dir: {:?}, {}.", path, err)])
+        .map_err(|err| vec![format!("Could not read config dir: {path:?}, {err}.")])
 }
 
 pub(super) fn component_name<P: AsRef<Path> + Debug>(path: P) -> Result<String, Vec<String>> {
@@ -55,7 +55,7 @@ pub(super) fn component_name<P: AsRef<Path> + Debug>(path: P) -> Result<String, 
         .file_stem()
         .and_then(|name| name.to_str())
         .map(|name| name.to_string())
-        .ok_or_else(|| vec![format!("Couldn't get component name for file: {:?}", path)])
+        .ok_or_else(|| vec![format!("Couldn't get component name for file: {path:?}")])
 }
 
 pub(super) fn open_file<P: AsRef<Path> + Debug>(path: P) -> Option<File> {
@@ -146,7 +146,7 @@ pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
-        warn!("{}", warning);
+        warn!("{warning}");
     }
 
     Ok(config)
@@ -222,7 +222,7 @@ async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> 
     validation::check_buffer_preconditions(&new_config).await?;
 
     for warning in build_warnings {
-        warn!("{}", warning);
+        warn!("{warning}");
     }
 
     Ok(new_config)
@@ -293,7 +293,7 @@ pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>>
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
-        warn!("{}", warning);
+        warn!("{warning}");
     }
 
     Ok(config)
@@ -366,7 +366,7 @@ fn default_path() -> PathBuf {
 fn default_path() -> PathBuf {
     let program_files =
         std::env::var("ProgramFiles").expect("%ProgramFiles% environment variable must be defined");
-    format!("{}\\Vector\\config\\vector.yaml", program_files).into()
+    format!("{program_files}\\Vector\\config\\vector.yaml").into()
 }
 
 fn default_config_paths() -> Vec<ConfigPath> {

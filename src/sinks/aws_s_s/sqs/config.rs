@@ -101,6 +101,7 @@ impl ValidatedSink for SqsSinkConfig {
         )?;
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
+        self.base_config.encoding.validate()?;
 
         Ok(ValidatedSqsSink {
             message_group_id,
@@ -115,7 +116,7 @@ impl ValidatedSink for SqsSinkConfig {
     ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
         let publisher = SqsMessagePublisher::new(client.clone(), self.queue_url.clone());
-        let healthcheck = Box::pin(healthcheck(client.clone(), self.queue_url.clone()));
+        let healthcheck = Box::pin(healthcheck(client, self.queue_url.clone()));
 
         let request_builder = SSRequestBuilder::new(
             validated.message_group_id.clone(),

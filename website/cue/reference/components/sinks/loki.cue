@@ -14,7 +14,10 @@ components: sinks: loki: {
 	features: {
 		auto_generated:   true
 		acknowledgements: true
-		healthcheck: enabled: true
+		healthcheck: {
+			enabled:  true
+			uses_uri: true
+		}
 		send: {
 			batch: {
 				enabled:      true

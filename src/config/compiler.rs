@@ -205,7 +205,7 @@ fn validate_sinks(config: &mut Config) -> Vec<String> {
         let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
         match dyn_sink.validate_dyn() {
             Ok(state) => sink.validated = Some(Arc::from(state)),
-            Err(e) => errors.push(format!("Failed to validate sink \"{}\": {}", key, e)),
+            Err(e) => errors.push(format!("Failed to validate sink \"{key}\": {e}")),
         }
     }
 

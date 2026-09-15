@@ -22,7 +22,7 @@ use crate::{
             http::{RequestConfig, RetryStrategy},
         },
     },
-    template::{ConfinementConfig, Template},
+    template::{ConfinementConfig, UriTemplate},
     tls::TlsConfig,
 };
 
@@ -163,7 +163,7 @@ impl SinkConfig for AxiomConfig {
 
 #[derive(Clone, Debug)]
 pub struct ValidatedAxiom {
-    uri: Template,
+    uri: UriTemplate,
     http: ValidatedHttp,
 }
 
@@ -176,7 +176,7 @@ impl ValidatedSink for AxiomConfig {
         self.endpoint.validate()?;
 
         // Resolve and parse the ingest endpoint up front (pure, no I/O).
-        let uri: Template = self.build_endpoint().try_into()?;
+        let uri: UriTemplate = self.build_endpoint().try_into()?;
 
         // Construct and validate the derived HTTP config up front so
         // `vector validate --no-environment` catches pure HTTP sink errors
@@ -208,7 +208,7 @@ impl AxiomConfig {
     /// Build the derived HTTP sink configuration. The org-id header is added
     /// here so the derived config (including the header value) is validated
     /// during `validate`.
-    fn http_sink_config(&self, uri: Template) -> crate::Result<HttpSinkConfig> {
+    fn http_sink_config(&self, uri: UriTemplate) -> crate::Result<HttpSinkConfig> {
         let mut request = self.request.clone();
         if let Some(org_id) = &self.org_id {
             // NOTE: Only add the org id header if an org id is provided

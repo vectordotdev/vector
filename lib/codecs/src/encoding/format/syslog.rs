@@ -321,7 +321,7 @@ impl SyslogMessage {
     fn encode(&self, rfc: &SyslogRFC) -> String {
         let mut result = String::with_capacity(256);
 
-        result.push_str(&self.pri.encode().to_string());
+        result.push_str(&self.pri.encode());
 
         if *rfc == SyslogRFC::Rfc5424 {
             result.push_str(SYSLOG_V1);
@@ -401,7 +401,7 @@ struct Tag {
 impl Tag {
     fn encode_rfc_3164(&self) -> String {
         let mut tag = if let Some(proc_id) = self.proc_id.as_deref() {
-            format!("{}[{}]:", self.app_name, proc_id)
+            format!("{}[{proc_id}]:", self.app_name)
         } else {
             format!("{}:", self.app_name)
         };
@@ -418,7 +418,7 @@ impl Tag {
     fn encode_rfc_5424(&self) -> String {
         let proc_id_str = self.proc_id.as_deref().unwrap_or(NIL_VALUE);
         let msg_id_str = self.msg_id.as_deref().unwrap_or(NIL_VALUE);
-        format!("{} {} {}", self.app_name, proc_id_str, msg_id_str)
+        format!("{} {proc_id_str} {msg_id_str}", self.app_name)
     }
 }
 
@@ -502,7 +502,7 @@ fn flatten_object(obj: ObjectMap, prefix: String, result: &mut BTreeMap<String, 
                 if let Ok(json) = serde_json::to_string(&arr) {
                     result.insert(full_key, json);
                 } else {
-                    result.insert(full_key, format!("{:?}", arr));
+                    result.insert(full_key, format!("{arr:?}"));
                 }
             }
             scalar => {
@@ -821,7 +821,7 @@ mod tests {
         let mut log = create_simple_log();
         log.insert(event_path!("long_app_name"), long_string.clone());
         log.insert(event_path!("long_proc_id"), long_string.clone());
-        log.insert(event_path!("long_msg_id"), long_string.clone());
+        log.insert(event_path!("long_msg_id"), long_string);
 
         let config = toml::from_str::<SyslogSerializerConfig>(
             r#"
@@ -1172,7 +1172,7 @@ mod tests {
 
         let output = run_encode(config, Event::Log(log));
         let expected_id = "a".repeat(32);
-        assert!(output.contains(&format!("[{}", expected_id)));
+        assert!(output.contains(&format!("[{expected_id}")));
         assert!(!output.contains(&format!("[{}", "a".repeat(50))));
     }
 
@@ -1214,7 +1214,7 @@ mod tests {
         assert!(output.contains("app_"));
 
         let expected_sd_id: String = "_".repeat(32);
-        assert!(output.contains(&format!("[{}", expected_sd_id)));
+        assert!(output.contains(&format!("[{expected_sd_id}")));
     }
 
     #[test]
