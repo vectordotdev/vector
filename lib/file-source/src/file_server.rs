@@ -79,10 +79,13 @@ struct NotifyWakeup {
     /// watcher whose glob path contains a symlink can still be nudged without canonicalizing
     /// every tracked file on every discovery pass.
     canonical_paths: HashSet<PathBuf>,
-    /// Raw paths whose canonical form has not been resolved successfully yet. Keeping only this
-    /// delta makes repeated notify events O(new paths) while still retrying paths that temporarily
-    /// disappear during a rename.
+    /// Raw paths awaiting their first canonicalization attempt. Keeping only this delta makes
+    /// repeated notify events O(new paths) while still retrying paths that temporarily disappear
+    /// during a rename.
     canonical_paths_pending: HashSet<PathBuf>,
+    /// Paths whose first canonicalization attempt failed. These are retried once after the current
+    /// notify debounce batch, rather than once for every event in that batch.
+    canonical_paths_retry: HashSet<PathBuf>,
     rename_paths: HashSet<PathBuf>,
     rename_paths_incomplete: bool,
 }
@@ -138,6 +141,7 @@ impl NotifyWakeup {
         } else {
             self.canonical_paths.clear();
             self.canonical_paths_pending.clear();
+            self.canonical_paths_retry.clear();
         }
     }
 
@@ -152,6 +156,7 @@ impl NotifyWakeup {
         if paths.is_empty() {
             return;
         }
+        self.canonical_paths_pending.clear();
 
         let canonical_paths = join_all(paths.iter().map(fs::canonicalize))
             .await
@@ -159,7 +164,35 @@ impl NotifyWakeup {
         for (path, canonical) in paths.into_iter().zip(canonical_paths) {
             if let Ok(canonical) = canonical {
                 self.canonical_paths.insert(canonical);
-                self.canonical_paths_pending.remove(&path);
+                self.canonical_paths_retry.remove(&path);
+            } else {
+                self.canonical_paths_retry.insert(path);
+            }
+        }
+        if self.canonical_paths.len() > NOTIFY_WAKEUP_PATH_LIMIT {
+            self.mark_all();
+        }
+    }
+
+    /// Retry paths that were missing during the first canonicalization attempt once the current
+    /// notify debounce batch is complete. A rename can make one of these paths available again,
+    /// but retrying it for every event in the batch makes a missing path increasingly expensive.
+    async fn retry_canonical_paths(&mut self) {
+        let paths: Vec<PathBuf> = match &self.state {
+            NotifyWakeupState::Paths(_) => self.canonical_paths_retry.iter().cloned().collect(),
+            NotifyWakeupState::None | NotifyWakeupState::All => return,
+        };
+        if paths.is_empty() {
+            return;
+        }
+
+        let canonical_paths = join_all(paths.iter().map(fs::canonicalize))
+            .await
+            .into_iter();
+        for (path, canonical) in paths.into_iter().zip(canonical_paths) {
+            if let Ok(canonical) = canonical {
+                self.canonical_paths.insert(canonical);
+                self.canonical_paths_retry.remove(&path);
             }
         }
         if self.canonical_paths.len() > NOTIFY_WAKEUP_PATH_LIMIT {
@@ -195,6 +228,7 @@ impl NotifyWakeup {
         self.state = NotifyWakeupState::All;
         self.canonical_paths.clear();
         self.canonical_paths_pending.clear();
+        self.canonical_paths_retry.clear();
     }
 
     fn take(&mut self) -> NotifyWakeup {
@@ -382,61 +416,67 @@ impl TrackedPathIndex {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct RekeyOutcome {
-    /// The last acknowledged position moved from the old fingerprint, before a restarted reader
-    /// is registered at zero under the replacement fingerprint.
-    acknowledged_position: Option<FilePosition>,
-}
-
 fn rekey_watcher(
     fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
     checkpoints: &CheckpointsView,
     old_key: FileFingerprint,
     new_key: FileFingerprint,
 ) -> bool {
-    rekey_watcher_with_outcome(fp_map, checkpoints, old_key, new_key).is_some()
+    rekey_watcher_with_drain(fp_map, checkpoints, old_key, new_key, None)
 }
 
-fn rekey_watcher_with_outcome(
+fn rekey_watcher_with_drain(
     fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
     checkpoints: &CheckpointsView,
     old_key: FileFingerprint,
     new_key: FileFingerprint,
-) -> Option<RekeyOutcome> {
+    drained_checkpoint: Option<(FilePosition, OwnerGeneration)>,
+) -> bool {
     if old_key == new_key {
-        return Some(RekeyOutcome {
-            acknowledged_position: None,
-        });
+        return true;
     }
     if fp_map.contains_key(&new_key) {
-        return None;
+        return false;
     }
     // `fp_map`'s iteration order is read priority under `oldest_first`: startup sorts by creation
     // time and new watchers append. Removing and re-inserting would move a rewritten older file to
     // the tail, letting a newer one drain first, so the entry goes back at the index it held.
-    let position = fp_map.get_index_of(&old_key)?;
-    let mut watcher = fp_map.shift_remove(&old_key)?;
+    let Some(position) = fp_map.get_index_of(&old_key) else {
+        return false;
+    };
+    let Some(mut watcher) = fp_map.shift_remove(&old_key) else {
+        return false;
+    };
     // Asks the watcher whether its reader was repositioned onto different content, rather than
     // inferring it from a zero offset: a watcher that simply has not read anything yet also sits at
     // zero, and resetting its checkpoint would discard a resumed position.
     let restarted = watcher.take_reader_restarted();
-    // A new owner for a new identity. Lines already in flight keep the old generation, so their
-    // acknowledgements find the old key gone and are dropped rather than moving this checkpoint.
+    // A new owner for a new identity. Lines already in flight keep the old generation. For a plain
+    // rekey their acknowledgements find the old key gone; a draining rekey retains that key as a
+    // reaped checkpoint until those acknowledgements have been accepted.
     let generation = watcher.take_new_generation();
     fp_map.shift_insert(position, new_key, watcher);
     // Carries the persisted position and the modified/removed bookkeeping onto the new identity.
-    let acknowledged_position =
+    // During a rotation, retain the old entry as a reaped checkpoint so acknowledgements from the
+    // bounded drain cannot fall into the gap between removing the old key and registering it again.
+    if let Some((resume_position, drained_generation)) = drained_checkpoint {
+        checkpoints.update_key_and_register_reaped(
+            old_key,
+            new_key,
+            generation,
+            drained_generation,
+            resume_position,
+        );
+    } else {
         checkpoints.update_key_and_get_position(old_key, new_key, generation);
+    }
     if restarted {
         // The reader was restarted at zero (an in-place rewrite), so the pre-rewrite offset must not
         // survive: a restart would resume past the start of the rewritten file and skip its opening
         // content. An appended-to file keeps its offset, and its checkpoint with it.
         checkpoints.register(new_key, 0, generation);
     }
-    Some(RekeyOutcome {
-        acknowledged_position,
-    })
+    true
 }
 
 /// Whether any component of `path` is a symlink.
@@ -1423,6 +1463,7 @@ where
                             // watcher rebuild.
                             disable_notify = drain_result.unwrap_or(false);
                         }
+                        pending_notify_wakeup.retry_canonical_paths().await;
                     }
                     _ = &mut sleep_fut => {}
                 }
@@ -1918,28 +1959,13 @@ where
                         // The old reader is still the owner of `stale_key`. The normal read loop can
                         // continue consuming it, and the next discovery pass will either finish
                         // the drain or apply the same bounded step again.
-                    } else if let Some(rekey_outcome) =
-                        rekey_watcher_with_outcome(fp_map, checkpoints, stale_key, file_id)
-                    {
-                        if let Some((old_position, old_generation)) = drained_checkpoint {
-                            // The old inode may be yielded later in this same glob pass as a
-                            // rotated archive. Keep its already-drained offset as an in-memory
-                            // resume point so `watch_new_file` avoids replaying records that were
-                            // just emitted, but persist only the position acknowledged before the
-                            // drain. `rekey_watcher` moved the current acknowledged position onto
-                            // `file_id`; read it back after that atomic handoff so acknowledgements
-                            // that raced with the drain are not lost. The old generation's later
-                            // acknowledgements advance the durable position after the lines reach
-                            // the sink.
-                            let acknowledged_position =
-                                rekey_outcome.acknowledged_position.unwrap_or_default();
-                            checkpoints.register_reaped(
-                                stale_key,
-                                acknowledged_position,
-                                old_position,
-                                old_generation,
-                            );
-                        }
+                    } else if rekey_watcher_with_drain(
+                        fp_map,
+                        checkpoints,
+                        stale_key,
+                        file_id,
+                        drained_checkpoint,
+                    ) {
                         tracked_path_index.rekeyed(stale_key, file_id);
                         let watcher = fp_map
                             .get_mut(&file_id)
@@ -2558,42 +2584,50 @@ where
             .min()
     }
 
-    /// Remove only idle watchers whose deadline is due. The regular idle poll remains responsible
-    /// for checking metadata and reactivating files; this pass exists solely so a notify source can
-    /// reap an unchanged idle file without waiting for the reconciliation backstop.
+    /// Remove only idle watchers whose deadline is due, after checking each file once more for
+    /// delayed or dropped notify events. This pass exists so a notify source can reap an unchanged
+    /// idle file without waiting for the reconciliation backstop.
     async fn remove_idle_watchers_due(
         &self,
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         lines: &mut Vec<Line>,
     ) {
+        for (&file_id, watcher) in &mut *fp_map {
+            self.recheck_idle_watcher_before_removal(watcher, file_id, lines)
+                .await;
+        }
+    }
+
+    /// Recheck an idle watcher's file before applying its removal deadline. A notify event can be
+    /// delayed or dropped, so the deadline alone is not enough evidence that the file is unchanged.
+    async fn recheck_idle_watcher_before_removal(
+        &self,
+        watcher: &mut FileWatcher,
+        file_id: FileFingerprint,
+        lines: &mut Vec<Line>,
+    ) {
         let Some(grace_period) = self.remove_after else {
             return;
         };
-        for (&file_id, watcher) in &mut *fp_map {
-            if watcher.idle_since().is_none_or(|idle| idle < grace_period) {
-                continue;
+        if watcher.idle_since().is_none_or(|idle| idle < grace_period) {
+            return;
+        }
+        match watcher.check_for_new_data().await {
+            Ok(true) => {
+                if let Err(error) = watcher.reactivate().await {
+                    self.emitter.emit_file_watch_error(&watcher.path, error);
+                    // The failed reactivation must be retried, not treated as an unchanged file
+                    // on the next timer tick.
+                    watcher.invalidate_idle_bookkeeping();
+                }
             }
-
-            // A timer firing only proves that the last observation is old. Re-stat the file before
-            // unlinking it: a write whose notify event was delayed or dropped must cancel the
-            // removal grace period and be read before the watcher is retired.
-            match watcher.check_for_new_data().await {
-                Ok(true) => {
-                    if let Err(error) = watcher.reactivate().await {
-                        self.emitter.emit_file_watch_error(&watcher.path, error);
-                        // The failed reactivation must be retried, not treated as an unchanged file
-                        // on the next timer tick.
-                        watcher.invalidate_idle_bookkeeping();
-                    }
-                }
-                Ok(false) => {
-                    self.remove_idle_watcher_if_due(watcher, file_id, lines)
-                        .await;
-                }
-                Err(error) => {
-                    if error.kind() != std::io::ErrorKind::NotFound {
-                        self.emitter.emit_file_watch_error(&watcher.path, error);
-                    }
+            Ok(false) => {
+                self.remove_idle_watcher_if_due(watcher, file_id, lines)
+                    .await;
+            }
+            Err(error) => {
+                if error.kind() != std::io::ErrorKind::NotFound {
+                    self.emitter.emit_file_watch_error(&watcher.path, error);
                 }
             }
         }
@@ -2721,7 +2755,7 @@ where
             //
             // Their removal deadline is still due, and reading a timer costs nothing.
             if notify_wakeup.has_specific_paths() && !notify_names_current_path {
-                self.remove_idle_watcher_if_due(watcher, file_id, lines)
+                self.recheck_idle_watcher_before_removal(watcher, file_id, lines)
                     .await;
                 continue;
             }
@@ -3702,13 +3736,22 @@ mod tests {
         wakeup.add_paths([missing_path.clone()]);
         wakeup.resolve_canonical_paths().await;
         assert!(
-            wakeup.canonical_paths_pending.contains(&missing_path),
+            wakeup.canonical_paths_pending.is_empty(),
+            "a failed canonicalization must leave the per-event pending delta"
+        );
+        assert!(
+            wakeup.canonical_paths_retry.contains(&missing_path),
             "a path that disappeared during a rename must remain retryable"
         );
 
         std::fs::write(&missing_path, b"line\n").unwrap();
-        wakeup.resolve_canonical_paths().await;
-        assert!(!wakeup.canonical_paths_pending.contains(&missing_path));
+        wakeup.retry_canonical_paths().await;
+        assert!(!wakeup.canonical_paths_retry.contains(&missing_path));
+        assert!(
+            wakeup
+                .canonical_paths
+                .contains(&std::fs::canonicalize(&missing_path).unwrap())
+        );
     }
 
     #[derive(Clone)]

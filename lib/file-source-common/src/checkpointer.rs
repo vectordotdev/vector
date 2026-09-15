@@ -348,6 +348,83 @@ impl CheckpointsView {
         let _ = self.update_key_and_get_position(old, new, new_generation);
     }
 
+    /// Move a checkpoint onto a new owner while retaining the old entry for a drained reader's
+    /// acknowledgements. The old entry is kept live until the new entry has been installed, then
+    /// changed to `Reaped` under its entry lock. This closes the window in which an acknowledgement
+    /// from the drain could arrive after the old key was removed but before `register_reaped` ran.
+    pub fn update_key_and_register_reaped(
+        &self,
+        old: FileFingerprint,
+        new: FileFingerprint,
+        new_generation: OwnerGeneration,
+        drained_generation: OwnerGeneration,
+        resume_position: FilePosition,
+    ) -> Option<FilePosition> {
+        if old == new {
+            return None;
+        }
+
+        // Keep the old entry in the map while claiming the new key. Acknowledgements for the
+        // drained reader can therefore update it either before or after the handoff below.
+        let old_position = self.checkpoints.get(&old).map(|entry| entry.position)?;
+        let claimed = Owned::live(old_position, new_generation);
+        let taken_over = match self.checkpoints.entry(new) {
+            dashmap::mapref::entry::Entry::Vacant(entry) => {
+                entry.insert(claimed);
+                true
+            }
+            dashmap::mapref::entry::Entry::Occupied(mut entry) => {
+                let claimable = entry.get().owner.claimable();
+                if claimable {
+                    entry.insert(claimed);
+                }
+                claimable
+            }
+        };
+
+        if let Some((_, value)) = self.modified_times.remove(&old) {
+            self.modified_times.insert(new, value);
+        }
+
+        let old_removal = self.removed_times.remove(&old).map(|(_, value)| value);
+        if taken_over {
+            self.removed_times.remove(&new);
+        } else if let Some(value) = old_removal {
+            self.removed_times.insert(new, value);
+        }
+
+        let marked_at = Utc::now();
+        let acknowledged_position = match self.checkpoints.entry(old) {
+            dashmap::mapref::entry::Entry::Occupied(mut entry)
+                if entry.get().owner.writer() == Some(drained_generation) =>
+            {
+                // Read the position while holding the entry lock, so an acknowledgement racing
+                // with the handoff is either included here or is accepted by the pending reaped
+                // owner immediately afterwards.
+                let acknowledged_position = entry.get().position;
+                let pending_acknowledgement =
+                    (acknowledged_position < resume_position).then_some(PendingAcknowledgement {
+                        generation: drained_generation,
+                        target: resume_position,
+                    });
+                let owned = entry.get_mut();
+                owned.owner = Owner::Reaped(drained_generation);
+                owned.pending_acknowledgement = pending_acknowledgement;
+                owned.live_position = None;
+                // Keep the mark installation under the checkpoint entry lock, like
+                // `register_reaped`, so expiry cannot observe a half-installed handoff.
+                self.removed_times.insert(old, marked_at);
+                Some(acknowledged_position)
+            }
+            dashmap::mapref::entry::Entry::Vacant(_) => None,
+            dashmap::mapref::entry::Entry::Occupied(_) => None,
+        };
+        if acknowledged_position.is_some() {
+            self.modified_times.insert(old, marked_at);
+        }
+        acknowledged_position
+    }
+
     /// Move a checkpoint like [`Self::update_key`], returning the position that was safe to persist
     /// immediately before the move. The file server uses that value to seed a separate reaped
     /// checkpoint for the rotated archive after resetting the replacement reader to zero.
@@ -969,6 +1046,44 @@ mod test {
         view.update(fng, 200, generation);
         assert_eq!(view.get(fng), Some(200));
         assert_eq!(view.get_acknowledged(fng), Some(200));
+    }
+
+    /// Rekeying a drained watcher must not leave a window in which its late acknowledgement is
+    /// dropped between moving the live checkpoint and installing the reaped handoff.
+    #[test]
+    fn a_rotation_rekey_keeps_the_old_checkpoint_for_late_acknowledgements() {
+        let view = CheckpointsView::default();
+        let old = FileFingerprint::FirstLinesChecksum(1);
+        let new = FileFingerprint::FirstLinesChecksum(2);
+        let drained_generation = next_owner_generation();
+        let replacement_generation = next_owner_generation();
+
+        view.register(old, 100, drained_generation);
+        view.update_key_and_register_reaped(
+            old,
+            new,
+            replacement_generation,
+            drained_generation,
+            200,
+        );
+
+        // This acknowledgement represents a line emitted by the old reader before it was
+        // repointed. It must still advance the durable position under the old fingerprint.
+        view.update(old, 150, drained_generation);
+        assert_eq!(view.get(old), Some(200));
+        assert_eq!(
+            view.get_acknowledged(old),
+            Some(150),
+            "the old entry must remain available for a late drain acknowledgement"
+        );
+        assert_eq!(
+            view.get(new),
+            Some(100),
+            "the replacement must keep the position it inherited at rekey time"
+        );
+
+        view.update(old, 200, drained_generation);
+        assert_eq!(view.get_acknowledged(old), Some(200));
     }
 
     /// Once an archive watcher claims the old fingerprint, acknowledgements from the drained
