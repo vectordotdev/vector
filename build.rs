@@ -134,7 +134,11 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/third-party/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/third-party/google/rpc/status.proto");
         println!("cargo:rerun-if-changed=proto/vector/dd_metric.proto");
-        println!("cargo:rerun-if-changed=proto/vector/dd_trace.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/agent_payload.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/tracer_payload.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/span.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/idx/tracer_payload.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/idx/span.proto");
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
         println!("cargo:rerun-if-changed=proto/vector/observability.proto");
@@ -162,13 +166,15 @@ fn main() {
                     "lib/vector-core/proto/event.proto",
                     "proto/vector/ddsketch_full.proto",
                     "proto/vector/dd_metric.proto",
-                    "proto/vector/dd_trace.proto",
+                    "proto/datadog/trace/agent_payload.proto",
+                    "proto/datadog/trace/idx/tracer_payload.proto",
                     "proto/third-party/google/pubsub/v1/pubsub.proto",
                     "proto/third-party/google/rpc/status.proto",
                     "proto/vector/vector.proto",
                     "proto/vector/observability.proto",
                 ],
                 &[
+                    "proto",
                     "proto/third-party",
                     "proto/vector",
                     "lib/vector-core/proto/",

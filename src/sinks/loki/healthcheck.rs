@@ -2,18 +2,15 @@ use super::append_loki_path;
 
 use crate::{
     http::{Auth, HttpClient},
-    sinks::util::HttpEndpoint,
+    sinks::util::{HttpEndpoint, UriSerde},
 };
 
 async fn fetch_status(
-    base_endpoint: &HttpEndpoint,
-    path: &str,
-    auth: &Option<Auth>,
+    endpoint: &http::Uri,
+    auth: Option<&Auth>,
     client: &HttpClient,
 ) -> crate::Result<http::StatusCode> {
-    let endpoint = append_loki_path(base_endpoint, path)?;
-
-    let mut req = http::Request::get(endpoint.as_uri())
+    let mut req = http::Request::get(endpoint)
         .body(hyper::Body::empty())
         .expect("Building request never fails.");
 
@@ -27,9 +24,26 @@ async fn fetch_status(
 pub async fn healthcheck(
     base_endpoint: HttpEndpoint,
     auth: Option<Auth>,
+    healthcheck_uri: Option<UriSerde>,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let status = match fetch_status(&base_endpoint, "ready", &auth, &client).await? {
+    // Healthcheck URI has been explicitly configured
+    if let Some(uri) = healthcheck_uri {
+        let auth = uri.auth.or(auth);
+        let status = fetch_status(&uri.uri, auth.as_ref(), &client).await?;
+        return match status {
+            http::StatusCode::OK => Ok(()),
+            _ => Err(format!("A non-successful status returned: {status}").into()),
+        };
+    }
+
+    let status = match fetch_status(
+        append_loki_path(&base_endpoint, "ready")?.as_uri(),
+        auth.as_ref(),
+        &client,
+    )
+    .await?
+    {
         // Issue https://github.com/vectordotdev/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
             debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
@@ -37,7 +51,12 @@ pub async fn healthcheck(
             // not `/loki`), matching the pre-`HttpEndpoint` behavior. Reverse
             // proxies commonly redirect `/loki` to `/loki/`, and the healthcheck
             // rejects non-200 responses rather than following them.
-            fetch_status(&base_endpoint, "/", &auth, &client).await?
+            fetch_status(
+                append_loki_path(&base_endpoint, "/")?.as_uri(),
+                auth.as_ref(),
+                &client,
+            )
+            .await?
         }
         status => status,
     };

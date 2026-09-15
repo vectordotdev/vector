@@ -50,7 +50,7 @@ releases: {
 		commits?: [#Commit, ...#Commit]
 		changelog: [#ChangeLogEntry, ...#ChangeLogEntry] | *[]
 		vrl_changelog?: string
-		whats_next: #Any | *[]
+		whats_next?: [...{title: string, description: string}]
 	}
 
 	{[Version=string]: #Release & {version: Version}}

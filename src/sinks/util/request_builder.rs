@@ -54,9 +54,6 @@ where
 }
 
 impl<P> EncodeResult<P> {
-    // Can't be `const` because you can't (yet?) run deconstructors in a const context, which is what this function does
-    // by dropping the (un)compressed sizes.
-    #[allow(clippy::missing_const_for_fn)]
     pub fn into_payload(self) -> P {
         self.payload
     }

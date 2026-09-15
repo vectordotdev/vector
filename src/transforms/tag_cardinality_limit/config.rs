@@ -25,7 +25,6 @@ pub struct Config {
     pub global: Inner,
 
     /// Controls how tag tracking state is partitioned across metrics.
-    #[configurable(derived)]
     #[serde(default)]
     pub tracking_scope: TrackingScope,
 
@@ -39,15 +38,13 @@ pub struct Config {
     /// When unset (default), there is no cap and the transform tracks all pairs it
     /// encounters. In `global` tracking scope mode, this limit still applies (the
     /// metric key is set to `None` unless there is a per-metric override).
-    #[configurable(derived)]
     #[serde(default)]
     pub max_tracked_keys: Option<usize>,
 
     /// Tag cardinality limits configuration per metric name.
-    #[configurable(
-        derived,
-        metadata(docs::additional_props_description = "An individual metric configuration.")
-    )]
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual metric configuration."
+    ))]
     #[serde(default)]
     pub per_metric_limits: HashMap<String, PerMetricConfig>,
 
@@ -57,10 +54,9 @@ pub struct Config {
     ///
     /// See the "Per-tag overrides" section under "How it works" for a worked example
     /// and the precedence rules.
-    #[configurable(
-        derived,
-        metadata(docs::additional_props_description = "An individual tag configuration.")
-    )]
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual tag configuration."
+    ))]
     #[serde(default)]
     pub per_tag_limits: HashMap<String, PerTagConfig>,
 }
@@ -89,14 +85,12 @@ pub struct Inner {
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
 
-    #[configurable(derived)]
     #[serde(default = "default_limit_exceeded_action")]
     pub limit_exceeded_action: LimitExceededAction,
 
     #[serde(flatten)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
 }
@@ -147,10 +141,9 @@ pub struct PerMetricConfig {
     /// are inherited from the enclosing per-metric configuration, except
     /// `cache_size_per_key`, which can be overridden per tag in probabilistic mode.
     /// Tags not listed here use the per-metric configuration.
-    #[configurable(
-        derived,
-        metadata(docs::additional_props_description = "An individual tag configuration.")
-    )]
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual tag configuration."
+    ))]
     #[serde(default)]
     pub per_tag_limits: HashMap<String, PerTagConfig>,
 
@@ -168,14 +161,12 @@ pub struct OverrideInner {
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
 
-    #[configurable(derived)]
     #[serde(default = "default_limit_exceeded_action")]
     pub limit_exceeded_action: LimitExceededAction,
 
     #[serde(flatten)]
     pub mode: OverrideMode,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
 }
@@ -235,7 +226,6 @@ impl OverrideMode {
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PerTagConfig {
-    #[configurable(derived)]
     #[serde(flatten)]
     pub mode: PerTagMode,
 }

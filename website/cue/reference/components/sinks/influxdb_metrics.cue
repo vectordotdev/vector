@@ -38,7 +38,6 @@ components: sinks: influxdb_metrics: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.influxdb_metrics.configuration

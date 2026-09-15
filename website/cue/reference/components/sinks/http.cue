@@ -72,7 +72,6 @@ components: sinks: http: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: ["Input type support can depend on configured `encoding.codec`"]
 	}
 
 	configuration: generated.components.sinks.http.configuration

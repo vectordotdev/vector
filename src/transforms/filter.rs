@@ -21,7 +21,6 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
-    #[configurable(derived)]
     /// The condition that every input event is matched against.
     ///
     /// If an event is matched by the condition, it is forwarded. Otherwise, the event is dropped.

@@ -1,12 +1,6 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
-use derivative::Derivative;
 use futures::{SinkExt, future::BoxFuture, stream};
 use indoc::indoc;
 use tower::Service;
@@ -19,8 +13,7 @@ use vector_lib::{
 
 use crate::{
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{
         Event, KeyString,
@@ -156,11 +149,9 @@ pub struct InfluxDbConfig {
     #[configurable(metadata(docs::minimal = true))]
     pub token: Option<SensitiveString>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
@@ -169,14 +160,12 @@ pub struct InfluxDbConfig {
     #[configurable(metadata(docs::examples = "example_tags()"))]
     pub tags: Option<HashMap<String, String>>,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// The list of quantiles to calculate when sending distribution metrics.
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -300,21 +289,16 @@ impl SinkConfig for InfluxDbConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedInfluxDbMetrics {
     // Omitted: the retained `uri` embeds the v1 password in its `p` query parameter.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     uri: http::Uri,
     token: SensitiveString,
     protocol_version: ProtocolVersion,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     batch: BatchSettings<MetricsBuffer>,
 }
 
@@ -1450,7 +1434,7 @@ mod integration_tests {
                 .position(|&r| r.trim() == "_measurement")
                 .unwrap()]
             .trim(),
-            format!("ns.{}", metric)
+            format!("ns.{metric}")
         );
         assert_eq!(
             record[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),

@@ -67,8 +67,7 @@ enum EsResultItem {
 }
 
 impl EsResultItem {
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    fn result(&self) -> &EsIndexResult {
+    const fn result(&self) -> &EsIndexResult {
         match self {
             EsResultItem::Index(r) => r,
             EsResultItem::Create(r) => r,
@@ -117,8 +116,7 @@ impl RetryLogic for ElasticsearchRetryLogic {
             }
             _ if status.is_server_error() => RetryAction::Retry(
                 format!(
-                    "{}: {}",
-                    status,
+                    "{status}: {}",
                     String::from_utf8_lossy(response.http_response.body())
                 )
                 .into(),

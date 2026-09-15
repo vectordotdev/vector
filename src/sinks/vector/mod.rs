@@ -46,6 +46,18 @@ mod test {
             assert!(result.is_err(), "{field} = 0 should be rejected");
         }
     }
+
+    #[test]
+    fn config_rejects_boolean_compression() {
+        for compression in [true, false] {
+            let result: Result<super::VectorConfig, _> =
+                toml::from_str(&format!("compression = {compression}"));
+            assert!(
+                result.is_err(),
+                "compression = {compression} should be rejected"
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -68,7 +80,7 @@ mod tests {
         event::{BatchNotifier, BatchStatus},
     };
 
-    use super::{config::with_default_scheme, *};
+    use super::*;
     use crate::{
         config::{SinkConfig as _, SinkContext},
         event::Event,
@@ -908,18 +920,6 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
-    #[test]
-    fn test_with_default_scheme() {
-        assert_eq!(
-            with_default_scheme("0.0.0.0", false).unwrap().to_string(),
-            "http://0.0.0.0/"
-        );
-        assert_eq!(
-            with_default_scheme("0.0.0.0", true).unwrap().to_string(),
-            "https://0.0.0.0/"
-        );
-    }
-
     async fn get_received(
         rx: mpsc::Receiver<(Parts, Bytes)>,
         assert_parts: impl Fn(Parts),
@@ -981,6 +981,8 @@ mod tests {
         // cannot write it yet since we don't know the size of the
         // encoded message
         buf.reserve(GRPC_HEADER_SIZE);
+        // SAFETY: The capacity for the complete header was reserved immediately above, and the
+        // header bytes are initialized before the buffer is read.
         unsafe {
             buf.advance_mut(GRPC_HEADER_SIZE);
         }

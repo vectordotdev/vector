@@ -57,7 +57,6 @@ pub struct ThrottleConfig {
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: ThrottleInternalMetricsConfig,
 }

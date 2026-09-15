@@ -268,7 +268,7 @@ impl Aggregator {
                 };
                 b.add(span, weight, is_top, aggkey);
 
-                debug!("Created {} start_time bucket.", btime);
+                debug!("Created {btime} start_time bucket.");
                 self.buckets.insert(btime, b);
             }
         }
@@ -305,7 +305,7 @@ impl Aggregator {
             align_timestamp(now) - ((BUCKET_WINDOW_LEN - 1) * BUCKET_DURATION_NANOSECONDS);
 
         if new_oldest_ts > self.oldest_timestamp {
-            debug!("Updated oldest_timestamp to {}.", new_oldest_ts);
+            debug!("Updated oldest_timestamp to {new_oldest_ts}.");
             self.oldest_timestamp = new_oldest_ts;
         }
 
@@ -358,7 +358,7 @@ impl Aggregator {
             let retain = bucket_start > flush_cutoff_time;
 
             if !retain {
-                debug!("Flushing {} start_time bucket.", bucket_start);
+                debug!("Flushing {bucket_start} start_time bucket.");
 
                 bucket.export().into_iter().for_each(|(payload_key, csb)| {
                     match m.get_mut(&payload_key) {

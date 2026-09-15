@@ -124,7 +124,7 @@ async fn acked(State(st): State<Arc<AppState>>, body: String) -> StatusCode {
 
 async fn ingest(State(st): State<Arc<AppState>>, body: String) -> StatusCode {
     let (records, understood) = parse_delivered(&body);
-    // 200 only if understood, so the sink never counts an unparseable body as
+    // 200 only if understood, so the sink never counts an unparsable body as
     // delivered — keeps the delivered set honest.
     if !understood {
         return StatusCode::INTERNAL_SERVER_ERROR;
