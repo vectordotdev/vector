@@ -636,6 +636,15 @@ async fn drain_and_repoint(
     repointed
 }
 
+/// The next deadline `interval` after `now`, keeping the old one if that instant is unrepresentable.
+///
+/// `reconcile_interval_secs` takes any `u64`, and a value large enough to mean "effectively never"
+/// overflows the clock -- which must not panic the source. Keeping the existing deadline leaves the
+/// caller with the far-future one it already had, which is what such a setting asks for.
+fn schedule_after(now: time::Instant, interval: Duration, current: time::Instant) -> time::Instant {
+    now.checked_add(interval).unwrap_or(current)
+}
+
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures.
 ///
@@ -921,15 +930,23 @@ where
             if next_glob_time <= now_time || notify_wakeup_ready {
                 // Leave the wakeup queued (don't take it) if we're here only because the backstop
                 // timer fired while the notify throttle hasn't elapsed yet.
+                let backstop_due = next_glob_time <= now_time;
                 let woken_by_notify_event = if notify_wakeup_ready {
-                    next_notify_discovery_time =
-                        now_time.checked_add(MIN_NOTIFY_DISCOVERY_INTERVAL).unwrap();
+                    next_notify_discovery_time = schedule_after(
+                        now_time,
+                        MIN_NOTIFY_DISCOVERY_INTERVAL,
+                        next_notify_discovery_time,
+                    );
                     pending_notify_wakeup.take()
                 } else {
                     NotifyWakeup::default()
                 };
-                // Schedule the next backstop reconciliation time.
-                next_glob_time = now_time.checked_add(discovery_interval).unwrap();
+                // Only when the backstop itself came due. Pushing it out on every notify pass lets a
+                // file that is written to continuously postpone it indefinitely -- and it is the
+                // backstop that recovers a creation whose event the backend dropped.
+                if backstop_due {
+                    next_glob_time = schedule_after(now_time, discovery_interval, next_glob_time);
+                }
 
                 if stats.started_at.elapsed() > Duration::from_secs(1) {
                     stats.report();
@@ -2332,6 +2349,18 @@ where
                     watcher.canonical_path(),
                 );
 
+            // A wakeup that names paths says nothing about the files it does not name, so statting
+            // them is the per-file-per-pass cost this mode exists to avoid: one busy writer would
+            // otherwise sweep every idle file on every event. The backstop pass names nothing and so
+            // still sweeps everything, which is what covers an event the backend dropped.
+            //
+            // Their removal deadline is still due, and reading a timer costs nothing.
+            if notify_wakeup.has_specific_paths() && !notify_names_current_path {
+                self.remove_idle_watcher_if_due(watcher, file_id, lines)
+                    .await;
+                continue;
+            }
+
             match watcher.check_for_new_data().await {
                 Ok(true) => {
                     if let Err(error) = watcher.reactivate().await {
@@ -2364,32 +2393,9 @@ where
                         }
                         continue;
                     }
-                    // Still idle and still unchanged. Idle files are eligible for `remove_after`
-                    // cleanup just like active ones, driven off how long they've sat unchanged
-                    // rather than "time since last successful read" (which is meaningless for a
-                    // watcher that, by construction, isn't reading).
-                    if let Some(grace_period) = self.remove_after
-                        && watcher
-                            .idle_since()
-                            .is_some_and(|idle| idle >= grace_period)
-                    {
-                        if !watcher.removal_is_authorized() {
-                            // Drained, not deleted: this path is outside the include patterns.
-                            salvage_final_partial_line(watcher, file_id, lines);
-                            watcher.set_dead();
-                        } else {
-                            match remove_file(&watcher.path).await {
-                                Ok(()) => {
-                                    self.emitter.emit_file_deleted(&watcher.path);
-                                    salvage_final_partial_line(watcher, file_id, lines);
-                                    watcher.set_dead();
-                                }
-                                Err(error) => {
-                                    self.emitter.emit_file_delete_error(&watcher.path, error);
-                                }
-                            }
-                        }
-                    }
+                    // Still idle and still unchanged, so its removal deadline may now be due.
+                    self.remove_idle_watcher_if_due(watcher, file_id, lines)
+                        .await;
                 }
                 Err(error) => {
                     if error.kind() == std::io::ErrorKind::NotFound {
@@ -2421,6 +2427,42 @@ where
         }
         self.emitter.emit_files_open(open);
         self.emitter.emit_files_idle(idle);
+    }
+
+    /// Delete an idle file that has been quiet for `remove_after`, if it is due.
+    ///
+    /// Driven off how long the watcher has sat unchanged rather than "time since last successful
+    /// read", which means nothing for a watcher that by construction is not reading. Reading that
+    /// timer costs no syscall, so this is also safe to run for watchers a notify wakeup did not
+    /// name -- their deadline falls due on schedule rather than waiting for the backstop pass.
+    async fn remove_idle_watcher_if_due(
+        &self,
+        watcher: &mut FileWatcher,
+        file_id: FileFingerprint,
+        lines: &mut Vec<Line>,
+    ) {
+        let Some(grace_period) = self.remove_after else {
+            return;
+        };
+        if watcher.idle_since().is_none_or(|idle| idle < grace_period) {
+            return;
+        }
+        if !watcher.removal_is_authorized() {
+            // Drained, not deleted: this path is outside the include patterns.
+            salvage_final_partial_line(watcher, file_id, lines);
+            watcher.set_dead();
+            return;
+        }
+        match remove_file(&watcher.path).await {
+            Ok(()) => {
+                self.emitter.emit_file_deleted(&watcher.path);
+                salvage_final_partial_line(watcher, file_id, lines);
+                watcher.set_dead();
+            }
+            Err(error) => {
+                self.emitter.emit_file_delete_error(&watcher.path, error);
+            }
+        }
     }
 
     async fn watch_new_file(
@@ -3532,6 +3574,97 @@ mod tests {
         assert!(
             fp_map.values().all(|watcher| watcher.dead()),
             "the watcher must still retire, or the path is reconsidered forever"
+        );
+    }
+
+    /// Regression test for a review finding: `reconcile_interval_secs` takes any `u64`, and a value
+    /// large enough to mean "effectively never" overflowed the clock and panicked the source on its
+    /// first discovery pass.
+    #[test]
+    fn an_unrepresentable_interval_keeps_the_current_deadline() {
+        let now = time::Instant::now();
+        let current = now + Duration::from_secs(30);
+
+        assert_eq!(
+            schedule_after(now, Duration::from_secs(5), current),
+            now + Duration::from_secs(5),
+            "an ordinary interval schedules normally"
+        );
+        assert_eq!(
+            schedule_after(now, Duration::from_secs(u64::MAX), current),
+            current,
+            "an interval the clock cannot represent must keep the deadline, not panic"
+        );
+    }
+
+    /// Regression test for a review finding: a wakeup naming one path still statted every idle
+    /// watcher, so one busy writer swept thousands of files on every event -- the per-file-per-pass
+    /// cost this mode exists to remove.
+    #[tokio::test]
+    async fn a_named_wakeup_does_not_poll_the_files_it_does_not_name() {
+        let directory = tempfile::tempdir().unwrap();
+        let named = directory.path().join("busy.log");
+        let unnamed = directory.path().join("quiet.log");
+        std::fs::write(&named, b"first\n").unwrap();
+        std::fs::write(&unnamed, b"first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let mut fp_map = IndexMap::new();
+        for (index, path) in [&named, &unnamed].into_iter().enumerate() {
+            let mut watcher = FileWatcher::new(
+                path.clone(),
+                ReadFrom::Beginning,
+                None,
+                1024,
+                Bytes::from_static(b"\n"),
+                true,
+            )
+            .await
+            .unwrap();
+            while watcher.read_line().await.unwrap().raw_line.is_some() {}
+            watcher.deactivate().await;
+            assert!(watcher.is_idle(), "test setup requires idle watchers");
+            fp_map.insert(FileFingerprint::DevInode(0, index as u64), watcher);
+        }
+
+        // Both files grow, but the wakeup names only one of them.
+        for path in [&named, &unnamed] {
+            std::fs::OpenOptions::new()
+                .append(true)
+                .open(path)
+                .and_then(|mut file| std::io::Write::write_all(&mut file, b"second\n"))
+                .unwrap();
+        }
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([named.clone()]);
+
+        let mut lines = Vec::new();
+        file_server
+            .poll_idle_watchers(&mut fp_map, &mut lines, &wakeup)
+            .await;
+
+        let reactivated = |path: &Path| {
+            fp_map
+                .values()
+                .find(|watcher| watcher.path == path)
+                .expect("watcher must still be tracked")
+                .is_active()
+        };
+        assert!(
+            reactivated(&named),
+            "the named file must be polled and resumed"
+        );
+        assert!(
+            !reactivated(&unnamed),
+            "a file the wakeup did not name must not be statted, let alone resumed"
         );
     }
 
