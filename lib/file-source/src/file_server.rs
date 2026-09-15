@@ -9,8 +9,8 @@ use std::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use file_source_common::{
-    FileFingerprint, FileSourceInternalEvents, Fingerprinter, OwnerGeneration, PrefixWanted,
-    ReadFrom,
+    FileFingerprint, FilePosition, FileSourceInternalEvents, Fingerprinter, OwnerGeneration,
+    PrefixWanted, ReadFrom,
     checkpointer::{Checkpointer, CheckpointsView},
 };
 use futures::{
@@ -589,8 +589,22 @@ fn salvage_final_partial_line(
     });
 }
 
+/// The result of a bounded rotation drain.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum DrainOutcome {
+    /// The old inode reached EOF and the watcher was pointed at `replacement`.
+    Repointed {
+        bytes_read: usize,
+        old_position: FilePosition,
+        old_generation: OwnerGeneration,
+    },
+    /// The read budget was exhausted before EOF. The watcher remains on the old inode so the
+    /// caller can continue draining it in a later pass.
+    LimitReached { bytes_read: usize },
+}
+
 /// Point a watcher at the file that replaced its own, reading out everything left on the old one
-/// first.
+/// first, subject to `max_read_bytes`.
 ///
 /// Rotation replaces the file at a tracked path, and reopening there abandons the inode the reader
 /// still holds: its unread records, and the unterminated one in its buffer, would be lost. Both are
@@ -598,30 +612,44 @@ fn salvage_final_partial_line(
 /// they came from rather than the one about to take its place.
 ///
 /// EOF here means "nothing more to read now"; a writer still holding the old descriptor can append
-/// afterwards, and those bytes are beyond recovery once the reader moves.
+/// afterwards, and those bytes are beyond recovery once the reader moves. If the limit is reached
+/// first, the old descriptor and fingerprint are retained and the caller must invoke this function
+/// again before repointing.
 async fn drain_and_repoint(
     watcher: &mut FileWatcher,
     file_id: FileFingerprint,
     replacement: PathBuf,
     lines: &mut Vec<Line>,
-) -> std::io::Result<()> {
+    max_read_bytes: usize,
+) -> std::io::Result<DrainOutcome> {
     // The pass marked every watcher unfindable before discovery, and `read_line` reads that at EOF as
     // "the file was deleted" and kills the watcher -- which would then be reaped straight after being
     // repointed. This file was just fingerprinted, so saying it was found is simply true.
     watcher.mark_found();
+    let old_generation = watcher.generation();
+    let mut bytes_read: usize = 0;
     loop {
         match watcher.read_line().await {
             Ok(RawLineResult {
                 raw_line: Some(line),
                 ..
-            }) => lines.push(Line {
-                text: line.bytes,
-                filename: watcher.path.to_str().expect("not a valid path").to_owned(),
-                file_id,
-                generation: watcher.generation(),
-                start_offset: line.offset,
-                end_offset: watcher.get_file_position(),
-            }),
+            }) => {
+                bytes_read = bytes_read.saturating_add(line.bytes.len());
+                lines.push(Line {
+                    text: line.bytes,
+                    filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                    file_id,
+                    generation: watcher.generation(),
+                    start_offset: line.offset,
+                    end_offset: watcher.get_file_position(),
+                });
+                // Match the normal read loop's per-file budget. In particular, do not probe EOF
+                // after this line: retaining the watcher on the old descriptor is what makes the
+                // next pass able to continue without keeping the whole tail in `lines`.
+                if bytes_read > max_read_bytes {
+                    return Ok(DrainOutcome::LimitReached { bytes_read });
+                }
+            }
             Ok(_) => break,
             // Not EOF: the file may still hold records this reader has not seen. Moving on would
             // drop the descriptor along with them, so leave the watcher where it is and let the next
@@ -633,6 +661,7 @@ async fn drain_and_repoint(
         }
     }
     salvage_final_partial_line(watcher, file_id, lines);
+    let old_position = watcher.get_file_position();
 
     let repointed = watcher.update_path(replacement).await;
     if repointed.is_err() {
@@ -642,7 +671,21 @@ async fn drain_and_repoint(
         // occupies its old path.
         watcher.prepare_for_discovery();
     }
-    repointed
+    repointed.map(|()| DrainOutcome::Repointed {
+        bytes_read,
+        old_position,
+        old_generation,
+    })
+}
+
+/// The outcome of one discovery pass. Notify discovery remains an implementation detail of the
+/// caller, while a bounded rotation drain needs to tell the main loop to retry reconciliation
+/// immediately rather than waiting for the normal polling interval.
+#[derive(Debug, PartialEq, Eq)]
+struct DiscoveryOutcome {
+    keep_notify_discovery: bool,
+    drain_pending: bool,
+    bytes_read: usize,
 }
 
 /// The next deadline `interval` after `now`, keeping the old one if that instant is unrepresentable.
@@ -799,7 +842,7 @@ where
         //
         // If notify initialization fails (e.g. platform resource limits like hitting the
         // inotify instance cap), we log and transparently fall back to polling-only behavior
-        // using `reconcile_interval` as the poll interval, rather than failing the whole file
+        // using the normal `glob_minimum_cooldown` cadence, rather than failing the whole file
         // source.
         let include_patterns = self.paths_provider.watch_roots();
         let mut notify_discovery = match self.discovery_mode {
@@ -907,26 +950,22 @@ where
         // omitted rename destination. The deadline is never extended by an ordinary wakeup or by
         // an unrelated watcher that happens to remain unfindable.
         let mut rename_recovery_deadline = None;
+        let mut previous_discovery_interval = self.glob_minimum_cooldown;
         loop {
-            // Use `reconcile_interval` whenever `Notify` mode was configured, even if the notify
-            // watcher isn't currently live (it failed to initialize, or died mid-run and was set
-            // to `None`): `glob_minimum_cooldown` is documented as ignored in `Notify` mode, so a
-            // user relying on that must still get `reconcile_interval`'s cadence during a fallback
-            // rather than silently reverting to whatever `glob_minimum_cooldown` happens to be set
-            // to (which, precisely because it's documented as ignored, may be tuned very
-            // differently than the intended discovery cadence).
-            // A directory that could not be watched produces no events, so waiting a full
-            // `reconcile_interval` to look at it again would leave files under it undiscovered for
-            // minutes -- and short-lived ones missed entirely. Reconcile on the polling cadence
-            // until every configured directory is covered.
+            // A notify watcher with complete coverage can use the long reconciliation backstop.
+            // If a root registration failed, keep retrying the full glob pass on the ordinary
+            // polling cadence: no event can arrive from that root, so waiting for the long notify
+            // backstop can miss a file that is created and removed in between. The same fallback
+            // applies while notify is absent or being torn down.
             let notify_covers_everything = notify_discovery
                 .as_ref()
                 .is_some_and(|discovery| !discovery.has_uncovered_roots());
-            let discovery_interval = if notify_covers_everything {
-                self.reconcile_interval
-            } else {
-                self.glob_minimum_cooldown
-            };
+            let discovery_interval =
+                if self.discovery_mode == FileDiscoveryMode::Notify && notify_covers_everything {
+                    self.reconcile_interval
+                } else {
+                    self.glob_minimum_cooldown
+                };
 
             // Glob find files to follow, but not too often. A pending notify wakeup only
             // triggers this early (ahead of `next_glob_time`) once `next_notify_discovery_time`
@@ -943,6 +982,28 @@ where
             );
             let notify_wakeup_ready =
                 pending_notify_wakeup.is_pending() && next_notify_discovery_time <= now_time;
+            if discovery_interval < previous_discovery_interval {
+                // Coverage can become incomplete during the discovery pass that scheduled the
+                // current (long) deadline. Pull it in immediately rather than waiting until the
+                // old `reconcile_interval` expires before the fallback polling pass runs.
+                let fallback_deadline =
+                    schedule_after(now_time, discovery_interval, next_glob_time);
+                if fallback_deadline < next_glob_time {
+                    next_glob_time = fallback_deadline;
+                }
+            }
+            previous_discovery_interval = discovery_interval;
+            // Idle watchers have no open handle and therefore do not get visited by the normal
+            // read loop. Do their deadline-only cleanup independently of reconciliation, but let a
+            // due discovery pass inspect notify-named files first so a just-arrived write can
+            // reactivate an idle watcher instead of being removed at the same instant.
+            if self.idle_removal_due(&fp_map)
+                && next_glob_time > now_time
+                && !pending_notify_wakeup.is_pending()
+            {
+                self.remove_idle_watchers_due(&mut fp_map, &mut lines).await;
+            }
+            let mut discovery_bytes_read = 0;
             if next_glob_time <= now_time || notify_wakeup_ready {
                 // Leave the wakeup queued (don't take it) if we're here only because the backstop
                 // timer fired while the notify throttle hasn't elapsed yet.
@@ -973,7 +1034,7 @@ where
                 }
 
                 let start = time::Instant::now();
-                let keep_notify_discovery = self
+                let discovery_outcome = self
                     .discover(
                         &mut fp_map,
                         &mut known_small_files,
@@ -983,7 +1044,15 @@ where
                         &mut lines,
                     )
                     .await;
-                if !keep_notify_discovery {
+                discovery_bytes_read = discovery_outcome.bytes_read;
+                if discovery_outcome.drain_pending {
+                    // A rotation drain is deliberately a continuation of the normal read loop,
+                    // not an unbounded discovery-side operation. Retry the reconciliation as soon
+                    // as this bounded batch has been handed downstream so the replacement can be
+                    // opened without waiting for the ordinary polling interval.
+                    next_glob_time = time::Instant::now();
+                }
+                if !discovery_outcome.keep_notify_discovery {
                     warn!(
                         "Notify-based discovery unavailable; relying on periodic reconciliation only."
                     );
@@ -1073,7 +1142,7 @@ where
             }
 
             // Collect lines by polling files.
-            let mut global_bytes_read: usize = 0;
+            let mut global_bytes_read: usize = discovery_bytes_read;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
                 if !watcher.should_read() {
@@ -1240,12 +1309,21 @@ where
             // take a while, and computing the remaining time against a stale timestamp would
             // overstate it, adding back some of the latency this cap exists to remove.
 
-            let sleep_duration = if pending_notify_wakeup.is_pending() {
+            let mut sleep_duration = if pending_notify_wakeup.is_pending() {
                 Duration::from_millis(backoff as u64)
                     .min(next_notify_discovery_time.saturating_duration_since(time::Instant::now()))
             } else {
                 Duration::from_millis(backoff as u64)
             };
+            // A notify-only source may otherwise sleep until its much later reconciliation
+            // backstop after an idle watcher becomes eligible for removal. Capping the existing
+            // backoff sleep is enough to wake the loop; the deadline-only pass above performs the
+            // removal without stat-ing every idle file.
+            if !pending_notify_wakeup.is_pending()
+                && let Some(idle_removal_delay) = self.next_idle_removal_delay(&fp_map)
+            {
+                sleep_duration = sleep_duration.min(idle_removal_delay);
+            }
             let sleep_fut = async move {
                 if !sleep_duration.is_zero() {
                     sleep(sleep_duration).await;
@@ -1454,8 +1532,8 @@ where
     /// alone is no evidence that a given file changed, and nudging every watcher regardless cost an
     /// O(N) sweep per event under a large `include`. Matching also compares canonical paths, so a
     /// symlink alias keeps the low-latency nudge; canonicalization happens once per event path.
-    /// Returns `false` if notify-based discovery must be disabled entirely (the watcher failed to
-    /// rebuild after a backend error), `true` otherwise.
+    /// Returns whether notify-based discovery should remain enabled, whether a bounded rotation
+    /// drain needs another pass, and how many bytes the drain emitted.
     #[must_use]
     async fn discover(
         &mut self,
@@ -1465,7 +1543,7 @@ where
         notify_discovery: Option<&mut NotifyDiscovery>,
         notify_wakeup: &NotifyWakeup,
         lines: &mut Vec<Line>,
-    ) -> bool {
+    ) -> DiscoveryOutcome {
         // Defensive resync: cheap to call, and covers the (rare) case where the set of
         // directories implied by `include` patterns needs to change -- e.g. a literal include
         // path's directory didn't exist at startup and now does, or the `PathsProvider`
@@ -1484,7 +1562,12 @@ where
             // substitute. The pending wakeup can therefore still be a narrow `Paths` set while an
             // unrelated creation event was dropped, so the targeted pass below must be skipped:
             // only the glob pass can find a file nothing named.
-            full_scan_required = discovery.take_full_scan_required();
+            // A failed resync leaves at least one configured root without an event source. Do a
+            // full pass now while the existing watcher is still available, then let the main loop
+            // fall back to periodic reconciliation rather than waiting for a notify event that can
+            // never arrive from that root.
+            let resync_full_scan_required = discovery.take_full_scan_required();
+            full_scan_required = !keep_notify_discovery || resync_full_scan_required;
         }
 
         // A plain modification event names the only paths that need to be fingerprinted. Create,
@@ -1500,7 +1583,11 @@ where
             // Every named path belonged to a tracked file. Otherwise fall through to the full pass:
             // an unaccounted path may be a new file the `include` globs cover, and only the glob
             // pass can decide that -- waiting for the backstop would leave it unread.
-            return keep_notify_discovery;
+            return DiscoveryOutcome {
+                keep_notify_discovery,
+                drain_pending: false,
+                bytes_read: 0,
+            };
         }
 
         for (_file_id, watcher) in &mut *fp_map {
@@ -1520,6 +1607,9 @@ where
             .flatten();
 
         let mut tracked_path_index = TrackedPathIndex::default();
+        let mut drain_attempted = HashSet::new();
+        let mut drain_pending = false;
+        let mut drain_bytes_read: usize = 0;
         for path in self.paths_provider.paths().into_iter() {
             let outcome = self
                 .fingerprinter
@@ -1543,24 +1633,58 @@ where
                     // file fingerprint matches a watched file
                     let was_found_this_cycle = watcher.file_findable();
                     if watcher.path == path {
-                        // A same-path replacement can fingerprint successfully and then vanish or
-                        // turn inaccessible before `update_path` reopens it. Marking it findable
-                        // regardless would leave the watcher on the old inode while suppressing the
-                        // unfindable grace period that recovers it.
+                        // A same-path replacement is invisible to the fingerprint key when the
+                        // replacement repeats the old first line. Verify the candidate identity
+                        // before declaring this watcher refreshed; otherwise `update_path` would
+                        // drop the old descriptor and its unread tail. Use the same bounded drain
+                        // as the changed-fingerprint branch, even though no rekey is needed.
                         let mut refreshed = true;
-                        if !watcher.path_has_tracked_identity().await {
-                            let current_path = watcher.path.clone();
-                            if let Err(error) = watcher.update_path(current_path).await {
-                                self.emitter.emit_file_watch_error(&watcher.path, error);
-                                refreshed = false;
+                        let mut path_changed = false;
+                        if !watcher.candidate_has_tracked_identity(path.clone()).await {
+                            if drain_attempted.insert(file_id) {
+                                match drain_and_repoint(
+                                    watcher,
+                                    file_id,
+                                    path.clone(),
+                                    lines,
+                                    self.max_read_bytes,
+                                )
+                                .await
+                                {
+                                    Ok(DrainOutcome::Repointed { bytes_read, .. }) => {
+                                        drain_bytes_read =
+                                            drain_bytes_read.saturating_add(bytes_read);
+                                        path_changed = true;
+                                    }
+                                    Ok(DrainOutcome::LimitReached { bytes_read }) => {
+                                        drain_bytes_read =
+                                            drain_bytes_read.saturating_add(bytes_read);
+                                        drain_pending = true;
+                                    }
+                                    Err(error) => {
+                                        self.emitter.emit_file_watch_error(&watcher.path, error);
+                                        refreshed = false;
+                                    }
+                                }
                             }
+                        } else if watcher.is_active() {
+                            // A full reconciliation can be the first pass to observe an appended
+                            // gzip member. Raise the raw-size baseline from the same stat so a later
+                            // truncate to a size between the original and current members is not
+                            // mistaken for ordinary growth.
+                            let check = watcher.shrank_below_reader().await;
+                            watcher.observe_raw_size(check.observed);
+                        }
+                        if path_changed {
                             tracked_path_index.paths_changed();
                         }
                         if refreshed {
                             watcher.set_file_findable(true);
+                            // The file fingerprints again, so any rewrite it was mid-way through
+                            // is over. This also releases the rewind guard after a same-fingerprint
+                            // replacement has been repointed.
+                            watcher.fingerprint_completed();
                         }
-                        // The file fingerprints again, so any rewrite it was mid-way through is over.
-                        watcher.fingerprint_completed();
                         trace!(
                             message = "Continue watching file.",
                             path = ?path,
@@ -1681,6 +1805,8 @@ where
                         continue;
                     }
                     let mut restart_failed = false;
+                    let mut drain_deferred = false;
+                    let mut drained_checkpoint = None;
                     if let Some(tracked_path) = watcher_path {
                         // The replacement is reopened at the *discovered* path, not the watcher's own:
                         // with overlapping or symlinked includes the old alias can be gone while the
@@ -1691,8 +1817,43 @@ where
                             Some(watcher) => {
                                 if !same_inode {
                                     // Finish the inode this reader still holds before it is pointed
-                                    // at the one that replaced it.
-                                    drain_and_repoint(watcher, stale_key, reopen_path, lines).await
+                                    // at the one that replaced it. A path can be yielded more than
+                                    // once through overlapping includes or aliases; do not spend a
+                                    // second drain budget on the same watcher in one pass.
+                                    if !drain_attempted.insert(stale_key) {
+                                        drain_deferred = true;
+                                        Ok(())
+                                    } else {
+                                        match drain_and_repoint(
+                                            watcher,
+                                            stale_key,
+                                            reopen_path,
+                                            lines,
+                                            self.max_read_bytes,
+                                        )
+                                        .await
+                                        {
+                                            Ok(DrainOutcome::Repointed {
+                                                bytes_read,
+                                                old_position,
+                                                old_generation,
+                                            }) => {
+                                                drain_bytes_read =
+                                                    drain_bytes_read.saturating_add(bytes_read);
+                                                drained_checkpoint =
+                                                    Some((old_position, old_generation));
+                                                Ok(())
+                                            }
+                                            Ok(DrainOutcome::LimitReached { bytes_read }) => {
+                                                drain_bytes_read =
+                                                    drain_bytes_read.saturating_add(bytes_read);
+                                                drain_pending = true;
+                                                drain_deferred = true;
+                                                Ok(())
+                                            }
+                                            Err(error) => Err(error),
+                                        }
+                                    }
                                 } else {
                                     // The fingerprint completed, which ends the rewrite. Whether the
                                     // reader still needs repositioning is decided inside, so a
@@ -1710,14 +1871,26 @@ where
                             restart_failed = true;
                         }
                         if !same_inode {
-                            // Only that arm reopened the watcher on a different path.
+                            // Only that arm either reopened the watcher on a different path or
+                            // attempted the bounded drain that precedes it.
                             tracked_path_index.paths_changed();
                         }
                     }
                     if restart_failed {
                         // Leave it for the next pass rather than rekeying a reader that is still
                         // positioned in discarded content.
+                    } else if drain_deferred {
+                        // The old reader is still the owner of `stale_key`. The normal read loop can
+                        // continue consuming it, and the next discovery pass will either finish
+                        // the drain or apply the same bounded step again.
                     } else if rekey_watcher(fp_map, checkpoints, stale_key, file_id) {
+                        if let Some((old_position, old_generation)) = drained_checkpoint {
+                            // The old inode may be yielded later in this same glob pass as a
+                            // rotated archive. Keep its already-drained offset claimable so
+                            // `watch_new_file` resumes at the archive's tail instead of replaying
+                            // records that were just emitted before the rekey.
+                            checkpoints.register_reaped(stale_key, old_position, old_generation);
+                        }
                         tracked_path_index.rekeyed(stale_key, file_id);
                         let watcher = fp_map
                             .get_mut(&file_id)
@@ -1814,7 +1987,11 @@ where
                 checkpoints.register(file_id, 0, watcher.take_new_generation());
             }
         }
-        keep_notify_discovery
+        DiscoveryOutcome {
+            keep_notify_discovery,
+            drain_pending,
+            bytes_read: drain_bytes_read,
+        }
     }
 
     /// Fingerprint only paths named by an ordinary notify modification event. The periodic full
@@ -1930,22 +2107,30 @@ where
                                 let Some(literal_root) = literal_root else {
                                     continue;
                                 };
-                                if let Ok(canonical_root) = fs::canonicalize(&literal_root).await
-                                    && canonical.starts_with(&canonical_root)
-                                    && path_contains_symlink(&literal_root).await
-                                {
-                                    // The literal prefix itself is reached through a symlink, so no
-                                    // spelling comparison can settle membership.
-                                    //
-                                    // Asked of the filesystem rather than by comparing the prefix
-                                    // against its canonical form: canonicalization rewrites a path
-                                    // with no symlink involved at all -- a Windows 8.3 short name
-                                    // (`6DB9~1`) becomes the long name under `\\?\`, macOS `/var`
-                                    // becomes `/private/var` -- so treating inequality as "symlink"
-                                    // made every excluded sibling in a watched directory force a
-                                    // full glob pass on those platforms.
-                                    under_a_root = true;
-                                    break;
+                                let Ok(canonical_root) = fs::canonicalize(&literal_root).await
+                                else {
+                                    continue;
+                                };
+                                if canonical.starts_with(&canonical_root) {
+                                    if path_contains_symlink(&literal_root).await {
+                                        // The literal prefix itself is reached through a symlink, so
+                                        // no spelling comparison can settle membership.
+                                        //
+                                        // Asked of the filesystem rather than by comparing the
+                                        // prefix against its canonical form: canonicalization
+                                        // rewrites a path with no symlink involved at all -- a
+                                        // Windows 8.3 short name (`6DB9~1`) becomes the long name
+                                        // under `\\?\`, macOS `/var` becomes `/private/var` -- so
+                                        // treating inequality as "symlink" made every excluded
+                                        // sibling in a watched directory force a full glob pass on
+                                        // those platforms.
+                                        under_a_root = true;
+                                        break;
+                                    }
+                                    // The event is already under the real literal root. A child
+                                    // link cannot be the reason it reaches this path, so do not
+                                    // walk the root tree for every ordinary excluded sibling.
+                                    continue;
                                 }
                                 // The symlink can instead sit in a *wildcard* component, and then
                                 // the event path need not be under the literal prefix at all: for
@@ -2126,14 +2311,19 @@ where
                 let watcher = fp_map
                     .get_mut(&file_id)
                     .expect("just checked this fingerprint is present");
+                // A notify-targeted pass must not reopen a same-named replacement in place: doing
+                // so discards the old descriptor before the full pass has had a chance to drain
+                // its tail. Leave the event unaccounted for and let `discover` perform the bounded
+                // rotation handoff.
+                if !watcher
+                    .candidate_has_tracked_identity(watcher.path.clone())
+                    .await
+                {
+                    all_paths_accounted_for = false;
+                    continue;
+                }
                 let mut refresh_failed = false;
-                if watcher.is_active() && !watcher.path_has_tracked_identity().await {
-                    let current_path = watcher.path.clone();
-                    if let Err(error) = watcher.update_path(current_path).await {
-                        self.emitter.emit_file_watch_error(&watcher.path, error);
-                        refresh_failed = true;
-                    }
-                } else if watcher.is_active() {
+                if watcher.is_active() {
                     let check = watcher.shrank_below_reader().await;
                     // Appended gzip members consumed since the reader opened leave its baseline
                     // below what was actually read, so raise it from the stat just taken.
@@ -2183,6 +2373,18 @@ where
                     // two spellings of one inode both resolve to the now-removed key.
                     continue;
                 };
+                // A changed fingerprint can also be caused by a same-path replacement. The
+                // targeted pass has no room for the bounded old-inode drain, so defer this event to
+                // the full pass instead of rekeying a reader that is still attached to the old
+                // descriptor.
+                if !watcher
+                    .candidate_has_tracked_identity(watcher.path.clone())
+                    .await
+                    || !watcher.path_has_tracked_identity().await
+                {
+                    all_paths_accounted_for = false;
+                    continue;
+                }
                 // No size check: under `FirstLinesChecksum` a changed fingerprint on the same inode
                 // can only be an in-place rewrite, and requiring a shrink missed the rewrites larger
                 // than the reader's offset.
@@ -2191,9 +2393,7 @@ where
                 // completed is not mistaken for the one already rewound for. The identity check
                 // gates only the reopen -- the guard must come down either way, or the *next*
                 // rewrite inherits it and skips its repositioning.
-                if !watcher.path_has_tracked_identity().await {
-                    watcher.fingerprint_completed();
-                } else if let Err(error) = watcher
+                if let Err(error) = watcher
                     .reconcile_rewrite(true, outcome.partial_prefix())
                     .await
                 {
@@ -2256,6 +2456,57 @@ where
         all_paths_accounted_for
     }
 
+    /// Whether at least one idle watcher has reached its independent removal deadline.
+    fn idle_removal_due(&self, fp_map: &IndexMap<FileFingerprint, FileWatcher>) -> bool {
+        let Some(grace_period) = self.remove_after else {
+            return false;
+        };
+        fp_map.values().any(|watcher| {
+            watcher
+                .idle_since()
+                .is_some_and(|idle| idle >= grace_period)
+        })
+    }
+
+    /// Return the shortest remaining idle-removal delay, if any idle watcher is being retained.
+    ///
+    /// This is a timer calculation only: it does not inspect the filesystem, which keeps the
+    /// notify path from turning one unrelated event into an O(number-of-idle-watchers) metadata
+    /// sweep.
+    fn next_idle_removal_delay(
+        &self,
+        fp_map: &IndexMap<FileFingerprint, FileWatcher>,
+    ) -> Option<Duration> {
+        let grace_period = self.remove_after?;
+        fp_map
+            .values()
+            .filter_map(|watcher| watcher.idle_since())
+            .map(|idle| grace_period.saturating_sub(idle))
+            .min()
+    }
+
+    /// Remove only idle watchers whose deadline is due. The regular idle poll remains responsible
+    /// for checking metadata and reactivating files; this pass exists solely so a notify source can
+    /// reap an unchanged idle file without waiting for the reconciliation backstop.
+    async fn remove_idle_watchers_due(
+        &self,
+        fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
+        lines: &mut Vec<Line>,
+    ) {
+        let Some(grace_period) = self.remove_after else {
+            return;
+        };
+        for (&file_id, watcher) in &mut *fp_map {
+            if watcher
+                .idle_since()
+                .is_some_and(|idle| idle >= grace_period)
+            {
+                self.remove_idle_watcher_if_due(watcher, file_id, lines)
+                    .await;
+            }
+        }
+    }
+
     /// Cheaply poll `Idle` watchers (no open file handle) for new data by stat-ing them, reusing
     /// the same discovery cadence (`discover`'s caller) rather than adding a whole separate
     /// polling loop. Promotes any that changed back to `Active` so the read loop picks them up.
@@ -2300,14 +2551,19 @@ where
                 // the event can arrive before the filesystem rename has finished); the scan is
                 // still shared per root for the whole pass.
                 let path_outside_glob = watcher.path_is_outside_glob();
-                path_has_tracked_identity =
-                    path_outside_glob && watcher.path_has_tracked_identity().await;
-                let broad_scan_required = !path_outside_glob
-                    || self.discovery_mode == FileDiscoveryMode::PollingOnly
+                let broad_scan_required = self.discovery_mode == FileDiscoveryMode::PollingOnly
                     || notify_wakeup.requires_broad_rename_scan();
+                // With a coarse/polling pass there is no precise rename candidate to resolve. A
+                // cheap identity check lets an outside-glob watcher skip the parent-tree scan when
+                // its last verified path is still the same. Do not perform this stat for an
+                // ordinary targeted event: it cannot help a watcher the event did not name.
+                if path_outside_glob && broad_scan_required && event_identities.is_none() {
+                    path_has_tracked_identity = watcher.path_has_tracked_identity().await;
+                }
                 let path = if let Some(path) =
                     watcher.find_renamed_path_in_identities(event_identities.as_ref())
                 {
+                    path_has_tracked_identity = path_outside_glob;
                     Some(path)
                 } else if broad_scan_required
                     && (!path_outside_glob
@@ -2335,7 +2591,8 @@ where
                         watcher.mark_path_outside_glob();
                         path_has_tracked_identity = true;
                     }
-                } else if path_outside_glob
+                } else if broad_scan_required
+                    && path_outside_glob
                     && !path_has_tracked_identity
                     && watcher.tracked_file_is_gone().await
                 {
@@ -3499,6 +3756,242 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn a_same_fingerprint_replacement_also_drains_before_repointing() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        let archive = directory.path().join("app.log.1");
+        std::fs::write(&path, b"header\nold tail\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .clone()
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the original must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"stranded\n"))
+            .unwrap();
+        std::fs::rename(&path, &archive).unwrap();
+        // The first fingerprint line intentionally remains the same, so the replacement keeps the
+        // old fingerprint and reaches the same-key branch in `discover`.
+        std::fs::write(&path, b"header\nnew tail\n").unwrap();
+
+        let checkpoints = CheckpointsView::default();
+        let mut lines = Vec::new();
+        let _ = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+                &mut lines,
+            )
+            .await;
+
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text, b"stranded"[..]);
+        let watcher = fp_map
+            .get_mut(&file_id)
+            .expect("the watcher remains tracked");
+        assert!(watcher.path_has_tracked_identity().await);
+        assert_eq!(
+            watcher
+                .read_line()
+                .await
+                .unwrap()
+                .raw_line
+                .expect("the replacement must be read from its beginning")
+                .bytes,
+            "header"
+        );
+    }
+
+    /// Regression test for the GitHub review finding: a large rotated tail must be drained in
+    /// bounded batches rather than accumulated in the discovery pass's shared `lines` vector.
+    #[tokio::test]
+    async fn a_rotation_drain_is_bounded_and_resumable() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        let archive = directory.path().join("app.log.1");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(watcher.read_line().await.unwrap().raw_line.is_some());
+        assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+
+        // Both records are on the inode that is about to be rotated away. The first bounded pass
+        // must leave the second one on the descriptor so it can be emitted by the next pass.
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"stranded-one\nok\n"))
+            .unwrap();
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&path, b"replacement\n").unwrap();
+
+        let old_file_id = FileFingerprint::DevInode(0, 0);
+        let mut lines = Vec::new();
+        let first = drain_and_repoint(&mut watcher, old_file_id, path.clone(), &mut lines, 8)
+            .await
+            .unwrap();
+
+        assert!(
+            matches!(first, DrainOutcome::LimitReached { bytes_read } if bytes_read > 8),
+            "the first pass must stop after its byte budget, got {first:?}"
+        );
+        assert_eq!(
+            lines.len(),
+            1,
+            "one bounded batch should contain one record"
+        );
+        assert!(
+            !watcher.path_has_tracked_identity().await,
+            "the watcher must remain attached to the old inode while its tail is pending"
+        );
+
+        let second = drain_and_repoint(&mut watcher, old_file_id, path, &mut lines, 8)
+            .await
+            .unwrap();
+
+        assert!(
+            matches!(second, DrainOutcome::Repointed { .. }),
+            "the next pass must finish the old inode and repoint"
+        );
+        assert_eq!(
+            lines.len(),
+            2,
+            "the old inode's complete tail must be preserved"
+        );
+        assert!(watcher.path_has_tracked_identity().await);
+    }
+
+    /// The discovery caller must not rekey a watcher whose bounded drain stopped early: the
+    /// next pass has to find the same old reader and continue from its current offset.
+    #[tokio::test]
+    async fn a_pending_rotation_drain_keeps_the_old_fingerprint() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        let archive = directory.path().join("app.log.1");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.max_read_bytes = 8;
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let old_file_id = file_server
+            .fingerprinter
+            .clone()
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the file must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let mut fp_map = IndexMap::from([(old_file_id, watcher)]);
+
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"stranded-one\nok\n"))
+            .unwrap();
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&path, b"replacement\n").unwrap();
+
+        let replacement_file_id = file_server
+            .fingerprinter
+            .clone()
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the replacement must fingerprint");
+        assert_ne!(old_file_id, replacement_file_id);
+
+        let checkpoints = CheckpointsView::default();
+        let mut lines = Vec::new();
+        let first = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+                &mut lines,
+            )
+            .await;
+
+        assert!(first.drain_pending);
+        assert_eq!(lines.len(), 1);
+        assert!(fp_map.contains_key(&old_file_id));
+        assert!(!fp_map.contains_key(&replacement_file_id));
+
+        lines.clear();
+        let second = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+                &mut lines,
+            )
+            .await;
+
+        assert!(!second.drain_pending);
+        assert_eq!(lines.len(), 1);
+        assert!(!fp_map.contains_key(&old_file_id));
+        assert!(fp_map.contains_key(&replacement_file_id));
+        assert_eq!(lines[0].text, &b"ok"[..]);
+    }
+
     /// Regression test for a review finding: draining marks the watcher found so reaching EOF is not
     /// read as a deletion, but a failed reopen left it that way -- still "found" on an inode it no
     /// longer describes, where `remove_after` would unlink whatever now occupies its old path.
@@ -3530,6 +4023,7 @@ mod tests {
             FileFingerprint::DevInode(0, 0),
             missing,
             &mut lines,
+            1024,
         )
         .await;
 
@@ -3730,6 +4224,7 @@ mod tests {
                     &mut Vec::new(),
                 )
                 .await
+                .keep_notify_discovery
         );
 
         let mut lines = Vec::new();
@@ -3826,6 +4321,7 @@ mod tests {
                     &mut Vec::new(),
                 )
                 .await
+                .keep_notify_discovery
         );
 
         assert_eq!(
@@ -3910,6 +4406,7 @@ mod tests {
                     &mut Vec::new(),
                 )
                 .await
+                .keep_notify_discovery
         );
 
         assert_eq!(fp_map.len(), 1, "no second watcher may be created");
@@ -4488,6 +4985,98 @@ mod tests {
         assert!(
             watcher.path_has_tracked_identity().await,
             "the watcher must have been reopened onto the replacement, not left on the old inode"
+        );
+    }
+
+    /// A replacement can be yielded before the rotated archive in one glob pass. The replacement
+    /// takes the old watcher after its descriptor is drained, while the archive is then a new path
+    /// under the old fingerprint. It must resume at the drained offset rather than replaying the
+    /// tail that was already emitted during the handoff.
+    #[tokio::test]
+    async fn a_rotated_archive_resumes_after_the_drain_without_duplicate_lines() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        let archive = directory.path().join("app.log.1");
+        std::fs::write(&path, b"old-header\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log*")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.ignore_checkpoints = false;
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let old_file_id = file_server
+            .fingerprinter
+            .clone()
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the original must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let old_position = watcher.get_file_position();
+        let old_generation = watcher.generation();
+        let mut fp_map = IndexMap::from([(old_file_id, watcher)]);
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register(old_file_id, old_position, old_generation);
+
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"stranded\n"))
+            .unwrap();
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&path, b"new-header\n").unwrap();
+        let replacement_file_id = file_server
+            .fingerprinter
+            .clone()
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the replacement must fingerprint");
+        assert_ne!(old_file_id, replacement_file_id);
+
+        let mut lines = Vec::new();
+        let _ = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+                &mut lines,
+            )
+            .await;
+
+        let stranded: Vec<_> = lines
+            .iter()
+            .filter(|line| line.text == b"stranded"[..])
+            .collect();
+        assert_eq!(
+            stranded.len(),
+            1,
+            "the old inode's tail must be emitted exactly once"
+        );
+        assert!(fp_map.contains_key(&replacement_file_id));
+        let archive_watcher = fp_map
+            .get(&old_file_id)
+            .expect("the archive must get its own watcher");
+        assert_eq!(
+            archive_watcher.get_file_position(),
+            std::fs::metadata(&archive).unwrap().len(),
+            "the archive watcher must resume after the drained tail"
         );
     }
 
@@ -5427,6 +6016,7 @@ mod tests {
                     &mut Vec::new(),
                 )
                 .await
+                .keep_notify_discovery
         );
         let mut lines = Vec::new();
         file_server

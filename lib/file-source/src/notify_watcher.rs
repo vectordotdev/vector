@@ -407,7 +407,9 @@ impl NotifyDiscovery {
     /// directory still needs that same ancestor as its own fallback).
     ///
     /// Returns `false` if a pending backend error forced a watcher rebuild that failed; callers
-    /// should then stop using notify-based discovery entirely and fall back to polling.
+    /// should then stop using notify-based discovery entirely and fall back to polling. A root
+    /// registration that fails while the watcher itself remains healthy is reported through
+    /// `has_uncovered_roots`, so callers can use the shorter polling cadence and retry it here.
     #[must_use]
     pub async fn resync_watches<E: FileSourceInternalEvents>(
         &mut self,
@@ -576,6 +578,7 @@ impl NotifyDiscovery {
                                 .await
                             }
                             None => {
+                                self.uncovered_roots = true;
                                 warn!(message = "Failed to watch directory.", path = ?path, %error);
                                 emitter.emit_file_watch_backend_error(&std::io::Error::other(
                                     error.to_string(),
@@ -638,6 +641,7 @@ impl NotifyDiscovery {
                     self.watched_dirs.insert(parent.clone(), mode);
                 }
                 Err(error) => {
+                    self.uncovered_roots = true;
                     warn!(message = "Failed to watch symlink parent.", path = ?parent, %error);
                     emitter
                         .emit_file_watch_backend_error(&std::io::Error::other(error.to_string()));
@@ -698,6 +702,13 @@ impl NotifyDiscovery {
             return Box::pin(self.resync_watches(&include_patterns, emitter)).await;
         }
 
+        // A configured root without a direct or fallback registration has no event source at all.
+        // Keep the coverage flag set so the caller switches to the documented polling fallback;
+        // the next full pass retries the missing registration.
+        if self.uncovered_roots {
+            return true;
+        }
+
         emitter.emit_file_watch_directories(self.watched_dirs.len());
         true
     }
@@ -752,6 +763,7 @@ impl NotifyDiscovery {
                 self.fallback_watches.insert(wanted.to_path_buf(), ancestor);
             }
             Err(error) => {
+                self.uncovered_roots = true;
                 warn!(message = "Failed to watch directory.", path = ?ancestor, %error);
                 emitter.emit_file_watch_backend_error(&std::io::Error::other(error.to_string()));
             }

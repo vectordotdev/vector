@@ -153,15 +153,60 @@ impl CheckpointsView {
     /// Until this runs, a checkpoint loaded from disk supplies a starting position but accepts no
     /// updates, so a stale acknowledgement cannot be mistaken for a live reader's progress.
     pub fn register(&self, fng: FileFingerprint, pos: FilePosition, generation: OwnerGeneration) {
-        self.checkpoints.insert(
-            fng,
-            Owned {
-                position: pos,
-                owner: Owner::Live(generation),
-            },
-        );
+        // Keep the ownership transition and clearing of the removal mark under the same
+        // per-fingerprint entry lock that expiry takes. Otherwise expiry can observe the old
+        // Reaped entry after this insert, but before this method clears `removed_times`, and then
+        // delete the checkpoint belonging to the new live watcher.
+        match self.checkpoints.entry(fng) {
+            dashmap::mapref::entry::Entry::Occupied(mut entry) => {
+                entry.insert(Owned {
+                    position: pos,
+                    owner: Owner::Live(generation),
+                });
+                self.removed_times.remove(&fng);
+            }
+            dashmap::mapref::entry::Entry::Vacant(entry) => {
+                entry.insert(Owned {
+                    position: pos,
+                    owner: Owner::Live(generation),
+                });
+                self.removed_times.remove(&fng);
+            }
+        }
         self.modified_times.insert(fng, Utc::now());
-        self.removed_times.remove(&fng);
+    }
+
+    /// Keep the final position of a reader that was drained before its watcher was repointed.
+    ///
+    /// The old fingerprint may be discovered again shortly afterwards when a rotated archive is
+    /// still inside the include patterns. Starting that watcher from zero would replay the tail
+    /// that the drain already emitted. The entry is deliberately Reaped: late acknowledgements from
+    /// the drained reader remain valid, while a newly registered watcher may take the fingerprint
+    /// over immediately.
+    pub fn register_reaped(
+        &self,
+        fng: FileFingerprint,
+        pos: FilePosition,
+        generation: OwnerGeneration,
+    ) {
+        let marked_at = Utc::now();
+        let mut installed = false;
+        match self.checkpoints.entry(fng) {
+            dashmap::mapref::entry::Entry::Vacant(entry) => {
+                entry.insert(Owned {
+                    position: pos,
+                    owner: Owner::Reaped(generation),
+                });
+                // Hold the checkpoint entry lock while installing the mark, so expiry cannot
+                // decide based on a half-installed state.
+                self.removed_times.insert(fng, marked_at);
+                installed = true;
+            }
+            dashmap::mapref::entry::Entry::Occupied(_) => {}
+        }
+        if installed {
+            self.modified_times.insert(fng, marked_at);
+        }
     }
 
     pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
@@ -183,15 +228,18 @@ impl CheckpointsView {
         // been replaced retires nothing, so marking regardless would leave a live replacement
         // carrying someone else's death sentence -- and `remove_expired` would delete its checkpoint
         // if it happened to stay idle.
-        match self.checkpoints.get_mut(&fng) {
-            Some(mut entry) if entry.owner == Owner::Live(generation) => {
-                entry.owner = Owner::Reaped(generation);
+        let marked_at = Utc::now();
+        match self.checkpoints.entry(fng) {
+            dashmap::mapref::entry::Entry::Occupied(mut entry)
+                if entry.get().owner == Owner::Live(generation) =>
+            {
+                entry.get_mut().owner = Owner::Reaped(generation);
+                self.removed_times.insert(fng, marked_at);
             }
             // No entry at all: nothing to contradict the notice, and upstream marked it too.
-            None => {}
-            Some(_) => return,
+            dashmap::mapref::entry::Entry::Vacant(_) => {}
+            dashmap::mapref::entry::Entry::Occupied(_) => {}
         }
-        self.removed_times.insert(fng, Utc::now());
     }
 
     /// Move a checkpoint onto the fingerprint its file now hashes to, under a new owner.
@@ -295,7 +343,8 @@ impl CheckpointsView {
                 .removed_times
                 .get(&fng)
                 .is_some_and(|mark| *mark.value() == marked_at);
-            if !still_marked {
+            let still_reaped = matches!(entry.get().owner, Owner::Reaped(_));
+            if !still_marked || !still_reaped {
                 continue;
             }
             entry.remove();
@@ -986,7 +1035,11 @@ mod test {
         let mut chkptr = Checkpointer::new(data_dir.path());
 
         for (fingerprint, position, removed) in cases.clone() {
-            chkptr.update_checkpoint(fingerprint, position);
+            let generation = next_owner_generation();
+            chkptr
+                .checkpoints
+                .register(fingerprint, position, generation);
+            chkptr.checkpoints.set_dead(fingerprint, generation);
 
             // slide these in manually so we don't have to sleep for a long time
             chkptr
