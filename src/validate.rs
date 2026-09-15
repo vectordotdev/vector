@@ -183,18 +183,14 @@ pub async fn validate(
 
     let mut validated = true;
 
-    // Config loading can block (e.g. on secret/provider resolution), so race it against
-    // shutdown signals to abort validation immediately if one is received.
+    // Config loading can block on secret/provider resolution; race it against shutdown.
     let mut config = match bootstrap
         .phase(validate_config(opts, signal_handler, &mut fmt))
         .await
     {
-        // A shutdown signal (or a closed signal channel) arrived while config loading was
-        // still in progress. Reload signals received along the way are dropped; there is
-        // nothing to reload during validation.
+        // Reloads are dropped here: nothing to reload during validation.
         Err(Interrupted) => {
-            // An interrupted validation is not a successful one; report a distinct
-            // non-zero code so scripts don't mistake it for a valid configuration.
+            // Distinct non-zero code: an interrupted validation is not a valid config.
             return exitcode::UNAVAILABLE;
         }
         Ok(Some(config)) => config,
@@ -211,8 +207,7 @@ pub async fn validate(
             bootstrap.run_guards();
             match outcome {
                 Ok(valid) => validated &= valid,
-                // An interrupted validation is not a successful one; report a distinct
-                // non-zero code so scripts don't mistake it for a valid configuration.
+                // Distinct non-zero code: an interrupted validation is not a valid config.
                 Err(Interrupted) => return exitcode::UNAVAILABLE,
             }
         } else {
@@ -220,19 +215,14 @@ pub async fn validate(
         }
     }
 
-    // The receiver is not polled after the config-loading race on the `--no-environment` path,
-    // and only until the environment phase completes otherwise. A shutdown signal arriving in
-    // between (e.g. while transforms or sinks are being validated) would otherwise be silently
-    // dropped, so drain the receiver once more before reporting the result. Reload signals and
-    // lagged receivers don't affect the result and are consumed along the way.
+    // A shutdown arriving outside a raced phase (e.g. during transform/sink validation)
+    // would otherwise be dropped, so drain the receiver once more before reporting.
     //
-    // Yield to the executor first: validation can run synchronously without ever yielding
-    // (e.g. `--threads 1`), so the OS-signal forwarding task may not have had a chance to
-    // enqueue a shutdown that arrived during that time.
+    // Yield first: validation may run without ever yielding (e.g. `--threads 1`), so the
+    // OS-signal task may not have had a chance to enqueue the shutdown yet.
     tokio::task::yield_now().await;
     if bootstrap.pending_shutdown() {
-        // An interrupted validation is not a successful one; report a distinct non-zero code so
-        // scripts don't mistake it for a valid configuration.
+        // Distinct non-zero code: an interrupted validation is not a valid config.
         return exitcode::UNAVAILABLE;
     }
 
@@ -428,14 +418,10 @@ async fn validate_components(
     fmt: &mut Formatter,
     bootstrap: &mut Bootstrap<'_>,
 ) -> Result<Option<TopologyPieces>, Interrupted> {
-    // Building the components can block on network I/O (e.g. a sink's build-time API probe).
-    // Race it against shutdown signals so that a signal received during the build aborts it
-    // immediately, instead of being queued and ignored until the build completes.
+    // Building components can block on network I/O; race it against shutdown.
     let build = TopologyPiecesBuilder::new(config, diff).build();
 
-    // A shutdown signal (or a closed signal channel) arriving while the build is in progress
-    // interrupts it; reload signals received along the way are dropped, as there is nothing to
-    // reload during validation.
+    // Reloads are dropped here: nothing to reload during validation.
     let result = bootstrap.phase(build).await?;
     Ok(match result {
         Ok(pieces) => {
@@ -474,16 +460,12 @@ async fn validate_healthchecks(
         };
 
         trace!("Healthcheck for {id} starting.");
-        // A healthcheck can block on network I/O, so race it against shutdown signals to
-        // abort validation immediately if one is received. On interrupt the spawned
-        // healthcheck is cancelled rather than awaited: the process exits immediately on this
-        // path, so any detached blocking work dies with it, and awaiting the handle could hang
-        // on a spawn_blocking healthcheck.
+        // A healthcheck can block on network I/O; race it against shutdown. On interrupt
+        // the spawned healthcheck is cancelled, not awaited: awaiting could hang on a
+        // spawn_blocking healthcheck.
         let mut handle = tokio::spawn(healthcheck);
         let result = match bootstrap.phase_join(&mut handle).await {
-            // A shutdown signal (or a closed signal channel) arrived while the healthcheck
-            // was running. Reload signals received along the way are dropped; there is
-            // nothing to reload during validation.
+            // Reloads are dropped here: nothing to reload during validation.
             Err(Interrupted) => return Err(Interrupted),
             Ok(result) => result,
         };

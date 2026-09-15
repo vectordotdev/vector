@@ -87,17 +87,12 @@ impl ApplicationConfig {
             None
         };
 
-        // Reload signals received while config loading is in progress are collected by the
-        // bootstrap and re-broadcast after loading completes, so that a one-shot reload during
-        // startup is applied once the topology is running instead of being lost. They are
-        // coalesced so a burst of reloads during a long outage is bounded (only the latest
-        // state per kind is retained) and replayed in a stable order.
+        // Bootstrap coalesces reloads arriving during config loading and re-broadcasts
+        // them once loading completes, in a stable order.
         let signal_tx = signal_handler.clone_tx();
 
-        // Loading the config can block on network I/O (e.g. provider or secret resolution).
-        // Race it against shutdown signals so that a signal received during config loading
-        // aborts startup immediately, instead of being queued and ignored until the topology
-        // build phase starts.
+        // Config loading can block on network I/O (provider/secrets); race it against
+        // shutdown so a signal aborts startup immediately.
         let config = {
             let mut bootstrap = Bootstrap::new(signal_rx, shutdown_rx, signal_tx.clone());
             let config = match bootstrap
@@ -111,16 +106,11 @@ impl ApplicationConfig {
                 ))
                 .await
             {
-                // A shutdown signal (or a closed signal channel) arrived while config loading
-                // was still in progress. Abort startup and exit the same way a running Vector
-                // would on such a signal. Reload signals received along the way are retained by
-                // the sink so they can be re-broadcast after config loading completes.
+                // Shutdown (or closed channel) during loading: exit like a running Vector.
                 Err(Interrupted) => return Err(exitcode::OK),
                 Ok(config) => config?,
             };
-            // Re-broadcast any reload signals received during config loading so they are
-            // applied once startup completes, in a stable order (disk, components, builder,
-            // enrichment).
+            // Re-broadcast coalesced reloads received during loading, in a stable order.
             bootstrap.replay_reloads();
             config
         };
@@ -149,9 +139,8 @@ impl ApplicationConfig {
 
         let mut bootstrap = Bootstrap::new(signal_rx, shutdown_rx, signal_tx.clone());
 
-        // Starting the topology can block on network I/O (e.g. sink healthchecks or build-time
-        // API probes). Race it against shutdown signals so that a signal received during startup
-        // aborts it immediately, instead of being queued and ignored until startup completes.
+        // Topology start can block on network I/O (healthchecks, API probes); race it
+        // against shutdown so a signal aborts startup immediately.
         let (topology, graceful_crash_receiver) = match bootstrap
             .phase(RunningTopology::start_init_validated(
                 config,
@@ -159,19 +148,14 @@ impl ApplicationConfig {
             ))
             .await
         {
-            // A shutdown signal (or a closed signal channel) arrived while startup was still in
-            // progress. There is no running topology to drain, so abort startup and exit the
-            // same way a running Vector would on such a signal. Reload signals received along
-            // the way are retained by the sink so they can be re-broadcast after the topology
-            // finishes starting.
+            // Shutdown (or closed channel) during startup: no topology to drain, exit
+            // like a running Vector.
             Err(Interrupted) => return Err(exitcode::OK),
             Ok(Some(topology)) => topology,
             Ok(None) => return Err(exitcode::CONFIG),
         };
 
-        // Re-broadcast any reload signals received while the topology was starting so they are
-        // applied once startup completes, in a stable order (disk, components, builder,
-        // enrichment).
+        // Re-broadcast coalesced reloads received during startup, in a stable order.
         bootstrap.replay_reloads();
 
         Ok(Self {
@@ -519,8 +503,7 @@ async fn handle_signal(
             warn!("Overflow, dropped {} signals.", amt);
             None
         }
-        // The handler (and thus the reload channel) is owned by this loop, so this is
-        // unreachable; treat it as a shutdown for safety, as the old combined channel did.
+        // Unreachable: this loop owns the reload channel. Treat as shutdown for safety.
         Err(RecvError::Closed) => Some(ShutdownSignal::Graceful(None)),
     }
 }
@@ -609,9 +592,8 @@ impl FinishedApplication {
                     exitcode::OK
                 })
             }, // Graceful shutdown finished
-            // A second shutdown signal forces an immediate exit. Shutdowns arrive on their own
-            // channel, so reload signals received during the drain cannot terminate it or
-            // crowd out a shutdown.
+            // A second shutdown forces an immediate quit. Shutdowns use their own channel,
+            // so reloads during drain can't crowd out a shutdown.
             _ = recv_shutdown(&mut signal_rx, &mut shutdown_rx, |_| {}) => Self::quit(),
         }
     }

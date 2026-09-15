@@ -21,8 +21,7 @@ pub type SignalRx = broadcast::Receiver<SignalTo>;
 pub type ShutdownSignalTx = broadcast::Sender<ShutdownSignal>;
 pub type ShutdownSignalRx = broadcast::Receiver<ShutdownSignal>;
 
-/// Capacity of both the reload and shutdown channels. Sized so that neither overflows in
-/// normal operation; the lag policies in this module handle the rest.
+/// Capacity of both channels; the lag policies in this module handle overflow.
 const CHANNEL_CAPACITY: usize = 128;
 
 #[derive(Debug, Clone)]
@@ -39,8 +38,8 @@ pub enum SignalTo {
     ReloadEnrichmentTables,
 }
 
-/// Shutdown messages, carried on a dedicated channel so that a flood of reload signals
-/// cannot overflow the receiver and drop a shutdown.
+/// Shutdown messages, on a dedicated channel so a flood of reloads can never overflow
+/// the receiver and drop a shutdown.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ShutdownSignal {
     /// Gracefully drain and shut down the process.
@@ -80,8 +79,7 @@ pub enum ShutdownError {
     SinkAborted { key: ComponentKey, error: String },
 }
 
-/// A signal received by the [`SignalHandler`], already routed to the reload or shutdown
-/// channel.
+/// A signal received by the [`SignalHandler`], already routed to the reload or shutdown channel.
 #[derive(Debug)]
 pub enum SignalOrShutdown {
     Reload(Box<SignalTo>),
@@ -144,8 +142,7 @@ impl SignalHandler {
     /// ensure the channel doesn't overflow and drop signals.
     pub fn new() -> (Self, SignalRx, ShutdownSignalRx) {
         let (tx, rx) = broadcast::channel(CHANNEL_CAPACITY);
-        // Shutdown signals live on their own channel so a burst of reloads overflowing
-        // the signal channel can never drop a shutdown or quit.
+        // Shutdowns get their own channel so reload overflow can never drop one.
         let (shutdown_tx, shutdown_rx) = broadcast::channel(CHANNEL_CAPACITY);
         let handler = Self {
             tx,
@@ -186,8 +183,7 @@ impl SignalHandler {
         }
     }
 
-    /// Takes a stream whose elements are convertible to [`SignalOrShutdown`], and spawns a
-    /// permanent task for transmitting to the receivers.
+    /// Spawns a permanent task transmitting [`SignalOrShutdown`] items to their receiver.
     fn forever<T, S>(&self, runtime: &Runtime, stream: S)
     where
         T: Into<SignalOrShutdown> + Send + Sync,
@@ -267,12 +263,9 @@ impl SignalHandler {
     }
 }
 
-/// Wrapper around the raw shutdown receiver that enforces the shutdown contract.
-///
-/// A second shutdown signal means force-quit. The tokio broadcast receiver reports lag
-/// when more shutdowns arrive than the channel holds while the receiver is busy, so any
-/// lag means multiple shutdowns were sent and dropped — at least a second one. By the
-/// contract, that resolves to an immediate quit rather than a graceful shutdown.
+/// Wrapper around the raw shutdown receiver that enforces the shutdown contract: lag
+/// means multiple shutdowns were sent and dropped, so it resolves to an immediate quit
+/// rather than a graceful shutdown.
 pub struct ShutdownReceiver {
     rx: ShutdownSignalRx,
 }
@@ -282,8 +275,8 @@ impl ShutdownReceiver {
         Self { rx }
     }
 
-    /// Receives the next shutdown signal, resolving when one arrives. A closed channel
-    /// resolves to a graceful shutdown; lag resolves to a quit per the contract above.
+    /// Receives the next shutdown. A closed channel resolves to a graceful shutdown;
+    /// lag resolves to a quit per the contract above.
     pub async fn recv(&mut self) -> ShutdownSignal {
         match self.rx.recv().await {
             Ok(shutdown) => shutdown,
@@ -292,8 +285,7 @@ impl ShutdownReceiver {
         }
     }
 
-    /// Non-blocking counterpart of [`ShutdownReceiver::recv`], returning `None` when no
-    /// shutdown is queued.
+    /// Non-blocking counterpart of [`ShutdownReceiver::recv`]; `None` if none queued.
     pub fn try_recv(&mut self) -> Option<ShutdownSignal> {
         match self.rx.try_recv() {
             Ok(shutdown) => Some(shutdown),
@@ -312,20 +304,17 @@ impl ShutdownReceiver {
     }
 }
 
-/// Resolves when a shutdown signal (or a closed shutdown channel) is received. Reload
-/// signals received along the way are forwarded to `on_reload` (e.g. so startup can
-/// re-broadcast them once it completes). Both channels are polled for the whole call, so
-/// reloads arriving during a long blocked phase are coalesced as they arrive instead of
-/// overflowing the bounded reload channel; a queued shutdown always wins a poll. Lag on
-/// the reload channel is logged; lag on the shutdown channel means multiple shutdowns were
-/// sent, which quits immediately.
+/// Resolves when a shutdown is received (a closed channel counts as graceful), polling
+/// both channels for the whole call so reloads arriving during a long blocked phase are
+/// coalesced via `on_reload` as they arrive instead of overflowing the bounded reload
+/// channel. A queued shutdown always wins a poll (`biased`). Reload lag is logged;
+/// shutdown lag means multiple shutdowns were sent, which quits immediately.
 pub async fn recv_shutdown(
     rx: &mut SignalRx,
     shutdown_rx: &mut ShutdownReceiver,
     mut on_reload: impl FnMut(SignalTo),
 ) -> ShutdownSignal {
-    // The reload channel closing mid-phase is not a shutdown; stop polling it so the
-    // select below isn't woken by `RecvError::Closed` in a tight loop.
+    // A closed reload channel isn't a shutdown; stop polling to avoid a busy loop.
     let mut reloads_open = true;
     loop {
         tokio::select! {
@@ -343,10 +332,8 @@ pub async fn recv_shutdown(
     }
 }
 
-/// Non-blocking counterpart of [`recv_shutdown`]: drains the signal receiver, returning the
-/// shutdown signal if one is queued (consuming reload signals along the way), or `None`
-/// once the queue is empty. Shutdown-channel lag means multiple shutdowns were sent,
-/// which quits immediately.
+/// Non-blocking counterpart of [`recv_shutdown`]: drains reloads via `on_reload`, returns
+/// the queued shutdown if any, else `None`. Shutdown lag quits immediately.
 pub fn try_recv_shutdown(
     rx: &mut SignalRx,
     shutdown_rx: &mut ShutdownReceiver,
@@ -445,9 +432,8 @@ mod tests {
 
     #[tokio::test]
     async fn reloads_arriving_during_a_blocked_phase_are_coalesced() {
-        // Reloads that keep arriving while `recv_shutdown` is waiting for a shutdown must
-        // be coalesced as they arrive (not left to overflow the bounded reload channel),
-        // and a queued shutdown must still win the next poll.
+        // Reloads must coalesce as they arrive rather than overflow the bounded reload
+        // channel, and a queued shutdown must still win the next poll.
         let (handler, mut rx, shutdown_rx) = SignalHandler::new();
         let mut shutdown_rx = ShutdownReceiver::new(shutdown_rx);
         let tx = handler.clone_tx();
