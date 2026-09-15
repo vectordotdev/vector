@@ -717,7 +717,10 @@ object. `EventMetadata` is omitted. `native_json` still wraps the payload as `{"
 These codecs emit the representation they received and do not convert.
 
 The generic `json` decoder remains log-only. Trace decode uses `native_json`, whose
-outer `{"trace": ...}` tag is the discriminator; the payload under that tag is untagged.
+outer `{"trace": ...}` tag is the discriminator. The payload under that tag is
+untagged: the canonical `{trace_id, resource, scope, datadog, spans}` object is
+`Typed`; any other object is `Legacy`. Matching both the typed shape and a Datadog or
+OTLP detector is a reported error.
 
 ## Rationale
 

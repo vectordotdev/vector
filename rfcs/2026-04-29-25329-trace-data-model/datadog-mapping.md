@@ -201,9 +201,10 @@ with at least one span expands into one `TraceEvent` per distinct
 The grouping rules are:
 
 - Before partitioning, for a given `Span.traceID` low half, a well-formed `_dd.p.tid`
-  on any span in the chunk applies to every span with that low half. An absent tag is
-  zero only when no sibling with that low half supplied one. Conflicting high halves
-  for the same low ID: wire-order first wins.
+  on any span in the chunk applies only to siblings whose tag is absent or empty. An
+  absent tag is zero only when no sibling with that low half supplied one. Explicitly
+  supplied high halves are kept even when they disagree, so those spans form different
+  `TraceEvent.trace_id` groups.
 - Scan each `TraceChunk`'s successfully decoded spans in wire order. The first span for
   a `(trace_id, service)` pair creates a group at the end of the group sequence; later
   spans with that pair append to the existing group. Emit one `TraceEvent` per group in
@@ -463,8 +464,8 @@ one shared coercion, named `dd_value_to_string` throughout this document, which 
 over every `AttrValue` variant, deterministic for a given value (including recursive
 ordering within `Array` and `Map`), and independent of any JSON library's non-finite-number
 behavior. A top-level `Null` map entry has no wire representation, so it is omitted
-rather than coerced. The specific rendering of each variant is an implementation
-choice satisfying those properties.
+rather than coerced. Per-variant rendering tracks the Datadog Agent OTLP converter
+cited in the Glossary.
 
 #### Datadog event-scoped state
 
@@ -590,7 +591,7 @@ fan-in of different tenants cannot share a payload.
 **`AgentPayload` grouping.** Groups events by their effective envelope and emits one
 `AgentPayload` per group. `TraceEvent.datadog.agent = Some(...)` is authoritative
 regardless of which source or transform populated it. When it is `None`, the effective
-envelope is synthesized from common `Resource` slots and proto3 defaults. This is the
+envelope is the proto3 defaults. This is the
 outermost grouping step, so every downstream `TracerPayload` and `TraceChunk` is by
 construction confined to a single `AgentPayload`.
 
@@ -598,15 +599,11 @@ construction confined to a single `AgentPayload`.
   `targetTPS`, `errorTPS`, `rareSamplerEnabled`, and `tags` are read from the matching
   fields in a present `datadog.agent`; tags use the normalization above.
 - Fallback for an absent agent envelope: events with `datadog.agent = None`
-  derive what they can from the typed
-  `Resource` slots and default the rest. Specifically: `AgentPayload.hostName` is
-  taken from `Resource.host`, `AgentPayload.env` from `Resource.environment`, and the
-  agent-internal-only fields (`agentVersion`, `targetTPS`, `errorTPS`,
-  `rareSamplerEnabled`, agent-level `tags`) are emitted as their proto3 defaults
-  (empty string, `0.0`, `false`, empty map). No `datadog_traces` sink configuration
-  governs these fields. Two such events with equal `Resource.host`
-  and `Resource.environment` therefore share the same synthesized envelope and land in
-  the same `AgentPayload`.
+  emit proto3 defaults for every `AgentPayload` envelope field, including `hostName`
+  and `env`. Application identity remains on `TracerPayload` via `Resource.host` /
+  `Resource.environment`. No `datadog_traces` sink configuration
+  governs these fields. Two such events therefore share the same default envelope and
+  land in the same `AgentPayload`.
 - Grouping on the full envelope preserves the partitioning Vector applies today, so
   two sets of events coming from different agent hosts or envs cannot be coalesced
   into the same `AgentPayload` and relayed traffic stays attributed to its originating
@@ -811,10 +808,11 @@ not authoritative.
 - The Datadog round-trip guarantee depends on a producer-side keyset-disjointness
   convention between `meta` and `metrics`. The Alternatives below describe contained
   fallbacks if this convention ever ceases to hold.
-- Events without an explicit Datadog agent envelope reaching the `datadog_traces` sink synthesize empty
-  agent-internal envelope fields (no `agentVersion`, default TPS values, etc.). This is
-  the same behaviour the Datadog Agent's own OTLP receiver exhibits, but operators who
-  expected the relay to forge agent-version-style fields will be surprised.
+- Events without an explicit Datadog agent envelope reaching the `datadog_traces` sink
+  emit proto3 defaults for every `AgentPayload` field, including `hostName` and `env`.
+  Application identity remains on `TracerPayload`. This matches leaving collector
+  identity unset when none was supplied, but operators who expected the relay to copy
+  `Resource.host` / `Resource.environment` onto the agent envelope will be surprised.
 - Datadog's `SpanLink.flags` bit 31 sentinel is not synthesized on egress for OTLP-
   sourced events, so the W3C trace-flags byte plus the OTLP remote-context tristate
   carried by such links are not surfaced through the Datadog wire. This is a cross-

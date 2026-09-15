@@ -89,6 +89,10 @@ below.
 - **Empty `ScopeSpans`** produce no event because the wire grouping supplies no trace ID
   for required `TraceEvent.trace_id`. Resource and scope state carried only by empty
   groupings is therefore not relayed.
+- **Resource and scope `dropped_attributes_count` after partition** are cloned onto
+  every trace-ID event. Egress re-coalescence of those partitions restores one count;
+  counts that do not re-coalesce, or that merge originally separate equal groupings,
+  may differ from the input.
 
 The OTLP-side consequences of the parent RFC's zero-ID rejection and wire-domain
 normalization also apply. The derived end-timestamp case is documented under "Span
@@ -192,9 +196,11 @@ the same resource-level Datadog bridge projection are gathered into one
 `ResourceSpans`. Within it, non-empty events sharing the same `Scope` and event-level
 `TraceEvent.datadog` bridge projection are re-coalesced into one `ScopeSpans`; spans retain event
 order and their order within each event. Re-coalescence prevents partitioning from
-multiplying scope-level state such as `Scope.dropped_attributes_count`. The emitted wire
-grouping may again contain several trace IDs; the single-ID invariant applies to
-Vector's internal `TraceEvent`, not to OTLP.
+multiplying scope-level state such as `Scope.dropped_attributes_count` when those
+partitions share an encoder batch. When they do not, duplicated or merged dropped
+counts are outside the guarantee (see Scope). The emitted wire grouping may again
+contain several trace IDs; the single-ID invariant applies to Vector's internal
+`TraceEvent`, not to OTLP.
 
 Every emitted OTLP `Span.trace_id` is copied from the enclosing
 `TraceEvent.trace_id`; internal spans have no independent trace ID.
