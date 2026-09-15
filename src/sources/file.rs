@@ -847,25 +847,27 @@ fn wrap_with_line_agg(
         LineAgg::new(
             rx.map(|line| {
                 (
-                    line.filename,
+                    // A multiline record must never span a reader handoff. Keeping the file name
+                    // as the only aggregation key lets a drained generation and its replacement
+                    // share one buffer, after which the acknowledgement is stamped only with the
+                    // replacement's owner.
+                    (line.filename, line.file_id, line.generation),
                     line.text,
-                    (
-                        line.file_id,
-                        line.start_offset,
-                        (line.end_offset, line.generation, line.file_id),
-                    ),
+                    (line.start_offset, line.end_offset),
                 )
             }),
             logic,
         )
         .map(
-            |(filename, text, (_, start_offset, initial_end), lastline_context)| {
-                // Fingerprint, offset and generation all come from the same line -- the last one
-                // folded in, or the first when it stands alone. An aggregate that spans a rekey
-                // would otherwise mix one reader's identity with another's offset, and its
-                // checkpoint would be written against the wrong owner or refused outright.
-                let (end_offset, generation, file_id) =
-                    lastline_context.map_or(initial_end, |(_, _, lastline_end)| lastline_end);
+            |(
+                (filename, file_id, generation),
+                text,
+                (start_offset, initial_end),
+                lastline_context,
+            )| {
+                // The key already guarantees that all contexts in this aggregate have one owner;
+                // use the last line's offset when a record contains multiple physical lines.
+                let end_offset = lastline_context.map_or(initial_end, |(_, end_offset)| end_offset);
                 Line {
                     text,
                     filename,
@@ -2189,6 +2191,50 @@ mod tests {
                 "to be INFO in\nthe middle".into(),
             ]
         );
+    }
+
+    /// A multiline buffer must be flushed independently for each reader generation. Otherwise a
+    /// rotation can merge the old inode's tail with the replacement and acknowledge only the last
+    /// owner's checkpoint context.
+    #[tokio::test]
+    async fn test_multi_line_aggregation_does_not_cross_reader_generations() {
+        let file_id = FileFingerprint::FirstLinesChecksum(1);
+        let lines = wrap_with_line_agg(
+            futures::stream::iter(vec![
+                Line {
+                    text: Bytes::from_static(b"INFO old"),
+                    filename: "app.log".to_owned(),
+                    file_id,
+                    generation: 1,
+                    start_offset: 0,
+                    end_offset: 8,
+                },
+                Line {
+                    text: Bytes::from_static(b"INFO new"),
+                    filename: "app.log".to_owned(),
+                    file_id,
+                    generation: 2,
+                    start_offset: 0,
+                    end_offset: 8,
+                },
+            ]),
+            line_agg::Config {
+                start_pattern: Regex::new("INFO").unwrap(),
+                condition_pattern: Regex::new("INFO").unwrap(),
+                mode: line_agg::Mode::ContinueThrough,
+                timeout: Duration::from_secs(60),
+            },
+        )
+        .collect::<Vec<_>>()
+        .await;
+
+        assert_eq!(lines.len(), 2);
+        assert!(lines.iter().any(|line| {
+            line.generation == 1 && line.text == b"INFO old"[..] && line.end_offset == 8
+        }));
+        assert!(lines.iter().any(|line| {
+            line.generation == 2 && line.text == b"INFO new"[..] && line.end_offset == 8
+        }));
     }
 
     #[tokio::test]

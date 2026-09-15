@@ -705,13 +705,23 @@ struct DiscoveryOutcome {
     bytes_read: usize,
 }
 
-/// The next deadline `interval` after `now`, keeping the old one if that instant is unrepresentable.
+/// The next deadline `interval` after `now`, saturating to the farthest representable future instant.
 ///
 /// `reconcile_interval_secs` takes any `u64`, and a value large enough to mean "effectively never"
-/// overflows the clock -- which must not panic the source. Keeping the existing deadline leaves the
-/// caller with the far-future one it already had, which is what such a setting asks for.
+/// overflows the clock -- which must not panic the source. Reusing an already-expired deadline would
+/// turn that setting into a busy reconciliation loop, so find the largest delay this clock accepts.
 fn schedule_after(now: time::Instant, interval: Duration, current: time::Instant) -> time::Instant {
-    now.checked_add(interval).unwrap_or(current)
+    let Some(deadline) = now.checked_add(interval) else {
+        let mut fallback = Duration::MAX;
+        while now.checked_add(fallback).is_none() {
+            fallback /= 2;
+        }
+        return now
+            .checked_add(fallback)
+            .expect("a halved duration must eventually fit in an Instant")
+            .max(current);
+    };
+    deadline
 }
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
@@ -1019,6 +1029,14 @@ where
                 && !pending_notify_wakeup.is_pending()
             {
                 self.remove_idle_watchers_due(&mut fp_map, &mut lines).await;
+                // `remove_idle_watchers_due` can reactivate a file after its metadata changed.
+                // Reuse the same checkpoint handoff as the regular idle-poll path: a replacement
+                // inode or truncation must not read new content under the old generation/offset.
+                for (&file_id, watcher) in &mut fp_map {
+                    if watcher.take_reader_restarted() {
+                        checkpoints.register(file_id, 0, watcher.take_new_generation());
+                    }
+                }
             }
             let mut discovery_bytes_read = 0;
             if next_glob_time <= now_time || notify_wakeup_ready {
@@ -1945,61 +1963,93 @@ where
                         .await;
                     self.emit_open_and_idle_counts(fp_map);
                 }
-            } else if let Some(watcher) = fp_map
-                .values_mut()
-                .find(|watcher| watcher.matches_path(&path, cwd_for_notify_comparison.as_deref()))
-            {
-                // Fingerprinting can legitimately fail while a writer has only emitted a
-                // partial/short record. Active watchers are considered here too, not just idle
-                // ones: this pass has already marked every watcher unfindable, so skipping an
-                // active one leaves it `findable == false`, which `read_line` reads as "the file
-                // was deleted" -- and a later completed fingerprint then starts a *second* watcher
-                // on the same path, duplicating records.
-                // A path that is gone, or no longer a regular file, is left untouched: staying
-                // unfindable is what lets the grace period reap its watcher, and neither rewinding
-                // nor reopening it can succeed.
-                if path_absent {
-                    trace!(message = "Watched path is gone or not a regular file.", path = ?path);
-                } else if !rewrite_suspected {
-                    // A read error rather than an incomplete prefix: the file may be unchanged and
-                    // readable, so rewinding would replay what the reader has emitted.
-                    watcher.set_file_findable(true);
-                } else if watcher.path_has_tracked_identity().await {
-                    // Same inode with a prefix that no longer hashes: an in-place rewrite. Reset the
-                    // reader so it does not resume inside the new content, and keep the watcher
-                    // findable while its new fingerprint is still incomplete. Whether this is the
-                    // rewrite already rewound for, or a further one on top of it, is decided inside.
-                    match watcher
-                        .reconcile_rewrite(false, outcome.partial_prefix())
-                        .await
-                    {
-                        Ok(()) => watcher.set_file_findable(true),
-                        Err(error) => {
-                            // The reopen failed -- typically the file was removed or replaced between
-                            // the identity check and this open. Reporting it as found would keep a
-                            // stale descriptor active and could let `remove_after` delete the
-                            // replacement path; leave it unfindable for the normal recovery path.
-                            self.emitter.emit_file_watch_error(&watcher.path, error);
-                        }
-                    }
-                } else if fs::metadata(&path)
-                    .await
-                    .is_ok_and(|metadata| metadata.is_file())
-                {
-                    // A regular file is there but its identity does not match: the path was replaced.
-                    // An idle watcher re-verifies identity on its next poll, but an active one never
-                    // does -- left alone its reader stays on the old inode, missing the replacement
-                    // until the backstop and leaving `remove_after` free to delete it meanwhile.
-                    if watcher.is_idle() {
+            } else {
+                let stale_key = fp_map
+                    .iter()
+                    .find(|(_, watcher)| {
+                        watcher.matches_path(&path, cwd_for_notify_comparison.as_deref())
+                    })
+                    .map(|(file_id, _)| *file_id);
+                if let Some(stale_key) = stale_key {
+                    let Some(watcher) = fp_map.get_mut(&stale_key) else {
+                        continue;
+                    };
+                    // Fingerprinting can legitimately fail while a writer has only emitted a
+                    // partial/short record. Active watchers are considered here too, not just idle
+                    // ones: this pass has already marked every watcher unfindable, so skipping an
+                    // active one leaves it `findable == false`, which `read_line` reads as "the file
+                    // was deleted" -- and a later completed fingerprint then starts a *second* watcher
+                    // on the same path, duplicating records.
+                    // A path that is gone, or no longer a regular file, is left untouched: staying
+                    // unfindable is what lets the grace period reap its watcher, and neither rewinding
+                    // nor reopening it can succeed.
+                    if path_absent {
+                        trace!(message = "Watched path is gone or not a regular file.", path = ?path);
+                    } else if !rewrite_suspected {
+                        // A read error rather than an incomplete prefix: the file may be unchanged and
+                        // readable, so rewinding would replay what the reader has emitted.
                         watcher.set_file_findable(true);
-                        watcher.invalidate_idle_bookkeeping();
-                    } else {
-                        let replacement = path.clone();
-                        match watcher.update_path(replacement).await {
+                    } else if watcher.path_has_tracked_identity().await {
+                        // Same inode with a prefix that no longer hashes: an in-place rewrite. Reset the
+                        // reader so it does not resume inside the new content, and keep the watcher
+                        // findable while its new fingerprint is still incomplete. Whether this is the
+                        // rewrite already rewound for, or a further one on top of it, is decided inside.
+                        match watcher
+                            .reconcile_rewrite(false, outcome.partial_prefix())
+                            .await
+                        {
                             Ok(()) => watcher.set_file_findable(true),
                             Err(error) => {
-                                // Left unfindable so the grace period recovers it, as above.
+                                // The reopen failed -- typically the file was removed or replaced between
+                                // the identity check and this open. Reporting it as found would keep a
+                                // stale descriptor active and could let `remove_after` delete the
+                                // replacement path; leave it unfindable for the normal recovery path.
                                 self.emitter.emit_file_watch_error(&watcher.path, error);
+                            }
+                        }
+                    } else if fs::metadata(&path)
+                        .await
+                        .is_ok_and(|metadata| metadata.is_file())
+                    {
+                        // A regular file is there but its identity does not match: the path was replaced.
+                        // An idle watcher re-verifies identity on its next poll, but an active one never
+                        // does -- left alone its reader stays on the old inode, missing the replacement
+                        // until the backstop and leaving `remove_after` free to delete it meanwhile.
+                        if watcher.is_idle() {
+                            watcher.set_file_findable(true);
+                            watcher.invalidate_idle_bookkeeping();
+                        } else {
+                            // A replacement can be too short for the configured fingerprinter. It is
+                            // still a different inode, so reopening it immediately would discard the
+                            // old reader's unread tail just because its new prefix is incomplete. Use
+                            // the same bounded drain as the completed-fingerprint path and leave the
+                            // old descriptor attached until it reaches EOF.
+                            if drain_attempted.insert(stale_key) {
+                                match drain_and_repoint(
+                                    watcher,
+                                    stale_key,
+                                    path.clone(),
+                                    lines,
+                                    self.max_read_bytes,
+                                )
+                                .await
+                                {
+                                    Ok(DrainOutcome::Repointed { bytes_read, .. }) => {
+                                        drain_bytes_read =
+                                            drain_bytes_read.saturating_add(bytes_read);
+                                        tracked_path_index.paths_changed();
+                                    }
+                                    Ok(DrainOutcome::LimitReached { bytes_read }) => {
+                                        drain_bytes_read =
+                                            drain_bytes_read.saturating_add(bytes_read);
+                                        drain_pending = true;
+                                    }
+                                    Err(error) => {
+                                        // `drain_and_repoint` restores the unfindable state on an
+                                        // error, so the old descriptor remains available for a retry.
+                                        self.emitter.emit_file_watch_error(&watcher.path, error);
+                                    }
+                                }
                             }
                         }
                     }
@@ -2286,20 +2336,12 @@ where
                         // backstop; removal and replacement recovery are the full pass's job.
                         all_paths_accounted_for = false;
                     } else {
-                        let mut refresh_failed = false;
                         if !watcher.path_has_tracked_identity().await {
-                            let current_path = watcher.path.clone();
-                            if let Err(error) = watcher.update_path(current_path).await {
-                                self.emitter.emit_file_watch_error(&watcher.path, error);
-                                refresh_failed = true;
-                            }
-                        }
-                        if refresh_failed {
-                            // The reopen failed (typically `NotFound`: the file went away between
-                            // the checks). Claiming the path is accounted for would skip the full
-                            // pass and strand this watcher on the old inode until the backstop.
+                            // A targeted pass has no room to drain a different inode. Defer to the
+                            // full pass, which can drain the old descriptor before opening a short or
+                            // fully fingerprintable replacement.
                             all_paths_accounted_for = false;
-                        } else if rewrite_suspected && watcher.path_has_tracked_identity().await {
+                        } else if rewrite_suspected {
                             // Same inode, yet its prefix no longer hashes: an in-place rewrite, so
                             // the reader's offset and buffered bytes describe vanished content.
                             // `rewrite_suspected` is required: a transient read error says nothing
@@ -2528,12 +2570,31 @@ where
             return;
         };
         for (&file_id, watcher) in &mut *fp_map {
-            if watcher
-                .idle_since()
-                .is_some_and(|idle| idle >= grace_period)
-            {
-                self.remove_idle_watcher_if_due(watcher, file_id, lines)
-                    .await;
+            if watcher.idle_since().is_none_or(|idle| idle < grace_period) {
+                continue;
+            }
+
+            // A timer firing only proves that the last observation is old. Re-stat the file before
+            // unlinking it: a write whose notify event was delayed or dropped must cancel the
+            // removal grace period and be read before the watcher is retired.
+            match watcher.check_for_new_data().await {
+                Ok(true) => {
+                    if let Err(error) = watcher.reactivate().await {
+                        self.emitter.emit_file_watch_error(&watcher.path, error);
+                        // The failed reactivation must be retried, not treated as an unchanged file
+                        // on the next timer tick.
+                        watcher.invalidate_idle_bookkeeping();
+                    }
+                }
+                Ok(false) => {
+                    self.remove_idle_watcher_if_due(watcher, file_id, lines)
+                        .await;
+                }
+                Err(error) => {
+                    if error.kind() != std::io::ErrorKind::NotFound {
+                        self.emitter.emit_file_watch_error(&watcher.path, error);
+                    }
+                }
             }
         }
     }
@@ -3787,6 +3848,92 @@ mod tests {
         );
     }
 
+    /// A replacement can remain too short for fingerprinting for several passes. That must not
+    /// take the active reader's old descriptor away before the fingerprint becomes available.
+    #[tokio::test]
+    async fn a_short_replacement_drains_the_old_inode_before_repointing() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        let archive = directory.path().join("app.log.1");
+        std::fs::write(&path, b"header\nold baseline\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.fingerprinter = Fingerprinter::new(
+            file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 2,
+            },
+            1024,
+            true,
+        );
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let old_file_id = file_server
+            .fingerprinter
+            .clone()
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the original must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let mut fp_map = IndexMap::from([(old_file_id, watcher)]);
+
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"stranded\n"))
+            .unwrap();
+        std::fs::rename(&path, &archive).unwrap();
+        // One line is insufficient for the two-line fingerprint strategy, so the replacement is
+        // discovered before its fingerprint is complete.
+        std::fs::write(&path, b"new header\n").unwrap();
+
+        let checkpoints = CheckpointsView::default();
+        let mut lines = Vec::new();
+        let _ = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+                &mut lines,
+            )
+            .await;
+
+        assert_eq!(
+            lines
+                .iter()
+                .map(|line| line.text.as_ref())
+                .collect::<Vec<_>>(),
+            vec![&b"stranded"[..]],
+            "the old inode must be drained even while the replacement is too short to fingerprint"
+        );
+        let watcher = fp_map
+            .get(&old_file_id)
+            .expect("the watcher remains tracked until the replacement fingerprints");
+        assert!(
+            watcher.path_has_tracked_identity().await,
+            "the reader must be repointed only after the old inode was drained"
+        );
+    }
+
     #[tokio::test]
     async fn a_same_fingerprint_replacement_also_drains_before_repointing() {
         let directory = tempfile::tempdir().unwrap();
@@ -4118,23 +4265,86 @@ mod tests {
         );
     }
 
+    /// A timer-only removal pass must revalidate the file first, because a delayed or dropped
+    /// notify event can leave new data on disk after the last idle poll.
+    #[tokio::test]
+    async fn idle_removal_rechecks_for_new_data_before_deleting() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.remove_after = Some(Duration::ZERO);
+
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        watcher.deactivate().await;
+        assert!(watcher.is_idle());
+        let file_id = FileFingerprint::DevInode(0, 0);
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"second\n"))
+            .unwrap();
+
+        let mut lines = Vec::new();
+        file_server
+            .remove_idle_watchers_due(&mut fp_map, &mut lines)
+            .await;
+
+        assert!(path.exists(), "new data must cancel timer-only removal");
+        assert!(lines.is_empty());
+        let watcher = fp_map.get_mut(&file_id).expect("watcher is retained");
+        assert!(!watcher.dead());
+        assert!(
+            watcher.is_active(),
+            "the changed idle watcher must reactivate"
+        );
+        assert_eq!(
+            watcher
+                .read_line()
+                .await
+                .unwrap()
+                .raw_line
+                .expect("the appended line must remain readable")
+                .bytes,
+            b"second"[..]
+        );
+    }
+
     /// Regression test for a review finding: `reconcile_interval_secs` takes any `u64`, and a value
-    /// large enough to mean "effectively never" overflowed the clock and panicked the source on its
-    /// first discovery pass.
+    /// large enough to mean "effectively never" must not reuse the already-due startup deadline.
     #[test]
-    fn an_unrepresentable_interval_keeps_the_current_deadline() {
+    fn an_unrepresentable_interval_schedules_a_future_deadline() {
         let now = time::Instant::now();
-        let current = now + Duration::from_secs(30);
+        let current = now;
 
         assert_eq!(
             schedule_after(now, Duration::from_secs(5), current),
             now + Duration::from_secs(5),
             "an ordinary interval schedules normally"
         );
-        assert_eq!(
-            schedule_after(now, Duration::from_secs(u64::MAX), current),
-            current,
-            "an interval the clock cannot represent must keep the deadline, not panic"
+        assert!(
+            schedule_after(now, Duration::from_secs(u64::MAX), current) > now,
+            "an interval the clock cannot represent must still schedule in the future"
         );
     }
 
