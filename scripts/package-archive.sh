@@ -95,6 +95,19 @@ cp -av LICENSE-3rdparty.csv "$ARCHIVE_DIR"
 mkdir -p "$ARCHIVE_DIR/bin"
 cp -av "$TARGET_DIR/release/vector" "$ARCHIVE_DIR/bin"
 
+# Generate shell completions (only if the binary is executable on this host)
+VECTOR_BIN="$ARCHIVE_DIR/bin/vector"
+if "$VECTOR_BIN" --version >/dev/null 2>&1; then
+  mkdir -p "$ARCHIVE_DIR/completion/bash" \
+           "$ARCHIVE_DIR/completion/zsh" \
+           "$ARCHIVE_DIR/completion/fish"
+  "$VECTOR_BIN" completion bash > "$ARCHIVE_DIR/completion/bash/vector"
+  "$VECTOR_BIN" completion zsh  > "$ARCHIVE_DIR/completion/zsh/_vector"
+  "$VECTOR_BIN" completion fish > "$ARCHIVE_DIR/completion/fish/vector.fish"
+else
+  echo "Skipping shell completion generation (binary not executable on this host)"
+fi
+
 # Copy the entire config dir to /config
 
 cp -rv config "$ARCHIVE_DIR/config"
