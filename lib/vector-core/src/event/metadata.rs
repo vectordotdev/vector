@@ -28,9 +28,9 @@ const VECTOR_METADATA_NAMESPACE: &str = "vector";
 /// This marker records which trace key layout an event was produced with so
 /// Vector's own transforms and sinks can dispatch on layout. It lives under
 /// `%vector` so it is already reserved and locked to VRL. Log namespacing does
-/// not apply to traces; `trace_to_log` drops the field when converting to a
-/// log. It is not documented for users, is not a compatibility contract, and
-/// may change or be removed without a deprecation cycle.
+/// not apply to traces; converting a trace to a log drops the field. It is not
+/// documented for users, is not a compatibility contract, and may change or be
+/// removed without a deprecation cycle.
 pub const TRACE_LAYOUT_KEY: &str = "trace_layout";
 
 /// Layout marker value written by the `datadog_agent` source.
@@ -238,6 +238,17 @@ impl EventMetadata {
             .get(path!(VECTOR_METADATA_NAMESPACE, TRACE_LAYOUT_KEY))
             .and_then(Value::as_bytes)
             .and_then(|bytes| std::str::from_utf8(bytes).ok())
+    }
+
+    /// Removes the internal trace-layout marker.
+    ///
+    /// Call this when converting a trace to a log. The marker is only meaningful
+    /// to components that consume traces as traces; leaving it would make
+    /// `LogEvent::namespace()` report `Vector` solely because of
+    /// `%vector.trace_layout`. Empty parent objects are pruned.
+    pub fn clear_trace_layout(&mut self) {
+        self.value_mut()
+            .remove(path!(VECTOR_METADATA_NAMESPACE, TRACE_LAYOUT_KEY), true);
     }
 
     /// Sets the `upstream_id` in the metadata to the provided value.
@@ -608,6 +619,28 @@ mod test {
         assert_eq!(metadata.trace_layout(), Some(TRACE_LAYOUT_OPENTELEMETRY));
         metadata.set_trace_layout(TRACE_LAYOUT_OTLP);
         assert_eq!(metadata.trace_layout(), Some(TRACE_LAYOUT_OTLP));
+    }
+
+    #[test]
+    fn clear_trace_layout_prunes_vector_namespace() {
+        let mut metadata = EventMetadata::default();
+        metadata.set_trace_layout(TRACE_LAYOUT_DATADOG);
+        assert!(
+            metadata
+                .value()
+                .get(path!(VECTOR_METADATA_NAMESPACE))
+                .is_some()
+        );
+
+        metadata.clear_trace_layout();
+
+        assert_eq!(metadata.trace_layout(), None);
+        assert!(
+            metadata
+                .value()
+                .get(path!(VECTOR_METADATA_NAMESPACE))
+                .is_none()
+        );
     }
 
     #[test]

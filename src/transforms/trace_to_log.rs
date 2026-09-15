@@ -1,11 +1,10 @@
 use vector_lib::config::clone_input_definitions;
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::metadata_path;
 
 use crate::config::OutputId;
 use crate::{
     config::{DataType, GenerateConfig, Input, TransformConfig, TransformContext, TransformOutput},
-    event::{Event, LogEvent, TRACE_LAYOUT_KEY},
+    event::{Event, LogEvent},
     schema::Definition,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
@@ -67,12 +66,7 @@ pub struct TraceToLog;
 impl FunctionTransform for TraceToLog {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         if let Event::Trace(trace) = event {
-            let mut log = LogEvent::from(trace);
-            // The layout marker is only meaningful to components that consume
-            // traces as traces. Drop it so a converted log is not classified
-            // as Vector-namespaced solely because of `%vector.trace_layout`.
-            log.remove_prune(metadata_path!("vector", TRACE_LAYOUT_KEY), true);
-            output.push(Event::Log(log));
+            output.push(Event::Log(LogEvent::from(trace)));
         }
     }
 }
