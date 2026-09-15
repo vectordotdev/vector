@@ -322,7 +322,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of DEB package.
         run: |
-          ./scripts/verify-install.sh "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_$(dpkg --print-architecture).deb"
+          ./scripts/verify-install.sh target/artifacts/*.deb
 
   rpm-verify:
     name: Verify RPM Packages
@@ -383,9 +383,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of RPM package.
         run: |
-          # package-rpm.sh replaces hyphens in prerelease versions with dots.
-          rpm_version="${VECTOR_VERSION//-/.}"
-          ./scripts/verify-install.sh "target/artifacts/vector-${rpm_version}-1.$(uname -m).rpm"
+          ./scripts/verify-install.sh target/artifacts/*.rpm
 
   macos-verify:
     name: Verify macOS Package
