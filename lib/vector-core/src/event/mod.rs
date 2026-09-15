@@ -13,7 +13,7 @@ pub use metadata::{
 };
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
-pub use ser::{MAX_VALUE_NESTING_FRAMES, event_exceeds_max_nesting_cost};
+pub use ser::{DecodeError, MAX_VALUE_NESTING_FRAMES, event_exceeds_max_nesting_cost};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;

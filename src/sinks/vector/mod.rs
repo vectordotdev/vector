@@ -951,7 +951,7 @@ mod tests {
 
             let mut events = Vec::with_capacity(req.events.len());
             for event in req.events {
-                let event: Event = event.into();
+                let event = Event::try_from(event).expect("encoded test event should decode");
                 let string = event
                     .as_log()
                     .get_message()
