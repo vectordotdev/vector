@@ -194,11 +194,7 @@ pub enum Compression {
     None,
 }
 
-/// Wraps the underlying file handed to a compression encoder so the sink can
-/// count exactly how many bytes the encoder has pushed to the file. This lets
-/// rollback logic validate that the file ends where this sink left it — bytes
-/// appended by another writer are distinguishable because they never pass through
-/// this counter.
+/// Wraps a file, counting bytes written beneath a compression encoder.
 struct CountingFile {
     file: File,
     written_since_mark: u64,
@@ -212,13 +208,10 @@ impl CountingFile {
         }
     }
 
-    /// Resets the running count so `written_since_mark` measures only the bytes
-    /// written to the file after this point.
     const fn mark(&mut self) {
         self.written_since_mark = 0;
     }
 
-    /// Bytes handed to the underlying file since the last `mark`.
     const fn written_since_mark(&self) -> u64 {
         self.written_since_mark
     }
@@ -325,8 +318,6 @@ impl OutFile {
         }
     }
 
-    /// Resets the per-file write counter so `written_bytes` measures only the
-    /// bytes this sink writes from this point on.
     fn mark_written(&mut self) {
         match &mut self.inner {
             OutFileInner::Regular(_) => {}
@@ -336,8 +327,6 @@ impl OutFile {
         }
     }
 
-    /// Bytes written to the underlying file by the compression encoder since the
-    /// last `mark_written` call. For uncompressed output this is meaningless.
     fn written_bytes(&self) -> u64 {
         match &self.inner {
             OutFileInner::Regular(_) => 0,
@@ -347,16 +336,7 @@ impl OutFile {
         }
     }
 
-    /// Rewinds the file to `size` and installs a fresh stream so that the next
-    /// write starts a new frame.
-    ///
-    /// The currently-open compression stream is completed first. Abandoning the
-    /// encoder via `into_inner` without terminating it would silently discard
-    /// any bytes still buffered inside it — including output from events already
-    /// marked Delivered — and leave the preceding frame unterminated, so the
-    /// data appended by the next frame would be appended to an unreadable file.
-    /// A failure to complete the stream is logged and the rewind still proceeds
-    /// (best-effort recovery), mirroring the caller's degraded-mode handling.
+    /// Rewinds the file to `size` and installs a fresh compression stream.
     async fn reset(&mut self, size: u64) -> Result<(), std::io::Error> {
         if let Err(error) = self.shutdown().await {
             warn!(
@@ -376,9 +356,6 @@ impl OutFile {
             Ok(())
         }
         .await;
-        // Rebuild `self.inner` on every path (even when the rollback above
-        // fails) so the handle is never left as the transient `Empty`, which
-        // would make the next write or shutdown hit `unreachable!`.
         self.inner = match self.compression {
             Compression::None => OutFileInner::Regular(file),
             Compression::Gzip => OutFileInner::Gzip(GzipEncoder::new(CountingFile::new(file))),
@@ -387,17 +364,8 @@ impl OutFile {
         result
     }
 
-    /// Preserves all previously written output as a single valid, terminated
-    /// compression stream and installs a fresh encoder so the next write begins
-    /// a new frame at the end of the completed one. The on-disk length of the
-    /// file is left unchanged.
-    ///
-    /// This is required before rewinding a compressed destination after a
-    /// partial write: a compressed stream cannot be rolled back to a record
-    /// boundary (the partial record is already inside the encoder), and
-    /// truncating through the frames that hold already-Delivered output would
-    /// leave them unterminated and unreadable. Completing the stream first
-    /// flushes any encoder-buffered bytes and writes the terminator.
+    /// Completes the current compression stream and starts a fresh one at the
+    /// end of the file.
     async fn finish_and_reopen(&mut self) -> Result<(), std::io::Error> {
         self.shutdown().await?;
         let end = self.len().await?;
@@ -956,10 +924,6 @@ impl FileSink {
             return;
         }
 
-        // Reset the per-batch write counter so `reconcile_after_partial_write`
-        // can later validate that the file ends exactly where this batch left
-        // it (the bytes counted from here on are only ever written by this
-        // sink's encoder, never by other writers).
         file.mark_written();
         let file_start = match file.len().await {
             Ok(start) => start,
@@ -1181,20 +1145,8 @@ fn emit_bytes_sent(path: &Bytes, byte_size: usize, include_file_metric_tag: bool
     });
 }
 
-/// Determines how much of a partially written batch is cleanly persisted and
-/// rewinds `file` so no partial record precedes a retry.
-///
-/// For uncompressed output the file can be truncated back to the last complete
-/// record boundary. A compressed stream cannot be rewound to a record boundary:
-/// the partial record is already inside the encoder, and feeding it the full
-/// record again would duplicate it in the decompressed stream. Rewinding would
-/// also cut through the frames holding already-Delivered output, leaving them
-/// unterminated; instead the current stream is completed (flushing buffered
-/// bytes and writing the terminator) so all previously delivered output is
-/// preserved as a single valid, terminated stream, and a fresh frame is opened
-/// for subsequent writes. In both cases, only roll back when the file still
-/// ends where this batch left it, so rollback never removes bytes appended by
-/// another writer.
+/// Rolls back a partially written batch to its last complete record,
+/// returning the count of cleanly persisted events.
 async fn reconcile_after_partial_write(
     file: &mut OutFile,
     compression: Compression,
@@ -1208,9 +1160,6 @@ async fn reconcile_after_partial_write(
 
     match compression {
         Compression::None => {
-            // Uncompressed: truncate back to the last complete record boundary.
-            // The events up to `last_complete` were cleanly persisted; the
-            // events beyond it are an unreconciled partial write.
             let rolled_back = match file.len().await {
                 Ok(current_len) => current_len == file_start + written as u64,
                 Err(_) => false,
@@ -1218,12 +1167,7 @@ async fn reconcile_after_partial_write(
             if rolled_back {
                 let rewind_to = file_start + last_complete as u64;
                 if let Err(e) = file.reset(rewind_to).await {
-                    // The rollback failed, so the partial record that follows
-                    // `last_complete` is still in the file. Reporting
-                    // `last_complete` as delivered would let the caller retry
-                    // the event whose partial prefix remains, corrupting framed
-                    // output: the batch must be treated as an unreconciled
-                    // partial write instead.
+                    // The rollback failed; the batch is an unreconciled partial write.
                     warn!(message = "Failed to rewind file after partial write.", error = ?e);
                     return 0;
                 }
@@ -1236,24 +1180,8 @@ async fn reconcile_after_partial_write(
             last_complete
         }
         Compression::Gzip | Compression::Zstd => {
-            // The bytes fed to the encoder (up to `written`) are already part of
-            // the currently-open frame, so they cannot be removed without
-            // corrupting the frames that hold already-Delivered output. Validate
-            // the rollback against the file end this batch actually produced:
-            // `file_start` plus the bytes the encoder has handed to the
-            // underlying file since `process_batch` marked the counter. Bytes
-            // appended by another writer never pass through that counter, so if
-            // the file is longer than the expected end, the file no longer ends
-            // where this batch left it and rolling back to `file_start` would
-            // delete the other writer's data. Stability across two reads does
-            // not establish this — a writer appending between the sampling of
-            // `file_start` and the first read makes both reads agree on the new
-            // length. If validation passes, first complete the frame: this
-            // flushes any encoder-buffered bytes and writes the terminator,
-            // preserving every previously acknowledged byte as a valid stream,
-            // and opens a fresh frame for subsequent batches. Every byte fed to
-            // the encoder is thus persisted and reported as delivered; the
-            // unfed remainder is retried.
+            // Roll back only when the file still ends where this batch left it,
+            // then complete the frame.
             let expected_end = file_start + file.written_bytes();
             let matches_expected_end = match file.len().await {
                 Ok(actual_end) => actual_end == expected_end,
@@ -2004,18 +1932,9 @@ mod tests {
         assert!(expected.exists(), "expected file not created: {expected:?}");
     }
 
-    // A batch of events buffered for one path can pass the per-event lexical
-    // confine check yet still be rejected by the *open-time* confinement check
-    // (`PathConfinement::verify_parent` inside `open_file`) — for example when
-    // an intermediate directory is replaced by a symlink after the earlier
-    // lexical check. Every event in that rejected batch is marked Errored, so
-    // the drop telemetry must count the whole batch, not a single event (which
-    // would undercount by `events.len() - 1`).
-    //
-    // This is made deterministic by exploiting the cached canonicalized base:
-    // the first open records the real base, then the base is swapped for a
-    // symlink to an outside directory. A later batch still passes the lexical
-    // check but fails `verify_parent` with `SymlinkEscape`.
+    // Regression test: a batch rejected by the open-time confinement check must
+    // count every event. The base is swapped for a symlink after the first open
+    // caches it.
     #[cfg(unix)]
     #[test]
     #[serial]
@@ -2024,10 +1943,7 @@ mod tests {
         use tempfile::tempdir;
 
         let before = discarded_intentional_count();
-        // A current-thread runtime keeps the spawned sink task on this OS
-        // thread, so its counter increments land in the thread-local registry
-        // that `discarded_intentional_count` reads (the metrics registry is
-        // thread-local; a multi-thread runtime would hide them from us).
+        // A current-thread runtime keeps counter increments in this thread's registry.
         let current_thread = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -2053,8 +1969,7 @@ mod tests {
                     .expect("running file sink failed")
             });
 
-            // First open succeeds and caches the canonicalized base inside the
-            // sink's `PathConfinement`. Wait for it so the swap cannot race it.
+            // Wait for the first open, which caches the canonicalized base.
             let mut seed = Event::Log(LogEvent::from("seed"));
             seed.as_mut_log().insert(event_path!("key"), "a");
             tx.unbounded_send(EventArray::from(seed)).unwrap();
@@ -2070,14 +1985,10 @@ mod tests {
             .await
             .expect("seed open did not complete in time");
 
-            // Replace the base with a symlink to an outside directory. The
-            // next open still lexically confines, but `verify_parent`
-            // canonicalizes the parent outside the *cached* base.
             let relocated = tmp.path().join("relocated");
             tokio::fs::rename(&base, &relocated).await.unwrap();
             tokio::fs::symlink(&outside, &base).await.unwrap();
 
-            // A batch of N events, all resolving to the same path.
             let rejected = base.join("b/app.log");
             for i in 0..3 {
                 let mut event = Event::Log(LogEvent::from(format!("payload {i}")));
@@ -2087,8 +1998,6 @@ mod tests {
             drop(tx);
             handle.await.expect("sink task panicked");
 
-            // The rejected batch was never written, neither to the confined
-            // path nor to the jailbreak destination behind the symlink.
             assert!(
                 !tokio::fs::try_exists(&rejected).await.unwrap(),
                 "rejected batch must not be written to the confined path"
@@ -2215,13 +2124,8 @@ mod tests {
         );
     }
 
-    // Simulates the compressed partial-write recovery path in
-    // `reconcile_after_partial_write`: earlier batches may still be sitting in
-    // the encoder's internal buffer (they are well below the 8 KiB flush
-    // threshold), so completing the frame must flush them to disk and terminate
-    // it before a fresh frame is opened for the next batch. If the encoder were
-    // abandoned without `shutdown`, those already-Delivered bytes would be
-    // silently discarded and the preceding frame would remain unterminated.
+    // Simulates `reconcile_after_partial_write`'s compressed recovery; earlier
+    // bytes may still be buffered in the encoder.
     async fn assert_preserved_completed_stream(compression: Compression, template: PathBuf) {
         let file = tokio::fs::OpenOptions::new()
             .create(true)
@@ -2231,22 +2135,17 @@ mod tests {
             .unwrap();
         let mut out = OutFile::new(file, compression);
 
-        // Earlier batches, already acknowledged.
         out.write(b"hello\n").await.unwrap();
         out.write(b"world\n").await.unwrap();
         let on_disk_before = out.len().await.unwrap();
 
-        // Partial-write recovery: complete the current frame and reopen.
         out.finish_and_reopen().await.unwrap();
 
-        // The completed frame -- including bytes the encoder had buffered --
-        // must now be durably flushed to disk, not discarded.
         assert!(
             out.len().await.unwrap() > on_disk_before,
             "completed stream must be flushed to disk, not discarded"
         );
 
-        // Subsequent writes start a fresh frame after the completed one.
         out.write(b"next\n").await.unwrap();
         out.close().await.unwrap();
 
@@ -2271,11 +2170,8 @@ mod tests {
         assert_preserved_completed_stream(Compression::Zstd, temp_file()).await;
     }
 
-    // A concurrent writer appending after `file_start` is sampled makes both
-    // metadata reads in a naive double-read check agree on the new length, yet
-    // the file no longer ends where this batch left it. The expected-end
-    // validation must detect this (via the per-batch write counter) and refuse
-    // to roll back rather than truncating away the other writer's bytes.
+    // Regression test: expected-end validation refuses to roll back when
+    // another writer appended.
     #[tokio::test]
     async fn reconcile_preserves_concurrent_appender_compressed() {
         trace_init();
@@ -2289,21 +2185,16 @@ mod tests {
                 .unwrap();
             let mut out = OutFile::new(file, compression);
 
-            // `process_batch` calls `mark_written` before sampling `file_start`.
+            // Mark before sampling `file_start`.
             out.mark_written();
             let file_start = out.len().await.unwrap();
 
-            // The batch is fed to the encoder; its compressed output may still
-            // be buffered inside the encoder (not yet on disk), so the on-disk
-            // length does not yet reflect it.
+            // The batch's compressed bytes may still be buffered in the encoder.
             let payload = b"this batch belongs to this sink";
             let written = out.write(payload).await.unwrap();
             assert!(written > 0);
 
-            // Another writer appends after our batch but before the metadata
-            // read that validates the rollback. Its bytes are on disk while our
-            // batch's bytes are still buffered, so the naive double-read check
-            // sees a stable (but unexpected) length.
+            // A concurrent writer appends before the rollback check.
             let mut other = tokio::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
@@ -2318,14 +2209,10 @@ mod tests {
             assert_eq!(raw_now, b"EXTRA", "concurrent append must be visible");
             drop(other);
 
-            // The partial write left no complete record boundary, so rollback
-            // must be considered.
             let delivered_up_to =
                 reconcile_after_partial_write(&mut out, compression, file_start, written, 0).await;
             assert_eq!(delivered_up_to, 0, "nothing may be safely delivered");
 
-            // The other writer's bytes must not have been truncated away, and
-            // the file must not have been rewound past them.
             assert_eq!(out.len().await.unwrap(), file_start + b"EXTRA".len() as u64);
             let raw = tokio::fs::read(&template).await.unwrap();
             assert!(
@@ -2335,17 +2222,11 @@ mod tests {
         }
     }
 
-    // If the rollback of a partial uncompressed write itself fails (e.g.
-    // `set_len`/`seek` errors), the partial record after `last_complete` is
-    // still in the file. The reconciliation must not report `last_complete` as
-    // delivered, because the caller would then retry the event whose partial
-    // prefix remains in the file, corrupting framed output.
+    // Regression test: a failed rollback is an unreconciled partial write.
     #[tokio::test]
     async fn uncompressed_failed_rollback_is_unreconciled() {
         trace_init();
-        // A read-only fd makes `set_len` fail during rollback (ftruncate on a
-        // read-only fd returns `EBADF`), deterministically exercising the
-        // failed-rollback path.
+        // A read-only fd makes `set_len` fail during rollback.
         let template = temp_file();
         tokio::fs::write(&template, b"0123456789").await.unwrap();
         let readonly = tokio::fs::File::open(&template).await.unwrap();

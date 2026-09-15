@@ -165,10 +165,7 @@ mod tests {
             .unwrap_or(0.0)
     }
 
-    // When a whole batch is rejected at open time, every record in the batch is
-    // marked Errored, so `ComponentDiscardedEventsTotal` must reflect the full
-    // `dropped_events` count -- not a hardcoded 1, which would undercount by
-    // `dropped_events - 1`.
+    // `dropped_events` must count all events rejected at open time.
     #[test]
     #[serial]
     fn outside_base_dir_error_counts_all_rejected_events() {
