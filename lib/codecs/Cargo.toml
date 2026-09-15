@@ -71,7 +71,7 @@ toml.workspace = true
 similar-asserts.workspace = true
 tempfile.workspace = true
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
-rstest = "0.26.1"
+rstest = "0.27.0"
 tracing-test = "0.2.6"
 uuid.workspace = true
 vrl.workspace = true
