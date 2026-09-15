@@ -579,6 +579,98 @@ mod test {
         assert_eq!(metric.value(), &MetricValue::Gauge { value: 42.0 });
     }
 
+    /// Remote-write senders mark a series stale by sending NaN. For a histogram
+    /// that puts NaN on `_count`/`_bucket`, which previously failed the whole
+    /// request with a 400 and dropped every sample batched alongside it.
+    #[tokio::test]
+    async fn test_skip_nan_values_histogram_stale_marker() {
+        let (_guard, address) = test_util::addr::next_addr();
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            path: default_path(),
+            auth: None,
+            tls: None,
+            metadata_conflict_strategy: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
+            skip_nan_values: true,
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let request_body = {
+            use prost::Message;
+            use vector_lib::prometheus::parser::proto;
+
+            let timestamp = chrono::Utc::now().timestamp_millis();
+            let stale_series = |name: &str, extra: Option<proto::Label>| {
+                let mut labels = vec![proto::Label {
+                    name: "__name__".into(),
+                    value: name.into(),
+                }];
+                labels.extend(extra);
+                proto::TimeSeries {
+                    labels,
+                    samples: vec![proto::Sample {
+                        value: f64::NAN,
+                        timestamp,
+                    }],
+                }
+            };
+
+            let request = proto::WriteRequest {
+                metadata: vec![proto::MetricMetadata {
+                    r#type: proto::MetricType::Histogram as i32,
+                    metric_family_name: "test_histogram".into(),
+                    help: String::default(),
+                    unit: String::default(),
+                }],
+                timeseries: vec![
+                    proto::TimeSeries {
+                        labels: vec![proto::Label {
+                            name: "__name__".into(),
+                            value: "test_metric_valid".into(),
+                        }],
+                        samples: vec![proto::Sample {
+                            value: 42.0,
+                            timestamp,
+                        }],
+                    },
+                    stale_series(
+                        "test_histogram_bucket",
+                        Some(proto::Label {
+                            name: "le".into(),
+                            value: "1".into(),
+                        }),
+                    ),
+                    stale_series("test_histogram_count", None),
+                    stale_series("test_histogram_sum", None),
+                ],
+            };
+
+            let mut buf = Vec::new();
+            request.encode(&mut buf).unwrap();
+
+            snap::raw::Encoder::new().compress_vec(&buf).unwrap()
+        };
+
+        // Before the fix this returned 400 and the valid sample was lost with it.
+        send_request_and_assert(address.port(), request_body).await;
+
+        let output = test_util::collect_ready(rx).await;
+        assert_eq!(output.len(), 1);
+
+        let metric = output[0].as_metric();
+        assert_eq!(metric.name(), "test_metric_valid");
+        assert_eq!(metric.value(), &MetricValue::Gauge { value: 42.0 });
+    }
+
     #[tokio::test]
     async fn test_skip_nan_values_disabled() {
         let (_guard, address) = test_util::addr::next_addr();
