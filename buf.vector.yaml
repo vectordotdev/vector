@@ -1,0 +1,44 @@
+version: v2
+modules:
+  - path: lib/vector-core/proto
+  - path: proto/vector
+lint:
+  use:
+    - STANDARD
+  except:
+    - FIELD_NOT_REQUIRED
+    - PACKAGE_NO_IMPORT_CYCLE
+  ignore_only:
+    DIRECTORY_SAME_PACKAGE:
+      - proto/vector/dd_metric.proto
+      - proto/vector/ddsketch_full.proto
+      - proto/vector/observability.proto
+      - proto/vector/vector.proto
+    ENUM_VALUE_PREFIX:
+      - lib/vector-core/proto/event.proto
+      - proto/vector/dd_metric.proto
+      - proto/vector/ddsketch_full.proto
+      - proto/vector/vector.proto
+    ENUM_VALUE_UPPER_SNAKE_CASE:
+      - lib/vector-core/proto/event.proto
+    ENUM_ZERO_VALUE_SUFFIX:
+      - lib/vector-core/proto/event.proto
+      - proto/vector/dd_metric.proto
+      - proto/vector/ddsketch_full.proto
+      - proto/vector/vector.proto
+    FIELD_LOWER_SNAKE_CASE:
+      - proto/vector/ddsketch_full.proto
+    PACKAGE_DIRECTORY_MATCH:
+      - lib/vector-core/proto/event.proto
+      - proto/vector/dd_metric.proto
+      - proto/vector/ddsketch_full.proto
+      - proto/vector/observability.proto
+      - proto/vector/vector.proto
+    PACKAGE_VERSION_SUFFIX:
+      - lib/vector-core/proto/event.proto
+      - proto/vector/dd_metric.proto
+      - proto/vector/ddsketch_full.proto
+      - proto/vector/vector.proto
+    SERVICE_SUFFIX:
+      - proto/vector/vector.proto
+  disallow_comment_ignores: true
