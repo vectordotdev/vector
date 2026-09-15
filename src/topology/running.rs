@@ -116,6 +116,18 @@ impl RunningTopology {
         }
     }
 
+    /// Force-reload transforms with external files (SIGHUP / `#23898`).
+    pub fn prepare_reload_from_disk(&mut self, config: &Config) {
+        let transform_keys_to_reload = config.transform_keys_with_external_files();
+        if !transform_keys_to_reload.is_empty() {
+            info!(
+                message = "Reloading transforms with external files.",
+                count = transform_keys_to_reload.len()
+            );
+            self.extend_reload_set(transform_keys_to_reload);
+        }
+    }
+
     /// Creates a subscription to topology changes.
     ///
     /// This is used by the tap API to observe configuration changes, and re-wire tap sinks.
@@ -283,20 +295,14 @@ impl RunningTopology {
 
     /// Attempts to load a new configuration and update this running topology.
     ///
-    /// If the new configuration was valid, and all changes were able to be made -- removing of
-    /// old components, changing of existing components, adding of new components -- then
-    /// `Ok(())` is returned.
-    ///
-    /// If the new configuration is not valid, or not all of the changes in the new configuration
-    /// were able to be made, then this method will attempt to undo the changes made and bring the
-    /// topology back to its previous state, returning the appropriate error.
-    ///
-    /// If the restore also fails, `ReloadError::FailedToRestore` is returned.
+    /// Returns `Ok(true)` if components were rebuilt, `Ok(false)` if skipped (unchanged).
+    /// Enrichment tables may still refresh on skip. On failure, attempts restore;
+    /// restore failure yields `ReloadError::FailedToRestore`.
     pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
         extra_context: ExtraContext,
-    ) -> Result<(), ReloadError> {
+    ) -> Result<bool, ReloadError> {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
@@ -306,16 +312,18 @@ impl RunningTopology {
             };
         }
 
-        // Calculate the change between the current configuration and the new configuration, and
-        // shutdown any components that are changing so that we can reclaim their buffers before
-        // spawning the new version of the component.
-        //
-        // We also shutdown any component that is simply being removed entirely.
-        let diff = if let Some(components) = &self.pending_reload {
-            ConfigDiff::new(&self.config, &new_config, components.clone())
-        } else {
-            ConfigDiff::new(&self.config, &new_config, HashSet::new())
-        };
+        // Consume pending_reload for this attempt; restore on failure so force-reload is not lost.
+        let components = self.pending_reload.take().unwrap_or_default();
+        let diff = ConfigDiff::new(&self.config, &new_config, components.clone());
+
+        if diff.is_empty() {
+            // Skip rebuild; adopt config then refresh enrichment (new tables need the new config).
+            self.config = new_config;
+            self.reload_enrichment_tables().await;
+            info!("Configuration unchanged; skipping component reload.");
+            return Ok(false);
+        }
+
         let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
@@ -350,7 +358,7 @@ impl RunningTopology {
 
                 info!("New configuration loaded successfully.");
 
-                return Ok(());
+                return Ok(true);
             }
         }
 
@@ -358,6 +366,11 @@ impl RunningTopology {
         // around the configuration differential to generate all the components that we need to
         // bring back to restore the current configuration.
         warn!("Failed to completely load new configuration. Restoring old configuration.");
+
+        // Preserve force-reload intent across the failed attempt.
+        if !components.is_empty() {
+            self.pending_reload = Some(components);
+        }
 
         let diff = diff.flip();
         if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&self.config, &diff)
