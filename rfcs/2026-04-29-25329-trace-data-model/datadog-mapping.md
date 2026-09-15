@@ -440,6 +440,7 @@ Datadog egress, in order:
    `Array`, `Map`) are stringified into `meta` via `dd_value_to_string`.
 
 The result is one entry per non-`Null` key in exactly one wire partition.
+A sink-owned write evicts that key from every partition first.
 
 **`dd_value_to_string` rule.** Several Datadog wire fields are `map<string, string>` and use one shared coercion,
 named `dd_value_to_string` throughout this document. Per-variant rendering tracks the
@@ -526,9 +527,7 @@ On Datadog egress, the sink:
 - Resolves the typed slot/attribute-map pair `Span.status` versus
   `Span.attributes."error.message"`:
   - When `Span.status` is `Error(message)` or `Other(_, message)` and `message` is
-    non-empty, `meta["error.message"]` is set to the typed message, overwriting
-    whatever the attribute partitioning step placed there. If the previous value
-    differed from the typed message, the overwrite is reported.
+    non-empty, `meta["error.message"]` is set to the typed message.
   - When `Span.status.message` is empty (`Unset`, `Ok`, `Error("")`, or `Other(_, "")`),
     the sink does not synthesize a `meta["error.message"]` tag and any value the
     attribute partitioning step placed there is left in place. This empty-message guard
