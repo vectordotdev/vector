@@ -242,17 +242,16 @@ pub struct FileConfig {
     /// existing files change.
     ///
     /// `polling` (the default) re-scans the `include` glob patterns on a fixed interval
-    /// (`glob_minimum_cooldown_ms`) and keeps an open file handle for every matched file for as
-    /// long as it exists on disk, even files excluded from reading by `ignore_older`. This is
-    /// simple and works identically everywhere, but can be expensive when a very large number of
-    /// files match `include`.
+    /// (`glob_minimum_cooldown_ms`). This is simple and works identically everywhere, but can be
+    /// expensive when a very large number of files match `include`.
     ///
     /// `notify` uses OS-level file system event notifications (inotify on Linux, FSEvents on
-    /// macOS, `ReadDirectoryChangesW` on Windows) to discover files and wake up reads promptly,
-    /// without needing to re-scan or hold a handle open for inactive files. A much less frequent
-    /// periodic reconciliation pass (`reconcile_interval_secs`) still runs as a correctness
-    /// backstop, since OS-level notification queues can silently overflow. This mode is newer
-    /// and has had less production exposure than `polling`.
+    /// macOS, `ReadDirectoryChangesW` on Windows) to discover files and wake up reads promptly.
+    /// A much less frequent periodic reconciliation pass (`reconcile_interval_secs`) still runs as
+    /// a correctness backstop, since OS-level notification queues can silently overflow. This mode
+    /// is newer and has had less production exposure than `polling`.
+    ///
+    /// File-handle retention is controlled independently by `idle_timeout_secs` in both modes.
     #[serde(default)]
     pub file_discovery_mode: FileDiscoveryModeConfig,
 

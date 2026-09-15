@@ -100,6 +100,10 @@ enum WatcherState {
         /// idle watchers never perform reads and so can't rely on "time since last successful
         /// read" the way `Active` watchers do.
         idle_since: Instant,
+        /// Do not retry a failed `remove_after` unlink before this deadline. Without a separate
+        /// deadline, an expired idle watcher makes the file server's sleep duration zero forever
+        /// when the filesystem keeps rejecting the unlink.
+        idle_removal_retry_at: Option<Instant>,
         /// Set once `check_for_new_data` ever observes the file shrink while `Idle`, and never
         /// cleared until the next `deactivate()` starts a fresh `Idle` period. `reactivate`'s own
         /// point-in-time size check (current size vs. `file_position`) alone isn't enough: a
@@ -289,6 +293,7 @@ impl FileWatcher {
                             last_known_size: Some(probe_size),
                             last_known_mtime: probe_mtime,
                             idle_since,
+                            idle_removal_retry_at: None,
                             truncated_while_idle: false,
                             force_recheck: false,
                             pending_partial_line: None,
@@ -1105,6 +1110,7 @@ impl FileWatcher {
             last_known_size,
             last_known_mtime,
             idle_since,
+            idle_removal_retry_at,
             truncated_while_idle,
             force_recheck,
             pending_partial_line,
@@ -1151,6 +1157,7 @@ impl FileWatcher {
             // eligible for idle-driven removal right now even though it's
             // about to be promoted back to `Active` by the caller anyway.
             *idle_since = Instant::now();
+            *idle_removal_retry_at = None;
         }
 
         Ok(changed)
@@ -1401,6 +1408,7 @@ impl FileWatcher {
             last_known_size,
             last_known_mtime,
             idle_since,
+            idle_removal_retry_at: None,
             // A fresh Idle period starts here: `file_position` above already reflects the
             // buffered-but-unterminated-line rewind (if any), which is a correction to where we
             // resume reading, not evidence the file itself was truncated on disk. There's nothing
@@ -1676,6 +1684,39 @@ impl FileWatcher {
         match &self.state {
             WatcherState::Idle { idle_since, .. } => Some(idle_since.elapsed()),
             WatcherState::Active { .. } => None,
+        }
+    }
+
+    /// Return the remaining delay before an idle watcher may be removed, including a retry
+    /// deadline after a previous unlink failure. `None` means the watcher is `Active`.
+    pub(crate) fn idle_removal_delay(&self, grace_period: Duration) -> Option<Duration> {
+        let WatcherState::Idle {
+            idle_since,
+            idle_removal_retry_at,
+            ..
+        } = &self.state
+        else {
+            return None;
+        };
+
+        let grace_remaining = grace_period.saturating_sub(idle_since.elapsed());
+        if grace_remaining.is_zero() {
+            Some(idle_removal_retry_at.map_or(Duration::ZERO, |retry_at| {
+                retry_at.saturating_duration_since(Instant::now())
+            }))
+        } else {
+            Some(grace_remaining)
+        }
+    }
+
+    /// Defer the next idle-file removal attempt after an unlink failure.
+    pub(crate) fn defer_idle_removal(&mut self, retry_after: Duration) {
+        if let WatcherState::Idle {
+            idle_removal_retry_at,
+            ..
+        } = &mut self.state
+        {
+            *idle_removal_retry_at = Some(Instant::now() + retry_after);
         }
     }
 

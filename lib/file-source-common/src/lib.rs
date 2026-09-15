@@ -182,9 +182,25 @@ impl KnownSmallFiles {
         let previous = previous.clone();
         if let Some(entry) = self.by_identity.get_mut(&previous) {
             entry.removal_paths.remove(removal_path);
-            if entry.removal_paths.is_empty() {
-                self.by_identity.remove(&previous);
-            }
+        }
+        self.drop_if_unremovable(&previous);
+    }
+
+    /// Drop an entry that no longer has a spelling which is safe to unlink. A canonical-only entry
+    /// must not linger: it cannot expire, and retaining it leaves stale reverse-index entries when
+    /// an alias is later reused by another file.
+    fn drop_if_unremovable(&mut self, identity: &std::path::Path) {
+        let Some(entry) = self.by_identity.get(identity) else {
+            return;
+        };
+        if entry.removal_path(identity).is_some() {
+            return;
+        }
+        let Some(entry) = self.by_identity.remove(identity) else {
+            return;
+        };
+        for path in entry.removal_paths {
+            self.owner_by_path.remove(&path);
         }
     }
 
@@ -201,19 +217,13 @@ impl KnownSmallFiles {
         }
         // `removal_path` may belong to a *different* file -- the caller saw it vanish or fingerprint
         // under one identity while the map recorded it under another. Drop it from that entry too.
-        if let Some(previous) = self.owner_by_path.remove(removal_path)
-            && let Some(entry) = self.by_identity.get_mut(&previous)
-        {
-            entry.removal_paths.remove(removal_path);
-            // Dropped when nothing *removable* is left, not merely when the set empties: an entry left
-            // with only its own identity has no safe removal path, so `expired` never returns it.
-            if entry.removal_path(&previous).is_none() {
-                let stranded: Vec<_> = entry.removal_paths.iter().cloned().collect();
-                self.by_identity.remove(&previous);
-                for path in stranded {
-                    self.owner_by_path.remove(&path);
-                }
+        if let Some(previous) = self.owner_by_path.remove(removal_path) {
+            if let Some(entry) = self.by_identity.get_mut(&previous) {
+                entry.removal_paths.remove(removal_path);
+                // Drop the entry when nothing *removable* is left, not merely when the set empties:
+                // an entry left with only its own identity has no safe removal path.
             }
+            self.drop_if_unremovable(&previous);
         }
     }
 
@@ -246,18 +256,14 @@ impl KnownSmallFiles {
         identity: &std::path::Path,
         missing: &std::path::Path,
     ) {
-        let Some(entry) = self.by_identity.get_mut(identity) else {
-            return;
-        };
-        entry.removal_paths.remove(missing);
-        self.owner_by_path.remove(missing);
-        if entry.removal_path(identity).is_none() {
-            let stranded: Vec<_> = entry.removal_paths.iter().cloned().collect();
-            self.by_identity.remove(identity);
-            for path in stranded {
-                self.owner_by_path.remove(&path);
-            }
+        {
+            let Some(entry) = self.by_identity.get_mut(identity) else {
+                return;
+            };
+            entry.removal_paths.remove(missing);
         }
+        self.owner_by_path.remove(missing);
+        self.drop_if_unremovable(identity);
     }
 
     /// Whether a file is recorded under `identity`.
@@ -632,7 +638,7 @@ mod known_small_files_tests {
     }
 
     #[test]
-    fn a_file_left_with_only_its_canonical_spelling_is_not_removable() {
+    fn a_file_left_with_only_its_canonical_spelling_is_dropped() {
         let mut known = KnownSmallFiles::default();
         let target = PathBuf::from("/var/shared/target.log");
         let alias = PathBuf::from("/logs/app.log");
@@ -650,18 +656,16 @@ mod known_small_files_tests {
             None,
         );
 
-        assert_eq!(
-            known.removal_path(&target),
-            None,
-            "with no configured spelling left, remove_after must not fall back to the canonical \
-             target: it can live outside the include and be shared"
+        assert!(
+            !known.contains_identity(&target),
+            "an entry with no configured spelling left must be dropped"
         );
         assert!(
             !known
                 .expired(Duration::from_secs(30))
                 .iter()
                 .any(|(identity, _)| identity == &target),
-            "such a file must not be offered for expiry at all"
+            "a dropped canonical-only file must not be offered for expiry"
         );
     }
 

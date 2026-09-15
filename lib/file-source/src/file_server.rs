@@ -49,6 +49,10 @@ const NOTIFY_EVENT_DEBOUNCE: Duration = Duration::from_millis(50);
 /// large `glob_minimum_cooldown` would silently also throttle checkpoint persistence.
 const CHECKPOINT_WRITE_INTERVAL: Duration = Duration::from_secs(1);
 
+/// Minimum delay between retries after an idle-file removal fails. This prevents a persistent
+/// filesystem error from turning the removal deadline into a zero-duration busy loop.
+const IDLE_REMOVAL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
+
 /// Minimum time between two full glob+fingerprint reconciliation passes (`discover`) triggered by
 /// notify events. Without this, a file under sustained writes would trigger a full re-glob on
 /// every `NOTIFY_EVENT_DEBOUNCE` window indefinitely. Doesn't delay reads of already-tracked
@@ -2562,8 +2566,8 @@ where
         };
         fp_map.values().any(|watcher| {
             watcher
-                .idle_since()
-                .is_some_and(|idle| idle >= grace_period)
+                .idle_removal_delay(grace_period)
+                .is_some_and(|delay| delay.is_zero())
         })
     }
 
@@ -2579,8 +2583,7 @@ where
         let grace_period = self.remove_after?;
         fp_map
             .values()
-            .filter_map(|watcher| watcher.idle_since())
-            .map(|idle| grace_period.saturating_sub(idle))
+            .filter_map(|watcher| watcher.idle_removal_delay(grace_period))
             .min()
     }
 
@@ -2609,7 +2612,10 @@ where
         let Some(grace_period) = self.remove_after else {
             return;
         };
-        if watcher.idle_since().is_none_or(|idle| idle < grace_period) {
+        if watcher
+            .idle_removal_delay(grace_period)
+            .is_none_or(|delay| !delay.is_zero())
+        {
             return;
         }
         match watcher.check_for_new_data().await {
@@ -2629,6 +2635,7 @@ where
                 if error.kind() != std::io::ErrorKind::NotFound {
                     self.emitter.emit_file_watch_error(&watcher.path, error);
                 }
+                watcher.defer_idle_removal(IDLE_REMOVAL_RETRY_INTERVAL);
             }
         }
     }
@@ -2843,7 +2850,10 @@ where
         let Some(grace_period) = self.remove_after else {
             return;
         };
-        if watcher.idle_since().is_none_or(|idle| idle < grace_period) {
+        if watcher
+            .idle_removal_delay(grace_period)
+            .is_none_or(|delay| !delay.is_zero())
+        {
             return;
         }
         if !watcher.removal_is_authorized() {
@@ -2860,6 +2870,7 @@ where
             }
             Err(error) => {
                 self.emitter.emit_file_delete_error(&watcher.path, error);
+                watcher.defer_idle_removal(IDLE_REMOVAL_RETRY_INTERVAL);
             }
         }
     }
@@ -4370,6 +4381,53 @@ mod tests {
                 .expect("the appended line must remain readable")
                 .bytes,
             b"second"[..]
+        );
+    }
+
+    /// A failed metadata/removal attempt must not leave an expired idle watcher making the main
+    /// loop's sleep duration zero on every iteration.
+    #[tokio::test]
+    async fn failed_idle_removal_is_backed_off() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.remove_after = Some(Duration::ZERO);
+
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        watcher.deactivate().await;
+        std::fs::remove_file(&path).unwrap();
+
+        let file_id = FileFingerprint::DevInode(0, 0);
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+        let mut lines = Vec::new();
+        file_server
+            .remove_idle_watchers_due(&mut fp_map, &mut lines)
+            .await;
+
+        assert!(
+            file_server
+                .next_idle_removal_delay(&fp_map)
+                .is_some_and(|delay| delay > Duration::ZERO),
+            "a failed idle removal must make the main loop sleep before retrying"
         );
     }
 
