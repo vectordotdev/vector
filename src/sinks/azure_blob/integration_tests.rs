@@ -36,7 +36,7 @@ use crate::{
 #[tokio::test]
 async fn azure_blob_uploads_one_shot_with_shared_key() {
     let config = AzureBlobSinkConfig::new_emulator().await;
-    let client = config.build_test_client().await;
+    let client = config.build_test_client();
     let blob_name = format!("one-shot/{}.blob", random_string(10));
     let payload = vec![b'x'; 3 * 1024 * 1024];
 
@@ -50,7 +50,7 @@ async fn azure_blob_uploads_one_shot_with_shared_key() {
 #[tokio::test]
 async fn azure_blob_uploads_multipart_with_shared_key() {
     let config = AzureBlobSinkConfig::new_emulator().await;
-    let client = config.build_test_client().await;
+    let client = config.build_test_client();
     let blob_name = format!("multipart/{}.blob", random_string(10));
     let payload = vec![b'x'; 5 * 1024 * 1024];
 
@@ -64,7 +64,7 @@ async fn azure_blob_uploads_multipart_with_shared_key() {
 #[tokio::test]
 async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
-    let client = config.build_test_client().await;
+    let client = config.build_test_client();
 
     azure_blob::config::build_healthcheck(config.container_name, client)
         .expect("Failed to build healthcheck")
@@ -75,7 +75,7 @@ async fn azure_blob_healthcheck_passed() {
 #[tokio::test]
 async fn azure_blob_healthcheck_passed_with_oauth() {
     let config = AzureBlobSinkConfig::new_emulator_with_oauth().await;
-    let client = config.build_test_client().await;
+    let client = config.build_test_client();
 
     azure_blob::config::build_healthcheck(config.container_name, client)
         .expect("Failed to build healthcheck")
@@ -90,7 +90,7 @@ async fn azure_blob_healthcheck_unknown_container() {
         container_name: String::from("other-container-name"),
         ..config
     };
-    let client = config.build_test_client().await;
+    let client = config.build_test_client();
 
     assert_eq!(
         azure_blob::config::build_healthcheck(config.container_name, client)
@@ -677,7 +677,7 @@ impl AzureBlobSinkConfig {
         config
     }
 
-    async fn build_test_client(&self) -> Arc<BlobContainerClient> {
+    fn build_test_client(&self) -> Arc<BlobContainerClient> {
         let connection_string = self
             .connection_string
             .clone()
@@ -699,12 +699,11 @@ impl AzureBlobSinkConfig {
             &crate::config::ProxyConfig::default(),
             self.tls.clone(),
         )
-        .await
         .expect("Failed to create client")
     }
 
-    async fn to_sink(&self) -> VectorSink {
-        let client = self.build_test_client().await;
+    fn to_sink(&self) -> VectorSink {
+        let client = self.build_test_client();
         let validated = self.validate().expect("Failed to validate config");
         self.build_processor(client, &validated)
             .expect("Failed to create sink")
@@ -712,16 +711,13 @@ impl AzureBlobSinkConfig {
 
     async fn run_assert(&self, input: impl Stream<Item = EventArray> + Send) {
         // `to_sink` needs to be inside the assertion check
-        assert_sink_compliance(
-            &SINK_TAGS,
-            async move { self.to_sink().await.run(input).await },
-        )
-        .await
-        .expect("Running sink failed");
+        assert_sink_compliance(&SINK_TAGS, async move { self.to_sink().run(input).await })
+            .await
+            .expect("Running sink failed");
     }
 
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
-        let client = self.build_test_client().await;
+        let client = self.build_test_client();
 
         // Iterate pager results and collect blob names. Filter by prefix server-side.
         let mut pager = client
@@ -741,7 +737,7 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn get_blob(&self, blob: String) -> (Option<String>, Option<String>, Vec<String>) {
-        let client = self.build_test_client().await;
+        let client = self.build_test_client();
 
         let blob_client = client.blob_client(&blob);
 
@@ -784,7 +780,7 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn get_blob_metadata(&self, blob: String) -> HashMap<String, String> {
-        let client = self.build_test_client().await;
+        let client = self.build_test_client();
         let blob_client = client.blob_client(&blob);
         let props_resp = blob_client
             .get_properties(None)
@@ -809,7 +805,7 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn get_blob_tags(&self, blob: String) -> HashMap<String, String> {
-        let client = self.build_test_client().await;
+        let client = self.build_test_client();
         let blob_client = client.blob_client(&blob);
         let resp = blob_client
             .get_tags(None)
@@ -833,7 +829,7 @@ impl AzureBlobSinkConfig {
     }
 
     async fn ensure_container(&self) {
-        let client = self.build_test_client().await;
+        let client = self.build_test_client();
         let result = client.create(None).await;
 
         let response = match result {

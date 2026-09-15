@@ -326,6 +326,7 @@ impl RootOpts {
 
     pub fn init_global(&self) {
         if !self.openssl_no_probe {
+            // SAFETY: Initialization runs before worker threads start.
             unsafe {
                 openssl_probe::init_openssl_env_vars();
             }
