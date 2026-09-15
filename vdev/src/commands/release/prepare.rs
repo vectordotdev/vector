@@ -42,6 +42,12 @@ struct Prepare {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        if !self.version.pre.is_empty() || !self.version.build.is_empty() {
+            bail!("release version must be a stable semantic version");
+        }
+        if !self.vrl_version.pre.is_empty() || !self.vrl_version.build.is_empty() {
+            bail!("VRL version must be a stable semantic version");
+        }
         let repo_root = paths::find_repo_root()?;
         env::set_current_dir(&repo_root)?;
 
@@ -67,6 +73,7 @@ impl Prepare {
     pub fn run(&self) -> Result<()> {
         debug!("run");
         self.create_release_branches()?;
+        self.prepare_vector_version()?;
         self.pin_vrl_version()?;
 
         self.generate_release_cue()?;
@@ -75,6 +82,11 @@ impl Prepare {
         self.update_vector_version(&self.repo_root.join(INSTALL_SCRIPT))?;
 
         if !self.dry_run {
+            git::add_files_in_current_dir()?;
+            git::commit(&format!(
+                "chore(releasing): Prepare version {}",
+                self.new_vector_version
+            ))?;
             self.open_release_pr()?;
         }
 
@@ -116,6 +128,21 @@ impl Prepare {
         Ok(())
     }
 
+    fn prepare_vector_version(&self) -> Result<()> {
+        debug!("prepare_vector_version");
+
+        let cargo_toml_path = self.repo_root.join("Cargo.toml");
+        let contents = fs::read_to_string(&cargo_toml_path).context("Failed to read Cargo.toml")?;
+        let expected_version = format!("{}-dev", self.new_vector_version);
+        let release_version = self.new_vector_version.to_string();
+        let updated_contents =
+            update_vector_package_version(&contents, &expected_version, &release_version)?;
+        fs::write(&cargo_toml_path, updated_contents).context("Failed to write Cargo.toml")?;
+
+        run_command("cargo update -p vector");
+        Ok(())
+    }
+
     /// Step 3
     fn pin_vrl_version(&self) -> Result<()> {
         debug!("pin_vrl_version");
@@ -126,9 +153,6 @@ impl Prepare {
 
         fs::write(cargo_toml_path, updated_contents).context("Failed to write Cargo.toml")?;
         run_command("cargo update -p vrl");
-        git::commit(&format!(
-            "chore(releasing): Pinned VRL version to {vrl_version}"
-        ))?;
         Ok(())
     }
 
@@ -142,8 +166,6 @@ impl Prepare {
         generate_cue::retire_all_fragments()?;
 
         self.append_vrl_changelog_to_release_cue()?;
-        git::add_files_in_current_dir()?;
-        git::commit("chore(releasing): Generated release CUE file")?;
         debug!("Generated release CUE file");
         Ok(())
     }
@@ -173,10 +195,6 @@ impl Prepare {
 
         fs::write(file_path, updated_contents)
             .map_err(|e| anyhow!("Failed to write {}: {}", file_path.display(), e))?;
-        git::commit(&format!(
-            "chore(releasing): Updated {} vector version to {new_version}",
-            file_path.strip_prefix(&self.repo_root).unwrap().display(),
-        ))?;
 
         Ok(())
     }
@@ -257,6 +275,26 @@ fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result
     vrl_table.remove("branch");
     vrl_table.insert("version", vrl_version.into());
 
+    Ok(doc.to_string())
+}
+
+fn update_vector_package_version(
+    cargo_toml_contents: &str,
+    expected_version: &str,
+    release_version: &str,
+) -> Result<String> {
+    let mut doc = cargo_toml_contents
+        .parse::<DocumentMut>()
+        .context("Failed to parse Cargo.toml")?;
+    let current_version = doc["package"]["version"]
+        .as_str()
+        .context("package.version should be a string")?;
+
+    if current_version != expected_version {
+        bail!("expected package version {expected_version}, found {current_version}");
+    }
+
+    doc["package"]["version"] = toml_edit::value(release_version);
     Ok(doc.to_string())
 }
 
@@ -349,7 +387,8 @@ fn get_vrl_changelog(version: &Version) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use crate::commands::release::prepare::{
-        format_vrl_changelog_block, insert_block_after_changelog, update_vrl_to_version,
+        format_vrl_changelog_block, insert_block_after_changelog, update_vector_package_version,
+        update_vrl_to_version,
     };
     use indoc::indoc;
 
@@ -372,6 +411,30 @@ mod tests {
         "#};
 
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_update_vector_package_version() {
+        let input = indoc! {r#"
+            [package]
+            name = "vector"
+            version = "0.59.0-dev"
+
+            [workspace]
+            resolver = "2"
+        "#};
+
+        let result = update_vector_package_version(input, "0.59.0-dev", "0.59.0")
+            .expect("should update the expected development version");
+        assert!(result.contains("version = \"0.59.0\""));
+
+        let error = update_vector_package_version(input, "0.58.0-dev", "0.59.0")
+            .expect_err("should reject an unexpected starting version");
+        assert!(
+            error
+                .to_string()
+                .contains("expected package version 0.58.0-dev")
+        );
     }
 
     #[test]
