@@ -844,9 +844,9 @@ mod tests {
             names_by_value,
         };
         let mut generated = json!({
-            "first": {"type": shared.clone()},
+            "first": {"type": shared},
             "second": {"type": shared},
-            "only": {"type": unique.clone()},
+            "only": {"type": unique},
         });
 
         definitions.count_references(&generated);
@@ -898,7 +898,7 @@ mod tests {
             )]),
         };
         let mut generated = json!({
-            "first": {"type": shared.clone()},
+            "first": {"type": shared},
             "second": {"type": shared},
         });
 
@@ -928,7 +928,7 @@ mod tests {
         let outer = json!({
             "object": {
                 "options": {
-                    "inner": {"required": true, "type": inner.clone()},
+                    "inner": {"required": true, "type": inner},
                 },
             },
         });
