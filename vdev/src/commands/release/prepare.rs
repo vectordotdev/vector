@@ -1,14 +1,14 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
+use crate::commands::release::generate_cue;
 use crate::utils::{command::run_command, git, paths};
-use crate::{app::CommandExt as _, commands::release::generate_cue};
 use anyhow::{Context, Result, anyhow, bail};
 use semver::Version;
 use std::{
     env, fs,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Command,
 };
 use toml_edit::DocumentMut;
 
@@ -80,11 +80,6 @@ impl Prepare {
 
         self.update_vector_version(&self.repo_root.join(KUBECLT_CUE_FILE))?;
         self.update_vector_version(&self.repo_root.join(INSTALL_SCRIPT))?;
-
-        Command::new("cargo")
-            .args(["metadata", "--locked", "--no-deps", "--format-version", "1"])
-            .stdout(Stdio::null())
-            .check_run()?;
 
         if !self.dry_run {
             git::add_files_in_current_dir()?;
