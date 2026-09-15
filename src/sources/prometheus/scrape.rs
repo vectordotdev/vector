@@ -168,17 +168,6 @@ enum ConfigError {
 #[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
-        // Validate: exactly one of endpoints or targets must be non-empty.
-        let has_endpoints = !self.endpoints.is_empty();
-        let has_configured_targets = self.has_any_targets();
-
-        if has_endpoints && has_configured_targets {
-            return Err(Box::new(ConfigError::EndpointsAndTargetsConflict));
-        }
-        if !has_endpoints && !has_configured_targets {
-            return Err(Box::new(ConfigError::NoEndpointsOrTargets));
-        }
-
         warn_if_interval_too_low(self.timeout, self.interval);
 
         // Collect static URLs
@@ -215,10 +204,6 @@ impl SourceConfig for PrometheusScrapeConfig {
                     }
                 })
                 .collect();
-
-            if kubernetes_cfgs.len() > 1 {
-                return Err(Box::new(ConfigError::MultipleKubernetesTargetGroups));
-            }
 
             if let Some(k8s_cfg) = kubernetes_cfgs.first() {
                 let client =
@@ -308,6 +293,35 @@ impl SourceConfig for PrometheusScrapeConfig {
         };
 
         Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
+    }
+
+    fn validate_structure(&self) -> std::result::Result<(), Vec<String>> {
+        let has_endpoints = !self.endpoints.is_empty();
+        let has_configured_targets = self.has_any_targets();
+        let mut errors = Vec::new();
+
+        if has_endpoints && has_configured_targets {
+            errors.push(ConfigError::EndpointsAndTargetsConflict.to_string());
+        } else if !has_endpoints && !has_configured_targets {
+            errors.push(ConfigError::NoEndpointsOrTargets.to_string());
+        }
+
+        #[cfg(feature = "kubernetes")]
+        if self
+            .targets
+            .iter()
+            .filter(|target| matches!(target, TargetConfig::Kubernetes(_)))
+            .count()
+            > 1
+        {
+            errors.push(ConfigError::MultipleKubernetesTargetGroups.to_string());
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -477,6 +491,66 @@ impl HttpClientContext for PrometheusScrapeContext {
                 endpoint = %url,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+    use crate::config;
+
+    fn config_with(endpoints: Vec<String>, targets: Vec<TargetConfig>) -> PrometheusScrapeConfig {
+        PrometheusScrapeConfig {
+            endpoints,
+            targets,
+            interval: default_interval(),
+            timeout: default_timeout(),
+            instance_tag: None,
+            endpoint_tag: None,
+            honor_labels: false,
+            query: HashMap::new(),
+            tls: None,
+            auth: None,
+        }
+    }
+
+    fn compilation_errors(config: PrometheusScrapeConfig) -> Vec<String> {
+        let mut builder = config::Config::builder();
+        builder.add_source("prometheus", config);
+        builder.build().expect_err("config should be rejected")
+    }
+
+    #[test]
+    fn requires_exactly_one_endpoint_or_target_during_config_compilation() {
+        let errors = compilation_errors(config_with(Vec::new(), Vec::new()));
+        assert!(errors.iter().any(|error| {
+            error == "Source prometheus at least one endpoint or target must be specified"
+        }));
+
+        let errors = compilation_errors(config_with(
+            vec!["http://localhost:9090/metrics".to_string()],
+            vec![TargetConfig::Static {
+                urls: vec!["http://localhost:9091/metrics".to_string()],
+            }],
+        ));
+        assert!(errors.iter().any(|error| {
+            error == "Source prometheus exactly one of `endpoints` or `targets` must be specified (\"endpoints\" is deprecated, prefer \"targets\")"
+        }));
+    }
+
+    #[cfg(feature = "kubernetes")]
+    #[test]
+    fn rejects_multiple_kubernetes_groups_during_config_compilation() {
+        let errors = compilation_errors(config_with(
+            Vec::new(),
+            vec![
+                TargetConfig::Kubernetes(KubernetesScrapeConfig::default()),
+                TargetConfig::Kubernetes(KubernetesScrapeConfig::default()),
+            ],
+        ));
+        assert!(errors.iter().any(|error| {
+            error == "Source prometheus only one Kubernetes target group is currently supported"
+        }));
     }
 }
 
