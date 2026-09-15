@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use snafu::Snafu;
 use vector_lib::{
     config::LegacyKey,
@@ -119,12 +121,26 @@ pub struct SampleConfig {
     /// independently per rendered group value.
     #[configurable(metadata(
         docs::examples = "{{ service }}",
-        docs::examples = "{{ hostname }}-{{ service }}"
+        docs::examples = "{{ hostname }}-{{ service }}",
+        docs::warnings = "Prefer grouping by fields with a small, stable set of values, such as \
+        `service` or `host`. When the template interpolates event content (for example \
+        `{{ message }}` or `{{ request_id }}`), every distinct rendered value creates a new \
+        group: exceeding `max_groups` then evicts the least recently used groups' sampling \
+        state, and the retained group values consume memory in proportion to their size."
     ))]
     pub group_by: Option<UnconfinedTemplate>,
+    /// The maximum number of distinct group values whose sampling state is retained.
+    ///
+    /// When this limit is reached, the least recently used group's state is evicted. If
+    /// `group_by` is not configured, only one group is retained.
+    #[serde(default = "default_max_groups")]
+    pub max_groups: NonZeroUsize,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
+}
+pub const fn default_max_groups() -> NonZeroUsize {
+    NonZeroUsize::new(5000).expect("static non-zero number")
 }
 
 impl SampleConfig {
@@ -171,6 +187,7 @@ impl GenerateConfig for SampleConfig {
             rate_field: None,
             key_field: None,
             group_by: None,
+            max_groups: default_max_groups(),
             exclude: None::<AnyCondition>,
             sample_rate_key: default_sample_rate_key(),
         })
@@ -198,6 +215,7 @@ impl TransformConfig for SampleConfig {
                     rate_field: self.rate_field.clone(),
                 },
                 self.group_by.clone(),
+                self.max_groups,
                 exclude,
                 self.sample_rate_key.clone(),
             )
@@ -207,6 +225,7 @@ impl TransformConfig for SampleConfig {
                 sample_mode,
                 self.key_field.clone(),
                 self.group_by.clone(),
+                self.max_groups,
                 exclude,
                 self.sample_rate_key.clone(),
             )
@@ -278,6 +297,11 @@ mod tests {
     fn generate_config() {
         crate::test_util::test_generate_config::<SampleConfig>();
     }
+    #[test]
+    fn defaults_max_groups_to_finite_capacity() {
+        let config: SampleConfig = serde_yaml::from_str("ratio: 0.5").unwrap();
+        assert_eq!(config.max_groups, super::default_max_groups());
+    }
 
     #[test]
     fn rejects_dynamic_ratio_only_configuration() {
@@ -287,6 +311,7 @@ mod tests {
             ratio_field: Some("sample_rate".to_string()),
             rate_field: None,
             key_field: None,
+            max_groups: super::default_max_groups(),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
@@ -304,6 +329,7 @@ mod tests {
             ratio_field: None,
             rate_field: Some("sample_rate_n".to_string()),
             key_field: None,
+            max_groups: super::default_max_groups(),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
@@ -321,6 +347,7 @@ mod tests {
             ratio_field: None,
             rate_field: Some("sample_rate_n".to_string()),
             key_field: None,
+            max_groups: super::default_max_groups(),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
@@ -337,6 +364,7 @@ mod tests {
             ratio_field: Some("sample_rate".to_string()),
             rate_field: Some("sample_rate_n".to_string()),
             key_field: None,
+            max_groups: super::default_max_groups(),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
             exclude: None,
@@ -353,6 +381,7 @@ mod tests {
             ratio: None,
             ratio_field: Some("sample_ratio".to_string()),
             rate_field: None,
+            max_groups: super::default_max_groups(),
             key_field: Some("trace_id".to_string()),
             sample_rate_key: super::default_sample_rate_key(),
             group_by: None,
