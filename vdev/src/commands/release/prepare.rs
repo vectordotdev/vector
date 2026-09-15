@@ -12,10 +12,6 @@ use std::{
 };
 use toml_edit::DocumentMut;
 
-const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
-const ALPINE_DOCKERFILE: &str = "distribution/docker/alpine/Dockerfile";
-const DEBIAN_PREFIX: &str = "FROM docker.io/debian:";
-const DEBIAN_DOCKERFILE: &str = "distribution/docker/debian/Dockerfile";
 const KUBECLT_CUE_FILE: &str = "website/cue/reference/administration/interfaces/kubectl.cue";
 const INSTALL_SCRIPT: &str = "distribution/install.sh";
 
@@ -29,15 +25,6 @@ pub struct Cli {
     /// The new VRL version.
     #[arg(long)]
     vrl_version: Version,
-    /// Optional: The Alpine version to use in `distribution/docker/alpine/Dockerfile`.
-    /// You can find the latest version here: <https://alpinelinux.org/releases/>.
-    #[arg(long)]
-    alpine_version: Option<String>,
-    /// Optional: The Debian version to use in `distribution/docker/debian/Dockerfile`.
-    /// You can find the latest version here: <https://www.debian.org/releases/>.
-    #[arg(long)]
-    debian_version: Option<String>,
-
     /// Dry run. Enabling this will make it so no PRs will be created and no branches will be pushed upstream.
     #[arg(long, default_value_t = false)]
     dry_run: bool,
@@ -46,8 +33,6 @@ pub struct Cli {
 struct Prepare {
     new_vector_version: Version,
     vrl_version: Version,
-    alpine_version: Option<String>,
-    debian_version: Option<String>,
     repo_root: PathBuf,
     latest_vector_version: Version,
     release_branch: String,
@@ -63,8 +48,6 @@ impl Cli {
         let prepare = Prepare {
             new_vector_version: self.version.clone(),
             vrl_version: self.vrl_version,
-            alpine_version: self.alpine_version,
-            debian_version: self.debian_version,
             repo_root,
             latest_vector_version: git::latest_release_version()?,
             release_branch: format!("v{}.{}", self.version.major, self.version.minor),
@@ -85,18 +68,6 @@ impl Prepare {
         debug!("run");
         self.create_release_branches()?;
         self.pin_vrl_version()?;
-
-        self.update_dockerfile_base_version(
-            &self.repo_root.join(ALPINE_DOCKERFILE),
-            self.alpine_version.as_deref(),
-            ALPINE_PREFIX,
-        )?;
-
-        self.update_dockerfile_base_version(
-            &self.repo_root.join(DEBIAN_DOCKERFILE),
-            self.debian_version.as_deref(),
-            DEBIAN_PREFIX,
-        )?;
 
         self.generate_release_cue()?;
 
@@ -161,59 +132,7 @@ impl Prepare {
         Ok(())
     }
 
-    /// Step 4 & 5: Update dockerfile versions.
-    /// TODO: investigate if this can be automated.
-    fn update_dockerfile_base_version(
-        &self,
-        dockerfile_path: &Path,
-        new_version: Option<&str>,
-        prefix: &str,
-    ) -> Result<()> {
-        debug!(
-            "update_dockerfile_base_version for {}",
-            dockerfile_path.display()
-        );
-        if let Some(version) = new_version {
-            let contents = fs::read_to_string(dockerfile_path)?;
-
-            if !contents.starts_with(prefix) {
-                return Err(anyhow::anyhow!(
-                    "Dockerfile at {} does not start with {prefix}",
-                    dockerfile_path.display()
-                ));
-            }
-
-            let mut lines = contents.lines();
-            let first_line = lines.next().expect("File should have at least one line");
-            let rest = lines.collect::<Vec<&str>>().join("\n");
-
-            // Split into prefix, version, and suffix
-            // E.g. "FROM docker.io/alpine:", "3.21", " AS builder"
-            let after_prefix = first_line.strip_prefix(prefix).ok_or_else(|| {
-                anyhow!("Failed to strip prefix in {}", dockerfile_path.display())
-            })?;
-            let parts: Vec<&str> = after_prefix.splitn(2, ' ').collect();
-            let suffix = parts.get(1).unwrap_or(&"");
-
-            // Rebuild with new version
-            let updated_version_line = format!("{prefix}{version} {suffix}");
-            let new_contents = format!("{updated_version_line}\n{rest}");
-
-            fs::write(dockerfile_path, &new_contents)?;
-            git::commit(&format!(
-                "chore(releasing): Bump {} version to {version}",
-                dockerfile_path
-                    .strip_prefix(&self.repo_root)
-                    .unwrap()
-                    .display(),
-            ))?;
-        } else {
-            debug!("No version specified for {dockerfile_path:?}; skipping update");
-        }
-        Ok(())
-    }
-
-    // Step 6
+    // Step 4
     fn generate_release_cue(&self) -> Result<()> {
         debug!("generate_release_cue");
         generate_cue::run(
@@ -229,7 +148,7 @@ impl Prepare {
         Ok(())
     }
 
-    /// Step 7 & 8: Replace old version with the new version.
+    /// Steps 5 & 6: Replace old version with the new version.
     fn update_vector_version(&self, file_path: &Path) -> Result<()> {
         debug!("update_vector_version for {file_path:?}");
         let contents = fs::read_to_string(file_path)
@@ -303,7 +222,7 @@ impl Prepare {
             return Err(anyhow!("{} not found", cue_path.display()));
         }
 
-        let vrl_changelog = get_latest_vrl_tag_and_changelog()?;
+        let vrl_changelog = get_vrl_changelog(&self.vrl_version)?;
         let vrl_changelog_block = format_vrl_changelog_block(&vrl_changelog);
 
         let original = fs::read_to_string(&cue_path)?;
@@ -385,22 +304,8 @@ fn insert_block_after_changelog(original: &str, block: &str) -> String {
     result.join("\n")
 }
 
-fn get_latest_vrl_tag_and_changelog() -> Result<String> {
-    // Step 1: get the latest tag
-    let tag_output = Command::new("gh")
-        .args(["api", "repos/vectordotdev/vrl/tags", "--jq", ".[0].name"])
-        .output()
-        .context("Failed to run `gh api` for VRL tags")?;
-
-    if !tag_output.status.success() {
-        let stderr = String::from_utf8_lossy(&tag_output.stderr);
-        bail!("gh api tags failed: {stderr}");
-    }
-
-    let tag = String::from_utf8(tag_output.stdout).context("gh api output is not valid UTF-8")?;
-    let tag = tag.trim().to_string();
-
-    // Step 2: fetch CHANGELOG.md for that tag
+fn get_vrl_changelog(version: &Version) -> Result<String> {
+    let tag = format!("v{version}");
     let changelog_output = Command::new("gh")
         .args([
             "api",
