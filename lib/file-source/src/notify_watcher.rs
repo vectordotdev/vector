@@ -129,6 +129,10 @@ pub struct NotifyDiscovery {
     /// rebuilt and arbitrary events may have been lost. Read (and cleared) by the caller via
     /// `take_full_scan_required`, which must then run a full glob pass instead of a targeted one.
     full_scan_required: bool,
+    /// Whether some configured directory could not be watched -- a permission error, or the backend
+    /// watch limit. No event can arrive for anything under it, so events alone no longer cover the
+    /// configuration and the caller must keep reconciling on the polling cadence.
+    uncovered_roots: bool,
     /// Set when an already-watched directory needs a different recursive mode than it has.
     ///
     /// Handled by rebuilding the watcher rather than re-`watch()`-ing in place, which leaks a
@@ -371,6 +375,7 @@ impl NotifyDiscovery {
             watched_dir_aliases: HashMap::new(),
             watched_dir_aliases_by_canonical: HashMap::new(),
             full_scan_required: false,
+            uncovered_roots: false,
             mode_change_pending: false,
         };
         // A rebuild can still fail here under resource pressure, and a `debug_assert` is compiled
@@ -413,6 +418,9 @@ impl NotifyDiscovery {
         // forget all bookkeeping so every directory below is re-`watch`ed from scratch. These
         // sticky flags are checked here rather than relying only on channel messages, because a
         // full channel can drop both the original event and the best-effort `Overflow` message.
+        // Recomputed from scratch each pass: a directory that could not be watched last time may
+        // well succeed now, and the retry happens below.
+        self.uncovered_roots = false;
         let backend_error_pending = self.backend_error_pending.swap(false, Ordering::Relaxed);
         let overflow_pending = self.overflow_pending.swap(false, Ordering::Relaxed);
         if overflow_pending {
@@ -578,6 +586,11 @@ impl NotifyDiscovery {
                         // Do not widen a permission or resource-limit failure to a recursive
                         // watch on a potentially very large ancestor. Leave this path unwatched;
                         // the next reconciliation pass will retry the direct registration.
+                        //
+                        // Until one succeeds no event can arrive for anything under it, so the
+                        // caller is told its coverage is incomplete rather than trusting events for
+                        // a directory nothing is watching.
+                        self.uncovered_roots = true;
                         warn!(message = "Failed to watch directory.", path = ?path, %error);
                         emitter.emit_file_watch_backend_error(&std::io::Error::other(
                             error.to_string(),
@@ -849,6 +862,12 @@ impl NotifyDiscovery {
     /// event named, so it cannot discover a file whose creation event was among the lost ones.
     pub fn take_full_scan_required(&mut self) -> bool {
         std::mem::take(&mut self.full_scan_required)
+    }
+
+    /// Whether some configured directory is not being watched, so events do not cover the whole
+    /// configuration and reconciliation must keep to the polling cadence until one does.
+    pub fn has_uncovered_roots(&self) -> bool {
+        self.uncovered_roots
     }
 
     /// Whether `path` is currently believed to be a watched directory (as opposed to, say, a file

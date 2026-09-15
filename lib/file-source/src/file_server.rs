@@ -609,19 +609,28 @@ async fn drain_and_repoint(
     // "the file was deleted" and kills the watcher -- which would then be reaped straight after being
     // repointed. This file was just fingerprinted, so saying it was found is simply true.
     watcher.mark_found();
-    while let Ok(RawLineResult {
-        raw_line: Some(line),
-        ..
-    }) = watcher.read_line().await
-    {
-        lines.push(Line {
-            text: line.bytes,
-            filename: watcher.path.to_str().expect("not a valid path").to_owned(),
-            file_id,
-            generation: watcher.generation(),
-            start_offset: line.offset,
-            end_offset: watcher.get_file_position(),
-        });
+    loop {
+        match watcher.read_line().await {
+            Ok(RawLineResult {
+                raw_line: Some(line),
+                ..
+            }) => lines.push(Line {
+                text: line.bytes,
+                filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                file_id,
+                generation: watcher.generation(),
+                start_offset: line.offset,
+                end_offset: watcher.get_file_position(),
+            }),
+            Ok(_) => break,
+            // Not EOF: the file may still hold records this reader has not seen. Moving on would
+            // drop the descriptor along with them, so leave the watcher where it is and let the next
+            // pass try again -- the reader keeps its offset, and the replacement is still there.
+            Err(error) => {
+                watcher.prepare_for_discovery();
+                return Err(error);
+            }
+        }
     }
     salvage_final_partial_line(watcher, file_id, lines);
 
@@ -906,7 +915,14 @@ where
             // rather than silently reverting to whatever `glob_minimum_cooldown` happens to be set
             // to (which, precisely because it's documented as ignored, may be tuned very
             // differently than the intended discovery cadence).
-            let discovery_interval = if self.discovery_mode == FileDiscoveryMode::Notify {
+            // A directory that could not be watched produces no events, so waiting a full
+            // `reconcile_interval` to look at it again would leave files under it undiscovered for
+            // minutes -- and short-lived ones missed entirely. Reconcile on the polling cadence
+            // until every configured directory is covered.
+            let notify_covers_everything = notify_discovery
+                .as_ref()
+                .is_some_and(|discovery| !discovery.has_uncovered_roots());
+            let discovery_interval = if notify_covers_everything {
                 self.reconcile_interval
             } else {
                 self.glob_minimum_cooldown

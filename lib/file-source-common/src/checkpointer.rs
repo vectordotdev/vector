@@ -276,11 +276,29 @@ impl CheckpointsView {
                 let duration = now - *ts;
                 duration >= chrono::Duration::seconds(60)
             })
-            .map(|entry| *entry.key())
-            .collect::<Vec<FileFingerprint>>();
+            .map(|entry| (*entry.key(), *entry.value()))
+            .collect::<Vec<(FileFingerprint, DateTime<Utc>)>>();
 
-        for fng in to_remove {
-            self.checkpoints.remove(&fng);
+        for (fng, marked_at) in to_remove {
+            // The list above is a hint, not a decision: a watcher can take this fingerprint over
+            // between collecting it and deleting it, and `register` clears the mark. Deleting on the
+            // stale verdict would discard every checkpoint that new owner writes, so a restart
+            // replays the file from the beginning. The mark is re-read under the entry lock and must
+            // still be the one collected -- a fingerprint reaped, revived and reaped again has a
+            // newer mark, whose own window has not elapsed yet.
+            let dashmap::mapref::entry::Entry::Occupied(entry) = self.checkpoints.entry(fng) else {
+                self.modified_times.remove(&fng);
+                self.removed_times.remove(&fng);
+                continue;
+            };
+            let still_marked = self
+                .removed_times
+                .get(&fng)
+                .is_some_and(|mark| *mark.value() == marked_at);
+            if !still_marked {
+                continue;
+            }
+            entry.remove();
             self.modified_times.remove(&fng);
             self.removed_times.remove(&fng);
         }
