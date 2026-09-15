@@ -43,8 +43,6 @@ Automated steps include:
 - Create a new release preparation branch from `master`
   - `git checkout -b "${PREP_BRANCH}" && git push -u`
 - Pin VRL to latest released version rather than `main`
-- Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or [Debian](https://www.debian.org/releases/) available to update the release images in
-      `distribution/docker/`. Update if so.
 - Generate a new cue file for the release in `website/cue/reference/releases/`
   - Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
         ([example](https://github.com/vectordotdev/vector/blob/9c67bba358195f5018febca2f228dfcb2be794b5/website/cue/reference/releases/0.41.0.cue#L33-L64))
