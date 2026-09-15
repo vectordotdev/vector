@@ -1,19 +1,20 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::commands::release::generate_cue;
 use crate::utils::{command::run_command, git, paths};
+use crate::{app::CommandExt as _, commands::release::generate_cue};
 use anyhow::{Context, Result, anyhow, bail};
 use semver::Version;
 use std::{
     env, fs,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 use toml_edit::DocumentMut;
 
 const KUBECLT_CUE_FILE: &str = "website/cue/reference/administration/interfaces/kubectl.cue";
 const INSTALL_SCRIPT: &str = "distribution/install.sh";
+const RELEASE_STATE_FILE: &str = ".github/release-state.json";
 
 /// Release preparations CLI options.
 #[derive(clap::Args, Debug)]
@@ -42,6 +43,12 @@ struct Prepare {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        if !self.version.pre.is_empty() || !self.version.build.is_empty() {
+            bail!("release version must be a stable semantic version");
+        }
+        if !self.vrl_version.pre.is_empty() || !self.vrl_version.build.is_empty() {
+            bail!("VRL version must be a stable semantic version");
+        }
         let repo_root = paths::find_repo_root()?;
         env::set_current_dir(&repo_root)?;
 
@@ -66,13 +73,19 @@ impl Cli {
 impl Prepare {
     pub fn run(&self) -> Result<()> {
         debug!("run");
-        self.create_release_branches()?;
+        let prepared_from = self.create_release_branches()?;
+        self.prepare_version_state(&prepared_from)?;
         self.pin_vrl_version()?;
 
         self.generate_release_cue()?;
 
         self.update_vector_version(&self.repo_root.join(KUBECLT_CUE_FILE))?;
         self.update_vector_version(&self.repo_root.join(INSTALL_SCRIPT))?;
+
+        Command::new("cargo")
+            .args(["metadata", "--locked", "--no-deps", "--format-version", "1"])
+            .stdout(Stdio::null())
+            .check_run()?;
 
         if !self.dry_run {
             self.open_release_pr()?;
@@ -82,7 +95,7 @@ impl Prepare {
     }
 
     /// Steps 1 & 2
-    fn create_release_branches(&self) -> Result<()> {
+    fn create_release_branches(&self) -> Result<String> {
         debug!("create_release_branches");
 
         if self.dry_run {
@@ -102,6 +115,10 @@ impl Prepare {
             git::checkout_main_branch()?;
         }
 
+        let prepared_from = git::run_and_check_output(&["rev-parse", "HEAD"])?
+            .trim()
+            .to_string();
+
         git::checkout_or_create_branch(self.release_branch.as_str())?;
         if !self.dry_run {
             git::push_and_set_upstream(self.release_branch.as_str())?;
@@ -113,6 +130,39 @@ impl Prepare {
         if !self.dry_run {
             git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
         }
+        Ok(prepared_from)
+    }
+
+    fn prepare_version_state(&self, prepared_from: &str) -> Result<()> {
+        debug!("prepare_version_state");
+
+        let cargo_toml_path = self.repo_root.join("Cargo.toml");
+        let contents = fs::read_to_string(&cargo_toml_path).context("Failed to read Cargo.toml")?;
+        let expected_version = format!("{}-dev", self.new_vector_version);
+        let release_version = self.new_vector_version.to_string();
+        let updated_contents =
+            update_vector_package_version(&contents, &expected_version, &release_version)?;
+        fs::write(&cargo_toml_path, updated_contents).context("Failed to write Cargo.toml")?;
+
+        run_command("cargo update -p vector");
+
+        let state = serde_json::json!({
+            "schema_version": 1,
+            "status": "prepared",
+            "version": release_version,
+            "prepared_from": prepared_from,
+        });
+        fs::write(
+            self.repo_root.join(RELEASE_STATE_FILE),
+            format!("{}\n", serde_json::to_string_pretty(&state)?),
+        )
+        .context("Failed to write release state")?;
+
+        git::add_files_in_current_dir()?;
+        git::commit(&format!(
+            "chore(releasing): Prepare version {}",
+            self.new_vector_version
+        ))?;
         Ok(())
     }
 
@@ -260,6 +310,26 @@ fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result
     Ok(doc.to_string())
 }
 
+fn update_vector_package_version(
+    cargo_toml_contents: &str,
+    expected_version: &str,
+    release_version: &str,
+) -> Result<String> {
+    let mut doc = cargo_toml_contents
+        .parse::<DocumentMut>()
+        .context("Failed to parse Cargo.toml")?;
+    let current_version = doc["package"]["version"]
+        .as_str()
+        .context("package.version should be a string")?;
+
+    if current_version != expected_version {
+        bail!("expected package version {expected_version}, found {current_version}");
+    }
+
+    doc["package"]["version"] = toml_edit::value(release_version);
+    Ok(doc.to_string())
+}
+
 fn format_vrl_changelog_block(changelog: &str) -> String {
     let double_tab = "\t\t";
     let body = changelog
@@ -349,7 +419,8 @@ fn get_vrl_changelog(version: &Version) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use crate::commands::release::prepare::{
-        format_vrl_changelog_block, insert_block_after_changelog, update_vrl_to_version,
+        format_vrl_changelog_block, insert_block_after_changelog, update_vector_package_version,
+        update_vrl_to_version,
     };
     use indoc::indoc;
 
@@ -372,6 +443,30 @@ mod tests {
         "#};
 
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_update_vector_package_version() {
+        let input = indoc! {r#"
+            [package]
+            name = "vector"
+            version = "0.59.0-dev"
+
+            [workspace]
+            resolver = "2"
+        "#};
+
+        let result = update_vector_package_version(input, "0.59.0-dev", "0.59.0")
+            .expect("should update the expected development version");
+        assert!(result.contains("version = \"0.59.0\""));
+
+        let error = update_vector_package_version(input, "0.58.0-dev", "0.59.0")
+            .expect_err("should reject an unexpected starting version");
+        assert!(
+            error
+                .to_string()
+                .contains("expected package version 0.58.0-dev")
+        );
     }
 
     #[test]
