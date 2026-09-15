@@ -127,7 +127,6 @@ pub struct FileSinkConfig {
     /// with one syscall per batch, reducing overhead when routing to many partitions
     /// (for example, one file per Kafka topic). The default timeout is 1 second; raising it
     /// increases throughput at the cost of end-to-end latency.
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
 }
@@ -195,6 +194,7 @@ pub enum Compression {
 
 struct OutFile {
     created_at: Instant,
+    compression: Compression,
     inner: OutFileInner,
 }
 
@@ -211,6 +211,7 @@ impl OutFile {
     fn new(file: File, compression: Compression) -> Self {
         Self {
             created_at: Instant::now(),
+            compression,
             inner: match compression {
                 Compression::None => OutFileInner::Regular(file),
                 Compression::Gzip => OutFileInner::Gzip(GzipEncoder::new(file)),
@@ -246,15 +247,6 @@ impl OutFile {
         }
     }
 
-    async fn write_all(&mut self, src: &[u8]) -> Result<(), std::io::Error> {
-        match &mut self.inner {
-            OutFileInner::Regular(file) => file.write_all(src).await,
-            OutFileInner::Gzip(gzip) => gzip.write_all(src).await,
-            OutFileInner::Zstd(zstd) => zstd.write_all(src).await,
-            OutFileInner::Empty => unreachable!("OutFileInner::Empty is transient"),
-        }
-    }
-
     async fn len(&mut self) -> Result<u64, std::io::Error> {
         match &mut self.inner {
             OutFileInner::Regular(file) => file.metadata().await.map(|m| m.len()),
@@ -265,24 +257,18 @@ impl OutFile {
     }
 
     async fn reset(&mut self, size: u64) -> Result<(), std::io::Error> {
-        let inner = std::mem::replace(&mut self.inner, OutFileInner::Empty);
-        enum Kind {
-            Regular,
-            Gzip,
-            Zstd,
-        }
-        let (kind, mut file) = match inner {
-            OutFileInner::Regular(file) => (Kind::Regular, file),
-            OutFileInner::Gzip(gzip) => (Kind::Gzip, gzip.into_inner()),
-            OutFileInner::Zstd(zstd) => (Kind::Zstd, zstd.into_inner()),
+        let mut file = match std::mem::replace(&mut self.inner, OutFileInner::Empty) {
+            OutFileInner::Regular(file) => file,
+            OutFileInner::Gzip(gzip) => gzip.into_inner(),
+            OutFileInner::Zstd(zstd) => zstd.into_inner(),
             OutFileInner::Empty => unreachable!("OutFileInner::Empty is transient"),
         };
         file.set_len(size).await?;
         file.seek(std::io::SeekFrom::Start(size)).await?;
-        self.inner = match kind {
-            Kind::Regular => OutFileInner::Regular(file),
-            Kind::Gzip => OutFileInner::Gzip(GzipEncoder::new(file)),
-            Kind::Zstd => OutFileInner::Zstd(ZstdEncoder::new(file)),
+        self.inner = match self.compression {
+            Compression::None => OutFileInner::Regular(file),
+            Compression::Gzip => OutFileInner::Gzip(GzipEncoder::new(file)),
+            Compression::Zstd => OutFileInner::Zstd(ZstdEncoder::new(file)),
         };
         Ok(())
     }
@@ -474,7 +460,8 @@ impl FileSink {
         loop {
             let input_next = input.next();
 
-            let next_timer_deadline = flush_deadlines.peek()
+            let next_timer_deadline = flush_deadlines
+                .peek()
                 .map(|&std::cmp::Reverse((d, _, _))| d);
 
             tokio::select! {
@@ -558,7 +545,7 @@ impl FileSink {
                                 *generation += 1;
                             }
                             // Flush immediately when the batch reaches the item or byte limit.
-                            let needs_flush = buffers.get(&path).map_or(false, |(events, _)| {
+                            let needs_flush = buffers.get(&path).is_some_and(|(events, _)| {
                                 let total_size: usize = events.iter()
                                     .map(|e| e.estimated_json_encoded_size_of().get())
                                     .sum();
@@ -577,7 +564,7 @@ impl FileSink {
                                 let now = tokio::time::Instant::now();
                                 loop {
                                     let expire_or_cap =
-                                        flush_deadlines.peek().map_or(false,
+                                        flush_deadlines.peek().is_some_and(
                                             |std::cmp::Reverse((d, _, _))| {
                                                 *d <= now || buffers.len() > 1000
                                             },
@@ -652,17 +639,16 @@ impl FileSink {
             // Flush any expired buffers after every wake-up.
             let now = tokio::time::Instant::now();
             loop {
-                let expired = flush_deadlines.peek().map_or(false,
-                    |std::cmp::Reverse((d, _, _))| *d <= now,
-                );
+                let expired = flush_deadlines
+                    .peek()
+                    .is_some_and(|std::cmp::Reverse((d, _, _))| *d <= now);
                 if !expired {
                     break;
                 }
-                let std::cmp::Reverse((_, path, generation)) =
-                    match flush_deadlines.pop() {
-                        Some(e) => e,
-                        None => break,
-                    };
+                let std::cmp::Reverse((_, path, generation)) = match flush_deadlines.pop() {
+                    Some(e) => e,
+                    None => break,
+                };
                 if let Some((events, current_generation)) = buffers.remove(&path) {
                     if current_generation == generation {
                         self.process_batch(path, events).await;
@@ -682,6 +668,7 @@ impl FileSink {
 
         let bytes_path = BytesPath::new(path.clone());
         let truncate = self.should_truncate(&bytes_path, &path).await;
+        let compression = self.compression;
 
         let file = if !truncate {
             if let Some(file) = self.files.reset_at(&path, next_deadline) {
@@ -727,7 +714,7 @@ impl FileSink {
                     }
                 };
 
-                let outfile = OutFile::new(file, self.compression);
+                let outfile = OutFile::new(file, compression);
                 self.files.insert_at(path.clone(), outfile, next_deadline);
                 emit!(FileOpen {
                     count: self.files.len()
@@ -771,7 +758,6 @@ impl FileSink {
                 }
             };
 
-            let compression = self.compression;
             let outfile = OutFile::new(file, compression);
             self.files.insert_at(path.clone(), outfile, next_deadline);
             emit!(FileOpen {
@@ -830,11 +816,7 @@ impl FileSink {
                 finalizers.update_status(EventStatus::Delivered);
                 self.events_sent.emit(CountByteSize(1, event_size));
             }
-            emit!(FileBytesSent {
-                byte_size: 0,
-                file: String::from_utf8_lossy(&path),
-                include_file_metric_tag: self.include_file_metric_tag,
-            });
+            emit_bytes_sent(&path, 0, self.include_file_metric_tag);
             return;
         }
 
@@ -857,10 +839,12 @@ impl FileSink {
         let mut written = 0usize;
         let write_result: Result<(), std::io::Error> = loop {
             match file.write(&batch_buffer[written..]).await {
-                Ok(0) => break Err(std::io::Error::new(
-                    std::io::ErrorKind::WriteZero,
-                    "write returned 0",
-                )),
+                Ok(0) => {
+                    break Err(std::io::Error::new(
+                        std::io::ErrorKind::WriteZero,
+                        "write returned 0",
+                    ));
+                }
                 Ok(n) => {
                     written += n;
                     if written >= len {
@@ -874,100 +858,50 @@ impl FileSink {
 
         match write_result {
             Ok(()) => {
-                for (buf, finalizers, event_size) in encoded {
+                for (_buf, finalizers, event_size) in encoded {
                     finalizers.update_status(EventStatus::Delivered);
                     self.events_sent.emit(CountByteSize(1, event_size));
                 }
-                emit!(FileBytesSent {
-                    byte_size: len,
-                    file: String::from_utf8_lossy(&path),
-                    include_file_metric_tag: self.include_file_metric_tag,
-                });
+                emit_bytes_sent(&path, len, self.include_file_metric_tag);
             }
-                Err(error) => {
-                    // `written` bytes made it to the file / compression stream.
-                    // Events whose end offset lies at or before `written` were
-                    // fully persisted; everything beyond that must be retried.
-                    //
-                    // If the write ended inside an event boundary the partially
-                    // appended record would corrupt framed output on retry, so
-                    // the file must be rewound past it before those events are
-                    // re-admitted.
-                    let last_complete = boundaries
-                        .iter()
-                        .filter(|&&b| b <= written)
-                        .last()
-                        .copied()
-                        .unwrap_or(0);
+            Err(error) => {
+                // `written` bytes made it to the file / compression stream.
+                // Events whose end offset lies at or before `written` were
+                // fully persisted; everything beyond that must be retried.
+                let last_complete = boundaries
+                    .iter()
+                    .rfind(|&&b| b <= written)
+                    .copied()
+                    .unwrap_or(0);
+                let delivered_up_to = reconcile_after_partial_write(
+                    file,
+                    compression,
+                    file_start,
+                    written,
+                    last_complete,
+                )
+                .await;
 
-                    // Rolling back a partial record only works for uncompressed
-                    // output, where we can truncate at the last complete record
-                    // boundary. A compressed stream cannot be rewound to a
-                    // record boundary: the partial record is already inside the
-                    // encoder, and feeding it the full record again would
-                    // duplicate it in the decompressed stream. Instead, rewind
-                    // the whole batch and reset the encoder so the partial
-                    // record is not retained and retries start a fresh stream.
-                    let delivered_up_to = if last_complete < written {
-                        // Only rewind when the file still ends where this batch
-                        // left it; rollback must never remove bytes appended by
-                        // another writer.
-                        let can_rewind = match file.len().await {
-                            Ok(current_len) if compression == Compression::None => {
-                                current_len == file_start + written as u64
-                            }
-                            Ok(current_len) => file
-                                .len()
-                                .await
-                                .is_ok_and(|again| again == current_len),
-                            Err(_) => false,
-                        };
-                        if can_rewind {
-                            let rewind_to = if compression == Compression::None {
-                                file_start + last_complete as u64
-                            } else {
-                                file_start
-                            };
-                            if let Err(e) = file.reset(rewind_to).await {
-                                warn!(message = "Failed to rewind file after partial write.", error = ?e);
-                            }
-                        } else {
-                            warn!(message = "File changed while writing; cannot safely rewind after partial write.",);
-                        }
-                        if compression == Compression::None {
-                            last_complete
-                        } else {
-                            0
-                        }
+                let dropped_events = boundaries.iter().filter(|&&b| b > delivered_up_to).count();
+                for (i, (_buf, finalizers, event_size)) in encoded.into_iter().enumerate() {
+                    if boundaries[i] <= delivered_up_to {
+                        finalizers.update_status(EventStatus::Delivered);
+                        self.events_sent.emit(CountByteSize(1, event_size));
                     } else {
-                        last_complete
-                    };
-
-                    let dropped_events =
-                        boundaries.iter().filter(|&&b| b > delivered_up_to).count();
-                    for (i, (_buf, finalizers, event_size)) in encoded.into_iter().enumerate() {
-                        if boundaries[i] <= delivered_up_to {
-                            finalizers.update_status(EventStatus::Delivered);
-                            self.events_sent.emit(CountByteSize(1, event_size));
-                        } else {
-                            finalizers.update_status(EventStatus::Errored);
-                        }
-                    }
-                    emit!(FileIoError {
-                        code: "failed_writing_file",
-                        message: "Failed to write the file.",
-                        error,
-                        path: &path,
-                        dropped_events,
-                    });
-                    if delivered_up_to > 0 {
-                        emit!(FileBytesSent {
-                            byte_size: delivered_up_to,
-                            file: String::from_utf8_lossy(&path),
-                            include_file_metric_tag: self.include_file_metric_tag,
-                        });
+                        finalizers.update_status(EventStatus::Errored);
                     }
                 }
+                emit!(FileIoError {
+                    code: "failed_writing_file",
+                    message: "Failed to write the file.",
+                    error,
+                    path: &path,
+                    dropped_events,
+                });
+                if delivered_up_to > 0 {
+                    emit_bytes_sent(&path, delivered_up_to, self.include_file_metric_tag);
+                }
+            }
         }
     }
 
@@ -1096,6 +1030,61 @@ async fn create_dirs_nofollow(path: &Path, base: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+fn emit_bytes_sent(path: &Bytes, byte_size: usize, include_file_metric_tag: bool) {
+    emit!(FileBytesSent {
+        byte_size,
+        file: String::from_utf8_lossy(path),
+        include_file_metric_tag,
+    });
+}
+
+/// Determines how much of a partially written batch is cleanly persisted and
+/// rewinds `file` so no partial record precedes a retry.
+///
+/// For uncompressed output the file can be truncated back to the last complete
+/// record boundary. A compressed stream cannot be rewound to a record boundary:
+/// the partial record is already inside the encoder, and feeding it the full
+/// record again would duplicate it in the decompressed stream. Instead, rewind
+/// the whole batch and reset the encoder so the partial record is not retained
+/// and retries start a fresh stream. In both cases, only rewind when the file
+/// still ends where this batch left it, so rollback never removes bytes
+/// appended by another writer.
+async fn reconcile_after_partial_write(
+    file: &mut OutFile,
+    compression: Compression,
+    file_start: u64,
+    written: usize,
+    last_complete: usize,
+) -> usize {
+    if last_complete >= written {
+        return last_complete;
+    }
+    let can_rewind = match file.len().await {
+        Ok(current_len) if compression == Compression::None => {
+            current_len == file_start + written as u64
+        }
+        Ok(current_len) => file.len().await.is_ok_and(|again| again == current_len),
+        Err(_) => false,
+    };
+    if can_rewind {
+        let rewind_to = if compression == Compression::None {
+            file_start + last_complete as u64
+        } else {
+            file_start
+        };
+        if let Err(e) = file.reset(rewind_to).await {
+            warn!(message = "Failed to rewind file after partial write.", error = ?e);
+        }
+    } else {
+        warn!(message = "File changed while writing; cannot safely rewind after partial write.",);
+    }
+    if compression == Compression::None {
+        last_complete
+    } else {
+        0
+    }
 }
 
 async fn open_file(
@@ -1710,18 +1699,25 @@ mod tests {
         cfg.base_dir = Some(apps.clone());
 
         let mut event = Event::Log(LogEvent::from("payload"));
-        event.as_mut_log().insert(event_path!("service"), "../../../etc/cron.d/vh-poc");
+        event
+            .as_mut_log()
+            .insert(event_path!("service"), "../../../etc/cron.d/vh-poc");
 
         // Run without compliance checks — no events are sent, so the compliance
         // metric assertions (BytesSent / component_sent_bytes_total) would fail.
         let sink = FileSink::new(&cfg, SinkContext::default()).unwrap();
         VectorSink::from_event_streamsink(sink)
-            .run(Box::pin(stream::iter(vec![event].into_iter().map(Into::into))))
+            .run(Box::pin(stream::iter(
+                vec![event].into_iter().map(Into::into),
+            )))
             .await
             .expect("Running sink failed");
 
         // `confine` rejects the traversal before any filesystem mutation.
-        assert!(!apps.exists(), "base_dir should not have been created: {:?}", apps);
+        assert!(
+            !apps.exists(),
+            "base_dir should not have been created: {apps:?}"
+        );
     }
 
     #[cfg(unix)]
@@ -1734,7 +1730,9 @@ mod tests {
         let template = format!("{}/{{{{ key }}}}.log", dir.display());
         let mut cfg = base_config(&template);
         cfg.base_dir = Some(dir.clone());
-        cfg.internal_metrics = FileInternalMetricsConfig { include_file_tag: true };
+        cfg.internal_metrics = FileInternalMetricsConfig {
+            include_file_tag: true,
+        };
 
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "/etc/passwd");
@@ -1756,7 +1754,9 @@ mod tests {
         let template = format!("{}/{{{{ key }}}}.log", dir.display());
         let mut cfg = base_config(&template);
         cfg.base_dir = Some(dir.clone());
-        cfg.internal_metrics = FileInternalMetricsConfig { include_file_tag: true };
+        cfg.internal_metrics = FileInternalMetricsConfig {
+            include_file_tag: true,
+        };
 
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "tenant-a");
@@ -1786,8 +1786,11 @@ mod tests {
         let dir = temp_dir();
         let template = format!("{}/{{{{ key }}}}.log", dir.display());
         let mut cfg = base_config(&template);
-        cfg.confinement.dangerously_allow_unconfined_template_resolution = true;
-        cfg.internal_metrics = FileInternalMetricsConfig { include_file_tag: true };
+        cfg.confinement
+            .dangerously_allow_unconfined_template_resolution = true;
+        cfg.internal_metrics = FileInternalMetricsConfig {
+            include_file_tag: true,
+        };
 
         let mut event = Event::Log(LogEvent::from("payload"));
         event.as_mut_log().insert(event_path!("key"), "safe-value");
