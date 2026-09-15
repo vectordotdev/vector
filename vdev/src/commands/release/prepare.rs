@@ -72,7 +72,16 @@ impl Cli {
 impl Prepare {
     pub fn run(&self) -> Result<()> {
         debug!("run");
-        self.create_release_branches()?;
+        if self.dry_run {
+            let head = git::run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])
+                .unwrap_or_else(|_| "<unknown>".to_string());
+            warn!(
+                "dry-run: generating changes on HEAD ({}) without switching branches",
+                head.trim()
+            );
+        } else {
+            self.create_release_branches()?;
+        }
         self.prepare_vector_version()?;
         self.pin_vrl_version()?;
 
@@ -97,34 +106,17 @@ impl Prepare {
     fn create_release_branches(&self) -> Result<()> {
         debug!("create_release_branches");
 
-        if self.dry_run {
-            // In dry-run mode the release is based on whatever is currently
-            // checked out. Surface that explicitly so a stale or feature
-            // branch doesn't silently produce a release from the wrong base.
-            let head = git::run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])
-                .unwrap_or_else(|_| "<unknown>".to_string());
-            warn!(
-                "dry-run: using HEAD ({}) as the release base; \
-                 verify this matches what you'd expect from master.",
-                head.trim()
-            );
-        } else {
-            // Step 1: Sync with remote and start from master.
-            git::run_and_check_output(&["fetch"])?;
-            git::checkout_main_branch()?;
-        }
+        // Step 1: Sync with remote and start from master.
+        git::run_and_check_output(&["fetch"])?;
+        git::checkout_main_branch()?;
 
         git::checkout_or_create_branch(self.release_branch.as_str())?;
-        if !self.dry_run {
-            git::push_and_set_upstream(self.release_branch.as_str())?;
-        }
+        git::push_and_set_upstream(self.release_branch.as_str())?;
 
         // Step 2: Create a new release preparation branch
         //         The branch website contains 'website' to generate vector.dev preview.
         git::checkout_or_create_branch(self.release_preparation_branch.as_str())?;
-        if !self.dry_run {
-            git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
-        }
+        git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
         Ok(())
     }
 

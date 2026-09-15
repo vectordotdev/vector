@@ -3,6 +3,7 @@ mod generate_cue;
 mod github;
 mod homebrew;
 mod prepare;
+mod workflow;
 
 crate::cli_subcommands! {
     "Manage the release process..."
@@ -12,6 +13,7 @@ crate::cli_subcommands! {
     github,
     homebrew,
     prepare,
+    workflow,
     s3,
 }
 
