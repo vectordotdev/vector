@@ -90,10 +90,11 @@ jobs:
           RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
         run: |
           set -euo pipefail
-          gh auth setup-git
           if git rev-parse --verify --quiet "refs/tags/${TAG}"; then
             echo "$TAG already points at $GITHUB_SHA"
           else
             git tag "$TAG" "$GITHUB_SHA"
           fi
-          git push --atomic origin "$TAG" "HEAD:refs/heads/${RELEASE_BRANCH}"
+          git push --atomic \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "$TAG" "HEAD:refs/heads/${RELEASE_BRANCH}"

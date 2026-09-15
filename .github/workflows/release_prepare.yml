@@ -184,8 +184,9 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ inputs.version }}
         run: |
-          gh auth setup-git
-          git push --set-upstream origin "HEAD:release/prepare-v${VERSION}"
+          git push \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/release/prepare-v${VERSION}"
 
       - name: Open preparation PR
         env:
