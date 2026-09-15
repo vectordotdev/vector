@@ -39,8 +39,11 @@ jobs:
       # Keep vendored protos in their upstream format.
       - name: Check owned protobuf style
         run: |
-          buf format proto/vector/vector.proto --diff --exit-code
-          buf format proto/vector/observability.proto --diff --exit-code
-          buf format lib/vector-core/proto/event.proto --diff --exit-code
-          buf lint --config buf.vector.yaml --path proto/vector/vector.proto
-          buf lint --config buf.vector.yaml --path proto/vector/observability.proto
+          for proto in \
+            lib/vector-core/proto/event.proto \
+            proto/vector/observability.proto \
+            proto/vector/vector.proto
+          do
+            buf format "$proto" --diff --exit-code
+            buf lint --config buf.vector.yaml --path "$proto"
+          done

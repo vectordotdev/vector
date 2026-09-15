@@ -6,6 +6,9 @@ lint:
   use:
     - BASIC
   ignore_only:
+    ENUM_VALUE_UPPER_SNAKE_CASE:
+      - lib/vector-core/proto/event.proto
     PACKAGE_DIRECTORY_MATCH:
+      - lib/vector-core/proto/event.proto
       - proto/vector/observability.proto
   disallow_comment_ignores: true
