@@ -53,7 +53,7 @@ impl SecretBackend for AwsSecretsManagerBackend {
     async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
-        _: &mut signal::SignalRx,
+        _: &mut signal::ShutdownReceiver,
     ) -> crate::Result<HashMap<String, String>> {
         let client = create_client::<SecretsManagerClientBuilder>(
             &SecretsManagerClientBuilder {},

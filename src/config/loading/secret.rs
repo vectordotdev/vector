@@ -69,7 +69,7 @@ impl SecretBackendLoader {
 
         debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
         let mut secrets: HashMap<String, String> = HashMap::new();
-        let mut signal_rx = signal_handler.subscribe();
+        let mut signal_rx = signal_handler.subscribe_shutdown();
 
         for (backend_name, keys) in &self.secret_keys {
             let backend = self
