@@ -280,7 +280,7 @@ fn stub_enrichment_tables(config: &Config) -> TableRegistry {
         enrichment_tables.load(stubs);
         // Do not call finish_load(): table_ids() and add_index() (used during
         // VRL compilation) both operate on the loading stage. finish_load()
-        // would move tables to the ArcSwap and make table_ids() return nothing.
+        // would publish the tables snapshot and make table_ids() return nothing.
     }
     enrichment_tables
 }

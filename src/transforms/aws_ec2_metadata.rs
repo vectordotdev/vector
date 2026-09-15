@@ -3,10 +3,9 @@ use std::{
     error, fmt,
     future::ready,
     pin::Pin,
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, Mutex, PoisonError},
 };
 
-use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{Request, StatusCode, Uri, uri::PathAndQuery};
@@ -171,7 +170,7 @@ const fn default_required() -> bool {
 
 #[derive(Clone, Debug)]
 pub struct Ec2MetadataTransform {
-    state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
+    state: Arc<Mutex<Arc<[(MetadataKey, Bytes)]>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -204,7 +203,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        let state = Arc::new(ArcSwap::new(Arc::new(vec![])));
+        let state = Arc::new(Mutex::new(Arc::from([])));
 
         let keys = Keys::new(self.namespace.clone());
         let host = Uri::from_maybe_shared(self.endpoint.clone()).unwrap();
@@ -322,7 +321,7 @@ impl TaskTransform<Event> for Ec2MetadataTransform {
 
 impl Ec2MetadataTransform {
     fn transform_one(&mut self, mut event: Event) -> Event {
-        let state = self.state.load();
+        let state = Arc::clone(&self.state.lock().unwrap_or_else(PoisonError::into_inner));
         match event {
             Event::Log(ref mut log) => {
                 state.iter().for_each(|(k, v)| {
@@ -346,7 +345,7 @@ struct MetadataClient {
     host: Uri,
     token: Option<(Bytes, Instant)>,
     keys: Keys,
-    state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
+    state: Arc<Mutex<Arc<[(MetadataKey, Bytes)]>>>,
     refresh_interval: Duration,
     refresh_timeout: Duration,
     fields: HashSet<String>,
@@ -373,7 +372,7 @@ impl MetadataClient {
         client: HttpClient<Body>,
         host: Uri,
         keys: Keys,
-        state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
+        state: Arc<Mutex<Arc<[(MetadataKey, Bytes)]>>>,
         refresh_interval: Duration,
         refresh_timeout: Duration,
         fields: Vec<String>,
@@ -586,7 +585,7 @@ impl MetadataClient {
                 }
             }
 
-            self.state.store(Arc::new(new_state));
+            *self.state.lock().unwrap_or_else(PoisonError::into_inner) = Arc::from(new_state);
         }
 
         Ok(())
