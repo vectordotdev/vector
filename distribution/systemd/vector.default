@@ -1,4 +1,4 @@
-# /etc/default/vector
+# Environment variables for Vector.
 # This file can theoretically contain a bunch of environment variables
 # for Vector.  See https://vector.dev/docs/setup/configuration/#environment-variables
 # for details.
