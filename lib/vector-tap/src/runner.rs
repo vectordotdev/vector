@@ -56,14 +56,13 @@ impl EventFormatter {
         if self.meta {
             match self.format {
                 TapEncodingFormat::Json => format!(
-                    r#"{{"{}":"{}","{}":"{}","{}":"{}","event":{}}}"#,
+                    r#"{{"{}":"{}","{}":"{}","{}":"{}","event":{event}}}"#,
                     self.component_id_label,
                     component_id.green(),
                     self.component_kind_label,
                     component_kind.green(),
                     self.component_type_label,
-                    component_type.green(),
-                    event
+                    component_type.green()
                 )
                 .into(),
                 TapEncodingFormat::Yaml => {
@@ -85,14 +84,13 @@ impl EventFormatter {
                     .into()
                 }
                 TapEncodingFormat::Logfmt => format!(
-                    "{}={} {}={} {}={} {}",
+                    "{}={} {}={} {}={} {event}",
                     self.component_id_label,
                     component_id.green(),
                     self.component_kind_label,
                     component_kind.green(),
                     self.component_type_label,
-                    component_type.green(),
-                    event
+                    component_type.green()
                 )
                 .into(),
             }
@@ -126,9 +124,9 @@ impl TapExecutorError {
 impl From<vector_api_client::Error> for TapExecutorError {
     fn from(err: vector_api_client::Error) -> Self {
         if err.is_fatal() {
-            TapExecutorError::Fatal(format!("{}", err))
+            TapExecutorError::Fatal(format!("{err}"))
         } else {
-            TapExecutorError::GrpcError(format!("{}", err))
+            TapExecutorError::GrpcError(format!("{err}"))
         }
     }
 }
@@ -263,17 +261,19 @@ impl<'a> TapRunner<'a> {
 
         let core_event_wrapper =
             vector_core::event::proto::EventWrapper::decode(Bytes::from(bytes))
-                .map_err(|e| format!("Failed to decode event: {}", e))?;
+                .map_err(|e| format!("Failed to decode event: {e}"))?;
 
         // Convert to vector-core Event (which has Serialize)
         let event: Event = core_event_wrapper.into();
 
         // Serialize based on format
         match format {
-            TapEncodingFormat::Json => serde_json::to_string(&event)
-                .map_err(|e| format!("JSON serialization failed: {}", e)),
-            TapEncodingFormat::Yaml => serde_yaml::to_string(&event)
-                .map_err(|e| format!("YAML serialization failed: {}", e)),
+            TapEncodingFormat::Json => {
+                serde_json::to_string(&event).map_err(|e| format!("JSON serialization failed: {e}"))
+            }
+            TapEncodingFormat::Yaml => {
+                serde_yaml::to_string(&event).map_err(|e| format!("YAML serialization failed: {e}"))
+            }
             TapEncodingFormat::Logfmt => {
                 // For logfmt, we need to extract the log event and serialize it
                 match event {
@@ -284,9 +284,9 @@ impl<'a> TapRunner<'a> {
                         // Wrap the LogEvent back into Event for the serializer
                         serializer
                             .encode(Event::Log(log_event), &mut bytes)
-                            .map_err(|e| format!("Logfmt serialization failed: {}", e))?;
+                            .map_err(|e| format!("Logfmt serialization failed: {e}"))?;
                         String::from_utf8(bytes.to_vec())
-                            .map_err(|e| format!("UTF-8 conversion failed: {}", e))
+                            .map_err(|e| format!("UTF-8 conversion failed: {e}"))
                     }
                     Event::Metric(_) => {
                         Err("logfmt format is only supported for log events".to_string())
@@ -315,7 +315,7 @@ impl<'a> TapRunner<'a> {
                         Ok(s) => s,
                         Err(e) => {
                             error!(message = "Failed to serialize event.", error = %e);
-                            format!("{:?}", event_wrapper)
+                            format!("{event_wrapper:?}")
                         }
                     }
                 } else {

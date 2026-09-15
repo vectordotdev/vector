@@ -124,7 +124,7 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
         builder = builder.authority(authority.clone());
     };
     builder = builder.path_and_query(match serializer.finish() {
-        query if !query.is_empty() => format!("{}?{}", uri.path(), query),
+        query if !query.is_empty() => format!("{}?{query}", uri.path()),
         _ => uri.path().to_string(),
     });
     builder

@@ -41,10 +41,8 @@ impl TestHarness {
         while events.len() < count {
             if start.elapsed() >= TAP_TIMEOUT {
                 return Err(format!(
-                    "Timeout: collected {}/{} events in {:?}",
-                    events.len(),
-                    count,
-                    TAP_TIMEOUT
+                    "Timeout: collected {}/{count} events in {TAP_TIMEOUT:?}",
+                    events.len()
                 ));
             }
 
@@ -53,7 +51,7 @@ impl TestHarness {
                     events.push(event);
                 }
                 Ok(Some(Err(e))) => {
-                    return Err(format!("Stream error: {}", e));
+                    return Err(format!("Stream error: {e}"));
                 }
                 Ok(None) => {
                     return Err(format!(
@@ -107,9 +105,8 @@ async fn tap_receives_events() {
 
     assert!(
         !tapped_events.is_empty(),
-        "Should receive at least one tapped event, got {} events total ({} notifications)",
-        events.len(),
-        notification_count
+        "Should receive at least one tapped event, got {} events total ({notification_count} notifications)",
+        events.len()
     );
 }
 

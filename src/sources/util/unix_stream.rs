@@ -52,9 +52,8 @@ where
     Ok(Box::pin(async move {
         let listener = UnixListener::bind(&listen_path).unwrap_or_else(|e| {
             panic!(
-                "Failed to bind to listener socket at path: {}. Err: {}",
-                listen_path.to_string_lossy(),
-                e
+                "Failed to bind to listener socket at path: {}. Err: {e}",
+                listen_path.to_string_lossy()
             )
         });
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");

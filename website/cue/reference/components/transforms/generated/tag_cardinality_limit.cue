@@ -141,11 +141,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						Tags not listed here use the per-metric configuration.
 						"""
 					required: false
-					type: object: options: "*": {
-						description: "An individual tag configuration."
-						required:    true
-						type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::PerTagConfig"]
-					}
+					type:     _schemaDefinitions["derived::9e26f78cee8a2ec00ecddfee"]
 				}
 				value_limit: {
 					description: "How many distinct values to accept for any given key. Ignored when `mode: excluded`."
@@ -165,11 +161,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			and the precedence rules.
 			"""
 		required: false
-		type: object: options: "*": {
-			description: "An individual tag configuration."
-			required:    true
-			type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::PerTagConfig"]
-		}
+		type:     _schemaDefinitions["derived::9e26f78cee8a2ec00ecddfee"]
 	}
 	tracking_scope: {
 		description: "Controls how tag tracking state is partitioned across metrics."

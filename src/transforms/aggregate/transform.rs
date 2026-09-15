@@ -110,24 +110,22 @@ impl Aggregate {
         }
         if config.interval_ms > MAX_DURATION_MS {
             return Err(format!(
-                "`interval_ms` ({}) exceeds the maximum supported value of {} ms",
-                config.interval_ms, MAX_DURATION_MS
+                "`interval_ms` ({}) exceeds the maximum supported value of {MAX_DURATION_MS} ms",
+                config.interval_ms
             )
             .into());
         }
         if let Some(event_time) = &config.event_time {
             if event_time.max_future_ms > MAX_DURATION_MS {
                 return Err(format!(
-                    "`event_time.max_future_ms` ({}) exceeds the maximum supported value of {} ms",
-                    event_time.max_future_ms, MAX_DURATION_MS
-                )
+                    "`event_time.max_future_ms` ({}) exceeds the maximum supported value of {MAX_DURATION_MS} ms",
+                    event_time.max_future_ms)
                 .into());
             }
             if event_time.allowed_lateness_ms > MAX_DURATION_MS {
                 return Err(format!(
-                    "`event_time.allowed_lateness_ms` ({}) exceeds the maximum supported value of {} ms",
-                    event_time.allowed_lateness_ms, MAX_DURATION_MS
-                )
+                    "`event_time.allowed_lateness_ms` ({}) exceeds the maximum supported value of {MAX_DURATION_MS} ms",
+                    event_time.allowed_lateness_ms)
                 .into());
             }
         }

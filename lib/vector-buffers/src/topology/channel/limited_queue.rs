@@ -191,7 +191,7 @@ impl Metrics {
             legacy_max_gauge.set(max_value);
             Self {
                 histogram: histogram!(histogram_name, "output" => label_value.clone()),
-                gauge: gauge!(level_name, "output" => label_value.clone()),
+                gauge: gauge!(level_name, "output" => label_value),
                 mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
                 max_gauge,
                 legacy_max_gauge,
@@ -639,7 +639,7 @@ mod tests {
 
         // Attempting to produce one more then the max capacity should block
         let mut send_final = spawn({
-            let msg_clone = msg.clone();
+            let msg_clone = msg;
             async { tx.send(msg_clone).await }
         });
         assert_pending!(send_final.poll());

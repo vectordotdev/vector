@@ -407,7 +407,7 @@ impl ValidatedSink for AzureBlobSinkConfig {
                         "`auth` configuration must be provided when using `account_name`".into(),
                     );
                 }
-                format!("AccountName={}", account_name)
+                format!("AccountName={account_name}")
             }
             (None, None, Some(blob_endpoint)) => {
                 if self.auth.is_none() {
@@ -419,9 +419,9 @@ impl ValidatedSink for AzureBlobSinkConfig {
                 let blob_endpoint = if blob_endpoint.ends_with('/') {
                     blob_endpoint.clone()
                 } else {
-                    format!("{}/", blob_endpoint)
+                    format!("{blob_endpoint}/")
                 };
-                format!("BlobEndpoint={}", blob_endpoint)
+                format!("BlobEndpoint={blob_endpoint}")
             }
             (None, None, None) => {
                 return Err("One of `connection_string`, `account_name`, or `blob_endpoint` must be provided".into());
@@ -521,8 +521,7 @@ impl ValidatedSink for AzureBlobSinkConfig {
             validated.container_url.clone(),
             cx.proxy(),
             self.tls.clone(),
-        )
-        .await?;
+        )?;
 
         let healthcheck = build_healthcheck(self.container_name.clone(), Arc::clone(&client))?;
         let sink = self.build_processor(client, validated)?;
@@ -1067,7 +1066,7 @@ fn validate_auth_conflict(
     }
 }
 
-pub async fn build_client(
+pub fn build_client(
     auth: Option<AzureAuthentication>,
     parsed: ParsedConnectionString,
     url: Url,
@@ -1117,7 +1116,7 @@ pub async fn build_client(
         (Auth::None, Some(AzureAuthentication::Specific(..))) => {
             info!("Using Azure Authentication method.");
             let credential_result: Arc<dyn TokenCredential> =
-                auth.unwrap().credential().await.map_err(|e| {
+                auth.unwrap().credential().map_err(|e| {
                     Error::with_message(
                         ErrorKind::Credential,
                         format!("Failed to configure Azure Authentication: {e}"),
@@ -1134,7 +1133,7 @@ pub async fn build_client(
         #[cfg(test)]
         (Auth::None, Some(AzureAuthentication::MockCredential)) => {
             warn!("Using mock token credential authentication.");
-            credential = Some(auth.unwrap().credential().await.unwrap());
+            credential = Some(auth.unwrap().credential().unwrap());
         }
         #[cfg(test)]
         (_, Some(AzureAuthentication::MockCredential)) => {
@@ -1149,7 +1148,7 @@ pub async fn build_client(
         let port = url.port();
         proxy.no_proxy.matches(host)
             || port
-                .map(|p| proxy.no_proxy.matches(&format!("{}:{}", host, p)))
+                .map(|p| proxy.no_proxy.matches(&format!("{host}:{p}")))
                 .unwrap_or(false)
     };
     if bypass_proxy || !proxy.enabled {

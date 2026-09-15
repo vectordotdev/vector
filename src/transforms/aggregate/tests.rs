@@ -436,7 +436,7 @@ fn count_agg() {
 
     // Two absolutes with the same series, counter should be 2
     agg.record(gauge_a_1.clone());
-    agg.record(gauge_a_2.clone());
+    agg.record(gauge_a_2);
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -495,7 +495,7 @@ fn absolute_max() {
 
     // Two absolutes, result should be higher of the 2
     agg.record(gauge_a_1.clone());
-    agg.record(gauge_a_2.clone());
+    agg.record(gauge_a_2);
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -537,7 +537,7 @@ fn absolute_min() {
 
     // Two absolutes, result should be lower of the 2
     agg.record(gauge_a_1.clone());
-    agg.record(gauge_a_2.clone());
+    agg.record(gauge_a_2);
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -589,7 +589,7 @@ fn absolute_diff() {
     assert_eq!(1, out.len());
     assert_eq!(&gauge_a_1, &out[0]);
 
-    agg.record(gauge_a_2.clone());
+    agg.record(gauge_a_2);
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
@@ -671,9 +671,9 @@ fn absolute_mean() {
     assert_eq!(0, out.len());
 
     // Three absolutes, result should be mean
-    agg.record(gauge_a_1.clone());
-    agg.record(gauge_a_2.clone());
-    agg.record(gauge_a_3.clone());
+    agg.record(gauge_a_1);
+    agg.record(gauge_a_2);
+    agg.record(gauge_a_3);
     out.clear();
     agg.flush_into(&mut out);
     assert_eq!(1, out.len());
