@@ -113,6 +113,7 @@ pub struct FilePathOutsideBaseDirError<'a> {
     pub path: &'a std::path::Path,
     pub base_dir: &'a std::path::Path,
     pub error: ConfineError,
+    pub dropped_events: usize,
 }
 
 impl InternalEvent for FilePathOutsideBaseDirError<'_> {
@@ -132,9 +133,65 @@ impl InternalEvent for FilePathOutsideBaseDirError<'_> {
         )
         .increment(1);
         emit!(ComponentEventsDropped::<INTENTIONAL> {
-            count: 1,
+            count: self.dropped_events,
             reason: "Rendered path outside base_dir.",
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use serial_test::serial;
+    use vector_lib::{event::MetricValue, internal_event::InternalEvent, metrics::Controller};
+
+    use super::{ConfineError, FilePathOutsideBaseDirError};
+
+    fn discarded_intentional_count() -> f64 {
+        Controller::get()
+            .expect("metrics controller initialized")
+            .capture_metrics()
+            .into_iter()
+            .find(|m| {
+                m.name() == "component_discarded_events_total"
+                    && m.tags()
+                        .is_some_and(|t| t.get("intentional") == Some("true"))
+            })
+            .map(|m| match m.value() {
+                MetricValue::Counter { value } => *value,
+                other => panic!("expected counter for discarded events, got {other:?}"),
+            })
+            .unwrap_or(0.0)
+    }
+
+    // When a whole batch is rejected at open time, every record in the batch is
+    // marked Errored, so `ComponentDiscardedEventsTotal` must reflect the full
+    // `dropped_events` count -- not a hardcoded 1, which would undercount by
+    // `dropped_events - 1`.
+    #[test]
+    #[serial]
+    fn outside_base_dir_error_counts_all_rejected_events() {
+        crate::test_util::trace_init();
+
+        let before = discarded_intentional_count();
+        FilePathOutsideBaseDirError {
+            path: Path::new("/tmp/outside/file.log"),
+            base_dir: Path::new("/tmp/base"),
+            error: ConfineError::SymlinkEscape {
+                parent: PathBuf::from("/tmp/outside/file.log"),
+                base: PathBuf::from("/tmp/base"),
+            },
+            dropped_events: 5,
+        }
+        .emit();
+        let after = discarded_intentional_count();
+
+        assert_eq!(
+            after - before,
+            5.0,
+            "every rejected event must be counted in ComponentDiscardedEventsTotal"
+        );
     }
 }
 
