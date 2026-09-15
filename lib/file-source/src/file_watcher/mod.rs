@@ -41,6 +41,15 @@ pub struct RawLine {
     pub bytes: Bytes,
 }
 
+/// Whether a file shrank below what its reader consumed, and the size seen if it did not.
+///
+/// The size rides along so a gzip watcher can raise its baseline from the same stat.
+#[derive(Debug, Default)]
+pub struct ShrinkCheck {
+    pub shrank: bool,
+    pub observed: Option<(u64, Option<SystemTime>)>,
+}
+
 #[derive(Debug)]
 pub struct RawLineResult {
     pub raw_line: Option<RawLine>,
@@ -679,20 +688,45 @@ impl FileWatcher {
     /// size cannot be read or a gzip watcher has no baseline; neither is evidence of a rewrite.
     ///
     /// Owned future: borrowing `&self` across the `await` makes `FileServer::run` non-`Send`.
-    pub fn shrank_below_reader(&self) -> impl std::future::Future<Output = bool> + Send + 'static {
+    pub fn shrank_below_reader(
+        &self,
+    ) -> impl std::future::Future<Output = ShrinkCheck> + Send + 'static {
         let path = self.path.clone();
         let is_gzip = self.is_gzip;
         let gzip_raw_metadata = self.gzip_raw_metadata;
         let file_position = self.file_position;
         async move {
             let Ok(metadata) = tokio::fs::metadata(&path).await else {
-                return false;
+                return ShrinkCheck::default();
             };
-            if is_gzip {
+            let shrank = if is_gzip {
                 gzip_raw_metadata.is_some_and(|(raw_len, _)| metadata.len() < raw_len)
             } else {
                 metadata.len() < file_position
+            };
+            ShrinkCheck {
+                shrank,
+                observed: (!shrank).then(|| (metadata.len(), metadata.modified().ok())),
             }
+        }
+    }
+
+    /// Raise the gzip baseline to a size observed while the reader was caught up.
+    ///
+    /// The baseline is only set when the reader is opened, so appended members consumed since then
+    /// leave it below what was actually read and a later truncation to between the two goes
+    /// unnoticed. It is a high-water mark, never lowered: a shrink is the signal to reopen, and
+    /// reopening establishes the new baseline.
+    pub fn observe_raw_size(&mut self, observed: Option<(u64, Option<SystemTime>)>) {
+        if !self.is_gzip {
+            return;
+        }
+        if let Some(observed) = observed
+            && self
+                .gzip_raw_metadata
+                .is_none_or(|(raw_len, _)| observed.0 > raw_len)
+        {
+            self.gzip_raw_metadata = Some(observed);
         }
     }
 
@@ -813,6 +847,17 @@ impl FileWatcher {
     #[inline]
     pub fn path_is_outside_glob(&self) -> bool {
         self.path_outside_glob
+    }
+
+    /// Whether `remove_after` may unlink this watcher's current path.
+    ///
+    /// A rotated file is recovered by identity, so a watcher can end up on a path no include
+    /// pattern matches -- `/logs/app.log.1` under `/logs/*.log` -- and unlinking that deletes an
+    /// archive the configuration never selected. A caller that skips removal must still retire the
+    /// watcher; removal is cleanup, not the reason it retires.
+    #[inline]
+    pub fn removal_is_authorized(&self) -> bool {
+        !self.path_outside_glob
     }
 
     /// Check whether the current path still resolves to the tracked file identity. This is a

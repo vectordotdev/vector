@@ -471,7 +471,7 @@ async fn restart_after_rewrite_rebases_the_gzip_size_baseline() {
 
     // Rewrite smaller: a genuine rewrite, which the watcher must notice and restart for.
     fs::write(&path, encode(b"small\n").await).unwrap();
-    assert!(watcher.shrank_below_reader().await);
+    assert!(watcher.shrank_below_reader().await.shrank);
     watcher
         .restart_after_rewrite()
         .await
@@ -480,8 +480,65 @@ async fn restart_after_rewrite_rebases_the_gzip_size_baseline() {
     // The baseline must now describe the *rewritten* file, so this smaller-than-original file is no
     // longer reported as freshly rewritten on every subsequent event.
     assert!(
-        !watcher.shrank_below_reader().await,
+        !watcher.shrank_below_reader().await.shrank,
         "the compressed-size baseline must be rebased, or every later event re-restarts the reader"
+    );
+}
+
+/// Regression test for a review finding: the gzip size baseline was only set when the reader was
+/// opened, so appended members consumed since then left it below what was actually read. A later
+/// truncation to between the two sizes then compared against the stale baseline and went unnoticed,
+/// leaving the decoder positioned past EOF and losing the rewritten records.
+#[tokio::test]
+async fn the_gzip_baseline_rises_with_consumed_appends() {
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("app.log.gz");
+    let first = encode(b"first\n").await;
+    fs::write(&path, &first).unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        16384,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .expect("FileWatcher::new failed");
+    assert!(watcher.is_gzip());
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+
+    // A second member is appended and consumed. The file is now larger than when it was opened.
+    let mut grown = first.clone();
+    grown.extend_from_slice(&encode(b"second\n").await);
+    fs::write(&path, &grown).unwrap();
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+    let check = watcher.shrank_below_reader().await;
+    assert!(!check.shrank, "growth is not a shrink");
+    watcher.observe_raw_size(check.observed);
+
+    // Rewritten to a size between the original and the grown one. Against the opening baseline this
+    // looks like growth; against what was actually read it is a truncation.
+    let rewritten = encode(b"rewritten-to-a-middling-length\n").await;
+    assert!(
+        rewritten.len() > first.len() && rewritten.len() < grown.len(),
+        "the rewrite must land between the two sizes for this test to mean anything"
+    );
+    fs::write(&path, &rewritten).unwrap();
+
+    assert!(
+        watcher.shrank_below_reader().await.shrank,
+        "a truncation below what the reader consumed must be detected"
     );
 }
 
@@ -578,14 +635,14 @@ async fn shrank_below_reader_uses_compressed_size_for_gzip() {
         "test setup requires decoded position to exceed compressed size"
     );
     assert!(
-        !watcher.shrank_below_reader().await,
+        !watcher.shrank_below_reader().await.shrank,
         "an untouched compressible file must not look truncated"
     );
 
     // Rewrite in place with *less* compressed data: this is a genuine rewrite.
     fs::write(&path, encode(b"small\n").await).unwrap();
     assert!(
-        watcher.shrank_below_reader().await,
+        watcher.shrank_below_reader().await.shrank,
         "a gzip file whose compressed size shrank has been rewritten and must be detected"
     );
 }

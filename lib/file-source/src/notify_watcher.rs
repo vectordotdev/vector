@@ -373,10 +373,14 @@ impl NotifyDiscovery {
             full_scan_required: false,
             mode_change_pending: false,
         };
-        // Can't fail here: `backend_error_pending` is freshly `false`, so this can't hit the
-        // rebuild-failure path.
-        let succeeded = discovery.resync_watches(include_patterns, emitter).await;
-        debug_assert!(succeeded);
+        // A rebuild can still fail here under resource pressure, and a `debug_assert` is compiled
+        // out of release builds -- leaving `watcher: None` while the caller treats notify as live,
+        // which panics in `watcher_mut()` instead of falling back to polling.
+        if !discovery.resync_watches(include_patterns, emitter).await {
+            return Err(notify::Error::generic(
+                "failed to establish initial file system watches",
+            ));
+        }
         Ok(discovery)
     }
 
@@ -555,7 +559,13 @@ impl NotifyDiscovery {
                     if is_missing_watch_path(&error, path).await {
                         match find_existing_ancestor(path).await {
                             Some(ancestor) => {
-                                self.watch_fallback_ancestor(path, ancestor, emitter).await
+                                self.watch_fallback_ancestor(
+                                    path,
+                                    ancestor,
+                                    &fallback_modes,
+                                    emitter,
+                                )
+                                .await
                             }
                             None => {
                                 warn!(message = "Failed to watch directory.", path = ?path, %error);
@@ -696,9 +706,16 @@ impl NotifyDiscovery {
         &mut self,
         wanted: &Path,
         ancestor: PathBuf,
+        fallback_modes: &HashMap<PathBuf, WatchMode>,
         emitter: &E,
     ) {
-        let watch_mode = fallback_watch_mode(wanted, &ancestor);
+        // The aggregate for this ancestor, not just what this root needs: registering the narrower
+        // mode first makes a deeper root force a full rebuild moments later, and `wanted` is a
+        // HashMap, so the rebuild can repeat the same order and churn.
+        let watch_mode = fallback_modes
+            .get(&ancestor)
+            .copied()
+            .unwrap_or_else(|| fallback_watch_mode(wanted, &ancestor));
         let mode = watch_mode.mode();
         if let Some(existing) = self.watched_dirs.get(&ancestor) {
             // Some other wanted directory already caused us to watch this ancestor. Record the

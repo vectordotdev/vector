@@ -589,6 +589,53 @@ fn salvage_final_partial_line(
     });
 }
 
+/// Point a watcher at the file that replaced its own, reading out everything left on the old one
+/// first.
+///
+/// Rotation replaces the file at a tracked path, and reopening there abandons the inode the reader
+/// still holds: its unread records, and the unterminated one in its buffer, would be lost. Both are
+/// emitted under the fingerprint the watcher still has, so they are checkpointed against the file
+/// they came from rather than the one about to take its place.
+///
+/// EOF here means "nothing more to read now"; a writer still holding the old descriptor can append
+/// afterwards, and those bytes are beyond recovery once the reader moves.
+async fn drain_and_repoint(
+    watcher: &mut FileWatcher,
+    file_id: FileFingerprint,
+    replacement: PathBuf,
+    lines: &mut Vec<Line>,
+) -> std::io::Result<()> {
+    // The pass marked every watcher unfindable before discovery, and `read_line` reads that at EOF as
+    // "the file was deleted" and kills the watcher -- which would then be reaped straight after being
+    // repointed. This file was just fingerprinted, so saying it was found is simply true.
+    watcher.mark_found();
+    while let Ok(RawLineResult {
+        raw_line: Some(line),
+        ..
+    }) = watcher.read_line().await
+    {
+        lines.push(Line {
+            text: line.bytes,
+            filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+            file_id,
+            generation: watcher.generation(),
+            start_offset: line.offset,
+            end_offset: watcher.get_file_position(),
+        });
+    }
+    salvage_final_partial_line(watcher, file_id, lines);
+
+    let repointed = watcher.update_path(replacement).await;
+    if repointed.is_err() {
+        // Nothing was found after all -- the replacement went away in the window between
+        // fingerprinting it and opening it. Put the watcher back where the pass left it, or it stays
+        // "found" on the inode it no longer describes and `remove_after` unlinks whatever now
+        // occupies its old path.
+        watcher.prepare_for_discovery();
+    }
+    repointed
+}
+
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures.
 ///
@@ -900,6 +947,7 @@ where
                         &checkpoints,
                         notify_discovery.as_mut(),
                         &woken_by_notify_event,
+                        &mut lines,
                     )
                     .await;
                 if !keep_notify_discovery {
@@ -1047,16 +1095,21 @@ where
                     if let Some(grace_period) = self.remove_after
                         && watcher.last_read_success().elapsed() >= grace_period
                     {
-                        // Try to remove
-                        match remove_file(&watcher.path).await {
-                            Ok(()) => {
-                                self.emitter.emit_file_deleted(&watcher.path);
-                                salvage_final_partial_line(watcher, file_id, &mut lines);
-                                watcher.set_dead();
-                            }
-                            Err(error) => {
-                                // We will try again after some time.
-                                self.emitter.emit_file_delete_error(&watcher.path, error);
+                        if !watcher.removal_is_authorized() {
+                            salvage_final_partial_line(watcher, file_id, &mut lines);
+                            watcher.set_dead();
+                        } else {
+                            // Try to remove
+                            match remove_file(&watcher.path).await {
+                                Ok(()) => {
+                                    self.emitter.emit_file_deleted(&watcher.path);
+                                    salvage_final_partial_line(watcher, file_id, &mut lines);
+                                    watcher.set_dead();
+                                }
+                                Err(error) => {
+                                    // We will try again after some time.
+                                    self.emitter.emit_file_delete_error(&watcher.path, error);
+                                }
                             }
                         }
                     }
@@ -1378,6 +1431,7 @@ where
         checkpoints: &CheckpointsView,
         notify_discovery: Option<&mut NotifyDiscovery>,
         notify_wakeup: &NotifyWakeup,
+        lines: &mut Vec<Line>,
     ) -> bool {
         // Defensive resync: cheap to call, and covers the (rare) case where the set of
         // directories implied by `include` patterns needs to change -- e.g. a literal include
@@ -1603,7 +1657,9 @@ where
                         let reopened = match fp_map.get_mut(&stale_key) {
                             Some(watcher) => {
                                 if !same_inode {
-                                    watcher.update_path(reopen_path).await
+                                    // Finish the inode this reader still holds before it is pointed
+                                    // at the one that replaced it.
+                                    drain_and_repoint(watcher, stale_key, reopen_path, lines).await
                                 } else {
                                     // The fingerprint completed, which ends the rewrite. Whether the
                                     // reader still needs repositioning is decided inside, so a
@@ -2044,18 +2100,24 @@ where
                         self.emitter.emit_file_watch_error(&watcher.path, error);
                         refresh_failed = true;
                     }
-                } else if watcher.is_active() && watcher.shrank_below_reader().await {
-                    // Truncated and rewritten in place while keeping the same fingerprint -- the
-                    // rewrite reused the first line, so there is nothing to rekey, but the reader is
-                    // still positioned in content that no longer exists. This is the ordinary
-                    // `copytruncate` shape for a log whose header does not change.
-                    if let Err(error) = watcher.restart_after_rewrite().await {
-                        self.emitter.emit_file_watch_error(&watcher.path, error);
-                        refresh_failed = true;
-                    } else {
-                        // The reader restarted at zero, so the persisted position must not keep
-                        // pointing past the start of the rewritten file.
-                        checkpoints.register(file_id, 0, watcher.take_new_generation());
+                } else if watcher.is_active() {
+                    let check = watcher.shrank_below_reader().await;
+                    // Appended gzip members consumed since the reader opened leave its baseline
+                    // below what was actually read, so raise it from the stat just taken.
+                    watcher.observe_raw_size(check.observed);
+                    if check.shrank {
+                        // Truncated and rewritten in place while keeping the same fingerprint -- the
+                        // rewrite reused the first line, so there is nothing to rekey, but the reader
+                        // is still positioned in content that no longer exists. This is the ordinary
+                        // `copytruncate` shape for a log whose header does not change.
+                        if let Err(error) = watcher.restart_after_rewrite().await {
+                            self.emitter.emit_file_watch_error(&watcher.path, error);
+                            refresh_failed = true;
+                        } else {
+                            // The reader restarted at zero, so the persisted position must not keep
+                            // pointing past the start of the rewritten file.
+                            checkpoints.register(file_id, 0, watcher.take_new_generation());
+                        }
                     }
                 }
                 if refresh_failed {
@@ -2311,14 +2373,20 @@ where
                             .idle_since()
                             .is_some_and(|idle| idle >= grace_period)
                     {
-                        match remove_file(&watcher.path).await {
-                            Ok(()) => {
-                                self.emitter.emit_file_deleted(&watcher.path);
-                                salvage_final_partial_line(watcher, file_id, lines);
-                                watcher.set_dead();
-                            }
-                            Err(error) => {
-                                self.emitter.emit_file_delete_error(&watcher.path, error);
+                        if !watcher.removal_is_authorized() {
+                            // Drained, not deleted: this path is outside the include patterns.
+                            salvage_final_partial_line(watcher, file_id, lines);
+                            watcher.set_dead();
+                        } else {
+                            match remove_file(&watcher.path).await {
+                                Ok(()) => {
+                                    self.emitter.emit_file_deleted(&watcher.path);
+                                    salvage_final_partial_line(watcher, file_id, lines);
+                                    watcher.set_dead();
+                                }
+                                Err(error) => {
+                                    self.emitter.emit_file_delete_error(&watcher.path, error);
+                                }
                             }
                         }
                     }
@@ -3295,6 +3363,178 @@ mod tests {
         }
     }
 
+    /// Regression test for a review finding: rotation replaces the file at a tracked path, and
+    /// reopening there abandoned the inode the reader still held -- losing records it had not read
+    /// yet, and the unterminated one in its buffer.
+    #[tokio::test]
+    async fn a_replaced_path_drains_the_old_inode_before_repointing() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .clone()
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("the file must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let mut fp_map = IndexMap::from([(file_id, watcher)]);
+
+        // Written after the reader caught up, then rotated away before discovery runs. These bytes
+        // exist only on the old inode.
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"stranded\n"))
+            .unwrap();
+        std::fs::rename(&path, directory.path().join("app.log.1")).unwrap();
+        std::fs::write(&path, b"replacement\n").unwrap();
+
+        let checkpoints = CheckpointsView::default();
+        let mut lines = Vec::new();
+        let _ = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+                &mut lines,
+            )
+            .await;
+
+        let texts: Vec<_> = lines
+            .iter()
+            .map(|line| String::from_utf8_lossy(&line.text).into_owned())
+            .collect();
+        assert!(
+            texts.iter().any(|text| text == "stranded"),
+            "the rotated-away inode must be drained before the reader moves, got {texts:?}"
+        );
+        // The pass marks watchers unfindable before discovery, and reaching EOF while unfindable is
+        // how `read_line` recognises a deleted file -- so draining must not retire the watcher that
+        // was just pointed at the replacement.
+        assert!(
+            fp_map.values().all(|watcher| !watcher.dead()),
+            "the repointed watcher must survive the drain, or the replacement is never read"
+        );
+    }
+
+    /// Regression test for a review finding: draining marks the watcher found so reaching EOF is not
+    /// read as a deletion, but a failed reopen left it that way -- still "found" on an inode it no
+    /// longer describes, where `remove_after` would unlink whatever now occupies its old path.
+    #[tokio::test]
+    async fn a_failed_repoint_leaves_the_watcher_unfindable() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        watcher.prepare_for_discovery();
+
+        // The replacement is gone by the time the reopen runs, as it would be if it were removed in
+        // the window after fingerprinting it.
+        let mut lines = Vec::new();
+        let missing = directory.path().join("vanished.log");
+        let repointed = drain_and_repoint(
+            &mut watcher,
+            FileFingerprint::DevInode(0, 0),
+            missing,
+            &mut lines,
+        )
+        .await;
+
+        assert!(
+            repointed.is_err(),
+            "the reopen must fail for this to mean anything"
+        );
+        assert!(
+            !watcher.file_findable(),
+            "a failed repoint must leave the watcher unfindable, as the pass left it"
+        );
+    }
+
+    /// Regression test for a review finding: a file rotated out of the include patterns is
+    /// recovered by identity, and `remove_after` then unlinked it -- deleting an archive the
+    /// configuration never selected.
+    #[tokio::test]
+    async fn remove_after_does_not_delete_a_path_outside_the_glob() {
+        let directory = tempfile::tempdir().unwrap();
+        let archive = directory.path().join("app.log.1");
+        std::fs::write(&archive, b"rotated\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.remove_after = Some(Duration::ZERO);
+
+        let mut watcher = FileWatcher::new(
+            archive.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        watcher.deactivate().await;
+        // Recovered by identity at a path no include pattern matches.
+        watcher.mark_path_outside_glob();
+
+        let mut fp_map = IndexMap::from([(FileFingerprint::DevInode(0, 0), watcher)]);
+        let mut lines = Vec::new();
+        file_server
+            .poll_idle_watchers(&mut fp_map, &mut lines, &NotifyWakeup::default())
+            .await;
+
+        assert!(
+            archive.exists(),
+            "remove_after must not unlink a path outside the include patterns"
+        );
+        assert!(
+            fp_map.values().all(|watcher| watcher.dead()),
+            "the watcher must still retire, or the path is reconsidered forever"
+        );
+    }
+
     #[tokio::test]
     async fn idle_watcher_survives_a_temporary_short_fingerprint_failure() {
         let directory = tempfile::tempdir().unwrap();
@@ -3338,6 +3578,7 @@ mod tests {
                     &checkpoints,
                     None,
                     &NotifyWakeup::default(),
+                    &mut Vec::new(),
                 )
                 .await
         );
@@ -3433,6 +3674,7 @@ mod tests {
                     &checkpoints,
                     None,
                     &NotifyWakeup::default(),
+                    &mut Vec::new(),
                 )
                 .await
         );
@@ -3516,6 +3758,7 @@ mod tests {
                     &checkpoints,
                     None,
                     &NotifyWakeup::default(),
+                    &mut Vec::new(),
                 )
                 .await
         );
@@ -4088,6 +4331,7 @@ mod tests {
                 &CheckpointsView::default(),
                 None,
                 &NotifyWakeup::default(),
+                &mut Vec::new(),
             )
             .await;
 
@@ -4152,6 +4396,7 @@ mod tests {
                 &checkpoints,
                 None,
                 &NotifyWakeup::default(),
+                &mut Vec::new(),
             )
             .await;
         let watcher = fp_map.values_mut().next().unwrap();
@@ -4175,6 +4420,7 @@ mod tests {
                     &checkpoints,
                     None,
                     &NotifyWakeup::default(),
+                    &mut Vec::new(),
                 )
                 .await;
             let watcher = fp_map.values_mut().next().unwrap();
@@ -5029,6 +5275,7 @@ mod tests {
                     &checkpoints,
                     None,
                     &wakeup,
+                    &mut Vec::new(),
                 )
                 .await
         );
