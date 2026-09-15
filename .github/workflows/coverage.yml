@@ -77,10 +77,15 @@ jobs:
           path: coverage-artifacts
           merge-multiple: false
 
+      - uses: ./.github/actions/setup
+        with:
+          mold: false
+          vdev: false
+          datadog-ci: true
+          lcov: true
+
       - name: Merge coverage reports
         run: |
-          timeout 30m sudo apt-get install -y --no-install-recommends lcov
-
           mapfile -t FILES < <(find coverage-artifacts -name '*.info')
           echo "Merging ${#FILES[@]} coverage file(s)"
 
@@ -98,11 +103,6 @@ jobs:
           path: merged-lcov.info
           retention-days: 90
           overwrite: true
-
-      - uses: ./.github/actions/setup
-        with:
-          vdev: false
-          datadog-ci: true
 
       - uses: ./.github/actions/dd-token
 

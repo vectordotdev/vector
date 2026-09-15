@@ -272,7 +272,7 @@ fn spawn_input_http_client(
                 }
                 Err(e) => {
                     // TODO: Emit metric that tracks a failed response from the HTTP server.
-                    error!("Failed to send request: {}", e);
+                    error!("Failed to send request: {e}");
                 }
             }
         }
@@ -441,7 +441,7 @@ impl HttpResourceOutputContext<'_> {
         // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
         // scraped... but since we need special logic to aggregate/deduplicate scraped metrics, we can't
         // use this generically for that purpose.
-        todo!()
+        unimplemented!()
     }
 }
 

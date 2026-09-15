@@ -563,9 +563,8 @@ mod integration_tests {
 
         // https://docs.humio.com/api/using-the-search-api-with-humio
         let search_url = format!(
-            "{}/api/v1/repositories/{}/query",
-            humio_address(),
-            repository_name
+            "{}/api/v1/repositories/{repository_name}/query",
+            humio_address()
         );
         let search_query = format!(r#"message="{message}""#);
 

@@ -570,9 +570,8 @@ mod tests {
     fn write_temp_schema(name: &str, content: &str) -> std::path::PathBuf {
         use std::io::Write;
         let path = std::env::temp_dir().join(format!(
-            "vector_parquet_test_{}_{}.schema",
+            "vector_parquet_test_{}_{name}.schema",
             std::process::id(),
-            name,
         ));
         let mut f = std::fs::File::create(&path).expect("Failed to create schema file");
         write!(f, "{content}").expect("Failed to write schema");
@@ -661,15 +660,14 @@ mod tests {
             let mut buffer = BytesMut::new();
             serializer
                 .encode(events.clone(), &mut buffer)
-                .unwrap_or_else(|e| panic!("Encoding with {:?} failed: {}", compression, e));
+                .unwrap_or_else(|e| panic!("Encoding with {compression:?} failed: {e}"));
 
             let data = buffer.freeze();
             assert_parquet_magic(&data);
             assert_eq!(
                 parquet_row_count(&data),
                 1,
-                "Wrong row count for {:?}",
-                compression
+                "Wrong row count for {compression:?}"
             );
         }
     }

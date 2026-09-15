@@ -428,13 +428,13 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
             if self.append_uuid {
                 let uuid = Uuid::new_v4();
-                format!("{}-{}", seconds, uuid.hyphenated())
+                format!("{seconds}-{}", uuid.hyphenated())
             } else {
                 seconds.to_string()
             }
         };
 
-        let key = format!("{}{}.{}", key, filename, self.extension);
+        let key = format!("{key}{filename}.{}", self.extension);
         let body = payload.into_payload();
 
         GcsRequest {

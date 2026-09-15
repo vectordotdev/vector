@@ -24,3 +24,26 @@ impl InternalEvent for DatadogAgentJsonParseError<'_> {
         .increment(1);
     }
 }
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct DatadogAgentUnsupportedTracePayloadError {
+    pub error_code: &'static str,
+}
+
+impl InternalEvent for DatadogAgentUnsupportedTracePayloadError {
+    fn emit(self) {
+        error!(
+            message = "Unsupported Datadog Agent trace payload shape.",
+            error_code = self.error_code,
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "error_code" => self.error_code,
+        )
+        .increment(1);
+    }
+}

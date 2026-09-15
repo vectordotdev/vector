@@ -679,8 +679,7 @@ async fn create_dirs_nofollow(path: &Path, base: &Path) -> std::io::Result<()> {
         match fs::symlink_metadata(&current).await {
             Ok(meta) if meta.file_type().is_symlink() => {
                 return Err(std::io::Error::other(format!(
-                    "intermediate path component {:?} is a symlink",
-                    current
+                    "intermediate path component {current:?} is a symlink"
                 )));
             }
             Ok(_) => {}

@@ -137,7 +137,7 @@ impl ConfigBuilder {
         let (config, warnings) = self.build_with_warnings()?;
 
         for warning in warnings {
-            warn!("{}", warning);
+            warn!("{warning}");
         }
 
         Ok(config)

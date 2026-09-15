@@ -458,7 +458,7 @@ mod integration_tests {
         request(
             Method::PUT,
             &format!("subscriptions/{subscription}"),
-            json!({ "topic": format!("projects/{}/topics/{}", PROJECT, topic) }),
+            json!({ "topic": format!("projects/{PROJECT}/topics/{topic}") }),
         )
         .await
         .json::<Value>()
@@ -468,7 +468,7 @@ mod integration_tests {
     }
 
     async fn request(method: Method, path: &str, json: Value) -> Response {
-        let url = format!("{}/v1/projects/{}/{}", *gcp::PUBSUB_ADDRESS, PROJECT, path);
+        let url = format!("{}/v1/projects/{PROJECT}/{path}", *gcp::PUBSUB_ADDRESS);
         Client::new()
             .request(method.clone(), &url)
             .json(&json)

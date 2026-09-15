@@ -1434,7 +1434,7 @@ mod integration_tests {
                 .position(|&r| r.trim() == "_measurement")
                 .unwrap()]
             .trim(),
-            format!("ns.{}", metric)
+            format!("ns.{metric}")
         );
         assert_eq!(
             record[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
