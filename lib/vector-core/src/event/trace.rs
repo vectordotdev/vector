@@ -132,7 +132,8 @@ impl From<LogEvent> for TraceEvent {
 }
 
 impl From<TraceEvent> for LogEvent {
-    fn from(trace: TraceEvent) -> Self {
+    fn from(mut trace: TraceEvent) -> Self {
+        trace.0.metadata_mut().clear_trace_layout();
         trace.0
     }
 }
