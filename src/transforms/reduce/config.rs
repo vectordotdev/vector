@@ -119,8 +119,13 @@ impl_generate_config_from_default!(ReduceConfig);
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self, &context.enrichment_tables, &context.metrics_storage)
-            .map(Transform::event_task)
+        Reduce::new(
+            self,
+            &context.enrichment_tables,
+            &context.metrics_storage,
+            context.globals.timezone(),
+        )
+        .map(Transform::event_task)
     }
 
     fn input(&self) -> Input {

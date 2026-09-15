@@ -26,8 +26,11 @@ impl Route {
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
         let mut conditions = Vec::with_capacity(config.route.len());
         for (output_name, condition) in config.route.iter() {
-            let condition =
-                condition.build(&context.enrichment_tables, &context.metrics_storage)?;
+            let condition = condition.build(
+                &context.enrichment_tables,
+                &context.metrics_storage,
+                context.globals.timezone(),
+            )?;
             conditions.push((output_name.clone(), condition));
         }
         Ok(Self {

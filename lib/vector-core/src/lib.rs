@@ -41,6 +41,7 @@ pub mod tcp;
 #[cfg(test)]
 mod test_util;
 pub mod time;
+pub mod timezone;
 pub mod tls;
 pub mod transform;
 pub mod vrl;
@@ -50,6 +51,7 @@ use std::path::PathBuf;
 pub use event::EstimatedJsonEncodedSizeOf;
 use float_eq::FloatEq;
 
+pub use crate::timezone::{LocalTimeZoneError, validate_timezone};
 pub use crate::vrl::compile_vrl;
 
 #[macro_use]

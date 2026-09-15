@@ -23,7 +23,7 @@ pub use vector_core::{
     EstimatedJsonEncodedSizeOf, SpanField, buckets, default_data_dir, emit, event, fanout,
     ipallowlist, latency, metric_tags, metrics, partition, quantiles, register,
     register_extra_span_field, samples, schema, serde, sink, source, source_sender, tcp, tls,
-    transform,
+    transform, validate_timezone,
 };
 pub use vector_lookup as lookup;
 pub use vector_stream as stream;
