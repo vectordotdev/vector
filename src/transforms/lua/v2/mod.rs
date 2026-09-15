@@ -524,7 +524,7 @@ mod tests {
     ) -> T::Output {
         test_util::trace_init();
         assert_transform_compliance(async move {
-            let config = super::super::LuaConfig::V2(serde_yaml::from_str(config).unwrap());
+            let config = serde_yaml::from_str::<super::super::LuaConfig>(config).unwrap();
             let (tx, rx) = mpsc::channel(1);
             let (topology, out) = create_topology(ReceiverStream::new(rx), config).await;
 
