@@ -263,14 +263,21 @@ impl OutFile {
             OutFileInner::Zstd(zstd) => zstd.into_inner(),
             OutFileInner::Empty => unreachable!("OutFileInner::Empty is transient"),
         };
-        file.set_len(size).await?;
-        file.seek(std::io::SeekFrom::Start(size)).await?;
+        let result = async {
+            file.set_len(size).await?;
+            file.seek(std::io::SeekFrom::Start(size)).await?;
+            Ok(())
+        }
+        .await;
+        // Rebuild `self.inner` on every path (even when the rollback above
+        // fails) so the handle is never left as the transient `Empty`, which
+        // would make the next write or shutdown hit `unreachable!`.
         self.inner = match self.compression {
             Compression::None => OutFileInner::Regular(file),
             Compression::Gzip => OutFileInner::Gzip(GzipEncoder::new(file)),
             Compression::Zstd => OutFileInner::Zstd(ZstdEncoder::new(file)),
         };
-        Ok(())
+        result
     }
 
     const fn created_at(&self) -> Instant {
