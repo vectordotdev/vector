@@ -1,6 +1,4 @@
-#[cfg(unix)]
-use std::path::PathBuf;
-use std::{net::SocketAddr, num::NonZeroU64, time::Duration};
+use std::{net::SocketAddr, num::NonZeroU64, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -120,7 +118,6 @@ pub enum Mode {
     /// Listen on UDS (Unix domain socket). This only supports Unix stream sockets.
     ///
     /// For Unix datagram sockets, use the `socket` source instead.
-    #[cfg(unix)]
     Unix {
         /// The Unix socket path.
         ///
@@ -236,28 +233,36 @@ impl SourceConfig for SyslogConfig {
                 log_namespace,
                 cx.out,
             )),
-            #[cfg(unix)]
             Mode::Unix {
                 path,
                 socket_file_mode,
             } => {
-                let decoder = Decoder::new(
-                    Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
-                        self.max_length,
-                    )),
-                    Deserializer::Syslog(
-                        SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                    ),
-                );
+                #[cfg(not(unix))]
+                {
+                    let _ = (path, socket_file_mode, cx);
+                    return Err(unsupported_unix_socket_error());
+                }
 
-                build_unix_stream_source(
-                    path,
-                    socket_file_mode,
-                    decoder,
-                    move |events, host| handle_events(events, &host_key, host, log_namespace),
-                    cx.shutdown,
-                    cx.out,
-                )
+                #[cfg(unix)]
+                {
+                    let decoder = Decoder::new(
+                        Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
+                            self.max_length,
+                        )),
+                        Deserializer::Syslog(
+                            SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
+                        ),
+                    );
+
+                    build_unix_stream_source(
+                        path,
+                        socket_file_mode,
+                        decoder,
+                        move |events, host| handle_events(events, &host_key, host, log_namespace),
+                        cx.shutdown,
+                        cx.out,
+                    )
+                }
             }
         }
     }
@@ -278,7 +283,6 @@ impl SourceConfig for SyslogConfig {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.as_tcp_resource()],
             Mode::Udp { address, .. } => vec![address.as_udp_resource()],
-            #[cfg(unix)]
             Mode::Unix { .. } => vec![],
         }
     }
@@ -286,6 +290,15 @@ impl SourceConfig for SyslogConfig {
     fn can_acknowledge(&self) -> bool {
         false
     }
+}
+
+#[cfg(not(unix))]
+fn unsupported_unix_socket_error() -> crate::Error {
+    format!(
+        "Unix Domain Socket sources are not supported on {}.",
+        std::env::consts::OS
+    )
+    .into()
 }
 
 #[derive(Debug, Clone)]
@@ -519,6 +532,17 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<SyslogConfig>();
+    }
+
+    #[test]
+    fn unix_mode_deserializes_on_all_platforms() {
+        let config: SyslogConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            mode: unix
+            path: /tmp/vector-syslog.sock
+        "#})
+        .unwrap();
+
+        assert!(matches!(config.mode, Mode::Unix { .. }));
     }
 
     #[test]

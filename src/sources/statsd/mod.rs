@@ -1,6 +1,7 @@
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     num::NonZeroU64,
+    path::PathBuf,
     time::Duration,
 };
 
@@ -44,7 +45,7 @@ mod unix;
 
 use parser::Parser;
 #[cfg(unix)]
-use unix::{UnixConfig, statsd_unix};
+use unix::statsd_unix;
 use vector_lib::config::LogNamespace;
 
 /// Configuration for the `statsd` source.
@@ -61,8 +62,24 @@ pub enum StatsdConfig {
     Udp(UdpConfig),
 
     /// Listen on a Unix domain Socket (UDS).
-    #[cfg(unix)]
     Unix(UnixConfig),
+}
+
+/// Unix domain socket configuration for the `statsd` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct UnixConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
+    #[configurable(metadata(docs::examples = "/path/to/socket"))]
+    pub path: PathBuf,
+
+    #[serde(default = "default_sanitize")]
+    pub sanitize: bool,
+
+    #[serde(default = "default_convert_to")]
+    pub convert_to: ConversionUnit,
 }
 
 /// Specifies the target unit for converting incoming StatsD timing values. When set to "seconds" (the default), timing values in milliseconds (`ms`) are converted to seconds (`s`). When set to "milliseconds", the original timing values are preserved.
@@ -233,8 +250,18 @@ impl SourceConfig for StatsdConfig {
                     LogNamespace::Legacy,
                 )
             }
-            #[cfg(unix)]
-            StatsdConfig::Unix(config) => statsd_unix(config.clone(), cx.shutdown, cx.out),
+            StatsdConfig::Unix(config) => {
+                #[cfg(unix)]
+                {
+                    statsd_unix(config.clone(), cx.shutdown, cx.out)
+                }
+
+                #[cfg(not(unix))]
+                {
+                    let _ = (config, cx);
+                    Err(unsupported_unix_socket_error())
+                }
+            }
         }
     }
 
@@ -246,7 +273,6 @@ impl SourceConfig for StatsdConfig {
         match self.clone() {
             Self::Tcp(tcp) => vec![tcp.address.as_tcp_resource()],
             Self::Udp(udp) => vec![udp.address.as_udp_resource()],
-            #[cfg(unix)]
             Self::Unix(_) => vec![],
         }
     }
@@ -281,7 +307,6 @@ impl StatsdDeserializer {
         }
     }
 
-    #[cfg(unix)]
     pub const fn unix(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Unix),
@@ -289,6 +314,15 @@ impl StatsdDeserializer {
             parser: Parser::new(sanitize, convert_to),
         }
     }
+}
+
+#[cfg(not(unix))]
+fn unsupported_unix_socket_error() -> crate::Error {
+    format!(
+        "Unix Domain Socket sources are not supported on {}.",
+        std::env::consts::OS
+    )
+    .into()
 }
 
 impl decoding::format::Deserializer for StatsdDeserializer {
@@ -439,6 +473,17 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StatsdConfig>();
+    }
+
+    #[test]
+    fn unix_mode_deserializes_on_all_platforms() {
+        let config: StatsdConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            mode: unix
+            path: /tmp/vector-statsd.sock
+        "#})
+        .unwrap();
+
+        assert!(matches!(config, StatsdConfig::Unix(_)));
     }
 
     #[tokio::test]
