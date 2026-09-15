@@ -285,6 +285,14 @@ impl Fingerprinter {
         // whole map on every success: that sweep was O(N^2) in syscalls for a burst of N short files.
         // The lexical fallback covers a path that cannot be canonicalized (it may already be gone),
         // where an absolute spelling is still better than none.
+        // Successful reads need no cleanup when there is no small-file state.
+        match &metadata {
+            Ok(Some(fingerprint)) if known_small_files.is_empty() => {
+                return FingerprintOutcome::Fingerprinted(*fingerprint, read_prefix);
+            }
+            Ok(None) if known_small_files.is_empty() => return FingerprintOutcome::Absent,
+            _ => {}
+        }
         let key = match fs::canonicalize(path).await {
             Ok(canonical) => canonical,
             Err(_) => crate::normalize_path_key(path),

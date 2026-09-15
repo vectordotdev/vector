@@ -180,6 +180,8 @@ pub struct FileWatcher {
     /// offset until the first line of the new content is acknowledged -- long enough for a restart
     /// to resume past the replacement's prefix.
     reader_restarted: bool,
+    /// Rotation output awaiting this watcher's turn in the oldest-first read pass.
+    pub(crate) pending_drain: Vec<crate::file_server::Line>,
     /// Bumped for every event that invalidates the content the reader was consuming: an in-place
     /// rewrite, a replacement inode, a truncation.
     ///
@@ -304,6 +306,7 @@ impl FileWatcher {
                         // before returning, so this watcher still holds no file descriptor.
                         identity: Some(identity),
                         reader_restarted: false,
+                        pending_drain: Vec::new(),
                         content_epoch: 0,
                         last_rewind_epoch: None,
                         rewound_at_len: None,
@@ -422,6 +425,7 @@ impl FileWatcher {
             file_position,
             identity: Some((devno, ino)),
             reader_restarted: false,
+            pending_drain: Vec::new(),
             content_epoch: 0,
             last_rewind_epoch: None,
             rewound_at_len: None,
@@ -1044,7 +1048,7 @@ impl FileWatcher {
     /// A fingerprint that keeps failing (a file rewritten to fewer lines than `FirstLinesChecksum`
     /// needs returns `UnexpectedEof` on every pass) must not restart the reader again: it would
     /// re-emit whatever was already consumed on each reconciliation.
-    fn rewind_pending(&self) -> bool {
+    pub(crate) fn rewind_pending(&self) -> bool {
         self.last_rewind_epoch == Some(self.content_epoch)
     }
 

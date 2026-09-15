@@ -107,6 +107,8 @@ impl Owner {
 struct PendingAcknowledgement {
     generation: OwnerGeneration,
     target: FilePosition,
+    /// The live reader belongs to a different inode whose fingerprint is still incomplete.
+    preserve_until_rekey: bool,
 }
 
 /// A checkpoint together with the watcher entitled to move it.
@@ -197,7 +199,7 @@ impl CheckpointsView {
             owned.position = owned.position.max(pos);
             if owned
                 .pending_acknowledgement
-                .is_some_and(|pending| pos >= pending.target)
+                .is_some_and(|pending| pos >= pending.target && !pending.preserve_until_rekey)
             {
                 owned.pending_acknowledgement = None;
                 if let Some(live_position) = owned.live_position {
@@ -247,6 +249,47 @@ impl CheckpointsView {
         self.modified_times.insert(fng, Utc::now());
     }
 
+    /// Retain the old inode's checkpoint while its short replacement still uses the old key.
+    /// The two positions must remain separate even after the drain is acknowledged: they refer
+    /// to different files, and will be split when the replacement can be fingerprinted.
+    pub fn register_short_replacement(
+        &self,
+        fng: FileFingerprint,
+        generation: OwnerGeneration,
+        drained_generation: OwnerGeneration,
+        resume_position: FilePosition,
+    ) {
+        let mut entry = self
+            .checkpoints
+            .entry(fng)
+            .or_insert_with(|| Owned::live(0, drained_generation));
+        entry.owner = Owner::Live(generation);
+        entry.live_position = Some(0);
+        entry.pending_acknowledgement = Some(PendingAcknowledgement {
+            generation: drained_generation,
+            target: resume_position,
+            preserve_until_rekey: true,
+        });
+        self.removed_times.remove(&fng);
+        self.modified_times.insert(fng, Utc::now());
+    }
+
+    /// Finish a short replacement that completed under the same fingerprint.
+    pub fn finish_short_replacement(&self, fng: FileFingerprint, generation: OwnerGeneration) {
+        if let Some(mut entry) = self.checkpoints.get_mut(&fng)
+            && entry.owner == Owner::Live(generation)
+            && entry
+                .pending_acknowledgement
+                .is_some_and(|pending| pending.preserve_until_rekey)
+        {
+            // The completed replacement hashes to the same key. That key now describes the
+            // replacement, so retire the old inode's progress rather than persisting its offset.
+            entry.position = entry.live_position.unwrap_or(0);
+            entry.pending_acknowledgement = None;
+            self.modified_times.insert(fng, Utc::now());
+        }
+    }
+
     /// Keep a drained reader's acknowledged position and its in-memory resume position.
     ///
     /// The old fingerprint may be discovered again shortly afterwards when a rotated archive is
@@ -270,6 +313,7 @@ impl CheckpointsView {
                     (acknowledged_position < resume_position).then_some(PendingAcknowledgement {
                         generation,
                         target: resume_position,
+                        preserve_until_rekey: false,
                     });
                 entry.insert(Owned {
                     position: acknowledged_position,
@@ -382,6 +426,9 @@ impl CheckpointsView {
             }
         };
 
+        if !taken_over {
+            return None;
+        }
         if let Some((_, value)) = self.modified_times.remove(&old) {
             self.modified_times.insert(new, value);
         }
@@ -396,7 +443,10 @@ impl CheckpointsView {
         let marked_at = Utc::now();
         let acknowledged_position = match self.checkpoints.entry(old) {
             dashmap::mapref::entry::Entry::Occupied(mut entry)
-                if entry.get().owner.writer() == Some(drained_generation) =>
+                if entry.get().owner.writer() == Some(drained_generation)
+                    || entry.get().pending_acknowledgement.is_some_and(|pending| {
+                        pending.preserve_until_rekey && pending.generation == drained_generation
+                    }) =>
             {
                 // Read the position while holding the entry lock, so an acknowledgement racing
                 // with the handoff is either included here or is accepted by the pending reaped
@@ -406,6 +456,7 @@ impl CheckpointsView {
                     (acknowledged_position < resume_position).then_some(PendingAcknowledgement {
                         generation: drained_generation,
                         target: resume_position,
+                        preserve_until_rekey: false,
                     });
                 let owned = entry.get_mut();
                 owned.owner = Owner::Reaped(drained_generation);
@@ -436,6 +487,25 @@ impl CheckpointsView {
     ) -> Option<FilePosition> {
         if old == new {
             return None;
+        }
+        let replacement = self.checkpoints.get(&old).and_then(|entry| {
+            entry
+                .pending_acknowledgement
+                .filter(|pending| pending.preserve_until_rekey)
+                .map(|pending| (pending, entry.live_position.unwrap_or(0)))
+        });
+        if let Some((pending, position)) = replacement {
+            let acknowledged = self.update_key_and_register_reaped(
+                old,
+                new,
+                new_generation,
+                pending.generation,
+                pending.target,
+            );
+            if acknowledged.is_some() {
+                self.register(new, position, new_generation);
+            }
+            return acknowledged;
         }
         let (_, moved) = self.checkpoints.remove(&old)?;
         let acknowledged_position = moved.position;
@@ -717,6 +787,45 @@ mod test {
         CHECKPOINT_FILE_NAME, Checkpoint, Checkpointer, CheckpointsView, FileFingerprint,
         FilePosition, State, TMP_FILE_NAME, next_owner_generation,
     };
+
+    #[test]
+    fn short_replacement_with_the_same_fingerprint_keeps_its_own_offset() {
+        let checkpoints = CheckpointsView::default();
+        let key = FileFingerprint::DevInode(1, 1);
+        let drained = next_owner_generation();
+        let replacement = next_owner_generation();
+        checkpoints.register(key, 20, drained);
+        checkpoints.register_short_replacement(key, replacement, drained, 30);
+        checkpoints.update(key, 5, replacement);
+        checkpoints.finish_short_replacement(key, replacement);
+        checkpoints.update(key, 30, drained);
+        assert_eq!(checkpoints.get(key), Some(5));
+    }
+
+    #[test]
+    fn short_replacement_retains_drain_acknowledgements_across_rekey() {
+        for acknowledge_before_rekey in [false, true] {
+            let checkpoints = CheckpointsView::default();
+            let old = FileFingerprint::DevInode(1, 1);
+            let new = FileFingerprint::DevInode(1, 2);
+            let drained = next_owner_generation();
+            let replacement = next_owner_generation();
+            let rekeyed = next_owner_generation();
+            checkpoints.register(old, 10, drained);
+            checkpoints.register_short_replacement(old, replacement, drained, 30);
+            checkpoints.update(old, 5, replacement);
+            assert_eq!(checkpoints.get_acknowledged(old), Some(10));
+            if acknowledge_before_rekey {
+                checkpoints.update(old, 30, drained);
+            }
+            checkpoints.update_key_and_get_position(old, new, rekeyed);
+            assert_eq!(checkpoints.get(old), Some(30));
+            assert_eq!(checkpoints.get(new), Some(5));
+            checkpoints.update(old, 30, drained);
+            assert_eq!(checkpoints.get_acknowledged(old), Some(30));
+            assert_eq!(checkpoints.get(new), Some(5));
+        }
+    }
 
     /// Regression test for a bug found in review: with acknowledgements enabled, the acking task
     /// holds the fingerprint captured when the line was read. One arriving after a rewrite rekeyed

@@ -369,6 +369,7 @@ fn watcher_for_timing() -> FileWatcher {
         file_position: 0,
         identity: None,
         reader_restarted: false,
+        pending_drain: Vec::new(),
         content_epoch: 0,
         last_rewind_epoch: None,
         rewound_at_len: None,

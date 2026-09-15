@@ -429,6 +429,17 @@ fn rekey_watcher(
     rekey_watcher_with_drain(fp_map, checkpoints, old_key, new_key, None)
 }
 
+fn finish_watcher_fingerprint(
+    watcher: &mut FileWatcher,
+    checkpoints: &CheckpointsView,
+    file_id: FileFingerprint,
+) {
+    if watcher.rewind_pending() {
+        checkpoints.finish_short_replacement(file_id, watcher.generation());
+    }
+    watcher.fingerprint_completed();
+}
+
 fn rekey_watcher_with_drain(
     fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
     checkpoints: &CheckpointsView,
@@ -682,19 +693,27 @@ async fn drain_and_repoint(
     replacement: PathBuf,
     lines: &mut Vec<Line>,
     max_read_bytes: usize,
+    mut report_discarded: impl FnMut(&bytes::BytesMut),
 ) -> std::io::Result<DrainOutcome> {
     // The pass marked every watcher unfindable before discovery, and `read_line` reads that at EOF as
     // "the file was deleted" and kills the watcher -- which would then be reaped straight after being
     // repointed. This file was just fingerprinted, so saying it was found is simply true.
     watcher.mark_found();
+    if !watcher.pending_drain.is_empty() {
+        return Ok(DrainOutcome::LimitReached { bytes_read: 0 });
+    }
     let old_generation = watcher.generation();
     let mut bytes_read: usize = 0;
     loop {
         match watcher.read_line().await {
             Ok(RawLineResult {
-                raw_line: Some(line),
-                ..
+                raw_line,
+                discarded_for_size_and_truncated,
             }) => {
+                for discarded in &discarded_for_size_and_truncated {
+                    report_discarded(discarded);
+                }
+                let Some(line) = raw_line else { break };
                 bytes_read = bytes_read.saturating_add(line.bytes.len());
                 lines.push(Line {
                     text: line.bytes,
@@ -711,7 +730,6 @@ async fn drain_and_repoint(
                     return Ok(DrainOutcome::LimitReached { bytes_read });
                 }
             }
-            Ok(_) => break,
             // Not EOF: the file may still hold records this reader has not seen. Moving on would
             // drop the descriptor along with them, so leave the watcher where it is and let the next
             // pass try again -- the reader keeps its offset, and the replacement is still there.
@@ -1113,6 +1131,17 @@ where
                 }
 
                 let start = time::Instant::now();
+                let previous_order = if self.oldest_first {
+                    fp_map
+                        .keys()
+                        .copied()
+                        .enumerate()
+                        .map(|(index, key)| (key, index))
+                        .collect::<HashMap<_, _>>()
+                } else {
+                    HashMap::new()
+                };
+                let discovery_line_start = lines.len();
                 let discovery_outcome = self
                     .discover(
                         &mut fp_map,
@@ -1123,6 +1152,21 @@ where
                         &mut lines,
                     )
                     .await;
+                if self.oldest_first {
+                    for line in lines.drain(discovery_line_start..) {
+                        // Rekeying preserves the watcher's index, while the drained lines retain
+                        // the retired fingerprint for their acknowledgements.
+                        let key = previous_order
+                            .get(&line.file_id)
+                            .and_then(|index| fp_map.get_index(*index))
+                            .map_or(line.file_id, |(key, _)| *key);
+                        fp_map
+                            .get_mut(&key)
+                            .expect("drained watcher remains tracked")
+                            .pending_drain
+                            .push(line);
+                    }
+                }
                 discovery_bytes_read = discovery_outcome.bytes_read;
                 if discovery_outcome.drain_pending {
                     // A rotation drain is deliberately a continuation of the normal read loop,
@@ -1224,6 +1268,14 @@ where
             let mut global_bytes_read: usize = discovery_bytes_read;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
+                if !watcher.pending_drain.is_empty() {
+                    let mut drained = std::mem::take(&mut watcher.pending_drain);
+                    let bytes_read = drained.iter().map(|line| line.text.len()).sum::<usize>();
+                    lines.append(&mut drained);
+                    if bytes_read > self.max_read_bytes {
+                        break;
+                    }
+                }
                 if !watcher.should_read() {
                     continue;
                 }
@@ -1337,6 +1389,9 @@ where
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
             fp_map.retain(|file_id, watcher| {
+                if !watcher.pending_drain.is_empty() {
+                    return true;
+                }
                 if watcher.dead() {
                     self.emitter
                         .emit_file_unwatched(&watcher.path, watcher.reached_eof());
@@ -1479,6 +1534,13 @@ where
                 }
                 stats.record("sleeping", start.elapsed());
                 if shutdown {
+                    for watcher in fp_map.values_mut() {
+                        if !watcher.pending_drain.is_empty() {
+                            chans
+                                .send(std::mem::take(&mut watcher.pending_drain))
+                                .await?;
+                        }
+                    }
                     chans
                         .close()
                         .await
@@ -1496,6 +1558,13 @@ where
 
             match select(shutdown_data, sleep_fut).await {
                 Either::Left((_shutdown_token, _)) => {
+                    for watcher in fp_map.values_mut() {
+                        if !watcher.pending_drain.is_empty() {
+                            chans
+                                .send(std::mem::take(&mut watcher.pending_drain))
+                                .await?;
+                        }
+                    }
                     chans
                         .close()
                         .await
@@ -1690,6 +1759,11 @@ where
         let mut drain_attempted = HashSet::new();
         let mut drain_pending = false;
         let mut drain_bytes_read: usize = 0;
+        let prefix_wanted = if fp_map.values().any(FileWatcher::rewind_pending) {
+            PrefixWanted::Yes
+        } else {
+            PrefixWanted::No
+        };
         for path in self.paths_provider.paths().into_iter() {
             let outcome = self
                 .fingerprinter
@@ -1697,13 +1771,7 @@ where
                     &path,
                     known_small_files,
                     &self.emitter,
-                    // Only a path some watcher already tracks can need the prefix: it is compared
-                    // against the one a pending rewind was taken for.
-                    if fp_map.is_empty() {
-                        PrefixWanted::No
-                    } else {
-                        PrefixWanted::Yes
-                    },
+                    prefix_wanted,
                 )
                 .await;
             let rewrite_suspected = outcome.is_incomplete();
@@ -1728,6 +1796,13 @@ where
                                     path.clone(),
                                     lines,
                                     self.max_read_bytes,
+                                    |buf| {
+                                        self.emitter.emit_file_line_too_long(
+                                            buf,
+                                            self.max_line_bytes,
+                                            buf.len(),
+                                        )
+                                    },
                                 )
                                 .await
                                 {
@@ -1763,7 +1838,7 @@ where
                             // The file fingerprints again, so any rewrite it was mid-way through
                             // is over. This also releases the rewind guard after a same-fingerprint
                             // replacement has been repointed.
-                            watcher.fingerprint_completed();
+                            finish_watcher_fingerprint(watcher, checkpoints, file_id);
                         }
                         trace!(
                             message = "Continue watching file.",
@@ -1797,7 +1872,7 @@ where
                         // The path may disappear between fingerprinting and opening it.
                         if watcher.update_path(path).await.is_ok() {
                             watcher.set_file_findable(true);
-                            watcher.fingerprint_completed();
+                            finish_watcher_fingerprint(watcher, checkpoints, file_id);
                             tracked_path_index.paths_changed();
                         }
                     } else {
@@ -1824,7 +1899,7 @@ where
                             // Failure is fine here: the next cycle retries. On success the file
                             // fingerprinted, so any rewrite it was mid-way through is over.
                             if watcher.update_path(path).await.is_ok() {
-                                watcher.fingerprint_completed();
+                                finish_watcher_fingerprint(watcher, checkpoints, file_id);
                                 tracked_path_index.paths_changed();
                             }
                         }
@@ -1910,6 +1985,13 @@ where
                                             reopen_path,
                                             lines,
                                             self.max_read_bytes,
+                                            |buf| {
+                                                self.emitter.emit_file_line_too_long(
+                                                    buf,
+                                                    self.max_line_bytes,
+                                                    buf.len(),
+                                                )
+                                            },
                                         )
                                         .await
                                         {
@@ -1976,7 +2058,7 @@ where
                             .expect("just rekeyed this watcher into place");
                         watcher.set_file_findable(true);
                         // Rekeyed under the fingerprint it now has, so the rewrite is over.
-                        watcher.fingerprint_completed();
+                        finish_watcher_fingerprint(watcher, checkpoints, file_id);
                     } else {
                         // The new fingerprint belongs to another watcher (two files can share one),
                         // so this path cannot be rekeyed onto it. Leave it to the next pass rather
@@ -2061,13 +2143,32 @@ where
                                     path.clone(),
                                     lines,
                                     self.max_read_bytes,
+                                    |buf| {
+                                        self.emitter.emit_file_line_too_long(
+                                            buf,
+                                            self.max_line_bytes,
+                                            buf.len(),
+                                        )
+                                    },
                                 )
                                 .await
                                 {
-                                    Ok(DrainOutcome::Repointed { bytes_read, .. }) => {
+                                    Ok(DrainOutcome::Repointed {
+                                        bytes_read,
+                                        old_position,
+                                        old_generation,
+                                    }) => {
                                         drain_bytes_read =
                                             drain_bytes_read.saturating_add(bytes_read);
                                         tracked_path_index.paths_changed();
+                                        if watcher.take_reader_restarted() {
+                                            checkpoints.register_short_replacement(
+                                                stale_key,
+                                                watcher.take_new_generation(),
+                                                old_generation,
+                                                old_position,
+                                            );
+                                        }
                                     }
                                     Ok(DrainOutcome::LimitReached { bytes_read }) => {
                                         drain_bytes_read =
@@ -2455,7 +2556,7 @@ where
                 }
                 // The file fingerprints again, so the rewrite is over. Left set, the *next* rewrite
                 // would be mistaken for this one and skip its repositioning.
-                watcher.fingerprint_completed();
+                finish_watcher_fingerprint(watcher, checkpoints, file_id);
                 if watcher.is_idle() && !watcher.path_has_tracked_identity().await {
                     watcher.invalidate_idle_bookkeeping();
                 }
@@ -2512,7 +2613,7 @@ where
                     .get_mut(&file_id)
                     .expect("just rekeyed this watcher into place");
                 // The rewrite completed under its new fingerprint, so it is over.
-                watcher.fingerprint_completed();
+                finish_watcher_fingerprint(watcher, checkpoints, file_id);
                 if watcher.is_idle() {
                     if watcher.path_has_tracked_identity().await
                         || fs::metadata(path)
@@ -3986,6 +4087,32 @@ mod tests {
             watcher.path_has_tracked_identity().await,
             "the reader must be repointed only after the old inode was drained"
         );
+        let drained_position = lines[0].end_offset;
+        let drained_generation = lines[0].generation;
+        assert_eq!(checkpoints.get(old_file_id), Some(drained_position));
+        assert_eq!(checkpoints.get_acknowledged(old_file_id), Some(0));
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"second line\n"))
+            .unwrap();
+        let _ = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+                &mut lines,
+            )
+            .await;
+        assert!(!fp_map.contains_key(&old_file_id));
+        checkpoints.update(old_file_id, drained_position, drained_generation);
+        assert_eq!(
+            checkpoints.get_acknowledged(old_file_id),
+            Some(drained_position)
+        );
+        assert_eq!(checkpoints.get(*fp_map.keys().next().unwrap()), Some(0));
     }
 
     #[tokio::test]
@@ -4098,9 +4225,16 @@ mod tests {
 
         let old_file_id = FileFingerprint::DevInode(0, 0);
         let mut lines = Vec::new();
-        let first = drain_and_repoint(&mut watcher, old_file_id, path.clone(), &mut lines, 8)
-            .await
-            .unwrap();
+        let first = drain_and_repoint(
+            &mut watcher,
+            old_file_id,
+            path.clone(),
+            &mut lines,
+            8,
+            |_| {},
+        )
+        .await
+        .unwrap();
 
         assert!(
             matches!(first, DrainOutcome::LimitReached { bytes_read } if bytes_read > 8),
@@ -4116,7 +4250,7 @@ mod tests {
             "the watcher must remain attached to the old inode while its tail is pending"
         );
 
-        let second = drain_and_repoint(&mut watcher, old_file_id, path, &mut lines, 8)
+        let second = drain_and_repoint(&mut watcher, old_file_id, path, &mut lines, 8, |_| {})
             .await
             .unwrap();
 
@@ -4256,6 +4390,7 @@ mod tests {
             missing,
             &mut lines,
             1024,
+            |_| {},
         )
         .await;
 
@@ -6460,6 +6595,110 @@ mod tests {
         ) -> std::task::Poll<Result<(), Self::Error>> {
             std::task::Poll::Ready(Ok(()))
         }
+    }
+
+    #[tokio::test]
+    async fn rotation_drain_reports_oversized_lines_even_at_eof() {
+        for contents in [b"oversized\nok\n".as_slice(), b"oversized\n".as_slice()] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("app.log");
+            std::fs::write(&path, contents).unwrap();
+            let mut watcher = FileWatcher::new(
+                path.clone(),
+                ReadFrom::Beginning,
+                None,
+                4,
+                Bytes::from_static(b"\n"),
+                true,
+            )
+            .await
+            .unwrap();
+            std::fs::rename(&path, dir.path().join("archive")).unwrap();
+            std::fs::write(&path, b"new\n").unwrap();
+            let mut discarded = 0;
+            let mut lines = Vec::new();
+            drain_and_repoint(
+                &mut watcher,
+                FileFingerprint::DevInode(1, 1),
+                path,
+                &mut lines,
+                1024,
+                |_| discarded += 1,
+            )
+            .await
+            .unwrap();
+            assert_eq!(discarded, 1);
+            assert!(lines.iter().all(|line| line.text == b"ok"[..]));
+        }
+    }
+
+    #[tokio::test]
+    async fn oldest_first_rotation_waits_for_the_older_backlog() {
+        let dir = tempfile::tempdir().unwrap();
+        let older = dir.path().join("a.log");
+        let newer = dir.path().join("z.log");
+        std::fs::write(&older, b"older\nolder\nolder\nolder\n").unwrap();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        std::fs::write(&newer, b"newer\nnewer\n").unwrap();
+        let paths = crate::paths_provider::Glob::new(
+            &[dir.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, dir.path().to_path_buf());
+        server.oldest_first = true;
+        server.max_read_bytes = 4;
+        server.glob_minimum_cooldown = Duration::ZERO;
+        server.idle_timeout = None;
+        let collected = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let (checkpoint_tx, checkpoint_rx) = tokio::sync::oneshot::channel::<()>();
+        let mut shutdown = Some((shutdown_tx, checkpoint_tx));
+        let mut rotated = false;
+        let sink = CollectSink(Arc::clone(&collected)).with(move |batch: Vec<Line>| {
+            if !batch.is_empty() && !rotated {
+                std::fs::rename(&newer, newer.with_extension("archive")).unwrap();
+                std::fs::write(&newer, b"replacement\n").unwrap();
+                rotated = true;
+            }
+            if batch.iter().any(|line| line.text == b"replacement"[..]) {
+                let (data, checkpoint) = shutdown.take().unwrap();
+                data.send(()).unwrap();
+                checkpoint.send(()).unwrap();
+            }
+            futures::future::ready(Ok::<_, std::convert::Infallible>(batch))
+        });
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            server.run(
+                sink,
+                futures::FutureExt::map(shutdown_rx, |_| ()),
+                futures::FutureExt::map(checkpoint_rx, |_| ()),
+                Checkpointer::new(dir.path()),
+            ),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let got = collected
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|line| line.text.clone())
+            .collect::<Vec<_>>();
+        let expected = [
+            "older",
+            "older",
+            "older",
+            "older",
+            "newer",
+            "newer",
+            "replacement",
+        ]
+        .map(Bytes::from);
+        assert_eq!(got, expected);
     }
 
     #[tokio::test]
