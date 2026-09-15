@@ -215,6 +215,10 @@ pub fn check_values(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
     for (key, source) in config.sources.iter() {
+        if let Err(errs) = source.inner.validate_structure() {
+            errors.extend(errs.into_iter().map(|msg| format!("Source {key} {msg}")));
+        }
+
         let outputs = source.inner.outputs(config.schema.log_namespace());
         if outputs
             .iter()

@@ -92,6 +92,19 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
     /// returned.
     async fn build(&self, cx: SourceContext) -> crate::Result<Source>;
 
+    /// Validates structural constraints on the source configuration that do not require
+    /// environment resources.
+    ///
+    /// Called during config compilation so errors are reported before the topology is built.
+    ///
+    /// # Errors
+    ///
+    /// If validation does not succeed, an error variant containing a list of all validation errors
+    /// is returned.
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+
     /// Gets the list of outputs exposed by this source.
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput>;
 
