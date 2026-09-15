@@ -582,8 +582,7 @@ A present but unrecognized hint returns the same error without attempting detect
   variant so generic topology and buffering code can operate without converting.
 - Temporary untyped forwarding methods preserve the legacy component API while every
   producer still emits `TraceEventCompat::Legacy`. They are removed before any producer
-  flips to typed output; the resulting compiler errors locate every remaining consumer
-  of the legacy layout.
+  flips to typed output.
 - Typed field accessors exist only on `TraceEvent`. `TraceEventCompat` does not expose
   them, so typed code cannot access an unconverted legacy event. This type separation,
   rather than a runtime check, is the enforcement mechanism.

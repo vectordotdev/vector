@@ -125,18 +125,8 @@ decoders.
 
 #### Ingress and egress mapping
 
-Each OTLP `ScopeSpans` is partitioned by the wire `Span.trace_id`. The grouping
-algorithm is stable and deterministic:
-
-1. Scan its successfully decoded spans in wire order.
-2. On the first span for a `trace_id`, create that ID's group at the end of the group
-   sequence.
-3. Append every later span with that ID to the existing group, preserving span order
-   within the group.
-4. Emit one `TraceEvent` per group in first-seen `trace_id` order.
-
-For example, spans ordered `[A1, B1, A2, C1, B2]` produce events
-`A: [A1, A2]`, `B: [B1, B2]`, then `C: [C1]`.
+Each OTLP `ScopeSpans` is partitioned by the wire `Span.trace_id` in first-seen ID
+order. Span order within each ID is preserved.
 
 Every resulting event receives the containing `ResourceSpans.resource` as
 `TraceEvent.resource` and the `ScopeSpans.scope` as `TraceEvent.scope`.
@@ -195,12 +185,10 @@ On OTLP egress, `TraceEvent`s sharing a `Resource` (including `Resource.schema_u
 the same resource-level Datadog bridge projection are gathered into one
 `ResourceSpans`. Within it, non-empty events sharing the same `Scope` and event-level
 `TraceEvent.datadog` bridge projection are re-coalesced into one `ScopeSpans`; spans retain event
-order and their order within each event. Re-coalescence prevents partitioning from
-multiplying scope-level state such as `Scope.dropped_attributes_count` when those
-partitions share an encoder batch. When they do not, duplicated or merged dropped
-counts are outside the guarantee (see Scope). The emitted wire grouping may again
-contain several trace IDs; the single-ID invariant applies to Vector's internal
-`TraceEvent`, not to OTLP.
+order and their order within each event. Re-coalescence of partitions that share an
+encoder batch restores cloned resource and scope dropped counts (see Scope). The
+emitted wire grouping may again contain several trace IDs; the single-ID invariant
+applies to Vector's internal `TraceEvent`, not to OTLP.
 
 Every emitted OTLP `Span.trace_id` is copied from the enclosing
 `TraceEvent.trace_id`; internal spans have no independent trace ID.
@@ -382,10 +370,10 @@ One consequence not derivable from the rules above:
 indistinguishable from a missing priority after an OTLP hop, and Datadog egress of a
 missing priority is `AutoKeep`, so the round trip would invert the sampling decision.
 
-The reserved key names, their per-member `AnyValue` types, the presence rules for
-optional and default-valued members, and the resolution of conflicting
-`datadog.chunk.*` values across spans in one trace-ID partition of a `ScopeSpans` are
-implementation choices that satisfy this contract.
+The reserved key names, their per-member `AnyValue` types, and the presence rules for
+optional and default-valued members are implementation choices that satisfy this
+contract. Conflicting valid `datadog.chunk.*` values across spans in one trace-ID
+partition of a `ScopeSpans` use wire-order first; the conflict is reported.
 
 ## Rationale
 

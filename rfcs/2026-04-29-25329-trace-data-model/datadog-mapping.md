@@ -57,9 +57,8 @@ Trace Context, and other informational entries are defined in the
 ## Cross cutting concerns
 
 - APM stats aggregation in the `datadog_traces` sink, today reading magic keys from
-  `TraceEvent`, will read typed fields after this RFC and its parent land. The sink
-  re-coalesces service partitions for one trace before aggregation so trace-wide inputs
-  such as the root span's `_sample_rate` remain available to every span.
+  `TraceEvent`, will read typed fields after this RFC and its parent land. Batch-scoped
+  re-coalescence before aggregation is specified under grouping.
 - The OTLP-side reservation of `datadog.*` resource and span attributes for synthesis
   of Datadog-native context on OTLP egress is the OTLP mapping sub-RFC's concern; this
   sub-RFC owns the context values those keys carry on cross-format relay.
@@ -105,10 +104,9 @@ Trace Context, and other informational entries are defined in the
   processed while indexed entries are discarded; see "Ingress and egress
   mapping."
 - Typed decoding of the pre-`tracerPayloads` `/api/v0.2/traces` shape
-  (`traces` / `transactions` with empty `tracerPayloads`). Today's source routes that
-  payload to `handle_dd_trace_payload_v0`. The typed mapping discards those spans and
-  reports the drop; see "Ingress and egress mapping." Removing that decode path, and the
-  local proto fields that carry it, may land independently of the typed migration.
+  (`traces` / `transactions` with empty `tracerPayloads`). The typed mapping discards
+  those spans and reports the drop. Removing that decode path may land independently
+  of the typed migration.
 - Exact wire parity with the Datadog Agent's complete OTLP converter, including its
   legacy metadata encodings and configuration-dependent synthetic tags.
 
@@ -121,8 +119,9 @@ Rationale section below.
 - **`Span.error` values other than `0` or `1`** ingest as `SpanStatus::Error(...)` and
   egress as `Span.error = 1`, normalizing the specific integer to the conforming
   bivalent representation.
-- **Malformed non-empty `meta["_dd.p.tid"]`** rejects the enclosing span even when its
-  low 64-bit `Span.traceID` is non-zero.
+- **Spans that omit `_dd.p.tid` when siblings reconstruct to more than one 128-bit
+  `trace_id` from the same wire `Span.traceID`** are dropped as malformed identity.
+  Explicitly tagged spans keep their reconstructed ID.
 - **Datadog wire-domain normalization**: negative wire durations are clamped to zero on
   ingress; durations and timestamps outside their destination fields' domains are
   clamped to the nearest endpoint on egress.
@@ -134,8 +133,8 @@ Rationale section below.
 - **Unknown `AttributeAnyValue` or array-element type discriminators** drop the
   containing span-event attribute and saturating-increment
   `SpanEvent.dropped_attributes_count`.
-The Datadog-side consequences of the parent RFC's zero-ID rejection and wire-domain
-normalization also apply.
+The Datadog-side consequences of the parent RFC's malformed-input rule, zero-ID
+rejection, and wire-domain normalization also apply.
 
 ## Pain
 
@@ -184,14 +183,10 @@ standard-empty case is lossless because it carries no span data the Datadog back
 would observe.
 
 A payload whose `tracerPayloads` is empty but whose `traces` or `transactions` fields
-carry spans is the pre-`tracerPayloads` shape. Today's source routes it to
-`handle_dd_trace_payload_v0`, which emits one event per `APITrace` and one event per
-`transactions` span. The typed mapping does not ingest that shape: those spans are
-discarded and the request is acknowledged so it is not retried. This is
-not a lossless empty payload. Adopting the upstream `AgentPayload` proto, which does not
-declare fields 3 and 4, makes the same spans undecodable unknown fields; the independent
-removal of that path must still report an empty-`tracerPayloads` payload so an operator
-on an Agent old enough to emit it gets a diagnosable signal.
+carry spans is the pre-`tracerPayloads` shape. The typed mapping does not ingest that
+shape: those spans are discarded and the request is acknowledged so it is not retried.
+This is not a lossless empty payload. Independent removal of that path must still report
+an empty-`tracerPayloads` payload.
 
 An `AgentPayload` with at least one `TracerPayload` carrying at least one `TraceChunk`
 with at least one span expands into one `TraceEvent` per distinct
@@ -200,26 +195,17 @@ with at least one span expands into one `TraceEvent` per distinct
 
 The grouping rules are:
 
-- Before partitioning, for a given `Span.traceID` low half, a well-formed `_dd.p.tid`
-  on any span in the chunk applies only to siblings whose tag is absent or empty. An
-  absent tag is zero only when no sibling with that low half supplied one. Explicitly
-  supplied high halves are kept even when they disagree, so those spans form different
-  `TraceEvent.trace_id` groups.
-- Scan each `TraceChunk`'s successfully decoded spans in wire order. The first span for
-  a `(trace_id, service)` pair creates a group at the end of the group sequence; later
-  spans with that pair append to the existing group. Emit one `TraceEvent` per group in
-  first-seen pair order, storing the pair's ID in `TraceEvent.trace_id` and preserving
-  span order within each group. A
-  conforming single-trace, single-service chunk remains one event; a multi-service or
-  non-conforming multi-trace chunk splits as needed. Egress re-coalesces service groups
-  for the same trace (see below). A `TraceChunk` whose `spans` repeated field is empty
-  produces zero `TraceEvent`s, extending the empty-`tracerPayloads` and
-  empty-`chunks` rule above one level down: no wire span is available to supply the
-  required `TraceEvent.trace_id`, no `Span.service` is available to populate
-  `Resource.service`, and a chunk envelope with no spans carries nothing the Datadog
-  backend would observe. Datadog ingress therefore never synthesizes an event that
-  exists only to satisfy the parent RFC's empty-spans rule; that rule still governs
-  Datadog egress for typed input and events that transforms filter empty.
+- Before partitioning, reconstruct each span's 128-bit ID from `Span.traceID` and
+  `_dd.p.tid` (absent or empty means high bits 0). If siblings that share a wire
+  `Span.traceID` reconstruct to exactly one distinct ID among those that supplied a
+  tag, untagged siblings receive that ID. If they reconstruct to more than one, keep
+  the tagged spans and drop untagged siblings as malformed identity.
+- Partition each `TraceChunk` into one `TraceEvent` per distinct `(trace_id, service)`
+  pair in first-seen pair order, storing the pair's ID in `TraceEvent.trace_id` and
+  preserving span order within each group. A conforming single-trace, single-service
+  chunk remains one event; a multi-service or non-conforming multi-trace chunk splits
+  as needed. Egress re-coalesces service groups for the same trace (see below). A
+  `TraceChunk` whose `spans` repeated field is empty produces zero `TraceEvent`s.
 - The enclosing `TracerPayload`'s metadata (`hostname`, `env`, `containerID`,
   `languageName`, `tracerVersion`, etc.) populates the event's `Resource`. Per-span
   `Span.service` populates `Resource.service`.
@@ -341,11 +327,8 @@ round-trip exclusion above.
 #### `_dd.p.tid` (128-bit trace-ID high half)
 
 On ingress, `meta["_dd.p.tid"]` is consumed into `TraceEvent.trace_id` and is not
-retained as a span attribute. A value that cannot be parsed as a hex-encoded `u64` is
-malformed and drops the span under the parent RFC's malformed-input rule even when the
-low half is non-zero. A well-formed value contributes to the grouping key stored in
-`TraceEvent.trace_id`. An absent `_dd.p.tid`, or a key present with an empty value, is
-equivalent to absent and does not drop the span.
+retained as a span attribute. An absent `_dd.p.tid`, or a key present with an empty
+value, is a valid 64-bit ID (high bits 0) and does not drop the span.
 
 The tag is sink-owned: Datadog egress derives it exclusively from
 `TraceEvent.trace_id.high_u64()`. If the high half is non-zero, egress writes
@@ -458,14 +441,10 @@ Datadog egress, in order:
 
 The result is one entry per non-`Null` key in exactly one wire partition.
 
-**`dd_value_to_string` rule.** Several Datadog wire fields are `map<string, string>` and
-therefore require every `AttrValue` to be coerced to a plain `String`. All of them use
-one shared coercion, named `dd_value_to_string` throughout this document, which is total
-over every `AttrValue` variant, deterministic for a given value (including recursive
-ordering within `Array` and `Map`), and independent of any JSON library's non-finite-number
-behavior. A top-level `Null` map entry has no wire representation, so it is omitted
-rather than coerced. Per-variant rendering tracks the Datadog Agent OTLP converter
-cited in the Glossary.
+**`dd_value_to_string` rule.** Several Datadog wire fields are `map<string, string>` and use one shared coercion,
+named `dd_value_to_string` throughout this document. Per-variant rendering tracks the
+Datadog Agent OTLP converter cited in the Glossary. A top-level `Null` map entry has
+no wire representation, so it is omitted rather than coerced.
 
 #### Datadog event-scoped state
 
@@ -651,19 +630,16 @@ distinct even when their reconstructed context and trace ID match. An explicit `
 including a Datadog-decoded all-default chunk whose wire priority was `0`, does not share
 that group.
 
-The sink forms these effective chunk/trace groups before APM stats aggregation, not
-only before wire serialization. Every service partition in one group is presented to
-the aggregator together, preserving trace-wide context such as `_sample_rate` carried
-only by the root span. The computation within a reconstructed group remains governed by
-RFC 9862.
+The sink forms these effective chunk/trace groups before APM stats aggregation and
+wire serialization when those partitions share a sink encoder batch. A partition
+lacking the root span that does not share that batch may derive the default APM
+weight; that split-batch case is outside the grouping guarantee. The computation
+within a reconstructed group remains governed by RFC 9862.
 
 - Empty events: an event whose `spans` vector is empty contributes no spans to any
-  group; it emits one additional `TraceChunk` whose `priority`, `origin`, `tags`, and
-  `dropped` are taken from the effective chunk context and whose `spans` is empty,
-  satisfying the parent RFC's empty-spans guideline. The Datadog wire shape has no
-  carrier for that empty event's `TraceEvent.trace_id`. Datadog ingress does not
-  produce such events, so they reach this step only from typed input or a transform
-  that filtered every span out, outside the pure-relay guarantee.
+  group; it emits one additional empty `TraceChunk` from the effective chunk context.
+  The Datadog wire shape has no carrier for that event's `TraceEvent.trace_id`. Such
+  events are outside the pure-relay guarantee.
 - Tags comparison and serialization: the `tags` comparison is canonical structural
   equality with deterministic key ordering. `DatadogChunkContext.tags` entries are serialized to
   the wire `TraceChunk.tags` (`map<string, string>`) via `dd_value_to_string`. For
@@ -671,11 +647,7 @@ RFC 9862.
   stringification is lossless on round-trip.
 - Cross-grouping invariant: chunk grouping is nested inside `TracerPayload` grouping
   which is nested inside `AgentPayload` grouping, so events in the same chunk group
-  are by construction in the same `TracerPayload` and `AgentPayload`. A transform that
-  mutates `.datadog.agent` on a subset of events split from the same original chunk
-  causes those spans to land in a different `AgentPayload` at the outermost step, and therefore a
-  different `TracerPayload` and `TraceChunk` as well, which is correct (the mutated
-  envelope should not be coalesced with the original).
+  are by construction in the same `TracerPayload` and `AgentPayload`.
 - Round-trip shapes: a multi-service wire chunk that was split into multiple events on
   ingest re-coalesces into one chunk on egress; a non-conforming multi-trace chunk,
   including one with several services per trace, produces one egress chunk per
@@ -697,11 +669,8 @@ the Glossary, is the reference for these derivations:
   (attribute-key lookup with `Span.name` fallback) follow the upstream Agent code.
 - The `TracerPayload` semantic-convention key set defining which `Resource.attributes`
   keys populate which `TracerPayload` scalar fields is similarly upstream-tracking.
-- Agent-envelope synthesis when `.datadog.agent` is absent uses the common-field-and-
-  defaults rule above; it produces no agent-internal fields (`agentVersion`,
-  `targetTPS`, `errorTPS`, `rareSamplerEnabled`, agent-level `tags`) because the OTLP
-  input has none, matching the Datadog Agent's own behaviour when serving as an OTLP
-  receiver.
+- Agent-envelope synthesis when `.datadog.agent` is absent uses proto3 defaults for
+  every `AgentPayload` field, including `hostName` and `env`.
 - Chunk priority when `.datadog.chunk` is absent or `.datadog.chunk.priority` is `None`
   emits `AutoKeep` (wire 1). Vector does not implement the Agent's probabilistic OTLP
   sampler; this matches today's `datadog_traces` sink and the Agent converter at its
@@ -906,7 +875,7 @@ coexistence integration. This sub-RFC supplies the following Datadog-specific wo
    above.
 3. During the parent RFC's sink-local stage, migrate the `datadog_traces` sink and APM
    stats aggregation. Reconstruct effective chunk/trace groups before invoking the
-   aggregator so service partitions share root-span context. Establish the
+   aggregator when those partitions share a sink encoder batch. Establish the
    `Datadog -> Vector -> Datadog` effective-equivalence guarantee, validate every
    declared exclusion, and establish the enumerated
    `OTLP -> Vector -> datadog_traces` conformance rules against the current Datadog
