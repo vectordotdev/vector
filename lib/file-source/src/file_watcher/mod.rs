@@ -52,6 +52,7 @@ pub struct RawLineResult {
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
+    findable_last_cycle: bool,
     reader: Box<dyn AsyncBufRead + Send + Unpin>,
     file_position: FilePosition,
     devno: u64,
@@ -162,6 +163,7 @@ impl FileWatcher {
         Ok(FileWatcher {
             path,
             findable: true,
+            findable_last_cycle: true,
             reader,
             file_position,
             devno,
@@ -208,6 +210,9 @@ impl FileWatcher {
     }
 
     pub fn set_file_findable(&mut self, f: bool) {
+        if !f {
+            self.findable_last_cycle = self.findable;
+        }
         self.findable = f;
         if f {
             self.last_seen = Instant::now();
@@ -216,6 +221,10 @@ impl FileWatcher {
 
     pub fn file_findable(&self) -> bool {
         self.findable
+    }
+
+    pub fn file_findable_last_cycle(&self) -> bool {
+        self.findable_last_cycle
     }
 
     pub fn set_dead(&mut self) {

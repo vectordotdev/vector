@@ -200,16 +200,17 @@ where
 
                 // Pre-sort eviction candidates by last read time (oldest first)
                 // Skip when max_open_files is None or 0 (unlimited)
-                let eviction_candidates: Vec<FileFingerprint> = if self.max_open_files.is_some_and(|m| m > 0) {
-                    let mut candidates: Vec<_> = fp_map
-                        .iter()
-                        .map(|(&fid, w)| (w.last_read_success(), fid))
-                        .collect();
-                    candidates.sort_unstable();
-                    candidates.into_iter().map(|(_, fid)| fid).collect()
-                } else {
-                    Vec::new()
-                };
+                let eviction_candidates: Vec<FileFingerprint> =
+                    if self.max_open_files.is_some_and(|m| m > 0) {
+                        let mut candidates: Vec<_> = fp_map
+                            .iter()
+                            .map(|(&fid, w)| (w.last_read_success(), fid))
+                            .collect();
+                        candidates.sort_unstable();
+                        candidates.into_iter().map(|(_, fid)| fid).collect()
+                    } else {
+                        Vec::new()
+                    };
                 let mut eviction_idx = 0;
 
                 for path in self.paths_provider.paths().into_iter() {
@@ -267,17 +268,15 @@ where
                                     let evict_id = eviction_candidates[eviction_idx];
                                     eviction_idx += 1;
                                     // Skip recently-rotated files whose open FD is the
-                                    // only way to drain remaining bytes. We identify them
-                                    // by last_seen being older than the glob interval
-                                    // (meaning the file was NOT found in the previous
-                                    // cycle) but younger than rotate_wait.
-                                    if let Some(candidate) = fp_map.get(&evict_id) {
-                                        let since_seen = candidate.last_seen().elapsed();
-                                        if since_seen > self.glob_minimum_cooldown * 2
-                                            && since_seen <= self.rotate_wait
-                                        {
-                                            continue;
-                                        }
+                                    // only way to drain remaining bytes. A rotated file
+                                    // was findable in the previous cycle but is no longer
+                                    // findable now, and is still within rotate_wait.
+                                    if let Some(candidate) = fp_map.get(&evict_id)
+                                        && candidate.file_findable_last_cycle()
+                                        && !candidate.file_findable()
+                                        && candidate.last_seen().elapsed() <= self.rotate_wait
+                                    {
+                                        continue;
                                     }
                                     if let Some(watcher) = fp_map.shift_remove(&evict_id) {
                                         info!(
@@ -286,8 +285,10 @@ where
                                             new_path = ?path,
                                             max_open_files = max,
                                         );
-                                        self.emitter
-                                            .emit_file_unwatched(&watcher.path, watcher.reached_eof());
+                                        self.emitter.emit_file_unwatched(
+                                            &watcher.path,
+                                            watcher.reached_eof(),
+                                        );
                                         evicted_files.insert(evict_id, time::Instant::now());
                                         evicted = true;
                                         break;
@@ -301,8 +302,15 @@ where
                                 }
                             }
                             let was_evicted = evicted_files.contains_key(&file_id);
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false, was_evicted)
-                                .await;
+                            self.watch_new_file(
+                                path,
+                                file_id,
+                                &mut fp_map,
+                                &checkpoints,
+                                false,
+                                was_evicted,
+                            )
+                            .await;
                             if fp_map.contains_key(&file_id) {
                                 evicted_files.remove(&file_id);
                             }
@@ -435,8 +443,11 @@ where
             }
 
             // Expire checkpoints for evicted files that were never rediscovered.
+            // Use at least glob_minimum_cooldown so the file has a chance to be
+            // rediscovered before its checkpoint is killed.
+            let eviction_expiry = self.rotate_wait.max(self.glob_minimum_cooldown);
             evicted_files.retain(|fid, evicted_at| {
-                if evicted_at.elapsed() > self.rotate_wait {
+                if evicted_at.elapsed() > eviction_expiry {
                     checkpoints.set_dead(*fid);
                     false
                 } else {

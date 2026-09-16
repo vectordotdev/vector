@@ -181,6 +181,7 @@ fn watcher_for_timing() -> FileWatcher {
     FileWatcher {
         path: PathBuf::new(),
         findable: true,
+        findable_last_cycle: true,
         reader: Box::new(null_reader()),
         file_position: 0,
         devno: 0,
