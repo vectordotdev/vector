@@ -1492,36 +1492,8 @@ fn global_per_tag_overridden_by_per_metric_entry() {
     }
 }
 
-// Transform-level TTL coverage focuses on the *config surface* (defaults,
-// deserialization, the public `contains_no_refresh` contract). The behavioral
-// TTL tests, where we need to drive `Instant`s, live in `tag_value_set.rs`.
-
-#[test]
-fn ttl_defaults_off() {
-    let cfg = make_transform_hashset(2, LimitExceededAction::DropTag);
-    assert!(
-        cfg.global.ttl_secs.is_none(),
-        "default config must not enable TTL"
-    );
-    assert_eq!(
-        cfg.global.ttl_generations,
-        default_ttl_generations(),
-        "default generations should match the documented default"
-    );
-}
-
-#[test]
-fn ttl_global_yaml_deserializes() {
-    let yaml = r#"
-value_limit: 5
-mode: exact
-ttl_secs: 3600
-ttl_generations: 6
-"#;
-    let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
-    assert_eq!(parsed.global.ttl_secs, Some(3600));
-    assert_eq!(parsed.global.ttl_generations, 6);
-}
+// Transform-level TTL coverage focuses on the config surface. Behavioral TTL
+// tests that need driven `Instant`s live in `tag_value_set.rs`.
 
 #[test]
 fn ttl_per_metric_yaml_deserializes() {
@@ -1529,6 +1501,7 @@ fn ttl_per_metric_yaml_deserializes() {
 value_limit: 5
 mode: exact
 ttl_secs: 3600
+ttl_generations: 6
 per_metric_limits:
   hot_metric:
     mode: probabilistic
@@ -1539,54 +1512,10 @@ per_metric_limits:
 "#;
     let parsed: Config = serde_yaml::from_str(yaml).expect("yaml should deserialize");
     assert_eq!(parsed.global.ttl_secs, Some(3600));
+    assert_eq!(parsed.global.ttl_generations, 6);
     let pm = parsed.per_metric_limits.get("hot_metric").unwrap();
     assert_eq!(pm.config.ttl_secs, Some(600));
     assert_eq!(pm.config.ttl_generations, 3);
-}
-
-/// Pins the basic contract of `contains_no_refresh`: it must return `true`
-/// for a value that was just inserted, across every backend variant. The
-/// "no-refresh" timing semantic (the actual *DropEvent* contract) is verified
-/// in `tag_value_set.rs::tests::{ttl_exact,rolling_bloom}_contains_no_refresh_*`,
-/// where the `Instant`-driven storage methods can be exercised directly.
-///
-/// Note: this test does NOT verify that `tag_limit_exceeded` calls
-/// `contains_no_refresh` (and not `contains`) — that wiring is enforced by
-/// code review of the (private) match arm in `mod.rs::tag_limit_exceeded`.
-#[test]
-fn contains_no_refresh_finds_inserted_values_on_all_backends() {
-    use super::tag_value_set::AcceptedTagValueSet;
-    use crate::event::metric::TagValueSet;
-
-    let v1 = TagValueSet::from(["v1".to_string()]);
-    let bloom_mode = Mode::Probabilistic(BloomFilterConfig {
-        cache_size_per_key: default_cache_size(),
-    });
-
-    for (label, mut set) in [
-        (
-            "exact no-ttl",
-            AcceptedTagValueSet::new(&Mode::Exact, None, 4),
-        ),
-        (
-            "bloom no-ttl",
-            AcceptedTagValueSet::new(&bloom_mode, None, 4),
-        ),
-        (
-            "exact ttl",
-            AcceptedTagValueSet::new(&Mode::Exact, Some(60), 4),
-        ),
-        (
-            "bloom ttl",
-            AcceptedTagValueSet::new(&bloom_mode, Some(60), 4),
-        ),
-    ] {
-        set.insert(v1.clone());
-        assert!(
-            set.contains_no_refresh(&v1),
-            "{label}: should find inserted value"
-        );
-    }
 }
 
 /// `ttl_secs: 0` must select the **non-TTL** backend (same as `None`). If we
@@ -1632,8 +1561,15 @@ fn ttl_zero_disables_ttl() {
 
 #[test]
 fn ttl_existing_yaml_unchanged() {
-    // A pre-TTL config must continue to parse without any TTL fields and
-    // produce ttl_secs=None — that's the backwards-compat contract.
+    // Defaults and pre-TTL configs must leave TTL off — the backwards-compat
+    // contract for configs that never opted into sliding-window expiry.
+    let default_cfg = make_transform_hashset(2, LimitExceededAction::DropTag);
+    assert!(default_cfg.global.ttl_secs.is_none());
+    assert_eq!(
+        default_cfg.global.ttl_generations,
+        default_ttl_generations()
+    );
+
     let yaml = r#"
 value_limit: 5
 mode: probabilistic

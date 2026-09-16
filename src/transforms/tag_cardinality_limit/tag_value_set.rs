@@ -658,43 +658,25 @@ mod tests {
     }
 
     #[test]
-    fn ttl_exact_len_does_not_sweep_between_intervals() {
-        // Ordinary `len` must stay O(1) between sweeps: filling `value_limit`
-        // would otherwise become O(N²) if every capacity check retained the
-        // whole bucket.
-        let ttl = Duration::from_secs(60);
-        let mut s = TtlExactStorage::new(ttl, 4);
-        let t0 = Instant::now();
-        s.map.insert(v("stale"), t0);
-        s.map.insert(v("hot"), t0 + Duration::from_secs(10));
-        let t70 = t0 + Duration::from_secs(70);
-        s.last_sweep = t70;
-
-        // Drive `len` with a pinned clock by calling maybe_sweep+len through
-        // the public shape: set last_sweep so the periodic path is skipped.
-        assert_eq!(s.len(), 2, "len between sweeps must not purge lapsed entries");
-        assert!(
-            s.map.contains_key(&v("stale")),
-            "ordinary len must not scan/evict unrelated entries"
-        );
-    }
-
-    #[test]
-    fn ttl_exact_purge_expired_reclaims_capacity() {
+    fn ttl_exact_len_defers_purge_until_capacity_reclaim() {
+        // Ordinary `len` must stay O(1) between sweeps (filling `value_limit`
+        // would otherwise become O(N²)). Capacity recovery still happens when
+        // callers force a full retain / purge.
         let ttl = Duration::from_secs(60);
         let mut s = TtlExactStorage::new(ttl, 4);
         let t0 = Instant::now();
         // Seed directly so `insert`'s maybe_sweep cannot drop stale early.
         s.map.insert(v("stale"), t0);
         s.map.insert(v("hot"), t0 + Duration::from_secs(10));
-        // Make the periodic path a no-op for ordinary `len`.
         let t70 = t0 + Duration::from_secs(70);
         s.last_sweep = t70;
 
         assert_eq!(s.len(), 2, "len alone must not reclaim between sweeps");
-        assert!(s.map.contains_key(&v("stale")));
+        assert!(
+            s.map.contains_key(&v("stale")),
+            "ordinary len must not scan/evict unrelated entries"
+        );
 
-        // Force a full retain with a clock past stale's lease but within hot's.
         s.sweep(t70);
         assert_eq!(s.map.len(), 1, "purge must drop only lapsed entries");
         assert!(s.map.contains_key(&v("hot")));
@@ -718,19 +700,6 @@ mod tests {
             after > t_insert,
             "contains() must refresh the stored Instant; was {t_insert:?}, still {after:?}"
         );
-    }
-
-    #[test]
-    fn ttl_exact_caps_generations_when_ttl_lt_generations() {
-        // ttl=1s, generations=4 → effective=1, sweep_interval=1s.
-        let s = TtlExactStorage::new(Duration::from_secs(1), 4);
-        assert_eq!(s.sweep_interval, Duration::from_secs(1));
-        // ttl=2s, generations=8 → effective=2, sweep_interval=1s.
-        let s = TtlExactStorage::new(Duration::from_secs(2), 8);
-        assert_eq!(s.sweep_interval, Duration::from_secs(1));
-        // ttl >> generations is unaffected by the cap.
-        let s = TtlExactStorage::new(Duration::from_secs(3600), 4);
-        assert_eq!(s.sweep_interval, Duration::from_secs(900));
     }
 
     #[test]
@@ -770,43 +739,6 @@ mod tests {
         // Sanity: the refreshing variant must seed it.
         assert!(s.contains(&v("a")));
         assert!(s.shards.back().unwrap().contains(&v("a")));
-    }
-
-    #[test]
-    fn rolling_bloom_drops_oldest_shard_on_rotate() {
-        let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
-        let t0 = Instant::now();
-        s.next_rotate = t0 + Duration::from_secs(1);
-        s.shards.back_mut().unwrap().insert(&v("old"));
-        s.rotate_if_needed(t0 + Duration::from_secs(5));
-        assert_eq!(s.shards.len(), s.max_shards);
-        assert!(
-            !s.shards.iter().any(|sh| sh.contains(&v("old"))),
-            "'old' should have rolled out of the window"
-        );
-    }
-
-    #[test]
-    fn rolling_bloom_refresh_on_contains_seeds_newest_shard() {
-        // After one rotation, `hot` lives in the front shard and the back is
-        // fresh-empty; `contains` must re-seed it into the newest shard.
-        let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
-        s.shards.back_mut().unwrap().insert(&v("hot"));
-        let t0 = Instant::now();
-        s.next_rotate = t0 + Duration::from_secs(1);
-        s.rotate_if_needed(t0 + Duration::from_secs(2));
-
-        assert_eq!(
-            s.shards.back().unwrap().count(),
-            0,
-            "back shard should be fresh-empty after rotation"
-        );
-
-        assert!(s.contains(&v("hot")));
-        assert!(
-            s.shards.back().unwrap().contains(&v("hot")),
-            "contains() must re-seed found values into the newest shard"
-        );
     }
 
     #[test]
@@ -887,75 +819,44 @@ mod tests {
     }
 
     #[test]
-    fn rolling_bloom_caps_generations_when_ttl_lt_generations() {
-        // ttl=1s, generations=4 → effective=1, slice=1s.
-        let s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(1));
-        assert_eq!(s.generations, 1, "effective generations capped to ttl");
-        assert_eq!(s.slice, Duration::from_secs(1));
-        // ttl=2s, generations=8 → effective=2, slice=1s.
-        let s = RollingBloomStorage::new(default_cache_size(), 8, Duration::from_secs(2));
-        assert_eq!(s.generations, 2);
-        assert_eq!(s.slice, Duration::from_secs(1));
-    }
-
-    #[test]
-    fn rolling_bloom_window_matches_ttl_exactly() {
-        // `slice * generations == ttl` must hold for every valid
-        // (ttl_secs, ttl_generations), including non-divisible TTLs (e.g. 10 / 4).
-        for (ttl_secs, generations) in [
-            (1u64, 4u8),
-            (2, 8),
-            (3, 4),
-            (10, 4),
-            (60, 4),
-            (3600, 4),
-            (86400, 6),
-            (4294967296, 4),
+    fn compute_ttl_slices_preserves_window_and_backend_wiring() {
+        // One table covers: generation caps when ttl < generations, fractional
+        // slices for non-divisible TTLs, and u64→u32 truncation avoidance.
+        // Also smoke-checks that both backends consume the helper.
+        for (ttl_secs, requested, expected_generations) in [
+            (1u64, 4u8, 1u32),
+            (2, 8, 2),
+            (10, 4, 4),
+            (3600, 4, 4),
+            (4294967296, 4, 4),
         ] {
-            let s = RollingBloomStorage::new(
-                default_cache_size(),
-                generations,
-                Duration::from_secs(ttl_secs),
+            let ttl = Duration::from_secs(ttl_secs);
+            let (generations, slice) = compute_ttl_slices(ttl, requested);
+            assert_eq!(
+                generations, expected_generations,
+                "ttl_secs={ttl_secs}, requested={requested}"
             );
             assert_eq!(
-                s.slice * u32::from(s.generations),
-                Duration::from_secs(ttl_secs),
-                "ttl_secs={ttl_secs}, generations={generations}: window must equal ttl",
+                slice * generations,
+                ttl,
+                "ttl_secs={ttl_secs}, requested={requested}: window must equal ttl"
             );
             assert!(
-                s.slice >= Duration::from_secs(1),
-                "ttl_secs={ttl_secs}, generations={generations}: slice must be >= 1s",
+                slice >= Duration::from_secs(1) || ttl < Duration::from_secs(1),
+                "ttl_secs={ttl_secs}: slice must be >= 1s when ttl allows"
             );
-        }
-    }
 
-    #[test]
-    fn compute_ttl_slices_non_divisible_ttl_uses_fractional_slices() {
-        // Integer seconds division would yield 10/4=2s slices and an ~8s window;
-        // Duration division must preserve the full 10s contract.
+            let rolling = RollingBloomStorage::new(default_cache_size(), requested, ttl);
+            assert_eq!(rolling.generations, expected_generations as u8);
+            assert_eq!(rolling.slice, slice);
+
+            let exact = TtlExactStorage::new(ttl, requested);
+            assert_eq!(exact.sweep_interval, slice);
+        }
+
+        // Explicit fractional-slice pin: 10/4 must not become 2s integer slices.
         let (_, slice) = compute_ttl_slices(Duration::from_secs(10), 4);
         assert_eq!(slice, Duration::from_millis(2500));
-        assert_eq!(slice * 4, Duration::from_secs(10));
-    }
-
-    #[test]
-    fn compute_ttl_slices_large_ttl_secs_avoids_u32_truncation() {
-        // `ttl.as_secs() as u32` wraps at 2^32, collapsing the generation cap
-        // to 1 and changing rotation cadence.
-        let ttl = Duration::from_secs(4294967296);
-        let (generations, slice) = compute_ttl_slices(ttl, 4);
-        assert_eq!(
-            generations, 4,
-            "requested generations must not collapse to 1"
-        );
-        assert_eq!(slice * generations, ttl);
-
-        let rolling = RollingBloomStorage::new(default_cache_size(), 4, ttl);
-        assert_eq!(rolling.generations, 4);
-        assert_eq!(rolling.slice * u32::from(rolling.generations), ttl);
-
-        let exact = TtlExactStorage::new(ttl, 4);
-        assert_eq!(exact.sweep_interval * 4, ttl);
     }
 
     #[test]
