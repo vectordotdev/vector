@@ -7,8 +7,10 @@ use heim::memory::os::macos::MemoryExt;
 use heim::units::information::byte;
 use vector_lib::{
     event::MetricTags,
-    internal_event::{CounterName, GaugeName},
+    internal_event::GaugeName,
 };
+#[cfg(not(windows))]
+use vector_lib::internal_event::CounterName;
 
 use super::HostMetrics;
 use crate::internal_events::HostMetricsScrapeDetailError;
