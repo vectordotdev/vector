@@ -267,16 +267,19 @@ where
                                 while eviction_idx < eviction_candidates.len() {
                                     let evict_id = eviction_candidates[eviction_idx];
                                     eviction_idx += 1;
-                                    // Skip recently-rotated files whose open FD is the
-                                    // only way to drain remaining bytes. A rotated file
-                                    // has a missing_since timestamp (set on the first
-                                    // cycle where it was not found) and is still within
-                                    // rotate_wait from that point.
-                                    if let Some(candidate) = fp_map.get(&evict_id)
-                                        && let Some(missing) = candidate.missing_since()
-                                        && missing.elapsed() <= self.rotate_wait
-                                    {
-                                        continue;
+                                    if let Some(candidate) = fp_map.get(&evict_id) {
+                                        // Skip recently-rotated files whose open FD is
+                                        // the only way to drain remaining bytes.
+                                        if let Some(missing) = candidate.missing_since()
+                                            && missing.elapsed() <= self.rotate_wait
+                                        {
+                                            continue;
+                                        }
+                                        // Skip gzipped files that haven't reached EOF —
+                                        // they cannot resume from a checkpoint offset.
+                                        if candidate.is_gzipped() && !candidate.reached_eof() {
+                                            continue;
+                                        }
                                     }
                                     if let Some(watcher) = fp_map.shift_remove(&evict_id) {
                                         info!(
@@ -318,6 +321,13 @@ where
                         }
                     }
                 }
+                // Now that discovery is complete, mark watchers that were not
+                // found in this scan. This must happen after the loop so we
+                // don't confuse not-yet-scanned files with rotated ones.
+                for (_, watcher) in &mut fp_map {
+                    watcher.mark_missing_if_absent();
+                }
+
                 stats.record("discovery", start.elapsed());
             }
 

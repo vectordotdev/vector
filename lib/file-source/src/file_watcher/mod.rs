@@ -53,6 +53,7 @@ pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
     missing_since: Option<Instant>,
+    gzipped: bool,
     reader: Box<dyn AsyncBufRead + Send + Unpin>,
     file_position: FilePosition,
     devno: u64,
@@ -164,6 +165,7 @@ impl FileWatcher {
             path,
             findable: true,
             missing_since: None,
+            gzipped,
             reader,
             file_position,
             devno,
@@ -210,13 +212,17 @@ impl FileWatcher {
     }
 
     pub fn set_file_findable(&mut self, f: bool) {
+        self.findable = f;
         if f {
             self.missing_since = None;
             self.last_seen = Instant::now();
-        } else if self.findable && self.missing_since.is_none() {
+        }
+    }
+
+    pub fn mark_missing_if_absent(&mut self) {
+        if !self.findable && self.missing_since.is_none() {
             self.missing_since = Some(Instant::now());
         }
-        self.findable = f;
     }
 
     pub fn file_findable(&self) -> bool {
@@ -225,6 +231,10 @@ impl FileWatcher {
 
     pub fn missing_since(&self) -> Option<Instant> {
         self.missing_since
+    }
+
+    pub fn is_gzipped(&self) -> bool {
+        self.gzipped
     }
 
     pub fn set_dead(&mut self) {
