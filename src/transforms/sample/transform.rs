@@ -144,6 +144,7 @@ pub struct Sample {
     dynamic_event_counters: HashMap<Option<String>, u64>,
     exclude: Option<Condition>,
     sample_rate_key: OptionalValuePath,
+    include_group_tag: bool,
 }
 
 impl Sample {
@@ -201,7 +202,13 @@ impl Sample {
             dynamic_event_counters: HashMap::default(),
             exclude,
             sample_rate_key,
+            include_group_tag: false,
         }
+    }
+
+    pub const fn with_include_group_tag(mut self, include_group_tag: bool) -> Self {
+        self.include_group_tag = include_group_tag;
+        self
     }
 
     #[cfg(test)]
@@ -349,10 +356,12 @@ impl FunctionTransform for Sample {
 
         let should_sample = match event_sample_mode {
             Some(EventSampleMode::Ratio(ratio)) => {
-                self.sample_with_dynamic_ratio(ratio, group_by_key)
+                self.sample_with_dynamic_ratio(ratio, group_by_key.clone())
             }
-            Some(EventSampleMode::Rate(rate)) => self.sample_with_dynamic_rate(rate, group_by_key),
-            None => self.static_mode.increment(group_by_key, value),
+            Some(EventSampleMode::Rate(rate)) => {
+                self.sample_with_dynamic_rate(rate, group_by_key.clone())
+            }
+            None => self.static_mode.increment(group_by_key.clone(), value),
         };
 
         if should_sample {
@@ -375,7 +384,10 @@ impl FunctionTransform for Sample {
             }
             output.push(event);
         } else {
-            emit!(SampleEventDiscarded);
+            emit!(SampleEventDiscarded {
+                group: group_by_key.unwrap_or_else(|| "None".to_string()),
+                include_group_tag: self.include_group_tag,
+            });
         }
     }
 }
