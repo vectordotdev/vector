@@ -174,7 +174,7 @@ impl Fingerprinter {
     /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`.
     #[cfg(test)]
     pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
-        self.fingerprint_observing_identity(path, &mut None, &mut None, PrefixWanted::Yes)
+        self.fingerprint_observing_identity(path, &mut None, &mut None, PrefixWanted::Yes, false)
             .await
     }
 
@@ -189,6 +189,7 @@ impl Fingerprinter {
         identity: &mut Option<(u64, u64)>,
         prefix: &mut Option<PartialPrefix>,
         want_prefix: PrefixWanted,
+        capture_identity: bool,
     ) -> Result<FileFingerprint> {
         use FileFingerprint::*;
 
@@ -219,6 +220,10 @@ impl Fingerprinter {
                 .await;
                 match read {
                     Ok(bytes_read) => {
+                        if capture_identity {
+                            let file_info = fp.file_info().await?;
+                            *identity = Some((file_info.portable_dev(), file_info.portable_ino()));
+                        }
                         // The same bytes the checksum is taken over. A rewrite that has *grown* into
                         // a complete fingerprint still begins with the partial prefix seen while it
                         // was short, which is what tells it from a different rewrite that completed.
@@ -266,6 +271,7 @@ impl Fingerprinter {
                         &mut read_identity,
                         &mut read_prefix,
                         want_prefix,
+                        false,
                     )
                     .await
                     .map(Some)
@@ -365,6 +371,31 @@ impl Fingerprinter {
                 }
             }
         }
+    }
+
+    /// Verify the rare replacement-open handoff against the descriptor used for fingerprinting.
+    /// Ordinary reconciliation does not pay for this additional identity query.
+    pub async fn fingerprint_matches_identity(
+        &mut self,
+        path: &Path,
+        expected: Option<FileFingerprint>,
+        identity: (u64, u64),
+    ) -> bool {
+        let mut observed_identity = None;
+        let result = self
+            .fingerprint_observing_identity(
+                path,
+                &mut observed_identity,
+                &mut None,
+                PrefixWanted::No,
+                true,
+            )
+            .await;
+        observed_identity == Some(identity)
+            && match result {
+                Ok(fingerprint) => Some(fingerprint) == expected,
+                Err(error) => expected.is_none() && error.kind() == ErrorKind::UnexpectedEof,
+            }
     }
 
     /// As [`Self::fingerprint_or_emit_detailed`], for callers that only need the fingerprint.

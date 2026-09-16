@@ -958,7 +958,7 @@ impl Source {
                 }
             }
 
-            checkpoints.update(line.file_id, line.end_offset, line.generation);
+            checkpoints.acknowledge_reader(line.generation, line.end_offset);
             event
         });
 

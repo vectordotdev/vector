@@ -16,7 +16,7 @@ use vector_common::constants::GZIP_MAGIC;
 
 use file_source_common::{
     AsyncFileInfo, FilePosition, OwnerGeneration, PartialPrefix, PortableFileExt, ReadFrom,
-    buffer::{ReadResult, read_until_with_max_size},
+    buffer::{ReadResult, read_until_with_max_size_or_discard},
 };
 use vector_common::compression::gzip_multiple_decoder;
 
@@ -52,6 +52,8 @@ pub struct ShrinkCheck {
 
 #[derive(Debug)]
 pub struct RawLineResult {
+    /// None can also mean a discarded-record yield; consult `FileWatcher::reached_eof` before
+    /// treating it as EOF or flushing a final partial record.
     pub raw_line: Option<RawLine>,
     pub discarded_for_size_and_truncated: Vec<BytesMut>,
 }
@@ -180,8 +182,10 @@ pub struct FileWatcher {
     /// offset until the first line of the new content is acknowledged -- long enough for a restart
     /// to resume past the replacement's prefix.
     reader_restarted: bool,
-    /// Rotation output awaiting this watcher's turn in the oldest-first read pass.
-    pub(crate) pending_drain: Vec<crate::file_server::Line>,
+    /// An opened inode displaced by a replacement; discovery must no longer repoint it.
+    pub(crate) retired: bool,
+    /// Last emitted record boundary, excluding discarded bytes and buffered partial records.
+    pub(crate) emitted_position: FilePosition,
     /// Bumped for every event that invalidates the content the reader was consuming: an in-place
     /// rewrite, a replacement inode, a truncation.
     ///
@@ -306,7 +310,8 @@ impl FileWatcher {
                         // before returning, so this watcher still holds no file descriptor.
                         identity: Some(identity),
                         reader_restarted: false,
-                        pending_drain: Vec::new(),
+                        retired: false,
+                        emitted_position: probe_size,
                         content_epoch: 0,
                         last_rewind_epoch: None,
                         rewound_at_len: None,
@@ -425,7 +430,8 @@ impl FileWatcher {
             file_position,
             identity: Some((devno, ino)),
             reader_restarted: false,
-            pending_drain: Vec::new(),
+            retired: false,
+            emitted_position: file_position,
             content_epoch: 0,
             last_rewind_epoch: None,
             rewound_at_len: None,
@@ -583,12 +589,27 @@ impl FileWatcher {
     }
 
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
+        self.update_path_checked(path, false).await
+    }
+
+    /// A rename must keep the opened inode. Check the descriptor, not a preceding path stat,
+    /// so a racing replacement cannot silently discard this reader's remaining records.
+    pub(crate) async fn update_path_if_same_identity(&mut self, path: PathBuf) -> io::Result<()> {
+        self.update_path_checked(path, true).await
+    }
+
+    async fn update_path_checked(&mut self, path: PathBuf, same_identity: bool) -> io::Result<()> {
         let was_idle = self.is_idle();
 
         let file_handle = open_regular_file(&path).await?;
 
         let file_info = file_handle.file_info().await?;
         let new_identity = (file_info.portable_dev(), file_info.portable_ino());
+        if same_identity && Some(new_identity) != self.identity {
+            return Err(io::Error::other(
+                "file identity changed during rename discovery",
+            ));
+        }
         let raw_metadata = file_handle.metadata().await.ok();
         let canonical_path = tokio::fs::canonicalize(&path).await.ok();
         if Some(new_identity) != self.identity {
@@ -1024,6 +1045,10 @@ impl FileWatcher {
         self.generation
     }
 
+    pub(crate) fn identity(&self) -> Option<FileIdentity> {
+        self.identity
+    }
+
     /// Take a fresh generation, retiring the one lines already in flight were stamped with.
     ///
     /// Called wherever the reader is repositioned onto different content -- a rekey onto a new
@@ -1031,6 +1056,7 @@ impl FileWatcher {
     /// consumed, so an acknowledgement still travelling for that content must not be allowed to
     /// move the checkpoint back past the reset.
     pub fn take_new_generation(&mut self) -> OwnerGeneration {
+        self.emitted_position = self.file_position;
         self.generation = file_source_common::next_owner_generation();
         self.generation
     }
@@ -1442,7 +1468,7 @@ impl FileWatcher {
         };
 
         let initial_position = self.file_position;
-        let read_result = read_until_with_max_size(
+        let read_result = read_until_with_max_size_or_discard(
             reader.as_mut(),
             &mut self.file_position,
             self.line_delimiter.as_ref(),
@@ -1450,6 +1476,18 @@ impl FileWatcher {
             self.max_line_bytes,
         )
         .await;
+        let read_result = match read_result {
+            Ok((result, true)) => {
+                // A discarded record consumed input, but is neither a delivered line nor EOF.
+                self.track_read_success();
+                return Ok(RawLineResult {
+                    raw_line: None,
+                    discarded_for_size_and_truncated: result.discarded_for_size_and_truncated,
+                });
+            }
+            Ok((result, false)) => Ok(result),
+            Err(error) => Err(error),
+        };
         // The borrow of `self.state` (via `reader`/`buf` above) ends here,
         // once `read_until_with_max_size` returns; everything below is free
         // to borrow `self` again, including re-matching on `self.state` to
@@ -1762,7 +1800,7 @@ pub(crate) async fn path_is_absent(path: &std::path::Path) -> bool {
     }
 }
 
-async fn path_identity(path: &std::path::Path) -> Option<(u64, u64)> {
+pub(crate) async fn path_identity(path: &std::path::Path) -> Option<FileIdentity> {
     let file = open_regular_file(path).await.ok()?;
     let file_info = file.file_info().await.ok()?;
     Some((file_info.portable_dev(), file_info.portable_ino()))

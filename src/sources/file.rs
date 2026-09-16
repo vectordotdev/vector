@@ -18,7 +18,7 @@ use vector_lib::{
         paths_provider::{Glob, MatchOptions},
     },
     file_source_common::{
-        Checkpointer, FileFingerprint, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
+        Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
     },
     finalizer::OrderedFinalizer,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
@@ -452,7 +452,6 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 
 #[derive(Debug)]
 pub(crate) struct FinalizerEntry {
-    pub(crate) file_id: FileFingerprint,
     /// The watcher that read the line, so a checkpoint written when this acknowledgement lands can
     /// be matched against the reader that produced it rather than against the fingerprint alone.
     pub(crate) generation: u64,
@@ -694,7 +693,7 @@ pub fn file_source(
         crate::spawn_in_current_span(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
-                    checkpoints.update(entry.file_id, entry.offset, entry.generation);
+                    checkpoints.acknowledge_reader(entry.generation, entry.offset);
                 }
             }
             send_shutdown.send(())
@@ -767,14 +766,13 @@ pub fn file_source(
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
                 let entry = FinalizerEntry {
-                    file_id: line.file_id,
                     generation: line.generation,
                     offset: line.end_offset,
                 };
-                // checkpoints.update will be called from ack_stream's thread
+                // The reader will be acknowledged from ack_stream's thread.
                 finalizer.add(entry, receiver);
             } else {
-                checkpoints.update(line.file_id, line.end_offset, line.generation);
+                checkpoints.acknowledge_reader(line.generation, line.end_offset);
             }
             event
         });
@@ -2197,7 +2195,7 @@ mod tests {
     /// owner's checkpoint context.
     #[tokio::test]
     async fn test_multi_line_aggregation_does_not_cross_reader_generations() {
-        let file_id = FileFingerprint::FirstLinesChecksum(1);
+        let file_id = vector_lib::file_source_common::FileFingerprint::FirstLinesChecksum(1);
         let lines = wrap_with_line_agg(
             futures::stream::iter(vec![
                 Line {
@@ -2290,6 +2288,83 @@ mod tests {
         );
         let lines = extract_messages_string(received_after_restart);
         assert_eq!(lines, vec!["INFO goodbye"]);
+    }
+
+    /// The generation a line is stamped with travels `Line` -> `FinalizerEntry` -> the ack task,
+    /// and only there does it reach `acknowledge_reader`. Neither library's tests cross that
+    /// boundary, so a rotation whose tail is acknowledged after the reader moved on is only
+    /// exercised here: the restart must resume past what was acknowledged, not replay it.
+    #[tokio::test]
+    async fn test_rotation_checkpoints_survive_acknowledgement() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*.log")],
+            offset_key: Some(OptionalValuePath::from(owned_value_path!("offset"))),
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("app.log");
+        let mut file = File::create(&path).unwrap();
+        writeln!(&mut file, "before rotation").unwrap();
+        file.sync_all().unwrap();
+
+        // Read the original, then rotate it away and write a replacement while the source is still
+        // running, so the tail of the old inode and the head of the new one are both in flight.
+        let received = run_file_source(&config, true, Acks, LogNamespace::Legacy, None, async {
+            sleep_500_millis().await;
+            writeln!(&mut file, "last line of the old inode").unwrap();
+            file.sync_all().unwrap();
+            sleep_500_millis().await;
+
+            std::fs::rename(&path, dir.path().join("archive.log")).unwrap();
+            let mut replacement = File::create(&path).unwrap();
+            writeln!(&mut replacement, "first line of the replacement").unwrap();
+            replacement.sync_all().unwrap();
+            sleep_500_millis().await;
+        })
+        .await;
+
+        let lines = extract_messages_string(received);
+        assert_eq!(
+            lines.len(),
+            3,
+            "each record must be delivered exactly once: {lines:?}"
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| line == "first line of the replacement")
+        );
+        assert!(
+            lines.iter().any(|line| line == "before rotation"),
+            "the original content must be read, got {lines:?}"
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| line == "last line of the old inode"),
+            "the rotated-away tail must not be lost, got {lines:?}"
+        );
+
+        // Everything above was acknowledged before shutdown, so a restart must not replay it.
+        let after_restart =
+            run_file_source(&config, false, Acks, LogNamespace::Legacy, None, async {
+                let mut replacement = std::fs::OpenOptions::new()
+                    .append(true)
+                    .open(&path)
+                    .unwrap();
+                writeln!(&mut replacement, "after restart").unwrap();
+                replacement.sync_all().unwrap();
+                sleep_500_millis().await;
+            })
+            .await;
+
+        let replayed = extract_messages_string(after_restart);
+        assert_eq!(
+            replayed,
+            vec!["after restart"],
+            "only newly appended content may be delivered after a restart"
+        );
     }
 
     #[tokio::test]
@@ -3196,6 +3271,7 @@ mod tests {
     /// what distinguishes these tests from the equivalent polling-mode tests above.
     mod notify_discovery {
         use super::*;
+        use similar_asserts::assert_eq;
 
         fn test_notify_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
             file::FileConfig {
