@@ -542,11 +542,10 @@ impl FileSink {
             path: self.path.clone(),
         };
         let batch_settings = self.batch_settings;
-        // Per-path event buffers with a generation counter that increments each
-        // time the buffer is flushed and recreated.  The generation lets us detect stale
-        // deadline entries in the BinaryHeap so that a completed batch's deadline
-        // is never applied to a later batch for the same path.
-        let mut buffers: std::collections::HashMap<Bytes, (Vec<Event>, u64)> =
+        // Per-path event buffers storing `(events, generation, bytes)`.
+        // `bytes` avoids rescanning on append; `generation`, incremented per
+        // flush, marks stale `flush_deadlines` entries.
+        let mut buffers: std::collections::HashMap<Bytes, (Vec<Event>, u64, usize)> =
             std::collections::HashMap::new();
         let mut per_path_gen: std::collections::HashMap<Bytes, u64> =
             std::collections::HashMap::new();
@@ -613,47 +612,49 @@ impl FileSink {
                                 }
                             };
                             let event_size = event.estimated_json_encoded_size_of().get();
-                            if let Some((events, _)) = buffers.get_mut(&path) {
-                                let current_size: usize = events.iter()
-                                    .map(|e| e.estimated_json_encoded_size_of().get())
-                                    .sum();
-                                if current_size + event_size > batch_settings.size_limit
+                            if let Some((events, _generation, bytes)) = buffers.get_mut(&path) {
+                                if *bytes + event_size > batch_settings.size_limit
                                     || events.len() >= batch_settings.item_limit
                                 {
                                     // Buffer is full — flush old batch and start fresh.
-                                    let (old_events, _old_generation) = buffers.remove(&path).unwrap();
+                                    let (old_events, _old_generation, _old_bytes) =
+                                        buffers.remove(&path).unwrap();
                                     self.process_batch(path.clone(), old_events).await;
                                     let generation = per_path_gen.entry(path.clone()).or_insert(0);
                                     let deadline = tokio::time::Instant::now()
                                         + batch_settings.timeout;
-                                    buffers.insert(path.clone(), (vec![event], *generation));
+                                    buffers.insert(
+                                        path.clone(),
+                                        (vec![event], *generation, event_size),
+                                    );
                                     flush_deadlines.push(
                                         std::cmp::Reverse((deadline, path.clone(), *generation)),
                                     );
                                     *generation += 1;
                                 } else {
+                                    *bytes += event_size;
                                     events.push(event);
                                 }
                             } else {
                                 let generation = per_path_gen.entry(path.clone()).or_insert(0);
                                 let deadline = tokio::time::Instant::now()
                                     + batch_settings.timeout;
-                                buffers.insert(path.clone(), (vec![event], *generation));
+                                buffers.insert(
+                                    path.clone(),
+                                    (vec![event], *generation, event_size),
+                                );
                                 flush_deadlines.push(
                                     std::cmp::Reverse((deadline, path.clone(), *generation)),
                                 );
                                 *generation += 1;
                             }
                             // Flush immediately when the batch reaches the item or byte limit.
-                            let needs_flush = buffers.get(&path).is_some_and(|(events, _)| {
-                                let total_size: usize = events.iter()
-                                    .map(|e| e.estimated_json_encoded_size_of().get())
-                                    .sum();
-                                total_size >= batch_settings.size_limit
+                            let needs_flush = buffers.get(&path).is_some_and(|(events, _, bytes)| {
+                                *bytes >= batch_settings.size_limit
                                     || events.len() >= batch_settings.item_limit
                             });
                             if needs_flush {
-                                let (events, _generation) = buffers.remove(&path).unwrap();
+                                let (events, _generation, _bytes) = buffers.remove(&path).unwrap();
                                 self.process_batch(path.clone(), events).await;
                                 // The stale deadline entry (generation) remains in the heap but won't
                                 // match the new generation if this path receives more events.
@@ -677,13 +678,13 @@ impl FileSink {
                                             Some(e) => e,
                                             None => break,
                                         };
-                                    if let Some((events, current_generation)) =
+                                    if let Some((events, current_generation, bytes)) =
                                         buffers.remove(&path)
                                     {
                                         if current_generation == generation {
                                             self.process_batch(path, events).await;
                                         } else {
-                                            buffers.insert(path, (events, current_generation));
+                                            buffers.insert(path, (events, current_generation, bytes));
                                         }
                                     }
                                 }
@@ -694,7 +695,7 @@ impl FileSink {
                             debug!(message = "Receiver exhausted, flushing remaining buffers.");
                             let paths: Vec<Bytes> = buffers.keys().cloned().collect();
                             for p in paths {
-                                if let Some((events, _generation)) = buffers.remove(&p) {
+                                if let Some((events, _generation, _bytes)) = buffers.remove(&p) {
                                     self.process_batch(p, events).await;
                                 }
                             }
@@ -749,11 +750,11 @@ impl FileSink {
                     Some(e) => e,
                     None => break,
                 };
-                if let Some((events, current_generation)) = buffers.remove(&path) {
+                if let Some((events, current_generation, bytes)) = buffers.remove(&path) {
                     if current_generation == generation {
                         self.process_batch(path, events).await;
                     } else {
-                        buffers.insert(path, (events, current_generation));
+                        buffers.insert(path, (events, current_generation, bytes));
                     }
                 }
             }
@@ -984,6 +985,7 @@ impl FileSink {
                     file_start,
                     written,
                     last_complete,
+                    &boundaries,
                 )
                 .await;
 
@@ -1146,13 +1148,14 @@ fn emit_bytes_sent(path: &Bytes, byte_size: usize, include_file_metric_tag: bool
 }
 
 /// Rolls back a partially written batch to its last complete record,
-/// returning the count of cleanly persisted events.
+/// returning the batch offset up to which events are acked.
 async fn reconcile_after_partial_write(
     file: &mut OutFile,
     compression: Compression,
     file_start: u64,
     written: usize,
     last_complete: usize,
+    boundaries: &[usize],
 ) -> usize {
     if last_complete >= written {
         return last_complete;
@@ -1172,10 +1175,19 @@ async fn reconcile_after_partial_write(
                     return 0;
                 }
             } else {
+                // Another appender moved the file, so the partial record's
+                // prefix remains on disk and can't be removed or isolated.
+                // Ack it (accepting truncation) rather than retry, which would
+                // re-write the prefix and corrupt the record.
                 warn!(
                     message =
                         "File changed while writing; cannot safely rewind after partial write.",
                 );
+                return boundaries
+                    .iter()
+                    .find(|&&b| b > last_complete)
+                    .copied()
+                    .unwrap_or(written);
             }
             last_complete
         }
@@ -2210,7 +2222,8 @@ mod tests {
             drop(other);
 
             let delivered_up_to =
-                reconcile_after_partial_write(&mut out, compression, file_start, written, 0).await;
+                reconcile_after_partial_write(&mut out, compression, file_start, written, 0, &[])
+                    .await;
             assert_eq!(delivered_up_to, 0, "nothing may be safely delivered");
 
             assert_eq!(out.len().await.unwrap(), file_start + b"EXTRA".len() as u64);
@@ -2243,11 +2256,71 @@ mod tests {
             file_start,
             written,
             last_complete,
+            &[last_complete],
         )
         .await;
         assert_eq!(
             delivered_up_to, 0,
             "a failed rollback must not be reported as delivered up to {last_complete}"
+        );
+    }
+
+    // Regression test: when another appender changes the file length, the
+    // partial record's prefix stays on disk, so it must be acked rather than
+    // retried (retrying would re-write the prefix and corrupt the record).
+    #[tokio::test]
+    async fn uncompressed_concurrent_appender_acks_partial_record() {
+        trace_init();
+        let template = temp_file();
+        tokio::fs::write(&template, b"0123456789").await.unwrap();
+        let file = tokio::fs::OpenOptions::new()
+            .write(true)
+            .open(&template)
+            .await
+            .unwrap();
+        let mut out = OutFile::new(file, Compression::None);
+
+        // The batch leaves the file at file_start + written; the record ending
+        // at boundary `next` was only partially written.
+        let file_start = 6; // out.len() (10) minus written (4)
+        let written = 4;
+        let last_complete = 2;
+        let boundaries = [last_complete, 5];
+        assert_eq!(out.len().await.unwrap(), file_start + written as u64);
+
+        // A concurrent writer appends before the rollback check.
+        let mut other = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&template)
+            .await
+            .unwrap();
+        tokio::io::AsyncWriteExt::write_all(&mut other, b"EXTRA")
+            .await
+            .unwrap();
+        other.sync_all().await.unwrap();
+        drop(other);
+
+        let delivered_up_to = reconcile_after_partial_write(
+            &mut out,
+            Compression::None,
+            file_start,
+            written,
+            last_complete,
+            &boundaries,
+        )
+        .await;
+        // Ack through the partial record's end boundary so it isn't retried.
+        assert_eq!(delivered_up_to, 5);
+        // The concurrent append must be preserved: no rewind happened.
+        assert_eq!(
+            out.len().await.unwrap(),
+            file_start + written as u64 + b"EXTRA".len() as u64
+        );
+        let raw = tokio::fs::read(&template).await.unwrap();
+        assert!(
+            raw.ends_with(b"EXTRA"),
+            "concurrent append must be preserved"
         );
     }
 }
