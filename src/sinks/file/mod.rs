@@ -542,9 +542,8 @@ impl FileSink {
             path: self.path.clone(),
         };
         let batch_settings = self.batch_settings;
-        // Per-path event buffers storing `(events, generation, bytes)`.
-        // `bytes` avoids rescanning on append; `generation`, incremented per
-        // flush, marks stale `flush_deadlines` entries.
+        // Per-path buffers of `(events, generation, bytes)`; `bytes` tracks
+        // size without rescanning, `generation` marks stale `flush_deadlines`.
         let mut buffers: std::collections::HashMap<Bytes, (Vec<Event>, u64, usize)> =
             std::collections::HashMap::new();
         let mut per_path_gen: std::collections::HashMap<Bytes, u64> =
@@ -1161,6 +1160,16 @@ async fn reconcile_after_partial_write(
         return last_complete;
     }
 
+    // The partial bytes can't be removed; ack it rather than retry
+    // (a retry would re-write the retained prefix).
+    let ack_partial = || {
+        boundaries
+            .iter()
+            .find(|&&b| b > last_complete)
+            .copied()
+            .unwrap_or(written)
+    };
+
     match compression {
         Compression::None => {
             let rolled_back = match file.len().await {
@@ -1170,29 +1179,21 @@ async fn reconcile_after_partial_write(
             if rolled_back {
                 let rewind_to = file_start + last_complete as u64;
                 if let Err(e) = file.reset(rewind_to).await {
-                    // The rollback failed; the batch is an unreconciled partial write.
                     warn!(message = "Failed to rewind file after partial write.", error = ?e);
-                    return 0;
+                    ack_partial()
+                } else {
+                    last_complete
                 }
             } else {
-                // Another appender moved the file, so the partial record's
-                // prefix remains on disk and can't be removed or isolated.
-                // Ack it (accepting truncation) rather than retry, which would
-                // re-write the prefix and corrupt the record.
                 warn!(
                     message =
                         "File changed while writing; cannot safely rewind after partial write.",
                 );
-                return boundaries
-                    .iter()
-                    .find(|&&b| b > last_complete)
-                    .copied()
-                    .unwrap_or(written);
+                ack_partial()
             }
-            last_complete
         }
         Compression::Gzip | Compression::Zstd => {
-            // Roll back only when the file still ends where this batch left it,
+            // Rewind only when the file still ends where this batch left it,
             // then complete the frame.
             let expected_end = file_start + file.written_bytes();
             let matches_expected_end = match file.len().await {
@@ -1206,17 +1207,19 @@ async fn reconcile_after_partial_write(
                 );
                 return 0;
             }
-            match file.finish_and_reopen().await {
-                Ok(()) => written,
-                Err(error) => {
-                    warn!(
-                        message = "Failed to complete compression stream after partial write; rewinding best-effort.",
-                        error = ?error,
-                    );
-                    if let Err(e) = file.reset(file_start).await {
-                        warn!(message = "Failed to rewind file after partial write.", error = ?e);
-                    }
-                    0
+            if let Err(error) = file.finish_and_reopen().await {
+                warn!(
+                    message = "Failed to complete compression stream after partial write; rewinding best-effort.",
+                    error = ?error,
+                );
+            }
+            // The finished frame holds the partial prefix; drop the whole batch
+            // before retrying, or ack the partial if it can't be removed.
+            match file.reset(file_start).await {
+                Ok(()) => 0,
+                Err(e) => {
+                    warn!(message = "Failed to rewind file after partial write.", error = ?e);
+                    ack_partial()
                 }
             }
         }
@@ -2235,9 +2238,9 @@ mod tests {
         }
     }
 
-    // Regression test: a failed rollback is an unreconciled partial write.
+    // A failed rollback leaves the partial bytes on disk; ack, don't retry.
     #[tokio::test]
-    async fn uncompressed_failed_rollback_is_unreconciled() {
+    async fn uncompressed_failed_rollback_acks_partial_record() {
         trace_init();
         // A read-only fd makes `set_len` fail during rollback.
         let template = temp_file();
@@ -2248,6 +2251,7 @@ mod tests {
         let file_start = 6; // out.len() (10) minus written (4)
         let written = 4;
         let last_complete = 2;
+        let boundaries = [last_complete, 5];
         assert_eq!(out.len().await.unwrap(), file_start + written as u64);
 
         let delivered_up_to = reconcile_after_partial_write(
@@ -2256,18 +2260,18 @@ mod tests {
             file_start,
             written,
             last_complete,
-            &[last_complete],
+            &boundaries,
         )
         .await;
-        assert_eq!(
-            delivered_up_to, 0,
-            "a failed rollback must not be reported as delivered up to {last_complete}"
-        );
+        // Ack the partial record so it isn't retried.
+        assert_eq!(delivered_up_to, 5);
+        // The failed rollback left the file untouched.
+        assert_eq!(out.len().await.unwrap(), file_start + written as u64);
+        let raw = tokio::fs::read(&template).await.unwrap();
+        assert_eq!(raw, b"0123456789");
     }
 
-    // Regression test: when another appender changes the file length, the
-    // partial record's prefix stays on disk, so it must be acked rather than
-    // retried (retrying would re-write the prefix and corrupt the record).
+    // A concurrent appender leaves the partial prefix on disk; ack, don't retry.
     #[tokio::test]
     async fn uncompressed_concurrent_appender_acks_partial_record() {
         trace_init();
@@ -2280,8 +2284,7 @@ mod tests {
             .unwrap();
         let mut out = OutFile::new(file, Compression::None);
 
-        // The batch leaves the file at file_start + written; the record ending
-        // at boundary `next` was only partially written.
+        // The batch leaves the file at file_start + written.
         let file_start = 6; // out.len() (10) minus written (4)
         let written = 4;
         let last_complete = 2;
@@ -2310,9 +2313,9 @@ mod tests {
             &boundaries,
         )
         .await;
-        // Ack through the partial record's end boundary so it isn't retried.
+        // Ack the partial record so it isn't retried.
         assert_eq!(delivered_up_to, 5);
-        // The concurrent append must be preserved: no rewind happened.
+        // No rewind happened; the concurrent append is preserved.
         assert_eq!(
             out.len().await.unwrap(),
             file_start + written as u64 + b"EXTRA".len() as u64
@@ -2322,5 +2325,64 @@ mod tests {
             raw.ends_with(b"EXTRA"),
             "concurrent append must be preserved"
         );
+    }
+
+    // A completed frame holds the partial prefix; the whole batch is truncated
+    // before retrying so the retry can't duplicate the prefix.
+    #[tokio::test]
+    async fn compressed_completed_frame_removes_batch_before_retry() {
+        trace_init();
+        for compression in [Compression::Gzip, Compression::Zstd] {
+            let template = temp_file();
+            let file = tokio::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&template)
+                .await
+                .unwrap();
+            let mut out = OutFile::new(file, compression);
+
+            out.mark_written();
+            let file_start = out.len().await.unwrap();
+            let _ = out.write(b"AAAABBBB").await.unwrap();
+
+            let delivered_up_to =
+                reconcile_after_partial_write(&mut out, compression, file_start, 4, 2, &[2, 8])
+                    .await;
+            assert_eq!(delivered_up_to, 0, "entire batch must be retried");
+            assert_eq!(
+                out.len().await.unwrap(),
+                file_start,
+                "the batch's compressed bytes must be removed"
+            );
+        }
+    }
+
+    // When the file can't be rewound (readonly fd), the compressed partial is
+    // acked rather than retried over its retained prefix.
+    #[tokio::test]
+    async fn compressed_failed_rewind_acks_partial_record() {
+        trace_init();
+        for compression in [Compression::Gzip, Compression::Zstd] {
+            let template = temp_file();
+            tokio::fs::write(&template, b"SEED").await.unwrap();
+            let seed_len = tokio::fs::metadata(&template).await.unwrap().len();
+            let readonly = tokio::fs::File::open(&template).await.unwrap();
+            let mut out = OutFile::new(readonly, compression);
+
+            out.mark_written();
+            let file_start = out.len().await.unwrap();
+            assert_eq!(file_start, seed_len);
+            // The encoder buffers the input; nothing reaches the readonly file.
+            let _ = out.write(b"AAAABBBB").await.unwrap();
+
+            let delivered_up_to =
+                reconcile_after_partial_write(&mut out, compression, file_start, 4, 2, &[2, 8])
+                    .await;
+            assert_eq!(delivered_up_to, 8, "partial record must be acked");
+            assert_eq!(out.len().await.unwrap(), seed_len, "no bytes appended");
+            let raw = tokio::fs::read(&template).await.unwrap();
+            assert_eq!(raw, b"SEED");
+        }
     }
 }
