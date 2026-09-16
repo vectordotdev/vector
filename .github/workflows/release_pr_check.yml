@@ -2,7 +2,7 @@ name: Validate release PR
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, edited]
   merge_group:
     types: [checks_requested]
 
@@ -12,14 +12,38 @@ permissions:
 jobs:
   validate:
     name: Validate release state transition
-    # No path filter: skipped runs still emit the required check for other PRs and merge groups.
+    # Only the new bot-authored minor-release path uses this validator. Existing manual
+    # releases (including patch releases) keep their current checks.
+    # Release PRs must be directly squash-merged during the freeze, never queued.
+    # Skipped merge-group runs emit the required check for ordinary queued PRs only.
     if: >-
       github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'vectordotdev-bot[bot]' &&
       startsWith(github.head_ref, 'prepare-v-') &&
       endsWith(github.head_ref, '-website')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - name: Validate release request and target
+        id: request
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr.base.ref !== 'master' || pr.head.repo.full_name !== context.repo.owner + '/' + context.repo.repo) {
+              throw new Error('Automated minor release PRs must come from this repository and target master.');
+            }
+            if (!/^prepare-v-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-0-website$/.test(pr.head.ref)) {
+              throw new Error('Automated preparation supports minor releases only.');
+            }
+            // Preserve the requested version recorded by the preparation workflow,
+            // rather than deriving the expectation from the manifest being checked.
+            const matches = [...(pr.body || '').matchAll(/^- Pins VRL to `(\d+\.\d+\.\d+)` and generates the release files\.$/gm)];
+            if (matches.length !== 1) {
+              throw new Error('Expected exactly one requested VRL version in the release PR description.');
+            }
+            core.setOutput('vrl_version', matches[0][1]);
+
       - name: Checkout PR head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -38,7 +62,9 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.head_ref }}
+          VRL_VERSION: ${{ steps.request.outputs.vrl_version }}
         run: >-
           cargo vdev release workflow pr-check
           --base-sha "$BASE_SHA"
           --head-ref "$HEAD_REF"
+          --vrl-version "$VRL_VERSION"

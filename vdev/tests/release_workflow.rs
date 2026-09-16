@@ -49,6 +49,10 @@ fn commit(repo: &Path) -> String {
 }
 
 fn preparation() -> (TempDir, String) {
+    preparation_with_breaking_changes(false)
+}
+
+fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
     let temp = tempdir().unwrap();
     let repo = temp.path();
     git(repo, &["init", "-b", "master"]);
@@ -57,6 +61,14 @@ fn preparation() -> (TempDir, String) {
     git(repo, &["config", "user.name", "Release test"]);
     git(repo, &["config", "user.email", "release@example.invalid"]);
     write(repo, "src/lib.rs", "");
+    write(
+        repo,
+        "website/cue/reference/administration/interfaces/kubectl.cue",
+        "version: \"0.58.0\"\n",
+    );
+    if breaking {
+        write(repo, "changelog.d/change.breaking.md", "Breaking change\n");
+    }
     write(
         repo,
         "distribution/install.sh",
@@ -71,6 +83,19 @@ fn preparation() -> (TempDir, String) {
     let base = commit(repo);
     git(repo, &["switch", "-c", "prepare-v-0-59-0-website"]);
     version(repo, "0.59.0");
+    write(
+        repo,
+        "website/cue/reference/administration/interfaces/kubectl.cue",
+        "version: \"0.59.0\"\n",
+    );
+    if breaking {
+        git(repo, &["rm", "changelog.d/change.breaking.md"]);
+        write(
+            repo,
+            "website/content/en/highlights/2026-09-16-0-59-0-upgrade-guide.md",
+            "Migration instructions\n",
+        );
+    }
     write(
         repo,
         "distribution/install.sh",
@@ -135,6 +160,41 @@ fn prepare_check(repo: &Path, success: bool) -> String {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert_eq!(output.status.success(), success, "{stderr}");
     stderr
+}
+
+#[test]
+fn release_preparation_requires_a_guide_when_the_base_has_breaking_changes() {
+    let (temp, base) = preparation_with_breaking_changes(true);
+    let repo = temp.path();
+    check(repo, &base, true);
+    git(
+        repo,
+        &[
+            "rm",
+            "website/content/en/highlights/2026-09-16-0-59-0-upgrade-guide.md",
+        ],
+    );
+    git(repo, &["commit", "--amend", "--no-edit"]);
+    assert!(
+        check(repo, &base, false).contains("breaking releases require a generated upgrade guide")
+    );
+}
+
+#[test]
+fn release_preparation_rejects_unrelated_kubectl_changes() {
+    let (temp, base) = preparation();
+    let repo = temp.path();
+    write(
+        repo,
+        "website/cue/reference/administration/interfaces/kubectl.cue",
+        "unrelated: \"change\"\n",
+    );
+    git(repo, &["add", "."]);
+    git(repo, &["commit", "--amend", "--no-edit"]);
+    assert!(
+        check(repo, &base, false)
+            .contains("kubectl.cue may only contain release version substitutions")
+    );
 }
 
 #[test]
