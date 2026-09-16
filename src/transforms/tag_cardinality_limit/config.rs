@@ -94,22 +94,31 @@ pub struct Inner {
     #[serde(default)]
     pub internal_metrics: InternalMetricsConfig,
 
-    /// Expire tracked tag values after this many seconds since they were last seen.
+    /// Expire tracked tag values after this many seconds since they were last
+    /// accepted into the cardinality cache.
     ///
     /// When unset (default) or set to `0`, values persist for the lifetime of the
     /// process — the historical behavior. When set to a positive value, the
-    /// transform behaves like a sliding window: any tag value not observed within
+    /// transform behaves like a sliding window: any tag value not accepted within
     /// the TTL is dropped, freeing room under `value_limit` for fresh values.
     /// Useful for bounding cost on backends (e.g. Datadog custom metrics) that
     /// bill on a rolling unique-series window.
     ///
-    /// In `exact` mode every value carries a precise last-seen timestamp; in
+    /// "Accepted" means the value was recorded on an emitted event. With
+    /// `limit_exceeded_action: drop_tag`, every retained tag sighting refreshes
+    /// the lease. With `limit_exceeded_action: drop_event`, the pre-check uses a
+    /// non-refreshing membership test and the record pass runs only when the
+    /// whole event is kept — so a value present on every *incoming* event can
+    /// still expire if those events are rejected because another tag is over
+    /// limit. Size the TTL around the active accepted set, not raw event volume.
+    ///
+    /// In `exact` mode every value carries a precise last-accepted timestamp; in
     /// `probabilistic` mode the underlying bloom filter is split into
     /// `ttl_generations` rolling shards, so eviction is approximate to within
     /// `ttl_secs / ttl_generations`.
     ///
     /// Not supported in `exact_fingerprint` mode, which keeps only hashes and has
-    /// nowhere to record a last-seen time; combining the two is a configuration
+    /// nowhere to record a last-accepted time; combining the two is a configuration
     /// error rather than a silently ignored setting.
     #[serde(default)]
     #[configurable(metadata(docs::human_name = "TTL (seconds)"))]
@@ -424,7 +433,7 @@ pub enum BuildError {
 
     #[snafu(display(
         "ttl_secs set on {scope} but mode is `exact_fingerprint`, which stores fingerprints \
-         without last-seen timestamps and so cannot expire them. Remove ttl_secs or switch to \
+         without last-accepted timestamps and so cannot expire them. Remove ttl_secs or switch to \
          `exact` or `probabilistic` mode."
     ))]
     TtlUnsupportedInFingerprintMode { scope: String },

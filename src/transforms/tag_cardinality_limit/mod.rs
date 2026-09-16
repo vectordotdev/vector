@@ -96,8 +96,9 @@ impl TagCardinalityLimit {
     /// Drop empty `AcceptedTagValueSet` buckets left behind by TTL eviction,
     /// decrementing `tracked_keys_count` so freed slots can be reused under
     /// `max_tracked_keys`. Called lazily on cap-hit paths so steady-state
-    /// overhead is zero. `len()` is called on every set because, for TTL
-    /// backends, it also drives the lazy sweep that may empty the bucket.
+    /// overhead is zero. Exact-TTL buckets are fully purged here (not just
+    /// periodically swept) so recently-lapsed entries do not keep a slot
+    /// occupied under the key cap.
     ///
     /// Intentionally empty `value_limit: 0` buckets are kept: they enforce that
     /// every value for that tag is rejected without storing state.
@@ -108,7 +109,7 @@ impl TagCardinalityLimit {
             .iter_mut()
             .flat_map(|(metric_key, inner)| {
                 inner.iter_mut().filter_map(|(tag_key, set)| {
-                    if set.len() != 0 {
+                    if set.len_reclaiming() != 0 {
                         return None;
                     }
                     Some((metric_key.clone(), tag_key.clone()))
@@ -298,8 +299,16 @@ impl TagCardinalityLimit {
             return AcceptResult::Tracked;
         }
 
+        // Ordinary `len` stays O(1) between exact-TTL sweeps. Only when the
+        // approximate count says we are full do we purge lapsed entries and
+        // re-check, so filling `value_limit` is O(N) rather than O(N²).
+        let mut live = tag_value_set.len();
+        if live >= config.value_limit {
+            live = tag_value_set.len_reclaiming();
+        }
+
         // Tag value not yet part of the accepted set.
-        if tag_value_set.len() < config.value_limit {
+        if live < config.value_limit {
             // accept the new value
             tag_value_set.insert(value.clone());
 
@@ -342,7 +351,11 @@ impl TagCardinalityLimit {
             return if value_set.contains_no_refresh(value) {
                 false
             } else {
-                value_set.len() >= resolved.value_limit
+                let mut live = value_set.len();
+                if live >= resolved.value_limit {
+                    live = value_set.len_reclaiming();
+                }
+                live >= resolved.value_limit
             };
         }
 

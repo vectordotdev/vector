@@ -152,7 +152,9 @@ impl FingerprintStorage {
 ///
 /// Reads never pay for that retain: `contains` inspects only the timestamp of
 /// the value it was asked about and drops that single entry when its lease has
-/// lapsed. `len` sweeps unconditionally because it gates `value_limit`.
+/// lapsed. Ordinary `len` checks also stay O(1) between sweeps (`maybe_sweep`);
+/// a full purge is reserved for capacity-recovery paths via
+/// [`Self::purge_expired`].
 struct TtlExactStorage {
     map: HashMap<TagValueSet, Instant>,
     ttl: Duration,
@@ -247,12 +249,25 @@ impl TtlExactStorage {
         self.map.insert(value, now);
     }
 
-    /// Gates `value_limit` and the `max_tracked_keys` bucket reclaim, so this
-    /// sweeps unconditionally: the count must never include lapsed entries.
+    /// Approximate live cardinality: runs the periodic sweep when due, then
+    /// returns `map.len()`. Between sweeps, recently-lapsed entries may still
+    /// inflate the count — callers that need to free capacity before rejecting
+    /// must call [`Self::purge_expired`] first.
+    ///
+    /// Keeping ordinary length checks O(1) matters: `try_accept_tag` and
+    /// `tag_limit_exceeded` hit `len` on every novel or rejected value, and
+    /// filling a large `value_limit` would otherwise become O(N²).
     fn len(&mut self) -> usize {
         let now = Instant::now();
-        self.sweep(now);
+        self.maybe_sweep(now);
         self.map.len()
+    }
+
+    /// Drop every lapsed entry now. Used when a capacity check has already
+    /// hit `value_limit` (or when reclaiming empty buckets) so expired slots
+    /// can be reused without scanning on every event.
+    fn purge_expired(&mut self) {
+        self.sweep(Instant::now());
     }
 }
 
@@ -463,8 +478,11 @@ impl AcceptedTagValueSet {
 
     /// Number of distinct values currently retained.
     ///
-    /// In TTL-enabled backends this also triggers lazy sweep/rotation so the
-    /// returned figure reflects post-expiry state.
+    /// Exact TTL uses the periodic sweep only (`maybe_sweep`), so between
+    /// sweeps the count may still include recently-lapsed entries. Call
+    /// [`Self::purge_expired`] when a capacity decision needs a hard live
+    /// count. Probabilistic TTL still rotates shards here (O(1) per due
+    /// rotation).
     pub fn len(&mut self) -> usize {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => set.len(),
@@ -473,6 +491,29 @@ impl AcceptedTagValueSet {
             TagValueSetStorage::TtlSet(s) => s.len(),
             TagValueSetStorage::RollingBloom(s) => s.len(),
         }
+    }
+
+    /// Force expiry of lapsed exact-TTL entries (and rotate probabilistic
+    /// shards). Used on capacity-recovery paths: after an ordinary `len`
+    /// reports full, and when reclaiming empty `max_tracked_keys` buckets.
+    pub fn purge_expired(&mut self) {
+        match &mut self.storage {
+            TagValueSetStorage::TtlSet(s) => s.purge_expired(),
+            // `len` already drives rotation; calling it keeps reclaim consistent.
+            TagValueSetStorage::RollingBloom(s) => {
+                let _ = s.len();
+            }
+            TagValueSetStorage::Set(_)
+            | TagValueSetStorage::Bloom(_)
+            | TagValueSetStorage::Fingerprint(_) => {}
+        }
+    }
+
+    /// Live cardinality after forcing expiry. Prefer [`Self::len`] on the
+    /// hot path; use this only when deciding whether to reject at capacity.
+    pub fn len_reclaiming(&mut self) -> usize {
+        self.purge_expired();
+        self.len()
     }
 
     pub fn insert(&mut self, value: TagValueSet) {
@@ -614,6 +655,50 @@ mod tests {
             "the sweep path must still drop lapsed entries"
         );
         assert!(s.map.contains_key(&v("hot")), "hot was refreshed to t70");
+    }
+
+    #[test]
+    fn ttl_exact_len_does_not_sweep_between_intervals() {
+        // Ordinary `len` must stay O(1) between sweeps: filling `value_limit`
+        // would otherwise become O(N²) if every capacity check retained the
+        // whole bucket.
+        let ttl = Duration::from_secs(60);
+        let mut s = TtlExactStorage::new(ttl, 4);
+        let t0 = Instant::now();
+        s.map.insert(v("stale"), t0);
+        s.map.insert(v("hot"), t0 + Duration::from_secs(10));
+        let t70 = t0 + Duration::from_secs(70);
+        s.last_sweep = t70;
+
+        // Drive `len` with a pinned clock by calling maybe_sweep+len through
+        // the public shape: set last_sweep so the periodic path is skipped.
+        assert_eq!(s.len(), 2, "len between sweeps must not purge lapsed entries");
+        assert!(
+            s.map.contains_key(&v("stale")),
+            "ordinary len must not scan/evict unrelated entries"
+        );
+    }
+
+    #[test]
+    fn ttl_exact_purge_expired_reclaims_capacity() {
+        let ttl = Duration::from_secs(60);
+        let mut s = TtlExactStorage::new(ttl, 4);
+        let t0 = Instant::now();
+        // Seed directly so `insert`'s maybe_sweep cannot drop stale early.
+        s.map.insert(v("stale"), t0);
+        s.map.insert(v("hot"), t0 + Duration::from_secs(10));
+        // Make the periodic path a no-op for ordinary `len`.
+        let t70 = t0 + Duration::from_secs(70);
+        s.last_sweep = t70;
+
+        assert_eq!(s.len(), 2, "len alone must not reclaim between sweeps");
+        assert!(s.map.contains_key(&v("stale")));
+
+        // Force a full retain with a clock past stale's lease but within hot's.
+        s.sweep(t70);
+        assert_eq!(s.map.len(), 1, "purge must drop only lapsed entries");
+        assert!(s.map.contains_key(&v("hot")));
+        assert!(!s.map.contains_key(&v("stale")));
     }
 
     #[test]

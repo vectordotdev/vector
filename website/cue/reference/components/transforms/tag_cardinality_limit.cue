@@ -171,9 +171,9 @@ components: transforms: tag_cardinality_limit: {
 			title: "TTL (sliding-window cardinality)"
 			body: """
 				By default, the cardinality cache grows monotonically — every distinct value
-				ever seen for a tag occupies a slot under `value_limit` until Vector restarts.
+				ever accepted for a tag occupies a slot under `value_limit` until Vector restarts.
 				Setting `ttl_secs` turns the cache into a *sliding window*: any tag value not
-				observed within that many seconds is dropped, freeing room for fresh values.
+				accepted within that many seconds is dropped, freeing room for fresh values.
 
 				This is useful when the downstream system bills or pages on a rolling
 				unique-series window (e.g. Datadog computes custom-metric cardinality on a
@@ -190,17 +190,23 @@ components: transforms: tag_cardinality_limit: {
 				ttl_generations: 4   # eviction granularity = 15 min
 				```
 
-				**Refresh-on-sighting**: every cache hit (not just inserts) extends the
-				value's lease. Continuously-observed values stay in the cache indefinitely;
-				only values that go silent for longer than `ttl_secs` are evicted.
+				**Refresh on accepted sightings**: every cache hit on an *accepted* event
+				(not just inserts) extends the value's lease. Continuously-accepted values
+				stay in the cache indefinitely; only values that go silent for longer than
+				`ttl_secs` are evicted. With `limit_exceeded_action: drop_event`, rejected
+				events do not refresh leases — the pre-check uses a non-refreshing
+				membership test, and the record pass runs only when the whole event is kept.
+				A value present on every incoming event can therefore still expire if those
+				events are dropped because another tag is over limit. Size the TTL around
+				the active accepted set, not raw event volume.
 
 				**Mode interaction**:
 
-				- `mode: exact` — every value carries a precise last-seen timestamp.
+				- `mode: exact` — every value carries a precise last-accepted timestamp.
 				  Eviction is exact to within roughly `ttl_secs / ttl_generations`.
 				  `ttl_generations` controls only the sweep cadence in exact mode.
 				- `mode: exact_fingerprint` — **not supported**. This mode stores only
-				  64-bit hashes, with nowhere to record when a value was last seen, so
+				  64-bit hashes, with nowhere to record when a value was last accepted, so
 				  nothing could ever expire. Setting `ttl_secs` here is a configuration
 				  error rather than a silently ignored setting. Use `mode: exact` if you
 				  need TTL with per-value precision.
