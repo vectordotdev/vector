@@ -203,19 +203,20 @@ mod tests {
         controller.capture_metrics()
     }
 
-    fn assert_counter(metrics: &[Metric], name: &str, key: Option<&str>) {
-        let metric = metrics
+    /// Look up metrics by name only; panic unless exactly one matches.
+    fn assert_single_metric<'a>(metrics: &'a [Metric], name: &str) -> &'a Metric {
+        let matches = metrics
             .iter()
-            .find(|metric| {
-                matches!(metric.value(), MetricValue::Counter { value } if *value == 1.0)
-                    && metric.name() == name
-                    && metric.tag_value("key").as_deref() == key
-            })
-            .unwrap_or_else(|| panic!("missing counter {name} with key {key:?}"));
+            .filter(|metric| metric.name() == name)
+            .collect::<Vec<_>>();
+        assert_eq!(matches.len(), 1, "expected exactly one metric named {name}");
+        matches[0]
+    }
 
-        if key.is_none() {
-            assert!(metric.tag_value("key").is_none());
-        }
+    /// Validate a retrieved metric's type, tags, and value.
+    fn assert_counter(metric: &Metric, key: Option<&str>) {
+        assert!(matches!(metric.value(), MetricValue::Counter { value } if *value == 1.0));
+        assert_eq!(metric.tag_value("key").as_deref(), key);
     }
 
     #[rstest]
@@ -254,10 +255,15 @@ mod tests {
         #[case] emit: fn(bool),
         #[values(false, true)] include_key_metric_tag: bool,
     ) {
+        let total_name = format!("{base_name}_total");
         let metrics = capture_metrics(|| emit(include_key_metric_tag));
-        let key = include_key_metric_tag.then_some(KEY);
 
-        assert_counter(&metrics, &format!("{base_name}_total"), key);
-        assert_counter(&metrics, base_name, key);
+        // Identify the expected metrics by name, then validate each in turn.
+        let total = assert_single_metric(&metrics, &total_name);
+        let legacy = assert_single_metric(&metrics, base_name);
+
+        let key = include_key_metric_tag.then_some(KEY);
+        assert_counter(total, key);
+        assert_counter(legacy, key);
     }
 }
