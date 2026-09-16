@@ -107,7 +107,7 @@ components: sources: host_metrics: {
 		}
 
 		// Host process
-		process_runtime: _host & _process_counter & {description: "The process uptime."}
+		process_runtime_total: _host & _process_counter & {description: "The process uptime."}
 		process_cpu_usage: _host & _process_gauge & {description: "The process CPU usage."}
 		process_memory_usage: _host & _process_gauge & {description: "The process memory usage."}
 		process_memory_virtual_usage: _host & _process_gauge & {description: "The process virtual memory usage."}
