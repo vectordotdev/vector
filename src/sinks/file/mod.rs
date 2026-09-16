@@ -1004,8 +1004,12 @@ impl FileSink {
                     path: &path,
                     dropped_events,
                 });
-                if delivered_up_to > 0 {
-                    emit_bytes_sent(&path, delivered_up_to, self.include_file_metric_tag);
+                // Telemetry counts only the bytes actually accepted by the
+                // file/encoder; `delivered_up_to` may extend into a partial
+                // event that was never accepted.
+                let bytes_accepted = written.min(delivered_up_to);
+                if bytes_accepted > 0 {
+                    emit_bytes_sent(&path, bytes_accepted, self.include_file_metric_tag);
                 }
             }
         }
@@ -1201,11 +1205,13 @@ async fn reconcile_after_partial_write(
                 Err(_) => false,
             };
             if !matches_expected_end {
+                // The encoder still holds the accepted prefix and it can't be
+                // removed (foreign data follows); ack the partial, don't retry.
                 warn!(
                     message =
                         "File changed while writing; cannot safely rewind after partial write.",
                 );
-                return 0;
+                return ack_partial();
             }
             if let Err(error) = file.finish_and_reopen().await {
                 warn!(
@@ -2206,8 +2212,7 @@ mod tests {
 
             // The batch's compressed bytes may still be buffered in the encoder.
             let payload = b"this batch belongs to this sink";
-            let written = out.write(payload).await.unwrap();
-            assert!(written > 0);
+            let _ = out.write(payload).await.unwrap();
 
             // A concurrent writer appends before the rollback check.
             let mut other = tokio::fs::OpenOptions::new()
@@ -2225,9 +2230,10 @@ mod tests {
             drop(other);
 
             let delivered_up_to =
-                reconcile_after_partial_write(&mut out, compression, file_start, written, 0, &[])
+                reconcile_after_partial_write(&mut out, compression, file_start, 4, 2, &[2, 8])
                     .await;
-            assert_eq!(delivered_up_to, 0, "nothing may be safely delivered");
+            // Ack the retained partial (end boundary 8) so it isn't retried.
+            assert_eq!(delivered_up_to, 8);
 
             assert_eq!(out.len().await.unwrap(), file_start + b"EXTRA".len() as u64);
             let raw = tokio::fs::read(&template).await.unwrap();
