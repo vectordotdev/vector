@@ -77,6 +77,10 @@ impl Cli {
 impl PrepareCheck {
     fn exec(self) -> Result<()> {
         ensure_stable(&self.version, "release version")?;
+        ensure!(
+            self.version.patch == 0,
+            "automated preparation supports minor releases only"
+        );
 
         let expected_current = development_version(&self.version)?;
         let current = current_cargo_version()?;
@@ -98,10 +102,8 @@ impl PrepareCheck {
             set_github_output("skip", "true")?;
             append_github_step_summary(&format!("Existing preparation PR: {url}"))?;
         } else {
-            ensure!(
-                !remote_ref_exists(&format!("refs/heads/{branch}"))?,
-                "branch {branch} exists without an open PR"
-            );
+            let resume = remote_ref_exists(&format!("refs/heads/{branch}"))?;
+            set_github_output("resume", if resume { "true" } else { "false" })?;
             set_github_output("skip", "false")?;
         }
         Ok(())
@@ -114,6 +116,10 @@ impl PrCheck {
         git::ensure_sha(&self.base_sha, "base SHA")?;
         git::ensure_worktree_clean()?;
         let version = parse_preparation_branch(&self.head_ref)?;
+        ensure!(
+            version.patch == 0,
+            "automated preparation supports minor releases only"
+        );
         let expected_base = development_version(&version)?;
         let base_version = cargo_version_at(&self.base_sha)?;
         let head_version = current_cargo_version()?;
@@ -132,7 +138,8 @@ impl PrCheck {
         let files = changed_files(&self.base_sha, "HEAD")?;
         validate_release_files(&files, &version)?;
         validate_retired_fragments()?;
-        validate_installer(&self.base_sha, &version)?;
+        validate_version_substitutions(&self.base_sha, &version)?;
+        validate_upgrade_guide(&self.base_sha, &files, &version)?;
         for file in [
             format!("website/cue/reference/releases/{version}.cue"),
             format!("website/content/en/releases/{version}.md"),
@@ -152,7 +159,7 @@ impl PrCheck {
     }
 }
 
-fn validate_installer(base: &str, version: &Version) -> Result<()> {
+fn validate_version_substitutions(base: &str, version: &Version) -> Result<()> {
     let file = "distribution/install.sh";
     let before = git::run_and_check_output(&["show", &format!("{base}:{file}")])?;
     // Use the frozen base's default, not mutable local/remote release tags.
@@ -164,10 +171,42 @@ fn validate_installer(base: &str, version: &Version) -> Result<()> {
         })
         .context("base installer is missing the default VECTOR_VERSION")?;
     let previous = parse_stable_version(previous, "base installer version")?;
-    ensure!(
-        fs::read_to_string(file)? == replace_version_references(&before, &previous, version),
-        "{file} may only contain release version substitutions"
-    );
+    for file in [
+        file,
+        "website/cue/reference/administration/interfaces/kubectl.cue",
+    ] {
+        let before = git::run_and_check_output(&["show", &format!("{base}:{file}")])?;
+        ensure!(
+            fs::read_to_string(file)? == replace_version_references(&before, &previous, version),
+            "{file} may only contain release version substitutions"
+        );
+    }
+    Ok(())
+}
+
+fn validate_upgrade_guide(base: &str, files: &[ChangedFile], version: &Version) -> Result<()> {
+    let base_fragments = git::run_and_check_output(&[
+        "ls-tree",
+        "-r",
+        "--name-only",
+        "-z",
+        base,
+        "--",
+        "changelog.d/",
+    ])?;
+    if base_fragments
+        .split_terminator('\0')
+        .any(|file| file.ends_with(".breaking.md"))
+    {
+        ensure!(
+            files.iter().any(|file| {
+                file.kind == ChangeKind::Added
+                    && release_highlight(&file.path, version)
+                    && Path::new(&file.path).is_file()
+            }),
+            "breaking releases require a generated upgrade guide for {version}"
+        );
+    }
     Ok(())
 }
 
