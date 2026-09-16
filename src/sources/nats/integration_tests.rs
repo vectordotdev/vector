@@ -942,6 +942,7 @@ async fn nats_jetstream_shutdown_during_recovery() {
         LogNamespace::Legacy,
         shutdown_signal,
         tx,
+        false,
     ));
 
     // Deliver one message to prove the source is running.
@@ -1071,6 +1072,7 @@ async fn nats_jetstream_shutdown_during_consumption() {
         LogNamespace::Legacy,
         shutdown_signal,
         tx,
+        false,
     ));
 
     // Deliver one message to prove the source is actively consuming a healthy stream.
