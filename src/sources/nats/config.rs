@@ -1,5 +1,6 @@
 use async_nats::jetstream::{
-    consumer::StreamError as ConsumerStreamError, context::GetStreamError,
+    consumer::{AckPolicy, StreamError as ConsumerStreamError},
+    context::GetStreamError,
 };
 use snafu::{ResultExt, Snafu};
 use vector_lib::{
@@ -41,6 +42,10 @@ pub enum BuildError {
     Consumer { source: async_nats::Error },
     #[snafu(display("Failed to retrieve messages from NATS consumer: {}", source))]
     Messages { source: ConsumerStreamError },
+    #[snafu(display(
+        "NATS JetStream consumer must use `AckPolicy::Explicit` when acknowledgements are enabled, found {policy:?}"
+    ))]
+    InvalidAckPolicy { policy: AckPolicy },
 }
 
 /// Batch settings for a JetStream pull consumer.
@@ -206,12 +211,14 @@ impl SourceConfig for NatsSourceConfig {
         match self.mode() {
             NatsMode::JetStream(js_config) => {
                 let connection = self.connect().await?;
-                let messages = create_consumer_stream(&connection, js_config).await?;
+                let (messages, ack_wait) =
+                    create_consumer_stream(&connection, js_config, acknowledgements).await?;
 
                 Ok(Box::pin(run_nats_jetstream(
                     self.clone(),
                     connection,
                     messages,
+                    ack_wait,
                     decoder,
                     log_namespace,
                     cx.shutdown,
@@ -262,7 +269,7 @@ impl SourceConfig for NatsSourceConfig {
 
     // Acknowledgment is only possible with Jetstream.
     fn can_acknowledge(&self) -> bool {
-        true
+        self.jetstream.is_some()
     }
 }
 
