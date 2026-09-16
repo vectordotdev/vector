@@ -1,0 +1,195 @@
+name: Prepare release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable Vector version to prepare, for example 0.59.0
+        required: true
+        type: string
+      vrl_version:
+        description: Released VRL version to pin, for example 0.28.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-prepare
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Generate release preparation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      base_sha: ${{ steps.base.outputs.sha }}
+      branch: ${{ steps.preflight.outputs.branch }}
+      skip: ${{ steps.preflight.outputs.skip }}
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Require active release freeze
+        uses: ./.github/actions/require-release-freeze
+
+      - name: Record frozen base
+        id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up release tooling
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          cue: true
+          rust: true
+          protoc: true
+          dd-rust-license-tool: true
+          vdev: false
+
+      - name: Validate requested release
+        id: preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: >-
+          cargo vdev release workflow prepare-check
+          --version "$VERSION"
+          --bot-app vectordotdev-bot
+          --repository "$GITHUB_REPOSITORY"
+
+      - name: Generate release changes
+        if: steps.preflight.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          VRL_VERSION: ${{ inputs.vrl_version }}
+        run: >-
+          cargo vdev release prepare
+          --version "$VERSION"
+          --vrl-version "$VRL_VERSION"
+          --dry-run
+
+      - name: Install VRL documentation builder
+        if: steps.preflight.outputs.skip != 'true'
+        uses: ./.github/actions/install-vrl-doc-builder
+
+      - name: Refresh dependency files
+        if: steps.preflight.outputs.skip != 'true'
+        run: make build-licenses generate-vector-vrl-docs
+
+      - name: Package prepared changes
+        if: steps.preflight.outputs.skip != 'true'
+        run: |
+          git add --all
+          git diff --cached --binary "${{ steps.base.outputs.sha }}" \
+            > "$RUNNER_TEMP/release-preparation.patch"
+          test -s "$RUNNER_TEMP/release-preparation.patch"
+
+      - name: Upload prepared changes
+        if: steps.preflight.outputs.skip != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-preparation
+          path: ${{ runner.temp }}/release-preparation.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Open release preparation PR
+    needs: generate
+    if: needs.generate.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout frozen master
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download prepared changes
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-preparation
+          path: ${{ runner.temp }}/release-preparation
+
+      - name: Validate and commit prepared changes
+        env:
+          BASE_SHA: ${{ needs.generate.outputs.base_sha }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$(git rev-parse HEAD)" == "$BASE_SHA" ]]
+
+          git apply --index --binary \
+            "$RUNNER_TEMP/release-preparation/release-preparation.patch"
+          while IFS= read -r file; do
+            case "$file" in
+              Cargo.toml|Cargo.lock|LICENSE-3rdparty.csv|\
+              distribution/install.sh|\
+              website/cue/reference/administration/interfaces/kubectl.cue|\
+              website/cue/reference/versions.cue|changelog.d/*.md|\
+              docs/generated/*|website/content/en/highlights/*.md|\
+              website/content/en/releases/*.md|website/cue/reference/releases/*.cue) ;;
+              *) echo "Unexpected release preparation file: $file" >&2; exit 1 ;;
+            esac
+          done < <(git diff --cached --name-only)
+          git diff --cached --quiet && exit 1
+
+          cargo_version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
+          [[ "$cargo_version" == "$VERSION" ]]
+
+          git config user.name "vectordotdev-bot[bot]"
+          git config user.email "vectordotdev-bot[bot]@users.noreply.github.com"
+          git commit -m "chore(releasing): prepare v${VERSION}"
+
+      - name: Create Vector bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Push preparation branch
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PREP_BRANCH: ${{ needs.generate.outputs.branch }}
+        run: |
+          git push \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "HEAD:refs/heads/${PREP_BRANCH}"
+
+      - name: Open preparation PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ inputs.version }}
+          VRL_VERSION: ${{ inputs.vrl_version }}
+          PREP_BRANCH: ${{ needs.generate.outputs.branch }}
+        run: |
+          url=$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base master \
+            --head "$PREP_BRANCH" \
+            --title "chore(releasing): prepare v${VERSION}" \
+            --label no-changelog \
+            --body "Automated preparation for Vector v${VERSION}.
+
+          - Changes \`${VERSION}-dev\` to \`${VERSION}\`.
+          - Pins VRL to \`${VRL_VERSION}\` and generates the release files.
+          - Must be squash-merged into \`master\`.")
+
+          echo "Opened $url" >> "$GITHUB_STEP_SUMMARY"
