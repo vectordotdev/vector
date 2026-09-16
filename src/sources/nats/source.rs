@@ -1,11 +1,15 @@
+use std::time::Duration;
+
+use async_nats::jetstream::AckKind;
 use async_nats::jetstream::consumer::PullConsumer;
 use chrono::Utc;
-use futures::StreamExt;
+use futures::{StreamExt, stream::FuturesUnordered};
 use snafu::ResultExt;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{DecoderFramedRead, decoding::StreamDecodingError},
     config::{LegacyKey, LogNamespace},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver},
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, EventsReceived, EventsReceivedHandle,
         InternalEventHandle as _, Protocol,
@@ -29,7 +33,7 @@ use crate::{
 /// The outcome of processing a single NATS message.
 pub enum ProcessingStatus {
     /// The message payload was fully decoded and sent downstream.
-    Success,
+    Success(Option<BatchStatusReceiver>),
     /// A non-recoverable error occurred while decoding the payload.
     Failed,
     /// The downstream channel is closed, and the source should shut down.
@@ -46,9 +50,11 @@ pub async fn process_message(
     log_namespace: LogNamespace,
     out: &mut SourceSender,
     events_received: &EventsReceivedHandle,
+    acknowledgements: bool,
 ) -> ProcessingStatus {
     let mut framed = DecoderFramedRead::new(msg.payload.as_ref(), decoder.clone());
     let mut success = true;
+    let mut decoded_events = Vec::new();
 
     while let Some(next) = framed.next().await {
         match next {
@@ -61,7 +67,7 @@ pub async fn process_message(
                 let byte_size = events.estimated_json_encoded_size_of();
                 events_received.emit(CountByteSize(count, byte_size));
                 let now = Utc::now();
-                let events = events.into_iter().map(|mut event| {
+                decoded_events.extend(events.into_iter().map(|mut event| {
                     if let Event::Log(ref mut log) = event {
                         log_namespace.insert_standard_vector_source_metadata(
                             log,
@@ -82,12 +88,7 @@ pub async fn process_message(
                         );
                     }
                     event
-                });
-
-                if out.send_batch(events).await.is_err() {
-                    emit!(StreamClosedError { count });
-                    return ProcessingStatus::ChannelClosed;
-                }
+                }));
             }
             Err(error) => {
                 success = false;
@@ -100,10 +101,43 @@ pub async fn process_message(
         }
     }
 
-    if success {
-        ProcessingStatus::Success
+    if !success {
+        return ProcessingStatus::Failed;
+    }
+
+    let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut decoded_events);
+    let count = decoded_events.len();
+    if out.send_batch(decoded_events).await.is_err() {
+        emit!(StreamClosedError { count });
+        ProcessingStatus::ChannelClosed
     } else {
-        ProcessingStatus::Failed
+        ProcessingStatus::Success(receiver)
+    }
+}
+
+const ACK_PROGRESS_INTERVAL: Duration = Duration::from_secs(1);
+
+async fn wait_for_delivery(
+    msg: &async_nats::jetstream::Message,
+    receiver: &mut BatchStatusReceiver,
+) -> BatchStatus {
+    let mut progress = tokio::time::interval(ACK_PROGRESS_INTERVAL);
+
+    loop {
+        tokio::select! {
+            status = &mut *receiver => return status,
+            _ = progress.tick() => {
+                if let Err(err) = msg.ack_with(AckKind::Progress).await {
+                    error!(message = "Failed to extend JetStream message acknowledgement deadline.", %err);
+                }
+            }
+        }
+    }
+}
+
+async fn acknowledge(msg: &async_nats::jetstream::Message) {
+    if let Err(err) = msg.ack().await {
+        error!(message = "Failed to acknowledge JetStream message.", %err);
     }
 }
 
@@ -137,6 +171,7 @@ pub async fn run_nats_jetstream(
     log_namespace: LogNamespace,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
+    acknowledgements: bool,
 ) -> Result<(), ()> {
     let events_received = register!(EventsReceived);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
@@ -148,6 +183,7 @@ pub async fn run_nats_jetstream(
         .expect("jetstream config must be present");
 
     let mut messages = initial_messages;
+    let mut finalizers = FuturesUnordered::new();
 
     loop {
         // `ShutdownSignal` fires once then polls `Pending` forever, so shutdown must be handled here via `select!`, not re-polled afterwards.
@@ -156,6 +192,12 @@ pub async fn run_nats_jetstream(
                 biased;
 
                 _ = &mut shutdown => return Ok(()),
+
+                Some((msg, status)) = finalizers.next(), if !finalizers.is_empty() => {
+                    if status == BatchStatus::Delivered {
+                        acknowledge(&msg).await;
+                    }
+                }
 
                 maybe_msg = messages.next() => {
                     match maybe_msg {
@@ -170,15 +212,18 @@ pub async fn run_nats_jetstream(
                                 log_namespace,
                                 &mut out,
                                 &events_received,
+                                acknowledgements,
                             )
                             .await;
 
                             match status {
-                                ProcessingStatus::Success => {
-                                    if let Err(err) = msg.ack().await {
-                                        error!(message = "Failed to acknowledge JetStream message.", %err);
-                                    }
+                                ProcessingStatus::Success(Some(mut receiver)) => {
+                                    finalizers.push(async move {
+                                        let status = wait_for_delivery(&msg, &mut receiver).await;
+                                        (msg, status)
+                                    });
                                 }
+                                ProcessingStatus::Success(None) => acknowledge(&msg).await,
                                 ProcessingStatus::ChannelClosed => return Err(()),
                                 // Do not acknowledge on failure; the message will be redelivered.
                                 ProcessingStatus::Failed => {}
@@ -204,9 +249,21 @@ pub async fn run_nats_jetstream(
         drop(messages);
         loop {
             let delay = backoff.next().expect("backoff never ends");
-            tokio::select! {
+            let reconnect = tokio::select! {
                 _ = &mut shutdown => return Ok(()),
-                _ = tokio::time::sleep(delay) => {},
+
+                Some((msg, status)) = finalizers.next(), if !finalizers.is_empty() => {
+                    if status == BatchStatus::Delivered {
+                        acknowledge(&msg).await;
+                    }
+                    false
+                }
+
+                _ = tokio::time::sleep(delay) => true,
+            };
+
+            if !reconnect {
+                continue;
             }
 
             match create_consumer_stream(&connection, js_config).await {
@@ -258,6 +315,7 @@ pub async fn run_nats_core(
                             log_namespace,
                             &mut out,
                             &events_received,
+                            false,
                         )
                         .await;
 

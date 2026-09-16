@@ -1,7 +1,10 @@
 #![allow(clippy::print_stdout)]
+use std::time::Duration;
+
 use async_nats::jetstream::stream::StorageType;
 use bytes::Bytes;
-use vector_lib::config::log_schema;
+use tokio::time::{sleep, timeout};
+use vector_lib::{config::log_schema, event::EventStatus};
 
 use crate::{
     SourceSender,
@@ -48,10 +51,16 @@ fn generate_source_config(url: &str, subject: &str) -> NatsSourceConfig {
 /// Test runner for JetStream sources.
 /// This function sets up the required JetStream stream and consumer,
 /// publishes a message, and then runs the source to ensure it receives the message.
-async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> {
+async fn run_jetstream_test(
+    mut conf: NatsSourceConfig,
+    status: EventStatus,
+    expected_messages: usize,
+    expected_ack_pending: usize,
+) -> Result<(), crate::Error> {
     let js_config = conf.jetstream.clone().unwrap();
     let subject = conf.subject.clone();
     let msg = "my jetstream message";
+    conf.acknowledgements = true.into();
 
     // Connect to NATS and set up the JetStream stream and consumer.
     let client = async_nats::connect(conf.url.clone())
@@ -69,9 +78,11 @@ async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> 
     .expect("Failed to create stream");
 
     let stream = js.get_stream(js_config.stream).await.unwrap();
-    stream
+    let mut consumer = stream
         .create_consumer(async_nats::jetstream::consumer::pull::Config {
             durable_name: Some(js_config.consumer),
+            ack_wait: Duration::from_millis(100),
+            max_deliver: 2,
             ..Default::default()
         })
         .await
@@ -82,13 +93,14 @@ async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> 
 
     // Run the source and verify it receives the event.
     let events = assert_source_compliance(&SOURCE_TAGS, async move {
-        let (tx, rx) = SourceSender::new_test();
-        let cx = SourceContext::new_test(tx, None);
+        let (tx, rx) = SourceSender::new_test_finalize(status);
+        let mut cx = SourceContext::new_test(tx, None);
+        cx.acknowledgements = true;
         let source = conf.build(cx).await.unwrap();
 
         tokio::spawn(source);
 
-        collect_n(rx, 1).await
+        collect_n(rx, expected_messages).await
     })
     .await;
 
@@ -96,6 +108,20 @@ async fn run_jetstream_test(conf: NatsSourceConfig) -> Result<(), crate::Error> 
         events[0].as_log()[log_schema().message_key().unwrap().to_string()],
         msg.into()
     );
+
+    timeout(Duration::from_secs(5), async {
+        loop {
+            let info = consumer.info().await.unwrap();
+            if info.num_ack_pending == expected_ack_pending
+                && (expected_ack_pending == 0 || info.num_redelivered > 0)
+            {
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("JetStream consumer acknowledgement state did not reach the expected value.");
 
     Ok(())
 }
@@ -458,7 +484,24 @@ async fn nats_jetstream_valid() {
         ..Default::default()
     });
 
-    let result = run_jetstream_test(conf).await;
+    let result = run_jetstream_test(conf, EventStatus::Delivered, 1, 0).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn nats_jetstream_does_not_ack_errored_delivery() {
+    let subject = format!("test-js-{}", random_string(10));
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.jetstream = Some(JetStreamConfig {
+        stream: format!("S_{}", subject.replace('.', "_")),
+        consumer: format!("C_{}", subject.replace('.', "_")),
+        ..Default::default()
+    });
+
+    let result = run_jetstream_test(conf, EventStatus::Errored, 2, 1).await;
     assert!(result.is_ok());
 }
 
