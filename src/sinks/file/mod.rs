@@ -720,8 +720,17 @@ impl FileSink {
                 result = self.files.next_expired(), if !self.files.is_empty() => {
                     match result {
                         None => unreachable!(),
-                        Some((expired_file, path)) => {
-                            self.close_file(expired_file, path).await;
+                        Some((expired_file, expired_path)) => {
+                            let path = expired_path.get_ref().clone();
+                            if let Some((events, _generation, _bytes)) = buffers.remove(&path) {
+                                // Flush pending work and keep the file open so
+                                // after-close truncation can't erase earlier output.
+                                self.files
+                                    .insert_at(path.clone(), expired_file, self.deadline_at());
+                                self.process_batch(path, events).await;
+                            } else {
+                                self.close_file(expired_file, expired_path).await;
+                            }
                         }
                     }
                 }
@@ -963,6 +972,18 @@ impl FileSink {
 
         match write_result {
             Ok(()) => {
+                // Complete the frame so a later rollback never truncates this batch.
+                if compression != Compression::None
+                    && let Err(error) = file.finish_and_reopen().await
+                {
+                    emit!(FileIoError {
+                        code: "failed_completing_frame",
+                        message: "Failed to complete the compression stream.",
+                        error,
+                        path: &path,
+                        dropped_events: 0,
+                    });
+                }
                 for (_buf, finalizers, event_size) in encoded {
                     finalizers.update_status(EventStatus::Delivered);
                     self.events_sent.emit(CountByteSize(1, event_size));
@@ -1004,9 +1025,8 @@ impl FileSink {
                     path: &path,
                     dropped_events,
                 });
-                // Telemetry counts only the bytes actually accepted by the
-                // file/encoder; `delivered_up_to` may extend into a partial
-                // event that was never accepted.
+                // Count only bytes actually accepted; `delivered_up_to` may
+                // extend into an unaccepted partial event.
                 let bytes_accepted = written.min(delivered_up_to);
                 if bytes_accepted > 0 {
                     emit_bytes_sent(&path, bytes_accepted, self.include_file_metric_tag);
@@ -1644,6 +1664,74 @@ mod tests {
         // make sure sink stops and that it did not panic
         drop(tx);
         sink_handle.await.unwrap();
+    }
+
+    // A pending batch keeps the file open; otherwise after-close truncation
+    // erases earlier output before the batch flushes.
+    #[tokio::test]
+    async fn pending_batch_keeps_file_open() {
+        trace_init();
+
+        let template = temp_file();
+        // batch timeout (5s) exceeds idle_timeout (1s).
+        let batch = serde_json::from_value::<BatchConfig<RealtimeSizeBasedDefaultBatchSettings>>(
+            serde_json::json!({ "timeout_secs": 5.0, "max_bytes": 10_000_000 }),
+        )
+        .unwrap();
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout: Duration::from_secs(1),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::None,
+            acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
+            truncate: FileTruncateConfig {
+                after_close_time_secs: Some(NonZeroU64::new(1).unwrap()),
+                after_modified_time_secs: None,
+                after_secs: None,
+            },
+            base_dir: None,
+            confinement: ConfinementConfig::default(),
+            batch,
+        };
+
+        let (mut tx, rx) = futures::channel::mpsc::channel::<Event>(0);
+        let sink_handle = tokio::spawn(async move {
+            let sink = FileSink::new(&config, SinkContext::default()).unwrap();
+            VectorSink::from_event_streamsink(sink)
+                .run(Box::pin(rx.map(Into::into)))
+                .await
+                .expect("Running sink failed");
+        });
+
+        tx.send(Event::Log(LogEvent::from("first"))).await.unwrap();
+        // Wait for the first batch to flush and open the file.
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                if let Ok(contents) = tokio::fs::read_to_string(&template).await
+                    && contents.contains("first")
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .expect("first batch did not flush in time");
+
+        // Queue a second event, then let the file exceed its idle deadline.
+        // The sleep must age the mtime past the whole-second truncation check.
+        tx.send(Event::Log(LogEvent::from("second"))).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(2500)).await;
+
+        drop(tx);
+        sink_handle.await.unwrap();
+
+        let output = lines_from_file(template);
+        assert_eq!(output, vec!["first".to_owned(), "second".to_owned()]);
     }
 
     #[tokio::test]
@@ -2389,6 +2477,51 @@ mod tests {
             assert_eq!(out.len().await.unwrap(), seed_len, "no bytes appended");
             let raw = tokio::fs::read(&template).await.unwrap();
             assert_eq!(raw, b"SEED");
+        }
+    }
+
+    // Rollback of a failing compressed batch preserves prior completed frames.
+    #[tokio::test]
+    async fn compressed_rollback_preserves_prior_frames() {
+        trace_init();
+        for compression in [Compression::Gzip, Compression::Zstd] {
+            let template = temp_file();
+            let file = tokio::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&template)
+                .await
+                .unwrap();
+            let mut out = OutFile::new(file, compression);
+
+            // Batch 1 completes its own frame.
+            out.write(b"first\n").await.unwrap();
+            out.mark_written();
+            out.finish_and_reopen().await.unwrap();
+            let file_start = out.len().await.unwrap();
+            assert!(file_start > 0);
+
+            // Batch 2 is partially accepted, then fails.
+            out.mark_written();
+            let _ = out.write(b"sec").await.unwrap();
+
+            let delivered_up_to =
+                reconcile_after_partial_write(&mut out, compression, file_start, 2, 1, &[1, 4])
+                    .await;
+            assert_eq!(delivered_up_to, 0, "failing batch must be retried");
+            assert_eq!(
+                out.len().await.unwrap(),
+                file_start,
+                "prior completed frame must be preserved"
+            );
+
+            let expected = vec!["first".to_owned()];
+            let output = match compression {
+                Compression::Gzip => lines_from_gzip_file(template),
+                Compression::Zstd => lines_from_zstd_file(template),
+                Compression::None => unreachable!("compressed stream expected"),
+            };
+            assert_eq!(output, expected);
         }
     }
 }
