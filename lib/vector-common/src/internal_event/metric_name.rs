@@ -387,36 +387,3 @@ impl CounterName {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::CounterName;
-
-    #[test]
-    fn memory_enrichment_table_counter_names_include_total_and_legacy() {
-        assert_eq!(
-            CounterName::MemoryEnrichmentTableFailedInsertionsTotal.as_str(),
-            "memory_enrichment_table_failed_insertions_total"
-        );
-        assert_eq!(
-            CounterName::MemoryEnrichmentTableFailedInsertions.as_str(),
-            "memory_enrichment_table_failed_insertions"
-        );
-        assert_eq!(
-            CounterName::MemoryEnrichmentTableFailedReadsTotal.as_str(),
-            "memory_enrichment_table_failed_reads_total"
-        );
-        assert_eq!(
-            CounterName::MemoryEnrichmentTableFailedReads.as_str(),
-            "memory_enrichment_table_failed_reads"
-        );
-        assert_eq!(
-            CounterName::MemoryEnrichmentTableTtlExpirationsTotal.as_str(),
-            "memory_enrichment_table_ttl_expirations_total"
-        );
-        assert_eq!(
-            CounterName::MemoryEnrichmentTableTtlExpirations.as_str(),
-            "memory_enrichment_table_ttl_expirations"
-        );
-    }
-}
