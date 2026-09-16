@@ -6,7 +6,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use chrono::Utc;
 use semver::Version;
 use serde_json::json;
@@ -597,10 +597,23 @@ fn parse_breaking_body(body: &str) -> Result<(String, BreakingDetails)> {
     ))
 }
 
-/// `git rm` every `*.md` under `changelog.d/` except `README.md`. Called by
-/// `release prepare` after a successful `run()` — never by the standalone
-/// `release generate-cue` subcommand.
+/// Remove every `*.md` under `changelog.d/` except `README.md` without staging deletions.
+/// Called by `release prepare` after a successful `run()`; publication stages the changes.
+/// Never called by the standalone `release generate-cue` subcommand.
 pub(super) fn retire_all_fragments() -> Result<()> {
+    ensure!(
+        git::run_and_check_output(&[
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            "--ignored",
+            "--",
+            "changelog.d/*.md",
+            ":(exclude)changelog.d/README.md",
+        ])?
+        .is_empty(),
+        "changelog fragments must be committed before retirement"
+    );
     let repo_root = paths::find_repo_root()?;
     retire_changelog_fragments(&repo_root.join(CHANGELOG_DIR))
 }
@@ -618,8 +631,8 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
         if path.file_name().and_then(|n| n.to_str()) == Some("README.md") {
             continue;
         }
-        let rel = path.strip_prefix(env::current_dir()?).unwrap_or(&path);
-        git::rm(&rel.to_string_lossy())?;
+        fs::remove_file(&path)
+            .with_context(|| format!("Failed to retire changelog fragment {}", path.display()))?;
     }
     Ok(())
 }
