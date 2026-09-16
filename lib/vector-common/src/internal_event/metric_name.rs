@@ -125,6 +125,7 @@ pub enum CounterName {
     NetworkTransmitPacketsTotal,
     NetworkTransmitErrsTotal,
     ProcessRuntime,
+    ProcessRuntimeTotal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -510,6 +511,7 @@ impl CounterName {
             Self::NetworkTransmitPacketsTotal => "network_transmit_packets_total",
             Self::NetworkTransmitErrsTotal => "network_transmit_errs_total",
             Self::ProcessRuntime => "process_runtime",
+            Self::ProcessRuntimeTotal => "process_runtime_total",
         }
     }
 }
