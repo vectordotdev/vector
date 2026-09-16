@@ -122,10 +122,10 @@ pub(crate) fn build_warp_filter(
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
-        out.clone(),
+        out,
         bytes_received,
         events_received,
-        headers.clone(),
+        headers,
         traces_deserializer,
     );
     log_filters

@@ -264,7 +264,7 @@ impl OpentelemetryConfig {
 
 impl OpentelemetryConfig {
     /// Build the source serving runtime-swappable TLS acceptors for the gRPC and/or HTTP listeners.
-    pub async fn build_with_tls_reloaders(
+    pub fn build_with_tls_reloaders(
         &self,
         cx: SourceContext,
         grpc_tls_reloader: Option<TlsAcceptorReloader>,
@@ -376,7 +376,7 @@ impl OpentelemetryConfig {
 #[typetag::serde(name = "opentelemetry")]
 impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        self.build_with_tls_reloaders(cx, None, None).await
+        self.build_with_tls_reloaders(cx, None, None)
     }
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",

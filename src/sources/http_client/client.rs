@@ -202,7 +202,7 @@ fn compile_parameter_vrl(
         Err(diagnostics) => {
             let error = format_vrl_diagnostics(param.value(), diagnostics);
             Err(sources::BuildError::VrlCompilationError {
-                message: format!("VRL compilation failed: {}", error),
+                message: format!("VRL compilation failed: {error}"),
             })
         }
     }

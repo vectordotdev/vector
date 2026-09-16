@@ -2,7 +2,8 @@ use super::schema::SchemaContext;
 use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
 use serde_json::{Value, json};
-use std::collections::{HashMap, hash_map::Entry};
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet, hash_map::Entry};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -10,6 +11,8 @@ use std::process::Command;
 const CUE_DEFINITIONS_FIELD: &str = "_schemaDefinitions";
 const CUE_DEFINITIONS_PLACEHOLDER_FIELD: &str = "vector_internal_schema_definitions";
 const CUE_REFERENCE_MARKER_PREFIX: &str = "__VECTOR_CUE_REFERENCE__";
+const CUE_DEFINITIONS_DIRECTORY: &str =
+    "website/cue/reference/components/generated/schema_definitions";
 
 // Component schemas are resolved independently before being imported from JSON into CUE. Reused
 // JSON Schema definitions are interned here so repeated resolved values can instead point at one
@@ -88,6 +91,59 @@ impl CueDefinitions {
         }
     }
 
+    fn discover_reused_anonymous_values<'a>(&mut self, roots: impl IntoIterator<Item = &'a Value>) {
+        let mut named_definitions_by_shape = HashMap::<String, Vec<String>>::new();
+        for (name, value) in &self.values {
+            named_definitions_by_shape
+                .entry(canonical_value(&schema_shape(value)))
+                .or_default()
+                .push(name.clone());
+        }
+
+        let mut candidates = HashMap::<String, (Value, usize)>::new();
+        for root in roots {
+            collect_object_values(root, &mut candidates);
+        }
+
+        let mut reusable = candidates
+            .into_iter()
+            .filter(|(serialized, (_, count))| {
+                *count >= 2 && !self.names_by_value.contains_key(serialized)
+            })
+            .map(|(serialized, (value, _))| {
+                let shape = canonical_value(&schema_shape(&value));
+                let hint = named_definitions_by_shape
+                    .get(&shape)
+                    .filter(|names| names.len() == 1)
+                    .map(|names| names[0].as_str());
+                let name = derived_definition_name(&value, hint);
+                (name, serialized, value)
+            })
+            .collect::<Vec<_>>();
+        reusable.sort_by(|left, right| left.0.cmp(&right.0).then(left.1.cmp(&right.1)));
+
+        let mut name_counts = HashMap::<String, usize>::new();
+        for (name, _, _) in &reusable {
+            *name_counts.entry(name.clone()).or_default() += 1;
+        }
+
+        for (name, serialized, value) in reusable {
+            // Different schemas can have the same documentation-independent identity. Avoid
+            // giving either an unstable content-derived suffix; named definitions still cover
+            // those schemas when available.
+            if name_counts.get(&name) != Some(&1) {
+                continue;
+            }
+
+            self.names_by_value.insert(serialized, name.clone());
+            self.usage_counts.insert(name.clone(), 0);
+            self.values.insert(name, value);
+        }
+
+        self.values.sort_keys();
+        self.usage_counts.sort_keys();
+    }
+
     fn retain_reused(&mut self) {
         self.retain_with_minimum_usage(2);
     }
@@ -115,7 +171,43 @@ impl CueDefinitions {
     }
 
     fn replace_references(&mut self, value: &mut Value) {
-        if let Some(cue_name) = self.definition_name(value) {
+        self.replace_references_except(value, None);
+    }
+
+    fn replace_references_in_used_definitions(&mut self) {
+        let mut processed = HashSet::new();
+        loop {
+            let referenced = self
+                .usage_counts
+                .iter()
+                .filter(|(name, count)| **count > 0 && !processed.contains(*name))
+                .map(|(name, _)| name.clone())
+                .collect::<Vec<_>>();
+            if referenced.is_empty() {
+                break;
+            }
+
+            for name in referenced {
+                let mut value = self
+                    .values
+                    .shift_remove(&name)
+                    .expect("referenced CUE definition has a value");
+                if let Value::Object(root) = &mut value {
+                    for child in root.values_mut() {
+                        self.replace_references_except(child, Some(&name));
+                    }
+                }
+                self.values.insert(name.clone(), value);
+                processed.insert(name);
+            }
+        }
+        self.values.sort_keys();
+    }
+
+    fn replace_references_except(&mut self, value: &mut Value, excluded_name: Option<&str>) {
+        if let Some(cue_name) = self.definition_name(value)
+            && excluded_name != Some(&cue_name)
+        {
             *value = Value::String(format!("{CUE_REFERENCE_MARKER_PREFIX}{cue_name}"));
             *self
                 .usage_counts
@@ -127,12 +219,12 @@ impl CueDefinitions {
         match value {
             Value::Array(values) => {
                 for value in values {
-                    self.replace_references(value);
+                    self.replace_references_except(value, excluded_name);
                 }
             }
             Value::Object(values) => {
                 for value in values.values_mut() {
-                    self.replace_references(value);
+                    self.replace_references_except(value, excluded_name);
                 }
             }
             _ => {}
@@ -164,6 +256,91 @@ fn canonical_value(value: &Value) -> String {
         .expect("only resolved object types are canonicalized");
     serde_json::to_string(&Value::Object(SchemaContext::sort_hash_nested(object)))
         .expect("serializing a JSON value cannot fail")
+}
+
+fn collect_object_values(value: &Value, candidates: &mut HashMap<String, (Value, usize)>) {
+    if value.get("object").is_some() {
+        let serialized = canonical_value(value);
+        let (_, count) = candidates
+            .entry(serialized)
+            .or_insert_with(|| (value.clone(), 0));
+        *count += 1;
+    }
+
+    match value {
+        Value::Array(values) => {
+            for value in values {
+                collect_object_values(value, candidates);
+            }
+        }
+        Value::Object(values) => {
+            for value in values.values() {
+                collect_object_values(value, candidates);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn derived_definition_name(value: &Value, hint: Option<&str>) -> String {
+    let identity = schema_identity(value);
+    let serialized = canonical_value(&identity);
+    let digest = Sha256::digest(serialized.as_bytes());
+    let digest = hex::encode(&digest[..12]);
+    hint.map_or_else(
+        || format!("derived::{digest}"),
+        |hint| format!("derived::{hint}::{digest}"),
+    )
+}
+
+fn schema_shape(value: &Value) -> Value {
+    match value {
+        Value::Array(values) => Value::Array(values.iter().map(schema_shape).collect()),
+        Value::Object(values) => Value::Object(
+            values
+                .iter()
+                .filter(|(key, _)| !matches!(key.as_str(), "default" | "required"))
+                .map(|(key, value)| (key.clone(), schema_shape(value)))
+                .collect(),
+        ),
+        _ => value.clone(),
+    }
+}
+
+fn schema_identity(value: &Value) -> Value {
+    match value {
+        Value::Array(values) => Value::Array(values.iter().map(schema_identity).collect()),
+        Value::Object(values) => {
+            let mut identity = serde_json::Map::new();
+            for (key, value) in values {
+                if matches!(
+                    key.as_str(),
+                    "description" | "deprecated_message" | "examples" | "warnings"
+                ) {
+                    continue;
+                }
+
+                let value = if key == "enum" {
+                    value.as_object().map_or_else(
+                        || schema_identity(value),
+                        |variants| {
+                            Value::Object(
+                                variants
+                                    .keys()
+                                    .map(|name| (name.clone(), Value::Null))
+                                    .collect(),
+                            )
+                        },
+                    )
+                } else {
+                    schema_identity(value)
+                };
+                identity.insert(key.clone(), value);
+            }
+            Value::Object(identity)
+        }
+        _ => value.clone(),
+    }
 }
 
 struct CueDocument {
@@ -252,6 +429,9 @@ pub fn run(schema_path: &Path) -> Result<()> {
         &root_schema,
     )?);
 
+    cue_definitions
+        .discover_reused_anonymous_values(documents.iter().map(|document| &document.data));
+
     for document in &documents {
         cue_definitions.count_references(&document.data);
     }
@@ -261,6 +441,7 @@ pub fn run(schema_path: &Path) -> Result<()> {
     for document in &mut documents {
         cue_definitions.replace_references(&mut document.data);
     }
+    cue_definitions.replace_references_in_used_definitions();
     cue_definitions.retain_used();
 
     for document in documents {
@@ -301,12 +482,11 @@ fn import_json_as_cue(
     let json_output_file = write_to_temp_file(prefix, ".json", &final_json)?;
 
     debug!(
-        "[✓]   Wrote {} schema to '{}'. ({} bytes)",
-        friendly_name,
+        "[✓]   Wrote {friendly_name} schema to '{}'. ({} bytes)",
         json_output_file.display(),
         final_json.len()
     );
-    debug!("[*] Importing {} schema as Cue file...", friendly_name);
+    debug!("[*] Importing {friendly_name} schema as Cue file...");
 
     if let Some(parent) = cue_output_file.parent() {
         fs::create_dir_all(parent)?;
@@ -336,8 +516,7 @@ fn import_json_as_cue(
     }
 
     debug!(
-        "[✓]   Imported {} schema to '{}'.",
-        friendly_name,
+        "[✓]   Imported {friendly_name} schema to '{}'.",
         cue_output_file.display()
     );
     Ok(())
@@ -532,25 +711,101 @@ fn render_and_import_cue_definitions(
     context: &SchemaContext,
     cue_definitions: &CueDefinitions,
 ) -> Result<()> {
-    let data = json!({
-        (CUE_DEFINITIONS_PLACEHOLDER_FIELD): cue_definitions.values,
-    });
-    let cue_output_file =
-        PathBuf::from("website/cue/reference/components/generated/schema_definitions.cue");
-    import_json_as_cue(
-        context,
-        None,
-        &data,
-        "shared schema definitions",
-        "config-schema-cue-definitions-",
-        &cue_output_file,
-    )?;
+    let definitions_directory = PathBuf::from(CUE_DEFINITIONS_DIRECTORY);
+    if definitions_directory.exists() {
+        fs::remove_dir_all(&definitions_directory)?;
+    }
+    fs::create_dir_all(&definitions_directory)?;
 
-    let cue_output = fs::read_to_string(&cue_output_file)?;
-    let cue_output = hide_cue_definitions_field(&cue_output)?;
-    fs::write(&cue_output_file, cue_output)?;
+    let definition_file_names =
+        definition_file_names(cue_definitions.values.keys().map(String::as_str));
+
+    for (name, value) in &cue_definitions.values {
+        let data = json!({
+            (CUE_DEFINITIONS_PLACEHOLDER_FIELD): {
+                (name): value,
+            },
+        });
+        let cue_output_file = definitions_directory.join(
+            definition_file_names
+                .get(name)
+                .expect("every CUE definition has a filename"),
+        );
+        import_json_as_cue(
+            context,
+            Some(cue_definitions),
+            &data,
+            &format!("shared schema definition '{name}'"),
+            "config-schema-cue-definition-",
+            &cue_output_file,
+        )?;
+
+        let cue_output = fs::read_to_string(&cue_output_file)?;
+        let cue_output = hide_cue_definitions_field(&cue_output)?;
+        fs::write(&cue_output_file, cue_output)?;
+    }
 
     Ok(())
+}
+
+fn definition_file_name(name: &str) -> String {
+    if let Some(identity) = name.strip_prefix("derived::") {
+        let (hint, digest) = identity.rsplit_once("::").unwrap_or(("", identity));
+        let stem = if hint.is_empty() {
+            "derived".to_string()
+        } else {
+            sanitized_definition_name(&format!("derived::{hint}"))
+        };
+        return format!("{stem}_{digest}.cue");
+    }
+
+    format!("{}.cue", sanitized_definition_name(name))
+}
+
+fn definition_file_names<'a>(names: impl IntoIterator<Item = &'a str>) -> HashMap<String, String> {
+    let names = names.into_iter().collect::<Vec<_>>();
+    let mut counts = HashMap::<String, usize>::new();
+    for name in &names {
+        *counts.entry(definition_file_name(name)).or_default() += 1;
+    }
+
+    names
+        .into_iter()
+        .map(|name| {
+            let file_name = definition_file_name(name);
+            if counts.get(&file_name) == Some(&1) {
+                return (name.to_string(), file_name);
+            }
+
+            let stem = file_name
+                .strip_suffix(".cue")
+                .expect("definition filenames use the CUE extension");
+            let digest = Sha256::digest(name.as_bytes());
+            (
+                name.to_string(),
+                format!("{stem}-{}.cue", hex::encode(&digest[..4])),
+            )
+        })
+        .collect()
+}
+
+fn sanitized_definition_name(name: &str) -> String {
+    let mut stem = String::with_capacity(name.len());
+    let mut previous_was_separator = false;
+    for character in name.chars() {
+        if character.is_ascii_alphanumeric() {
+            stem.push(character.to_ascii_lowercase());
+            previous_was_separator = false;
+        } else if !previous_was_separator {
+            stem.push('_');
+            previous_was_separator = true;
+        }
+    }
+    let mut stem = stem.trim_matches('_').to_string();
+    if stem.is_empty() {
+        stem.push_str("definition");
+    }
+    stem
 }
 
 fn hide_cue_definitions_field(cue_output: &str) -> Result<String> {
@@ -589,9 +844,9 @@ mod tests {
             names_by_value,
         };
         let mut generated = json!({
-            "first": {"type": shared.clone()},
+            "first": {"type": shared},
             "second": {"type": shared},
-            "only": {"type": unique.clone()},
+            "only": {"type": unique},
         });
 
         definitions.count_references(&generated);
@@ -608,6 +863,163 @@ mod tests {
             definitions.values.keys().collect::<Vec<_>>(),
             vec![&shared_name]
         );
+    }
+
+    #[test]
+    fn discovers_repeated_anonymous_object_values() {
+        let shared = json!({
+            "object": {
+                "options": {
+                    "codec": {
+                        "description": "Codec to use.",
+                        "required": false,
+                        "type": {"string": {"default": "bytes"}},
+                    },
+                },
+            },
+        });
+        let named = json!({
+            "object": {
+                "options": {
+                    "codec": {
+                        "description": "Codec to use.",
+                        "required": true,
+                        "type": {"string": {}},
+                    },
+                },
+            },
+        });
+        let mut definitions = CueDefinitions {
+            values: IndexMap::from([("DeserializerConfig".to_string(), named.clone())]),
+            usage_counts: IndexMap::from([("DeserializerConfig".to_string(), 0)]),
+            names_by_value: HashMap::from([(
+                canonical_value(&named),
+                "DeserializerConfig".to_string(),
+            )]),
+        };
+        let mut generated = json!({
+            "first": {"type": shared},
+            "second": {"type": shared},
+        });
+
+        definitions.discover_reused_anonymous_values([&generated]);
+        definitions.count_references(&generated);
+        definitions.retain_reused();
+        definitions.reset_usage_counts();
+        definitions.replace_references(&mut generated);
+        definitions.retain_used();
+
+        let name = definitions.values.keys().next().unwrap();
+        assert!(name.starts_with("derived::DeserializerConfig::"));
+        let marker = Value::String(format!("{CUE_REFERENCE_MARKER_PREFIX}{name}"));
+        assert_eq!(generated.pointer("/first/type"), Some(&marker));
+        assert_eq!(generated.pointer("/second/type"), Some(&marker));
+    }
+
+    #[test]
+    fn replaces_references_inside_used_definitions() {
+        let inner = json!({
+            "object": {
+                "options": {
+                    "value": {"required": true, "type": {"string": {}}},
+                },
+            },
+        });
+        let outer = json!({
+            "object": {
+                "options": {
+                    "inner": {"required": true, "type": inner},
+                },
+            },
+        });
+        let mut definitions = CueDefinitions {
+            values: IndexMap::from([
+                ("Inner".to_string(), inner.clone()),
+                ("Outer".to_string(), outer),
+            ]),
+            usage_counts: IndexMap::from([("Inner".to_string(), 0), ("Outer".to_string(), 1)]),
+            names_by_value: HashMap::from([(canonical_value(&inner), "Inner".to_string())]),
+        };
+
+        definitions.replace_references_in_used_definitions();
+
+        assert_eq!(
+            definitions.values["Outer"].pointer("/object/options/inner/type"),
+            Some(&Value::String(format!(
+                "{CUE_REFERENCE_MARKER_PREFIX}Inner"
+            )))
+        );
+        assert_eq!(definitions.usage_counts["Inner"], 1);
+    }
+
+    #[test]
+    fn derived_definition_names_ignore_documentation() {
+        let old = json!({
+            "object": {
+                "options": {
+                    "codec": {
+                        "description": "Old docs.",
+                        "type": {"string": {"enum": {"bytes": "Old variant docs."}}},
+                    },
+                },
+            },
+        });
+        let new = json!({
+            "object": {
+                "options": {
+                    "codec": {
+                        "description": "New docs.",
+                        "type": {"string": {"enum": {"bytes": "New variant docs."}}},
+                    },
+                },
+            },
+        });
+
+        assert_eq!(
+            derived_definition_name(&old, Some("DeserializerConfig")),
+            derived_definition_name(&new, Some("DeserializerConfig"))
+        );
+    }
+
+    #[test]
+    fn definition_file_names_are_stable_and_safe() {
+        assert_eq!(
+            definition_file_name("derived::bb2440a04988b7e322be398c"),
+            "derived_bb2440a04988b7e322be398c.cue"
+        );
+        assert_eq!(
+            definition_file_name(
+                "derived::codecs::decoding::DeserializerConfig::bb2440a04988b7e322be398c"
+            ),
+            "derived_codecs_decoding_deserializerconfig_bb2440a04988b7e322be398c.cue"
+        );
+
+        let name = "core::option::Option<vector_core::tls::settings::TlsConfig>";
+        let filename = definition_file_name(name);
+
+        assert_eq!(
+            filename,
+            "core_option_option_vector_core_tls_settings_tlsconfig.cue"
+        );
+        assert!(
+            Path::new(&filename)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("cue"))
+        );
+        assert!(
+            filename
+                .chars()
+                .all(|character| character.is_ascii_lowercase()
+                    || character.is_ascii_digit()
+                    || matches!(character, '_' | '-' | '.'))
+        );
+
+        let colliding = definition_file_names(["example::Config", "example<Config>"]);
+        let first = &colliding["example::Config"];
+        let second = &colliding["example<Config>"];
+        assert!(first.starts_with("example_config-"));
+        assert!(second.starts_with("example_config-"));
+        assert_ne!(first, second);
     }
 
     #[test]

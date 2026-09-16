@@ -59,7 +59,6 @@ impl<S> Utilization<S> {
     ///
     /// This can't be constant because destructors can't be run in a const context, and we're
     /// discarding `IntervalStream`/`Timer` when we call this.
-    #[allow(clippy::missing_const_for_fn)]
     pub(crate) fn into_inner(self) -> S {
         self.inner
     }

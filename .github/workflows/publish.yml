@@ -164,11 +164,9 @@ jobs:
           cargo-deb: true
           protoc: true
           libsasl2: true
-      - name: Install cross-compilation tools
-        run: timeout 30m sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu cmark-gfm
-      - name: Install rpm
-        if: endsWith(matrix.target, '-linux-gnu') || matrix.target == 'armv7-unknown-linux-gnueabihf'
-        run: timeout 30m sudo apt-get install -y rpm
+          cmark-gfm: true
+          cross-binutils: true
+          rpm: ${{ endsWith(matrix.target, '-linux-gnu') || matrix.target == 'armv7-unknown-linux-gnueabihf' }}
       - name: Build Vector
         run: make package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish
@@ -324,7 +322,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of DEB package.
         run: |
-          ./scripts/verify-install.sh "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_$(dpkg --print-architecture).deb"
+          ./scripts/verify-install.sh target/artifacts/*.deb
 
   rpm-verify:
     name: Verify RPM Packages
@@ -385,7 +383,7 @@ jobs:
           path: target/artifacts
       - name: Verify install of RPM package.
         run: |
-          ./scripts/verify-install.sh "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.$(uname -m).rpm"
+          ./scripts/verify-install.sh target/artifacts/*.rpm
 
   macos-verify:
     name: Verify macOS Package

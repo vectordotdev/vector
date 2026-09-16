@@ -1,12 +1,6 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
-use derivative::Derivative;
 use futures::{FutureExt, SinkExt, future::BoxFuture, stream};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
@@ -140,12 +134,11 @@ impl SinkConfig for SematextMetricsConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedSematextMetrics {
     endpoint: String,
     uri: Uri,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     batch: BatchSettings<MetricsBuffer>,
 }
 
