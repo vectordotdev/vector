@@ -1,6 +1,11 @@
 {
   "deprecations_pending": [
     {
+      "what": "`aggregate_failed_updates` counter without the `_total` suffix",
+      "deprecated_since": "0.59.0",
+      "description": "The `aggregate` transform now also emits the failed-updates counter with the `_total` suffix, matching Vector's counter naming convention:\n\n- `aggregate_failed_updates_total`\n\nThe previous name without the `_total` suffix is deprecated and will be removed in a future release. Migrate any dashboards or alerts that reference:\n\n- `aggregate_failed_updates`"
+    },
+    {
       "what": "`series_api_version: v1` option on the `datadog_metrics` sink",
       "deprecated_since": "0.56.0",
       "description": "The `series_api_version: v1` option is deprecated in favor of `v2` (the default).\nThe v1 series endpoint (`/api/v1/series`) is a legacy endpoint.\n\nUsers should remove `series_api_version: v1` from their configuration or set it to `v2`."

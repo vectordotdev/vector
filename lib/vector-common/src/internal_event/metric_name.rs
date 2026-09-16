@@ -24,6 +24,7 @@ pub enum CounterName {
     // Internal events from src/internal_events/
     AggregateEventsRecordedTotal,
     AggregateFailedUpdates,
+    AggregateFailedUpdatesTotal,
     AggregateFlushesTotal,
     ApiStartedTotal,
     CheckpointsTotal,
@@ -393,6 +394,7 @@ impl CounterName {
             Self::BufferErrorsTotal => "buffer_errors_total",
             Self::AggregateEventsRecordedTotal => "aggregate_events_recorded_total",
             Self::AggregateFailedUpdates => "aggregate_failed_updates",
+            Self::AggregateFailedUpdatesTotal => "aggregate_failed_updates_total",
             Self::AggregateFlushesTotal => "aggregate_flushes_total",
             Self::ApiStartedTotal => "api_started_total",
             Self::CheckpointsTotal => "checkpoints_total",
@@ -513,5 +515,40 @@ impl CounterName {
             Self::ProcessRuntime => "process_runtime",
             Self::ProcessRuntimeTotal => "process_runtime_total",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use strum::IntoEnumIterator;
+
+    use super::CounterName;
+
+    #[test]
+    fn counters_end_in_total_except_deprecated() {
+        // Deprecated legacy aliases of `_total` successors, still emitted for
+        // backward compatibility.
+        let mut exempt = HashSet::from([
+            "memory_enrichment_table_failed_insertions",
+            "memory_enrichment_table_failed_reads",
+            "memory_enrichment_table_ttl_expirations",
+            "process_runtime",
+            "aggregate_failed_updates",
+        ]);
+
+        for variant in CounterName::iter() {
+            let name = CounterName::as_str(variant);
+            if name.ends_with("_total") {
+                continue;
+            }
+            assert!(
+                exempt.remove(name),
+                "counter `{name}` must end in `_total` or be listed as exempt"
+            );
+        }
+
+        assert!(exempt.is_empty(), "exempt counters not emitted: {exempt:?}");
     }
 }
