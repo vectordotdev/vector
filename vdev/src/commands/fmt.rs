@@ -24,10 +24,16 @@ impl Cli {
                 continue;
             }
             info!("Formatting {ext} files with prettier...");
-            let args: Vec<&str> = ["--ignore-path", ".prettierignore", "--write"]
-                .into_iter()
-                .chain(files.iter().map(String::as_str))
-                .collect();
+            let args: Vec<&str> = [
+                "--ignore-path",
+                ".prettierignore",
+                "--log-level",
+                "silent",
+                "--write",
+            ]
+            .into_iter()
+            .chain(files.iter().map(String::as_str))
+            .collect();
             app::exec("prettier", &args, true)?;
         }
 
