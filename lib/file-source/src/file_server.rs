@@ -269,12 +269,12 @@ where
                                     eviction_idx += 1;
                                     // Skip recently-rotated files whose open FD is the
                                     // only way to drain remaining bytes. A rotated file
-                                    // was findable in the previous cycle but is no longer
-                                    // findable now, and is still within rotate_wait.
+                                    // has a missing_since timestamp (set on the first
+                                    // cycle where it was not found) and is still within
+                                    // rotate_wait from that point.
                                     if let Some(candidate) = fp_map.get(&evict_id)
-                                        && candidate.file_findable_last_cycle()
-                                        && !candidate.file_findable()
-                                        && candidate.last_seen().elapsed() <= self.rotate_wait
+                                        && let Some(missing) = candidate.missing_since()
+                                        && missing.elapsed() <= self.rotate_wait
                                     {
                                         continue;
                                     }
