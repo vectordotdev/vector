@@ -15,16 +15,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 	internal_metrics: {
 		description: "Configuration of internal metrics for the TagCardinalityLimit transform."
 		required:    false
-		type: object: options: include_extended_tags: {
-			description: """
-				Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
-
-				This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
-				increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
-				"""
-			required: false
-			type: bool: default: false
-		}
+		type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::InternalMetricsConfig"]
 	}
 	limit_exceeded_action: {
 		description: """
@@ -66,6 +57,13 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				This mode has higher memory requirements than `probabilistic`, but never falsely outputs
 				metrics with new tags after the limit has been hit.
 				"""
+			exact_fingerprint: """
+				This mode operates similarly to `exact` mode except it tracks cardinality using 64-bit hash fingerprints
+				of tag values instead of the original strings. This leads to lower memory requirements in most
+				scenarios (assuming average tag value size is greater than 8 bytes) at the cost of slightly
+				reduced throughput due to extra hashing operations and a very small chance of collisions at
+				very high cardinalities.
+				"""
 			probabilistic: """
 				Tracks cardinality probabilistically.
 
@@ -97,16 +95,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				internal_metrics: {
 					description: "Configuration of internal metrics for the TagCardinalityLimit transform."
 					required:    false
-					type: object: options: include_extended_tags: {
-						description: """
-																				Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
-
-																				This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
-																				increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
-																				"""
-						required: false
-						type: bool: default: false
-					}
+					type:        _schemaDefinitions["vector::transforms::tag_cardinality_limit::config::InternalMetricsConfig"]
 				}
 				limit_exceeded_action: {
 					description: """
@@ -126,7 +115,8 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					description: "Controls the approach taken for tracking tag cardinality."
 					required:    true
 					type: string: enum: {
-						exact: "Tracks cardinality exactly. See `Mode::Exact` for details."
+						exact:             "Tracks cardinality exactly. See `Mode::Exact` for details."
+						exact_fingerprint: "Tracks cardinality using 64-bit hash fingerprints. See `Mode::ExactFingerprint` for details."
 						excluded: """
 																			Skip cardinality tracking for this metric. All tag values pass through and nothing is
 																			limited. Other fields in this per-metric configuration are ignored when this is selected.
@@ -146,36 +136,12 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						- `mode: excluded` — opt this tag out of tracking entirely.
 
 						All other settings (tracking algorithm, `limit_exceeded_action`, etc.)
-						are inherited from the enclosing per-metric configuration.
+						are inherited from the enclosing per-metric configuration, except
+						`cache_size_per_key`, which can be overridden per tag in probabilistic mode.
 						Tags not listed here use the per-metric configuration.
 						"""
 					required: false
-					type: object: options: "*": {
-						description: "An individual tag configuration."
-						required:    true
-						type: object: options: {
-							mode: {
-								description: "Controls how this tag key is handled."
-								required:    true
-								type: string: enum: {
-									excluded: """
-																											Opt this tag out of cardinality tracking entirely. All values pass through
-																											without being recorded or checked against any `value_limit`.
-																											"""
-									limit_override: """
-																											Track this tag with a per-tag value limit. The enclosing per-metric tracking
-																											algorithm and all other settings still apply.
-																											"""
-								}
-							}
-							value_limit: {
-								description:   "Maximum number of distinct values to accept for this tag key."
-								relevant_when: "mode = \"limit_override\""
-								required:      true
-								type: uint: {}
-							}
-						}
-					}
+					type:     _schemaDefinitions["derived::9e26f78cee8a2ec00ecddfee"]
 				}
 				value_limit: {
 					description: "How many distinct values to accept for any given key. Ignored when `mode: excluded`."
@@ -184,6 +150,18 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				}
 			}
 		}
+	}
+	per_tag_limits: {
+		description: """
+			Global per-tag-key overrides, applied to every metric that does not match a
+			`per_metric_limits` entry. Each entry sets `mode: limit_override` (with a
+			per-tag `value_limit`) or `mode: excluded` (bypass tracking for that tag).
+
+			See the "Per-tag overrides" section under "How it works" for a worked example
+			and the precedence rules.
+			"""
+		required: false
+		type:     _schemaDefinitions["derived::9e26f78cee8a2ec00ecddfee"]
 	}
 	tracking_scope: {
 		description: "Controls how tag tracking state is partitioned across metrics."

@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.34.0": {
-	date:     "2023-11-07"
-	codename: ""
+	date: "2023-11-07"
 
 	whats_next: []
 
@@ -448,7 +447,7 @@ releases: "0.34.0": {
 		{sha: "91221c6605526d42a6eeab1746e6938399a9b4a5", date: "2023-10-11 04:09:21 UTC", description: "Bump bstr from 1.6.2 to 1.7.0", pr_number: 18810, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 2, insertions_count: 13, deletions_count: 7},
 		{sha: "d9aca80873f1b5dc7863b483ab3426a5767a723b", date: "2023-10-11 04:09:28 UTC", description: "Bump semver from 1.0.19 to 1.0.20", pr_number: 18811, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 2, insertions_count: 5, deletions_count: 5},
 		{sha: "67c4beb8fbff4cdb0f988da16c10ff720fb36e05", date: "2023-10-11 00:04:08 UTC", description: "fix tokio unstable", pr_number: 18776, scopes: ["observability"], type: "chore", breaking_change: false, author: "Doug Smith", files_count: 2, insertions_count: 8, deletions_count: 2},
-		{sha: "9d1a676626101208fd673a6b413e48e52c6d8626", date: "2023-10-12 00:41:29 UTC", description: "Remove unusued Dockerfile", pr_number: 18824, scopes: ["ci"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 0, deletions_count: 20},
+		{sha: "9d1a676626101208fd673a6b413e48e52c6d8626", date: "2023-10-12 00:41:29 UTC", description: "Remove unused Dockerfile", pr_number: 18824, scopes: ["ci"], type: "chore", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 0, deletions_count: 20},
 		{sha: "b107ff706535a2a374cfb4d418f2c86d98628b3a", date: "2023-10-12 04:32:54 UTC", description: "panic when http server receives metric events", pr_number: 18781, scopes: ["http_server source"], type: "fix", breaking_change: false, author: "Pavlos Rontidis", files_count: 2, insertions_count: 64, deletions_count: 58},
 		{sha: "774094ec1f8972c01e26d3f8a35429bea2091e01", date: "2023-10-12 12:04:06 UTC", description: "add an example of parsing upstreaminfo with parse_nginx_log", pr_number: 18815, scopes: ["vrl"], type: "docs", breaking_change: false, author: "ex5", files_count: 1, insertions_count: 31, deletions_count: 0},
 		{sha: "4002ef0458ac2f28a25d7321409732c702c52bac", date: "2023-10-12 13:29:46 UTC", description: "Bump libc from 0.2.148 to 0.2.149", pr_number: 18800, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 2, insertions_count: 3, deletions_count: 3},

@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use futures::FutureExt;
-use http::{StatusCode, Uri};
+use http::StatusCode;
 use hyper::Body;
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
@@ -12,12 +12,16 @@ use crate::{
     sinks::{
         Healthcheck, HealthcheckError,
         gcs_common::service::GcsResponse,
-        util::retries::{RetryAction, RetryLogic},
+        util::{
+            HttpEndpoint,
+            retries::{RetryAction, RetryLogic},
+        },
     },
 };
 
-pub fn default_endpoint() -> String {
-    "https://storage.googleapis.com".to_string()
+pub fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://storage.googleapis.com")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 /// GCS Predefined ACLs.
@@ -108,11 +112,11 @@ pub enum GcsError {
 pub fn build_healthcheck(
     bucket: String,
     client: HttpClient,
-    base_url: String,
+    base_url: HttpEndpoint,
     auth: GcpAuthenticator,
 ) -> crate::Result<Healthcheck> {
     let healthcheck = async move {
-        let uri = base_url.parse::<Uri>()?;
+        let uri = base_url.into_uri();
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
         auth.apply(&mut request);
@@ -130,7 +134,16 @@ pub fn healthcheck_response(
     response: http::Response<hyper::Body>,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
-    match response.status() {
+    healthcheck_status(response.status(), not_found_error)
+}
+
+/// Classifies a GCP healthcheck response by status alone, shared by the legacy and native
+/// HTTP clients.
+pub fn healthcheck_status(
+    status: http::StatusCode,
+    not_found_error: crate::Error,
+) -> crate::Result<()> {
+    match status {
         StatusCode::OK => Ok(()),
         StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),

@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: windows_event_log
+    channels:
+      - System,Application,Security

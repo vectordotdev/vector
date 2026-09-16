@@ -4,14 +4,14 @@ use super::{
     super::{Event, LogEvent, Metric},
     metric::LuaMetric,
 };
+use crate::event::MetricTagMode;
 
 pub struct LuaEvent {
     pub event: Event,
-    pub metric_multi_value_tags: bool,
+    pub metric_tag_mode: MetricTagMode,
 }
 
 impl IntoLua for LuaEvent {
-    #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn into_lua(self, lua: &Lua) -> LuaResult<LuaValue> {
         let table = lua.create_table()?;
         match self.event {
@@ -20,7 +20,7 @@ impl IntoLua for LuaEvent {
                 "metric",
                 LuaMetric {
                     metric,
-                    multi_value_tags: self.metric_multi_value_tags,
+                    tag_mode: self.metric_tag_mode,
                 }
                 .into_lua(lua)?,
             )?,
@@ -80,23 +80,23 @@ mod test {
                 "event",
                 LuaEvent {
                     event,
-                    metric_multi_value_tags: false,
+                    metric_tag_mode: MetricTagMode::Single,
                 },
             )
             .unwrap();
         for assertion in assertions {
             assert!(
                 lua.load(assertion).eval::<bool>().expect(assertion),
-                "{}",
-                assertion
+                "{assertion}"
             );
         }
     }
 
     #[test]
     fn into_lua_log() {
+        use vrl::event_path;
         let mut event = LogEvent::default();
-        event.insert("field", "value");
+        event.insert(event_path!("field"), "value");
 
         let assertions = vec![
             "type(event) == 'table'",

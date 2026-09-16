@@ -46,6 +46,22 @@ impl InternalEvent for TcpSocketConnectionShutdown {
     }
 }
 
+/// Emitted once per accepted TCP source connection, after the per-connection
+/// task exits — regardless of cause. This includes pre-loop exits (TLS
+/// handshake failure, shutdown signal arriving during handshake) as well as
+/// every read/ack loop exit (graceful peer EOF, decoder failure, downstream
+/// closed, ack write failure, shutdown signal, tripwire, max connection
+/// duration). Pairs exactly with `ConnectionOpen`.
+#[derive(Debug, NamedInternalEvent)]
+pub struct TcpSourceConnectionClosed;
+
+impl InternalEvent for TcpSourceConnectionClosed {
+    fn emit(self) {
+        debug!(message = "Connection closed.");
+        counter!(CounterName::ConnectionShutdownTotal, "mode" => "tcp").increment(1);
+    }
+}
+
 #[cfg(all(unix, feature = "sources-dnstap"))]
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpSocketError<'a, E> {
@@ -113,6 +129,40 @@ impl InternalEvent for TcpSocketTlsConnectionError {
     }
 }
 
+/// Emitted when a TLS handshake does not complete within the configured
+/// handshake timeout. Without this, a peer that opens a TCP connection but
+/// never completes (or never starts) the TLS handshake — a bare TCP
+/// healthcheck, a stalled client, or deliberate slow-handshake abuse — would
+/// hold its connection-limit slot indefinitely, since neither TCP keepalive
+/// nor `max_connection_duration_secs` are wired up until after the handshake
+/// succeeds.
+#[derive(Debug, NamedInternalEvent)]
+pub struct TcpSocketTlsHandshakeTimeout {
+    pub peer_addr: SocketAddr,
+    pub timeout: std::time::Duration,
+}
+
+impl InternalEvent for TcpSocketTlsHandshakeTimeout {
+    fn emit(self) {
+        warn!(
+            message = "TLS handshake timed out.",
+            peer_addr = %self.peer_addr,
+            timeout_secs = self.timeout.as_secs(),
+            error_code = "tls_handshake_timeout",
+            error_type = error_type::TIMED_OUT,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            CounterName::ComponentErrorsTotal,
+            "error_code" => "tls_handshake_timeout",
+            "error_type" => error_type::TIMED_OUT,
+            "stage" => error_stage::RECEIVING,
+            "mode" => "tcp",
+        )
+        .increment(1);
+    }
+}
+
 #[derive(Debug, NamedInternalEvent)]
 pub struct TcpSendAckError {
     pub error: std::io::Error,
@@ -156,5 +206,96 @@ impl InternalEvent for TcpBytesReceived {
             CounterName::ComponentReceivedBytesTotal, "protocol" => "tcp"
         )
         .increment(self.byte_size as u64);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use serial_test::serial;
+    use vector_lib::event::MetricValue;
+    use vector_lib::internal_event::InternalEvent;
+    use vector_lib::metrics::Controller;
+
+    use super::{TcpSendAckError, TcpSourceConnectionClosed};
+
+    /// Returns the current value of a counter matching `name` and all `tags`.
+    /// Counters that have not yet been touched aren't in the snapshot and
+    /// register as 0.0 here.
+    fn counter_value(name: &str, tags: &[(&str, &str)]) -> f64 {
+        Controller::get()
+            .expect("metrics controller initialized")
+            .capture_metrics()
+            .into_iter()
+            .find(|m| {
+                m.name() == name
+                    && tags
+                        .iter()
+                        .all(|(k, v)| m.tags().is_some_and(|t| t.get(k) == Some(*v)))
+            })
+            .map(|m| match m.value() {
+                MetricValue::Counter { value } => *value,
+                other => panic!("expected counter for {name}, got {other:?}"),
+            })
+            .unwrap_or(0.0)
+    }
+
+    /// `TcpSourceConnectionClosed` MUST bump `connection_shutdown_total{mode="tcp"}`
+    /// once per emit. Pins the contract that this event is the sole owner of the
+    /// connection-close counter on the source side.
+    #[test]
+    #[serial]
+    fn tcp_source_connection_closed_increments_shutdown_total() {
+        crate::test_util::trace_init();
+        let before = counter_value("connection_shutdown_total", &[("mode", "tcp")]);
+
+        TcpSourceConnectionClosed.emit();
+
+        let after = counter_value("connection_shutdown_total", &[("mode", "tcp")]);
+        assert_eq!(after - before, 1.0);
+    }
+
+    /// `TcpSendAckError` is an `*Error` event and per the instrumentation spec MUST
+    /// only emit on real errors — bumping `component_errors_total` with the
+    /// `ack_failed` error_code.
+    #[test]
+    #[serial]
+    fn tcp_send_ack_error_emit_always_increments_component_errors_total() {
+        crate::test_util::trace_init();
+        let errors_before = counter_value(
+            "component_errors_total",
+            &[
+                ("error_code", "ack_failed"),
+                ("error_type", "writer_failed"),
+                ("stage", "sending"),
+                ("mode", "tcp"),
+            ],
+        );
+        let shutdown_before = counter_value("connection_shutdown_total", &[("mode", "tcp")]);
+
+        TcpSendAckError {
+            error: io::Error::from(io::ErrorKind::ConnectionReset),
+        }
+        .emit();
+
+        assert_eq!(
+            counter_value(
+                "component_errors_total",
+                &[
+                    ("error_code", "ack_failed"),
+                    ("error_type", "writer_failed"),
+                    ("stage", "sending"),
+                    ("mode", "tcp"),
+                ],
+            ) - errors_before,
+            1.0,
+        );
+        assert_eq!(
+            counter_value("connection_shutdown_total", &[("mode", "tcp")]),
+            shutdown_before,
+            "TcpSendAckError must not bump the connection-close counter — \
+             that is TcpSourceConnectionClosed's responsibility.",
+        );
     }
 }

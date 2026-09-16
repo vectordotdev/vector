@@ -11,7 +11,10 @@ use snafu::{ResultExt, Snafu};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, metric::MetricSketch},
+    event::{
+        DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue,
+        metric::{MetricSketch, TagValue},
+    },
     metrics::AgentDDSketch,
     request_metadata::GroupedCountByteSize,
 };
@@ -24,7 +27,8 @@ use vector_common::constants::{
 use super::config::{DatadogMetricsCompression, DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::{
-        DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
+        DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogPoint, DatadogSeriesMetric,
+        DatadogSeriesMetricMetadata,
     },
     proto::fds::protobuf_descriptors,
     sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
@@ -613,13 +617,37 @@ fn series_to_proto_message(
         });
     }
 
-    // In the `datadog_agent` source, the tag is added as `device` for the V1 endpoint
-    // and `resource.device` for the V2 endpoint.
-    if let Some(device) = tags.remove("device").or(tags.remove("resource.device")) {
+    // The Agent source preserves `device` as a plain tag for v1/v2 compatibility.
+    if let Some(device) = tags.remove("device") {
         resources.push(ddmetric_proto::metric_payload::Resource {
             r#type: "device".to_string(),
             name: device,
         });
+    }
+
+    let resource_tags: Vec<_> = tags
+        .keys()
+        .filter_map(|tag| {
+            tag.strip_prefix(DATADOG_METRIC_RESOURCE_TAG_PREFIX)
+                .filter(|resource_type| !resource_type.is_empty())
+                .map(|resource_type| (tag.to_string(), resource_type.to_string()))
+        })
+        .collect();
+
+    for (tag, resource_type) in resource_tags {
+        if let Some(values) = tags.remove_set(&tag) {
+            for value in values {
+                match value {
+                    TagValue::Value(name) if !name.is_empty() => {
+                        resources.push(ddmetric_proto::metric_payload::Resource {
+                            r#type: resource_type.clone(),
+                            name,
+                        });
+                    }
+                    value => tags.insert(tag.clone(), value),
+                }
+            }
+        }
     }
 
     let source_type_name = tags.remove("source_type_name").unwrap_or_default();
@@ -980,17 +1008,17 @@ fn write_payload_footer(
 
 #[cfg(test)]
 mod tests {
-    use std::io::{self, Write as _};
+    use std::io::Write as _;
     use std::{num::NonZeroU32, sync::Arc};
 
-    use bytes::{BufMut, Bytes, BytesMut};
+    use bytes::{BufMut, Bytes};
     use chrono::{DateTime, TimeZone, Timelike, Utc};
-    use flate2::read::ZlibDecoder;
     use proptest::{
         arbitrary::any, collection::btree_map, num::f64::POSITIVE as ARB_POSITIVE_F64, prop_assert,
         proptest, strategy::Strategy, string::string_regex,
     };
     use prost::Message;
+    use vector_common::decompression::CappedDecoder;
     use vector_lib::{
         config::{LogSchema, log_schema},
         event::{
@@ -1082,18 +1110,6 @@ mod tests {
             .finish()
             .expect("should not fail")
             .freeze()
-    }
-
-    fn decompress_zlib_payload(payload: Bytes) -> io::Result<Bytes> {
-        let mut decompressor = ZlibDecoder::new(&payload[..]);
-        let mut decompressed = BytesMut::new().writer();
-        io::copy(&mut decompressor, &mut decompressed)?;
-        Ok(decompressed.into_inner().freeze())
-    }
-
-    fn decompress_zstd_payload(payload: Bytes) -> io::Result<Bytes> {
-        let decompressed = zstd::decode_all(&payload[..])?;
-        Ok(Bytes::from(decompressed))
     }
 
     /// Returns the number of bytes added to the compressor's output buffer after writing `n`
@@ -1239,6 +1255,137 @@ mod tests {
     fn test_encode_timestamp() {
         assert_eq!(encode_timestamp(None), Utc::now().timestamp());
         assert_eq!(encode_timestamp(Some(ts())), 1542182950);
+    }
+
+    #[test]
+    fn encode_resource_tags_as_v2_resources() {
+        let metric = get_simple_counter().with_tags(Some(metric_tags! {
+            "resource.database_instance" => "mongo-repro-01",
+            "resource.database_instance" => "custom",
+            "resource.aws_docdb_cluster" => "docdb-cluster",
+            "resource.owner" => "payments",
+            "abc.def.ghi" => "database_name:mongo_potatoes",
+        }));
+
+        let series_proto = series_to_proto_message(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
+        }));
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "aws_docdb_cluster" && resource.name == "docdb-cluster"
+        }));
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "database_instance" && resource.name == "custom"
+        }));
+        assert!(
+            series_proto
+                .resources
+                .iter()
+                .any(|resource| resource.r#type == "owner" && resource.name == "payments")
+        );
+        assert_eq!(
+            series_proto.tags,
+            vec!["abc.def.ghi:database_name:mongo_potatoes"]
+        );
+    }
+
+    #[test]
+    fn encode_multi_value_resource_tags_and_preserve_bare_tags() {
+        let mut tags = MetricTags::default();
+        tags.insert(
+            "resource.database_instance".into(),
+            TagValue::Value("mongo-repro-01".into()),
+        );
+        tags.insert(
+            "resource.database_instance".into(),
+            TagValue::Value("mongo-repro-02".into()),
+        );
+        tags.insert("resource.database_instance".into(), TagValue::Bare);
+        tags.insert("resource.bare_only".into(), TagValue::Bare);
+        tags.insert("resource.".into(), "missing-type");
+        tags.insert("resource.empty".into(), "");
+
+        let metric = get_simple_counter().with_tags(Some(tags));
+
+        let series_proto = series_to_proto_message(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        let database_instances: Vec<_> = series_proto
+            .resources
+            .iter()
+            .filter(|resource| resource.r#type == "database_instance")
+            .map(|resource| resource.name.as_str())
+            .collect();
+        assert_eq!(database_instances, vec!["mongo-repro-01", "mongo-repro-02"]);
+        assert!(
+            !series_proto
+                .resources
+                .iter()
+                .any(|resource| resource.r#type == "bare_only")
+        );
+        assert_eq!(
+            series_proto.tags,
+            vec![
+                "resource.:missing-type",
+                "resource.bare_only",
+                "resource.database_instance",
+                "resource.empty:",
+            ]
+        );
+    }
+
+    #[test]
+    fn encode_resource_tag_from_any_source_as_v2_resource() {
+        let metric = get_simple_counter().with_tags(Some(metric_tags! {
+            "resource.database_instance" => "mongo-repro-01",
+        }));
+
+        let series_proto = series_to_proto_message(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        assert!(series_proto.resources.iter().any(|resource| {
+            resource.r#type == "database_instance" && resource.name == "mongo-repro-01"
+        }));
+        assert!(series_proto.tags.is_empty());
+    }
+
+    #[test]
+    fn encode_resource_tag_as_v1_tag() {
+        let metric = get_simple_counter().with_tags(Some(metric_tags! {
+            "resource.database_instance" => "mongo-repro-01",
+        }));
+
+        let series = generate_series_metrics(
+            &metric,
+            &None,
+            log_schema(),
+            DEFAULT_DD_ORIGIN_PRODUCT_VALUE,
+        )
+        .unwrap();
+
+        assert_eq!(
+            series[0].tags,
+            Some(vec![
+                "resource.database_instance:mongo-repro-01".to_string()
+            ])
+        );
     }
 
     #[test]
@@ -2142,7 +2289,7 @@ mod tests {
                 prop_assert!(payload.len() <= compressed_limit);
 
                 // V1 uses zlib/deflate.
-                let result = decompress_zlib_payload(payload);
+                let result = CappedDecoder::zlib(&payload[..]).decompress().map(Bytes::from);
                 prop_assert!(result.is_ok());
 
                 let decompressed = result.unwrap();
@@ -2169,7 +2316,9 @@ mod tests {
                 prop_assert!(payload.len() <= compressed_limit);
 
                 // V2 uses zstd.
-                let result = decompress_zstd_payload(payload);
+                let result = CappedDecoder::zstd(&payload[..])
+                    .and_then(|decoder| decoder.decompress())
+                    .map(Bytes::from);
                 prop_assert!(result.is_ok());
 
                 let decompressed = result.unwrap();

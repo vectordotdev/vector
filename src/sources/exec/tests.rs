@@ -372,7 +372,7 @@ async fn test_run_command_linux() {
         assert_eq!(*log.get_source_type().unwrap(), "exec".into());
         assert_eq!(*log.get_message().unwrap(), "Hello World!".into());
         assert_eq!(*log.get_host().unwrap(), "Some.Machine".into());
-        assert!(log.get(PID_KEY).is_some());
+        assert!(log.get(vrl::event_path!(PID_KEY)).is_some());
         assert!(log.get_timestamp().is_some());
 
         assert_eq!(8, log.all_event_fields().unwrap().count());

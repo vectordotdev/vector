@@ -1,0 +1,16 @@
+sinks:
+  my_sink_id:
+    type: mqtt
+    inputs:
+      - my-source-or-transform-id
+    clean_session: false
+    dangerously_allow_unconfined_template_resolution: false
+    encoding:
+      codec: json
+    host: mqtt.example.com
+    keep_alive: 60
+    max_packet_size: 10240
+    port: 1883
+    quality_of_service: atleastonce
+    retain: false
+    topic: my-topic

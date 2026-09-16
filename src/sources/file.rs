@@ -99,7 +99,6 @@ pub struct FileConfig {
     pub ignore_checkpoints: Option<bool>,
 
     #[serde(default = "default_read_from")]
-    #[configurable(derived)]
     pub read_from: ReadFromConfig,
 
     /// Ignore files with a data modification date older than the specified number of seconds.
@@ -162,7 +161,6 @@ pub struct FileConfig {
     #[configurable(metadata(docs::human_name = "Glob Minimum Cooldown"))]
     pub glob_minimum_cooldown_ms: Duration,
 
-    #[configurable(derived)]
     #[serde(alias = "fingerprinting", default)]
     fingerprint: FingerprintConfig,
 
@@ -187,7 +185,6 @@ pub struct FileConfig {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
-    #[configurable(derived)]
     #[serde(default)]
     pub multiline: Option<MultilineConfig>,
 
@@ -220,11 +217,9 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = "\r\n"))]
     pub line_delimiter: String,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub encoding: Option<EncodingConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -233,7 +228,6 @@ pub struct FileConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     internal_metrics: FileInternalMetricsConfig,
 
@@ -402,17 +396,13 @@ impl SourceConfig for FileConfig {
             // source are only global, name can be used for subdir
             .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
-        // Clippy rule, because async_trait?
-        #[allow(clippy::suspicious_else_formatting)]
-        {
-            if let Some(ref config) = self.multiline {
-                let _: line_agg::Config = config.try_into()?;
-            }
+        if let Some(ref config) = self.multiline {
+            let _: line_agg::Config = config.try_into()?;
+        }
 
-            if let Some(ref indicator) = self.message_start_indicator {
-                Regex::new(indicator)
-                    .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
-            }
+        if let Some(ref indicator) = self.message_start_indicator {
+            Regex::new(indicator)
+                .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
         }
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
@@ -580,7 +570,7 @@ pub fn file_source(
         // checkpoints until all the acks have come in.
         let (send_shutdown, shutdown2) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
                     checkpoints.update(entry.file_id, entry.offset);
@@ -832,9 +822,14 @@ mod tests {
         fs::{self, File},
         future::Future,
         io::{Seek, Write},
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
     };
 
     use encoding_rs::UTF_16LE;
+    use indoc::indoc;
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::time::{Duration, sleep, timeout};
@@ -847,7 +842,10 @@ mod tests {
         event::{Event, EventStatus, Value},
         shutdown::ShutdownSignal,
         sources::file,
-        test_util::components::{FILE_SOURCE_TAGS, assert_source_compliance},
+        test_util::{
+            components::{FILE_SOURCE_TAGS, assert_source_compliance},
+            wait_for_atomic_usize_timeout_ms,
+        },
     };
 
     #[test]
@@ -856,12 +854,16 @@ mod tests {
     }
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
+        // Store checkpoints in a subdirectory so they don't appear in the
+        // glob-watched directory (which covers dir.path()/*).
+        let data_dir = dir.path().join(".data");
+        fs::create_dir_all(&data_dir).unwrap();
         file::FileConfig {
             fingerprint: FingerprintConfig::Checksum {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
-            data_dir: Some(dir.path().to_path_buf()),
+            data_dir: Some(data_dir),
             glob_minimum_cooldown_ms: Duration::from_millis(100),
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
@@ -876,16 +878,17 @@ mod tests {
 
     #[test]
     fn parse_config() {
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-            include = [ "/var/log/**/*.log" ]
-            file_key = "file"
-            glob_minimum_cooldown_ms = 1000
-            multi_line_timeout = 1000
-            max_read_bytes = 2048
-            line_delimiter = "\n"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            file_key: file
+            glob_minimum_cooldown_ms: 1000
+            multi_line_timeout: 1000
+            max_read_bytes: 2048
+            line_delimiter: "\n"
+            "#,
+        })
         .unwrap();
         assert_eq!(config, FileConfig::default());
         assert_eq!(
@@ -896,25 +899,27 @@ mod tests {
             }
         );
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        [fingerprint]
-        strategy = "device_and_inode"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            fingerprint:
+              strategy: device_and_inode
+            "#,
+        })
         .unwrap();
         assert_eq!(config.fingerprint, FingerprintConfig::DevInode);
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        [fingerprint]
-        strategy = "checksum"
-        bytes = 128
-        ignored_header_bytes = 512
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            fingerprint:
+              strategy: checksum
+              bytes: 128
+              ignored_header_bytes: 512
+            "#,
+        })
         .unwrap();
         assert_eq!(
             config.fingerprint,
@@ -924,31 +929,34 @@ mod tests {
             }
         );
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        [encoding]
-        charset = "utf-16le"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            encoding:
+              charset: utf-16le
+            "#,
+        })
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        read_from = "beginning"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            read_from: beginning
+            "#,
+        })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::Beginning);
 
-        let config: FileConfig = toml::from_str(
+        let config: FileConfig = serde_yaml::from_str(indoc! {
             r#"
-        include = [ "/var/log/**/*.log" ]
-        read_from = "end"
-        "#,
-        )
+            include:
+              - /var/log/**/*.log
+            read_from: end
+            "#,
+        })
         .unwrap();
         assert_eq!(config.read_from, ReadFromConfig::End);
     }
@@ -962,9 +970,10 @@ mod tests {
         config.global.data_dir = global_dir.keep().into();
 
         // local path given -- local should win
+        let local_data_dir = Some(local_dir.path().to_path_buf());
         let res = config
             .global
-            .resolve_and_validate_data_dir(test_default_file_config(&local_dir).data_dir.as_ref())
+            .resolve_and_validate_data_dir(local_data_dir.as_ref())
             .unwrap();
         assert_eq!(res, local_dir.path());
 
@@ -1153,7 +1162,7 @@ mod tests {
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
 
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
 
@@ -1176,14 +1185,14 @@ mod tests {
             let line =
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
             if line.starts_with("hello") {
-                assert_eq!(line, format!("hello {}", hello_i));
+                assert_eq!(line, format!("hello {hello_i}"));
                 assert_eq!(
                     event.as_log()["file"].to_string_lossy(),
                     path1.to_str().unwrap()
                 );
                 hello_i += 1;
             } else {
-                assert_eq!(line, format!("goodbye {}", goodbye_i));
+                assert_eq!(line, format!("goodbye {goodbye_i}"));
                 assert_eq!(
                     event.as_log()["file"].to_string_lossy(),
                     path2.to_str().unwrap()
@@ -1208,7 +1217,7 @@ mod tests {
 
         let path = dir.path().join("file");
 
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             writeln!(&mut file, "line for checkpointing").unwrap();
@@ -1234,7 +1243,7 @@ mod tests {
             ..test_default_file_config(&dir)
         };
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             for i in 0..n {
@@ -1272,9 +1281,9 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
 
             if pre_trunc {
-                assert_eq!(line, format!("pretrunc {}", i));
+                assert_eq!(line, format!("pretrunc {i}"));
             } else {
-                assert_eq!(line, format!("posttrunc {}", i));
+                assert_eq!(line, format!("posttrunc {i}"));
             }
 
             i += 1;
@@ -1297,7 +1306,7 @@ mod tests {
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             for i in 0..n {
@@ -1337,9 +1346,9 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()].to_string_lossy();
 
             if pre_rot {
-                assert_eq!(line, format!("prerot {}", i));
+                assert_eq!(line, format!("prerot {i}"));
             } else {
-                assert_eq!(line, format!("postrot {}", i));
+                assert_eq!(line, format!("postrot {i}"));
             }
 
             i += 1;
@@ -1365,7 +1374,7 @@ mod tests {
         let path2 = dir.path().join("b.txt");
         let path3 = dir.path().join("a.log");
         let path4 = dir.path().join("a.ignore.txt");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
             let mut file3 = File::create(&path3).unwrap();
@@ -1416,7 +1425,7 @@ mod tests {
 
         let path1 = dir.path().join("a//b/a.log.1");
         let path2 = dir.path().join("a//b/test.log.1");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             std::fs::create_dir_all(dir.path().join("a/b")).unwrap();
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
@@ -1469,15 +1478,16 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, acks, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
+            let received =
+                run_file_source(&config, true, acks, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
 
-                writeln!(&mut file, "hello there").unwrap();
-                file.flush().unwrap();
+                    writeln!(&mut file, "hello there").unwrap();
+                    file.flush().unwrap();
 
-                sleep_500_millis().await;
-            })
-            .await;
+                    sleep_500_millis().await;
+                })
+                .await;
 
             assert_eq!(received.len(), 1);
             assert_eq!(
@@ -1496,15 +1506,16 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, acks, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
+            let received =
+                run_file_source(&config, true, acks, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
 
-                writeln!(&mut file, "hello there").unwrap();
-                file.flush().unwrap();
+                    writeln!(&mut file, "hello there").unwrap();
+                    file.flush().unwrap();
 
-                sleep_500_millis().await;
-            })
-            .await;
+                    sleep_500_millis().await;
+                })
+                .await;
 
             assert_eq!(received.len(), 1);
             assert_eq!(
@@ -1522,15 +1533,16 @@ mod tests {
             };
 
             let path = dir.path().join("file");
-            let received = run_file_source(&config, true, acks, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
+            let received =
+                run_file_source(&config, true, acks, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
 
-                writeln!(&mut file, "hello there").unwrap();
+                    writeln!(&mut file, "hello there").unwrap();
 
-                file.flush().unwrap();
-                sleep_500_millis().await;
-            })
-            .await;
+                    file.flush().unwrap();
+                    sleep_500_millis().await;
+                })
+                .await;
 
             assert_eq!(received.len(), 1);
             assert_eq!(
@@ -1576,26 +1588,28 @@ mod tests {
 
         // First time server runs it picks up existing lines.
         {
-            let received = run_file_source(&config, true, acking, LogNamespace::Legacy, async {
-                sleep_500_millis().await;
-                writeln!(&mut file, "first line").unwrap();
-                file.flush().unwrap();
-                sleep_500_millis().await;
-            })
-            .await;
+            let received =
+                run_file_source(&config, true, acking, LogNamespace::Legacy, None, async {
+                    sleep_500_millis().await;
+                    writeln!(&mut file, "first line").unwrap();
+                    file.flush().unwrap();
+                    sleep_500_millis().await;
+                })
+                .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
         // Restart server, read file from checkpoint.
         {
-            let received = run_file_source(&config, true, acking, LogNamespace::Legacy, async {
-                sleep_500_millis().await;
-                writeln!(&mut file, "second line").unwrap();
-                file.flush().unwrap();
-                sleep_500_millis().await;
-            })
-            .await;
+            let received =
+                run_file_source(&config, true, acking, LogNamespace::Legacy, None, async {
+                    sleep_500_millis().await;
+                    writeln!(&mut file, "second line").unwrap();
+                    file.flush().unwrap();
+                    sleep_500_millis().await;
+                })
+                .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
@@ -1608,13 +1622,14 @@ mod tests {
                 read_from: ReadFromConfig::Beginning,
                 ..test_default_file_config(&dir)
             };
-            let received = run_file_source(&config, false, acking, LogNamespace::Legacy, async {
-                sleep_500_millis().await;
-                writeln!(&mut file, "third line").unwrap();
-                file.flush().unwrap();
-                sleep_500_millis().await;
-            })
-            .await;
+            let received =
+                run_file_source(&config, false, acking, LogNamespace::Legacy, None, async {
+                    sleep_500_millis().await;
+                    writeln!(&mut file, "third line").unwrap();
+                    file.flush().unwrap();
+                    sleep_500_millis().await;
+                })
+                .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(
@@ -1643,6 +1658,7 @@ mod tests {
             false,
             Unfinalized,
             LogNamespace::Legacy,
+            None,
             sleep(Duration::from_secs(5)),
         )
         .await;
@@ -1655,6 +1671,7 @@ mod tests {
             false,
             Unfinalized,
             LogNamespace::Legacy,
+            None,
             sleep(Duration::from_secs(5)),
         )
         .await;
@@ -1685,6 +1702,7 @@ mod tests {
             true,
             Acks,
             LogNamespace::Legacy,
+            None,
             // shutdown signal is sent after this duration
             sleep_500_millis(),
         )
@@ -1695,13 +1713,26 @@ mod tests {
         // bug we're testing for, which happens if the finalizer stream exits on shutdown with pending acks
         assert!(lines.len() < line_count);
 
-        // Restart the server, and it should read the rest without duplicating any
+        // Restart the server, and it should read the rest without duplicating any.
+        // Use the event counter to drain rx continuously (removing backpressure so
+        // the file server can read all remaining lines without being stalled), then
+        // trigger shutdown once all expected events have been received.
+        let remaining = line_count - lines.len();
+        let event_count = Arc::new(AtomicUsize::new(0));
         let received = run_file_source(
             &config,
             true,
             Acks,
             LogNamespace::Legacy,
-            sleep(Duration::from_secs(5)),
+            Some(Arc::clone(&event_count)),
+            async {
+                wait_for_atomic_usize_timeout_ms(
+                    Arc::clone(&event_count),
+                    |n| n >= remaining,
+                    5_000,
+                )
+                .await;
+            },
         )
         .await;
         let lines2 = extract_messages_string(received);
@@ -1731,13 +1762,14 @@ mod tests {
         let path_for_old_file = dir.path().join("file.old");
         // Run server first time, collect some lines.
         {
-            let received = run_file_source(&config, true, acking, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
-                writeln!(&mut file, "first line").unwrap();
-                file.flush().unwrap();
-                sleep_500_millis().await;
-            })
-            .await;
+            let received =
+                run_file_source(&config, true, acking, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
+                    writeln!(&mut file, "first line").unwrap();
+                    file.flush().unwrap();
+                    sleep_500_millis().await;
+                })
+                .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["first line"]);
@@ -1747,13 +1779,14 @@ mod tests {
         // Restart the server and make sure it does not re-read the old file
         // even though it has a new name.
         {
-            let received = run_file_source(&config, false, acking, LogNamespace::Legacy, async {
-                let mut file = File::create(&path).unwrap();
-                writeln!(&mut file, "second line").unwrap();
-                file.flush().unwrap();
-                sleep_500_millis().await;
-            })
-            .await;
+            let received =
+                run_file_source(&config, false, acking, LogNamespace::Legacy, None, async {
+                    let mut file = File::create(&path).unwrap();
+                    writeln!(&mut file, "second line").unwrap();
+                    file.flush().unwrap();
+                    sleep_500_millis().await;
+                })
+                .await;
 
             let lines = extract_messages_string(received);
             assert_eq!(lines, vec!["second line"]);
@@ -1806,6 +1839,7 @@ mod tests {
             };
             let after_times = [after_time, after_time];
 
+            // SAFETY: The descriptors and both two-element arrays remain valid for these calls.
             unsafe {
                 libc::futimes(before_file.as_raw_fd(), before_times.as_ptr());
                 libc::futimes(after_file.as_raw_fd(), after_times.as_ptr());
@@ -1815,7 +1849,7 @@ mod tests {
         before_file.sync_all().unwrap();
         after_file.sync_all().unwrap();
 
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             sleep_500_millis().await;
             writeln!(&mut before_file, "second line").unwrap();
             writeln!(&mut after_file, "_second line").unwrap();
@@ -1854,7 +1888,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             writeln!(&mut file, "short").unwrap();
@@ -1891,37 +1925,48 @@ mod tests {
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
             message_start_indicator: Some("INFO".into()),
-            multi_line_timeout: 25, // less than 50 in sleep()
+            multi_line_timeout: 25,
             ..test_default_file_config(&dir)
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let mut file = File::create(&path).unwrap();
+        let event_count = Arc::new(AtomicUsize::new(0));
+        let received = run_file_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(Arc::clone(&event_count)),
+            async {
+                let mut file = File::create(&path).unwrap();
 
-            writeln!(&mut file, "leftover foo").unwrap();
-            writeln!(&mut file, "INFO hello").unwrap();
-            writeln!(&mut file, "INFO goodbye").unwrap();
-            writeln!(&mut file, "part of goodbye").unwrap();
+                // Write all lines through the second "INFO hello". Events 1-4
+                // are emitted immediately by EndExclude; event 5 ("INFO hello"
+                // standalone) requires the 25ms timeout to fire.
+                writeln!(&mut file, "leftover foo").unwrap();
+                writeln!(&mut file, "INFO hello").unwrap();
+                writeln!(&mut file, "INFO goodbye").unwrap();
+                writeln!(&mut file, "part of goodbye").unwrap();
+                writeln!(&mut file, "INFO hi again").unwrap();
+                writeln!(&mut file, "and some more").unwrap();
+                writeln!(&mut file, "INFO hello").unwrap();
+                file.flush().unwrap();
 
-            file.flush().unwrap();
-            sleep_500_millis().await;
+                // Block until event 5 is observed: the timeout fired and
+                // "INFO hello" was emitted before we write "too slow".
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&event_count), |n| n >= 5, 500).await;
 
-            writeln!(&mut file, "INFO hi again").unwrap();
-            writeln!(&mut file, "and some more").unwrap();
-            writeln!(&mut file, "INFO hello").unwrap();
+                writeln!(&mut file, "too slow").unwrap();
+                writeln!(&mut file, "INFO doesn't have").unwrap();
+                writeln!(&mut file, "to be INFO in").unwrap();
+                writeln!(&mut file, "the middle").unwrap();
+                file.flush().unwrap();
 
-            file.flush().unwrap();
-            sleep_500_millis().await;
-
-            writeln!(&mut file, "too slow").unwrap();
-            writeln!(&mut file, "INFO doesn't have").unwrap();
-            writeln!(&mut file, "to be INFO in").unwrap();
-            writeln!(&mut file, "the middle").unwrap();
-
-            file.flush().unwrap();
-            sleep_500_millis().await;
-        })
+                // Wait for events 6 ("too slow") and 7 ("INFO doesn't have")
+                // before triggering shutdown.
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&event_count), |n| n >= 7, 500).await;
+            },
+        )
         .await;
 
         let received = extract_messages_value(received);
@@ -1950,38 +1995,49 @@ mod tests {
                 start_pattern: "INFO".to_owned(),
                 condition_pattern: "INFO".to_owned(),
                 mode: line_agg::Mode::HaltBefore,
-                timeout_ms: Duration::from_millis(25), // less than 50 in sleep()
+                timeout_ms: Duration::from_millis(25),
             }),
             ..test_default_file_config(&dir)
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
-            let mut file = File::create(&path).unwrap();
+        let event_count = Arc::new(AtomicUsize::new(0));
+        let received = run_file_source(
+            &config,
+            false,
+            NoAcks,
+            LogNamespace::Legacy,
+            Some(Arc::clone(&event_count)),
+            async {
+                let mut file = File::create(&path).unwrap();
 
-            writeln!(&mut file, "leftover foo").unwrap();
-            writeln!(&mut file, "INFO hello").unwrap();
-            writeln!(&mut file, "INFO goodbye").unwrap();
-            writeln!(&mut file, "part of goodbye").unwrap();
+                // Write all lines through the second "INFO hello". Events 1-4
+                // are emitted immediately by EndExclude; event 5 ("INFO hello"
+                // standalone) requires the 25ms timeout to fire.
+                writeln!(&mut file, "leftover foo").unwrap();
+                writeln!(&mut file, "INFO hello").unwrap();
+                writeln!(&mut file, "INFO goodbye").unwrap();
+                writeln!(&mut file, "part of goodbye").unwrap();
+                writeln!(&mut file, "INFO hi again").unwrap();
+                writeln!(&mut file, "and some more").unwrap();
+                writeln!(&mut file, "INFO hello").unwrap();
+                file.flush().unwrap();
 
-            file.flush().unwrap();
-            sleep_500_millis().await;
+                // Block until event 5 is observed: the timeout fired and
+                // "INFO hello" was emitted before we write "too slow".
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&event_count), |n| n >= 5, 500).await;
 
-            writeln!(&mut file, "INFO hi again").unwrap();
-            writeln!(&mut file, "and some more").unwrap();
-            writeln!(&mut file, "INFO hello").unwrap();
+                writeln!(&mut file, "too slow").unwrap();
+                writeln!(&mut file, "INFO doesn't have").unwrap();
+                writeln!(&mut file, "to be INFO in").unwrap();
+                writeln!(&mut file, "the middle").unwrap();
+                file.flush().unwrap();
 
-            file.flush().unwrap();
-            sleep_500_millis().await;
-
-            writeln!(&mut file, "too slow").unwrap();
-            writeln!(&mut file, "INFO doesn't have").unwrap();
-            writeln!(&mut file, "to be INFO in").unwrap();
-            writeln!(&mut file, "the middle").unwrap();
-
-            file.flush().unwrap();
-            sleep_500_millis().await;
-        })
+                // Wait for events 6 ("too slow") and 7 ("INFO doesn't have")
+                // before triggering shutdown.
+                wait_for_atomic_usize_timeout_ms(Arc::clone(&event_count), |n| n >= 7, 500).await;
+            },
+        )
         .await;
 
         let received = extract_messages_value(received);
@@ -2024,12 +2080,14 @@ mod tests {
 
         file.sync_all().unwrap();
 
-        // Read and aggregate existing lines
+        // Read and aggregate existing lines. wait_shutdown=true ensures the
+        // checkpoint is fully written to disk before the second run reads it.
         let received = run_file_source(
             &config,
-            false,
+            true,
             Acks,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -2041,7 +2099,7 @@ mod tests {
 
         // After restart, we should not see any part of the previously aggregated lines
         let received_after_restart =
-            run_file_source(&config, false, Acks, LogNamespace::Legacy, async {
+            run_file_source(&config, false, Acks, LogNamespace::Legacy, None, async {
                 writeln!(&mut file, "INFO goodbye").unwrap();
                 file.flush().unwrap();
                 sleep_500_millis().await;
@@ -2086,6 +2144,7 @@ mod tests {
             false,
             NoAcks,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -2148,6 +2207,7 @@ mod tests {
             false,
             NoAcks,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -2182,7 +2242,7 @@ mod tests {
         writeln!(&mut file, "hello i am a normal line").unwrap();
         file.sync_all().unwrap();
 
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             sleep_500_millis().await;
 
             write!(&mut file, "i am not a full line").unwrap();
@@ -2229,6 +2289,7 @@ mod tests {
             false,
             NoAcks,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -2261,6 +2322,7 @@ mod tests {
             false,
             NoAcks,
             LogNamespace::Legacy,
+            None,
             sleep_500_millis(),
         )
         .await;
@@ -2289,7 +2351,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             write!(&mut file, "hello i am a line\r\n").unwrap();
@@ -2328,7 +2390,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             sleep_500_millis().await;
@@ -2344,14 +2406,14 @@ mod tests {
             // Event 1: Position \r\n to split at first boundary
             let event1_prefix = "Event 1: ";
             let padding1_len = buffer_size - event1_prefix.len() - 1; // -1 for the \r
-            write!(&mut file, "{}", event1_prefix).unwrap();
+            write!(&mut file, "{event1_prefix}").unwrap();
             file.write_all(&vec![b'X'; padding1_len]).unwrap();
             write!(&mut file, "\r\n").unwrap(); // \r at byte 8191, \n at byte 8192
 
             // Event 2: Position \r\n to split at second boundary
             let event2_prefix = "Event 2: ";
             let padding2_len = buffer_size - event2_prefix.len() - 1;
-            write!(&mut file, "{}", event2_prefix).unwrap();
+            write!(&mut file, "{event2_prefix}").unwrap();
             file.write_all(&vec![b'Y'; padding2_len]).unwrap();
             write!(&mut file, "\r\n").unwrap(); // \r at byte 16383, \n at byte 16384
 
@@ -2378,13 +2440,11 @@ mod tests {
 
         assert!(
             msg0.starts_with("Event 1: "),
-            "First event should start with 'Event 1: ', got: {}",
-            msg0
+            "First event should start with 'Event 1: ', got: {msg0}"
         );
         assert!(
             msg1.starts_with("Event 2: "),
-            "Second event should start with 'Event 2: ', got: {}",
-            msg1
+            "Second event should start with 'Event 2: ', got: {msg1}"
         );
         assert_eq!(msg2, "Event 3: Final");
 
@@ -2393,13 +2453,11 @@ mod tests {
             let msg_str = msg.to_string_lossy();
             assert!(
                 !msg_str.contains('\r'),
-                "Event {} should not contain embedded \\r",
-                i
+                "Event {i} should not contain embedded \\r"
             );
             assert!(
                 !msg_str.contains('\n'),
-                "Event {} should not contain embedded \\n",
-                i
+                "Event {i} should not contain embedded \\n"
             );
         }
     }
@@ -2417,7 +2475,7 @@ mod tests {
         };
 
         let path = dir.path().join("file");
-        let received = run_file_source(&config, false, Acks, LogNamespace::Legacy, async {
+        let received = run_file_source(&config, false, Acks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).unwrap();
 
             for i in 0..n {
@@ -2459,6 +2517,11 @@ mod tests {
         wait_shutdown: bool,
         acking_mode: AckingMode,
         log_namespace: LogNamespace,
+        // When `Some`, events are relayed through an unbounded channel and the
+        // counter is incremented for each event received.  The inner future can
+        // call `wait_for_atomic_usize` on this counter to gate writes on
+        // observed events instead of relying on wall-clock sleeps.
+        event_counter: Option<Arc<AtomicUsize>>,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
         assert_source_compliance(&FILE_SOURCE_TAGS, async move {
@@ -2494,21 +2557,47 @@ mod tests {
                 log_namespace,
             ));
 
-            inner.await;
+            let result = if let Some(counter) = event_counter {
+                // Relay mode: a background task forwards events and increments
+                // the counter so `inner` can observe them without arbitrary sleeps.
+                let (relay_tx, mut relay_rx) = tokio::sync::mpsc::unbounded_channel::<Event>();
+                tokio::spawn(async move {
+                    let mut rx = rx;
+                    while let Some(event) = rx.next().await {
+                        counter.fetch_add(1, Ordering::SeqCst);
+                        relay_tx.send(event).ok(); // receiver gone means pipeline is shutting down
+                    }
+                });
 
-            drop(trigger_shutdown);
+                inner.await;
+                drop(trigger_shutdown);
 
-            let result = if acking_mode == Unfinalized {
-                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
-                    .collect::<Vec<_>>()
-                    .await
+                timeout(Duration::from_secs(5), async move {
+                    let mut events = Vec::new();
+                    while let Some(event) = relay_rx.recv().await {
+                        events.push(event);
+                    }
+                    events
+                })
+                .await
+                .expect("Unclosed channel: may indicate file-server could not shutdown gracefully.")
             } else {
-                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
-                    .await
-                    .expect(
-                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
-                    )
+                inner.await;
+                drop(trigger_shutdown);
+
+                if acking_mode == Unfinalized {
+                    rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
+                        .collect::<Vec<_>>()
+                        .await
+                } else {
+                    timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                        .await
+                        .expect(
+                            "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                        )
+                }
             };
+
             if wait_shutdown {
                 shutdown_done.await;
             }

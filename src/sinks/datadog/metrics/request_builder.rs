@@ -38,7 +38,7 @@ impl RequestBuilderError {
             // single metric/event at a time.
             Self::FailedToEncode { source } => (source.to_string(), source.as_error_type(), 1),
             Self::FailedToSplit { dropped_events } => (
-                "A split payload was still too big to encode/compress withing size limits."
+                "A split payload was still too big to encode/compress within size limits."
                     .to_string(),
                 "split_failed",
                 dropped_events,
@@ -233,7 +233,8 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
         let (ddmetrics_metadata, request_metadata) = metadata;
         let uri = self
             .endpoint_configuration
-            .get_uri_for_endpoint(ddmetrics_metadata.endpoint);
+            .get_uri_for_endpoint(ddmetrics_metadata.endpoint)
+            .into_uri();
 
         DatadogMetricsRequest {
             api_key: ddmetrics_metadata.api_key,

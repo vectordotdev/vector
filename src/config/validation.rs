@@ -9,7 +9,6 @@ use super::{
     ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
     transform::get_transform_output_ids,
 };
-use crate::config::schema;
 
 /// Minimum value (exclusive) for EWMA alpha options.
 /// The alpha value must be strictly greater than this value.
@@ -122,8 +121,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
     for (id, uses) in used_keys.into_iter().filter(|(_id, uses)| uses.len() > 1) {
         errors.push(format!(
-            "More than one component with name \"{}\" ({}).",
-            id,
+            "More than one component with name \"{id}\" ({}).",
             uses.join(", ")
         ));
     }
@@ -140,9 +138,8 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     for (output_type, key, inputs) in sink_inputs.chain(transform_inputs) {
         if inputs.is_empty() {
             errors.push(format!(
-                "{} \"{}\" has no inputs",
-                capitalize(output_type),
-                key
+                "{} \"{key}\" has no inputs",
+                capitalize(output_type)
             ));
         }
 
@@ -154,11 +151,8 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
         for (dup, count) in frequencies.into_iter().filter(|(_name, count)| *count > 1) {
             errors.push(format!(
-                "{} \"{}\" has input \"{}\" duplicated {} times",
+                "{} \"{key}\" has input \"{dup}\" duplicated {count} times",
                 capitalize(output_type),
-                key,
-                dup,
-                count,
             ));
         }
     }
@@ -234,10 +228,10 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
-        // use the most general definition possible, since the real value isn't known yet.
-        let definition = schema::Definition::any();
-
-        if let Err(errs) = transform.inner.validate(&definition) {
+        // Structural validation: reserved names, duplicate routes, invalid sample rates.
+        // These checks run during config compilation. Transforms that need the schema/enrichment
+        // context must implement validate_with_context(), called later in validate.rs.
+        if let Err(errs) = transform.inner.validate_structure() {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 
@@ -363,9 +357,9 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
                 .map(|usage| usage.id().id())
                 .collect::<Vec<_>>();
             errors.push(format!(
-                "Mountpoint '{}' has total capacity of {} bytes, but configured buffers using mountpoint have total maximum size of {} bytes. \
+                "Mountpoint '{}' has total capacity of {mountpoint_total_capacity} bytes, but configured buffers using mountpoint have total maximum size of {buffer_max_size_total} bytes. \
 Reduce the `max_size` of the buffers to fit within the total capacity of the mountpoint. (components associated with mountpoint: {})",
-                mountpoint.to_string_lossy(), mountpoint_total_capacity, buffer_max_size_total, component_ids.join(", "),
+                mountpoint.to_string_lossy(), component_ids.join(", "),
             ));
         }
     }
@@ -444,9 +438,8 @@ pub fn warnings(config: &Config) -> Vec<String> {
                 .any(|(_, sink)| sink.inputs.contains(&id))
         {
             warnings.push(format!(
-                "{} \"{}\" has no consumers",
-                capitalize(input_type),
-                id
+                "{} \"{id}\" has no consumers",
+                capitalize(input_type)
             ));
         }
     }

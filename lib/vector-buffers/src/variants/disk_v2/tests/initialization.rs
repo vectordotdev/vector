@@ -182,3 +182,59 @@ async fn reader_doesnt_block_when_ahead_of_last_record_in_current_data_file() {
     let parent = trace_span!("reader_doesnt_block_when_ahead_of_last_record_in_current_data_file");
     fut.instrument(parent.or_current()).await;
 }
+
+#[tokio::test]
+async fn restart_aligns_writer_with_reader_checkpoint_one_file_ahead() {
+    let _a = install_tracing_helpers();
+
+    with_temp_dir(|dir| {
+        let data_dir = dir.to_path_buf();
+
+        async move {
+            let (writer, reader, ledger) =
+                create_default_buffer_v2::<_, SizedRecord>(data_dir.clone()).await;
+            let previous_writer_file_id = ledger.get_current_writer_file_id();
+            let reader_file_id = ledger.get_next_writer_file_id();
+
+            // Model the durable state left when the reader abandons the writer's current file and
+            // advances to the next file before the writer rolls there.
+            ledger.increment_acked_reader_file_id();
+            ledger.flush().expect("ledger flush should not fail");
+            assert_eq!(reader_file_id, ledger.get_current_reader_file_id());
+            assert_eq!(previous_writer_file_id, ledger.get_current_writer_file_id());
+            assert!(
+                !tokio::fs::try_exists(ledger.get_current_reader_data_file_path())
+                    .await
+                    .expect("checking reader data file should not fail")
+            );
+
+            drop(reader);
+            drop(writer);
+            drop(ledger);
+
+            let (mut writer, mut reader, ledger) = timeout(
+                Duration::from_millis(500),
+                create_default_buffer_v2::<_, SizedRecord>(data_dir),
+            )
+            .await
+            .expect("reader-ahead buffer should reopen without deadlocking");
+
+            assert_eq!(reader_file_id, ledger.get_current_reader_file_id());
+            assert_eq!(reader_file_id, ledger.get_current_writer_file_id());
+            assert_eq!(0, ledger.get_total_buffer_size());
+
+            writer
+                .write_record(SizedRecord::new(64))
+                .await
+                .expect("write should not fail");
+            writer.flush().await.expect("flush should not fail");
+            let record = reader
+                .next()
+                .await
+                .expect("read should not fail")
+                .expect("record should be present");
+            assert_eq!(SizedRecord::new(64), record);
+        }
+    })
+    .await;
+}

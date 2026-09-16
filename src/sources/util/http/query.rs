@@ -35,7 +35,7 @@ pub fn add_query_parameters(
                     }
                 }
             }
-            // Add all query_parameters that match against wildcard pattens specified
+            // Add all query_parameters that match against wildcard patterns specified
             // in the `query_parameters` config option to the event.
             HttpConfigParamKind::Glob(query_parameter_pattern) => {
                 for query_parameter_name in query_parameters.keys() {

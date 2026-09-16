@@ -43,8 +43,6 @@ Automated steps include:
 - Create a new release preparation branch from `master`
   - `git checkout -b "${PREP_BRANCH}" && git push -u`
 - Pin VRL to latest released version rather than `main`
-- Check if there is a newer version of [Alpine](https://alpinelinux.org/releases/) or [Debian](https://www.debian.org/releases/) available to update the release images in
-      `distribution/docker/`. Update if so.
 - Generate a new cue file for the release in `website/cue/reference/releases/`
   - Copy VRL changelogs from the VRL version in the last Vector release as a new changelog entry
         ([example](https://github.com/vectordotdev/vector/blob/9c67bba358195f5018febca2f228dfcb2be794b5/website/cue/reference/releases/0.41.0.cue#L33-L64))
@@ -65,7 +63,7 @@ Automated steps include:
   - [ ] Ensure any deprecations are highlighted in the release upgrade guide.
   - [ ] Review generated changelog entries to ensure they are understandable to end-users.
   - [ ] Ensure the date matches the scheduled release date.
-  - [ ] Add a link to pending deprecation items from [DEPRECATIONS.md](https://github.com/vectordotdev/vector/blob/master/docs/DEPRECATIONS.md).
+  - [ ] Run `cargo vdev deprecation show --version "${NEW_VECTOR_VERSION}"` to review new deprecation announcements in this release.
 - [ ] PR review & approval.
 
 # On the day of release
@@ -95,7 +93,6 @@ Automated steps include:
 - [ ] Release Linux packages. Refer to the internal releasing doc.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md).
 - [ ] Release Homebrew. Refer to the internal releasing doc.
-- [ ] Create internal Docker images. Refer to the internal releasing doc.
 - [ ] Update the latest [release tag](https://github.com/vectordotdev/vector/releases) description with the release announcement.
 - [ ] Create a new PR with title starting as `chore(releasing):`
   - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`.

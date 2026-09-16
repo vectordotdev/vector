@@ -86,7 +86,15 @@ services:
         CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
     init: true
     user: "0:0" # test only, override special user with root
-    command: ["--config", "/etc/otelcol-contrib/config.yaml"]
+    # Wipe stale output before starting: the file exporter appends and the
+    # vector_target volume is external, so it survives `compose down --volumes`.
+    # Also ensures the directory exists before otelcol scans it on startup (v0.157.0+).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        rm -rf /output/opentelemetry-metrics
+        mkdir -p /output/opentelemetry-metrics
+        exec /otelcol-contrib --config /etc/otelcol-contrib/config.yaml
     volumes:
       - type: bind
         source: ../data/collector-sink.yaml

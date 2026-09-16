@@ -1,7 +1,7 @@
 use std::io;
 
 use bytes::BytesMut;
-use itertools::{Itertools, Position};
+use itertools::Itertools;
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -50,10 +50,9 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) 
 
             let mut bytes = BytesMut::new();
             match (position, encoder.framer()) {
-                (
-                    Position::Last | Position::Only,
-                    Framer::CharacterDelimited(_) | Framer::NewlineDelimited(_),
-                ) => {
+                (position, Framer::CharacterDelimited(_) | Framer::NewlineDelimited(_))
+                    if position.is_last() =>
+                {
                     encoder
                         .serialize(event, &mut bytes)
                         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
@@ -99,6 +98,7 @@ impl Encoder<Event> for (Transformer, vector_lib::codecs::Encoder<()>) {
     }
 }
 
+#[cfg(feature = "codecs-arrow")]
 impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
     fn encode_input(
         &self,
@@ -155,6 +155,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::EncoderKind) {
             vector_lib::codecs::EncoderKind::Framed(encoder) => {
                 (self.0.clone(), *encoder.clone()).encode_input(events, writer)
             }
+            #[cfg(feature = "codecs-arrow")]
             vector_lib::codecs::EncoderKind::Batch(encoder) => {
                 (self.0.clone(), encoder.clone()).encode_input(events, writer)
             }
@@ -522,7 +523,7 @@ mod tests {
     #[test]
     fn test_encode_batch_protobuf_multiple() {
         let message_raw = std::fs::read(test_data_dir().join("test_proto.pb")).unwrap();
-        let messages = vec![message_raw.clone(), message_raw.clone()];
+        let messages = vec![message_raw.clone(), message_raw];
         let total_input_proto_size: usize = messages.iter().map(|m| m.len()).sum();
 
         let mut buf = BytesMut::with_capacity(128);

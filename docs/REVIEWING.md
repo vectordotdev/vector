@@ -90,7 +90,7 @@ backward compatibility, it is much less likely to be approved. It is highly
 recommended you discuss this change with a Vector team member before investing
 development time.
 
-Any deprecations should follow our [deprecation policy](DEPRECATION.md).
+Any deprecations should follow our [deprecation policy](DEPRECATION_POLICY.md).
 
 ## Code Of Conduct
 
