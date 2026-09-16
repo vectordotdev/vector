@@ -291,10 +291,10 @@ pub struct FileConfig {
     /// on-disk size already matches its stored checkpoint position, or because it isn't
     /// gzip-compressed, in which case an old file is never read from regardless of checkpoint).
     ///
-    /// Defaults to 60 seconds. Set this explicitly to `null` to disable idle-timeout-based closing
-    /// entirely, so that active file handles are only ever closed by other means (for example,
-    /// rotation via `rotate_wait_secs`), matching Vector's behavior prior to this option's
-    /// introduction.
+    /// Disabled by default, so handles are closed only by other means (for example, rotation via
+    /// `rotate_wait_secs`) unless this is set. Closing idle handles changes how a file is recovered
+    /// after it rotates, as described above, so it is opt-in rather than something an upgrade turns
+    /// on. 60 seconds is a reasonable starting value.
     #[serde(default = "default_idle_timeout_secs")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 60))]
@@ -370,13 +370,15 @@ const fn default_reconcile_interval_secs() -> Duration {
     Duration::from_secs(300)
 }
 
-/// Default `idle_timeout_secs`: 60 seconds of no new data after reaching EOF before a file's
-/// handle is closed. This is deliberately much longer than the read backoff (which tops out at
-/// 250ms) so that ordinary, bursty log writers don't cause handles to be repeatedly closed and
-/// reopened; it is deliberately not "no limit" (unlike `rotate_wait`) because the entire point of
-/// this option is to bound the number of concurrently open handles by default.
+/// Default `idle_timeout_secs`: off, so an upgrade does not change how anyone's files are held or
+/// recovered. Closing an idle handle is what bounds the number of concurrently open handles, but it
+/// also narrows where a file can be found again once it rotates, so the operator opts in.
+///
+/// A value much longer than the read backoff (which tops out at 250ms) is the sensible shape when
+/// enabling it, so that ordinary bursty writers do not cause handles to be closed and reopened
+/// repeatedly; 60 seconds is the documented starting point.
 const fn default_idle_timeout_secs() -> Option<u64> {
-    Some(60)
+    None
 }
 
 /// Configuration for how files should be identified.

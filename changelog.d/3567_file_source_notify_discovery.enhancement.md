@@ -5,9 +5,11 @@ the cost of re-globbing and re-fingerprinting every matched file on a fixed inte
 frequent periodic reconciliation pass (`reconcile_interval_secs`) still runs as a correctness
 backstop. The default remains the existing polling-based `file_discovery_mode: polling` behavior.
 
-Separately (and independently of `file_discovery_mode`), a new `idle_timeout_secs` option (default:
-60 seconds) closes a file's handle once it has reached EOF and received no new data for that long,
-avoiding holding a large number of open file handles for files that are being watched but aren't
-actively being written to. See the `idle_timeout_secs` documentation for details.
+Separately (and independently of `file_discovery_mode`), a new opt-in `idle_timeout_secs` option
+closes a file's handle once it has reached EOF and received no new data for that long, avoiding
+holding a large number of open file handles for files that are being watched but aren't actively
+being written to. It is disabled by default, since closing a handle changes how the file is
+recovered if it rotates out of the watched paths. See the `idle_timeout_secs` documentation for
+details.
 
 authors: sashamelentiev

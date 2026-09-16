@@ -29,7 +29,6 @@ pub(crate) struct ReaderRegistry {
     readers: IndexMap<ReaderId, TrackedReader>,
     by_fingerprint: HashMap<FileFingerprint, ReaderId>,
     retired: HashSet<ReaderId>,
-    retired_by_identity: HashMap<FileIdentity, HashSet<ReaderId>>,
     next_id: u64,
 }
 
@@ -101,7 +100,7 @@ impl ReaderRegistry {
                     .readers
                     .get_index_of(&old_id)
                     .expect("indexed reader exists");
-                self.readers.shift_remove(&old_id);
+                self.forget(old_id);
                 position
             })
             .unwrap_or(self.readers.len());
@@ -119,6 +118,20 @@ impl ReaderRegistry {
             },
         );
         self.by_fingerprint.insert(fingerprint, id);
+    }
+
+    /// Drop a reader and every index entry that referred to it.
+    ///
+    /// The only place a reader leaves the table. Removing it from `readers` alone would leave a
+    /// dangling id behind in `retired`, and the lookup there resolves ids with `expect`.
+    fn forget(&mut self, id: ReaderId) {
+        let Some(reader) = self.readers.shift_remove(&id) else {
+            return;
+        };
+        self.retired.remove(&id);
+        if self.by_fingerprint.get(&reader.fingerprint) == Some(&id) {
+            self.by_fingerprint.remove(&reader.fingerprint);
+        }
     }
 
     pub(crate) fn rekey(&mut self, old: FileFingerprint, new: FileFingerprint) -> bool {
@@ -157,16 +170,27 @@ impl ReaderRegistry {
         self.retired.iter().copied().collect()
     }
 
+    /// Whether any reader is still draining a file it no longer owns a discovery key for.
     pub(crate) fn has_retired_identities(&self) -> bool {
-        !self.retired_by_identity.is_empty()
+        !self.retired.is_empty()
     }
 
+    /// The reader still draining the file at `identity`, if one is.
+    ///
+    /// Read from each watcher rather than from an index keyed by identity: a retired reader is read
+    /// by the ordinary loop, and `reactivate` reassigns its identity, so an index built at
+    /// retirement can name a file the reader has since left. Retired readers are few -- one per
+    /// rotation still draining -- and the caller only asks when there is at least one.
+    ///
+    /// The oldest is returned when several share an identity, so a chain of rotations over one inode
+    /// is drained in the order it happened.
     pub(crate) fn retired_with_identity(&self, identity: FileIdentity) -> Option<ReaderId> {
-        self.retired_by_identity
-            .get(&identity)?
+        self.readers
             .iter()
-            .next()
-            .copied()
+            .find(|(id, reader)| {
+                self.retired.contains(id) && reader.watcher.identity() == Some(identity)
+            })
+            .map(|(id, _)| *id)
     }
 
     /// With oldest-first scheduling, a retired reader cannot bypass an earlier active reader,
@@ -205,12 +229,6 @@ impl ReaderRegistry {
         watcher.mark_found();
         watcher.mark_ready_to_read();
         self.retired.insert(id);
-        if let Some(identity) = watcher.identity() {
-            self.retired_by_identity
-                .entry(identity)
-                .or_default()
-                .insert(id);
-        }
         true
     }
     #[cfg(test)]
@@ -234,20 +252,11 @@ impl ReaderRegistry {
     ) {
         let by_fingerprint = &mut self.by_fingerprint;
         let retired = &mut self.retired;
-        let retired_by_identity = &mut self.retired_by_identity;
         self.readers.retain(|id, reader| {
             if keep(&reader.fingerprint, &mut reader.watcher) {
                 true
             } else {
                 retired.remove(id);
-                if let Some(identity) = reader.watcher.identity()
-                    && let Some(ids) = retired_by_identity.get_mut(&identity)
-                {
-                    ids.remove(id);
-                    if ids.is_empty() {
-                        retired_by_identity.remove(&identity);
-                    }
-                }
                 if by_fingerprint.get(&reader.fingerprint) == Some(id) {
                     by_fingerprint.remove(&reader.fingerprint);
                 }
@@ -338,6 +347,61 @@ mod tests {
         registry.retain(|_, _| false);
         assert_eq!(registry.retired_with_identity(identity), None);
         assert!(!registry.has_retired_identities());
+    }
+
+    /// Review finding: `insert` displaces the reader holding a fingerprint, and a rotation whose
+    /// replacement reuses the first line arrives at exactly that -- a new reader inserted over a
+    /// retired one. Leaving the displaced id behind in `retired` made the next lookup resolve an id
+    /// no longer in the table, where `get_by_id_mut` panics.
+    #[tokio::test]
+    async fn displacing_a_retired_reader_forgets_it_everywhere() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"header\n").unwrap();
+        let key = FileFingerprint::FirstLinesChecksum(1);
+        let make = || {
+            FileWatcher::new(
+                path.clone(),
+                ReadFrom::Beginning,
+                None,
+                1024,
+                Bytes::from_static(b"\n"),
+                false,
+            )
+        };
+
+        let mut registry = ReaderRegistry::new();
+        registry.insert(key, make().await.unwrap());
+        let displaced = registry.reader_id(&key).unwrap();
+        assert!(registry.retire(key));
+
+        // Rotation: the retired reader keeps the archived inode, and the replacement -- hashing the
+        // same, as a shared header does -- is installed at the original path.
+        let archive = directory.path().join("app.log.1");
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&path, b"header\n").unwrap();
+        registry.insert(key, make().await.unwrap());
+
+        // Retiring released the fingerprint, so the new reader does not displace the retired one:
+        // it is still draining its own inode and must stay.
+        assert!(
+            registry.get_by_id_mut(displaced).is_some(),
+            "a retired reader must keep draining, not be displaced by the replacement"
+        );
+        assert!(
+            registry.retired_ids().contains(&displaced),
+            "and must stay in the retired set while it drains"
+        );
+        // The archived inode still resolves to its own reader, and the replacement at the original
+        // path does not: the two are separate files that merely hash alike.
+        let archived = crate::file_watcher::path_identity(&archive).await.unwrap();
+        assert_eq!(registry.retired_with_identity(archived), Some(displaced));
+        let replacement = crate::file_watcher::path_identity(&path).await.unwrap();
+        assert_eq!(
+            registry.retired_with_identity(replacement),
+            None,
+            "the live replacement is not a retired reader"
+        );
     }
 
     #[tokio::test]

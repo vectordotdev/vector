@@ -200,14 +200,15 @@ generated: components: sources: file: configuration: {
 			briefly to check whether it is gzip-compressed and to capture its identity, then the handle
 			is closed when Vector can determine that there is no new data to read.
 
-			Defaults to 60 seconds. Set this explicitly to `null` to disable idle-timeout-based
-			closing entirely.
+			Disabled by default, so handles are closed only by other means (for example, rotation via
+			`rotate_wait_secs`) unless this is set. Closing idle handles changes how a file is
+			recovered after it rotates, as described above, so it is opt-in rather than something an
+			upgrade turns on. 60 seconds is a reasonable starting value.
 			"""
 		required: false
 		type: uint: {
-			default: 60
 			examples: [60]
-			unit:    "seconds"
+			unit: "seconds"
 		}
 	}
 	ignore_checkpoints: {
