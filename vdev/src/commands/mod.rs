@@ -78,7 +78,6 @@ mod features;
 mod fmt;
 mod info;
 mod integration;
-mod meta;
 mod package;
 mod release;
 mod run;
@@ -100,7 +99,6 @@ cli_commands! {
     fmt,
     info,
     integration,
-    meta,
     package,
     release,
     run,
