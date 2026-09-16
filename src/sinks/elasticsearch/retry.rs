@@ -1,7 +1,7 @@
 use http::StatusCode;
 use serde::Deserialize;
-use vrl::prelude::value::simdutf_bytes_utf8_lossy;
 use vector_lib::{EstimatedJsonEncodedSizeOf, json_size::JsonSize};
+use vrl::prelude::value::simdutf_bytes_utf8_lossy;
 
 use crate::{
     event::Finalizable,
