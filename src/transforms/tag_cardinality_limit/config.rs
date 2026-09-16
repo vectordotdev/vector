@@ -124,18 +124,25 @@ pub struct Inner {
     #[configurable(metadata(docs::human_name = "TTL (seconds)"))]
     pub ttl_secs: Option<u64>,
 
-    /// Number of time-slices the TTL window is split into for the
-    /// `probabilistic` backend.
+    /// Number of time-slices the TTL window is split into.
     ///
-    /// Higher values smooth eviction (closer to a true sliding window) at the
-    /// cost of `(ttl_generations + 1) * cache_size_per_key` memory per (metric,
-    /// tag-key) pair. The extra shard is the one currently being written: it
-    /// covers only part of a slice, so retiring without it would expire values
-    /// after `ttl_secs - (ttl_secs / ttl_generations)` instead of the full TTL.
-    /// `1` produces a one-shard tumbling window: all tracked values are dropped
-    /// at once every `ttl_secs`, using `cache_size_per_key` memory. Ignored when
-    /// `ttl_secs` is unset, or when mode is `exact` (which uses precise
-    /// per-value timestamps).
+    /// In `probabilistic` mode, higher values smooth eviction (closer to a true
+    /// sliding window) at the cost of `(ttl_generations + 1) * cache_size_per_key`
+    /// memory per (metric, tag-key) pair. The extra shard is the one currently
+    /// being written: it covers only part of a slice, so retiring without it
+    /// would expire values after `ttl_secs - (ttl_secs / ttl_generations)` instead
+    /// of the full TTL. `1` produces a one-shard tumbling window: all tracked
+    /// values are dropped at once every `ttl_secs`, using `cache_size_per_key`
+    /// memory.
+    ///
+    /// In `exact` mode this does not change eviction precision (each value still
+    /// carries its own last-accepted timestamp). It only sets how often the
+    /// transform may proactively scan the value map (`sweep_interval ≈
+    /// ttl_secs / ttl_generations`): higher values scan more frequently. Raising
+    /// it has no benefit for correctness and can increase CPU on large
+    /// `value_limit` buckets.
+    ///
+    /// Ignored when `ttl_secs` is unset.
     #[serde(default = "default_ttl_generations")]
     #[configurable(metadata(docs::human_name = "TTL Generations"))]
     pub ttl_generations: u8,

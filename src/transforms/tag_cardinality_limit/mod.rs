@@ -1,4 +1,8 @@
-use std::{future::ready, pin::Pin};
+use std::{
+    future::ready,
+    pin::Pin,
+    time::{Duration, Instant},
+};
 
 use futures::{Stream, StreamExt};
 use hashbrown::HashMap;
@@ -25,6 +29,11 @@ use tag_value_set::AcceptedTagValueSet;
 use crate::event::metric::TagValueSet;
 
 type MetricId = (Option<String>, String);
+
+/// Minimum gap between full exact-TTL purges during `max_tracked_keys` reclaim.
+/// Cap misses between windows still inspect bucket lengths via the cheap
+/// `maybe_sweep` path, so empty buckets can be freed without scanning every map.
+const RECLAIM_FULL_PURGE_INTERVAL: Duration = Duration::from_secs(1);
 
 /// Replaces the bloom filter size in a `Probabilistic` mode with the override. No-op when
 /// `override_size` is `None`.
@@ -64,6 +73,10 @@ pub struct TagCardinalityLimit {
     /// Total count of currently-tracked (metric_bucket, tag_key) pairs.
     /// Used to enforce `config.max_tracked_keys`.
     tracked_keys_count: usize,
+    /// Last time `reclaim_empty_buckets` ran a full exact-TTL purge across all
+    /// buckets. Used to amortize O(total cached values) scans under sustained
+    /// `max_tracked_keys` pressure.
+    last_full_reclaim: Option<Instant>,
 }
 
 impl TagCardinalityLimit {
@@ -72,6 +85,7 @@ impl TagCardinalityLimit {
             config,
             accepted_tags: HashMap::new(),
             tracked_keys_count: 0,
+            last_full_reclaim: None,
         }
     }
 
@@ -96,20 +110,38 @@ impl TagCardinalityLimit {
     /// Drop empty `AcceptedTagValueSet` buckets left behind by TTL eviction,
     /// decrementing `tracked_keys_count` so freed slots can be reused under
     /// `max_tracked_keys`. Called lazily on cap-hit paths so steady-state
-    /// overhead is zero. Exact-TTL buckets are fully purged here (not just
-    /// periodically swept) so recently-lapsed entries do not keep a slot
-    /// occupied under the key cap.
+    /// overhead is zero.
+    ///
+    /// Full exact-TTL purges (`len_reclaiming`) are rate-limited: under
+    /// sustained key churn with no empty buckets, scanning every map on every
+    /// miss would be O(total cached values) repeatedly. Between full purges we
+    /// still consult ordinary `len()` (periodic `maybe_sweep`), which frees
+    /// buckets that the sweep has already emptied.
     ///
     /// Intentionally empty `value_limit: 0` buckets are kept: they enforce that
     /// every value for that tag is rejected without storing state.
     fn reclaim_empty_buckets(&mut self) {
+        let now = Instant::now();
+        let full_purge = match self.last_full_reclaim {
+            Some(last) if now.duration_since(last) < RECLAIM_FULL_PURGE_INTERVAL => false,
+            _ => {
+                self.last_full_reclaim = Some(now);
+                true
+            }
+        };
+
         let mut reclaimed = 0usize;
         let empty_buckets: Vec<(Option<MetricId>, String)> = self
             .accepted_tags
             .iter_mut()
             .flat_map(|(metric_key, inner)| {
                 inner.iter_mut().filter_map(|(tag_key, set)| {
-                    if set.len_reclaiming() != 0 {
+                    let live = if full_purge {
+                        set.len_reclaiming()
+                    } else {
+                        set.len()
+                    };
+                    if live != 0 {
                         return None;
                     }
                     Some((metric_key.clone(), tag_key.clone()))

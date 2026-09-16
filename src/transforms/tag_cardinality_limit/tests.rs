@@ -1625,6 +1625,25 @@ fn max_tracked_keys_reclaims_empty_buckets() {
     );
 }
 
+#[test]
+fn reclaim_full_purge_is_rate_limited() {
+    let mut config = make_transform_hashset(10, LimitExceededAction::DropTag);
+    config.max_tracked_keys = Some(1);
+    let mut transform = TagCardinalityLimit::new(config);
+
+    transform.reclaim_empty_buckets();
+    let first = transform
+        .last_full_reclaim
+        .expect("first reclaim must record a full-purge timestamp");
+
+    transform.reclaim_empty_buckets();
+    assert_eq!(
+        transform.last_full_reclaim,
+        Some(first),
+        "immediate second reclaim must not force another full purge"
+    );
+}
+
 /// With `value_limit: 0` + `max_tracked_keys` at cap, an intentionally empty
 /// enforcement bucket must not be reclaimed, so additional tag keys pass through
 /// unchecked rather than stealing the slot.
