@@ -424,11 +424,7 @@ impl ComponentRow {
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
 /// UI and other events are handled separately, to ensure one doesn't block the other.
-pub async fn updater(
-    mut event_rx: EventRx,
-    mut ui_event_rx: UiEventRx,
-    mut state: State,
-) -> StateRx {
+pub fn updater(mut event_rx: EventRx, mut ui_event_rx: UiEventRx, mut state: State) -> StateRx {
     let (tx, rx) = watch::channel(state.clone());
 
     tokio::spawn(async move {
