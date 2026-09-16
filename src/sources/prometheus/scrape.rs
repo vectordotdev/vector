@@ -7,6 +7,8 @@ use serde_with::serde_as;
 use snafu::ResultExt;
 use vector_lib::{config::LogNamespace, configurable::configurable_component, event::Event};
 
+#[cfg(feature = "kubernetes")]
+use super::kubernetes_sd::{self, KubernetesScrapeConfig};
 use super::parser;
 use crate::{
     Result,
@@ -34,6 +36,23 @@ static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 40
                                   did you mean to use /metrics?\
                                   This behavior changed in version 0.11.";
 
+/// Auto-discover scrape targets. Each entry describes a target group.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[configurable(metadata(docs::enum_tag_description = "The type of targets to discover."))]
+pub enum TargetConfig {
+    /// A static list of scrape URLs.
+    Static {
+        /// URLs to scrape.
+        #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
+        urls: Vec<String>,
+    },
+    /// Kubernetes Pod auto-discovery via `prometheus.io/*` annotations.
+    #[cfg(feature = "kubernetes")]
+    Kubernetes(KubernetesScrapeConfig),
+}
+
 /// Configuration for the `prometheus_scrape` source.
 #[serde_as]
 #[configurable_component(source(
@@ -43,9 +62,18 @@ static NOT_FOUND_NO_PATH: &str = "No path is set on the endpoint and we got a 40
 #[derive(Clone, Debug)]
 pub struct PrometheusScrapeConfig {
     /// Endpoints to scrape metrics from.
+    ///
+    /// Deprecated: use `targets` with a `static` block instead.
     #[configurable(metadata(docs::examples = "http://localhost:9090/metrics"))]
-    #[serde(alias = "hosts")]
+    #[serde(alias = "hosts", default)]
     endpoints: Vec<String>,
+
+    /// Auto-discover scrape targets.
+    ///
+    /// Each entry in the list configures a target group. Supported types are
+    /// `static` (fixed URLs) and `kubernetes` (Pod annotation discovery).
+    #[serde(default)]
+    targets: Vec<TargetConfig>,
 
     /// The interval between scrapes. Requests are run concurrently so if a scrape takes longer
     /// than the interval a new scrape will be started. This can take extra resources, set the timeout
@@ -78,7 +106,7 @@ pub struct PrometheusScrapeConfig {
     /// If `true`, the new tag is not added if the scraped metric has the tag already. If `false`, the conflicting tag
     /// is renamed by prepending `exported_` to the original name.
     ///
-    /// This matches Prometheus’ `honor_labels` configuration.
+    /// This matches Prometheus' `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
 
@@ -110,6 +138,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
+            targets: vec![],
             interval: default_interval(),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -123,28 +152,136 @@ impl GenerateConfig for PrometheusScrapeConfig {
     }
 }
 
+#[derive(Debug, snafu::Snafu)]
+enum ConfigError {
+    #[snafu(display(
+        "exactly one of `endpoints` or `targets` must be specified (\"endpoints\" is deprecated, prefer \"targets\")"
+    ))]
+    EndpointsAndTargetsConflict,
+    #[snafu(display("at least one endpoint or target must be specified"))]
+    NoEndpointsOrTargets,
+    #[snafu(display("only one Kubernetes target group is currently supported"))]
+    MultipleKubernetesTargetGroups,
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
     async fn build(&self, cx: SourceContext) -> Result<sources::Source> {
-        let urls = self
-            .endpoints
-            .iter()
-            .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
-            .map(|r| r.map(|uri| build_url(&uri, &self.query)))
-            .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
+        warn_if_interval_too_low(self.timeout, self.interval);
+
+        // Collect static URLs
+        let mut static_urls: Vec<Uri> = Vec::new();
+        for s in &self.endpoints {
+            let uri = s.parse::<Uri>().context(sources::UriParseSnafu)?;
+            static_urls.push(uri);
+        }
+        for target in &self.targets {
+            match target {
+                TargetConfig::Static { urls } => {
+                    for s_url in urls {
+                        let uri = s_url.parse::<Uri>().context(sources::UriParseSnafu)?;
+                        static_urls.push(uri);
+                    }
+                }
+                #[cfg(feature = "kubernetes")]
+                TargetConfig::Kubernetes(_) => {}
+            }
+        }
+
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
 
+        #[cfg(feature = "kubernetes")]
+        {
+            let kubernetes_cfgs: Vec<&KubernetesScrapeConfig> = self
+                .targets
+                .iter()
+                .filter_map(|t| {
+                    if let TargetConfig::Kubernetes(k) = t {
+                        Some(k)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            if let Some(k8s_cfg) = kubernetes_cfgs.first() {
+                let client =
+                    kubernetes_sd::build_kube_client(k8s_cfg.kube_config_file.as_ref()).await?;
+
+                let self_node_name = if k8s_cfg.use_self_node_only {
+                    let resolved = match k8s_cfg.self_node_name.clone() {
+                        Some(n) => n,
+                        None => std::env::var(kubernetes_sd::SELF_NODE_NAME_ENV_KEY).map_err(
+                            |_| {
+                                let msg = format!(
+                                    "self_node_name config value or {} env var must be set when use_self_node_only is true",
+                                    kubernetes_sd::SELF_NODE_NAME_ENV_KEY
+                                );
+                                msg
+                            },
+                        )?,
+                    };
+                    Some(resolved)
+                } else {
+                    None
+                };
+
+                let field_selector = kubernetes_sd::build_field_selector(
+                    self_node_name.as_deref(),
+                    &k8s_cfg.extra_field_selector,
+                );
+                let label_selector = kubernetes_sd::build_label_selector(&k8s_cfg.label_selector);
+
+                let parser_cfg = kubernetes_sd::AnnotationParserConfig {
+                    prefix: k8s_cfg.annotation_prefix.clone(),
+                    default_scheme: k8s_cfg.default_scheme,
+                    default_path: k8s_cfg.default_path.clone(),
+                    pod_label_tags: k8s_cfg.pod_label_tags.clone(),
+                    pod_annotation_tags: k8s_cfg.pod_annotation_tags.clone(),
+                };
+
+                let scrape_cfg = kubernetes_sd::ScrapeConfig {
+                    interval: self.interval,
+                    timeout: self.timeout,
+                    instance_tag: self.instance_tag.clone(),
+                    endpoint_tag: self.endpoint_tag.clone(),
+                    honor_labels: self.honor_labels,
+                    auth: self.auth.clone(),
+                    query: self.query.clone(),
+                };
+
+                // Convert static URLs to Target structs.
+                let static_targets = static_urls.into_iter().map(static_target).collect();
+
+                return Ok(Box::pin(kubernetes_sd::run(
+                    client,
+                    tls,
+                    cx.proxy.clone(),
+                    k8s_cfg.namespaces.clone(),
+                    field_selector,
+                    label_selector,
+                    parser_cfg,
+                    scrape_cfg,
+                    static_targets,
+                    cx.out,
+                    cx.shutdown,
+                )));
+            }
+        }
+
+        // Pure static path: use existing `call()`.
         let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
             instance_tag: self.instance_tag.clone(),
             endpoint_tag: self.endpoint_tag.clone(),
         };
 
-        warn_if_interval_too_low(self.timeout, self.interval);
-
         let inputs = GenericHttpClientInputs {
-            urls,
+            urls: static_urls
+                .iter()
+                .map(|uri| build_url(uri, &self.query))
+                .collect(),
             interval: self.interval,
             timeout: self.timeout,
             headers: HashMap::new(),
@@ -158,11 +295,76 @@ impl SourceConfig for PrometheusScrapeConfig {
         Ok(call(inputs, builder, cx.out, HttpMethod::Get).boxed())
     }
 
+    fn validate_structure(&self) -> std::result::Result<(), Vec<String>> {
+        let has_endpoints = !self.endpoints.is_empty();
+        let has_configured_targets = self.has_any_targets();
+        let mut errors = Vec::new();
+
+        if has_endpoints && has_configured_targets {
+            errors.push(ConfigError::EndpointsAndTargetsConflict.to_string());
+        } else if !has_endpoints && !has_configured_targets {
+            errors.push(ConfigError::NoEndpointsOrTargets.to_string());
+        }
+
+        #[cfg(feature = "kubernetes")]
+        if self
+            .targets
+            .iter()
+            .filter(|target| matches!(target, TargetConfig::Kubernetes(_)))
+            .count()
+            > 1
+        {
+            errors.push(ConfigError::MultipleKubernetesTargetGroups.to_string());
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         vec![SourceOutput::new_metrics()]
     }
 
     fn can_acknowledge(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(feature = "kubernetes")]
+fn static_target(uri: Uri) -> kubernetes_sd::Target {
+    let port = uri.port_u16().unwrap_or_else(|| match uri.scheme() {
+        Some(scheme) if scheme == &http::uri::Scheme::HTTP => 80,
+        Some(scheme) if scheme == &http::uri::Scheme::HTTPS => 443,
+        _ => 0,
+    });
+    let instance = kubernetes_sd::format_host_port(uri.host().unwrap_or_default(), port);
+    kubernetes_sd::Target {
+        uri,
+        instance,
+        is_static: true,
+        namespace: String::new(),
+        pod_name: String::new(),
+        pod_uid: String::new(),
+        node_name: None,
+        container_name: None,
+        extra_tags: std::collections::BTreeMap::new(),
+    }
+}
+
+impl PrometheusScrapeConfig {
+    fn has_any_targets(&self) -> bool {
+        for target in &self.targets {
+            match target {
+                TargetConfig::Static { urls } if !urls.is_empty() => return true,
+                #[cfg(feature = "kubernetes")]
+                TargetConfig::Kubernetes(_) => return true,
+                #[allow(unreachable_patterns)]
+                TargetConfig::Static { .. } => {}
+            }
+        }
         false
     }
 }
@@ -244,16 +446,7 @@ impl HttpClientContext for PrometheusScrapeContext {
                 honor_label,
             }) = &self.instance_info
             {
-                match (honor_label, metric.tag_value(tag)) {
-                    (false, Some(old_instance)) => {
-                        metric.replace_tag(format!("exported_{tag}"), old_instance);
-                        metric.replace_tag(tag.clone(), instance.clone());
-                    }
-                    (true, Some(_)) => {}
-                    (_, None) => {
-                        metric.replace_tag(tag.clone(), instance.clone());
-                    }
-                }
+                super::merge_honor_label_tag(metric, tag, instance, *honor_label);
             }
             if let Some(EndpointInfo {
                 tag,
@@ -261,16 +454,7 @@ impl HttpClientContext for PrometheusScrapeContext {
                 honor_label,
             }) = &self.endpoint_info
             {
-                match (honor_label, metric.tag_value(tag)) {
-                    (false, Some(old_endpoint)) => {
-                        metric.replace_tag(format!("exported_{tag}"), old_endpoint);
-                        metric.replace_tag(tag.clone(), endpoint.clone());
-                    }
-                    (true, Some(_)) => {}
-                    (_, None) => {
-                        metric.replace_tag(tag.clone(), endpoint.clone());
-                    }
-                }
+                super::merge_honor_label_tag(metric, tag, endpoint, *honor_label);
             }
         }
     }
@@ -310,6 +494,66 @@ impl HttpClientContext for PrometheusScrapeContext {
     }
 }
 
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+    use crate::config;
+
+    fn config_with(endpoints: Vec<String>, targets: Vec<TargetConfig>) -> PrometheusScrapeConfig {
+        PrometheusScrapeConfig {
+            endpoints,
+            targets,
+            interval: default_interval(),
+            timeout: default_timeout(),
+            instance_tag: None,
+            endpoint_tag: None,
+            honor_labels: false,
+            query: HashMap::new(),
+            tls: None,
+            auth: None,
+        }
+    }
+
+    fn compilation_errors(config: PrometheusScrapeConfig) -> Vec<String> {
+        let mut builder = config::Config::builder();
+        builder.add_source("prometheus", config);
+        builder.build().expect_err("config should be rejected")
+    }
+
+    #[test]
+    fn requires_exactly_one_endpoint_or_target_during_config_compilation() {
+        let errors = compilation_errors(config_with(Vec::new(), Vec::new()));
+        assert!(errors.iter().any(|error| {
+            error == "Source prometheus at least one endpoint or target must be specified"
+        }));
+
+        let errors = compilation_errors(config_with(
+            vec!["http://localhost:9090/metrics".to_string()],
+            vec![TargetConfig::Static {
+                urls: vec!["http://localhost:9091/metrics".to_string()],
+            }],
+        ));
+        assert!(errors.iter().any(|error| {
+            error == "Source prometheus exactly one of `endpoints` or `targets` must be specified (\"endpoints\" is deprecated, prefer \"targets\")"
+        }));
+    }
+
+    #[cfg(feature = "kubernetes")]
+    #[test]
+    fn rejects_multiple_kubernetes_groups_during_config_compilation() {
+        let errors = compilation_errors(config_with(
+            Vec::new(),
+            vec![
+                TargetConfig::Kubernetes(KubernetesScrapeConfig::default()),
+                TargetConfig::Kubernetes(KubernetesScrapeConfig::default()),
+            ],
+        ));
+        assert!(errors.iter().any(|error| {
+            error == "Source prometheus only one Kubernetes target group is currently supported"
+        }));
+    }
+}
+
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
     use http_body::Body as _;
@@ -338,6 +582,19 @@ mod test {
         crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
     }
 
+    #[cfg(feature = "kubernetes")]
+    #[test]
+    fn mixed_static_target_applies_source_query_once() {
+        let target = static_target("http://localhost:9090/metrics".parse().unwrap());
+        let query = HashMap::from([(
+            "key".to_string(),
+            QueryParameterValue::MultiParams(vec![ParameterValue::String("value".to_string())]),
+        )]);
+
+        let url = build_url(&target.uri, &query);
+        assert_eq!(url.query(), Some("key=value"));
+    }
+
     #[tokio::test]
     async fn test_prometheus_sets_headers() {
         let (_guard, in_addr) = next_addr();
@@ -353,6 +610,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -387,6 +645,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -439,6 +698,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -505,6 +765,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -560,6 +821,7 @@ mod test {
 
         let config = PrometheusScrapeConfig {
             endpoints: vec![format!("http://{in_addr}/metrics?key1=val1")],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -676,6 +938,7 @@ mod test {
             "in",
             PrometheusScrapeConfig {
                 endpoints: vec![format!("http://{in_addr}")],
+                targets: vec![],
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,
@@ -768,6 +1031,7 @@ mod integration_tests {
     async fn scrapes_metrics() {
         let config = PrometheusScrapeConfig {
             endpoints: vec!["http://prometheus:9090/metrics".into()],
+            targets: vec![],
             interval: Duration::from_secs(1),
             timeout: Duration::from_secs(1),
             instance_tag: Some("instance".to_string()),
