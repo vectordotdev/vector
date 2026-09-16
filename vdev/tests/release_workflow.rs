@@ -80,6 +80,12 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
         "version: \"0.58.0\"\n",
     );
     version(repo, "0.59.0-dev");
+    // Legacy release without a corresponding releases/*.cue file.
+    write(
+        repo,
+        "website/cue/reference/versions.cue",
+        "versions: [\n\"0.1.0\",\n]\n",
+    );
     let base = commit(repo);
     git(repo, &["switch", "-c", "prepare-v-0-59-0-website"]);
     version(repo, "0.59.0");
@@ -114,7 +120,7 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
     write(
         repo,
         "website/cue/reference/versions.cue",
-        "versions: [\"0.59.0\"]\n",
+        "package metadata\n\nversions: [string, ...string] & [\n\t\"0.59.0\",\n\t\"0.58.0\",\n\t\"0.1.0\",\n]\n",
     );
     commit(repo);
     (temp, base)
@@ -195,6 +201,23 @@ fn release_preparation_rejects_unrelated_kubectl_changes() {
         check(repo, &base, false)
             .contains("kubectl.cue may only contain release version substitutions")
     );
+}
+
+#[test]
+fn release_preparation_rejects_invalid_versions_index() {
+    for contents in [
+        "versions: [\"0.59.0\"]\n",
+        "not valid CUE",
+        "package metadata\n\nversions: [string, ...string] & [\n\t\"0.59.0\",\n\t\"0.58.0\",\n]\n",
+        "package metadata\n\nversions: [string, ...string] & [\n\t\"0.60.0\",\n\t\"0.59.0\",\n\t\"0.58.0\",\n\t\"0.1.0\",\n]\n",
+    ] {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        write(repo, "website/cue/reference/versions.cue", contents);
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "--amend", "--no-edit"]);
+        assert!(check(repo, &base, false).contains("versions.cue must match the generated index"));
+    }
 }
 
 #[test]

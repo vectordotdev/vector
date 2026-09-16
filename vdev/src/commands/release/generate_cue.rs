@@ -158,7 +158,7 @@ pub(super) fn run(
 /// previously left `versions.cue` stale so the new version was invisible in local Hugo previews.
 pub(super) fn refresh_versions_cue(repo_root: &Path) -> Result<()> {
     let releases_dir = repo_root.join(RELEASES_DIR);
-    let mut versions: std::collections::HashSet<Version> = fs::read_dir(&releases_dir)
+    let versions: Vec<Version> = fs::read_dir(&releases_dir)
         .with_context(|| format!("Failed to read {}", releases_dir.display()))?
         .filter_map(std::result::Result::ok)
         .filter_map(|e| {
@@ -178,12 +178,23 @@ pub(super) fn refresh_versions_cue(repo_root: &Path) -> Result<()> {
         .join("cue")
         .join("reference")
         .join("versions.cue");
-    if let Ok(text) = fs::read_to_string(&versions_cue_path) {
-        for line in text.lines() {
-            let trimmed = line.trim().trim_end_matches(',').trim_matches('"');
-            if let Ok(v) = trimmed.parse::<Version>() {
-                versions.insert(v);
-            }
+    let previous = fs::read_to_string(&versions_cue_path).unwrap_or_default();
+    atomic_write(
+        &versions_cue_path,
+        &render_versions_cue(versions, &previous),
+    )?;
+    Ok(())
+}
+
+pub(super) fn render_versions_cue(
+    versions: impl IntoIterator<Item = Version>,
+    previous: &str,
+) -> String {
+    let mut versions: std::collections::HashSet<Version> = versions.into_iter().collect();
+    for line in previous.lines() {
+        let trimmed = line.trim().trim_end_matches(',').trim_matches('"');
+        if let Ok(v) = trimmed.parse::<Version>() {
+            versions.insert(v);
         }
     }
 
@@ -196,15 +207,7 @@ pub(super) fn refresh_versions_cue(repo_root: &Path) -> Result<()> {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let content = format!("package metadata\n\nversions: [string, ...string] & [\n{list}\n]\n");
-
-    let versions_cue = repo_root
-        .join("website")
-        .join("cue")
-        .join("reference")
-        .join("versions.cue");
-    atomic_write(&versions_cue, &content)?;
-    Ok(())
+    format!("package metadata\n\nversions: [string, ...string] & [\n{list}\n]\n")
 }
 
 /// Write `website/content/en/releases/<version>.md` — the Hugo stub Hugo needs to route
