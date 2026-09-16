@@ -5,12 +5,9 @@ use heim::memory::os::linux::MemoryExt;
 #[cfg(target_os = "macos")]
 use heim::memory::os::macos::MemoryExt;
 use heim::units::information::byte;
-use vector_lib::{
-    event::MetricTags,
-    internal_event::GaugeName,
-};
 #[cfg(not(windows))]
 use vector_lib::internal_event::CounterName;
+use vector_lib::{event::MetricTags, internal_event::GaugeName};
 
 use super::HostMetrics;
 use crate::internal_events::HostMetricsScrapeDetailError;
