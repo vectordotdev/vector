@@ -44,10 +44,10 @@ jobs:
             }
             core.setOutput('vrl_version', matches[0][1]);
 
-      - name: Checkout PR head
+      - name: Checkout trusted base
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -58,13 +58,26 @@ jobs:
           rust: true
           vdev: false
 
+      - name: Build trusted release validator
+        run: |
+          cargo build --locked --package vdev
+          cp target/debug/vdev "$RUNNER_TEMP/release-vdev"
+
+      # Build and set up exclusively from the base before inspecting PR-controlled files.
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Validate files, base, and version
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.head_ref }}
           VRL_VERSION: ${{ steps.request.outputs.vrl_version }}
         run: >-
-          cargo vdev release workflow pr-check
+          "$RUNNER_TEMP/release-vdev" release workflow pr-check
           --base-sha "$BASE_SHA"
           --head-ref "$HEAD_REF"
           --vrl-version "$VRL_VERSION"

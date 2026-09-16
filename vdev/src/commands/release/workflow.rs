@@ -151,12 +151,44 @@ impl PrCheck {
             );
         }
 
+        validate_versions_index(&self.base_sha, &version)?;
+
         // Confirm the prepared manifest and lockfile agree without modifying the lockfile.
         Command::new("cargo")
             .args(["metadata", "--locked", "--format-version", "1"])
             .stdout(Stdio::null())
             .check_run()
     }
+}
+
+fn validate_versions_index(base: &str, version: &Version) -> Result<()> {
+    const INDEX: &str = "website/cue/reference/versions.cue";
+    let previous = git::run_and_check_output(&["show", &format!("{base}:{INDEX}")])?;
+    let releases = git::run_and_check_output(&[
+        "ls-tree",
+        "-r",
+        "--name-only",
+        "-z",
+        base,
+        "--",
+        "website/cue/reference/releases/",
+    ])?;
+    let versions = releases.split_terminator('\0').filter_map(|path| {
+        path.strip_prefix("website/cue/reference/releases/")?
+            .strip_suffix(".cue")?
+            .parse::<Version>()
+            .ok()
+    });
+    // Derive history from the frozen base, never from the candidate index.
+    let expected = super::generate_cue::render_versions_cue(
+        versions.chain(std::iter::once(version.clone())),
+        &previous,
+    );
+    ensure!(
+        fs::read_to_string(INDEX)? == expected,
+        "versions.cue must match the generated index and preserve release history"
+    );
+    Ok(())
 }
 
 fn validate_version_substitutions(base: &str, version: &Version) -> Result<()> {
