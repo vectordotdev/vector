@@ -41,6 +41,9 @@ Unit tests for a type live in the same source file as that type (`#[cfg(test)] m
 the bottom of the file) unless they exercise behavior that spans multiple modules. Cross-module
 tests belong with the composing type, not in a catch-all tests file for the crate.
 
+That `tests` submodule may instead live in its own file if the tests grow too large: declare
+`#[cfg(test)] mod tests;` in the type's file and put the tests in the corresponding `tests.rs`.
+
 ## Logging Style
 
 Always use the [Tracing crate](https://tracing.rs/tracing/)'s key/value style:
