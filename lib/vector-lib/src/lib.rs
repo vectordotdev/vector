@@ -46,6 +46,8 @@ pub mod config {
 
 #[cfg(feature = "opentelemetry")]
 pub mod opentelemetry {
+    #[cfg(feature = "typed-trace")]
+    pub use opentelemetry_proto::typed_trace;
     pub use opentelemetry_proto::{common, logs, metrics, proto, spans};
 }
 

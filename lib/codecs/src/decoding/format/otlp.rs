@@ -502,4 +502,49 @@ mod tests {
         assert!(trace.get(event_path!(RESOURCE_SPANS_JSON_FIELD)).is_some());
         validate_trace_ids(trace.value());
     }
+
+    #[test]
+    fn resource_spans_layout_converts_to_typed_kind_and_status() {
+        use opentelemetry_proto::{
+            proto::trace::v1::Status,
+            typed_trace::{HintedLegacy, hinted_legacy_to_typed},
+        };
+        use vector_core::event::typed_trace::{PanicOnIssue, SpanKind, SpanStatus};
+
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: None,
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: TEST_TRACE_ID.to_vec(),
+                        span_id: TEST_SPAN_ID.to_vec(),
+                        name: "s".into(),
+                        kind: 2,
+                        status: Some(Status {
+                            message: "boom".into(),
+                            code: 2,
+                        }),
+                        ..Default::default()
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+        let mut events = OtlpDeserializer::default()
+            .parse(Bytes::from(request.encode_to_vec()), LogNamespace::Vector)
+            .unwrap();
+        let Some(Event::Trace(trace)) = events.pop() else {
+            panic!("expected a trace event");
+        };
+
+        let HintedLegacy::Done(events) = hinted_legacy_to_typed(trace, &mut PanicOnIssue) else {
+            panic!("the source sets an OTLP layout hint");
+        };
+        let events = events.expect("OTLP layout conversion");
+        let span = &events[0].spans()[0];
+        assert_eq!(span.kind, SpanKind::Server);
+        assert_eq!(span.status, SpanStatus::Error("boom".into()));
+    }
 }
