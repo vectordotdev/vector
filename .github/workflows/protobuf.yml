@@ -6,6 +6,8 @@ permissions:
 on:
   pull_request:
     paths:
+      - ".github/workflows/protobuf.yml"
+      - "buf.vector.yaml"
       - "proto/**"
       - "lib/vector-core/proto/**"
   merge_group:
@@ -35,7 +37,13 @@ jobs:
           archive: false
           pr_comment: false
       # Keep vendored protos in their upstream format.
-      - name: Check owned protobuf formatting
+      - name: Check owned protobuf style
         run: |
-          buf format proto/vector --diff --exit-code
-          buf format lib/vector-core/proto --diff --exit-code
+          for proto in \
+            lib/vector-core/proto/event.proto \
+            proto/vector/observability.proto \
+            proto/vector/vector.proto
+          do
+            buf format "$proto" --diff --exit-code
+            buf lint --config buf.vector.yaml --path "$proto"
+          done
