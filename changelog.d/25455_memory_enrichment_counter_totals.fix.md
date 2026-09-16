@@ -6,4 +6,4 @@ Renamed the memory enrichment table failure and TTL-expiration internal metrics 
 
 This replaces the previous non-`_total` metric names. The previous metric names without the `_total` suffix are still emitted but are deprecated and will be removed in a future release.
 
-authors: nanookclaw
+authors: nanookclaw thomasqueirozb

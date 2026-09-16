@@ -125,6 +125,7 @@ pub(crate) struct MemoryEnrichmentTableTtlExpiredCount {
 
 impl InternalEvent for MemoryEnrichmentTableTtlExpiredCount {
     fn emit(self) {
+        counter!(CounterName::MemoryEnrichmentTableTtlExpirationsTotal,).increment(self.count);
         counter!(CounterName::MemoryEnrichmentTableTtlExpirations,).increment(self.count);
     }
 }
@@ -265,5 +266,23 @@ mod tests {
         let key = include_key_metric_tag.then_some(KEY);
         assert_counter(total, key);
         assert_counter(legacy, key);
+    }
+
+    #[test]
+    fn ttl_expired_count_emits_total_and_legacy() {
+        let count = 7;
+        let metrics = capture_metrics(|| {
+            MemoryEnrichmentTableTtlExpiredCount { count }.emit();
+        });
+
+        let total = assert_single_metric(&metrics, "memory_enrichment_table_ttl_expirations_total");
+        let legacy = assert_single_metric(&metrics, "memory_enrichment_table_ttl_expirations");
+
+        for metric in [total, legacy] {
+            assert!(
+                matches!(metric.value(), MetricValue::Counter { value } if *value == count as f64)
+            );
+            assert_eq!(metric.tag_value("key"), None);
+        }
     }
 }
