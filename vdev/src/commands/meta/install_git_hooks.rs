@@ -11,13 +11,6 @@ const SIGNOFF_HOOK: &str = r#"#!/usr/bin/env bash
 set -euo pipefail
 
 # Automatically sign off your commits.
-#
-# Installation:
-#
-#    cp scripts/signoff-git-hook.sh .git/hooks/commit-msg
-#
-# It's also possible to symlink the script, however that's a security hazard and
-# is not recommended.
 
 NAME="$(git config user.name)"
 EMAIL="$(git config user.email)"

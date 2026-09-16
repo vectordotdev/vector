@@ -556,9 +556,9 @@ signoff: ## Signsoff all previous commits since branch creation
 version: ## Get the current Vector version
 	@$(VDEV) version
 
-.PHONY: git-hooks
-git-hooks: ## Add Vector-local git hooks for commit sign-off
-	@scripts/install-git-hooks.sh
+.PHONY: install-git-hooks
+install-git-hooks: ## Add Vector-local git hooks for commit sign-off
+	@$(VDEV) meta install-git-hooks
 
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
