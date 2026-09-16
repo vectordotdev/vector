@@ -183,6 +183,7 @@ impl InternalEvent for MemoryEnrichmentTableInsertFailed<'_> {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
     use vector_lib::{
         event::{Metric, MetricValue},
         metrics::Controller,
@@ -192,22 +193,14 @@ mod tests {
 
     const KEY: &str = "test_key";
 
-    fn emit_compatibility_events(include_key_metric_tag: bool) {
-        MemoryEnrichmentTableTtlExpired {
-            key: KEY,
-            include_key_metric_tag,
-        }
-        .emit();
-        MemoryEnrichmentTableReadFailed {
-            key: KEY,
-            include_key_metric_tag,
-        }
-        .emit();
-        MemoryEnrichmentTableInsertFailed {
-            key: KEY,
-            include_key_metric_tag,
-        }
-        .emit();
+    fn capture_metrics(emit: impl FnOnce()) -> Vec<Metric> {
+        vector_lib::metrics::init_test();
+        let controller = Controller::get().unwrap();
+        controller.reset();
+
+        emit();
+
+        controller.capture_metrics()
     }
 
     fn assert_counter(metrics: &[Metric], name: &str, key: Option<&str>) {
@@ -225,40 +218,46 @@ mod tests {
         }
     }
 
-    fn assert_compatibility_counter_names(metrics: &[Metric], key: Option<&str>) {
-        for name in [
-            "memory_enrichment_table_ttl_expirations_total",
-            "memory_enrichment_table_ttl_expirations",
-            "memory_enrichment_table_failed_reads_total",
-            "memory_enrichment_table_failed_reads",
-            "memory_enrichment_table_failed_insertions_total",
-            "memory_enrichment_table_failed_insertions",
-        ] {
-            assert_counter(metrics, name, key);
-        }
-    }
+    #[rstest]
+    #[case::ttl_expired(
+        "memory_enrichment_table_ttl_expirations",
+        |include_key_metric_tag| {
+            MemoryEnrichmentTableTtlExpired {
+                key: KEY,
+                include_key_metric_tag,
+            }
+            .emit();
+        },
+    )]
+    #[case::read_failed(
+        "memory_enrichment_table_failed_reads",
+        |include_key_metric_tag| {
+            MemoryEnrichmentTableReadFailed {
+                key: KEY,
+                include_key_metric_tag,
+            }
+            .emit();
+        },
+    )]
+    #[case::insert_failed(
+        "memory_enrichment_table_failed_insertions",
+        |include_key_metric_tag| {
+            MemoryEnrichmentTableInsertFailed {
+                key: KEY,
+                include_key_metric_tag,
+            }
+            .emit();
+        },
+    )]
+    fn emits_total_and_legacy_counters(
+        #[case] base_name: &str,
+        #[case] emit: fn(bool),
+        #[values(false, true)] include_key_metric_tag: bool,
+    ) {
+        let metrics = capture_metrics(|| emit(include_key_metric_tag));
+        let key = include_key_metric_tag.then_some(KEY);
 
-    #[test]
-    fn compatibility_counters_emit_total_and_legacy_names_without_key() {
-        vector_lib::metrics::init_test();
-        let controller = Controller::get().unwrap();
-        controller.reset();
-
-        emit_compatibility_events(false);
-
-        let metrics = controller.capture_metrics();
-        assert_compatibility_counter_names(&metrics, None);
-    }
-
-    #[test]
-    fn compatibility_counters_emit_total_and_legacy_names_with_key() {
-        vector_lib::metrics::init_test();
-        let controller = Controller::get().unwrap();
-        controller.reset();
-
-        emit_compatibility_events(true);
-
-        let metrics = controller.capture_metrics();
-        assert_compatibility_counter_names(&metrics, Some(KEY));
+        assert_counter(&metrics, &format!("{base_name}_total"), key);
+        assert_counter(&metrics, base_name, key);
     }
 }
