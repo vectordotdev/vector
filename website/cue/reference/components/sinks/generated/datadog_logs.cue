@@ -125,6 +125,17 @@ generated: components: sinks: datadog_logs: configuration: {
 		required: false
 		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
 	}
+	max_payload_bytes: {
+		description: """
+			Maximum uncompressed payload size in bytes sent to the endpoint. Must be at least
+			5,000,000 (5 MB, the standard Datadog API limit). Increase this when targeting a
+			compatible endpoint that accepts larger payloads. The batch goal is derived as
+			`max_payload_bytes - 750,000` bytes; events larger than the batch goal are sent
+			alone in their batch.
+			"""
+		required: false
+		type: uint: {}
+	}
 	request: {
 		description: "Outbound HTTP request settings."
 		required:    false
