@@ -72,7 +72,7 @@ fn main() -> Result<()> {
                 "Failed to render the '{component_name}' component schema."
             ))?;
             rendered_component_schemas.insert(
-                format!("{}s/base/{}", base_component_type.as_str(), component_name),
+                format!("{}s/base/{component_name}", base_component_type.as_str()),
                 rendered_component_schema,
             );
         }

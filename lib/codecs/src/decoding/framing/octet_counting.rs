@@ -105,7 +105,7 @@ impl OctetCountingDecoder {
                 //
                 // There aren't enough in this frame so we need to discard the
                 // entire frame and adjust the amount to discard accordingly.
-                self.octet_decoding = Some(State::Discarding(src.len() - chars));
+                self.octet_decoding = Some(State::Discarding(chars - src.len()));
                 src.advance(src.len());
                 Ok(None)
             }
@@ -406,5 +406,24 @@ mod tests {
 
         assert!(result.is_err());
         assert_eq!(b"32 something valid"[..], buffer);
+    }
+
+    #[test]
+    fn octet_decode_discard_partial_frame_underflow() {
+        let mut decoder = OctetCountingDecoder::new_with_max_length(16);
+        let mut buffer = BytesMut::with_capacity(32);
+
+        // A length prefix of 26 exceeds the max length of 16, so the decoder
+        // enters the discarding state with 26 bytes to discard, leaving "abc".
+        buffer.put(&b"26 abc"[..]);
+        let _result = decoder.decode(&mut buffer);
+        assert_eq!(decoder.octet_decoding, Some(State::Discarding(26)));
+
+        // Only three more bytes arrive, so the buffer holds fewer bytes than
+        // remain to be discarded. This is the branch that previously underflowed.
+        buffer.put(&b"def"[..]);
+        let result = decoder.decode(&mut buffer);
+        assert_eq!(Ok(None), result.map_err(|_| false));
+        assert_eq!(decoder.octet_decoding, Some(State::Discarding(20)));
     }
 }

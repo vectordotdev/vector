@@ -192,7 +192,7 @@ mod tests {
         let deserializer = JsonDeserializer::default();
 
         let namespace = LogNamespace::Vector;
-        let events = deserializer.parse(input.clone(), namespace).unwrap();
+        let events = deserializer.parse(input, namespace).unwrap();
         let mut events = events.into_iter();
 
         let event = events.next().unwrap();

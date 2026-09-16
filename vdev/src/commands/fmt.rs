@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{app, utils::git::git_ls_files};
+use crate::{app, commands::style, utils::git::git_ls_files};
 
 pub(crate) const PRETTIER_EXTENSIONS: &[&str] =
     &["*.yml", "*.yaml", "*.js", "*.ts", "*.tsx", "*.json"];
@@ -12,8 +12,8 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        info!("Checking style (trailing spaces, line endings)...");
-        app::exec("scripts/check-style.sh", ["--fix"], true)?;
+        app::set_repo_dir()?;
+        style::fix_changed()?;
 
         info!("Formatting Rust code...");
         app::exec("cargo", ["fmt", "--all"], true)?;

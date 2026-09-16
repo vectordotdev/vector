@@ -349,6 +349,7 @@ impl FrameHandler for CommonFrameHandler {
 #[cfg(test)]
 mod tests {
     use vector_lib::event::{Event, LogEvent};
+    use vrl::event_path;
 
     use super::*;
 
@@ -400,7 +401,9 @@ mod tests {
 
         let json: serde_json::Value = serde_json::from_str(record).unwrap();
         let mut event = Event::from(LogEvent::from(vrl::value::Value::from(json)));
-        event.as_mut_log().insert("timestamp", chrono::Utc::now());
+        event
+            .as_mut_log()
+            .insert(event_path!("timestamp"), chrono::Utc::now());
 
         let definition = DnstapEventSchema;
         let schema = vector_lib::schema::Definition::empty_legacy_namespace()
@@ -424,6 +427,7 @@ mod integration_tests {
     use serde_json::json;
     use tokio::time;
     use vector_lib::{event::Event, lookup::lookup_v2::OptionalValuePath};
+    use vrl::event_path;
 
     use self::unix::UnixConfig;
     use super::*;
@@ -523,7 +527,9 @@ mod integration_tests {
         if raw_data {
             assert_eq!(events.len(), 2);
             assert!(
-                events.iter().all(|v| v.as_log().get("rawData").is_some()),
+                events
+                    .iter()
+                    .all(|v| v.as_log().get(event_path!("rawData")).is_some()),
                 "No rawData field!"
             );
         } else if query_event == "query" {
@@ -531,13 +537,15 @@ mod integration_tests {
             assert!(
                 events
                     .iter()
-                    .any(|v| v.as_log().get("messageType")
+                    .any(|v| v.as_log().get(event_path!("messageType"))
                         == Some(&Value::Bytes("ClientQuery".into()))),
                 "No ClientQuery event!"
             );
             assert!(
-                events.iter().any(|v| v.as_log().get("messageType")
-                    == Some(&Value::Bytes("ClientResponse".into()))),
+                events
+                    .iter()
+                    .any(|v| v.as_log().get(event_path!("messageType"))
+                        == Some(&Value::Bytes("ClientResponse".into()))),
                 "No ClientResponse event!"
             );
         } else if query_event == "update" {
@@ -545,26 +553,28 @@ mod integration_tests {
             assert!(
                 events
                     .iter()
-                    .any(|v| v.as_log().get("messageType")
+                    .any(|v| v.as_log().get(event_path!("messageType"))
                         == Some(&Value::Bytes("UpdateQuery".into()))),
                 "No UpdateQuery event!"
             );
             assert!(
-                events.iter().any(|v| v.as_log().get("messageType")
-                    == Some(&Value::Bytes("UpdateResponse".into()))),
+                events
+                    .iter()
+                    .any(|v| v.as_log().get(event_path!("messageType"))
+                        == Some(&Value::Bytes("UpdateResponse".into()))),
                 "No UpdateResponse event!"
             );
             assert!(
                 events
                     .iter()
-                    .any(|v| v.as_log().get("messageType")
+                    .any(|v| v.as_log().get(event_path!("messageType"))
                         == Some(&Value::Bytes("AuthQuery".into()))),
                 "No UpdateQuery event!"
             );
             assert!(
                 events
                     .iter()
-                    .any(|v| v.as_log().get("messageType")
+                    .any(|v| v.as_log().get(event_path!("messageType"))
                         == Some(&Value::Bytes("AuthResponse".into()))),
                 "No UpdateResponse event!"
             );

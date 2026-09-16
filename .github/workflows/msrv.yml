@@ -31,4 +31,5 @@ jobs:
           protoc: true
           libsasl2: true
           cargo-msrv: true
+          cargo-cache: true
       - run: cargo msrv verify

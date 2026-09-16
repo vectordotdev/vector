@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: mqtt
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    host: mqtt.example.com
+    topic: my-topic

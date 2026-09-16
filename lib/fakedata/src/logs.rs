@@ -3,7 +3,7 @@ use chrono::{
     format::{DelayedFormat, StrftimeItems},
     prelude::Local,
 };
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 
 static FAKE_USERNAMES: [&str; 20] = [
     "log_whisperer",

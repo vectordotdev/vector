@@ -18,7 +18,6 @@ components: sinks: _sematext: {
 	}
 	configuration: {
 		endpoint: {
-			common:        false
 			description:   "The endpoint to send data to."
 			relevant_when: "region is not set"
 			required:      false

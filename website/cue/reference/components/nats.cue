@@ -36,7 +36,6 @@ components: _nats: {
 
 	support: {
 		requirements: []
-		notices: []
 		warnings: []
 	}
 

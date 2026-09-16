@@ -1,0 +1,14 @@
+sinks:
+  my_sink_id:
+    type: clickhouse
+    inputs:
+      - my-source-or-transform-id
+    compression: gzip
+    dangerously_allow_unconfined_template_resolution: false
+    database: mydatabase
+    date_time_best_effort: false
+    endpoint: http://localhost:8123
+    format: json_each_row
+    insert_random_shard: false
+    skip_unknown_fields: false
+    table: mytable
