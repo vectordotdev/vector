@@ -34,7 +34,9 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
 
 pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
+pub(super) const SERIES_V3_PATH: &str = "/api/intake/metrics/v3/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
+pub(super) const SKETCHES_V3_PATH: &str = "/api/intake/metrics/v3/sketches";
 
 /// The API version to use when submitting series metrics to Datadog.
 #[configurable_component]
@@ -52,6 +54,13 @@ pub enum SeriesApiVersion {
     /// This is the recommended and default endpoint.
     #[default]
     V2,
+
+    /// Use the v3 series endpoint (`/api/intake/metrics/v3/series`).
+    ///
+    /// Columnar protobuf format with dictionary-based string deduplication and delta
+    /// encoding. More efficient than v2 for workloads with many metrics that share
+    /// common tags or names.
+    V3,
 }
 
 impl SeriesApiVersion {
@@ -59,7 +68,60 @@ impl SeriesApiVersion {
         match self {
             Self::V1 => SERIES_V1_PATH,
             Self::V2 => SERIES_V2_PATH,
+            Self::V3 => SERIES_V3_PATH,
         }
+    }
+
+    /// Returns true if this version uses the V3 columnar encoding format.
+    pub const fn is_v3_format(self) -> bool {
+        matches!(self, Self::V3)
+    }
+}
+
+/// The API version to use when submitting sketch metrics (distributions, histograms) to Datadog.
+///
+/// Independent of `series_api_version`: Datadog's intake gates V3 series and V3 sketches
+/// separately, so enabling one does not enable the other.
+///
+/// `V3` is deliberately kept in this enum (and fully wired through the encoder and request
+/// builder) but marked `#[serde(skip)]` below, so it cannot currently be configured. Datadog's
+/// V3 sketches intake routes don't exist yet: both `/api/intake/metrics/v3/sketches` and
+/// `/api/intake/metrics/v3beta/sketches` return 404, and a 404 maps to a *retriable*
+/// `ClientError`, so sketches sent this way retry forever without ever delivering. Remove the
+/// `#[serde(skip)]` once the intake side supports it.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum SketchesApiVersion {
+    /// Use the legacy sketches endpoint (`/api/beta/sketches`).
+    ///
+    /// This is the recommended and default endpoint.
+    #[default]
+    V2,
+
+    /// Use the v3 sketches endpoint (`/api/intake/metrics/v3/sketches`).
+    ///
+    /// Columnar protobuf format, matching the encoding used for V3 series. Must be enabled
+    /// separately from `series_api_version`.
+    ///
+    /// Not currently configurable — see the `#[serde(skip)]` note on this enum's doc comment.
+    /// The variant, `get_path()`, `is_v3_format()`, and the request builder's V3 sketches
+    /// encoder path are all still fully implemented; only the config surface is disabled.
+    #[serde(skip)]
+    V3,
+}
+
+impl SketchesApiVersion {
+    pub const fn get_path(self) -> &'static str {
+        match self {
+            Self::V2 => SKETCHES_PATH,
+            Self::V3 => SKETCHES_V3_PATH,
+        }
+    }
+
+    /// Returns true if this version uses the V3 columnar encoding format.
+    pub const fn is_v3_format(self) -> bool {
+        matches!(self, Self::V3)
     }
 }
 
@@ -83,7 +145,7 @@ impl DatadogMetricsEndpoint {
     pub const fn content_type(self) -> &'static str {
         match self {
             Self::Series(SeriesApiVersion::V1) => "application/json",
-            Self::Sketches | Self::Series(SeriesApiVersion::V2) => "application/x-protobuf",
+            _ => "application/x-protobuf",
         }
     }
 
@@ -97,6 +159,11 @@ impl DatadogMetricsEndpoint {
                 3_200_000,  // 3.2 MB
             ),
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => (
+                5_242_880, // 5 MiB
+                512_000,   // 512 KB
+            ),
+            // V3 uses the same limits as V2 series.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3) => (
                 5_242_880, // 5 MiB
                 512_000,   // 512 KB
             ),
@@ -177,10 +244,20 @@ pub struct DatadogMetricsConfig {
 
     /// Controls which Datadog series API endpoint is used to submit metrics.
     ///
-    /// Defaults to `v2` (`/api/v2/series`). Set to `v1` (`/api/v1/series`) only if you need to
-    /// fall back to the legacy endpoint.
+    /// Defaults to `v2` (`/api/v2/series`). Set to `v3` (`/api/intake/metrics/v3/series`) to use
+    /// the columnar protobuf format, or to `v1` (`/api/v1/series`) only if you need to fall back
+    /// to the legacy endpoint.
     #[serde(default)]
     pub series_api_version: SeriesApiVersion,
+
+    /// Controls which Datadog sketches API endpoint is used to submit distributions and
+    /// histograms.
+    ///
+    /// Only `v2` (`/api/beta/sketches`) can currently be configured. The V3 sketches intake
+    /// routes do not exist yet (`/api/intake/metrics/v3/sketches` and its beta counterpart both
+    /// 404), so V3 sketches support is temporarily disabled at the configuration level.
+    #[serde(default)]
+    pub sketches_api_version: SketchesApiVersion,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -243,7 +320,7 @@ impl DatadogMetricsConfig {
         let base_uri = self.get_base_agent_endpoint(dd_common);
 
         let series_endpoint = build_uri(&base_uri, self.series_api_version.get_path())?;
-        let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
+        let sketches_endpoint = build_uri(&base_uri, self.sketches_api_version.get_path())?;
 
         Ok(DatadogMetricsEndpointConfiguration::new(
             series_endpoint,
@@ -291,6 +368,7 @@ impl DatadogMetricsConfig {
             endpoint_configuration,
             self.default_namespace.clone(),
             self.series_api_version,
+            self.sketches_api_version,
         );
 
         let protocol = self.get_protocol(dd_common);
@@ -384,5 +462,108 @@ mod tests {
 
         assert_eq!(series.size_limit, 1_000_000);
         assert_eq!(sketches.size_limit, 1_000_000);
+    }
+
+    // `sketches_api_version` is independent of `series_api_version`: Datadog's intake gates V3
+    // series and V3 sketches separately, so each must resolve to its own path regardless of what
+    // the other is set to.
+    #[test]
+    fn sketches_path_is_independent_of_series_api_version() {
+        assert_eq!(SketchesApiVersion::V2.get_path(), SKETCHES_PATH);
+        assert_eq!(SketchesApiVersion::V3.get_path(), SKETCHES_V3_PATH);
+    }
+
+    // The V3 sketches intake routes don't exist (404 -> retriable ClientError -> endless
+    // retry loop that never delivers), so `sketches_api_version: v3` must be rejected at
+    // config-load time rather than accepted and failed at runtime. `SketchesApiVersion::V3`
+    // itself stays fully implemented (see the previous test) -- only the config surface, via
+    // `#[serde(skip)]` on the variant, is disabled.
+    #[test]
+    fn sketches_api_version_v3_is_not_configurable() {
+        let err = toml::from_str::<DatadogMetricsConfig>(
+            r#"
+            default_api_key = "unused"
+            sketches_api_version = "v3"
+            "#,
+        )
+        .expect_err("sketches_api_version = \"v3\" must be rejected");
+
+        assert!(
+            err.to_string().contains("unknown variant"),
+            "expected an unknown-variant error, got: {err}"
+        );
+    }
+
+    // `v2` -- the only configurable value -- and the unset default must both still work.
+    #[test]
+    fn sketches_api_version_v2_and_default_are_configurable() {
+        for toml in [
+            r#"default_api_key = "unused""#,
+            r#"default_api_key = "unused"
+            sketches_api_version = "v2""#,
+        ] {
+            let config = toml::from_str::<DatadogMetricsConfig>(toml)
+                .expect("v2 and the unset default must both parse");
+            assert_eq!(config.sketches_api_version, SketchesApiVersion::V2);
+        }
+    }
+
+    // `v1`, `v2`, `v3` -- the configurable values -- and the unset default must all still work.
+    #[test]
+    fn series_api_version_v1_v2_v3_and_default_are_configurable() {
+        for (toml, expected) in [
+            (r#"default_api_key = "unused""#, SeriesApiVersion::V2),
+            (
+                r#"default_api_key = "unused"
+            series_api_version = "v1""#,
+                SeriesApiVersion::V1,
+            ),
+            (
+                r#"default_api_key = "unused"
+            series_api_version = "v2""#,
+                SeriesApiVersion::V2,
+            ),
+            (
+                r#"default_api_key = "unused"
+            series_api_version = "v3""#,
+                SeriesApiVersion::V3,
+            ),
+        ] {
+            let config = toml::from_str::<DatadogMetricsConfig>(toml)
+                .expect("v1, v2, v3, and the unset default must all parse");
+            assert_eq!(config.series_api_version, expected);
+        }
+    }
+
+    // Each configurable series version must resolve to its own intake path, and only `v3` uses
+    // the columnar wire format.
+    #[test]
+    fn series_api_version_paths_and_formats() {
+        assert_eq!(SeriesApiVersion::V1.get_path(), SERIES_V1_PATH);
+        assert_eq!(SeriesApiVersion::V2.get_path(), SERIES_V2_PATH);
+        assert_eq!(SeriesApiVersion::V3.get_path(), SERIES_V3_PATH);
+
+        assert!(!SeriesApiVersion::V1.is_v3_format());
+        assert!(!SeriesApiVersion::V2.is_v3_format());
+        assert!(SeriesApiVersion::V3.is_v3_format());
+    }
+
+    // `dual_write` (the removed V3 shadow option) must be rejected outright rather than
+    // silently ignored, so an old config carrying it fails loudly at load time.
+    #[test]
+    fn removed_dual_write_option_is_rejected() {
+        let err = toml::from_str::<DatadogMetricsConfig>(
+            r#"
+            default_api_key = "unused"
+            [dual_write]
+            enabled = true
+            "#,
+        )
+        .expect_err("`dual_write` must no longer be accepted");
+
+        assert!(
+            err.to_string().contains("unknown field"),
+            "expected an unknown-field error, got: {err}"
+        );
     }
 }
