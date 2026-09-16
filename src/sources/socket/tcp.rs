@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZeroU64, time::Duration};
 
 use chrono::Utc;
 use serde_with::serde_as;
@@ -26,10 +26,8 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
     /// The timeout before a connection is forcefully closed during shutdown.
@@ -59,10 +57,8 @@ pub struct TcpConfig {
     #[serde(default = "default_port_key")]
     port_key: OptionalValuePath,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
-    #[configurable(derived)]
     tls: Option<TlsSourceConfig>,
 
     /// The size of the receive buffer used for each connection.
@@ -75,14 +71,20 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     max_connection_duration_secs: Option<u64>,
 
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
+
     /// The maximum number of TCP connections that are allowed at any given time.
     #[configurable(metadata(docs::type_unit = "connections"))]
     pub connection_limit: Option<u32>,
 
-    #[configurable(derived)]
     pub(super) framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub(super) decoding: DeserializerConfig,
 
@@ -112,6 +114,7 @@ impl TcpConfig {
             tls: None,
             receive_buffer_bytes: None,
             max_connection_duration_secs: None,
+            tls_handshake_timeout_secs: None,
             framing: None,
             decoding: default_decoding(),
             connection_limit: None,
@@ -161,6 +164,15 @@ impl TcpConfig {
 
     pub const fn set_max_connection_duration_secs(&mut self, val: Option<u64>) -> &mut Self {
         self.max_connection_duration_secs = val;
+        self
+    }
+
+    pub const fn tls_handshake_timeout_secs(&self) -> Option<NonZeroU64> {
+        self.tls_handshake_timeout_secs
+    }
+
+    pub const fn set_tls_handshake_timeout_secs(&mut self, val: Option<NonZeroU64>) -> &mut Self {
+        self.tls_handshake_timeout_secs = val;
         self
     }
 

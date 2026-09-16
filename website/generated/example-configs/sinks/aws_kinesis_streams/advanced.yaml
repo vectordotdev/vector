@@ -1,0 +1,13 @@
+sinks:
+  my_sink_id:
+    type: aws_kinesis_streams
+    inputs:
+      - my-source-or-transform-id
+    compression: none
+    encoding:
+      codec: json
+    endpoint: http://127.0.0.0:5000/path/to/service
+    partition_key_field: user_id
+    region: us-east-1
+    request_retry_partial: false
+    stream_name: my-stream

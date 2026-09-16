@@ -4,6 +4,7 @@ use config::AmqpPropertiesConfig;
 use futures::StreamExt;
 use lapin::types::ShortString;
 use vector_lib::{config::LogNamespace, event::LogEvent};
+use vrl::event_path;
 
 use super::*;
 use crate::{
@@ -319,7 +320,7 @@ async fn amqp_priority_with_template(
     let event = {
         let mut event = LogEvent::from_str_legacy(&input);
         if let Some(priority) = event_field_priority {
-            event.insert("priority", priority);
+            event.insert(event_path!("priority"), priority);
         }
         event
     };

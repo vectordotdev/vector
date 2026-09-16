@@ -6,6 +6,7 @@ use hyper::StatusCode;
 use indoc::indoc;
 use similar_asserts::assert_eq;
 use vector_lib::event::{BatchNotifier, BatchStatus};
+use vrl::event_path;
 
 use super::*;
 use crate::{
@@ -29,8 +30,8 @@ fn random_events_with_stream(
         lines,
         stream.map(|mut events| {
             events.iter_logs_mut().for_each(|log| {
-                log.insert("title", "All!");
-                log.insert("invalid", "Tik");
+                log.insert(event_path!("title"), "All!");
+                log.insert(event_path!("invalid"), "Tik");
             });
             events
         }),

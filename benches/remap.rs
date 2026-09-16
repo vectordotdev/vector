@@ -129,7 +129,7 @@ fn benchmark_remap(c: &mut Criterion) {
             let mut event = Event::Log(LogEvent::from("parse me"));
             event
                 .as_mut_log()
-                .insert("foo", r#"{"key": "value"}"#.to_owned());
+                .insert(vrl::event_path!("foo"), r#"{"key": "value"}"#.to_owned());
             event
         };
 

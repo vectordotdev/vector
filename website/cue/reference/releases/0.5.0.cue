@@ -1,8 +1,7 @@
 package metadata
 
-releases: "0.5.0": {
-	date:     "2019-10-10"
-	codename: "Platform Mingling"
+releases: "0.5.0": {// Platform Mingling
+	date: "2019-10-10"
 
 	whats_next: []
 

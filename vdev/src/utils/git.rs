@@ -37,15 +37,11 @@ pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
 pub fn changed_files() -> Result<Vec<String>> {
     let mut files = HashSet::new();
 
-    // Committed e.g.:
-    // A   relative/path/to/file.added
-    // M   relative/path/to/file.modified
-    let output = run_and_check_output(&["diff", "--name-status", "origin/master..."])?;
+    // Use name-only output so renames and copies yield their destination path.
+    let output = run_and_check_output(&["diff", "--name-only", "origin/master..."])?;
     for line in output.lines() {
-        if !is_warning_line(line)
-            && let Some((_, path)) = line.split_once('\t')
-        {
-            files.insert(path.to_string());
+        if !is_warning_line(line) {
+            files.insert(line.to_string());
         }
     }
 
@@ -96,6 +92,21 @@ pub fn get_modified_files() -> Result<Vec<String>> {
         .collect())
 }
 
+/// Get a list of files that differ from HEAD, including staged and untracked files.
+pub fn get_files_changed_from_head() -> Result<Vec<String>> {
+    let mut files = HashSet::new();
+
+    let output = run_and_check_output(&["diff", "--name-only", "HEAD"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let output = run_and_check_output(&["ls-files", "--others", "--exclude-standard"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let mut files = Vec::from_iter(files);
+    files.sort();
+    Ok(files)
+}
+
 pub fn set_config_value(key: &str, value: &str) -> Result<String> {
     Command::new("git")
         .args(["config", key, value])
@@ -121,6 +132,24 @@ pub fn commit(commit_message: &str) -> Result<String> {
     Command::new("git")
         .args(["commit", "--all", "--message", commit_message])
         .check_output()
+}
+
+/// Returns the latest semver release tag (e.g. `0.55.0`), ignoring `vdev-v…` tags.
+pub fn latest_release_version() -> Result<semver::Version> {
+    let output = Command::new("git")
+        .args(["tag", "--list", "--sort=-v:refname"])
+        .check_output()?;
+    let re = regex::Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
+    for tag in output.lines() {
+        if tag.starts_with("vdev-v") {
+            continue;
+        }
+        if re.is_match(tag) {
+            return semver::Version::parse(tag.trim_start_matches('v'))
+                .context("Failed to parse version from tag");
+        }
+    }
+    anyhow::bail!("No valid semantic version tag found")
 }
 
 /// Removes a file from the index (and working tree) using `git rm`.
@@ -189,7 +218,7 @@ pub fn create_branch(branch_name: &str) -> Result<()> {
     let reference = branch.into_reference();
     let full_ref_name = reference
         .name()
-        .ok_or_else(|| git2::Error::from_str("branch reference has no name"))?;
+        .context("branch reference name is not valid UTF-8")?;
     repo.set_head(full_ref_name)?;
     repo.checkout_head(None)?;
 

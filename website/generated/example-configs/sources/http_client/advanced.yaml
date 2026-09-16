@@ -1,0 +1,25 @@
+sources:
+  my_source_id:
+    type: http_client
+    endpoint: http://127.0.0.1:9898/logs
+    headers:
+      Accept:
+        - text/plain
+        - text/html
+      X-My-Custom-Header:
+        - a
+        - vector
+        - of
+        - values
+    method: GET
+    query:
+      field: value
+      fruit:
+        - mango
+        - papaya
+        - kiwi
+      start_time:
+        type: vrl
+        value: now()
+    scrape_interval_secs: 15
+    scrape_timeout_secs: 5.0

@@ -1,8 +1,7 @@
 package metadata
 
-releases: "0.7.0": {
-	date:     "2020-01-22"
-	codename: "The Great Omelet"
+releases: "0.7.0": {// The Great Omelet
+	date: "2020-01-22"
 
 	whats_next: []
 

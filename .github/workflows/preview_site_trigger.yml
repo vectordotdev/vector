@@ -1,7 +1,7 @@
 name: Call Build Preview
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
 
 # Restrictive default permissions
 permissions:
@@ -14,24 +14,18 @@ jobs:
     permissions:
       contents: read # Required for repository context
       actions: write # Required to upload artifacts that trigger the preview build workflow
-    # Only run for PRs with 'website' in the branch name
-    if: ${{ contains(github.head_ref, 'website') }}
+    # Only run when at least one "preview: <app>" label is present
+    if: >-
+      ${{
+        contains(github.event.pull_request.labels.*.name, 'preview: website') ||
+        contains(github.event.pull_request.labels.*.name, 'preview: playground') ||
+        contains(github.event.pull_request.labels.*.name, 'preview: rust-doc')
+      }}
     steps:
-      # Validate branch name
-      - name: Validate branch name and set output
-        id: validate
-        env:
-          BRANCH: ${{ github.head_ref }}
-        run: |
-          if [[ ! "$BRANCH" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-            echo "valid=false" >> $GITHUB_OUTPUT
-          else
-            echo "valid=true" >> $GITHUB_OUTPUT
-          fi
-
-      # Save PR information (only if branch is valid)
-      - name: Validate and save PR information
-        if: steps.validate.outputs.valid == 'true'
+      # Save PR information. The raw branch name is only ever written as file data, hashed for
+      # the integrity check, or sanitized (see create_preview_sites.yml) before it reaches a URL,
+      # so there's nothing here to reject it against.
+      - name: Save PR information
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -40,20 +34,26 @@ jobs:
             const crypto = require('crypto');
             const prNumber = context.payload.number;
             const branchName = context.payload.pull_request.head.ref;
+            const labelNames = context.payload.pull_request.labels.map(l => l.name);
+            const apps = {
+              website: labelNames.includes('preview: website'),
+              playground: labelNames.includes('preview: playground'),
+              rustDoc: labelNames.includes('preview: rust-doc'),
+            };
 
             await fs.mkdir('./pr', { recursive: true });
             await fs.writeFile('./pr/number', prNumber.toString());
             await fs.writeFile('./pr/branch', branchName);
+            await fs.writeFile('./pr/apps', JSON.stringify(apps));
 
             const numberHash = crypto.createHash('sha256').update(prNumber.toString()).digest('hex');
             const branchHash = crypto.createHash('sha256').update(branchName).digest('hex');
             await fs.writeFile('./pr/integrity', `${numberHash}:${branchHash}`);
 
-            core.info(`Saved PR #${prNumber} and branch ${branchName}`);
+            core.info(`Saved PR #${prNumber}, branch ${branchName}, apps ${JSON.stringify(apps)}`);
 
-      # Upload the artifact using latest version (only if branch is valid)
+      # Upload the artifact using latest version
       - name: Upload PR information artifact
-        if: steps.validate.outputs.valid == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pr

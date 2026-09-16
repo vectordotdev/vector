@@ -1,7 +1,7 @@
 package metadata
 
 releases: {
-	#SemanticType: "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status" | "deprecation" | "revert"
+	#SemanticType: "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "security" | "status" | "revert"
 
 	#Commit: {
 		author:           string
@@ -13,8 +13,8 @@ releases: {
 		insertions_count: uint
 		pr_number:        uint | null
 		scopes: [string, ...string] | *[]
-		sha:  #CommitSha
-		type: #SemanticType
+		sha:   #CommitSha
+		type?: string
 	}
 
 	#CommitSha: =~"^[a-z0-9]{40}$"
@@ -23,14 +23,26 @@ releases: {
 		type: #SemanticType
 		scopes: [string, ...string] | *[]
 		breaking:    bool | *false
+		title?:      string
+		anchor?:     string
 		description: string
 		pr_numbers: [uint, ...uint] | *[]
 		contributors: [string, ...string] | *[]
 	}
 
+	#DeprecationEntry: {
+		what:             string
+		deprecated_since: string
+		description:      string
+	}
+
+	#EnactedDeprecationEntry: {
+		#DeprecationEntry
+		removed_in: string
+	}
+
 	#Release: {
 		version:      string
-		codename?:    string
 		date:         string
 		description?: string
 		known_issues: [string, ...string] | *[]
@@ -38,7 +50,7 @@ releases: {
 		commits?: [#Commit, ...#Commit]
 		changelog: [#ChangeLogEntry, ...#ChangeLogEntry] | *[]
 		vrl_changelog?: string
-		whats_next: #Any | *[]
+		whats_next?: [...{title: string, description: string}]
 	}
 
 	{[Version=string]: #Release & {version: Version}}

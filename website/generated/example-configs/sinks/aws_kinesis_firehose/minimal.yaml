@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: aws_kinesis_firehose
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    stream_name: my-stream

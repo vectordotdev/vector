@@ -66,13 +66,11 @@ pub struct PrometheusScrapeConfig {
     /// The tag name added to each event representing the scraped instance's `host:port`.
     ///
     /// The tag value is the host and port of the scraped instance.
-    #[configurable(metadata(docs::advanced))]
     instance_tag: Option<String>,
 
     /// The tag name added to each event representing the scraped instance's endpoint.
     ///
     /// The tag value is the endpoint of the scraped instance.
-    #[configurable(metadata(docs::advanced))]
     endpoint_tag: Option<String>,
 
     /// Controls how tag conflicts are handled if the scraped source has tags to be added.
@@ -82,7 +80,6 @@ pub struct PrometheusScrapeConfig {
     ///
     /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
-    #[configurable(metadata(docs::advanced))]
     honor_labels: bool,
 
     /// Custom parameters for the scrape request query string.
@@ -95,11 +92,8 @@ pub struct PrometheusScrapeConfig {
     #[configurable(metadata(docs::examples = "query_example()"))]
     query: QueryParameters,
 
-    #[configurable(derived)]
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     auth: Option<Auth>,
 }
 
@@ -113,8 +107,8 @@ fn query_example() -> serde_json::Value {
 }
 
 impl GenerateConfig for PrometheusScrapeConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             interval: default_interval(),
             timeout: default_timeout(),
@@ -358,7 +352,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -392,7 +386,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -444,7 +438,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -510,7 +504,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -565,7 +559,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics?key1=val1")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -681,7 +675,7 @@ mod test {
         config.add_source(
             "in",
             PrometheusScrapeConfig {
-                endpoints: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{in_addr}")],
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,
