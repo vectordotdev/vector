@@ -251,7 +251,7 @@ components: transforms: aggregate: {
 
 	telemetry: metrics: {
 		aggregate_events_recorded_total: components.sources.internal_metrics.output.metrics.aggregate_events_recorded_total
-		aggregate_failed_updates_total:   components.sources.internal_metrics.output.metrics.aggregate_failed_updates_total
+		aggregate_failed_updates_total:  components.sources.internal_metrics.output.metrics.aggregate_failed_updates_total
 		aggregate_flushes_total:         components.sources.internal_metrics.output.metrics.aggregate_flushes_total
 	}
 }
