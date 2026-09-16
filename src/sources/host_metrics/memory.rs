@@ -12,9 +12,6 @@ use vector_lib::{event::MetricTags, internal_event::GaugeName};
 use super::HostMetrics;
 use crate::internal_events::HostMetricsScrapeDetailError;
 
-#[cfg(target_os = "linux")]
-const OOM_KILL: &str = "oom_kill";
-
 impl HostMetrics {
     pub async fn memory_metrics(&self, output: &mut super::MetricsBuffer) {
         output.name = "memory";
@@ -137,15 +134,18 @@ impl HostMetrics {
             .await
             .unwrap_or_else(|join_error| {
                 Err(procfs::ProcError::Other(format!(
-                    "Failed to join blocking task: {}",
-                    join_error
+                    "Failed to join blocking task: {join_error}"
                 )))
             });
 
         match result {
             Ok(stats) => {
                 if let Some(&oom_kill) = stats.get("oom_kill") {
-                    output.counter(OOM_KILL, oom_kill as f64, MetricTags::default());
+                    output.counter(
+                        CounterName::MemoryOomKillEventsTotal,
+                        oom_kill as f64,
+                        MetricTags::default(),
+                    );
                 }
             }
             Err(error) => {
@@ -160,10 +160,10 @@ impl HostMetrics {
 
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
+    use vector_lib::internal_event::CounterName;
+
     use crate::event::metric::MetricValue;
     use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
-
-    use super::OOM_KILL;
 
     #[tokio::test]
     async fn generates_vmstat_oom_kill_metric() {
@@ -171,15 +171,18 @@ mod tests {
         HostMetrics::new(HostMetricsConfig::default())
             .vmstat_metrics(&mut buffer)
             .await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
 
         assert_eq!(metrics.len(), 1);
 
         let metric = &metrics[0];
-        assert_eq!(metric.name(), OOM_KILL);
+        assert_eq!(
+            metric.name(),
+            CounterName::MemoryOomKillEventsTotal.as_str()
+        );
         assert!(
             matches!(metric.value(), MetricValue::Counter { .. }),
-            "oom_kill metric should be a counter"
+            "memory_oom_kill_events_total metric should be a counter"
         );
 
         let tags = metric.tags().expect("metric must have tags");

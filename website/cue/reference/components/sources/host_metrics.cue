@@ -165,7 +165,7 @@ components: sources: host_metrics: {
 		memory_total_bytes: _host & _memory_gauge & {description: "The total number of bytes of main memory."}
 		memory_used_bytes: _host & _memory_linux & {description: "The number of bytes of main memory used by programs or caches."}
 		memory_wired_bytes: _host & _memory_macos & {description: "The number of wired bytes of main memory."}
-		oom_kill: _host & _memory_counter & _linux & {description: "The number of Out-Of-Memory (OOM) kill events recorded."}
+		memory_oom_kill_events_total: _host & _memory_counter & _linux & {description: "The number of Out-Of-Memory (OOM) kill events recorded."}
 
 		// Host network
 		network_receive_bytes_total: _host & _network_counter & {description: "The number of bytes received on this interface."}
