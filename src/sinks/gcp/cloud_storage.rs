@@ -278,6 +278,7 @@ impl ValidatedSink for GcsSinkConfig {
     type Validated = ValidatedGcsSink;
 
     fn validate(&self) -> crate::Result<ValidatedGcsSink> {
+        self.encoding.validate()?;
         let base_url = self.endpoint.append_path(&format!("{}/", self.bucket))?;
         let batch_settings = self.batch.into_batcher_settings()?;
         let key_prefix_template = self.key_prefix_template()?;
@@ -427,13 +428,13 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
             if self.append_uuid {
                 let uuid = Uuid::new_v4();
-                format!("{}-{}", seconds, uuid.hyphenated())
+                format!("{seconds}-{}", uuid.hyphenated())
             } else {
                 seconds.to_string()
             }
         };
 
-        let key = format!("{}{}.{}", key, filename, self.extension);
+        let key = format!("{key}{filename}.{}", self.extension);
         let body = payload.into_payload();
 
         GcsRequest {

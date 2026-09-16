@@ -257,13 +257,12 @@ impl LogplexSource {
 
         if events.len() != msg_count {
             let error_msg = format!(
-                "Parsed event count does not match message count header: {} vs {}",
-                events.len(),
-                msg_count
+                "Parsed event count does not match message count header: {} vs {msg_count}",
+                events.len()
             );
 
             if cfg!(test) {
-                panic!("{}", error_msg);
+                panic!("{error_msg}");
             }
             return Err(header_error_message("Logplex-Msg-Count", &error_msg));
         }

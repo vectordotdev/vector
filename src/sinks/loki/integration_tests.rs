@@ -69,14 +69,12 @@ async fn build_sink_with_compression(codec: &str, compression: &str) -> (uuid::U
         r#"
             endpoint = "{}"
             labels = {{test_name = "placeholder"}}
-            encoding.codec = "{}"
-            compression = "{}"
+            encoding.codec = "{codec}"
+            compression = "{compression}"
             remove_timestamp = false
             tenant_id = "default"
         "#,
-        loki_address(),
-        codec,
-        compression
+        loki_address()
     );
 
     let (mut config, cx) = load_sink::<LokiConfig>(&config).unwrap();
@@ -687,9 +685,8 @@ async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
 async fn fetch_stream_with_key(key: &str, stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
     let query = format!("%7B{key}%3D\"{stream}\"%7D");
     let query = format!(
-        "{}/loki/api/v1/query_range?query={}&direction=forward",
-        loki_address(),
-        query
+        "{}/loki/api/v1/query_range?query={query}&direction=forward",
+        loki_address()
     );
 
     let res = reqwest::Client::new()
