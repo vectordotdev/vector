@@ -474,7 +474,6 @@ impl<B> StatefulBatch<B> {
         self.was_full
     }
 
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn into_inner(self) -> B {
         self.inner
     }

@@ -282,8 +282,7 @@ async fn azure_blob_build_config_with_null_auth() {
             let err_str = e.to_string();
             assert!(
                 err_str.contains("data did not match any variant of untagged enum"),
-                "Config parsing did not complain about invalid auth config: {}",
-                err_str
+                "Config parsing did not complain about invalid auth config: {err_str}"
             );
         }
     }
@@ -405,8 +404,7 @@ async fn azure_blob_build_config_with_account_name_with_no_auth() {
             let err_str = e.to_string();
             assert!(
                 err_str.contains("`auth` configuration must be provided"),
-                "Config build did not complain about missing `auth`: {}",
-                err_str
+                "Config build did not complain about missing `auth`: {err_str}"
             );
         }
     }
@@ -454,8 +452,7 @@ async fn azure_blob_build_config_with_blob_endpoint_with_no_auth() {
             let err_str = e.to_string();
             assert!(
                 err_str.contains("`auth` configuration must be provided"),
-                "Config build did not complain about missing `auth`: {}",
-                err_str
+                "Config build did not complain about missing `auth`: {err_str}"
             );
         }
     }
@@ -483,8 +480,7 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_account_
             let err_str = e.to_string();
             assert!(
                 err_str.contains("`connection_string` and `account_name`"),
-                "Config build did not complain about conflicting connection_string and account_name: {}",
-                err_str
+                "Config build did not complain about conflicting connection_string and account_name: {err_str}"
             );
         }
     }
@@ -519,8 +515,7 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_client_i
             assert!(
                 err_str
                     .contains("Cannot use both Shared Key and another Azure Authentication method"),
-                "Config build did not complain about conflicting Shared Key and Client ID: {}",
-                err_str
+                "Config build did not complain about conflicting Shared Key and Client ID: {err_str}"
             );
         }
     }

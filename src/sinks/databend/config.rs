@@ -1,12 +1,6 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::{collections::BTreeMap, sync::Arc};
 
 use databend_client::APIClient as DatabendAPIClient;
-use derivative::Derivative;
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
 use vector_lib::{
@@ -114,11 +108,10 @@ impl SinkConfig for DatabendConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedDatabend {
     // Omitted: `endpoint` embeds the basic-auth username/password in its URL.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     endpoint: String,
     request_settings: TowerRequestSettings,
     batch_settings: BatcherSettings,

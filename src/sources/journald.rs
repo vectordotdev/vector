@@ -980,12 +980,7 @@ fn decode_array_as_bytes(array: &[JsonValue]) -> Option<JsonValue> {
     // array was not a valid byte.
     array
         .iter()
-        .map(|item| {
-            item.as_u64().and_then(|num| match num {
-                num if num <= u8::MAX as u64 => Some(num as u8),
-                _ => None,
-            })
-        })
+        .map(|item| item.as_u64().and_then(|num| u8::try_from(num).ok()))
         .collect::<Option<Vec<u8>>>()
         .map(|array| String::from_utf8_lossy(&array).into())
 }
