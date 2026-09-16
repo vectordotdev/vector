@@ -29,6 +29,18 @@ pub struct ThrottleInternalMetricsConfig {
     /// Only set this to true if you know that the number of unique keys is bounded.
     #[serde(default)]
     pub emit_events_discarded_per_key: bool,
+
+    /// Whether or not to include the `group` tag on the `component_discarded_events_total`
+    /// internal metric.
+    ///
+    /// If true, the counter will be incremented for each discarded event with the value of
+    /// `key_field` associated with the discarded event. If false, the counter will not include
+    /// the `group` tag.
+    ///
+    /// Note that this defaults to false because the `group` tag has potentially unbounded
+    /// cardinality. Only set this to true if you know that the number of unique groups is bounded.
+    #[serde(default)]
+    pub include_group_tag: bool,
 }
 
 /// Configuration for the `throttle` transform.
@@ -116,5 +128,23 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<ThrottleConfig>();
+    }
+
+    #[test]
+    fn internal_metrics_include_group_tag_defaults_to_false() {
+        let config = serde_yaml::from_str::<ThrottleConfig>(
+            "threshold: 1\nwindow_secs: 1\ninternal_metrics: {}\n",
+        )
+        .unwrap();
+        assert!(!config.internal_metrics.include_group_tag);
+    }
+
+    #[test]
+    fn internal_metrics_include_group_tag_can_be_enabled() {
+        let config = serde_yaml::from_str::<ThrottleConfig>(
+            "threshold: 1\nwindow_secs: 1\ninternal_metrics:\n  include_group_tag: true\n",
+        )
+        .unwrap();
+        assert!(config.internal_metrics.include_group_tag);
     }
 }
