@@ -10,13 +10,13 @@ use glob::{Pattern, PatternError};
 use heim::units::ratio::ratio;
 use heim::units::time::second;
 use serde_with::serde_as;
-use sysinfo::System;
+use sysinfo::{Components, System};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
-    configurable::configurable_component,
+    configurable::{configurable_component, schema::is_generating_root_schema},
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
@@ -40,6 +40,7 @@ mod network;
 mod process;
 #[cfg(target_os = "linux")]
 mod tcp;
+mod temperature;
 
 /// Collector types.
 #[serde_as]
@@ -78,6 +79,9 @@ pub enum Collector {
 
     /// Metrics related to TCP connections.
     TCP,
+
+    /// Metrics related to component temperatures.
+    Temperature,
 }
 
 /// Filtering configuration.
@@ -121,24 +125,19 @@ pub struct HostMetricsConfig {
     #[serde(default = "default_namespace")]
     pub namespace: Option<String>,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_cgroups_config()"))]
     #[serde(default = "default_cgroups_config")]
     pub cgroups: Option<CGroupsConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub disk: disk::DiskConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub filesystem: filesystem::FilesystemConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub network: network::NetworkConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub process: process::ProcessConfig,
 }
@@ -186,7 +185,7 @@ pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-const fn example_collectors() -> [&'static str; 9] {
+const fn example_collectors() -> [&'static str; 10] {
     [
         "cgroups",
         "cpu",
@@ -197,6 +196,7 @@ const fn example_collectors() -> [&'static str; 9] {
         "memory",
         "network",
         "tcp",
+        "temperature",
     ]
 }
 
@@ -218,7 +218,7 @@ fn default_collectors() -> Option<Vec<Collector>> {
         collectors.push(Collector::TCP);
     }
     #[cfg(not(target_os = "linux"))]
-    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+    if is_generating_root_schema() {
         collectors.push(Collector::CGroups);
         collectors.push(Collector::TCP);
     }
@@ -266,8 +266,8 @@ fn example_cgroups() -> FilterList {
 }
 
 fn default_cgroups_config() -> Option<CGroupsConfig> {
-    // Check env variable to allow generating docs on non-linux systems.
-    if std::env::var("VECTOR_GENERATE_SCHEMA").is_ok() {
+    // Include the Linux-only default when generating docs on other platforms.
+    if is_generating_root_schema() {
         return Some(CGroupsConfig::default());
     }
 
@@ -353,6 +353,10 @@ impl HostMetricsConfig {
 pub struct HostMetrics {
     config: HostMetricsConfig,
     system: System,
+    // Kept across scrapes so that sysinfo-derived values such as
+    // `Component::max()` retain their refresh history instead of resetting on
+    // every collection (see `temperature_metrics`).
+    components: Components,
     #[cfg(target_os = "linux")]
     root_cgroup: Option<cgroups::CGroupRoot>,
     events_received: Registered<EventsReceived>,
@@ -364,6 +368,7 @@ impl HostMetrics {
         Self {
             config,
             system: System::new(),
+            components: Components::new_with_refreshed_list(),
             events_received: register!(EventsReceived),
         }
     }
@@ -375,6 +380,7 @@ impl HostMetrics {
         Self {
             config,
             system: System::new(),
+            components: Components::new_with_refreshed_list(),
             root_cgroup,
             events_received: register!(EventsReceived),
         }
@@ -395,7 +401,7 @@ impl HostMetrics {
             self.cpu_metrics(&mut buffer).await;
         }
         if self.config.has_collector(Collector::Process) {
-            self.process_metrics(&mut buffer).await;
+            self.process_metrics(&mut buffer);
         }
         if self.config.has_collector(Collector::Disk) {
             self.disk_metrics(&mut buffer).await;
@@ -419,6 +425,9 @@ impl HostMetrics {
         #[cfg(target_os = "linux")]
         if self.config.has_collector(Collector::TCP) {
             self.tcp_metrics(&mut buffer).await;
+        }
+        if self.config.has_collector(Collector::Temperature) {
+            self.temperature_metrics(&mut buffer);
         }
 
         let metrics = buffer.metrics;
@@ -546,7 +555,13 @@ where
     filter_result_sync(result, message)
 }
 
-#[allow(clippy::missing_const_for_fn)]
+#[cfg_attr(
+    not(target_os = "linux"),
+    expect(
+        clippy::missing_const_for_fn,
+        reason = "#[cfg(linux)] calls non-const methods"
+    )
+)]
 fn init_roots() {
     #[cfg(target_os = "linux")]
     {
@@ -913,7 +928,12 @@ mod tests {
         let keys = collect_tag_values(&all_metrics, tag);
         // Pick an arbitrary key value
         if let Some(key) = keys.into_iter().next() {
-            let key_prefix = &key[..key.len() - 1].to_string();
+            #[expect(
+                clippy::string_slice,
+                reason = "index from char_indices, always a char boundary"
+            )]
+            let key_prefix =
+                &key[..key.char_indices().next_back().map_or(0, |(i, _)| i)].to_string();
             let key_prefix_pattern = PatternWrapper::try_from(format!("{key_prefix}*")).unwrap();
             let key_pattern = PatternWrapper::try_from(key.clone()).unwrap();
 

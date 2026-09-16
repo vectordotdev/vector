@@ -4,7 +4,6 @@ components: sinks: kafka: {
 	title: "Kafka"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "dynamic"
@@ -19,7 +18,6 @@ components: sinks: kafka: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       true
 				max_events:   null
 				max_bytes:    null
 				timeout_secs: null

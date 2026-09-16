@@ -1,4 +1,4 @@
-FROM docker.io/library/debian:trixie
+FROM docker.io/library/debian:trixie@sha256:3615a749858a1cba49b408fb49c37093db813321355a9ab7c1f9f4836341e9db
 
 ENV DEBIAN_FRONTEND=noninteractive
 

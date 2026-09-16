@@ -12,9 +12,9 @@ badges:
 ---
 
 To ensure Vector fits into existing workflows, like Kubernetes, we've added
-support for JSON and YAML config formats in addition to TOML. TOML will
-continue to be our default format, but users are welcome to use JSON and YAML
-as they see fit.
+support for JSON and YAML config formats in addition to TOML. YAML is now the
+recommended and default configuration format, but users are welcome to use
+TOML and JSON as they see fit.
 
 ## Use cases
 

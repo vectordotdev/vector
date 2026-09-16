@@ -26,7 +26,6 @@ components: sources: gcp_pubsub: {
 	}
 
 	classes: {
-		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
 		development:   "beta"
@@ -50,7 +49,6 @@ components: sources: gcp_pubsub: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	installation: {

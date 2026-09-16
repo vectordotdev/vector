@@ -14,7 +14,7 @@ use vector::{
         util::{BatchConfig, Compression},
     },
     sources,
-    template::Template,
+    template::UriTemplate,
     test_util::{addr::next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
 };
 use vector_lib::codecs::{TextSerializerConfig, encoding::FramingConfig};
@@ -51,11 +51,10 @@ fn benchmark_http(c: &mut Criterion) {
                             "out",
                             &["in"],
                             sinks::http::config::HttpSinkConfig {
-                                uri: Template::try_from(out_addr.to_string()).unwrap(),
+                                uri: UriTemplate::try_from(format!("http://{out_addr}")).unwrap(),
                                 compression: *compression,
                                 method: Default::default(),
                                 auth: Default::default(),
-                                headers: Default::default(),
                                 payload_prefix: Default::default(),
                                 payload_suffix: Default::default(),
                                 batch,
@@ -64,6 +63,8 @@ fn benchmark_http(c: &mut Criterion) {
                                 request: Default::default(),
                                 tls: Default::default(),
                                 acknowledgements: Default::default(),
+                                retry_strategy: Default::default(),
+                                confinement: Default::default(),
                             },
                         );
 
@@ -103,7 +104,7 @@ fn serve(addr: SocketAddr) -> Runtime {
 
         Server::bind(&addr)
             .serve(make_service)
-            .map_err(|e| panic!("{}", e))
+            .map_err(|e| panic!("{e}"))
             .await
     });
     rt

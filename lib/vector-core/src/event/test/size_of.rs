@@ -4,7 +4,8 @@ use lookup::{PathPrefix, path};
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use vector_common::byte_size_of::ByteSizeOf;
 
-use super::{common::Name, *};
+use super::*;
+use crate::event::arbitrary_impl::Name;
 
 #[test]
 fn at_least_wrapper_size() {
@@ -117,7 +118,7 @@ fn log_operation_maintains_size() {
                     let new_value_sz = value.size_of();
                     let target_path = (PathPrefix::Event, path!(key.as_str()));
                     let old_value_sz = log_event.get(target_path).map_or(0, ByteSizeOf::size_of);
-                    if !log_event.contains(key.as_str()) {
+                    if !log_event.contains((PathPrefix::Event, path!(key.as_str()))) {
                         current_size += key.size_of();
                     }
                     log_event.insert(target_path, value);
@@ -128,10 +129,12 @@ fn log_operation_maintains_size() {
                     assert_eq!(current_size, log_event.size_of());
                 }
                 Action::Contains { key } => {
-                    log_event.contains(key.as_str());
+                    log_event.contains((PathPrefix::Event, path!(key.as_str())));
                 }
                 Action::Remove { key } => {
-                    let value_sz = log_event.remove(key.as_str()).size_of();
+                    let value_sz = log_event
+                        .remove((PathPrefix::Event, path!(key.as_str())))
+                        .size_of();
                     current_size -= value_sz;
                     current_size -= key.size_of();
                 }

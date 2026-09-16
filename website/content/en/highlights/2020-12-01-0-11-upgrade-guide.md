@@ -13,12 +13,12 @@ badges:
 0.11 includes some minor breaking changes:
 
 1. [The metrics emitted by the `internal_metrics` source have changed names.](#second)
-1. [The `statsd` sink now supports all socket types.](#third)
-1. [The `source_type` field is now explicit in the `splunk_hec` sink.](#fifth)
-1. [Remove forwarding to syslog from distributed systemd unit.](#sixth)
-1. [The `http` source no longer dedots JSON fields.](#seventh)
-1. [The `prometheus` sink has been renamed to `prometheus_exporter`](#first)
-1. [The `reduce` transform `identifier_fields` was renamed to `group_by`.](#fourth)
+2. [The `statsd` sink now supports all socket types.](#third)
+3. [The `source_type` field is now explicit in the `splunk_hec` sink.](#fifth)
+4. [Remove forwarding to syslog from distributed systemd unit.](#sixth)
+5. [The `http` source no longer dedots JSON fields.](#seventh)
+6. [The `prometheus` sink has been renamed to `prometheus_exporter`](#first)
+7. [The `reduce` transform `identifier_fields` was renamed to `group_by`.](#fourth)
 
 We cover each below to help you upgrade quickly:
 

@@ -11,11 +11,10 @@ use tokio::{
     time::{self, Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::IntervalStream;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        Decoder, DecodingConfig, StreamDecodingError,
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace, log_schema},
@@ -45,13 +44,10 @@ mod tests;
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ExecConfig {
-    #[configurable(derived)]
     pub mode: Mode,
 
-    #[configurable(derived)]
     pub scheduled: Option<ScheduledConfig>,
 
-    #[configurable(derived)]
     pub streaming: Option<StreamingConfig>,
 
     /// The command to run, plus any arguments required.
@@ -80,10 +76,8 @@ pub struct ExecConfig {
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
 
-    #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
@@ -503,8 +497,13 @@ async fn run_command(
     'outer: loop {
         tokio::select! {
             _ = &mut shutdown => {
-                if !shutdown_child(&mut child, &command).await {
-                        break 'outer; // couldn't signal, exit early
+                #[cfg(unix)]
+                let shutdown_succeeded = shutdown_child(&mut child, &command);
+                #[cfg(windows)]
+                let shutdown_succeeded = shutdown_child(&mut child, &command).await;
+
+                if !shutdown_succeeded {
+                    break 'outer; // couldn't signal, exit early
                 }
             }
             v = receiver.recv() => {
@@ -566,10 +565,7 @@ fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_durati
 }
 
 #[cfg(unix)]
-async fn shutdown_child(
-    child: &mut tokio::process::Child,
-    command: &tokio::process::Command,
-) -> bool {
+fn shutdown_child(child: &mut tokio::process::Child, command: &tokio::process::Command) -> bool {
     match child.id().map(i32::try_from) {
         Some(Ok(pid)) => {
             // shutting down, send a SIGTERM to the child
@@ -725,10 +721,10 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
     // Start the green background thread for collecting
-    drop(tokio::spawn(async move {
-        debug!("Start capturing {} command output.", origin);
+    drop(crate::spawn_in_current_span(async move {
+        debug!("Start capturing {origin} command output.");
 
-        let mut stream = FramedRead::new(reader, decoder);
+        let mut stream = DecoderFramedRead::new(reader, decoder);
         while let Some(result) = stream.next().await {
             match result {
                 Ok(next) => {
@@ -749,6 +745,6 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
             }
         }
 
-        debug!("Finished capturing {} command output.", origin);
+        debug!("Finished capturing {origin} command output.");
     }));
 }

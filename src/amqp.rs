@@ -21,7 +21,6 @@ pub(crate) struct AmqpConfig {
     ))]
     pub(crate) connection_string: String,
 
-    #[configurable(derived)]
     pub(crate) tls: Option<crate::tls::TlsConfig>,
 }
 
@@ -72,7 +71,7 @@ impl AmqpConfig {
                 };
                 let identity = if let Some(identity) = &tls.key_file {
                     let der = tokio::fs::read(identity.to_owned()).await?;
-                    Some(OwnedIdentity {
+                    Some(OwnedIdentity::PKCS12 {
                         der,
                         password: tls
                             .key_pass
@@ -91,6 +90,7 @@ impl AmqpConfig {
                     &addr,
                     lapin::ConnectionProperties::default(),
                     tls_config,
+                    async_rs::Runtime::tokio_current(),
                 )
                 .await
             }

@@ -19,12 +19,11 @@ enum KafkaError {
 
 /// Supported compression types for Kafka.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum KafkaCompression {
     /// No compression.
-    #[derivative(Default)]
+    #[default]
     None,
 
     /// Gzip.
@@ -44,11 +43,8 @@ pub enum KafkaCompression {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct KafkaAuthConfig {
-    #[configurable(derived)]
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     pub(crate) tls: Option<TlsEnableableConfig>,
 }
 

@@ -16,14 +16,11 @@
 #![deny(unused_extern_crates)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
-#![allow(clippy::cast_possible_wrap)]
-#![allow(clippy::cast_sign_loss)]
 #![allow(clippy::default_trait_access)] // triggers on generated prost code
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wildcard_for_single_variants)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)] // many false positives in this package
-#![allow(clippy::non_ascii_literal)] // using unicode literals is a-okay in vector
 #![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 
@@ -31,6 +28,7 @@ pub mod config;
 pub mod event;
 pub mod fanout;
 pub mod ipallowlist;
+pub mod latency;
 pub mod metrics;
 pub mod partition;
 pub mod schema;
@@ -38,13 +36,13 @@ pub mod serde;
 pub mod sink;
 pub mod source;
 pub mod source_sender;
+pub mod span_fields;
 pub mod tcp;
 #[cfg(test)]
 mod test_util;
 pub mod time;
 pub mod tls;
 pub mod transform;
-#[cfg(feature = "vrl")]
 pub mod vrl;
 
 use std::path::PathBuf;
@@ -52,7 +50,6 @@ use std::path::PathBuf;
 pub use event::EstimatedJsonEncodedSizeOf;
 use float_eq::FloatEq;
 
-#[cfg(feature = "vrl")]
 pub use crate::vrl::compile_vrl;
 
 #[macro_use]
@@ -82,3 +79,10 @@ macro_rules! register {
         vector_lib::internal_event::register($event)
     };
 }
+
+pub use span_fields::SpanField;
+
+// Re-export `inventory` so `register_extra_span_field!` can resolve `submit!` through this
+// crate without forcing downstream callers to declare `inventory` as a direct dependency.
+#[doc(hidden)]
+pub use inventory as __inventory;

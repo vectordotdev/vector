@@ -30,7 +30,7 @@ use crate::{
         MetricMetadataParseError, ParserMissingFieldError,
     },
     schema,
-    template::{Template, TemplateRenderingError},
+    template::{TemplateRenderingError, UnconfinedTemplate},
     transforms::{
         FunctionTransform, OutputBuffer, Transform, log_to_metric::TransformError::PathNotFound,
     },
@@ -84,7 +84,6 @@ pub struct CounterConfig {
     #[serde(default = "default_increment_by_value")]
     pub increment_by_value: bool,
 
-    #[configurable(derived)]
     #[serde(default = "default_kind")]
     pub kind: MetricKind,
 }
@@ -99,24 +98,23 @@ pub struct CounterConfig {
 #[derive(Clone, Debug)]
 pub struct MetricConfig {
     /// Name of the field in the event to generate the metric.
-    pub field: Template,
+    pub field: UnconfinedTemplate,
 
     /// Overrides the name of the counter.
     ///
     /// If not specified, `field` is used as the name of the metric.
-    pub name: Option<Template>,
+    pub name: Option<UnconfinedTemplate>,
 
     /// Sets the namespace for the metric.
-    pub namespace: Option<Template>,
+    pub namespace: Option<UnconfinedTemplate>,
 
     /// Tags to apply to the metric.
     ///
     /// Both keys and values can be templated, allowing you to attach dynamic tags to events.
     ///
     #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
-    pub tags: Option<IndexMap<Template, TagConfig>>,
+    pub tags: Option<IndexMap<UnconfinedTemplate, TagConfig>>,
 
-    #[configurable(derived)]
     #[serde(flatten)]
     pub metric: MetricTypeConfig,
 }
@@ -129,10 +127,10 @@ pub struct MetricConfig {
 #[serde(untagged)]
 pub enum TagConfig {
     /// A single tag value.
-    Plain(Option<Template>),
+    Plain(Option<UnconfinedTemplate>),
 
     /// An array of values to give to the same tag name.
-    Multi(Vec<Option<Template>>),
+    Multi(Vec<Option<UnconfinedTemplate>>),
 }
 
 /// Specification of the type of an individual metric, and any associated data.
@@ -158,7 +156,7 @@ pub enum MetricTypeConfig {
 }
 
 impl MetricConfig {
-    fn field(&self) -> &str {
+    const fn field(&self) -> &str {
         self.field.get_ref()
     }
 }
@@ -178,8 +176,8 @@ pub struct LogToMetric {
 }
 
 impl GenerateConfig for LogToMetricConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             metrics: Some(vec![MetricConfig {
                 field: "field_name".try_into().expect("Fixed template"),
                 name: None,
@@ -224,7 +222,7 @@ impl TransformConfig for LogToMetricConfig {
     }
 }
 
-/// Kinds of TranformError for Parsing
+/// Kinds of TransformError for Parsing
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub enum TransformParseErrorKind {
@@ -270,14 +268,14 @@ enum TransformError {
     },
 }
 
-fn render_template(template: &Template, event: &Event) -> Result<String, TransformError> {
+fn render_template(template: &UnconfinedTemplate, event: &Event) -> Result<String, TransformError> {
     template
         .render_string(event)
         .map_err(TransformError::TemplateRenderingError)
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<Template, TagConfig>>,
+    tags: &Option<IndexMap<UnconfinedTemplate, TagConfig>>,
     event: &Event,
 ) -> Result<Option<MetricTags>, TransformError> {
     let mut static_tags: HashMap<String, String> = HashMap::new();
@@ -316,8 +314,7 @@ fn render_tags(
                 if let Some(discarded_v) = dynamic_tags.insert(k.clone(), v.clone()) {
                     warn!(
                         "Static tags overrides dynamic tags. \
-                key: {}, value: {:?}, discarded value: {:?}",
-                        k, v, discarded_v
+                key: {k}, value: {v:?}, discarded value: {discarded_v:?}"
                     );
                 };
             }
@@ -328,8 +325,8 @@ fn render_tags(
 
 fn render_tag_into(
     event: &Event,
-    key_template: &Template,
-    value_template: Option<&Template>,
+    key_template: &UnconfinedTemplate,
+    value_template: Option<&UnconfinedTemplate>,
     result: &mut MetricTags,
     static_tags: &mut HashMap<String, String>,
     dynamic_tags: &mut HashMap<String, String>,
@@ -498,9 +495,7 @@ fn bytes_to_str(value: &Value) -> Option<String> {
 fn try_get_string_from_log(log: &LogEvent, path: &str) -> Result<Option<String>, TransformError> {
     // TODO: update returned errors after `TransformError` is refactored.
     let maybe_value = log.parse_path_and_get_value(path).map_err(|e| match e {
-        PathParseError::InvalidPathSyntax { path } => PathNotFound {
-            path: path.to_string(),
-        },
+        PathParseError::InvalidPathSyntax { path } => PathNotFound { path },
     })?;
     match maybe_value {
         None => Err(PathNotFound {
@@ -638,13 +633,13 @@ fn get_distribution_value(log: &LogEvent) -> Result<MetricValue, TransformError>
 
 fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_buckets = log
-        .get(event_path!("histogram", "buckets"))
+        .get(event_path!("aggregated_histogram", "buckets"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "histogram.buckets".to_string(),
+            path: "aggregated_histogram.buckets".to_string(),
         })?
         .as_array()
         .ok_or_else(|| TransformError::ParseError {
-            path: "histogram.buckets".to_string(),
+            path: "aggregated_histogram.buckets".to_string(),
             kind: TransformParseErrorKind::ArrayError,
         })?;
 
@@ -653,22 +648,22 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         let upper_limit = e_bucket
             .get(path!("upper_limit"))
             .ok_or_else(|| TransformError::PathNotFound {
-                path: "histogram.buckets.upper_limit".to_string(),
+                path: "aggregated_histogram.buckets.upper_limit".to_string(),
             })?
             .as_float()
             .ok_or_else(|| TransformError::ParseError {
-                path: "histogram.buckets.upper_limit".to_string(),
+                path: "aggregated_histogram.buckets.upper_limit".to_string(),
                 kind: TransformParseErrorKind::FloatError,
             })?;
 
         let count = e_bucket
             .get(path!("count"))
             .ok_or_else(|| TransformError::PathNotFound {
-                path: "histogram.buckets.count".to_string(),
+                path: "aggregated_histogram.buckets.count".to_string(),
             })?
             .as_integer()
             .ok_or_else(|| TransformError::ParseError {
-                path: "histogram.buckets.count".to_string(),
+                path: "aggregated_histogram.buckets.count".to_string(),
                 kind: TransformParseErrorKind::IntError,
             })?;
 
@@ -679,24 +674,24 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     }
 
     let count = log
-        .get(event_path!("histogram", "count"))
+        .get(event_path!("aggregated_histogram", "count"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "histogram.count".to_string(),
+            path: "aggregated_histogram.count".to_string(),
         })?
         .as_integer()
         .ok_or_else(|| TransformError::ParseError {
-            path: "histogram.count".to_string(),
+            path: "aggregated_histogram.count".to_string(),
             kind: TransformParseErrorKind::IntError,
         })?;
 
     let sum = log
-        .get(event_path!("histogram", "sum"))
+        .get(event_path!("aggregated_histogram", "sum"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "histogram.sum".to_string(),
+            path: "aggregated_histogram.sum".to_string(),
         })?
         .as_float()
         .ok_or_else(|| TransformError::ParseError {
-            path: "histogram.sum".to_string(),
+            path: "aggregated_histogram.sum".to_string(),
             kind: TransformParseErrorKind::FloatError,
         })?;
 
@@ -709,13 +704,13 @@ fn get_histogram_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
 
 fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     let event_quantiles = log
-        .get(event_path!("summary", "quantiles"))
+        .get(event_path!("aggregated_summary", "quantiles"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "summary.quantiles".to_string(),
+            path: "aggregated_summary.quantiles".to_string(),
         })?
         .as_array()
         .ok_or_else(|| TransformError::ParseError {
-            path: "summary.quantiles".to_string(),
+            path: "aggregated_summary.quantiles".to_string(),
             kind: TransformParseErrorKind::ArrayError,
         })?;
 
@@ -724,22 +719,22 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
         let quantile = e_quantile
             .get(path!("quantile"))
             .ok_or_else(|| TransformError::PathNotFound {
-                path: "summary.quantiles.quantile".to_string(),
+                path: "aggregated_summary.quantiles.quantile".to_string(),
             })?
             .as_float()
             .ok_or_else(|| TransformError::ParseError {
-                path: "summary.quantiles.quantile".to_string(),
+                path: "aggregated_summary.quantiles.quantile".to_string(),
                 kind: TransformParseErrorKind::FloatError,
             })?;
 
         let value = e_quantile
             .get(path!("value"))
             .ok_or_else(|| TransformError::PathNotFound {
-                path: "summary.quantiles.value".to_string(),
+                path: "aggregated_summary.quantiles.value".to_string(),
             })?
             .as_float()
             .ok_or_else(|| TransformError::ParseError {
-                path: "summary.quantiles.value".to_string(),
+                path: "aggregated_summary.quantiles.value".to_string(),
                 kind: TransformParseErrorKind::FloatError,
             })?;
 
@@ -750,24 +745,24 @@ fn get_summary_value(log: &LogEvent) -> Result<MetricValue, TransformError> {
     }
 
     let count = log
-        .get(event_path!("summary", "count"))
+        .get(event_path!("aggregated_summary", "count"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "summary.count".to_string(),
+            path: "aggregated_summary.count".to_string(),
         })?
         .as_integer()
         .ok_or_else(|| TransformError::ParseError {
-            path: "summary.count".to_string(),
+            path: "aggregated_summary.count".to_string(),
             kind: TransformParseErrorKind::IntError,
         })?;
 
     let sum = log
-        .get(event_path!("summary", "sum"))
+        .get(event_path!("aggregated_summary", "sum"))
         .ok_or_else(|| TransformError::PathNotFound {
-            path: "summary.sum".to_string(),
+            path: "aggregated_summary.sum".to_string(),
         })?
         .as_float()
         .ok_or_else(|| TransformError::ParseError {
-            path: "summary.sum".to_string(),
+            path: "aggregated_summary.sum".to_string(),
             kind: TransformParseErrorKind::FloatError,
         })?;
 
@@ -830,8 +825,8 @@ fn to_metrics(event: &Event) -> Result<Metric, TransformError> {
             value = match key.as_str() {
                 "gauge" => Some(get_gauge_value(log)?),
                 "distribution" => Some(get_distribution_value(log)?),
-                "histogram" => Some(get_histogram_value(log)?),
-                "summary" => Some(get_summary_value(log)?),
+                "aggregated_histogram" => Some(get_histogram_value(log)?),
+                "aggregated_summary" => Some(get_summary_value(log)?),
                 "counter" => Some(get_counter_value(log)?),
                 "set" => Some(get_set_value(log)?),
                 _ => None,
@@ -959,6 +954,7 @@ mod tests {
     use std::{sync::Arc, time::Duration};
 
     use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
+    use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::{
@@ -977,6 +973,11 @@ mod tests {
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };
+
+    const TEST_SOURCE_COMPONENT_ID: &str = "in";
+    const TEST_UPSTREAM_COMPONENT_ID: &str = "transform";
+    const TEST_SOURCE_TYPE: &str = "unit_test_stream";
+    const TEST_NAMESPACE: &str = "test_namespace";
 
     #[test]
     fn generate_config() {
@@ -999,11 +1000,19 @@ mod tests {
     }
 
     fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {
+        use vrl::path::{OwnedSegment, OwnedTargetPath, OwnedValuePath};
         let mut log = Event::Log(LogEvent::from("i am a log"));
-        log.as_mut_log().insert(key, value);
+        let path = OwnedTargetPath::event(OwnedValuePath::from(vec![OwnedSegment::field(key)]));
+        log.as_mut_log().insert(&path, value);
         log.as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
         log
+    }
+
+    fn set_test_source_metadata(metadata: &mut EventMetadata) {
+        metadata.set_upstream_id(Arc::new(OutputId::from(TEST_UPSTREAM_COMPONENT_ID)));
+        metadata.set_source_id(Arc::new(ComponentKey::from(TEST_SOURCE_COMPONENT_ID)));
+        metadata.set_source_type(TEST_SOURCE_TYPE);
     }
 
     async fn do_transform(config: LogToMetricConfig, event: Event) -> Option<Event> {
@@ -1072,8 +1081,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -1102,8 +1110,8 @@ mod tests {
         );
 
         let mut event = create_event("message", "i am log");
-        event.as_mut_log().insert("method", "post");
-        event.as_mut_log().insert("code", "200");
+        event.as_mut_log().insert(event_path!("method"), "post");
+        event.as_mut_log().insert(event_path!("code"), "200");
         let mut metadata =
             event
                 .metadata()
@@ -1115,8 +1123,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1157,7 +1164,7 @@ mod tests {
         let mut test_dict = ObjectMap::default();
         test_dict.insert("one".into(), Value::from("foo"));
         test_dict.insert("two".into(), Value::from("baz"));
-        log.insert("dict", Value::from(test_dict));
+        log.insert(event_path!("dict"), Value::from(test_dict));
 
         let mut metadata =
             event
@@ -1170,8 +1177,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1209,11 +1215,11 @@ mod tests {
 
         let mut map1 = ObjectMap::default();
         map1.insert("key1".into(), Value::from("val1"));
-        log.insert("map1", Value::from(map1));
+        log.insert(event_path!("map1"), Value::from(map1));
 
         let mut map2 = ObjectMap::default();
         map2.insert("l1_key1".into(), Value::from("val2"));
-        log.insert("map2", Value::from(map2));
+        log.insert(event_path!("map2"), Value::from(map2));
 
         let mut metadata =
             event
@@ -1226,8 +1232,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap().into_metric();
         let tags = metric.tags().expect("Metric should have tags");
@@ -1286,7 +1291,7 @@ mod tests {
 
         let mut test_dict = ObjectMap::default();
         test_dict.insert("one".into(), Value::from(vec!["foo", "baz"]));
-        log.insert("dict", Value::from(test_dict));
+        log.insert(event_path!("dict"), Value::from(test_dict));
 
         let metric = do_transform(config, event).await.unwrap().into_metric();
         let tags = metric.tags().expect("Metric should have tags");
@@ -1351,8 +1356,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1407,8 +1411,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
         let metric = do_transform(config, event).await.unwrap();
 
         assert_eq!(
@@ -1448,8 +1451,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1490,8 +1492,7 @@ mod tests {
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
 
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1572,8 +1573,10 @@ mod tests {
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
-        event.as_mut_log().insert("status", "42");
-        event.as_mut_log().insert("backtrace", "message");
+        event.as_mut_log().insert(event_path!("status"), "42");
+        event
+            .as_mut_log()
+            .insert(event_path!("backtrace"), "message");
         let mut metadata =
             event
                 .metadata()
@@ -1586,8 +1589,7 @@ mod tests {
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let output = do_transform_multiple_events(config, event, 2).await;
 
@@ -1635,11 +1637,13 @@ mod tests {
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key_target_path().unwrap(), ts());
-        event.as_mut_log().insert("status", "42");
-        event.as_mut_log().insert("backtrace", "message");
-        event.as_mut_log().insert("host", "local");
-        event.as_mut_log().insert("worker", "abc");
-        event.as_mut_log().insert("service", "xyz");
+        event.as_mut_log().insert(event_path!("status"), "42");
+        event
+            .as_mut_log()
+            .insert(event_path!("backtrace"), "message");
+        event.as_mut_log().insert(event_path!("host"), "local");
+        event.as_mut_log().insert(event_path!("worker"), "abc");
+        event.as_mut_log().insert(event_path!("service"), "xyz");
         let mut metadata =
             event
                 .metadata()
@@ -1652,8 +1656,7 @@ mod tests {
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let output = do_transform_multiple_events(config, event, 2).await;
 
@@ -1706,8 +1709,7 @@ mod tests {
                 ));
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1748,8 +1750,7 @@ mod tests {
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1791,8 +1792,7 @@ mod tests {
 
         // definitions aren't valid for metrics yet, it's just set to the default (anything).
         metadata.set_schema_definition(&Arc::new(Definition::any()));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        set_test_source_metadata(&mut metadata);
 
         let metric = do_transform(config, event).await.unwrap();
 
@@ -1814,21 +1814,20 @@ mod tests {
     //  Metric Metadata Tests
     //
     fn create_log_event(json_str: &str) -> Event {
-        create_log_event_with_namespace(json_str, Some("test_namespace"))
+        create_log_event_with_namespace(json_str, Some(TEST_NAMESPACE))
     }
 
     fn create_log_event_with_namespace(json_str: &str, namespace: Option<&str>) -> Event {
         let mut log_value: Value =
             serde_json::from_str(json_str).expect("JSON was not well-formatted");
-        log_value.insert("timestamp", ts());
+        log_value.insert(vrl::path!("timestamp"), ts());
 
         if let Some(namespace) = namespace {
-            log_value.insert("namespace", namespace);
+            log_value.insert(vrl::path!("namespace"), namespace);
         }
 
         let mut metadata = EventMetadata::default();
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        set_test_source_metadata(&mut metadata);
 
         Event::Log(LogEvent::from_parts(log_value, metadata.clone()))
     }
@@ -1861,7 +1860,7 @@ mod tests {
                 MetricValue::Gauge { value: 990.0 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -1878,7 +1877,7 @@ mod tests {
         };
 
         let json_str = r#"{
-          "histogram": {
+          "aggregated_histogram": {
             "sum": 18.0,
             "count": 5,
             "buckets": [
@@ -1938,7 +1937,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -1997,7 +1996,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -2056,7 +2055,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -2073,7 +2072,7 @@ mod tests {
         };
 
         let json_str = r#"{
-          "summary": {
+          "aggregated_summary": {
             "sum": 100.0,
             "count": 7,
             "quantiles": [
@@ -2117,7 +2116,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -2154,7 +2153,7 @@ mod tests {
                 MetricValue::Counter { value: 10.0 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",
@@ -2193,7 +2192,7 @@ mod tests {
                 },
                 metric.metadata().clone(),
             )
-            .with_namespace(Some("test_namespace"))
+            .with_namespace(Some(TEST_NAMESPACE))
             .with_tags(Some(metric_tags!(
                 "env" => "test_env",
                 "host" => "localhost",

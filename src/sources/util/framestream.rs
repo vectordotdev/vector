@@ -1,5 +1,5 @@
 #[cfg(unix)]
-use std::os::unix::{fs::PermissionsExt, io::AsRawFd};
+use std::os::unix::fs::PermissionsExt;
 use std::{
     convert::TryInto,
     fs,
@@ -117,7 +117,7 @@ impl ControlHeader {
             0x04 => Ok(ControlHeader::Ready),
             0x05 => Ok(ControlHeader::Finish),
             _ => {
-                error!("Don't know header value {} (expected 0x01 - 0x05).", val);
+                error!("Don't know header value {val} (expected 0x01 - 0x05).");
                 Err(())
             }
         }
@@ -143,7 +143,7 @@ impl ControlField {
         match val {
             0x01 => Ok(ControlField::ContentType),
             _ => {
-                error!("Don't know field type {} (expected 0x01).", val);
+                error!("Don't know field type {val} (expected 0x01).");
                 Err(())
             }
         }
@@ -341,8 +341,8 @@ impl FrameStreamReader {
         }
 
         error!(
-            "Content types did not match up. Expected {} got {:?}.",
-            self.expected_content_type, content_types
+            "Content types did not match up. Expected {} got {content_types:?}.",
+            self.expected_content_type
         );
         Err(())
     }
@@ -363,7 +363,7 @@ impl FrameStreamReader {
         let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)]);
 
         if let Err(e) = block_on(self.response_sink.lock().unwrap().send_all(&mut stream)) {
-            error!("Encountered error '{:#?}' while sending control frame.", e);
+            error!("Encountered error '{e:#?}' while sending control frame.");
         }
     }
 }
@@ -410,8 +410,6 @@ pub fn build_framestream_tcp_source(
 ) -> crate::Result<Source> {
     let addr = frame_handler.address();
     let tls = frame_handler.tls();
-    let shutdown = shutdown.clone();
-    let out = out.clone();
 
     Ok(Box::pin(async move {
         let listenfd = ListenFd::from_env();
@@ -419,6 +417,7 @@ pub fn build_framestream_tcp_source(
             addr,
             listenfd,
             &tls,
+            None, // tls_reloader: not wired for this source
             frame_handler
                 .allowed_origins()
                 .map(|origins| origins.to_vec()),
@@ -703,7 +702,7 @@ pub fn build_framestream_unix_source(
         }
         Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {} //doesn't exist, do nothing
         Err(e) => {
-            error!("Unable to get socket information; error = {:?}.", e);
+            error!("Unable to get socket information; error = {e:?}.");
             return Err(Box::new(e));
         }
     };
@@ -713,12 +712,12 @@ pub fn build_framestream_unix_source(
     // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
     if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
         _ = nix::sys::socket::setsockopt(
-            listener.as_raw_fd(),
+            &listener,
             nix::sys::socket::sockopt::RcvBuf,
             &(socket_receive_buffer_size),
         );
         let rcv_buf_size =
-            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::RcvBuf);
+            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::RcvBuf);
         info!(
             "Unix socket receive buffer size modified to {}.",
             rcv_buf_size.unwrap()
@@ -728,12 +727,12 @@ pub fn build_framestream_unix_source(
     // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
     if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
         _ = nix::sys::socket::setsockopt(
-            listener.as_raw_fd(),
+            &listener,
             nix::sys::socket::sockopt::SndBuf,
             &(socket_send_buffer_size),
         );
         let snd_buf_size =
-            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::SndBuf);
+            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::SndBuf);
         info!(
             "Unix socket buffer send size modified to {}.",
             snd_buf_size.unwrap()
@@ -750,13 +749,10 @@ pub fn build_framestream_unix_source(
         }
         match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
             Ok(_) => {
-                info!("Socket permissions updated to {:#o}.", socket_permission);
+                info!("Socket permissions updated to {socket_permission:#o}.");
             }
             Err(e) => {
-                error!(
-                    "Failed to update listener socket permissions; error = {:?}.",
-                    e
-                );
+                error!("Failed to update listener socket permissions; error = {e:?}.");
                 return Err(Box::new(e));
             }
         };
@@ -771,7 +767,7 @@ pub fn build_framestream_unix_source(
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(e) => {
-                    error!("Failed to accept socket; error = {:?}.", e);
+                    error!("Failed to accept socket; error = {e:?}.");
                     continue;
                 }
                 Ok(s) => s,
@@ -837,7 +833,7 @@ fn build_framestream_source<T: Send + 'static>(
     error_mapper: impl FnMut(std::io::Error) + Send + 'static,
 ) {
     let content_type = frame_handler.content_type();
-    let mut event_sink = out.clone();
+    let mut event_sink = out;
     let (sock_sink, sock_stream) = Framed::new(
         socket,
         length_delimited::Builder::new()
@@ -863,7 +859,7 @@ fn build_framestream_source<T: Send + 'static>(
 
         let handler = async move {
             if let Err(e) = event_sink.send_event_stream(&mut events).await {
-                error!("Error sending event: {:?}.", e);
+                error!("Error sending event: {e:?}.");
             }
 
             info!("Finished sending.");
@@ -908,7 +904,7 @@ async fn spawn_event_handling_tasks(
 ) -> JoinHandle<()> {
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks).await;
 
-    tokio::spawn(async move {
+    crate::spawn_in_current_span(async move {
         future::ready({
             if let Some(evt) = event_handler.handle_event(received_from, event_data)
                 && event_sink.send_event(evt).await.is_err()
@@ -1304,7 +1300,7 @@ mod test {
         sock_sink: &mut S,
         frames: Vec<Result<Bytes, std::io::Error>>,
     ) {
-        let mut stream = stream::iter(frames.into_iter());
+        let mut stream = stream::iter(frames);
         //send and send_all consume the sink
         _ = sock_sink.send_all(&mut stream).await;
     }

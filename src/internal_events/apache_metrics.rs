@@ -1,7 +1,6 @@
-use metrics::counter;
 use vector_lib::{
-    NamedInternalEvent,
-    internal_event::{InternalEvent, error_stage, error_type},
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -19,12 +18,12 @@ impl InternalEvent for ApacheMetricsEventsReceived<'_> {
     fn emit(self) {
         trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size, endpoint = %self.endpoint);
         counter!(
-            "component_received_events_total",
+            CounterName::ComponentReceivedEventsTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.count as u64);
         counter!(
-            "component_received_event_bytes_total",
+            CounterName::ComponentReceivedEventBytesTotal,
             "endpoint" => self.endpoint.to_owned(),
         )
         .increment(self.byte_size.get() as u64);
@@ -47,7 +46,7 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
             endpoint = %self.endpoint,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "stage" => error_stage::PROCESSING,
             "error_type" => error_type::PARSER_FAILED,
             "endpoint" => self.endpoint.to_owned(),

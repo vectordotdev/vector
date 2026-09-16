@@ -27,7 +27,7 @@ pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: NonZeroUsize =
     vector_buffers::config::memory_buffer_default_max_events();
 
 // This enum should be kept alphabetically sorted as the bitmask value is used when
-// sorting sources by data type in the GraphQL API.
+// sorting sources by data type in the API.
 #[bitmask(u8)]
 #[bitmask_config(flags_iter)]
 pub enum DataType {
@@ -197,7 +197,7 @@ fn fmt_helper(
     data_type: DataType,
 ) -> fmt::Result {
     match maybe_port {
-        Some(port) => write!(f, "port: \"{port}\",",),
+        Some(port) => write!(f, "port: \"{port}\","),
         None => write!(f, "port: None,"),
     }?;
     write!(f, " types: {data_type}")
@@ -634,7 +634,7 @@ mod test {
     }
 
     #[test]
-    fn test_source_definitons_vector() {
+    fn test_source_definitions_vector() {
         let definition = schema::Definition::default_for_namespace(&[LogNamespace::Vector].into())
             .with_metadata_field(
                 &owned_value_path!("vector", "zork"),
@@ -652,7 +652,7 @@ mod test {
         valid_event
             .metadata_mut()
             .value_mut()
-            .insert(path!("vector").concat("zork"), 32);
+            .insert(path!("vector").concat(path!("zork")), 32);
 
         let valid_event = valid_event.into();
 
@@ -663,7 +663,7 @@ mod test {
         invalid_event
             .metadata_mut()
             .value_mut()
-            .insert(path!("vector").concat("zork"), "noog");
+            .insert(path!("vector").concat(path!("zork")), "noog");
 
         let invalid_event = invalid_event.into();
 

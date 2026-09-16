@@ -1,5 +1,5 @@
 {{ $id := (.id | default .text) | urlize }}
-{{ $text := .text | markdownify }}
+{{ $text := cond .mono .text (.text | markdownify) }}
 {{ $level := .level | default 2 }}
 {{ $iconSizes := dict "1" "7" "2" "6" "3" "5" "4" "4" "5" "3" "6" "3" }}
 {{ $n := index $iconSizes ($level | string) }}

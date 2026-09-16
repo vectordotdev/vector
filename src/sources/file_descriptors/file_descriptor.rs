@@ -34,10 +34,8 @@ pub struct FileDescriptorSourceConfig {
     /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     pub host_key: Option<OptionalValuePath>,
 
-    #[configurable(derived)]
     pub framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
@@ -71,7 +69,7 @@ impl FileDescriptorConfig for FileDescriptorSourceConfig {
 }
 
 impl GenerateConfig for FileDescriptorSourceConfig {
-    fn generate_config() -> toml::Value {
+    fn generate_config() -> serde_json::Value {
         let fd = null_fd().unwrap();
         toml::from_str(&format!(
             r#"
@@ -96,6 +94,7 @@ pub(crate) fn null_fd() -> crate::Result<RawFd> {
 #[typetag::serde(name = "file_descriptor")]
 impl SourceConfig for FileDescriptorSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
+        // SAFETY: The configured descriptor is open and its ownership is transferred here.
         let pipe = io::BufReader::new(unsafe { File::from_raw_fd(self.fd as i32) });
         let log_namespace = cx.log_namespace(self.log_namespace);
 
@@ -121,6 +120,7 @@ impl SourceConfig for FileDescriptorSourceConfig {
 mod tests {
     use futures::StreamExt;
     use nix::unistd::{close, pipe, write};
+    use std::os::fd::AsRawFd;
     use vector_lib::lookup::path;
     use vrl::value;
 
@@ -148,13 +148,13 @@ mod tests {
                 host_key: Default::default(),
                 framing: None,
                 decoding: default_decoding(),
-                fd: read_fd as u32,
+                fd: read_fd.into_raw_fd() as u32,
                 log_namespace: None,
             };
 
             let mut stream = rx;
 
-            write(write_fd, b"hello world\nhello world again\n").unwrap();
+            write(&write_fd, b"hello world\nhello world again\n").unwrap();
             close(write_fd).unwrap();
 
             let context = SourceContext::new_test(tx, None);
@@ -189,13 +189,13 @@ mod tests {
                 host_key: Default::default(),
                 framing: None,
                 decoding: default_decoding(),
-                fd: read_fd as u32,
+                fd: read_fd.into_raw_fd() as u32,
                 log_namespace: Some(true),
             };
 
             let mut stream = rx;
 
-            write(write_fd, b"hello world\nhello world again\n").unwrap();
+            write(&write_fd, b"hello world\nhello world again\n").unwrap();
             close(write_fd).unwrap();
 
             let context = SourceContext::new_test(tx, None);
@@ -239,13 +239,16 @@ mod tests {
                 host_key: Default::default(),
                 framing: None,
                 decoding: default_decoding(),
-                fd: write_fd as u32, // intentionally giving the source a write-only fd
+                fd: write_fd.as_raw_fd() as u32, // intentionally giving the source a write-only fd
                 log_namespace: None,
             };
 
             let mut stream = rx;
 
-            write(write_fd, b"hello world\nhello world again\n").unwrap();
+            write(&write_fd, b"hello world\nhello world again\n").unwrap();
+            // Consume the OwnedFd without closing it to avoid double-close
+            // with the File created in build().
+            _ = write_fd.into_raw_fd();
 
             let context = SourceContext::new_test(tx, None);
             config.build(context).await.unwrap().await.unwrap();

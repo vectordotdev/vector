@@ -1,5 +1,6 @@
 pub mod logs;
 pub mod metrics;
+pub mod metrics_native;
 
 use std::{io, path::Path, process::Command};
 
@@ -69,6 +70,7 @@ where
         vrl_value,
         &vrl::protobuf::encode::Options {
             use_json_names: true,
+            allow_lossy_string_coercion: true,
         },
     )
     .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;

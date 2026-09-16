@@ -1,1 +1,1 @@
-{"name":"test","type":"record","fields":[{"name":"float_field","type":"float"}]}
+{"type":"record","name":"test","fields":[{"name":"float_field","type":"float","default":0}]}

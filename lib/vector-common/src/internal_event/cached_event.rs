@@ -91,34 +91,36 @@ where
 #[cfg(test)]
 mod tests {
     #![allow(unreachable_pub)]
-    use metrics::{Counter, counter};
+    use metrics::Counter;
+    use strum::IntoEnumIterator;
 
     use super::*;
-
-    crate::registered_event!(
-        TestEvent {
-            fixed: String,
-            dynamic: String,
-        } => {
-            event: Counter = {
-                counter!("test_event_total", "fixed" => self.fixed, "dynamic" => self.dynamic)
-            },
-        }
-
-        fn emit(&self, count: u64) {
-            self.event.increment(count);
-        }
-
-        fn register(fixed: String, dynamic: String) {
-            crate::internal_event::register(TestEvent {
-                fixed,
-                dynamic,
-            })
-        }
-    );
+    use crate::internal_event::CounterName;
 
     #[test]
     fn test_fixed_tag() {
+        crate::registered_event!(
+            TestEvent {
+                fixed: String,
+                dynamic: String,
+            } => {
+                event: Counter = {
+                    crate::counter!(CounterName::iter().next().unwrap(), "fixed" => self.fixed, "dynamic" => self.dynamic)
+                },
+            }
+
+            fn emit(&self, count: u64) {
+                self.event.increment(count);
+            }
+
+            fn register(fixed: String, dynamic: String) {
+                crate::internal_event::register(TestEvent {
+                    fixed,
+                    dynamic,
+                })
+            }
+        );
+
         let event: RegisteredEventCache<String, TestEvent> =
             RegisteredEventCache::new("fixed".to_string());
 

@@ -1,0 +1,35 @@
+name: Remove Awaiting Author Label
+
+permissions:
+  pull-requests: write
+
+on:
+  pull_request_target:
+    types: [synchronize, review_requested]
+
+jobs:
+  remove_label:
+    if: "contains(github.event.pull_request.labels.*.name, 'meta: awaiting author')"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Remove label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const labelName = 'meta: awaiting author';
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: labelName,
+              });
+              core.info(`Removed "${labelName}" label from PR #${context.issue.number}`);
+            } catch (err) {
+              if (err.status === 404) {
+                core.info(`Label "${labelName}" already absent from PR #${context.issue.number}, skipping`);
+              } else {
+                throw err;
+              }
+            }

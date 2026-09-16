@@ -2,6 +2,7 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
 use itertools::Itertools;
 use snafu::Snafu;
+use tracing::Instrument;
 use vector_lib::{
     event::{ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
@@ -12,6 +13,7 @@ use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
     common::datadog::{DD_RESERVED_SEMANTIC_ATTRS, DDTAGS, MESSAGE, is_reserved_attribute},
+    internal_events::DatadogLogsReservedAttributeConflict,
     sinks::{
         prelude::*,
         util::{Compressor, http::HttpJsonBatchSizer},
@@ -108,7 +110,7 @@ pub fn normalize_event(event: &mut Event) {
 
     // Will cast the internal value to an object if it already isn't
     if !log.value().is_object() {
-        log.insert(MESSAGE, log.value().clone());
+        log.insert(event_path!(MESSAGE), log.value().clone());
     }
 
     // Upstream Sources may have semantically defined Datadog reserved attributes outside of their
@@ -174,7 +176,7 @@ pub fn normalize_as_agent_event(event: &mut Event) {
         }
     }
     // .. nest this object at the root under the reserved key named 'message'
-    log.insert(MESSAGE, local_root);
+    log.insert(event_path!(MESSAGE), local_root);
 }
 
 // If an expected reserved attribute is not located in the event root, rename it and handle
@@ -183,7 +185,7 @@ pub fn position_reserved_attr_event_root(
     log: &mut LogEvent,
     current_path: &OwnedTargetPath,
     expected_field_name: &str,
-    meaning: &str,
+    meaning: &'static str,
 ) {
     // the path that DD archives expects this reserved attribute to be in.
     let desired_path = event_path!(expected_field_name);
@@ -195,11 +197,12 @@ pub fn position_reserved_attr_event_root(
         if log.contains(desired_path) {
             let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
-            warn!(
-                message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
-                meaning = meaning,
-                renamed = &rename_attr,
-            );
+            emit!(DatadogLogsReservedAttributeConflict {
+                meaning,
+                source_path: current_path,
+                destination_path: expected_field_name,
+                renamed_existing_to: &rename_attr,
+            });
             log.rename_key(desired_path, rename_path);
         }
 
@@ -386,19 +389,26 @@ where
             conforms_as_agent: self.conforms_as_agent,
         });
 
-        let input = input.batched_partitioned(partitioner, || {
+        let input = input.batched_partitioned(partitioner, batch_settings.timeout, |_| {
             batch_settings.as_item_size_config(HttpJsonBatchSizer)
         });
         input
             .concurrent_map(default_request_builder_concurrency_limit(), move |input| {
                 let builder = Arc::clone(&builder);
 
-                Box::pin(async move {
-                    let (api_key, events) = input;
-                    let api_key = api_key.unwrap_or_else(|| Arc::clone(&builder.default_api_key));
+                // `concurrent_map` spawns this future on a detached task. The closure itself runs
+                // within `run_inner`'s span, so `in_current_span` captures the sink span here and
+                // re-enters it on the spawned task to preserve the sink's automatic component tags.
+                Box::pin(
+                    async move {
+                        let (api_key, events) = input;
+                        let api_key =
+                            api_key.unwrap_or_else(|| Arc::clone(&builder.default_api_key));
 
-                    builder.build_request(events, api_key)
-                })
+                        builder.build_request(events, api_key)
+                    }
+                    .in_current_span(),
+                )
             })
             .filter_map(|request| async move {
                 match request {
@@ -580,7 +590,7 @@ mod tests {
         assert_normalized_log_has_expected_attrs(event.as_log());
         assert_only_reserved_fields_at_root(event.as_log());
         assert_eq!(
-            event.as_log().get("message"),
+            event.as_log().get(event_path!("message")),
             Some(&value!({"message": "the_message"}))
         );
     }

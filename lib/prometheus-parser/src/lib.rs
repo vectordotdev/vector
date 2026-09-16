@@ -157,6 +157,10 @@ impl GroupKind {
         prefix_len: usize,
         metric: Metric,
     ) -> Result<Option<Metric>, ParserError> {
+        #[expect(
+            clippy::string_slice,
+            reason = "prefix_len is always self.name.len(), a valid UTF-8 boundary"
+        )]
         let suffix = &metric.name[prefix_len..];
         let mut key = GroupKey {
             timestamp: metric.timestamp,
@@ -328,15 +332,23 @@ struct MetricGroupSet(IndexMap<String, GroupKind>);
 
 impl MetricGroupSet {
     fn get_group<'a>(&'a mut self, name: &str) -> (usize, &'a String, &'a mut GroupKind) {
-        let len = name.len();
         let name = if self.0.contains_key(name) {
             name
-        } else if name.ends_with("_bucket") && self.0.contains_key(&name[..len - 7]) {
-            &name[..len - 7]
-        } else if name.ends_with("_sum") && self.0.contains_key(&name[..len - 4]) {
-            &name[..len - 4]
-        } else if name.ends_with("_count") && self.0.contains_key(&name[..len - 6]) {
-            &name[..len - 6]
+        } else if let Some(base) = name
+            .strip_suffix("_bucket")
+            .filter(|b| self.0.contains_key(*b))
+        {
+            base
+        } else if let Some(base) = name
+            .strip_suffix("_sum")
+            .filter(|b| self.0.contains_key(*b))
+        {
+            base
+        } else if let Some(base) = name
+            .strip_suffix("_count")
+            .filter(|b| self.0.contains_key(*b))
+        {
+            base
         } else {
             self.0
                 .insert(name.into(), GroupKind::new(MetricKind::Untyped));

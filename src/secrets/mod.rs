@@ -9,7 +9,7 @@ use crate::{
     signal,
 };
 
-#[cfg(feature = "secrets-aws-secrets-manager")]
+#[cfg(feature = "secrets-aws_secrets_manager")]
 mod aws_secrets_manager;
 mod directory;
 mod exec;
@@ -51,15 +51,11 @@ mod test;
 /// Secrets are loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
 /// configuration reload process.
 #[allow(clippy::large_enum_variant)]
-#[configurable_component(global_option("secret"))]
+#[configurable_component]
 #[derive(Clone, Debug)]
 #[enum_dispatch(SecretBackend)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[configurable(metadata(
-    docs::enum_tag_description = "secret type",
-    docs::common = false,
-    docs::required = false,
-))]
+#[configurable(metadata(docs::enum_tag_description = "secret type", docs::required = false))]
 pub enum SecretBackends {
     /// File.
     File(file::FileBackend),
@@ -71,7 +67,7 @@ pub enum SecretBackends {
     Exec(exec::ExecBackend),
 
     /// AWS Secrets Manager.
-    #[cfg(feature = "secrets-aws-secrets-manager")]
+    #[cfg(feature = "secrets-aws_secrets_manager")]
     AwsSecretsManager(aws_secrets_manager::AwsSecretsManagerBackend),
 
     /// Test.
@@ -79,9 +75,23 @@ pub enum SecretBackends {
     Test(test::TestBackend),
 }
 
+// Manual NamedComponent impl required because enum_dispatch doesn't support it yet.
+impl vector_lib::configurable::NamedComponent for SecretBackends {
+    fn get_component_name(&self) -> &'static str {
+        match self {
+            Self::File(config) => config.get_component_name(),
+            Self::Directory(config) => config.get_component_name(),
+            Self::Exec(config) => config.get_component_name(),
+            #[cfg(feature = "secrets-aws_secrets_manager")]
+            Self::AwsSecretsManager(config) => config.get_component_name(),
+            Self::Test(config) => config.get_component_name(),
+        }
+    }
+}
+
 impl GenerateConfig for SecretBackends {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::File(file::FileBackend {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self::File(file::FileBackend {
             path: "path/to/file".into(),
         }))
         .unwrap()

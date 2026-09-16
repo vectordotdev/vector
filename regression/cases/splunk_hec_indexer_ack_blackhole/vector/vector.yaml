@@ -9,7 +9,7 @@ sources:
     type: "internal_metrics"
 
   splunk_hec:
-    type:    "splunk_hec"
+    type: "splunk_hec"
     address: "0.0.0.0:8282"
     acknowledgements:
       enabled: true
@@ -20,11 +20,11 @@ sources:
 
 sinks:
   prometheus:
-    type:    "prometheus_exporter"
-    inputs: [ "internal_metrics" ]
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
     address: "0.0.0.0:9090"
 
   blackhole:
-    type:                "blackhole"
+    type: "blackhole"
     print_interval_secs: 0
-    inputs: [ "splunk_hec" ]
+    inputs: ["splunk_hec"]

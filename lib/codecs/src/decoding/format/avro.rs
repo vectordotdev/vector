@@ -103,8 +103,7 @@ pub struct AvroDeserializerOptions {
     ))]
     pub schema: String,
 
-    /// For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix.
-    /// According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
+    /// For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix, as described in [Confluent Kafka's documentation](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
     pub strip_schema_id_prefix: bool,
 }
 
@@ -148,7 +147,9 @@ impl Deserializer for AvroDeserializer {
             bytes
         };
 
-        let value = apache_avro::from_avro_datum(&self.schema, &mut bytes.reader(), None)?;
+        let value = apache_avro::reader::datum::GenericDatumReader::builder(&self.schema)
+            .build()?
+            .read_value(&mut bytes.reader())?;
 
         let apache_avro::types::Value::Record(fields) = value else {
             return Err(vector_common::Error::from("Expected an avro Record"));
@@ -281,7 +282,11 @@ mod tests {
             message: "hello from avro".to_owned(),
         };
         let record_value = apache_avro::to_value(event).unwrap();
-        let record_datum = apache_avro::to_avro_datum(&schema, record_value).unwrap();
+        let record_datum = apache_avro::writer::datum::GenericDatumWriter::builder(&schema)
+            .build()
+            .unwrap()
+            .write_value_to_vec(record_value)
+            .unwrap();
         let record_bytes = Bytes::from(record_datum);
 
         let deserializer = AvroDeserializer::new(schema, false);
@@ -291,7 +296,7 @@ mod tests {
         assert_eq!(events.len(), 1);
 
         assert_eq!(
-            events[0].as_log().get("message").unwrap(),
+            events[0].as_log().get(event_path!("message")).unwrap(),
             &VrlValue::from("hello from avro")
         );
     }
@@ -304,7 +309,11 @@ mod tests {
             message: "hello from avro".to_owned(),
         };
         let record_value = apache_avro::to_value(event).unwrap();
-        let record_datum = apache_avro::to_avro_datum(&schema, record_value).unwrap();
+        let record_datum = apache_avro::writer::datum::GenericDatumWriter::builder(&schema)
+            .build()
+            .unwrap()
+            .write_value_to_vec(record_value)
+            .unwrap();
 
         let mut bytes = BytesMut::new();
         bytes.extend([0, 0, 0, 0, 0]); // 0 prefix + 4 byte schema id
@@ -317,7 +326,7 @@ mod tests {
         assert_eq!(events.len(), 1);
 
         assert_eq!(
-            events[0].as_log().get("message").unwrap(),
+            events[0].as_log().get(event_path!("message")).unwrap(),
             &VrlValue::from("hello from avro")
         );
     }
@@ -332,7 +341,11 @@ mod tests {
         };
         let value = apache_avro::to_value(event).unwrap();
         // let value = value.resolve(&schema).unwrap();
-        let datum = apache_avro::to_avro_datum(&schema, value).unwrap();
+        let datum = apache_avro::writer::datum::GenericDatumWriter::builder(&schema)
+            .build()
+            .unwrap()
+            .write_value_to_vec(value)
+            .unwrap();
 
         let mut bytes = BytesMut::new();
         bytes.extend([0, 0, 0, 0, 0]); // 0 prefix + 4 byte schema id
@@ -344,7 +357,7 @@ mod tests {
             .unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(
-            events[0].as_log().get("message").unwrap(),
+            events[0].as_log().get(event_path!("message")).unwrap(),
             &VrlValue::from(uuid)
         );
     }

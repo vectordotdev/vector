@@ -183,14 +183,14 @@ In the [WASM transform](https://github.com/vectordotdev/vector/pull/2006/files) 
 This RFC ultimately proposes the following steps:
 
 1. Add UX improvements on `LogEvent`, particularly turning JSON into or from `LogEvent`.
-1. Refactor the `PathIter` to make `vector::event::Lookup` type.
-1. Add UX improvements on `Lookup` , particularly an internal `String` ↔ `Lookup` with an `Into`/`From` that does not do path parsing, as well as a `<Lookup as std::str::FromStr>::from_str(s: String)` that does. (This also enables `"foo.bar".parse::<Lookup>()?`)
-1. Refactor all `LogEvent` to accept `Into<Lookup>` values.
+2. Refactor the `PathIter` to make `vector::event::Lookup` type.
+3. Add UX improvements on `Lookup` , particularly an internal `String` ↔ `Lookup` with an `Into`/`From` that does not do path parsing, as well as a `<Lookup as std::str::FromStr>::from_str(s: String)` that does. (This also enables `"foo.bar".parse::<Lookup>()?`)
+4. Refactor all `LogEvent` to accept `Into<Lookup>` values.
     1. Remove obsolete functionality like `insert_path` since the new `Lookup` type covers this.
     2. Refactor the `keys` function to return an `Iterator<Lookup>`
-1. Add an `Entry` style API to `LogEvent`.
+5. Add an `Entry` style API to `LogEvent`.
     1. Remove functionality rendered obsolete by the Entry API like `try_insert`, moving them to use the new Entry API
-1. Provide `iter` and `iter_mut` functions that yield `(Lookup, Value)`.
+6. Provide `iter` and `iter_mut` functions that yield `(Lookup, Value)`.
     1. Remove the `all_fields` function, moving them to the new iterator.
 
 We believe these steps will provide a more ergonomic and consistent API.

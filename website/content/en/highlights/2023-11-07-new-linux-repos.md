@@ -54,14 +54,14 @@ existing repository to your discretion.
 rm "/etc/apt/sources.list.d/timber-vector.list"
 ```
 
-2. Run the following commands to set up APT to download through HTTPS:
+1. Run the following commands to set up APT to download through HTTPS:
 
 ```sh
 sudo apt-get update
 sudo apt-get install apt-transport-https curl gnupg
 ```
 
-3. Run the following commands to set up the Vector `deb` repo on your system
+1. Run the following commands to set up the Vector `deb` repo on your system
 and create a Datadog archive keyring:
 
 ```sh
@@ -73,7 +73,7 @@ curl https://keys.datadoghq.com/DATADOG_APT_KEY_F14F620E.public | sudo gpg --no-
 curl https://keys.datadoghq.com/DATADOG_APT_KEY_C0962C7D.public | sudo gpg --no-default-keyring --keyring /usr/share/keyrings/datadog-archive-keyring.gpg --import --batch
 ```
 
-4. Run the following commands to update your local `apt` repo and install Vector:
+1. Run the following commands to update your local `apt` repo and install Vector:
 
 ```sh
 sudo apt-get update
@@ -91,7 +91,7 @@ sudo apt-get install vector
 rm "/etc/yum.repos.d/timber-vector.repo"
 ```
 
-2. Run the following commands to set up the Vector `rpm` repo on your system:
+1. Run the following commands to set up the Vector `rpm` repo on your system:
 
 ```sh
 cat <<EOF > /etc/yum.repos.d/vector.repo
@@ -109,7 +109,7 @@ EOF
 
 **Note:** If you are running RHEL 8.1 or CentOS 8.1, use `repo_gpgcheck=0` instead of `repo_gpgcheck=1` in the configuration above.
 
-3. Update your packages and install Vector:
+1. Update your packages and install Vector:
 
 ```sh
 sudo yum makecache

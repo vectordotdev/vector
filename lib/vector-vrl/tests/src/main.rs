@@ -95,6 +95,7 @@ fn main() {
         timings: cmd.timings,
         runtime: cmd.runtime,
         timezone: cmd.timezone(),
+        run_skipped: false,
     };
 
     run_tests(

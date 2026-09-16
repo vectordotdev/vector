@@ -18,14 +18,17 @@ metric events through Kafka. Metrics events are encoded into a format that
 mimics our [internal metrics data model], ideal for custom consumers on the
 other end. Getting started is easy:
 
-```toml
-[sources.host_metrics]
-type = "host_metrics"
+```yaml
+sources:
+  host_metrics:
+    type: "host_metrics"
 
-[sinks.kafka]
-type = "kafka"
-inputs = ["host_metrics"]
-encoding.codec = "json"
+sinks:
+  kafka:
+    type: "kafka"
+    inputs: ["host_metrics"]
+    encoding:
+      codec: "json"
 ```
 
 ## Caveats

@@ -13,11 +13,11 @@ impl Cli {
         let artifacts = glob("target/artifacts/*")
             .expect("failed to read glob pattern")
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| anyhow!("failed to read path: {}", e))?
+            .map_err(|e| anyhow!("failed to read path: {e}"))?
             .into_iter()
             .map(|p| p.into_os_string().into_string())
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| anyhow!("failed to turn path into string: {:?}", e))?;
+            .map_err(|e| anyhow!("failed to turn path into string: {}", e.to_string_lossy()))?;
 
         let version = cargo::get_version()?;
         let mut command = Command::new("gh");
@@ -32,7 +32,9 @@ impl Cli {
                 "--title",
                 &format!("v{version}"),
                 "--notes",
-                &format!("[View release notes](https://vector.dev/releases/{version})"),
+                &format!(
+                    "The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is excited to announce version `{version}`! 🚀\n\n[View release notes](https://vector.dev/releases/{version})"
+                ),
             ]
             .map(String::from)
             .into_iter()

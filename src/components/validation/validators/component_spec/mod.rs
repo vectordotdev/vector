@@ -36,11 +36,11 @@ impl Validator for ComponentSpecValidator {
             .count() as u64;
 
         for input in inputs {
-            info!("Validator observed input event: {:?}", input);
+            info!("Validator observed input event: {input:?}");
         }
 
         for output in outputs {
-            info!("Validator observed output event: {:?}", output);
+            info!("Validator observed output event: {output:?}");
         }
 
         // Validate that the number of inputs/outputs matched the test case expectation.
@@ -203,9 +203,8 @@ fn filter_events_by_metric_and_component<'a>(
     component_id: &'a str,
 ) -> Vec<&'a Metric> {
     info!(
-        "Filter looking for metric {} {}",
-        metric.to_string(),
-        component_id
+        "Filter looking for metric {} {component_id}",
+        metric.to_string()
     );
 
     let metrics: Vec<&Metric> = telemetry_events
@@ -219,7 +218,7 @@ fn filter_events_by_metric_and_component<'a>(
         })
         .filter(|&m| {
             if m.name() == metric.to_string() {
-                debug!("{}", m);
+                debug!("{m}");
                 if let Some(tags) = m.tags()
                     && tags.get("component_id").unwrap_or("") == component_id
                 {
@@ -297,5 +296,5 @@ fn compare_actual_to_expected(
         return Err(errs);
     }
 
-    Ok(vec![format!("{}: {}", metric_type, actual)])
+    Ok(vec![format!("{metric_type}: {actual}")])
 }

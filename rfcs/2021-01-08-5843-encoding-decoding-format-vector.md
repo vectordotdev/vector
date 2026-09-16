@@ -248,7 +248,7 @@ Per the data format itself - I haven't found any single conglomerate conclusion 
 
 ## Drawbacks
 
-The only drawback to adopting protobuf as the encoding format is that Protobufs can be slightly slower than other schema'd data formats and we don't shed the protobuf tooling overhead.
+The only drawback to adopting protobuf as the encoding format is that Protobufs can be slightly slower than other schema-based data formats and we don't shed the protobuf tooling overhead.
 
 Drawbacks to adopting HTTP/2 are that (like literally any other transport we could pick) it alters our kubernetes deployment handling and if we don't decide to continue to maintain other transports it means needing to appropriately handle the deprecation and removal of our TCP and HTTP/1.1 implementations fairly soon afterwards.
 

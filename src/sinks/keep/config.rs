@@ -2,7 +2,9 @@
 
 use bytes::Bytes;
 use futures::FutureExt;
-use http::{Request, StatusCode, Uri};
+use http::StatusCode;
+use http_1::Request;
+use http_body_util::BodyExt;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
@@ -11,14 +13,17 @@ use super::{
     sink::KeepSink,
 };
 use crate::{
-    http::HttpClient,
+    config::ValidatedSink,
+    http::client_v1::{HttpClient, full_body},
     sinks::{
         prelude::*,
         util::{
-            BatchConfig, BoxedRawValue,
-            http::{HttpService, http_response_retry_logic},
+            BatchConfig, BoxedRawValue, HttpEndpoint, TowerRequestSettings,
+            http::RetryStrategy,
+            http_v1::{HttpService, http_response_retry_logic},
         },
     },
+    tls::MaybeTlsSettings,
 };
 
 pub(super) const HTTP_HEADER_KEEP_API_KEY: &str = "x-api-key";
@@ -33,36 +38,36 @@ pub struct KeepConfig {
         docs::examples = "https://backend.keep.com:8081/alerts/event/vectordev?provider_id=test",
     ))]
     #[configurable(validation(format = "uri"))]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     /// The API key that is used to authenticate against Keep.
     #[configurable(metadata(docs::examples = "${KEEP_API_KEY}"))]
     #[configurable(metadata(docs::examples = "keepappkey"))]
     api_key: SensitiveString,
 
-    #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<KeepDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    #[serde(default)]
+    pub retry_strategy: RetryStrategy,
 }
 
-fn default_endpoint() -> String {
-    "http://localhost:8080/alerts/event/vectordev?provider_id=test".to_string()
+fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("http://localhost:8080/alerts/event/vectordev?provider_id=test")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -75,11 +80,11 @@ impl SinkBatchSettings for KeepDefaultBatchSettings {
 }
 
 impl GenerateConfig for KeepConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"api_key = "${KEEP_API_KEY}"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"api_key: ${KEEP_API_KEY}
             "#,
-        )
+        })
         .unwrap()
     }
 }
@@ -87,40 +92,6 @@ impl GenerateConfig for KeepConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "keep")]
 impl SinkConfig for KeepConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
-
-        let request_builder = KeepRequestBuilder {
-            encoder: KeepEncoder {
-                transformer: self.encoding.clone(),
-            },
-            // TODO: add compression support
-            compression: Compression::None,
-        };
-
-        let uri: Uri = self.endpoint.clone().try_into()?;
-        let keep_service_request_builder = KeepSvcRequestBuilder {
-            uri: uri.clone(),
-            api_key: self.api_key.clone(),
-        };
-
-        let client = HttpClient::new(None, cx.proxy())?;
-
-        let service = HttpService::new(client.clone(), keep_service_request_builder);
-
-        let request_limits = self.request.into_settings();
-
-        let service = ServiceBuilder::new()
-            .settings(request_limits, http_response_retry_logic())
-            .service(service);
-
-        let sink = KeepSink::new(service, batch_settings, request_builder);
-
-        let healthcheck = healthcheck(uri, self.api_key.clone(), client).boxed();
-
-        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
-    }
-
     fn input(&self) -> Input {
         let requirement = Requirement::empty().optional_meaning("timestamp", Kind::timestamp());
 
@@ -132,18 +103,90 @@ impl SinkConfig for KeepConfig {
     }
 }
 
-async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> crate::Result<()> {
-    let request = Request::post(uri).header(HTTP_HEADER_KEEP_API_KEY, api_key.inner());
+#[derive(Clone, Debug)]
+pub struct ValidatedKeep {
+    batch_settings: BatcherSettings,
+    endpoint: HttpEndpoint,
+    request_limits: TowerRequestSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for KeepConfig {
+    type Validated = ValidatedKeep;
+
+    fn validate(&self) -> crate::Result<ValidatedKeep> {
+        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
+        let endpoint = self.endpoint.clone();
+        let request_limits = self.request.into_settings();
+
+        Ok(ValidatedKeep {
+            batch_settings,
+            endpoint,
+            request_limits,
+        })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedKeep,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let ValidatedKeep {
+            batch_settings,
+            endpoint,
+            request_limits,
+        } = validated;
+
+        let request_builder = KeepRequestBuilder {
+            encoder: KeepEncoder {
+                transformer: self.encoding.clone(),
+            },
+            // TODO: add compression support
+            compression: Compression::None,
+        };
+
+        let keep_service_request_builder = KeepSvcRequestBuilder {
+            endpoint: endpoint.clone(),
+            api_key: self.api_key.clone(),
+        };
+
+        let client = HttpClient::new(MaybeTlsSettings::from_config(None, false)?, cx.proxy())?;
+
+        let service = HttpService::new(client.clone(), keep_service_request_builder);
+
+        let service = ServiceBuilder::new()
+            .settings(
+                request_limits.clone(),
+                http_response_retry_logic(self.retry_strategy.clone()),
+            )
+            .service(service);
+
+        let sink = KeepSink::new(service, *batch_settings, request_builder);
+
+        let healthcheck = healthcheck(endpoint.clone(), self.api_key.clone(), client).boxed();
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+}
+async fn healthcheck(
+    endpoint: HttpEndpoint,
+    api_key: SensitiveString,
+    client: HttpClient,
+) -> crate::Result<()> {
+    let request =
+        Request::post(endpoint.into_v1()).header(HTTP_HEADER_KEEP_API_KEY, api_key.inner());
     let body = crate::serde::json::to_bytes(&Vec::<BoxedRawValue>::new())
         .unwrap()
         .freeze();
+
     let req: Request<Bytes> = request.body(body)?;
-    let req = req.map(hyper::Body::from);
+    let req = req.map(full_body);
 
     let res = client.send(req).await?;
 
-    let status = res.status();
-    let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
+    let status = StatusCode::from_u16(res.status().as_u16())
+        .expect("HTTP status codes are valid u16 values");
+    let body = res.into_body().collect().await?.to_bytes();
 
     match status {
         StatusCode::OK => Ok(()),          // Healthcheck passed
@@ -165,5 +208,39 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
             let body = String::from_utf8_lossy(&body[..]);
             Err(format!("Server returned unexpected error status: {status} body: {body}").into())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ValidatedSink;
+
+    #[test]
+    fn rejects_non_http_endpoint() {
+        let err = serde_yaml::from_str::<KeepConfig>(
+            r#"
+            api_key: "test-key"
+            endpoint: "ftp://example.com"
+            "#,
+        )
+        .expect_err("a non-http endpoint must be rejected");
+        assert!(err.to_string().contains("http"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn validate_produces_usable_values() {
+        let config: KeepConfig = serde_yaml::from_str(
+            r#"
+            api_key: "test-key"
+            "#,
+        )
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.endpoint.to_string(),
+            "http://localhost:8080/alerts/event/vectordev?provider_id=test"
+        );
+        assert_eq!(validated.batch_settings.size_limit, 100_000);
     }
 }

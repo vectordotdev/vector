@@ -13,12 +13,12 @@ badges:
 Vector's 0.17.0 release includes several **breaking changes**:
 
 1. [Blackhole sink configuration changes](#blackhole)
-1. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
-1. [Vector now logs to stderr](#logging)
-1. [The `generator` source now has a default `interval` setting](#interval)
-1. [The deprecated `wasm` transform was removed](#wasm)
-1. [The `exec` source now has a `decoding` setting](#exec_source)
-1. [The algorithm underlying ARC has been optimized](#arc)
+2. [Datadog Logs sink loses `batch.max_bytes` setting](#datadog_logs_max_bytes)
+3. [Vector now logs to stderr](#logging)
+4. [The `generator` source now has a default `interval` setting](#interval)
+5. [The deprecated `wasm` transform was removed](#wasm)
+6. [The `exec` source now has a `decoding` setting](#exec_source)
+7. [The algorithm underlying ARC has been optimized](#arc)
 
 We cover them below to help you upgrade quickly:
 

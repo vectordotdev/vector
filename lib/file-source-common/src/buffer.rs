@@ -1,5 +1,5 @@
 use crate::FilePosition;
-use std::{cmp::min, io, pin::Pin};
+use std::{cmp::min, io};
 
 use bstr::Finder;
 use bytes::BytesMut;
@@ -34,7 +34,7 @@ pub struct ReadResult {
 /// GiB/s range for buffers of length 1KiB. For buffers any smaller than this
 /// the overhead of setup dominates our benchmarks.
 pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
-    reader: Pin<Box<&'a mut R>>,
+    reader: &'a mut R,
     position: &'a mut FilePosition,
     delim: &'a [u8],
     buf: &'a mut BytesMut,
@@ -45,7 +45,6 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
     let delim_finder = Finder::new(delim);
     let delim_len = delim.len();
     let mut discarded_for_size_and_truncated = Vec::new();
-    let mut reader = Box::new(reader);
 
     // Used to track partial delimiter matches across buffer boundaries.
     // Data is read in chunks from the reader (see `fill_buf` below).
@@ -294,7 +293,7 @@ mod test {
             let mut reader = BufReader::new(Cursor::new(&chunk));
 
             match read_until_with_max_size(
-                Box::pin(&mut reader),
+                &mut reader,
                 &mut position,
                 &delimiter,
                 &mut buffer,
@@ -398,14 +397,14 @@ mod test {
             // We want (delimiter_len - 1) bytes before boundary, then 1 byte after
             let line_content = if bytes_until_boundary > delimiter_len {
                 let content_len = bytes_until_boundary - (delimiter_len - 1);
-                format!("line{:0width$}", i, width = content_len.saturating_sub(4)).into_bytes()
+                format!("line{i:0width$}", width = content_len.saturating_sub(4)).into_bytes()
             } else {
                 // Not enough room in this buffer, pad to next boundary
                 let padding = bytes_until_boundary;
                 let extra_content = buffer_capacity - (delimiter_len - 1);
                 let mut content = vec![b'X'; padding];
                 content.extend_from_slice(
-                    format!("L{:0width$}", i, width = extra_content.saturating_sub(1)).as_bytes(),
+                    format!("L{i:0width$}", width = extra_content.saturating_sub(1)).as_bytes(),
                 );
                 content
             };
@@ -425,7 +424,7 @@ mod test {
         for (i, expected_line) in expected_lines.iter().enumerate() {
             let mut buffer = BytesMut::new();
             let result = read_until_with_max_size(
-                Box::pin(&mut reader),
+                &mut reader,
                 &mut position,
                 delimiter,
                 &mut buffer,
@@ -437,16 +436,14 @@ mod test {
             assert_eq!(
                 buffer.as_ref(),
                 expected_line.as_slice(),
-                "Line {} should match expected content. Got: {:?}, Expected: {:?}",
-                i,
+                "Line {i} should match expected content. Got: {:?}, Expected: {:?}",
                 String::from_utf8_lossy(&buffer),
                 String::from_utf8_lossy(expected_line)
             );
 
             assert!(
                 result.successfully_read.is_some(),
-                "Should find delimiter for line {}",
-                i
+                "Should find delimiter for line {i}"
             );
         }
     }

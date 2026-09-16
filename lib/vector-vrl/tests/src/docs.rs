@@ -141,8 +141,8 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
 
     if returns.is_some() && output.is_some() {
         panic!(
-            "example must either specify return or output, not both: {}/{}",
-            category, &name
+            "example must either specify return or output, not both: {category}/{}",
+            &name
         );
     }
 
@@ -192,6 +192,7 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
         skip,
         read_only_paths: vec![],
         check_diagnostics: false,
+        check_type_only: false,
         source_file: format!("website/cue/reference/remap/functions/{name}.cue"),
         source_line: 1,
     }

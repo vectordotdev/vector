@@ -4,7 +4,6 @@ components: sinks: pulsar: {
 	title: "Apache Pulsar"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "stream"
@@ -53,7 +52,6 @@ components: sinks: pulsar: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.pulsar.configuration

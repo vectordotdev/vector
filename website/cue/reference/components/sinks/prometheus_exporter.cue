@@ -4,10 +4,8 @@ components: sinks: prometheus_exporter: {
 	_port: 9598
 
 	title: "Prometheus Exporter"
-	alias: "prometheus"
 
 	classes: {
-		commonly_used: true
 		delivery:      "best_effort"
 		development:   "stable"
 		egress_method: "expose"
@@ -55,7 +53,6 @@ components: sinks: prometheus_exporter: {
 				to protect against this.
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.prometheus_exporter.configuration

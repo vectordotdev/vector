@@ -1,15 +1,12 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use futures::{
-    StreamExt,
-    channel::mpsc::{Receiver, TryRecvError},
-    stream::Stream,
-};
+use futures::{StreamExt, channel::mpsc::Receiver, stream::Stream};
 use hyper::StatusCode;
 use indoc::indoc;
 use similar_asserts::assert_eq;
 use vector_lib::event::{BatchNotifier, BatchStatus};
+use vrl::event_path;
 
 use super::*;
 use crate::{
@@ -33,8 +30,8 @@ fn random_events_with_stream(
         lines,
         stream.map(|mut events| {
             events.iter_logs_mut().for_each(|log| {
-                log.insert("title", "All!");
-                log.insert("invalid", "Tik");
+                log.insert(event_path!("title"), "All!");
+                log.insert(event_path!("invalid"), "Tik");
             });
             events
         }),
@@ -105,7 +102,7 @@ async fn smoke() {
 async fn handles_failure() {
     let (_expected, mut rx) = start_test(StatusCode::FORBIDDEN, BatchStatus::Rejected).await;
 
-    assert!(matches!(rx.try_next(), Err(TryRecvError { .. })));
+    assert!(rx.try_recv().is_err());
 }
 
 #[tokio::test]

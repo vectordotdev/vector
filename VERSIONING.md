@@ -9,16 +9,16 @@ Please see the [FAQ](#faq) section for more info.**
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
 1. [Convention](#convention)
-1. [Public API](#public-api)
+2. [Public API](#public-api)
    1. [Areas that *are* covered](#areas-that-are-covered)
       1. [Intended for *public* consumption](#intended-for-public-consumption)
-      1. [Intended for *private* consumption](#intended-for-private-consumption)
-   1. [Areas that are *NOT* covered](#areas-that-are-not-covered)
-1. [FAQ](#faq)
+      2. [Intended for *private* consumption](#intended-for-private-consumption)
+   2. [Areas that are *NOT* covered](#areas-that-are-not-covered)
+3. [FAQ](#faq)
    1. [How often is Vector released?](#how-often-is-vector-released)
-   1. [How does Vector treat patch and minor versions?](#how-does-vector-treat-patch-and-minor-versions)
-   1. [How does Vector treat major versions \(breaking changes\)?](#how-does-vector-treat-major-versions-breaking-changes)
-   1. [How does Vector treat pre-1.0 versions?](#how-does-vector-treat-pre-10-versions)
+   2. [How does Vector treat patch and minor versions?](#how-does-vector-treat-patch-and-minor-versions)
+   3. [How does Vector treat major versions \(breaking changes\)?](#how-does-vector-treat-major-versions-breaking-changes)
+   4. [How does Vector treat pre-1.0 versions?](#how-does-vector-treat-pre-10-versions)
 
 <!-- /MarkdownTOC -->
 
@@ -56,7 +56,7 @@ a major version increment.
 * [Data model]
   * As output in all sinks except the [`vector` sink]
   * As exposed in the source of the [`lua` transform]
-* [GraphQL API]
+* [Observability API]
 * Telemetry
   * Vector's internal metrics as provided by the [`internal_metrics` source]
 * [VRL]
@@ -124,13 +124,12 @@ here. Each minor release bump will include an upgrade guide in the
 [data directory]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
 [data model]: https://vector.dev/docs/architecture/data-model/
 [GitHub repository]: https://github.com/vectordotdev/vector
-[GraphQL API]: https://vector.dev/docs/reference/api/
+[Observability API]: https://vector.dev/docs/reference/api/
 [Installation workflows]: https://vector.dev/docs/setup/installation/
 [`internal_logs_` source]: https://vector.dev/docs/reference/configuration/sources/internal_logs/
 [`internal_metrics` source]: https://vector.dev/docs/reference/configuration/sources/internal_metrics/
 [`lua` transform]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [`master` branch]: https://github.com/vectordotdev/vector/tree/master
-[nightly artifact list]: https://packages.timber.io/vector/nightly/
 [package manager]: https://vector.dev/docs/setup/installation/package-managers/
 [release notes]: https://vector.dev/releases/
 [release policy]: https://github.com/vectordotdev/vector/blob/master/RELEASES.md

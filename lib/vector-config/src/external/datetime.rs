@@ -8,7 +8,7 @@ use vrl::compiler::TimeZone;
 use crate::{
     Configurable, GenerateError, Metadata, ToValue,
     schema::{
-        SchemaGenerator, SchemaObject, apply_base_metadata, generate_const_string_schema,
+        SchemaGenerator, SchemaObject, apply_metadata, generate_const_string_schema,
         generate_one_of_schema, get_or_generate_schema,
     },
 };
@@ -48,7 +48,7 @@ impl Configurable for TimeZone {
         let mut local_schema = generate_const_string_schema("local".to_string());
         let mut local_metadata = Metadata::with_description("System local timezone.");
         local_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Local"));
-        apply_base_metadata(&mut local_schema, local_metadata);
+        apply_metadata(&mut local_schema, local_metadata);
 
         let mut tz_metadata = Metadata::with_title("A named timezone.");
         tz_metadata.set_description(

@@ -1,0 +1,70 @@
+# Docs review hold — workflow 2/3
+#
+# Fires on every review submission or dismissal. If at least one MEMBER/OWNER
+# has an APPROVED review and the hold label is present, writes the PR number to
+# an artifact for remove_docs_review_label.yml (3/3) to act on.
+#
+# The workflow_run indirection exists for a security reason: pull_request_review
+# events from fork PRs run with a read-only token, so label writes must happen in
+# a separate workflow that runs in the base-repo context with a write token.
+#
+# Review state check is intentionally simple: any APPROVED review from a
+# MEMBER/OWNER is sufficient, regardless of later CHANGES_REQUESTED from the
+# same reviewer. Best-effort is good enough here.
+name: Check Docs Review
+
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-labels-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  LABEL_NAME: "docs review on hold"
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check approval and label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const allowed = ['MEMBER', 'OWNER'];
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const approved = reviews.some(r => allowed.includes(r.author_association) && r.state === 'APPROVED');
+            core.info(`Member approval found: ${approved}`);
+            if (!approved) return;
+
+            const labelName = process.env.LABEL_NAME;
+            const labels = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            if (!labels.some(l => l.name === labelName)) {
+              core.info(`Label "${labelName}" not found, skipping`);
+              return;
+            }
+
+            require('fs').writeFileSync('pr-number', String(context.payload.pull_request.number));
+
+      - name: Upload PR number
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-review-pr
+          path: pr-number
+          if-no-files-found: ignore

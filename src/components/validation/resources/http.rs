@@ -89,7 +89,6 @@ impl HttpResourceConfig {
 }
 
 /// Spawns an HTTP server that a source will make requests to in order to get events.
-#[allow(clippy::missing_const_for_fn)]
 fn spawn_input_http_server(
     config: HttpResourceConfig,
     codec: ResourceCodec,
@@ -188,8 +187,8 @@ fn spawn_input_http_server(
         // Wait for the runner to signal us to shutdown
         resource_shutdown_rx.wait().await;
 
-        // Shutdown the server
-        _ = http_server_shutdown_tx.send(());
+        // Shutdown the server; error is ignored since it only fails if the server already stopped.
+        http_server_shutdown_tx.send(()).ok();
 
         info!("HTTP server external input resource marking as done.");
         resource_completed.mark_as_done();
@@ -273,7 +272,7 @@ fn spawn_input_http_client(
                 }
                 Err(e) => {
                     // TODO: Emit metric that tracks a failed response from the HTTP server.
-                    error!("Failed to send request: {}", e);
+                    error!("Failed to send request: {e}");
                 }
             }
         }
@@ -298,7 +297,6 @@ pub struct HttpResourceOutputContext<'a> {
 
 impl HttpResourceOutputContext<'_> {
     /// Spawns an HTTP server that accepts events sent by a sink.
-    #[allow(clippy::missing_const_for_fn)]
     fn spawn_output_http_server(&self, config: HttpResourceConfig) -> vector_lib::Result<()> {
         // This HTTP server will wait for events to be sent by a sink, and collect them and send them on
         // via an output sender. We accept/collect events until we're told to shutdown.
@@ -329,10 +327,29 @@ impl HttpResourceOutputContext<'_> {
                 let mut decoder = decoder.clone();
 
                 async move {
+                    // Extract the Content-Encoding header before consuming the request
+                    let content_encoding = request
+                        .headers()
+                        .get("content-encoding")
+                        .and_then(|v| v.to_str().ok())
+                        .map(|s| s.to_string());
+
                     match request.into_body().collect().await.map(Collected::to_bytes) {
                         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                         Ok(body) => {
                             let byte_size = body.len();
+
+                            // Validation tests should not use compression - error if we receive compressed data
+                            if let Some(encoding) = &content_encoding
+                                && encoding != "identity"
+                            {
+                                error!(
+                                    "Received compressed data (Content-Encoding: {encoding}). \
+                                        Validation tests assert on bytes sizes and compressed size might not be deterministic."
+                                );
+                                return StatusCode::BAD_REQUEST.into_response();
+                            }
+
                             let mut body = BytesMut::from(&body[..]);
                             loop {
                                 match decoder.decode_eof(&mut body) {
@@ -381,7 +398,7 @@ impl HttpResourceOutputContext<'_> {
                                     }
                                     Err(_) => {
                                         error!(
-                                            "HTTP server failed to decode {:?}",
+                                            "HTTP server failed to decode body: {:?}",
                                             String::from_utf8_lossy(&body)
                                         );
                                         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
@@ -408,7 +425,7 @@ impl HttpResourceOutputContext<'_> {
             resource_shutdown_rx.wait().await;
 
             // signal the server to shutdown
-            let _ = http_server_shutdown_tx.send(());
+            http_server_shutdown_tx.send(()).ok();
 
             // mark ourselves as done
             resource_completed.mark_as_done();
@@ -420,12 +437,11 @@ impl HttpResourceOutputContext<'_> {
     }
 
     /// Spawns an HTTP client that pulls events by making requests to an HTTP server driven by a sink.
-    #[allow(clippy::missing_const_for_fn)]
     fn spawn_output_http_client(&self, _config: HttpResourceConfig) {
         // TODO: The `prometheus_exporter` sink is the only sink that exposes an HTTP server which must be
         // scraped... but since we need special logic to aggregate/deduplicate scraped metrics, we can't
         // use this generically for that purpose.
-        todo!()
+        unimplemented!()
     }
 }
 

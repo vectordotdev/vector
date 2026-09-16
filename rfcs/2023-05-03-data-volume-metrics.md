@@ -109,7 +109,7 @@ as the O(1) scan.
 
 #### `component_received_event_bytes_total`
 
-This metric is emitted by the framework [here][source_sender], so it looks like
+This metric is emitted by the [framework's source sender][source_sender], so it looks like
 the only change needed is to add the service tag.
 
 #### `component_sent_event_bytes_total`

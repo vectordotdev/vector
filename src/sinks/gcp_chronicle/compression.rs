@@ -7,7 +7,7 @@ use vector_lib::configurable::{
     Configurable, GenerateError, Metadata, ToValue,
     attributes::CustomAttribute,
     schema::{
-        SchemaGenerator, SchemaObject, apply_base_metadata, generate_one_of_schema,
+        SchemaGenerator, SchemaObject, apply_metadata, generate_one_of_schema,
         generate_struct_schema, get_or_generate_schema,
     },
 };
@@ -20,11 +20,10 @@ use crate::sinks::util::{
 };
 
 /// Compression configuration.
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ChronicleCompression {
     /// No compression.
-    #[derivative(Default)]
+    #[default]
     None,
 
     /// [Gzip][gzip] compression.
@@ -79,7 +78,7 @@ impl Configurable for ChronicleCompression {
 
         let mut all_string_oneof_subschema =
             generate_one_of_schema(&[none_string_subschema, gzip_string_subschema]);
-        apply_base_metadata(&mut all_string_oneof_subschema, string_metadata);
+        apply_metadata(&mut all_string_oneof_subschema, string_metadata);
 
         let compression_level_schema =
             get_or_generate_schema(&CompressionLevel::as_configurable_ref(), generator, None)?;
@@ -98,7 +97,7 @@ impl Configurable for ChronicleCompression {
         let mut full_metadata =
             Metadata::with_description("Compression algorithm and compression level.");
         full_metadata.add_custom_attribute(CustomAttribute::flag("docs::hidden"));
-        apply_base_metadata(&mut full_subschema, full_metadata);
+        apply_metadata(&mut full_subschema, full_metadata);
 
         Ok(generate_one_of_schema(&[
             all_string_oneof_subschema,

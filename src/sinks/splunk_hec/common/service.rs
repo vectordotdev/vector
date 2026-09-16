@@ -58,7 +58,7 @@ where
         let max_pending_acks = indexer_acknowledgements.max_pending_acks.get();
         let tx = if let Some(ack_client) = ack_client {
             let (tx, rx) = mpsc::channel(128);
-            tokio::spawn(run_acknowledgements(
+            crate::spawn_in_current_span(run_acknowledgements(
                 rx,
                 ack_client,
                 Arc::clone(&http_request_builder),
@@ -280,8 +280,8 @@ mod tests {
     };
 
     use bytes::Bytes;
-    use futures_util::{StreamExt, poll, stream::FuturesUnordered};
-    use tower::{Service, ServiceExt, util::BoxService};
+    use futures_util::{StreamExt, future::BoxFuture, poll, stream::FuturesUnordered};
+    use tower::{Service, ServiceExt};
     use vector_lib::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
@@ -304,7 +304,7 @@ mod tests {
                 request::HecRequest,
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
             },
-            util::{Compression, metadata::RequestMetadataBuilder},
+            util::{Compression, http::HttpBatchService, metadata::RequestMetadataBuilder},
         },
     };
 
@@ -314,7 +314,12 @@ mod tests {
     fn get_hec_service(
         endpoint: String,
         acknowledgements_config: HecClientAcknowledgementsConfig,
-    ) -> HecService<BoxService<HecRequest, http::Response<Bytes>, crate::Error>> {
+    ) -> HecService<
+        HttpBatchService<
+            BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
+            HecRequest,
+        >,
+    > {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             endpoint,
@@ -329,7 +334,7 @@ mod tests {
             false,
         );
         HecService::new(
-            BoxService::new(http_service),
+            http_service,
             Some(client),
             http_request_builder,
             acknowledgements_config,

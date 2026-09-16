@@ -1,0 +1,6 @@
+sinks:
+  my_sink_id:
+    type: appsignal
+    inputs:
+      - my-source-or-transform-id
+    push_api_key: 00000000-0000-0000-0000-000000000000

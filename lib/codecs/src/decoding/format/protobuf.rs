@@ -75,7 +75,7 @@ pub struct ProtobufDeserializerOptions {
     ///
     /// This file is the output of `protoc -I <include path> -o <desc output path> <proto>`.
     ///
-    /// You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
+    /// For more information, see [How Buf images work](https://buf.build/docs/reference/images/#how-buf-images-work).
     pub desc_file: PathBuf,
 
     /// The name of the message type to use for serializing.
@@ -85,7 +85,7 @@ pub struct ProtobufDeserializerOptions {
     /// Use JSON field names (camelCase) instead of protobuf field names (snake_case).
     ///
     /// When enabled, the deserializer will output fields using their JSON names as defined
-    /// in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+    /// in the `.proto` file (for example, `jobDescription` instead of `job_description`).
     ///
     /// This is useful when working with data that needs to be converted to JSON or
     /// when interfacing with systems that use JSON naming conventions.
@@ -186,6 +186,7 @@ mod tests {
     use std::{env, fs, path::PathBuf};
 
     use vector_core::config::log_schema;
+    use vrl::event_path;
 
     use super::*;
 
@@ -279,10 +280,10 @@ mod tests {
         let message_type = "test_protobuf.Person";
         let validate_log = |log: &LogEvent| {
             // No field will be set.
-            assert!(!log.contains("name"));
-            assert!(!log.contains("id"));
-            assert!(!log.contains("email"));
-            assert!(!log.contains("phones"));
+            assert!(!log.contains(event_path!("name")));
+            assert!(!log.contains(event_path!("id")));
+            assert!(!log.contains(event_path!("email")));
+            assert!(!log.contains(event_path!("phones")));
         };
 
         parse_and_validate(

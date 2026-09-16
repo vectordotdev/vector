@@ -9,15 +9,53 @@ use super::{
     ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
     transform::get_transform_output_ids,
 };
-use crate::config::schema;
 
-/// Minimum value (exclusive) for `utilization_ewma_alpha`.
+/// Minimum value (exclusive) for EWMA alpha options.
 /// The alpha value must be strictly greater than this value.
 const EWMA_ALPHA_MIN: f64 = 0.0;
 
-/// Maximum value (exclusive) for `utilization_ewma_alpha`.
+/// Maximum value (exclusive) for EWMA alpha options.
 /// The alpha value must be strictly less than this value.
 const EWMA_ALPHA_MAX: f64 = 1.0;
+
+/// Minimum value (exclusive) for EWMA half-life options.
+/// The half-life value must be strictly greater than this value.
+const EWMA_HALF_LIFE_SECONDS_MIN: f64 = 0.0;
+
+/// Validates an optional EWMA alpha value and returns an error message if invalid.
+/// Returns `None` if the value is `None` or valid, otherwise returns an error message.
+fn validate_ewma_alpha(alpha: Option<f64>, field_name: &str) -> Option<String> {
+    if let Some(alpha) = alpha
+        && !(alpha > EWMA_ALPHA_MIN && alpha < EWMA_ALPHA_MAX)
+    {
+        Some(format!(
+            "Global `{field_name}` must be between 0 and 1 exclusive (0 < alpha < 1), got {alpha}"
+        ))
+    } else {
+        None
+    }
+}
+
+/// Validates an optional EWMA half-life value and returns an error message if invalid.
+/// Returns `None` if the value is `None` or valid, otherwise returns an error message.
+#[expect(
+    clippy::neg_cmp_op_on_partial_ord,
+    reason = "!(x > 0) rejects NaN and non-positive values; (x <= 0) would incorrectly accept NaN"
+)]
+fn validate_ewma_half_life_seconds(
+    half_life_seconds: Option<f64>,
+    field_name: &str,
+) -> Option<String> {
+    if let Some(half_life_seconds) = half_life_seconds
+        && !(half_life_seconds > EWMA_HALF_LIFE_SECONDS_MIN)
+    {
+        Some(format!(
+            "Global `{field_name}` must be greater than 0, got {half_life_seconds}"
+        ))
+    } else {
+        None
+    }
+}
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
@@ -83,8 +121,7 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
     for (id, uses) in used_keys.into_iter().filter(|(_id, uses)| uses.len() > 1) {
         errors.push(format!(
-            "More than one component with name \"{}\" ({}).",
-            id,
+            "More than one component with name \"{id}\" ({}).",
             uses.join(", ")
         ));
     }
@@ -101,9 +138,8 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     for (output_type, key, inputs) in sink_inputs.chain(transform_inputs) {
         if inputs.is_empty() {
             errors.push(format!(
-                "{} \"{}\" has no inputs",
-                capitalize(output_type),
-                key
+                "{} \"{key}\" has no inputs",
+                capitalize(output_type)
             ));
         }
 
@@ -115,11 +151,8 @@ pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
         for (dup, count) in frequencies.into_iter().filter(|(_name, count)| *count > 1) {
             errors.push(format!(
-                "{} \"{}\" has input \"{}\" duplicated {} times",
+                "{} \"{key}\" has input \"{dup}\" duplicated {count} times",
                 capitalize(output_type),
-                key,
-                dup,
-                count,
             ));
         }
     }
@@ -155,17 +188,25 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-/// Validates that `buffer_utilization_ewma_alpha` value is within the valid range (0 < alpha < 1)
-/// for the global configuration.
-pub fn check_buffer_utilization_ewma_alpha(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    if let Some(alpha) = config.global.buffer_utilization_ewma_alpha
-        && (alpha <= EWMA_ALPHA_MIN || alpha >= EWMA_ALPHA_MAX)
+/// Validates that `*_ewma_alpha` values are within the valid range (0 < alpha < 1).
+pub fn check_values(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+
+    if let Some(error) = validate_ewma_half_life_seconds(
+        config.global.buffer_utilization_ewma_half_life_seconds,
+        "buffer_utilization_ewma_half_life_seconds",
+    ) {
+        errors.push(error);
+    }
+    if let Some(error) = validate_ewma_alpha(config.global.latency_ewma_alpha, "latency_ewma_alpha")
     {
-        Err(vec![format!(
-            "Global `buffer_utilization_ewma_alpha` must be between 0 and 1 exclusive (0 < alpha < 1), got {alpha}"
-        )])
-    } else {
+        errors.push(error);
+    }
+
+    if errors.is_empty() {
         Ok(())
+    } else {
+        Err(errors)
     }
 }
 
@@ -187,10 +228,10 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
-        // use the most general definition possible, since the real value isn't known yet.
-        let definition = schema::Definition::any();
-
-        if let Err(errs) = transform.inner.validate(&definition) {
+        // Structural validation: reserved names, duplicate routes, invalid sample rates.
+        // These checks run during config compilation. Transforms that need the schema/enrichment
+        // context must implement validate_with_context(), called later in validate.rs.
+        if let Err(errs) = transform.inner.validate_structure() {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
 
@@ -316,9 +357,9 @@ pub async fn check_buffer_preconditions(config: &Config) -> Result<(), Vec<Strin
                 .map(|usage| usage.id().id())
                 .collect::<Vec<_>>();
             errors.push(format!(
-                "Mountpoint '{}' has total capacity of {} bytes, but configured buffers using mountpoint have total maximum size of {} bytes. \
+                "Mountpoint '{}' has total capacity of {mountpoint_total_capacity} bytes, but configured buffers using mountpoint have total maximum size of {buffer_max_size_total} bytes. \
 Reduce the `max_size` of the buffers to fit within the total capacity of the mountpoint. (components associated with mountpoint: {})",
-                mountpoint.to_string_lossy(), mountpoint_total_capacity, buffer_max_size_total, component_ids.join(", "),
+                mountpoint.to_string_lossy(), component_ids.join(", "),
             ));
         }
     }
@@ -397,9 +438,8 @@ pub fn warnings(config: &Config) -> Vec<String> {
                 .any(|(_, sink)| sink.inputs.contains(&id))
         {
             warnings.push(format!(
-                "{} \"{}\" has no consumers",
-                capitalize(input_type),
-                id
+                "{} \"{id}\" has no consumers",
+                capitalize(input_type)
             ));
         }
     }

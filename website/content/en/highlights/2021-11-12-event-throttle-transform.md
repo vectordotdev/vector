@@ -48,12 +48,13 @@ Given these incoming log events:
 
 ...and this configuration...
 
-```toml
-[transforms.my_transform_id]
-type = "throttle"
-inputs = [ "my-source-or-transform-id" ]
-threshold = 1
-window_secs = 60
+```yaml
+transforms:
+  my_transform_id:
+    type: "throttle"
+    inputs: ["my-source-or-transform-id"]
+    threshold: 1
+    window_secs: 60
 ```
 
 ...only one event will be allowed through:

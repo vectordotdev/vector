@@ -61,7 +61,7 @@ where
 {
     // URLs and SHA256s for both architectures
     let arm_package_url = format!(
-        "https://packages.timber.io/vector/{vector_version}/vector-{vector_version}-arm64-apple-darwin.tar.gz"
+        "https://install.datadoghq.com/vector/{vector_version}/vector-{vector_version}-arm64-apple-darwin.tar.gz"
     );
     let arm_package_sha256 = hex::encode(sha2::Sha256::digest(
         reqwest::blocking::get(&arm_package_url)?.bytes()?,

@@ -20,8 +20,8 @@ pub struct DirectoryBackend {
 }
 
 impl GenerateConfig for DirectoryBackend {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(DirectoryBackend {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(DirectoryBackend {
             path: PathBuf::from("/path/to/secrets"),
             remove_trailing_whitespace: false,
         })

@@ -104,22 +104,44 @@ fn git_short_hash() -> std::io::Result<String> {
     })
 }
 
+#[cfg(not(feature = "nightly"))]
+fn git_path(path: &str) -> std::io::Result<String> {
+    let output_result = Command::new("git")
+        .args(["rev-parse", "--git-path", path])
+        .output();
+
+    output_result.map(|output| {
+        String::from_utf8(output.stdout)
+            .expect("valid UTF-8")
+            .trim_end_matches(['\r', '\n'])
+            .to_owned()
+    })
+}
+
 fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
 
     // re-run if the HEAD has changed. This is only necessary for non-release and nightly builds.
     #[cfg(not(feature = "nightly"))]
-    println!("cargo:rerun-if-changed=.git/HEAD");
+    println!(
+        "cargo:rerun-if-changed={}",
+        git_path("HEAD").expect("git HEAD path detection failed")
+    );
 
     #[cfg(feature = "protobuf-build")]
     {
         println!("cargo:rerun-if-changed=proto/third-party/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/third-party/google/rpc/status.proto");
         println!("cargo:rerun-if-changed=proto/vector/dd_metric.proto");
-        println!("cargo:rerun-if-changed=proto/vector/dd_trace.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/agent_payload.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/tracer_payload.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/span.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/idx/tracer_payload.proto");
+        println!("cargo:rerun-if-changed=proto/datadog/trace/idx/span.proto");
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
+        println!("cargo:rerun-if-changed=proto/vector/observability.proto");
 
         // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
         //
@@ -133,7 +155,8 @@ fn main() {
         let mut prost_build = prost_build::Config::new();
         prost_build
             .btree_map(["."])
-            .file_descriptor_set_path(protobuf_fds_path);
+            .file_descriptor_set_path(protobuf_fds_path)
+            .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
         tonic_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")
@@ -143,12 +166,15 @@ fn main() {
                     "lib/vector-core/proto/event.proto",
                     "proto/vector/ddsketch_full.proto",
                     "proto/vector/dd_metric.proto",
-                    "proto/vector/dd_trace.proto",
+                    "proto/datadog/trace/agent_payload.proto",
+                    "proto/datadog/trace/idx/tracer_payload.proto",
                     "proto/third-party/google/pubsub/v1/pubsub.proto",
                     "proto/third-party/google/rpc/status.proto",
                     "proto/vector/vector.proto",
+                    "proto/vector/observability.proto",
                 ],
                 &[
+                    "proto",
                     "proto/third-party",
                     "proto/vector",
                     "lib/vector-core/proto/",

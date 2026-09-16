@@ -79,7 +79,7 @@ pub fn spawn_thread<'a>(
     let mut component_config_paths: Vec<_> = component_configs
         .clone()
         .into_iter()
-        .flat_map(|p| p.config_paths.clone())
+        .flat_map(|p| p.config_paths)
         .collect();
 
     config_paths.append(&mut component_config_paths);

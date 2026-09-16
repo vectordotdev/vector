@@ -1,0 +1,30 @@
+# Build artifacts
+target/
+node_modules/
+
+# Generated / test fixture files
+docs/generated/
+lib/codecs/tests/data/
+
+# Hugo templates and assets (Go template syntax breaks prettier)
+website/**/*.html
+website/assets/js/app.js
+website/assets/js/dd-browser-logs-rum.js
+website/layouts/
+
+# Hugo build output and generated resources
+website/public/
+website/resources/
+website/data/
+website/assets/jsconfig.json
+
+# CUE files (not supported by prettier)
+website/cue/
+
+# Config examples using VRL triple-quoted strings
+config/examples/docs_example.yaml
+config/examples/file_to_prometheus.yaml
+
+# Lock files
+Cargo.lock
+website/yarn.lock

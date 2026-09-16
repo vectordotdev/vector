@@ -8,7 +8,6 @@ components: transforms: incremental_to_absolute: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
 		stateful:      true
@@ -21,7 +20,6 @@ components: transforms: incremental_to_absolute: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.incremental_to_absolute.configuration

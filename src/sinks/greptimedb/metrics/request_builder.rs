@@ -1,5 +1,8 @@
 use chrono::Utc;
-use greptimedb_ingester::{api::v1::*, helpers::values::*};
+use greptimedb_ingester::api::v1::{
+    ColumnDataType, ColumnSchema, Row, RowInsertRequest, Rows, SemanticType, Value,
+};
+use greptimedb_ingester::helpers::values::{f64_value, string_value, timestamp_millisecond_value};
 use vector_lib::{
     event::{
         Metric, MetricValue,
@@ -238,6 +241,7 @@ fn tag_column(name: &str) -> ColumnSchema {
 #[cfg(test)]
 mod tests {
 
+    use greptimedb_ingester::api::v1::value;
     use similar_asserts::assert_eq;
 
     use super::*;

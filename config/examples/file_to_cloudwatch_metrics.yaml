@@ -8,13 +8,13 @@ data_dir: "/var/lib/vector"
 sources:
   file:
     type: "file"
-    include: [ "sample.log" ]
+    include: ["sample.log"]
     start_at_beginning: true
 
 # Structure and parse the data
 transforms:
   remap:
-    inputs: [ "file" ]
+    inputs: ["file"]
     type: "remap"
     drop_on_error: false
     source: |
@@ -22,7 +22,7 @@ transforms:
 
   # Transform into metrics
   log_to_metric:
-    inputs: [ "remap" ]
+    inputs: ["remap"]
     type: "log_to_metric"
     metrics:
       - type: "counter"
@@ -35,19 +35,19 @@ transforms:
 # Output data
 sinks:
   console_metrics:
-    inputs: [ "log_to_metric" ]
+    inputs: ["log_to_metric"]
     type: "console"
     encoding:
       codec: "json"
 
   console_logs:
-    inputs: [ "remap" ]
+    inputs: ["remap"]
     type: "console"
     encoding:
       codec: "json"
 
   cloudwatch:
-    inputs: [ "log_to_metric" ]
+    inputs: ["log_to_metric"]
     type: "aws_cloudwatch_metrics"
     namespace: "vector"
     endpoint: "http://localhost:4566"

@@ -1,0 +1,10 @@
+transforms:
+  my_transform_id:
+    type: sample
+    inputs:
+      - my-source-or-transform-id
+    group_by: "{{ service }}"
+    key_field: message
+    measure_cpu_usage: false
+    ratio: 0.13
+    sample_rate_key: sample_rate

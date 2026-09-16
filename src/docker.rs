@@ -4,12 +4,11 @@ use std::{collections::HashMap, env, path::PathBuf};
 use bollard::{
     API_DEFAULT_VERSION, Docker,
     errors::Error as DockerError,
-    models::HostConfig,
+    models::{ContainerCreateBody, HostConfig},
     query_parameters::{
         CreateContainerOptionsBuilder, CreateImageOptionsBuilder, ListImagesOptionsBuilder,
         RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
     },
-    secret::ContainerCreateBody,
 };
 use futures::StreamExt;
 use http::uri::Uri;
@@ -109,10 +108,7 @@ fn get_authority(url: &str) -> Result<String, Error> {
 
 async fn pull_image(docker: &Docker, image: &str, tag: &str) {
     let mut filters = HashMap::new();
-    filters.insert(
-        String::from("reference"),
-        vec![format!("{}:{}", image, tag)],
-    );
+    filters.insert(String::from("reference"), vec![format!("{image}:{tag}")]);
 
     let options = Some(ListImagesOptionsBuilder::new().filters(&filters).build());
 
@@ -130,7 +126,7 @@ async fn pull_image(docker: &Docker, image: &str, tag: &str) {
             .create_image(options, None, None)
             .for_each(|item| async move {
                 let info = item.unwrap();
-                if let Some(error) = info.error {
+                if let Some(error) = info.error_detail {
                     panic!("{error:?}");
                 }
             })
