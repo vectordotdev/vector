@@ -6,10 +6,11 @@ use crate::opentelemetry::{
 };
 use vrl::value::Value as VrlValue;
 
-// telemetrygen generates 100 traces, each trace contains exactly 2 spans (parent + child)
-// Collector forwards via both gRPC and HTTP to Vector, so: 100 traces * 2 spans * 2 protocols = 400 spans
-const EXPECTED_SPAN_COUNT: usize = 400;
+// The source collector records telemetrygen's input once, then forwards it to Vector over both
+// OTLP protocols.
 const EXPECTED_TRACE_COUNT: usize = 100;
+const SOURCE_SPAN_COUNT: usize = 200; // 100 traces * 2 spans (parent + child).
+const FORWARDED_SPAN_COUNT: usize = 400; // 200 spans * 2 Vector exports (gRPC + HTTP).
 
 fn parse_export_traces_request(content: &str) -> Result<ExportTraceServiceRequest, String> {
     // The file may contain multiple lines, each with a JSON object containing an array of resourceSpans
@@ -155,16 +156,14 @@ fn assert_span_ids_match(
 
     assert_eq!(
         collector_span_ids.len(),
-        EXPECTED_SPAN_COUNT / 2,
-        "Collector should have {} unique span IDs",
-        EXPECTED_SPAN_COUNT / 2
+        SOURCE_SPAN_COUNT,
+        "Collector should have {SOURCE_SPAN_COUNT} unique span IDs"
     );
 
     assert_eq!(
         vector_span_ids.len(),
-        EXPECTED_SPAN_COUNT / 2,
-        "Vector should have {} unique span IDs",
-        EXPECTED_SPAN_COUNT / 2
+        SOURCE_SPAN_COUNT,
+        "Vector should have {SOURCE_SPAN_COUNT} unique span IDs"
     );
 
     assert_eq!(
@@ -262,15 +261,13 @@ fn vector_sink_otel_sink_traces_match() {
         .count();
 
     assert_eq!(
-        source_span_count,
-        EXPECTED_SPAN_COUNT / 2, // TODO find out why /2
-        "Collector-source received {source_span_count} spans, expected {}",
-        EXPECTED_SPAN_COUNT / 2
+        source_span_count, SOURCE_SPAN_COUNT,
+        "Collector-source received {source_span_count} spans, expected {SOURCE_SPAN_COUNT}"
     );
 
     assert_eq!(
-        sink_span_count, EXPECTED_SPAN_COUNT,
-        "Collector-sink received {sink_span_count} spans from Vector, expected {EXPECTED_SPAN_COUNT}"
+        sink_span_count, FORWARDED_SPAN_COUNT,
+        "Collector-sink received {sink_span_count} spans from Vector, expected {FORWARDED_SPAN_COUNT}"
     );
 
     // Verify service.name attribute
@@ -349,5 +346,5 @@ fn vector_component_received_events_total_counts_individual_spans() {
     // OpenTelemetry source when use_otlp_decoding is disabled.
     use crate::opentelemetry::assert_component_received_events_total;
 
-    assert_component_received_events_total("traces", EXPECTED_SPAN_COUNT);
+    assert_component_received_events_total("traces", FORWARDED_SPAN_COUNT);
 }
