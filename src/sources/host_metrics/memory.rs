@@ -5,7 +5,9 @@ use heim::memory::os::linux::MemoryExt;
 #[cfg(target_os = "macos")]
 use heim::memory::os::macos::MemoryExt;
 use heim::units::information::byte;
-use vector_lib::event::MetricTags;
+#[cfg(not(windows))]
+use vector_lib::internal_event::CounterName;
+use vector_lib::{event::MetricTags, internal_event::GaugeName};
 
 use super::HostMetrics;
 use crate::internal_events::HostMetricsScrapeDetailError;
@@ -16,59 +18,59 @@ impl HostMetrics {
         match heim::memory::memory().await {
             Ok(memory) => {
                 output.gauge(
-                    "memory_total_bytes",
+                    GaugeName::MemoryTotalBytes,
                     memory.total().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 output.gauge(
-                    "memory_free_bytes",
+                    GaugeName::MemoryFreeBytes,
                     memory.free().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 output.gauge(
-                    "memory_available_bytes",
+                    GaugeName::MemoryAvailableBytes,
                     memory.available().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 #[cfg(any(target_os = "linux", target_os = "macos"))]
                 output.gauge(
-                    "memory_active_bytes",
+                    GaugeName::MemoryActiveBytes,
                     memory.active().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 #[cfg(target_os = "linux")]
                 output.gauge(
-                    "memory_buffers_bytes",
+                    GaugeName::MemoryBuffersBytes,
                     memory.buffers().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 #[cfg(target_os = "linux")]
                 output.gauge(
-                    "memory_cached_bytes",
+                    GaugeName::MemoryCachedBytes,
                     memory.cached().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 #[cfg(target_os = "linux")]
                 output.gauge(
-                    "memory_shared_bytes",
+                    GaugeName::MemorySharedBytes,
                     memory.shared().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 #[cfg(target_os = "linux")]
                 output.gauge(
-                    "memory_used_bytes",
+                    GaugeName::MemoryUsedBytes,
                     memory.used().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 #[cfg(target_os = "macos")]
                 output.gauge(
-                    "memory_inactive_bytes",
+                    GaugeName::MemoryInactiveBytes,
                     memory.inactive().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 #[cfg(target_os = "macos")]
                 output.gauge(
-                    "memory_wired_bytes",
+                    GaugeName::MemoryWiredBytes,
                     memory.wire().get::<byte>() as f64,
                     MetricTags::default(),
                 );
@@ -87,29 +89,29 @@ impl HostMetrics {
         match heim::memory::swap().await {
             Ok(swap) => {
                 output.gauge(
-                    "memory_swap_free_bytes",
+                    GaugeName::MemorySwapFreeBytes,
                     swap.free().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 output.gauge(
-                    "memory_swap_total_bytes",
+                    GaugeName::MemorySwapTotalBytes,
                     swap.total().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 output.gauge(
-                    "memory_swap_used_bytes",
+                    GaugeName::MemorySwapUsedBytes,
                     swap.used().get::<byte>() as f64,
                     MetricTags::default(),
                 );
                 #[cfg(not(windows))]
                 output.counter(
-                    "memory_swapped_in_bytes_total",
+                    CounterName::MemorySwappedInBytesTotal,
                     swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
                     MetricTags::default(),
                 );
                 #[cfg(not(windows))]
                 output.counter(
-                    "memory_swapped_out_bytes_total",
+                    CounterName::MemorySwappedOutBytesTotal,
                     swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
                     MetricTags::default(),
                 );
