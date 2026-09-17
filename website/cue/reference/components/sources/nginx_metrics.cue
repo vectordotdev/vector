@@ -41,7 +41,6 @@ components: sources: nginx_metrics: {
 		]
 
 		warnings: []
-		notices: []
 	}
 
 	installation: {

@@ -312,10 +312,9 @@ mod tests {
             let output = deserialize(input, format);
             match expected {
                 Ok(expected) => {
-                    #[allow(clippy::expect_fun_call)] // false positive
-                    let output: ConfigBuilder = output.expect(&format!(
-                        "expected Ok, got Err with format {format:?} and input {input:?}"
-                    ));
+                    let output: ConfigBuilder = output.unwrap_or_else(|_| {
+                        panic!("expected Ok, got Err with format {format:?} and input {input:?}")
+                    });
                     let output_json = serde_json::to_value(output).unwrap();
                     let expected_output: ConfigBuilder = deserialize(expected, Format::Toml)
                         .expect("Invalid TOML passed as an expectation");

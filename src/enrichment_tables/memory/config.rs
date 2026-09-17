@@ -182,7 +182,7 @@ const fn default_ttl() -> u64 {
 }
 
 const fn default_scan_interval() -> NonZeroU64 {
-    unsafe { NonZeroU64::new_unchecked(30) }
+    NonZeroU64::new(30).expect("the default scan interval is nonzero")
 }
 
 impl MemoryConfig {
@@ -273,7 +273,7 @@ impl MemoryConfig {
                 if let Some(max_byte_size) = self.max_byte_size
                     && filter_size > max_byte_size
                 {
-                    return Err(format!("Configured bloom filter is larger ({}) than defined `max_byte_size` ({}). Reduce the size of bloom filter or increase or remove `max_byte_size`.", filter_size, max_byte_size).into());
+                    return Err(format!("Configured bloom filter is larger ({filter_size}) than defined `max_byte_size` ({max_byte_size}). Reduce the size of bloom filter or increase or remove `max_byte_size`.").into());
                 }
             }
             _ => {}

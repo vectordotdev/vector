@@ -26,7 +26,6 @@ components: sources: internal_metrics: {
 	}
 
 	support: {
-		notices: []
 		requirements: []
 		warnings: []
 	}
@@ -71,7 +70,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		aggregate_failed_updates: {
+		aggregate_failed_updates_total: {
 			description:       "The number of failed metric updates, `incremental` adds, encountered by the aggregate transform."
 			type:              "counter"
 			default_namespace: "vector"

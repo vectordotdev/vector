@@ -58,7 +58,6 @@ components: sinks: honeycomb: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.honeycomb.configuration

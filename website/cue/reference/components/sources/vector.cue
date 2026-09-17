@@ -45,7 +45,6 @@ components: sources: vector: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
