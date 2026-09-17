@@ -3734,6 +3734,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "datadog-proto"
+version = "0.1.0"
+dependencies = [
+ "prost 0.12.6",
+ "prost-build 0.12.6",
+]
+
+[[package]]
 name = "dbl"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13379,6 +13387,7 @@ dependencies = [
  "cuckoo-clock",
  "databend-client",
  "databricks-zerobus-ingest-sdk",
+ "datadog-proto",
  "deadpool 0.13.1",
  "derivative",
  "derive_more",
