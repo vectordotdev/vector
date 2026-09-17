@@ -179,7 +179,8 @@ jobs:
           existing=$(git ls-remote --heads origin "refs/heads/${PREP_BRANCH}")
           if [[ -n "$existing" ]]; then
             git fetch --no-tags origin "refs/heads/${PREP_BRANCH}"
-            [[ "$(git rev-list --parents -n 1 FETCH_HEAD)" == "$(git rev-parse FETCH_HEAD) $BASE_SHA" ]]
+            git merge-base --is-ancestor "$BASE_SHA" FETCH_HEAD
+            [[ -z "$(git rev-list --merges "${BASE_SHA}..FETCH_HEAD")" ]]
             git diff --exit-code HEAD FETCH_HEAD
             git switch --detach FETCH_HEAD
           fi
