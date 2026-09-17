@@ -21,11 +21,6 @@ use super::metadata::{Inner, default_schema_definition};
 use super::ser::DecodeError;
 use super::{EventMetadata, array, metric::MetricSketch};
 
-/// Convert chrono `timestamp_subsec_nanos` (`u32`, always ≤ `1_999_999_999`) to protobuf `i32`.
-fn chrono_nanos_to_i32(nanos: u32) -> i32 {
-    i32::try_from(nanos).expect("chrono subsec nanos always fits in i32")
-}
-
 fn require_variant<T>(value: Option<T>) -> Result<T, DecodeError> {
     value.ok_or(DecodeError::UnrecognizedEventVariant)
 }
@@ -434,10 +429,10 @@ impl From<super::Metric> for WithMetadata<Metric> {
         let name = series.name.name;
         let namespace = series.name.namespace.unwrap_or_default();
 
-        // timestamp_subsec_nanos is always ≤ 1_999_999_999 (chrono leap-second specs).
         let timestamp = data.time.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),
-            nanos: chrono_nanos_to_i32(ts.timestamp_subsec_nanos()),
+            nanos: i32::try_from(ts.timestamp_subsec_nanos())
+                .expect("chrono subsecond nanoseconds fit in i32"),
         });
 
         let interval_ms = data.time.interval_ms.map_or(0, std::num::NonZeroU32::get);
@@ -792,7 +787,8 @@ fn encode_value(value: super::Value) -> Value {
             super::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
             super::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
-                nanos: chrono_nanos_to_i32(ts.timestamp_subsec_nanos()),
+                nanos: i32::try_from(ts.timestamp_subsec_nanos())
+                    .expect("chrono subsecond nanoseconds fit in i32"),
             })),
             super::Value::Integer(value) => Some(value::Kind::Integer(value)),
             super::Value::Float(value) => Some(value::Kind::Float(value.into_inner())),
