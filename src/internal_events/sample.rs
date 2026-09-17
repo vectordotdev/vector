@@ -1,17 +1,24 @@
 use vector_lib::{
     NamedInternalEvent, counter,
-    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
+    internal_event::{CounterName, InternalEvent},
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct SampleEventDiscarded {
+pub struct SampleEventsDropped {
     pub group: String,
     pub include_group_tag: bool,
 }
 
-impl InternalEvent for SampleEventDiscarded {
+impl InternalEvent for SampleEventsDropped {
     fn emit(self) {
         let reason = "Sample discarded.";
+
+        debug!(
+            message = "Events dropped.",
+            intentional = true,
+            count = 1,
+            reason,
+        );
 
         if self.include_group_tag {
             counter!(
@@ -19,10 +26,13 @@ impl InternalEvent for SampleEventDiscarded {
                 "intentional" => "true",
                 "group" => self.group,
             )
-            .increment(1);
         } else {
-            emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
+            counter!(
+                CounterName::ComponentDiscardedEventsTotal,
+                "intentional" => "true",
+            )
         }
+        .increment(1);
     }
 }
 
@@ -31,7 +41,7 @@ mod tests {
     use serial_test::serial;
     use vector_lib::{event::MetricValue, internal_event::InternalEvent, metrics::Controller};
 
-    use super::SampleEventDiscarded;
+    use super::SampleEventsDropped;
 
     fn discarded_events_counter(tags: &[(&str, &str)]) -> Option<f64> {
         Controller::get()
@@ -61,7 +71,7 @@ mod tests {
             .reset();
 
         for group in ["group-a", "group-b", "None"] {
-            SampleEventDiscarded {
+            SampleEventsDropped {
                 group: group.to_string(),
                 include_group_tag: true,
             }
@@ -84,7 +94,7 @@ mod tests {
             .expect("metrics controller initialized")
             .reset();
 
-        SampleEventDiscarded {
+        SampleEventsDropped {
             group: "group-a".to_string(),
             include_group_tag: false,
         }
