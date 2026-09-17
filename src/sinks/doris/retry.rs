@@ -18,6 +18,9 @@ struct DorisStreamLoadResponse {
 
     #[serde(rename = "Message")]
     message: Option<String>,
+    
+    #[serde(rename = "ErrorURL")]
+    error_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +56,14 @@ impl RetryLogic for DorisRetryLogic {
                     doris_status = %doris_resp.status,
                     error_message = %message
                 );
+
+                if let Some(url) = doris_resp.error_url.as_ref() {
+                    debug!(
+                        message = "Doris stream load failed; details can be found at:",
+                        error_url = %url
+                    );
+                }
+
                 return RetryAction::Retry(
                     format!("Doris error: {} - {message}", doris_resp.status).into(),
                 );
