@@ -24,7 +24,7 @@ use crate::{
 #[serde_as]
 #[configurable_component(transform(
     "reduce",
-    "Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
+    "Collapse multiple log or trace events into a single event based on a set of conditions and merge strategies.",
 ))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -124,7 +124,7 @@ impl TransformConfig for ReduceConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(DataType::Log | DataType::Trace)
     }
 
     fn outputs(
@@ -229,7 +229,10 @@ impl TransformConfig for ReduceConfig {
             output_definitions.insert(output.clone(), schema_definition.clone());
         }
 
-        vec![TransformOutput::new(DataType::Log, output_definitions)]
+        vec![TransformOutput::new(
+            DataType::Log | DataType::Trace,
+            output_definitions,
+        )]
     }
 
     fn validate_structure(&self) -> Result<(), Vec<String>> {
