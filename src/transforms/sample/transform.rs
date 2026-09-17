@@ -14,7 +14,7 @@ use vector_lib::{
 use crate::{
     conditions::Condition,
     event::{Event, Value},
-    internal_events::SampleEventDiscarded,
+    internal_events::SampleEventsDropped,
     sinks::prelude::TemplateRenderingError,
     template::UnconfinedTemplate,
     transforms::{FunctionTransform, OutputBuffer},
@@ -384,7 +384,7 @@ impl FunctionTransform for Sample {
             }
             output.push(event);
         } else {
-            emit!(SampleEventDiscarded {
+            emit!(SampleEventsDropped {
                 group: group_by_key.unwrap_or_else(|| "None".to_string()),
                 include_group_tag: self.include_group_tag,
             });

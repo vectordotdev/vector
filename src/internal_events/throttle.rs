@@ -1,16 +1,16 @@
 use vector_lib::{
     NamedInternalEvent, counter,
-    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
+    internal_event::{CounterName, InternalEvent},
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub(crate) struct ThrottleEventDiscarded {
+pub(crate) struct ThrottleEventsDropped {
     pub key: String,
     pub emit_events_discarded_per_key: bool,
     pub include_group_tag: bool,
 }
 
-impl InternalEvent for ThrottleEventDiscarded {
+impl InternalEvent for ThrottleEventsDropped {
     fn emit(self) {
         let message = "Rate limit exceeded.";
 
@@ -19,19 +19,26 @@ impl InternalEvent for ThrottleEventDiscarded {
             counter!(CounterName::EventsDiscardedTotal, "key" => self.key.clone()).increment(1); // Deprecated.
         }
 
+        debug!(
+            message = "Events dropped.",
+            intentional = true,
+            count = 1,
+            reason = message,
+        );
+
         if self.include_group_tag {
             counter!(
                 CounterName::ComponentDiscardedEventsTotal,
                 "intentional" => "true",
                 "group" => self.key,
             )
-            .increment(1);
         } else {
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: message
-            });
+            counter!(
+                CounterName::ComponentDiscardedEventsTotal,
+                "intentional" => "true",
+            )
         }
+        .increment(1);
     }
 }
 
@@ -40,7 +47,7 @@ mod tests {
     use serial_test::serial;
     use vector_lib::{event::MetricValue, internal_event::InternalEvent, metrics::Controller};
 
-    use super::ThrottleEventDiscarded;
+    use super::ThrottleEventsDropped;
 
     fn discarded_events_counter(tags: &[(&str, &str)]) -> Option<f64> {
         Controller::get()
@@ -70,7 +77,7 @@ mod tests {
             .reset();
 
         for key in ["group-a", "group-b", "None"] {
-            ThrottleEventDiscarded {
+            ThrottleEventsDropped {
                 key: key.to_string(),
                 emit_events_discarded_per_key: false,
                 include_group_tag: true,
@@ -94,7 +101,7 @@ mod tests {
             .expect("metrics controller initialized")
             .reset();
 
-        ThrottleEventDiscarded {
+        ThrottleEventsDropped {
             key: "group-a".to_string(),
             emit_events_discarded_per_key: false,
             include_group_tag: false,
