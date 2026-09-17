@@ -69,7 +69,7 @@ jobs:
       smp-version: ${{ steps.experimental-meta.outputs.SMP_CRATE_VERSION }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # need to pull repository history to find merge bases
 
@@ -128,7 +128,7 @@ jobs:
     outputs:
       source_changed: ${{ steps.filter.outputs.SOURCE_CHANGED }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Collect file changes
         id: changes
@@ -203,16 +203,16 @@ jobs:
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve-inputs.outputs.baseline-sha }}
           path: baseline-vector
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -242,16 +242,16 @@ jobs:
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
           path: comparison-vector
 
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Build 'vector' target image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -283,7 +283,7 @@ jobs:
       id-token: write # Required for GitHub OIDC token exchange
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
@@ -320,7 +320,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
@@ -363,7 +363,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
@@ -396,12 +396,12 @@ jobs:
       contents: read # Required to checkout code
       id-token: write # Required for GitHub OIDC token exchange
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
@@ -475,10 +475,10 @@ jobs:
       contents: read # Required to checkout code
       id-token: write # Required for GitHub OIDC token exchange
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2
@@ -515,12 +515,12 @@ jobs:
       contents: read # Required to checkout code
       id-token: write # Required for GitHub OIDC token exchange
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: arn:aws:iam::850406765696:role/smp-regression-oidc
           aws-region: us-west-2

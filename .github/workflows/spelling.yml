@@ -24,5 +24,5 @@ jobs:
       group: spelling-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
       - uses: crate-ci/typos@d43b6c087ac471e2ea7b8af622ff15f05c0c365b # v1.50.1
