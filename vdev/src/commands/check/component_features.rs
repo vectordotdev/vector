@@ -41,6 +41,7 @@ const EXCLUDED_META_FEATURES: &[&str] = &[
     "all-integration-tests",
     "all-e2e-tests",
     "vector-api-tests",
+    "ifile-tests",
     "vector-unit-test-tests",
 ];
 

@@ -39,6 +39,11 @@ name = "vector_api"
 path = "tests/vector_api/lib.rs"
 required-features = ["vector-api-tests"]
 
+[[test]]
+name = "ifile"
+path = "tests/ifile/lib.rs"
+required-features = ["ifile-tests"]
+
 [profile.release]
 debug = false # Do not include debug symbols in the executable.
 codegen-units = 1
@@ -1039,6 +1044,7 @@ all-integration-tests = [
   "greptimedb-integration-tests",
   "http-client-integration-tests",
   "humio-integration-tests",
+  "ifile-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
   "logstash-integration-tests",
@@ -1153,6 +1159,13 @@ e2e-tests-opentelemetry = [
   "sinks-file",
   "codecs-opentelemetry",
   "dep:prost-reflect"
+]
+
+ifile-tests = [
+  "sources-ifile",
+  "sources-internal_metrics",
+  "transforms-filter",
+  "sinks-console"
 ]
 
 vector-api-tests = [
