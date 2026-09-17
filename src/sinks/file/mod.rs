@@ -551,11 +551,11 @@ impl FileSink {
         };
         let batch_settings = self.batch_settings;
         // Per-path buffers of `(events, generation, bytes)`; `bytes` tracks
-        // size without rescanning, `generation` marks stale `flush_deadlines`.
+        // size without rescanning, a global `generation` marks stale deadlines.
+        // A global (not per-path) counter avoids retaining retired-path state.
         let mut buffers: std::collections::HashMap<Bytes, (Vec<Event>, u64, usize)> =
             std::collections::HashMap::new();
-        let mut per_path_gen: std::collections::HashMap<Bytes, u64> =
-            std::collections::HashMap::new();
+        let mut next_generation: u64 = 0;
         let mut flush_deadlines: std::collections::BinaryHeap<
             std::cmp::Reverse<(tokio::time::Instant, Bytes, u64)>,
         > = std::collections::BinaryHeap::new();
@@ -619,52 +619,57 @@ impl FileSink {
                                 }
                             };
                             let event_size = event.estimated_json_encoded_size_of().get();
-                            if let Some((events, _generation, bytes)) = buffers.get_mut(&path) {
-                                if *bytes + event_size > batch_settings.size_limit
-                                    || events.len() >= batch_settings.item_limit
-                                {
-                                    // Buffer is full — flush old batch and start fresh.
-                                    let (old_events, _old_generation, _old_bytes) =
-                                        buffers.remove(&path).unwrap();
-                                    self.process_batch(path.clone(), old_events).await;
-                                    let generation = per_path_gen.entry(path.clone()).or_insert(0);
-                                    let deadline = tokio::time::Instant::now()
-                                        + batch_settings.timeout;
+                            // Queue a deadline only for a pending fresh batch; one
+                            // flushed at its item/byte limit never needs a heap entry.
+                            let fresh_batch =
+                                if let Some((events, _generation, bytes)) = buffers.get_mut(&path) {
+                                    if *bytes + event_size > batch_settings.size_limit
+                                        || events.len() >= batch_settings.item_limit
+                                    {
+                                        // Buffer is full — flush old batch and start fresh.
+                                        let (old_events, _old_generation, _old_bytes) =
+                                            buffers.remove(&path).unwrap();
+                                        self.process_batch(path.clone(), old_events).await;
+                                        let generation = next_generation;
+                                        next_generation = next_generation.wrapping_add(1);
+                                        buffers.insert(
+                                            path.clone(),
+                                            (vec![event], generation, event_size),
+                                        );
+                                        true
+                                    } else {
+                                        *bytes += event_size;
+                                        events.push(event);
+                                        false
+                                    }
+                                } else {
+                                    let generation = next_generation;
+                                    next_generation = next_generation.wrapping_add(1);
                                     buffers.insert(
                                         path.clone(),
-                                        (vec![event], *generation, event_size),
+                                        (vec![event], generation, event_size),
                                     );
-                                    flush_deadlines.push(
-                                        std::cmp::Reverse((deadline, path.clone(), *generation)),
-                                    );
-                                    *generation += 1;
-                                } else {
-                                    *bytes += event_size;
-                                    events.push(event);
-                                }
-                            } else {
-                                let generation = per_path_gen.entry(path.clone()).or_insert(0);
+                                    true
+                                };
+                            // Flush at the item/byte limit; only pending fresh
+                            // batches queue a timeout deadline.
+                            let needs_flush = buffers.get(&path).is_some_and(
+                                |(events, _, bytes)| {
+                                    *bytes >= batch_settings.size_limit
+                                        || events.len() >= batch_settings.item_limit
+                                },
+                            );
+                            if needs_flush {
+                                let (events, _generation, _bytes) =
+                                    buffers.remove(&path).unwrap();
+                                self.process_batch(path.clone(), events).await;
+                            } else if fresh_batch {
+                                let generation = buffers.get(&path).unwrap().1;
                                 let deadline = tokio::time::Instant::now()
                                     + batch_settings.timeout;
-                                buffers.insert(
-                                    path.clone(),
-                                    (vec![event], *generation, event_size),
-                                );
                                 flush_deadlines.push(
-                                    std::cmp::Reverse((deadline, path.clone(), *generation)),
+                                    std::cmp::Reverse((deadline, path, generation)),
                                 );
-                                *generation += 1;
-                            }
-                            // Flush immediately when the batch reaches the item or byte limit.
-                            let needs_flush = buffers.get(&path).is_some_and(|(events, _, bytes)| {
-                                *bytes >= batch_settings.size_limit
-                                    || events.len() >= batch_settings.item_limit
-                            });
-                            if needs_flush {
-                                let (events, _generation, _bytes) = buffers.remove(&path).unwrap();
-                                self.process_batch(path.clone(), events).await;
-                                // The stale deadline entry (generation) remains in the heap but won't
-                                // match the new generation if this path receives more events.
                             }
                             // Bound active-buffer memory under high-cardinality templates.
                             // Also flush expired buffers inline.
@@ -731,10 +736,11 @@ impl FileSink {
                         Some((expired_file, expired_path)) => {
                             let path = expired_path.get_ref().clone();
                             if let Some((events, _generation, _bytes)) = buffers.remove(&path) {
-                                // Flush pending work and keep the file open so
-                                // after-close truncation can't erase earlier output.
+                                // Keep the file open so after-close truncation
+                                // can't erase earlier output; keep the original
+                                // deadline so `should_truncate` sees the true mtime.
                                 self.files
-                                    .insert_at(path.clone(), expired_file, self.deadline_at());
+                                    .insert_at(path.clone(), expired_file, expired_path.deadline().into_std());
                                 self.process_batch(path, events).await;
                             } else {
                                 self.close_file(expired_file, expired_path).await;
@@ -981,6 +987,7 @@ impl FileSink {
         match write_result {
             Ok(()) => {
                 // Complete the frame so a later rollback never truncates this batch.
+                // On failure the frame may be incomplete; fail the batch for retries.
                 if compression != Compression::None
                     && let Err(error) = file.finish_and_reopen().await
                 {
@@ -989,8 +996,12 @@ impl FileSink {
                         message: "Failed to complete the compression stream.",
                         error,
                         path: &path,
-                        dropped_events: 0,
+                        dropped_events: n_events,
                     });
+                    for (_buf, finalizers, _event_size) in encoded {
+                        finalizers.update_status(EventStatus::Errored);
+                    }
+                    return;
                 }
                 for (_buf, finalizers, event_size) in encoded {
                     finalizers.update_status(EventStatus::Delivered);
@@ -1369,7 +1380,7 @@ mod tests {
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::{JsonSerializerConfig, encoding::SerializerConfig},
-        event::{LogEvent, TraceEvent},
+        event::{BatchNotifier, BatchStatus, LogEvent, TraceEvent},
         sink::VectorSink,
     };
     #[cfg(unix)]
@@ -1447,6 +1458,41 @@ mod tests {
             base_dir: None,
             confinement: ConfinementConfig::default(),
             batch: Default::default(),
+        };
+
+        let (input, _events) = random_lines_with_stream(100, 64, None);
+
+        run_assert_log_sink(&config, input.clone()).await;
+
+        let output = lines_from_file(template);
+        for (input, output) in input.into_iter().zip(output) {
+            assert_eq!(input, output);
+        }
+    }
+
+    // `max_events: 1` flushes each batch immediately, with no queued deadline.
+    #[tokio::test]
+    async fn log_single_partition_max_events_one() {
+        let template = temp_file();
+
+        let batch = serde_json::from_value::<BatchConfig<RealtimeSizeBasedDefaultBatchSettings>>(
+            serde_json::json!({ "max_events": 1, "timeout_secs": 5.0, "max_bytes": 10_000_000 }),
+        )
+        .unwrap();
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::None,
+            acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
+            truncate: Default::default(),
+            base_dir: None,
+            confinement: ConfinementConfig::default(),
+            batch,
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -1762,6 +1808,75 @@ mod tests {
 
         let output = lines_from_file(template);
         assert_eq!(output, vec!["first".to_owned(), "second".to_owned()]);
+    }
+
+    // Regression: keep the file's original deadline when flushing a pending
+    // batch on idle expiry so `after_modified_time_secs` truncates stale output.
+    #[tokio::test]
+    async fn expired_pending_batch_truncates_stale_output() {
+        trace_init();
+
+        let template = temp_file();
+        // batch timeout (5s) > idle_timeout (2s), so "fresh" is still pending
+        // when the file's idle deadline fires.
+        let batch = serde_json::from_value::<BatchConfig<RealtimeSizeBasedDefaultBatchSettings>>(
+            serde_json::json!({ "timeout_secs": 5.0, "max_bytes": 10_000_000 }),
+        )
+        .unwrap();
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout: Duration::from_secs(2),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::None,
+            acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
+            truncate: FileTruncateConfig {
+                after_close_time_secs: None,
+                // idle_timeout (2s) > 1s, so the stale write ages past the threshold.
+                after_modified_time_secs: Some(NonZeroU64::new(1).unwrap()),
+                after_secs: None,
+            },
+            base_dir: None,
+            confinement: ConfinementConfig::default(),
+            batch,
+        };
+
+        let (mut tx, rx) = futures::channel::mpsc::channel::<Event>(0);
+        let sink_handle = tokio::spawn(async move {
+            let sink = FileSink::new(&config, SinkContext::default()).unwrap();
+            VectorSink::from_event_streamsink(sink)
+                .run(Box::pin(rx.map(Into::into)))
+                .await
+                .expect("Running sink failed");
+        });
+
+        tx.send(Event::Log(LogEvent::from("stale"))).await.unwrap();
+        // Wait for the first batch to flush and open the file.
+        tokio::time::timeout(Duration::from_secs(10), async {
+            loop {
+                if let Ok(contents) = tokio::fs::read_to_string(&template).await
+                    && contents.contains("stale")
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .expect("first batch did not flush in time");
+
+        // Sleep past the idle deadline so the stale write is old enough to truncate.
+        tx.send(Event::Log(LogEvent::from("fresh"))).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(3000)).await;
+
+        drop(tx);
+        sink_handle.await.unwrap();
+
+        let output = lines_from_file(template);
+        assert_eq!(output, vec!["fresh".to_owned()]);
     }
 
     #[tokio::test]
@@ -2307,6 +2422,48 @@ mod tests {
     async fn finish_and_reopen_preserves_completed_zstd_stream() {
         trace_init();
         assert_preserved_completed_stream(Compression::Zstd, temp_file()).await;
+    }
+
+    // Regression: finalization failure (e.g. ENOSPC surfaced at shutdown) must
+    // fail the batch so acknowledgements retry a possibly incomplete frame.
+    #[tokio::test]
+    async fn compression_finalization_failure_fails_batch() {
+        trace_init();
+
+        let template = temp_file();
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout: default_idle_timeout(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::Gzip,
+            acknowledgements: Default::default(),
+            timezone: Default::default(),
+            internal_metrics: FileInternalMetricsConfig {
+                include_file_tag: true,
+            },
+            truncate: Default::default(),
+            base_dir: None,
+            confinement: ConfinementConfig::default(),
+            batch: Default::default(),
+        };
+        let mut sink = FileSink::new(&config, SinkContext::default()).unwrap();
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let event = Event::from(LogEvent::from("hello").with_batch_notifier(&batch));
+
+        // A read-only file accepts the batch into the encoder's buffer but
+        // rejects the final flush, failing `finish_and_reopen`.
+        tokio::fs::write(&template, b"old").await.unwrap();
+        let readonly = tokio::fs::File::open(&template).await.unwrap();
+        let outfile = OutFile::new(readonly, Compression::Gzip);
+        let path = Bytes::from_static(b"/finalization-failure.log");
+        sink.files
+            .insert_at(path.clone(), outfile, sink.deadline_at());
+
+        sink.process_batch(path, vec![event]).await;
+        drop(batch);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
     }
 
     // Regression test: expected-end validation refuses to roll back when
