@@ -1200,6 +1200,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "asyncband"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2d85fd3d291fabcc40c7232c92c280ec1754fd7b5d7ea769f143222143e179a"
+
+[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8092,12 +8098,12 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendal"
-version = "0.58.2"
+version = "0.59.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33dbff14cc9bb085224256d6a81289d2f3202e85b06f408d42534b42162a4231"
+checksum = "f950151f9587a51a7bed70a15fa0cff464eae96e41ae7499f97067bdafdf43eb"
 dependencies = [
- "opendal-core",
- "opendal-http-transport-reqwest",
+ "opendal-core 0.59.2",
+ "opendal-http-transport-reqwest 0.59.2",
  "opendal-layer-logging",
  "opendal-service-webhdfs",
 ]
@@ -8109,7 +8115,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48dbcef97d3eb7591db2c18d5cae95c836bcce07359b98d98dd6f4e861eb77b7"
 dependencies = [
  "anyhow",
- "asyncband",
+ "asyncband 0.6.7",
+ "base64 0.23.1",
+ "bytes",
+ "futures",
+ "http 1.5.0",
+ "jiff",
+ "log",
+ "md-5 0.11.0",
+ "percent-encoding",
+ "quick-xml 0.41.0",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
+ "uuid",
+ "web-time",
+]
+
+[[package]]
+name = "opendal-core"
+version = "0.59.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de4566a412776e3f65d53dd9fceced5b432a0a9c9a1e8d50ccf58823795e5c5b"
+dependencies = [
+ "anyhow",
+ "asyncband 0.7.2",
  "base64 0.23.1",
  "bytes",
  "futures",
@@ -8137,32 +8168,46 @@ dependencies = [
  "futures",
  "http 1.5.0",
  "http-body 1.0.1",
- "opendal-core",
+ "opendal-core 0.58.2",
+ "reqwest 0.13.4",
+]
+
+[[package]]
+name = "opendal-http-transport-reqwest"
+version = "0.59.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f772ce6c137ab43647726116d505a649a88d41928fcd813438eb30b02312bcbb"
+dependencies = [
+ "bytes",
+ "futures",
+ "http 1.5.0",
+ "http-body 1.0.1",
+ "opendal-core 0.59.2",
  "reqwest 0.13.4",
 ]
 
 [[package]]
 name = "opendal-layer-logging"
-version = "0.58.2"
+version = "0.59.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2de17c61cd32e9d8d7d8efb91795e714dbccbafbc3c4e219e1542f4d6324161"
+checksum = "0a8daab5a91eac76f94516e7c71e677195c9221840ce8f5e71815e3fc8207742"
 dependencies = [
  "log",
- "opendal-core",
+ "opendal-core 0.59.2",
 ]
 
 [[package]]
 name = "opendal-service-webhdfs"
-version = "0.58.2"
+version = "0.59.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a0f7466fde4e0574935079401198c59980fe3dceb820c23a239e2fe513b1126"
+checksum = "94fdf17d44fe4103feeaa7b5233303a7f237b804ba40d0c4264f74b2d41c5fdd"
 dependencies = [
  "anyhow",
- "asyncband",
+ "asyncband 0.7.2",
  "bytes",
  "http 1.5.0",
  "log",
- "opendal-core",
+ "opendal-core 0.59.2",
  "serde",
  "serde_json",
  "uuid",
@@ -13443,7 +13488,7 @@ dependencies = [
  "nom 8.0.0",
  "notify",
  "opendal",
- "opendal-http-transport-reqwest",
+ "opendal-http-transport-reqwest 0.58.2",
  "openssl",
  "openssl-probe 0.1.6",
  "openssl-src",
