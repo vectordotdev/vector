@@ -32,7 +32,9 @@ impl Cli {
                 "--title",
                 &format!("v{version}"),
                 "--notes",
-                &format!("[View release notes](https://vector.dev/releases/{version})"),
+                &format!(
+                    "The [COSE team](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team) is excited to announce version `{version}`! 🚀\n\n[View release notes](https://vector.dev/releases/{version})"
+                ),
             ]
             .map(String::from)
             .into_iter()

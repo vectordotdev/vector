@@ -13,9 +13,13 @@ pub(crate) mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
-#[allow(warnings)]
+#[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 pub(crate) mod ddtrace_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
+    #[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
+    pub mod idx {
+        include!(concat!(env!("OUT_DIR"), "/datadog.trace.idx.rs"));
+    }
+    include!(concat!(env!("OUT_DIR"), "/datadog.trace.rs"));
 }
 
 use std::{convert::Infallible, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
@@ -140,22 +144,17 @@ pub struct DatadogAgentConfig {
     #[configurable(metadata(docs::hidden))]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 
@@ -222,7 +221,10 @@ impl SourceConfig for DatadogAgentConfig {
             self.parse_ddtags,
             self.split_metric_namespace,
         );
-        let listener = tls.bind(&self.address).await?;
+        let listener = tls
+            .bind(&self.address)
+            .await?
+            .with_keepalive(self.keepalive.tcp_keepalive);
         let handler = RequestHandler {
             acknowledgements: cx.do_acknowledgements(self.acknowledgements),
             multiple_outputs: self.multiple_outputs,
@@ -265,7 +267,7 @@ impl SourceConfig for DatadogAgentConfig {
                 .with_graceful_shutdown(shutdown.map(|_| ()))
                 .await
                 .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
+                    error!("An error occurred: {err:?}.");
                 })?;
 
             Ok(())
@@ -522,7 +524,7 @@ impl DatadogAgentSource {
         }
 
         if !config.disable_llmobs {
-            let llmobs_filter = llmobs::build_warp_filter(handler.clone(), self.clone());
+            let llmobs_filter = llmobs::build_warp_filter(handler, self.clone());
             filters = filters
                 .map(|f| f.or(llmobs_filter.clone()).unify().boxed())
                 .or(Some(llmobs_filter));

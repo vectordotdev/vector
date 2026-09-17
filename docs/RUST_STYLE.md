@@ -1,9 +1,9 @@
 # Rust Style Guide for Vector
 
-> **Note:
-** This is a draft document primarily intended for AI agents (like Claude) to understand Vector's Rust coding conventions. These guidelines help ensure consistent code generation and modifications.
-
-This document outlines Rust coding conventions and patterns for Vector development.
+Vector enforces Rust style mechanically wherever practical. Use `make fmt` to apply `rustfmt`,
+and use `make check-clippy` to enforce the workspace Clippy lints configured in
+[`Cargo.toml`](../Cargo.toml). This guide documents additional project conventions and patterns
+that automated tooling does not fully capture.
 
 ## Import Statements (`use`)
 
@@ -34,7 +34,6 @@ fn my_function() {
 **Organization:**
 
 - Group imports: `std` → external crates → internal (`crate::`)
-- Use `rustfmt` to automatically organize them: `make fmt`
 
 ## Logging Style
 
@@ -59,26 +58,6 @@ warn!("Failed to merge value: {}.", err);  // Don't do this
 - Use `error` (not `e` or `err`) for error values
 - Prefer Display over Debug: `%error` not `?error`
 - Key/value pairs provide structured logging
-
-## String Formatting
-
-Prefer inline variable syntax in format strings (Rust 1.58+).
-
-**Correct:**
-
-```rust
-format!("Error: {err}");
-println!("Processing {count} items");
-```
-
-**Incorrect:**
-
-```rust
-format!("Error: {}", err);      // Unnecessary positional argument
-println!("Processing {} items", count);
-```
-
-**Why:** Inline syntax is more readable and reduces mistakes with argument ordering.
 
 ## Panics
 
