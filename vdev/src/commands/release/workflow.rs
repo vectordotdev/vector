@@ -52,6 +52,9 @@ struct PrCheck {
     base_sha: String,
     #[arg(long)]
     head_ref: String,
+    /// Require this VRL pin when reusing a preparation branch for a workflow retry.
+    #[arg(long)]
+    expected_vrl_version: Option<Version>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -128,8 +131,8 @@ impl PrCheck {
             head_version == version,
             "expected head version {version}, found {head_version}"
         );
-        validate_single_commit(&self.base_sha)?;
-        validate_release_manifest(&self.base_sha, &version)?;
+        validate_linear_history(&self.base_sha)?;
+        validate_release_manifest(&self.base_sha, &version, self.expected_vrl_version.as_ref())?;
 
         let files = changed_files(&self.base_sha, "HEAD")?;
         validate_release_files(&files, &version)?;
@@ -238,7 +241,11 @@ fn validate_upgrade_guide(base: &str, files: &[ChangedFile], version: &Version) 
     Ok(())
 }
 
-fn validate_release_manifest(base: &str, version: &Version) -> Result<()> {
+fn validate_release_manifest(
+    base: &str,
+    version: &Version,
+    expected_vrl_version: Option<&Version>,
+) -> Result<()> {
     let actual: toml::Value = toml::from_str(&fs::read_to_string("Cargo.toml")?)?;
     let vrl = actual
         .get("workspace")
@@ -248,6 +255,12 @@ fn validate_release_manifest(base: &str, version: &Version) -> Result<()> {
         .and_then(toml::Value::as_str)
         .context("Cargo.toml must pin VRL to a released registry version")?;
     let vrl_version = parse_stable_version(vrl, "VRL version")?;
+    if let Some(expected) = expected_vrl_version {
+        ensure!(
+            vrl_version == *expected,
+            "existing preparation branch pins VRL to {vrl_version}, but requested {expected}"
+        );
+    }
     let base_manifest = git::run_and_check_output(&["show", &format!("{base}:Cargo.toml")])?;
     let expected = update_vector_package_version(
         &base_manifest,
@@ -441,13 +454,16 @@ fn changed_files(before: &str, after: &str) -> Result<Vec<ChangedFile>> {
         .collect()
 }
 
-fn validate_single_commit(base: &str) -> Result<()> {
-    let head = git::run_and_check_output(&["rev-list", "--parents", "-n", "1", "HEAD"])?;
-    let mut revisions = head.split_whitespace();
-    let _head = revisions.next();
+fn validate_linear_history(base: &str) -> Result<()> {
+    let merge_base = git::run_and_check_output(&["merge-base", base, "HEAD"])?;
     ensure!(
-        revisions.next() == Some(base) && revisions.next().is_none(),
-        "release PR must contain exactly one non-merge commit on base {base}"
+        merge_base.trim() == base,
+        "release PR must descend from frozen base {base}"
+    );
+    let merges = git::run_and_check_output(&["rev-list", "--merges", &format!("{base}..HEAD")])?;
+    ensure!(
+        merges.trim().is_empty(),
+        "release PR must contain only non-merge commits after base {base}"
     );
     Ok(())
 }

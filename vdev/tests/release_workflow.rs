@@ -146,6 +146,10 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
 }
 
 fn check(repo: &Path, base: &str, success: bool) -> String {
+    check_with_args(repo, base, &[], success)
+}
+
+fn check_with_args(repo: &Path, base: &str, args: &[&str], success: bool) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
         .args([
             "release",
@@ -156,6 +160,7 @@ fn check(repo: &Path, base: &str, success: bool) -> String {
             "--head-ref",
             "prepare-v-0-59-0-website",
         ])
+        .args(args)
         .current_dir(repo)
         .output()
         .unwrap();
@@ -183,6 +188,39 @@ fn prepare_check(repo: &Path, success: bool) -> String {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert_eq!(output.status.success(), success, "{stderr}");
     stderr
+}
+
+#[test]
+fn release_preparation_accepts_review_commits() {
+    let (temp, base) = preparation();
+    let repo = temp.path();
+    write(
+        repo,
+        "website/cue/reference/releases/0.59.0.cue",
+        "version: \"0.59.0\"\ndescription: \"Reviewed release notes\"\n",
+    );
+    commit(repo);
+    write(
+        repo,
+        "website/content/en/releases/0.59.0.md",
+        "Corrected release date\n",
+    );
+    commit(repo);
+    check(repo, &base, true);
+
+    // Extra commits do not bypass validation of the complete release diff.
+    write(repo, "src/lib.rs", "pub fn unexpected() {}\n");
+    commit(repo);
+    assert!(check(repo, &base, false).contains("unexpected release preparation file: src/lib.rs"));
+}
+
+#[test]
+fn release_preparation_retry_requires_the_requested_vrl_pin() {
+    let (temp, base) = preparation();
+    let repo = temp.path();
+    check_with_args(repo, &base, &["--expected-vrl-version", "0.28.0"], true);
+    let error = check_with_args(repo, &base, &["--expected-vrl-version", "0.28.1"], false);
+    assert!(error.contains("existing preparation branch pins VRL to 0.28.0, but requested 0.28.1"));
 }
 
 #[test]
@@ -279,10 +317,11 @@ fn release_preparation_requires_its_frozen_base() {
     write(repo, "README.md", "A concurrent change\n");
     let updated = commit(repo);
     git(repo, &["switch", "prepare-v-0-59-0-website"]);
+    assert!(check(repo, &updated, false).contains("release PR must descend from frozen base"));
     git(repo, &["merge", "--no-edit", "master"]);
 
     let error = check(repo, &updated, false);
-    assert!(error.contains("release PR must contain exactly one non-merge commit"));
+    assert!(error.contains("release PR must contain only non-merge commits"));
 }
 
 #[test]
@@ -393,5 +432,14 @@ fn release_preparation_rejects_a_merge_commit() {
     );
 
     let error = check(repo, &base, false);
-    assert!(error.contains("release PR must contain exactly one non-merge commit"));
+    assert!(error.contains("release PR must contain only non-merge commits"));
+
+    // Reject merges anywhere in the preparation history, not just at HEAD.
+    write(
+        repo,
+        "website/content/en/releases/0.59.0.md",
+        "Reviewed notes\n",
+    );
+    commit(repo);
+    assert!(check(repo, &base, false).contains("release PR must contain only non-merge commits"));
 }

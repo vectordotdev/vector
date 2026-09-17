@@ -83,13 +83,15 @@ jobs:
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
           PREP_BRANCH: ${{ steps.preflight.outputs.branch }}
+          VRL_VERSION: ${{ inputs.vrl_version }}
         run: |
           # The preflight built this binary from the frozen master checkout.
           cp target/debug/vdev "$RUNNER_TEMP/release-vdev"
           git fetch --no-tags origin "refs/heads/${PREP_BRANCH}"
           git switch --detach FETCH_HEAD
           "$RUNNER_TEMP/release-vdev" release workflow pr-check \
-            --base-sha "$BASE_SHA" --head-ref "$PREP_BRANCH"
+            --base-sha "$BASE_SHA" --head-ref "$PREP_BRANCH" \
+            --expected-vrl-version "$VRL_VERSION"
 
       - name: Install VRL documentation builder
         if: steps.preflight.outputs.skip != 'true' && steps.preflight.outputs.resume != 'true'
