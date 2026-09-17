@@ -105,8 +105,11 @@ fn assert_span_static_fields(request: &ExportTraceServiceRequest) {
                     "{prefix} span name should not be empty"
                 );
 
-                // Assert span has a kind set (default is 0, but telemetrygen should set it)
-                // Note: SpanKind 0 is SPAN_KIND_UNSPECIFIED, but we're just checking it exists
+                assert_ne!(
+                    span.kind, 0,
+                    "{prefix} span kind should not be SPAN_KIND_UNSPECIFIED"
+                );
+
                 // timeUnixNano fields are ignored as they vary
             }
         }
