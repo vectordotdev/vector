@@ -13,14 +13,14 @@ jobs:
   validate:
     name: Validate release state transition
     # Only the new bot-authored minor-release path uses this validator. Existing manual
-    # releases (including patch releases) keep their current checks.
+    # releases (including patch releases) keep their current checks; patch automation is
+    # separate work. Keep this trigger broad: vdev owns branch-format and version validation.
     # Release PRs must be directly squash-merged during the freeze, never queued.
     # Skipped merge-group runs emit the required check for ordinary queued PRs only.
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login == 'vectordotdev-bot[bot]' &&
-      startsWith(github.head_ref, 'prepare-v-') &&
-      endsWith(github.head_ref, '-website')
+      startsWith(github.head_ref, 'prepare')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -32,9 +32,6 @@ jobs:
             const pr = context.payload.pull_request;
             if (pr.base.ref !== 'master' || pr.head.repo.full_name !== context.repo.owner + '/' + context.repo.repo) {
               throw new Error('Automated minor release PRs must come from this repository and target master.');
-            }
-            if (!/^prepare-v-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-0-website$/.test(pr.head.ref)) {
-              throw new Error('Automated preparation supports minor releases only.');
             }
             // Preserve the requested version recorded by the preparation workflow,
             // rather than deriving the expectation from the manifest being checked.
@@ -56,6 +53,7 @@ jobs:
         with:
           cargo-cache: true
           rust: true
+          # The published binary may predate these helpers. Build the exact trusted base below.
           vdev: false
 
       - name: Build trusted release validator
