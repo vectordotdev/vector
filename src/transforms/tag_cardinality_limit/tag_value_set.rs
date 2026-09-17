@@ -98,7 +98,8 @@ impl BloomFilterStorage {
         }
     }
 
-    fn insert(&mut self, value: &TagValueSet) {
+    /// Inserts `value` and returns whether this shard's cardinality increased.
+    fn insert(&mut self, value: &TagValueSet) -> bool {
         // Write bits unconditionally so the rolling-bloom refresh path can
         // not leave a value riding on another value's false-positive bits.
         // Count tracks distinct first sightings only.
@@ -107,6 +108,7 @@ impl BloomFilterStorage {
         if !was_already_present {
             self.count += 1;
         }
+        !was_already_present
     }
 
     fn contains(&self, value: &TagValueSet) -> bool {
@@ -272,18 +274,22 @@ impl TtlExactStorage {
 }
 
 /// Sliding-window bloom: for more than one generation, `generations` closed
-/// shards plus the open one being written. A single generation is a tumbling
-/// window with one shard. Each shard is a full `cache_size_per_key` bloom filter.
-/// Front of the deque is the oldest shard; back is the current. On rotation, the
-/// front shard is dropped and a fresh empty one is pushed at the back. Membership
-/// is the OR across shards; refresh-on-sighting writes hits into the current
-/// shard so hot values survive future rotations.
+/// shards plus the open one being written. An **explicit** single generation is
+/// a tumbling window with one shard. Each shard is a full `cache_size_per_key`
+/// bloom filter. Front of the deque is the oldest shard; back is the current.
+/// On rotation, the front shard is dropped and a fresh empty one is pushed at
+/// the back. Membership is the OR across shards; refresh-on-sighting writes
+/// hits into the current shard so hot values survive future rotations.
 struct RollingBloomStorage {
     shards: VecDeque<BloomFilterStorage>,
     generations: u8,
     /// For sliding windows, `generations + 1`: the closed shards spanning the
-    /// window, plus the open one currently accepting writes. A single generation
-    /// deliberately uses one shard to provide the documented tumbling behavior.
+    /// window, plus the open one currently accepting writes. An explicit
+    /// `ttl_generations: 0|1` uses one shard for the documented tumbling
+    /// behavior. When a higher request is clamped to one generation because
+    /// `ttl_secs` is too short for multi-slice windows (e.g. `ttl_secs: 1`
+    /// with the default of 4), we still keep two shards so retention stays in
+    /// `[ttl, 2·ttl)` rather than tumbling early.
     ///
     /// The open shard only covers part of a slice at any moment, so retiring at
     /// `generations` shards would evict a value inserted just before a rotation
@@ -303,8 +309,12 @@ struct RollingBloomStorage {
 impl RollingBloomStorage {
     fn new(cache_size_per_key: usize, generations: u8, ttl: Duration) -> Self {
         // Cap generations so `slice >= 1s` and `slice * generations == ttl`.
+        let requested = generations;
         let (generations, slice) = compute_ttl_slices(ttl, generations);
-        let max_shards = if generations == 1 {
+        // Tumbling (one shard) only when the operator asked for a single
+        // generation. A clamp from a higher request must keep the extra shard
+        // so a short TTL cannot silently become a tumbling window.
+        let max_shards = if generations == 1 && requested <= 1 {
             1
         } else {
             generations as usize + 1
@@ -351,16 +361,28 @@ impl RollingBloomStorage {
         }
     }
 
+    #[cfg(test)]
     fn contains(&mut self, value: &TagValueSet) -> bool {
+        self.contains_and_refresh(value).0
+    }
+
+    /// Returns `(found, newest_shard_count_increased)`.
+    ///
+    /// The second result lets the caller detect the rare case where refreshing
+    /// a retained value consumes another slot in the summed shard budget,
+    /// without adding cardinality scans to ordinary cache hits.
+    fn contains_and_refresh(&mut self, value: &TagValueSet) -> (bool, bool) {
         let now = Instant::now();
         self.rotate_if_needed(now);
         // Newest -> oldest short-circuits hot values; re-seed hits into the
         // newest shard so they survive the next rotation.
         let found = self.shards.iter().rev().any(|s| s.contains(value));
-        if found && let Some(newest) = self.shards.back_mut() {
-            newest.insert(value);
-        }
-        found
+        let count_increased = found
+            && self
+                .shards
+                .back_mut()
+                .is_some_and(|newest| newest.insert(value));
+        (found, count_increased)
     }
 
     /// Read-only membership check: triggers lazy rotation but does **not**
@@ -443,13 +465,8 @@ impl AcceptedTagValueSet {
         Self { storage }
     }
 
-    /// Returns true if `value` is currently retained.
-    ///
-    /// In TTL-enabled backends this is a mutating operation: it triggers lazy
-    /// sweep/rotation **and refreshes the value's lease on a hit**. Use this
-    /// on the accept path (`try_accept_tag`, where a hit means we keep the
-    /// value). For read-only checks where the event might still be rejected,
-    /// use [`Self::contains_no_refresh`].
+    /// Test helper for refreshing membership checks across all backends.
+    #[cfg(test)]
     pub fn contains(&mut self, value: &TagValueSet) -> bool {
         match &mut self.storage {
             TagValueSetStorage::Set(set) => set.contains(value),
@@ -460,7 +477,34 @@ impl AcceptedTagValueSet {
         }
     }
 
-    /// Like [`Self::contains`] but never refreshes the value's TTL lease.
+    /// Returns `(found, reached_limit_during_refresh)`.
+    ///
+    /// Only rolling bloom refreshes can increase cardinality on a membership
+    /// hit. Other backends retain their original single-lookup hot path.
+    pub(crate) fn contains_with_limit_transition(
+        &mut self,
+        value: &TagValueSet,
+        value_limit: usize,
+    ) -> (bool, bool) {
+        match &mut self.storage {
+            TagValueSetStorage::Set(set) => (set.contains(value), false),
+            TagValueSetStorage::Bloom(bloom) => (bloom.contains(value), false),
+            TagValueSetStorage::Fingerprint(fp) => (fp.contains(value), false),
+            TagValueSetStorage::TtlSet(s) => (s.contains(value), false),
+            TagValueSetStorage::RollingBloom(s) => {
+                let (found, count_increased) = s.contains_and_refresh(value);
+                let reached_limit = count_increased
+                    && s.shards
+                        .iter()
+                        .map(BloomFilterStorage::count)
+                        .sum::<usize>()
+                        == value_limit;
+                (found, reached_limit)
+            }
+        }
+    }
+
+    /// Checks membership without refreshing the value's TTL lease.
     ///
     /// The `DropEvent` pre-check pass uses this so that an event rejected by a
     /// later tag does not silently extend the leases of earlier-checked values.
@@ -521,10 +565,14 @@ impl AcceptedTagValueSet {
             TagValueSetStorage::Set(set) => {
                 set.insert(value);
             }
-            TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
+            TagValueSetStorage::Bloom(bloom) => {
+                bloom.insert(&value);
+            }
             TagValueSetStorage::Fingerprint(fp) => fp.insert(&value),
             TagValueSetStorage::TtlSet(s) => s.insert(value),
-            TagValueSetStorage::RollingBloom(s) => s.insert(&value),
+            TagValueSetStorage::RollingBloom(s) => {
+                s.insert(&value);
+            }
         };
     }
 
@@ -536,6 +584,16 @@ impl AcceptedTagValueSet {
             self.storage,
             TagValueSetStorage::TtlSet(_) | TagValueSetStorage::RollingBloom(_)
         )
+    }
+
+    /// Test-only: advance a rolling-bloom window by one slice so a previously
+    /// inserted value sits only in the closed shard (refresh can then re-seed
+    /// it into the newest shard and bump the summed slot count).
+    #[cfg(test)]
+    pub(crate) fn force_rolling_bloom_rotate(&mut self) {
+        if let TagValueSetStorage::RollingBloom(s) = &mut self.storage {
+            s.rotate_if_needed(s.next_rotate);
+        }
     }
 }
 
@@ -797,7 +855,40 @@ mod tests {
         // `generations: 0` would divide by zero / leave an empty deque.
         let s = RollingBloomStorage::new(default_cache_size(), 0, Duration::from_secs(60));
         assert_eq!(s.generations, 1);
+        assert_eq!(s.max_shards, 1);
         assert_eq!(s.shards.len(), 1);
+    }
+
+    #[test]
+    fn rolling_bloom_clamped_short_ttl_keeps_extra_shard() {
+        // Default `ttl_generations: 4` with `ttl_secs: 1` clamps to one
+        // generation (slice must be ≥1s). That must still be a 2-shard sliding
+        // window — otherwise a value accepted just before the boundary tumbles
+        // out almost immediately instead of lasting the configured second.
+        let ttl = Duration::from_secs(1);
+        let mut s = RollingBloomStorage::new(default_cache_size(), 4, ttl);
+        assert_eq!(s.generations, 1);
+        assert_eq!(s.slice, ttl);
+        assert_eq!(s.max_shards, 2, "clamped configs must keep the extra shard");
+
+        let t0 = Instant::now();
+        s.next_rotate = t0 + Duration::from_millis(1);
+        s.shards.back_mut().unwrap().insert(&v("edge"));
+
+        // Immediately after the first rotation the closed shard still holds it.
+        s.rotate_if_needed(t0 + Duration::from_millis(2));
+        assert!(
+            s.shards.iter().any(|sh| sh.contains(&v("edge"))),
+            "value must survive the first rotation of a clamped short TTL"
+        );
+
+        // Only the second rotation (past a full TTL past the first boundary)
+        // may drop it.
+        s.rotate_if_needed(t0 + ttl + Duration::from_millis(2));
+        assert!(
+            !s.shards.iter().any(|sh| sh.contains(&v("edge"))),
+            "value must eventually expire after a full TTL plus one slice"
+        );
     }
 
     #[test]
@@ -815,6 +906,36 @@ mod tests {
         assert!(
             !s.shards.back().unwrap().contains(&v("old")),
             "a single generation must clear the complete window on rotation"
+        );
+    }
+
+    #[test]
+    fn rolling_bloom_refresh_after_rotation_increases_len() {
+        // `contains` re-seeds hits into the newest shard. After a rotation that
+        // can raise the summed per-shard count even though no novel value was
+        // admitted — the accept path must observe that transition for
+        // `value_limit_reached_total`.
+        let mut s = RollingBloomStorage::new(default_cache_size(), 2, Duration::from_secs(120));
+        let hot = v("hot");
+        s.shards.back_mut().unwrap().insert(&hot);
+        assert_eq!(s.len(), 1);
+
+        let t0 = Instant::now();
+        s.next_rotate = t0 + Duration::from_secs(1);
+        s.rotate_if_needed(t0 + Duration::from_secs(2));
+        assert_eq!(s.shards.len(), 2);
+        assert_eq!(s.len(), 1, "rotation alone must not duplicate the count");
+
+        let (found, count_increased) = s.contains_and_refresh(&hot);
+        assert!(found);
+        assert!(
+            count_increased,
+            "refresh into a new shard must report the slot transition"
+        );
+        assert_eq!(
+            s.len(),
+            2,
+            "refresh into the newest shard must bump the summed slot count"
         );
     }
 
@@ -849,6 +970,15 @@ mod tests {
             let rolling = RollingBloomStorage::new(default_cache_size(), requested, ttl);
             assert_eq!(rolling.generations, expected_generations as u8);
             assert_eq!(rolling.slice, slice);
+            let expected_shards = if expected_generations == 1 && requested <= 1 {
+                1
+            } else {
+                expected_generations as usize + 1
+            };
+            assert_eq!(
+                rolling.max_shards, expected_shards,
+                "ttl_secs={ttl_secs}, requested={requested}: shard count"
+            );
 
             let exact = TtlExactStorage::new(ttl, requested);
             assert_eq!(exact.sweep_interval, slice);

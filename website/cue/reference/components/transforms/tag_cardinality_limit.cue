@@ -211,23 +211,27 @@ components: transforms: tag_cardinality_limit: {
 				  error rather than a silently ignored setting. Use `mode: exact` if you
 				  need TTL with per-value precision.
 				- `mode: probabilistic` — the underlying bloom filter is split into
-				  rolling shards: `ttl_generations` covering the window plus one
-				  currently being written, so memory cost rises to
-				  `(ttl_generations + 1) * cache_size_per_key` per (metric, tag-key)
-				  pair. The extra shard is what guarantees a value is retained for at
-				  least `ttl_secs`; without it a value inserted just before a rotation
-				  would expire a full slice early. Eviction therefore lands in
-				  `[ttl_secs, ttl_secs + ttl_secs / ttl_generations)` — never early.
+				  rolling shards: the effective `ttl_generations` covering the window
+				  plus one currently being written, so memory cost rises to
+				  `(effective ttl_generations + 1) * cache_size_per_key` per (metric,
+				  tag-key) pair. The extra shard is what guarantees a value is retained
+				  for at least `ttl_secs`; without it a value inserted just before a
+				  rotation would expire a full slice early. Eviction therefore lands
+				  in `[ttl_secs, ttl_secs + ttl_secs / effective ttl_generations)` —
+				  never early.
 				  Reduce `cache_size_per_key` if you want to keep total memory flat.
-				  `ttl_generations: 1` instead uses one shard and produces a tumbling
-				  window (everything resets at once every `ttl_secs`) with the same
-				  memory cost as no TTL. The `value_limit` cap is enforced against an
+				  Explicitly setting `ttl_generations: 1` uses one shard and produces a
+				  tumbling window (everything resets at once every `ttl_secs`) with the
+				  same memory cost as no TTL. A clamp that reduces generations to 1
+				  because `ttl_secs` is too short still keeps the extra write shard.
+				  The `value_limit` cap is enforced against an
 				  upper-bound estimate of the union cardinality across shards. Under
 				  refresh-on-sighting, hot continuously-seen values may be counted in
 				  more than one shard, so the effective cap can be as low as
-				  `value_limit / (ttl_generations + 1)` for refresh-heavy workloads. If this
-				  shows up as elevated `tag_value_limit_exceeded_total` without a
-				  matching rise in distinct admitted values, set `ttl_generations: 1`.
+				  `value_limit / (effective ttl_generations + 1)` for refresh-heavy
+				  workloads. If this shows up as elevated
+				  `tag_value_limit_exceeded_total` without a matching rise in distinct
+				  admitted values, set `ttl_generations: 1`.
 
 				**Reading `tag_cardinality_ttl_expirations_total`**: the counter reports
 				cache slots reclaimed, the same unit `value_limit` is enforced against.
@@ -241,7 +245,11 @@ components: transforms: tag_cardinality_limit: {
 				generations is silently capped to `ttl_secs` so the configured TTL
 				window is honored exactly. For example `ttl_secs: 2, ttl_generations: 8`
 				resolves to 2 generations of 1-second slices (not 8 generations of
-				1-second slices, which would stretch the window to 8 s).
+				1-second slices, which would stretch the window to 8 s). When the
+				clamp reduces generations to 1 (e.g. `ttl_secs: 1` with the default of
+				4), probabilistic mode still keeps the extra write shard so retention
+				stays in `[ttl_secs, 2·ttl_secs)` — only an explicit
+				`ttl_generations: 1` selects the one-shard tumbling window.
 
 				**Per-metric overrides do not inherit**: setting `ttl_secs` inside a
 				`per_metric_limits.<name>` block (or leaving it unset there) fully

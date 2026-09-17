@@ -1719,6 +1719,67 @@ per_tag_limits:
     assert_eq!(excluded.mode, PerTagMode::Excluded);
 }
 
+/// A probabilistic TTL refresh that re-seeds a retained value into the newest
+/// shard can fill `value_limit` without admitting a novel value; subsequent
+/// novel values must then be dropped.
+#[test]
+fn probabilistic_ttl_refresh_can_fill_value_limit() {
+    let mut config = make_transform_bloom(2, LimitExceededAction::DropTag);
+    config.global.ttl_secs = Some(120);
+    config.global.ttl_generations = 2;
+    let mut transform = TagCardinalityLimit::new(config);
+
+    let metric_key: Option<MetricId> = None;
+    let hot = TagValueSet::from(["hot".to_string()]);
+    let novel = TagValueSet::from(["novel".to_string()]);
+
+    assert_eq!(
+        transform.try_accept_tag(metric_key.as_ref(), "env", &hot),
+        AcceptResult::Tracked
+    );
+
+    let bucket = transform
+        .accepted_tags
+        .get_mut(&metric_key)
+        .unwrap()
+        .get_mut("env")
+        .unwrap();
+    assert!(
+        bucket.ttl_enabled(),
+        "probabilistic ttl_secs must select RollingBloom"
+    );
+    assert_eq!(bucket.len(), 1);
+    bucket.force_rolling_bloom_rotate();
+    assert_eq!(
+        bucket.len(),
+        1,
+        "rotation alone must not duplicate the count"
+    );
+
+    // Refresh re-seeds `hot` into the newest shard → summed len hits the limit.
+    assert_eq!(
+        transform.try_accept_tag(metric_key.as_ref(), "env", &hot),
+        AcceptResult::Tracked
+    );
+    assert_eq!(
+        transform
+            .accepted_tags
+            .get_mut(&metric_key)
+            .unwrap()
+            .get_mut("env")
+            .unwrap()
+            .len(),
+        2,
+        "refresh must fill value_limit via duplicate-shard counting"
+    );
+
+    assert_eq!(
+        transform.try_accept_tag(metric_key.as_ref(), "env", &novel),
+        AcceptResult::Dropped,
+        "novel values must be rejected once a refresh filled the budget"
+    );
+}
+
 /// A re-sent already-accepted tag value must pass through even after the limit is hit,
 /// for both DropTag and DropEvent actions.
 #[test]

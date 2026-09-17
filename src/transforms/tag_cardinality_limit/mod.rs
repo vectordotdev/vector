@@ -327,7 +327,16 @@ impl TagCardinalityLimit {
             AcceptedTagValueSet::new(&config.mode, config.ttl_secs, config.ttl_generations)
         });
 
-        if tag_value_set.contains(value) {
+        // A rolling-bloom refresh can re-seed a retained value into the newest
+        // shard and thereby fill the summed slot budget. Detect that uncommon
+        // transition inside the storage backend so other modes do not pay for
+        // extra `len()` calls on every lookup.
+        let (already_tracked, reached_limit) =
+            tag_value_set.contains_with_limit_transition(value, config.value_limit);
+        if already_tracked {
+            if reached_limit {
+                emit!(TagCardinalityValueLimitReached { key });
+            }
             return AcceptResult::Tracked;
         }
 

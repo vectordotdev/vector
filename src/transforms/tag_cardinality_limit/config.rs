@@ -127,13 +127,16 @@ pub struct Inner {
     /// Number of time-slices the TTL window is split into.
     ///
     /// In `probabilistic` mode, higher values smooth eviction (closer to a true
-    /// sliding window) at the cost of `(ttl_generations + 1) * cache_size_per_key`
-    /// memory per (metric, tag-key) pair. The extra shard is the one currently
-    /// being written: it covers only part of a slice, so retiring without it
-    /// would expire values after `ttl_secs - (ttl_secs / ttl_generations)` instead
-    /// of the full TTL. `1` produces a one-shard tumbling window: all tracked
-    /// values are dropped at once every `ttl_secs`, using `cache_size_per_key`
-    /// memory.
+    /// sliding window) at the cost of `(effective ttl_generations + 1) *
+    /// cache_size_per_key` memory per (metric, tag-key) pair. The extra shard is
+    /// the one currently being written: it covers only part of a slice, so
+    /// retiring without it would expire values after `ttl_secs - (ttl_secs /
+    /// ttl_generations)` instead of the full TTL. Explicitly setting `1`
+    /// produces a one-shard tumbling window: all tracked values are dropped at
+    /// once every `ttl_secs`, using
+    /// `cache_size_per_key` memory. When `ttl_secs` is shorter than the requested
+    /// generation count (slices are capped at ≥1s), generations are clamped but
+    /// the extra shard is still kept so short TTLs do not silently tumble.
     ///
     /// In `exact` mode this does not change eviction precision (each value still
     /// carries its own last-accepted timestamp). It only sets how often the
