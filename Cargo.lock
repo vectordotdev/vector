@@ -6070,6 +6070,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "ifile-source"
+version = "0.1.0"
+dependencies = [
+ "async-compression",
+ "bytes",
+ "chrono",
+ "criterion",
+ "dashmap",
+ "file-source-common",
+ "futures",
+ "glob",
+ "indexmap 2.14.2",
+ "libc",
+ "notify",
+ "serde",
+ "tempfile",
+ "tokio",
+ "tracing 0.1.44",
+ "vector-common",
+ "vector-config",
+ "winapi",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13792,6 +13816,7 @@ dependencies = [
  "enrichment",
  "file-source",
  "file-source-common",
+ "ifile-source",
  "opentelemetry-proto",
  "prometheus-parser",
  "vector-api-client",

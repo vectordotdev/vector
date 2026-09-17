@@ -2,7 +2,7 @@
 #[cfg(feature = "sources-http_server")]
 mod body_decoding;
 pub mod decompression;
-#[cfg(feature = "sources-file")]
+#[cfg(any(feature = "sources-file", feature = "sources-ifile"))]
 mod encoding_config;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
@@ -43,7 +43,7 @@ mod unix_stream;
 mod wrappers;
 
 pub use decompression::{max_decompressed_size_bytes, set_max_decompressed_size_bytes};
-#[cfg(feature = "sources-file")]
+#[cfg(any(feature = "sources-file", feature = "sources-ifile"))]
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(

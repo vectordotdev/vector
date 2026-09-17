@@ -16,7 +16,7 @@ tokio-util = { version = "0.7", default-features = false, features = ["join-map"
 tracing.workspace = true
 indexmap = { version = "2.11.0", default-features = false, features = ["serde"] }
 bytes.workspace = true
-futures = { version = "0.3.31", default-features = false, features = ["executor"] }
+futures = { version = "0.3.31", default-features = false }
 futures-util.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 file-source-common = { path = "../file-source-common" }
