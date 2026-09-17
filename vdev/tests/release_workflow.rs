@@ -32,13 +32,15 @@ fn version(repo: &Path, version: &str) {
         repo,
         "Cargo.toml",
         &format!(
-            "[package]\nname = \"vector\"\nversion = \"{version}\"\nedition = \"2021\"\n[workspace.dependencies]\nvrl = {{ {vrl} }}\n"
+            "[package]\nname = \"vector\"\nversion = \"{version}\"\nedition = \"2021\"\n[dependencies]\nvrl = {{ workspace = true }}\n[workspace.dependencies]\nvrl = {{ {vrl} }}\n"
         ),
     );
     write(
         repo,
         "Cargo.lock",
-        &format!("version = 4\n[[package]]\nname = \"vector\"\nversion = \"{version}\"\n"),
+        &format!(
+            "version = 4\n[[package]]\nname = \"vector\"\nversion = \"{version}\"\ndependencies = [\"vrl\"]\n[[package]]\nname = \"vrl\"\nversion = \"0.28.0\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n"
+        ),
     );
 }
 
@@ -61,6 +63,23 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
     git(repo, &["config", "user.name", "Release test"]);
     git(repo, &["config", "user.email", "release@example.invalid"]);
     write(repo, "src/lib.rs", "");
+    // Resolve a tiny registry dependency offline while exercising real Cargo metadata.
+    write(
+        repo,
+        ".cargo/config.toml",
+        "[source.crates-io]\nreplace-with = \"fixture\"\n[source.fixture]\ndirectory = \".git/vendor\"\n",
+    );
+    write(
+        repo,
+        ".git/vendor/vrl/Cargo.toml",
+        "[package]\nname = \"vrl\"\nversion = \"0.28.0\"\nedition = \"2021\"\n",
+    );
+    write(repo, ".git/vendor/vrl/src/lib.rs", "");
+    write(
+        repo,
+        ".git/vendor/vrl/.cargo-checksum.json",
+        r#"{"files":{},"package":null}"#,
+    );
     write(
         repo,
         "website/cue/reference/administration/interfaces/kubectl.cue",
@@ -127,6 +146,10 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
 }
 
 fn check(repo: &Path, base: &str, success: bool) -> String {
+    check_with_args(repo, base, &[], success)
+}
+
+fn check_with_args(repo: &Path, base: &str, args: &[&str], success: bool) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
         .args([
             "release",
@@ -136,9 +159,8 @@ fn check(repo: &Path, base: &str, success: bool) -> String {
             base,
             "--head-ref",
             "prepare-v-0-59-0-website",
-            "--vrl-version",
-            "0.28.0",
         ])
+        .args(args)
         .current_dir(repo)
         .output()
         .unwrap();
@@ -166,6 +188,39 @@ fn prepare_check(repo: &Path, success: bool) -> String {
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert_eq!(output.status.success(), success, "{stderr}");
     stderr
+}
+
+#[test]
+fn release_preparation_accepts_review_commits() {
+    let (temp, base) = preparation();
+    let repo = temp.path();
+    write(
+        repo,
+        "website/cue/reference/releases/0.59.0.cue",
+        "version: \"0.59.0\"\ndescription: \"Reviewed release notes\"\n",
+    );
+    commit(repo);
+    write(
+        repo,
+        "website/content/en/releases/0.59.0.md",
+        "Corrected release date\n",
+    );
+    commit(repo);
+    check(repo, &base, true);
+
+    // Extra commits do not bypass validation of the complete release diff.
+    write(repo, "src/lib.rs", "pub fn unexpected() {}\n");
+    commit(repo);
+    assert!(check(repo, &base, false).contains("unexpected release preparation file: src/lib.rs"));
+}
+
+#[test]
+fn release_preparation_retry_requires_the_requested_vrl_pin() {
+    let (temp, base) = preparation();
+    let repo = temp.path();
+    check_with_args(repo, &base, &["--expected-vrl-version", "0.28.0"], true);
+    let error = check_with_args(repo, &base, &["--expected-vrl-version", "0.28.1"], false);
+    assert!(error.contains("existing preparation branch pins VRL to 0.28.0, but requested 0.28.1"));
 }
 
 #[test]
@@ -221,6 +276,38 @@ fn release_preparation_rejects_invalid_versions_index() {
 }
 
 #[test]
+fn release_preparation_requires_a_stable_vrl_pin() {
+    for requirement in ["*", "^0.28.0", "0.28", "0.28.0-rc.1", "0.28.0+build"] {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        let manifest = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
+        write(repo, "Cargo.toml", &manifest.replace("0.28.0", requirement));
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "--amend", "--no-edit"]);
+        assert!(check(repo, &base, false).contains("VRL version"));
+    }
+}
+
+#[test]
+fn release_preparation_requires_matching_registry_vrl_in_lockfile() {
+    for (old, new) in [
+        ("0.28.0", "0.28.1"),
+        (
+            "registry+https://github.com/rust-lang/crates.io-index",
+            "git+https://github.com/vectordotdev/vrl.git#abc",
+        ),
+    ] {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        let lock = fs::read_to_string(repo.join("Cargo.lock")).unwrap();
+        write(repo, "Cargo.lock", &lock.replace(old, new));
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "--amend", "--no-edit"]);
+        assert!(check(repo, &base, false).contains("Cargo.lock must resolve VRL"));
+    }
+}
+
+#[test]
 fn release_preparation_requires_its_frozen_base() {
     let (temp, base) = preparation();
     let repo = temp.path();
@@ -230,10 +317,11 @@ fn release_preparation_requires_its_frozen_base() {
     write(repo, "README.md", "A concurrent change\n");
     let updated = commit(repo);
     git(repo, &["switch", "prepare-v-0-59-0-website"]);
+    assert!(check(repo, &updated, false).contains("release PR must descend from frozen base"));
     git(repo, &["merge", "--no-edit", "master"]);
 
     let error = check(repo, &updated, false);
-    assert!(error.contains("release PR must contain exactly one non-merge commit"));
+    assert!(error.contains("release PR must contain only non-merge commits"));
 }
 
 #[test]
@@ -344,5 +432,14 @@ fn release_preparation_rejects_a_merge_commit() {
     );
 
     let error = check(repo, &base, false);
-    assert!(error.contains("release PR must contain exactly one non-merge commit"));
+    assert!(error.contains("release PR must contain only non-merge commits"));
+
+    // Reject merges anywhere in the preparation history, not just at HEAD.
+    write(
+        repo,
+        "website/content/en/releases/0.59.0.md",
+        "Reviewed notes\n",
+    );
+    commit(repo);
+    assert!(check(repo, &base, false).contains("release PR must contain only non-merge commits"));
 }
