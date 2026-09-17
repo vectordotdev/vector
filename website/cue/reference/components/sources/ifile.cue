@@ -6,8 +6,7 @@ components: sources: ifile: {
 	title: "IFile"
 
 	classes: {
-		commonly_used: true
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
@@ -50,14 +49,13 @@ components: sources: ifile: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	installation: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.ifile.configuration & {
+	configuration: generated.components.sources.ifile.configuration & {
 		remove_after_secs: warnings: [
 			"""
 				Vector’s process must have permission to delete files.
@@ -432,18 +430,15 @@ components: sources: ifile: {
 		async_implementation: {
 			title: "Async Implementation"
 			body: """
-				The `ifile` source is a complete rewrite of the original `file` source using
-				async/await throughout. This provides better performance and resource utilization,
-				especially when watching a large number of files.
+				The `ifile` source is an async implementation intended as a modern replacement
+				for the existing `file` source.
 
-				The implementation uses the [notify-rs](https://github.com/notify-rs/notify) library
-				to detect file changes through OS-level notifications instead of polling. This means
-				Vector can detect new files and changes to existing files within milliseconds, without
-				the need for periodic globbing.
+				It uses the [notify-rs](https://github.com/notify-rs/notify) library for OS-level
+				notifications, with periodic glob scans to discover files if notifications are missed.
 
-				The `ifile` source also never keeps file handles open for idle files, only opening them
-				when needed for reading. This reduces the number of open file handles and improves
-				resource usage.
+				Plain files retain their open handles so Vector can continue reading writes after
+				a rename. The `rotate_wait_secs` option controls how long rotated files remain open.
+				Compressed files retain their decoder and handle until the end of the stream.
 				"""
 		}
 
@@ -458,7 +453,7 @@ components: sources: ifile: {
 
 				The `checkpoint_interval` setting only affects recovery after an abrupt termination
 				(such as SIGKILL or power loss). In such cases, Vector may reprocess up to `checkpoint_interval`
-				seconds worth of data from each file.
+				milliseconds worth of data from each file.
 
 				A lower value results in less data being reprocessed if Vector is terminated abruptly,
 				but increases the performance impact of checkpointing during normal operation.

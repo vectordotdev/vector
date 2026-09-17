@@ -55,6 +55,7 @@ pub const IFILE_SOURCE_TAGS: [&str; 1] = ["ifile"];
 
 /// The component test specification for the ifile source.
 pub static IFILE_SOURCE_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTests {
+    buffer_metrics: Some(SOURCE_BUFFER_METRIC_REQUIREMENT),
     events: &["EventsSent"],
     tagged_counters: &["component_received_bytes_total"],
     untagged_counters: &[
