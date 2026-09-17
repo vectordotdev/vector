@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![warn(clippy::pedantic)]
 
 pub use vrl::{
     event_path, metadata_path, owned_value_path, path,

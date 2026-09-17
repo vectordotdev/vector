@@ -151,6 +151,7 @@ uninlined_format_args = "warn"
 borrow_as_ptr = "warn"
 checked_conversions = "warn"
 ptr_as_ptr = "warn"
+ref_as_ptr = "warn"
 rc_buffer = "warn"
 todo = "warn"
 
