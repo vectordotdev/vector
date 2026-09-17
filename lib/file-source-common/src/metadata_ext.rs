@@ -34,6 +34,9 @@ pub trait AsyncFileInfo {
 #[cfg(windows)]
 pub trait AsyncFileInfo: std::os::windows::io::AsRawHandle {
     // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L458-L478
+    /// # Errors
+    ///
+    /// Returns an error if converting the device-control result fails.
     #[allow(unused_assignments, unused_variables)]
     fn reparse_point<'a>(
         &self,
@@ -47,21 +50,34 @@ pub trait AsyncFileInfo: std::os::windows::io::AsRawHandle {
                     FSCTL_GET_REPARSE_POINT,
                     ptr::null_mut(),
                     0,
-                    space.as_mut_ptr() as *mut _,
-                    space.len() as DWORD,
-                    &mut bytes,
+                    space.as_mut_ptr().cast(),
+                    MAXIMUM_REPARSE_DATA_BUFFER_SIZE,
+                    &raw mut bytes,
                     ptr::null_mut(),
                 )
             })?;
-            Ok((bytes, &*(space.as_ptr() as *const REPARSE_DATA_BUFFER)))
+            // TODO: audit the alignment of this legacy byte-buffer conversion.
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[expect(
+                clippy::cast_ptr_alignment,
+                reason = "Legacy Windows buffer alignment needs auditing"
+            )]
+            let reparse_data = &*space.as_ptr().cast::<REPARSE_DATA_BUFFER>();
+            Ok((bytes, reparse_data))
         }
     }
     // This code is from the Rust stdlib https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L326-L351
+    /// # Errors
+    ///
+    /// Returns an error if converting the file-information result fails.
     #[allow(unused_assignments, unused_variables)]
     fn file_info_inner(&self) -> std::io::Result<BY_HANDLE_FILE_INFORMATION> {
         unsafe {
             let mut info: BY_HANDLE_FILE_INFORMATION = zeroed();
-            cvt(GetFileInformationByHandle(self.as_raw_handle(), &mut info))?;
+            cvt(GetFileInformationByHandle(
+                self.as_raw_handle(),
+                &raw mut info,
+            ))?;
             let mut reparse_tag = 0;
             if info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
                 let mut b = [0; MAXIMUM_REPARSE_DATA_BUFFER_SIZE as usize];
@@ -110,7 +126,7 @@ impl PortableFileExt for BY_HANDLE_FILE_INFORMATION {
     // This is not exactly inode, but it's close. See https://docs.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information
     fn portable_ino(&self) -> u64 {
         // https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/windows/fs.rs#L347
-        (self.nFileIndexLow as u64) | ((self.nFileIndexHigh as u64) << 32)
+        u64::from(self.nFileIndexLow) | (u64::from(self.nFileIndexHigh) << 32)
     }
 }
 
@@ -126,10 +142,19 @@ pub struct REPARSE_DATA_BUFFER {
 
 // This code is from the Rust stdlib  https://github.com/rust-lang/rust/blob/30ddb5a8c1e85916da0acdc665d6a16535a12dd6/src/libstd/sys/hermit/mod.rs#L141-L143
 #[cfg(windows)]
+/// # Errors
+///
+/// Returns an OS error for a negative result.
 pub fn cvt(result: i32) -> std::io::Result<usize> {
     if result < 0 {
         Err(std::io::Error::from_raw_os_error(-result))
     } else {
-        Ok(result as usize)
+        // The negative case is handled above; Windows pointer widths are at least 32 bits.
+        #[expect(
+            clippy::cast_sign_loss,
+            reason = "The result is nonnegative in this branch"
+        )]
+        let result = result as usize;
+        Ok(result)
     }
 }
