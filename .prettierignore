@@ -10,6 +10,9 @@ lib/codecs/tests/data/
 website/**/*.html
 website/assets/js/app.js
 website/assets/js/dd-browser-logs-rum.js
+
+# Helm chart templates (Go template syntax breaks prettier)
+website/content/en/guides/level-up/k8s-autoscaling/manifests/
 website/layouts/
 
 # Hugo build output and generated resources
