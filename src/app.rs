@@ -15,7 +15,7 @@ use exitcode::ExitCode;
 use futures::StreamExt;
 use tokio::{
     runtime::{self, Handle, Runtime},
-    sync::{MutexGuard, broadcast::error::RecvError},
+    sync::watch,
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -33,8 +33,8 @@ use crate::{
         VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped, VectorStopping,
     },
     signal::{
-        ShutdownReceiver, ShutdownSignal, SignalHandler, SignalPair, SignalRx, SignalTo, SignalTx,
-        recv_shutdown,
+        ReloadConfig, ReloadPlan, ShutdownSignal, ShutdownState, SignalHandler, Signals,
+        wait_for_immediate, wait_for_shutdown,
     },
     topology::{
         ReloadOutcome, RunningTopology, SharedTopologyController, ShutdownErrorReceiver,
@@ -62,15 +62,13 @@ pub struct ApplicationConfig {
 pub struct Application {
     pub root_opts: RootOpts,
     pub config: ApplicationConfig,
-    pub signals: SignalPair,
+    pub signals: Signals,
 }
 
 impl ApplicationConfig {
     pub async fn from_opts(
         opts: &RootOpts,
-        signal_handler: &mut SignalHandler,
-        signal_rx: &mut SignalRx,
-        shutdown_rx: &mut ShutdownReceiver,
+        signals: &mut Signals,
         extra_context: ExtraContext,
     ) -> Result<Self, ExitCode> {
         let config_paths = opts.config_paths_with_formats();
@@ -87,57 +85,40 @@ impl ApplicationConfig {
             None
         };
 
-        // Bootstrap coalesces reloads arriving during config loading and re-broadcasts
-        // them once loading completes, in a stable order.
-        let signal_tx = signal_handler.clone_tx();
-
         // Config loading can block on network I/O (provider/secrets); race it against
         // shutdown so a signal aborts startup immediately.
         let config = {
-            let mut bootstrap = Bootstrap::new(signal_rx, shutdown_rx, signal_tx.clone());
-            let config = match bootstrap
+            let mut bootstrap = Bootstrap::new(&mut signals.shutdown);
+            match bootstrap
                 .phase(load_configs(
                     &config_paths,
                     watcher_conf,
                     opts.require_healthy,
                     opts.allow_empty_config,
                     graceful_shutdown_duration,
-                    signal_handler,
+                    &mut signals.handler,
                 ))
                 .await
             {
                 // Shutdown (or closed channel) during loading: exit like a running Vector.
                 Err(Interrupted) => return Err(exitcode::OK),
                 Ok(config) => config?,
-            };
-            // Re-broadcast coalesced reloads received during loading, in a stable order.
-            bootstrap.replay_reloads();
-            config
+            }
         };
 
-        Self::from_config(
-            config_paths,
-            config,
-            extra_context,
-            signal_rx,
-            shutdown_rx,
-            &signal_tx,
-        )
-        .await
+        Self::from_config(config_paths, config, extra_context, &mut signals.shutdown).await
     }
 
     pub async fn from_config(
         config_paths: Vec<ConfigPath>,
         config: Config,
         extra_context: ExtraContext,
-        signal_rx: &mut SignalRx,
-        shutdown_rx: &mut ShutdownReceiver,
-        signal_tx: &SignalTx,
+        shutdown: &mut watch::Receiver<ShutdownState>,
     ) -> Result<Self, ExitCode> {
         #[cfg(feature = "api")]
         let api = config.api;
 
-        let mut bootstrap = Bootstrap::new(signal_rx, shutdown_rx, signal_tx.clone());
+        let mut bootstrap = Bootstrap::new(shutdown);
 
         // Topology start can block on network I/O (healthchecks, API probes); race it
         // against shutdown so a signal aborts startup immediately.
@@ -154,9 +135,6 @@ impl ApplicationConfig {
             Ok(Some(topology)) => topology,
             Ok(None) => return Err(exitcode::CONFIG),
         };
-
-        // Re-broadcast coalesced reloads received during startup, in a stable order.
-        bootstrap.replay_reloads();
 
         Ok(Self {
             config_paths,
@@ -291,7 +269,7 @@ impl Application {
         )?;
 
         // Signal handler for OS and provider messages.
-        let mut signals = SignalPair::new(&runtime);
+        let mut signals = Signals::new(&runtime);
 
         if let Some(sub_command) = &opts.sub_command {
             // Combine root and subcommand flags before setting the global once.
@@ -306,9 +284,7 @@ impl Application {
 
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
-            &mut signals.handler,
-            &mut signals.receiver,
-            &mut signals.shutdown_receiver,
+            &mut signals,
             extra_context,
         ))?;
 
@@ -363,7 +339,7 @@ pub struct StartedApplication {
     pub config_paths: Vec<ConfigPath>,
     pub internal_topologies: Vec<RunningTopology>,
     pub graceful_crash_receiver: ShutdownErrorReceiver,
-    pub signals: SignalPair,
+    pub signals: Signals,
     pub topology_controller: SharedTopologyController,
     pub allow_empty_config: bool,
 }
@@ -377,7 +353,7 @@ impl StartedApplication {
         let Self {
             config_paths,
             graceful_crash_receiver,
-            signals,
+            mut signals,
             topology_controller,
             internal_topologies,
             allow_empty_config,
@@ -385,136 +361,126 @@ impl StartedApplication {
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
 
-        let mut signal_handler = signals.handler;
-        let mut signal_rx = signals.receiver;
-        let mut shutdown_rx = signals.shutdown_receiver;
-
-        let signal = loop {
+        loop {
             let has_sources = !topology_controller.lock().await.topology.config.is_empty();
             tokio::select! {
                 biased;
                 // Handle shutdown before a queued reload that may block on config loading.
-                shutdown = shutdown_rx.recv() => break shutdown,
-                signal = signal_rx.recv() => if let Some(signal) = handle_signal(
-                    signal,
-                    &topology_controller,
-                    &config_paths,
-                    &mut signal_handler,
-                    allow_empty_config,
-                ).await {
-                    break signal;
+                _ = wait_for_shutdown(&mut signals.shutdown) => break,
+                plan = signals.reloads.recv() => {
+                    let mut reload_shutdown = signals.shutdown.clone();
+                    tokio::select! {
+                        biased;
+                        _ = wait_for_immediate(&mut signals.shutdown) => break,
+                        result = handle_reload(
+                            plan,
+                            &topology_controller,
+                            &config_paths,
+                            &mut signals.handler,
+                            &mut reload_shutdown,
+                            allow_empty_config,
+                        ) => {
+                            if let Some(signal) = result {
+                                signals.handler.shutdown.send(signal);
+                            }
+                        }
+                    }
                 },
                 // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                error = graceful_crash.next() => break ShutdownSignal::Graceful(error),
+                error = graceful_crash.next() => {
+                    signals.handler.shutdown.send(error.map_or(
+                        ShutdownSignal::Graceful,
+                        ShutdownSignal::Failed,
+                    ));
+                },
                 _ = TopologyController::sources_finished(topology_controller.clone()), if has_sources => {
                     info!("All sources have finished.");
-                    break ShutdownSignal::Graceful(None)
+                    signals.handler.shutdown.send(ShutdownSignal::Graceful);
                 },
             }
-        };
+        }
 
         FinishedApplication {
-            signal,
-            signal_rx,
-            shutdown_rx,
+            signals,
             topology_controller,
             internal_topologies,
         }
     }
 }
 
-async fn handle_signal(
-    signal: Result<SignalTo, RecvError>,
+async fn handle_reload(
+    plan: ReloadPlan,
     topology_controller: &SharedTopologyController,
     config_paths: &[ConfigPath],
     signal_handler: &mut SignalHandler,
+    shutdown: &mut watch::Receiver<ShutdownState>,
     allow_empty_config: bool,
 ) -> Option<ShutdownSignal> {
-    match signal {
-        Ok(SignalTo::ReloadComponents(components_to_reload)) => {
-            let mut topology_controller = topology_controller.lock().await;
+    let mut topology_controller = topology_controller.lock().await;
+    let needs_config = plan.config.is_some() || !plan.components.is_empty();
+    if needs_config {
+        if !plan.components.is_empty() {
             topology_controller
                 .topology
-                .extend_reload_set(components_to_reload);
-
-            // Reload paths
-            if let Some(paths) = config::process_paths(config_paths) {
-                topology_controller.config_paths = paths;
-            }
-
-            // Reload config
-            let new_config = config::load_from_paths_with_provider_and_secrets(
-                &topology_controller.config_paths,
-                signal_handler,
-                allow_empty_config,
-            )
-            .await;
-
-            reload_config_from_result(topology_controller, new_config).await
+                .extend_reload_set(plan.components);
         }
-        Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
-            let topology_controller = topology_controller.lock().await;
-            reload_config_from_result(topology_controller, config_builder.build()).await
-        }
-        Ok(SignalTo::ReloadFromDisk) => {
-            let mut topology_controller = topology_controller.lock().await;
 
-            // Reload paths
-            if let Some(paths) = config::process_paths(config_paths) {
-                topology_controller.config_paths = paths;
-            }
+        let new_config = match plan.config {
+            Some(ReloadConfig::Builder(builder)) => builder.build(),
+            Some(ReloadConfig::Disk) | None => {
+                if let Some(paths) = config::process_paths(config_paths) {
+                    topology_controller.config_paths = paths;
+                }
 
-            // Reload config
-            let new_config = config::load_from_paths_with_provider_and_secrets(
-                &topology_controller.config_paths,
-                signal_handler,
-                allow_empty_config,
-            )
-            .await;
-
-            if let Ok(ref config) = new_config {
-                // Find all transforms that have external files to watch
-                let transform_keys_to_reload = config.transform_keys_with_external_files();
-
-                // Add these transforms to reload set
-                if !transform_keys_to_reload.is_empty() {
-                    info!(
-                        message = "Reloading transforms with external files.",
-                        count = transform_keys_to_reload.len()
-                    );
-                    topology_controller
-                        .topology
-                        .extend_reload_set(transform_keys_to_reload);
+                // Loading is cancellation-safe; topology replacement below must finish or
+                // roll back before graceful shutdown can drain it.
+                tokio::select! {
+                    biased;
+                    _ = wait_for_shutdown(shutdown) => return None,
+                    config = config::load_from_paths_with_provider_and_secrets(
+                        &topology_controller.config_paths,
+                        signal_handler,
+                        allow_empty_config,
+                    ) => config,
                 }
             }
+        };
 
-            reload_config_from_result(topology_controller, new_config).await
+        if plan.reload_external_files
+            && let Ok(config) = &new_config
+        {
+            let transforms = config.transform_keys_with_external_files();
+            if !transforms.is_empty() {
+                info!(
+                    message = "Reloading transforms with external files.",
+                    count = transforms.len()
+                );
+                topology_controller.topology.extend_reload_set(transforms);
+            }
         }
-        Ok(SignalTo::ReloadEnrichmentTables) => {
-            let topology_controller = topology_controller.lock().await;
 
-            topology_controller
-                .topology
-                .reload_enrichment_tables()
-                .await;
-            None
+        if let Some(signal) = reload_config_from_result(&mut topology_controller, new_config).await
+        {
+            return Some(signal);
         }
-        Err(RecvError::Lagged(amt)) => {
-            warn!("Overflow, dropped {} signals.", amt);
-            None
-        }
-        // Unreachable: this loop owns the reload channel. Treat as shutdown for safety.
-        Err(RecvError::Closed) => Some(ShutdownSignal::Graceful(None)),
     }
+
+    if plan.enrichment_tables {
+        topology_controller
+            .topology
+            .reload_enrichment_tables()
+            .await;
+    }
+    None
 }
 
 async fn reload_config_from_result(
-    mut topology_controller: MutexGuard<'_, TopologyController>,
+    topology_controller: &mut TopologyController,
     config: Result<Config, Vec<String>>,
 ) -> Option<ShutdownSignal> {
     match config {
         Ok(new_config) => match topology_controller.reload(new_config).await {
-            ReloadOutcome::FatalError(error) => Some(ShutdownSignal::Graceful(Some(error))),
+            ReloadOutcome::FatalError(error) => Some(ShutdownSignal::Failed(error)),
             _ => None,
         },
         Err(errors) => {
@@ -526,9 +492,7 @@ async fn reload_config_from_result(
 }
 
 pub struct FinishedApplication {
-    pub signal: ShutdownSignal,
-    pub signal_rx: SignalRx,
-    pub shutdown_rx: ShutdownReceiver,
+    pub signals: Signals,
     pub topology_controller: SharedTopologyController,
     pub internal_topologies: Vec<RunningTopology>,
 }
@@ -536,9 +500,7 @@ pub struct FinishedApplication {
 impl FinishedApplication {
     pub async fn shutdown(self) -> ExitStatus {
         let FinishedApplication {
-            signal,
-            signal_rx,
-            shutdown_rx,
+            mut signals,
             topology_controller,
             internal_topologies,
         } = self;
@@ -550,17 +512,11 @@ impl FinishedApplication {
             .expect("fail to unwrap topology controller")
             .into_inner();
 
-        let status = match signal {
-            ShutdownSignal::Graceful(triggering_error) => {
-                Self::stop(
-                    topology_controller,
-                    signal_rx,
-                    shutdown_rx,
-                    triggering_error.is_none(),
-                )
-                .await
-            }
-            ShutdownSignal::Quit => Self::quit(),
+        let state = wait_for_shutdown(&mut signals.shutdown).await;
+        let status = if state.is_immediate() {
+            Self::quit()
+        } else {
+            Self::stop(topology_controller, &mut signals.shutdown).await
         };
 
         for topology in internal_topologies {
@@ -572,15 +528,16 @@ impl FinishedApplication {
 
     async fn stop(
         topology_controller: TopologyController,
-        mut signal_rx: SignalRx,
-        mut shutdown_rx: ShutdownReceiver,
-        clean_shutdown: bool,
+        shutdown: &mut watch::Receiver<ShutdownState>,
     ) -> ExitStatus {
         emit!(VectorStopping);
         tokio::select! {
+            biased;
+            // Repeated shutdown requests are durable even if both arrived before drain.
+            _ = wait_for_immediate(shutdown) => Self::quit(),
             drained = topology_controller.stop() => {
                 emit!(VectorStopped);
-                if clean_shutdown && drained {
+                if shutdown.borrow().error().is_none() && drained {
                     info!("All components shut down gracefully.");
                 }
                 ExitStatus::from_raw({
@@ -592,9 +549,6 @@ impl FinishedApplication {
                     exitcode::OK
                 })
             }, // Graceful shutdown finished
-            // A second shutdown forces an immediate quit. Shutdowns use their own channel,
-            // so reloads during drain can't crowd out a shutdown.
-            _ = recv_shutdown(&mut signal_rx, &mut shutdown_rx, |_| {}) => Self::quit(),
         }
     }
 
@@ -754,7 +708,7 @@ pub async fn load_configs(
         // Start listening for config changes.
         config::watcher::spawn_thread(
             watcher_conf,
-            signal_handler.clone_tx(),
+            signal_handler.reloads.clone(),
             watched_paths,
             watched_component_paths,
             None,

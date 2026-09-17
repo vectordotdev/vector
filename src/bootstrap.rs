@@ -1,103 +1,43 @@
 #![allow(missing_docs)]
 
-use std::{collections::HashSet, future::Future};
-
-use tokio::task::JoinError;
-use tokio::task::JoinHandle;
-
-use crate::config::{ComponentKey, ConfigBuilder};
-use crate::signal::{
-    ShutdownReceiver, SignalRx, SignalTo, SignalTx, recv_shutdown, try_recv_shutdown,
+use tokio::{
+    sync::watch,
+    task::{JoinError, JoinHandle},
 };
+
+use crate::signal::{ShutdownState, wait_for_shutdown};
 
 /// Marker for a phase being interrupted by a shutdown signal.
 pub(crate) struct Interrupted;
 
-/// Coalesced reload signals received while a phase is blocked; bounded to the latest state
-/// per kind and replayed in a stable order.
-#[derive(Default)]
-struct PendingReloads {
-    from_disk: bool,
-    components: Option<HashSet<ComponentKey>>,
-    from_builder: Option<ConfigBuilder>,
-    enrichment_tables: bool,
-}
-
-impl PendingReloads {
-    fn push(&mut self, signal: SignalTo) {
-        match signal {
-            SignalTo::ReloadFromDisk => self.from_disk = true,
-            SignalTo::ReloadComponents(components) => {
-                self.components
-                    .get_or_insert_with(HashSet::new)
-                    .extend(components);
-            }
-            SignalTo::ReloadFromConfigBuilder(builder) => self.from_builder = Some(builder),
-            SignalTo::ReloadEnrichmentTables => self.enrichment_tables = true,
-        }
-    }
-
-    fn into_signals(self) -> Vec<SignalTo> {
-        let mut signals = Vec::new();
-        if self.from_disk {
-            signals.push(SignalTo::ReloadFromDisk);
-        }
-        if let Some(components) = self.components {
-            signals.push(SignalTo::ReloadComponents(components));
-        }
-        if let Some(builder) = self.from_builder {
-            signals.push(SignalTo::ReloadFromConfigBuilder(builder));
-        }
-        if self.enrichment_tables {
-            signals.push(SignalTo::ReloadEnrichmentTables);
-        }
-        signals
-    }
-}
-
 /// Orchestrates startup/validation phases against shutdown signals.
 ///
-/// Each phase races `recv_shutdown`, shutdown branch biased first; shutdowns travel on a
-/// dedicated channel so a burst of reloads can't overflow and drop one. Reloads received
-/// mid-phase are coalesced and re-broadcast by [`Bootstrap::replay_reloads`].
+/// Reload requests remain in their mailbox while a phase is blocked.
 pub(crate) struct Bootstrap<'a> {
-    signal_rx: &'a mut SignalRx,
-    shutdown_rx: &'a mut ShutdownReceiver,
-    signal_tx: SignalTx,
-    pending_reloads: PendingReloads,
+    shutdown: &'a mut watch::Receiver<ShutdownState>,
     guards: Vec<Box<dyn FnOnce()>>,
 }
 
 impl<'a> Bootstrap<'a> {
-    pub(crate) fn new(
-        signal_rx: &'a mut SignalRx,
-        shutdown_rx: &'a mut ShutdownReceiver,
-        signal_tx: SignalTx,
-    ) -> Self {
+    pub(crate) fn new(shutdown: &'a mut watch::Receiver<ShutdownState>) -> Self {
         Self {
-            signal_rx,
-            shutdown_rx,
-            signal_tx,
-            pending_reloads: Default::default(),
+            shutdown,
             guards: Default::default(),
         }
     }
 
-    /// Races a phase against shutdown; returns `Err(Interrupted)` if a shutdown (or closed
-    /// channel) arrives first. Reloads received meanwhile are coalesced for replay.
+    /// Races a phase against durable shutdown state, including an earlier shutdown.
     pub(crate) async fn phase<T>(
         &mut self,
         fut: impl Future<Output = T>,
     ) -> Result<T, Interrupted> {
-        let mut fut = Box::pin(fut);
         tokio::select! {
             biased;
-            // Shutdown (or closed channel) arrived mid-phase; reloads coalesce for replay.
-            _ = recv_shutdown(self.signal_rx, self.shutdown_rx, |reload| self.pending_reloads.push(reload)) => {
+            _ = wait_for_shutdown(self.shutdown) => {
                 self.run_guards();
                 Err(Interrupted)
             }
-            result = &mut fut => Ok(result),
+            result = fut => self.complete_phase(result),
         }
     }
 
@@ -111,12 +51,22 @@ impl<'a> Bootstrap<'a> {
             biased;
             // Shutdown arrived mid-phase: abort and report it. The process exits immediately
             // on this path, so detached blocking work dies with it.
-            _ = recv_shutdown(self.signal_rx, self.shutdown_rx, |reload| self.pending_reloads.push(reload)) => {
+            _ = wait_for_shutdown(self.shutdown) => {
                 handle.abort();
                 self.run_guards();
                 Err(Interrupted)
             }
-            result = &mut *handle => Ok(result),
+            result = &mut *handle => self.complete_phase(result),
+        }
+    }
+
+    fn complete_phase<T>(&mut self, result: T) -> Result<T, Interrupted> {
+        // The phase can observe shutdown after select polled its shutdown branch.
+        if self.pending_shutdown() {
+            self.run_guards();
+            Err(Interrupted)
+        } else {
+            Ok(result)
         }
     }
 
@@ -132,18 +82,55 @@ impl<'a> Bootstrap<'a> {
         }
     }
 
-    /// Re-broadcasts coalesced reloads in a stable order (disk, components, builder, enrichment).
-    pub(crate) fn replay_reloads(&mut self) {
-        for reload in std::mem::take(&mut self.pending_reloads).into_signals() {
-            drop(self.signal_tx.send(reload));
-        }
+    /// Checks shutdown state without consuming it.
+    pub(crate) fn pending_shutdown(&self) -> bool {
+        self.shutdown.borrow().is_shutdown() || self.shutdown.has_changed().is_err()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{cell::Cell, rc::Rc};
+
+    use super::*;
+    use crate::signal::{ShutdownSignal, Signals};
+
+    #[tokio::test]
+    async fn shutdown_interrupts_successive_phases_and_runs_guards_once() {
+        let mut signals = Signals::default();
+        let mut bootstrap = Bootstrap::new(&mut signals.shutdown);
+        let cleanups = Rc::new(Cell::new(0));
+        let count = Rc::clone(&cleanups);
+        bootstrap.guard(move || count.set(count.get() + 1));
+
+        let interrupted = bootstrap
+            .phase(async {
+                signals.handler.shutdown.send(ShutdownSignal::Graceful);
+                std::future::pending::<()>().await;
+            })
+            .await;
+        assert!(interrupted.is_err());
+        assert_eq!(cleanups.get(), 1);
+
+        // An observed shutdown must still win against a ready phase.
+        assert!(
+            bootstrap
+                .phase(async { panic!("phase ran after shutdown") })
+                .await
+                .is_err()
+        );
+        assert_eq!(cleanups.get(), 1);
     }
 
-    /// Non-blocking shutdown check; coalesces queued reloads into the pending set.
-    pub(crate) fn pending_shutdown(&mut self) -> bool {
-        try_recv_shutdown(self.signal_rx, self.shutdown_rx, |reload| {
-            self.pending_reloads.push(reload)
-        })
-        .is_some()
+    #[tokio::test]
+    async fn completed_phase_cannot_hide_concurrent_shutdown() {
+        let mut signals = Signals::default();
+        let mut bootstrap = Bootstrap::new(&mut signals.shutdown);
+        let result = bootstrap
+            .phase(async {
+                signals.handler.shutdown.send(ShutdownSignal::Graceful);
+            })
+            .await;
+        assert!(result.is_err());
     }
 }

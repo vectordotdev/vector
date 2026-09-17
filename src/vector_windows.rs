@@ -393,7 +393,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
 
                     // Handle stop
                     ServiceControl::Stop => {
-                        handler.send_shutdown(ShutdownSignal::Graceful(None));
+                        handler.shutdown.send(ShutdownSignal::Graceful);
                         ServiceControlHandlerResult::NoError
                     }
 

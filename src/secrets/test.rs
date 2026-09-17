@@ -18,7 +18,7 @@ impl SecretBackend for TestBackend {
     async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
-        _: &mut signal::ShutdownReceiver,
+        _: &mut tokio::sync::watch::Receiver<signal::ShutdownState>,
     ) -> crate::Result<HashMap<String, String>> {
         Ok(secret_keys
             .into_iter()

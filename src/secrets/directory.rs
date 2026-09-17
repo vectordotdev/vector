@@ -33,7 +33,7 @@ impl SecretBackend for DirectoryBackend {
     async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
-        _: &mut signal::ShutdownReceiver,
+        _: &mut tokio::sync::watch::Receiver<signal::ShutdownState>,
     ) -> crate::Result<HashMap<String, String>> {
         let mut secrets = HashMap::new();
         for k in secret_keys.into_iter() {

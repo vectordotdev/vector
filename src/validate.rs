@@ -16,7 +16,7 @@ use crate::{
         loading::ConfigBuilderLoader,
     },
     schema::Definition,
-    signal::{ShutdownReceiver, SignalRx},
+    signal::Signals,
     topology::{
         self,
         builder::{TopologyPieces, TopologyPiecesBuilder},
@@ -169,23 +169,16 @@ impl Opts {
 }
 
 /// Performs topology, component, and health checks.
-pub async fn validate(
-    opts: &Opts,
-    signal_handler: &mut crate::signal::SignalHandler,
-    signal_rx: &mut SignalRx,
-    shutdown_rx: &mut ShutdownReceiver,
-    color: bool,
-) -> ExitCode {
+pub async fn validate(opts: &Opts, signals: &mut Signals, color: bool) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
-    let signal_tx = signal_handler.clone_tx();
-    let mut bootstrap = Bootstrap::new(signal_rx, shutdown_rx, signal_tx);
+    let mut bootstrap = Bootstrap::new(&mut signals.shutdown);
 
     let mut validated = true;
 
     // Config loading can block on secret/provider resolution; race it against shutdown.
     let mut config = match bootstrap
-        .phase(validate_config(opts, signal_handler, &mut fmt))
+        .phase(validate_config(opts, &mut signals.handler, &mut fmt))
         .await
     {
         // Reloads are dropped here: nothing to reload during validation.
@@ -215,8 +208,7 @@ pub async fn validate(
         }
     }
 
-    // A shutdown arriving outside a raced phase (e.g. during transform/sink validation)
-    // would otherwise be dropped, so drain the receiver once more before reporting.
+    // Also check shutdown after phases that do not yield to the runtime.
     //
     // Yield first: validation may run without ever yielding (e.g. `--threads 1`), so the
     // OS-signal task may not have had a chance to enqueue the shutdown yet.
