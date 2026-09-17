@@ -538,7 +538,7 @@ pub fn ifile_source(
                 Ok(mut canonical) => {
                     if canonical == path {
                         // Not a symlink, we should be good to keep original_path
-                        return original_path.clone();
+                        return original_path;
                     }
                     while let Some(popped) = popped.pop() {
                         canonical.push(popped);
@@ -649,7 +649,7 @@ pub fn ifile_source(
         offset_key: config.offset_key.clone().and_then(|k| k.path),
     };
 
-    let exclude = exclude_patterns.clone();
+    let exclude = exclude_patterns;
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
@@ -1615,10 +1615,7 @@ mod tests {
             let archive_path = archive_path.to_str().unwrap();
             assert!(
                 file_path == path || file_path == archive_path,
-                "File path should be either {} or {}, but was {}",
-                path,
-                archive_path,
-                file_path
+                "File path should be either {path} or {archive_path}, but was {file_path}"
             );
         }
     }
@@ -2171,6 +2168,8 @@ mod tests {
             };
 
             let ret =
+                // SAFETY: the file descriptor is open and the two-element timeval
+                // array remains valid for the duration of the call.
                 unsafe { libc::futimes(older_file.as_raw_fd(), [older_time, older_time].as_ptr()) };
             assert_eq!(ret, 0);
         }
@@ -2891,7 +2890,7 @@ mod tests {
             }
 
             if attempt == max_attempts {
-                return Err(format!("Condition not met after {} attempts", max_attempts));
+                return Err(format!("Condition not met after {max_attempts} attempts"));
             }
 
             sleep(Duration::from_millis(delay_ms)).await;

@@ -1,10 +1,11 @@
 #![allow(dead_code)] // FIXME
-use metrics::{counter, gauge};
 use std::borrow::Cow;
+use vector_lib::internal_event::{CounterName, GaugeName};
 use vector_lib::{
     configurable::configurable_component,
     internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
 };
+use vector_lib::{counter, gauge};
 
 pub use self::source::*;
 
@@ -30,7 +31,7 @@ pub struct FileOpen {
 
 impl InternalEvent for FileOpen {
     fn emit(self) {
-        gauge!("open_files").set(self.count as f64);
+        gauge!(GaugeName::OpenFiles).set(self.count as f64);
     }
 }
 
@@ -51,13 +52,13 @@ impl InternalEvent for FileBytesSent<'_> {
         );
         if self.include_file_metric_tag {
             counter!(
-                "component_sent_bytes_total",
+                CounterName::ComponentSentBytesTotal,
                 "protocol" => "file",
                 "file" => self.file.clone().into_owned(),
             )
         } else {
             counter!(
-                "component_sent_bytes_total",
+                CounterName::ComponentSentBytesTotal,
                 "protocol" => "file",
             )
         }
@@ -86,7 +87,7 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_code" => self.code,
             "error_type" => error_type::IO_FAILED,
             "stage" => error_stage::SENDING,
@@ -105,10 +106,10 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
-    use metrics::counter;
     use vector_lib::file_source_common::internal_events::{
         FileSourceExtendedInternalEvents, FileSourceInternalEvents,
     };
+    use vector_lib::{counter, internal_event::CounterName};
 
     use crate::internal_events::FileLineTooBigError;
 
@@ -136,13 +137,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_received_bytes_total",
+                    CounterName::ComponentReceivedBytesTotal,
                     "protocol" => "ifile",
                     "ifile" => self.file.to_owned()
                 )
             } else {
                 counter!(
-                    "component_received_bytes_total",
+                    CounterName::ComponentReceivedBytesTotal,
                     "protocol" => "ifile",
                 )
             }
@@ -168,18 +169,18 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_received_events_total",
+                    CounterName::ComponentReceivedEventsTotal,
                     "file" => self.file.to_owned(),
                 )
                 .increment(self.count as u64);
                 counter!(
-                    "component_received_event_bytes_total",
+                    CounterName::ComponentReceivedEventBytesTotal,
                     "file" => self.file.to_owned(),
                 )
                 .increment(self.byte_size.get() as u64);
             } else {
-                counter!("component_received_events_total").increment(self.count as u64);
-                counter!("component_received_event_bytes_total")
+                counter!(CounterName::ComponentReceivedEventsTotal).increment(self.count as u64);
+                counter!(CounterName::ComponentReceivedEventBytesTotal)
                     .increment(self.byte_size.get() as u64);
             }
         }
@@ -199,11 +200,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "checksum_errors_total",
+                    CounterName::ChecksumErrorsTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("checksum_errors_total")
+                counter!(CounterName::ChecksumErrorsTotal)
             }
             .increment(1);
         }
@@ -229,7 +230,7 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -237,7 +238,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "reading_fingerprint",
                     "error_type" => error_type::READER_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -269,7 +270,7 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
@@ -277,7 +278,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => DELETION_FAILED,
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -301,11 +302,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_deleted_total",
+                    CounterName::FilesDeletedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_deleted_total")
+                counter!(CounterName::FilesDeletedTotal)
             }
             .increment(1);
         }
@@ -328,13 +329,13 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_unwatched_total",
+                    CounterName::FilesUnwatchedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                     "reached_eof" => reached_eof,
                 )
             } else {
                 counter!(
-                    "files_unwatched_total",
+                    CounterName::FilesUnwatchedTotal,
                     "reached_eof" => reached_eof,
                 )
             }
@@ -362,7 +363,7 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -370,7 +371,7 @@ mod source {
                 )
             } else {
                 counter!(
-                    "component_errors_total",
+                    CounterName::ComponentErrorsTotal,
                     "error_code" => "watching",
                     "error_type" => error_type::COMMAND_FAILED,
                     "stage" => error_stage::RECEIVING,
@@ -396,11 +397,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_resumed_total",
+                    CounterName::FilesResumedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_resumed_total")
+                counter!(CounterName::FilesResumedTotal)
             }
             .increment(1);
         }
@@ -420,11 +421,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_added_total",
+                    CounterName::FilesAddedTotal,
                     "file" => self.file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_added_total")
+                counter!(CounterName::FilesAddedTotal)
             }
             .increment(1);
         }
@@ -443,7 +444,7 @@ mod source {
                 count = %self.count,
                 duration_ms = self.duration.as_millis() as u64,
             );
-            counter!("checkpoints_total").increment(self.count as u64);
+            counter!(CounterName::CheckpointsTotal).increment(self.count as u64);
         }
     }
 
@@ -463,7 +464,7 @@ mod source {
                 internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "writing_checkpoints",
                 "error_type" => error_type::WRITER_FAILED,
                 "stage" => error_stage::RECEIVING,
@@ -490,7 +491,7 @@ mod source {
                 internal_log_rate_limit = true,
             );
             counter!(
-                "component_errors_total",
+                CounterName::ComponentErrorsTotal,
                 "error_code" => "globbing",
                 "error_type" => error_type::READER_FAILED,
                 "stage" => error_stage::RECEIVING,
@@ -605,11 +606,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_passive_total",
+                    CounterName::FilesPassiveTotal,
                     "file" => file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_passive_total")
+                counter!(CounterName::FilesPassiveTotal)
             }
             .increment(1);
         }
@@ -622,11 +623,11 @@ mod source {
             );
             if self.include_file_metric_tag {
                 counter!(
-                    "files_active_total",
+                    CounterName::FilesActiveTotal,
                     "file" => file.to_string_lossy().into_owned(),
                 )
             } else {
-                counter!("files_active_total")
+                counter!(CounterName::FilesActiveTotal)
             }
             .increment(1);
         }

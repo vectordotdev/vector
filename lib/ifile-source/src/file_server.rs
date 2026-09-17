@@ -528,13 +528,16 @@ where
         .await
         {
             Ok(mut watcher) => {
-                // Rewriting a file can change its checksum without changing its
-                // inode. Retire the old fingerprint's reader before reading the
-                // replacement, or both handles would emit the rewritten lines.
-                for previous in fp_map.values_mut() {
-                    if previous.same_file(&watcher) {
-                        previous.set_dead();
-                    }
+                // A rewrite can change the checksum without changing the inode.
+                // Keep the existing reader: it may already have observed the
+                // truncation and read some of the replacement contents between
+                // discovery passes. Starting another reader would replay them.
+                let previous_index = fp_map.values().position(|old| old.same_file(&watcher));
+                if let Some(index) = previous_index {
+                    let (old_id, previous) = fp_map.shift_remove_index(index).unwrap();
+                    checkpoints.set_dead(old_id);
+                    watcher = previous;
+                    watcher.update_path(path.clone()).await.ok();
                 }
                 if let ReadFrom::Checkpoint(file_position) = read_from {
                     self.emitter.emit_file_resumed(&path, file_position);

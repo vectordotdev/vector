@@ -16,11 +16,7 @@ generated: components: sources: ifile: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type: object: options: enabled: {
-			description: "Whether or not end-to-end acknowledgements are enabled for this source."
-			required:    false
-			type: bool: {}
-		}
+		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
 	}
 	checkpoint_interval: {
 		description: """
@@ -36,9 +32,9 @@ generated: components: sources: ifile: configuration: {
 			"""
 		required: false
 		type: uint: {
-			default: 30
-			examples: [5, 10, 60]
-			unit: "seconds"
+			default: 500
+			examples: [500, 1000, 2000, 5000]
+			unit: "milliseconds"
 		}
 	}
 	data_dir: {
@@ -58,23 +54,7 @@ generated: components: sources: ifile: configuration: {
 	encoding: {
 		description: "Character set encoding."
 		required:    false
-		type: object: options: charset: {
-			description: """
-				Encoding of the source messages.
-
-				Takes one of the encoding [label strings](https://encoding.spec.whatwg.org/#concept-encoding-get) defined as
-				part of the [Encoding Standard](https://encoding.spec.whatwg.org/).
-
-				When set, the messages are transcoded from the specified encoding to UTF-8, which is the encoding that is
-				assumed internally for string-like data. Enable this transcoding operation if you need your data to
-				be in UTF-8 for further processing. At the time of transcoding, any malformed sequences (that can't be mapped to
-				UTF-8) is replaced with the Unicode [REPLACEMENT
-				CHARACTER](https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character) and warnings are
-				logged.
-				"""
-			required: true
-			type: string: examples: ["utf-16le", "utf-16be"]
-		}
+		type:        _schemaDefinitions["core::option::Option<vector::sources::util::encoding_config::EncodingConfig>"]
 	}
 	exclude: {
 		description: """
@@ -102,7 +82,7 @@ generated: components: sources: ifile: configuration: {
 		type: string: {
 			default: "file"
 			examples: [
-				"path",
+				"path"
 			]
 		}
 	}
@@ -202,7 +182,7 @@ generated: components: sources: ifile: configuration: {
 		required:    false
 		type: uint: {
 			examples: [
-				600,
+				600
 			]
 			unit: "seconds"
 		}
@@ -215,16 +195,7 @@ generated: components: sources: ifile: configuration: {
 	internal_metrics: {
 		description: "Configuration of internal metrics for file-based components."
 		required:    false
-		type: object: options: include_file_tag: {
-			description: """
-				Whether or not to include the "file" tag on the component's corresponding internal metrics.
-
-				This is useful for distinguishing between different files while monitoring. However, the tag's
-				cardinality is unbounded.
-				"""
-			required: false
-			type: bool: default: false
-		}
+		type:        _schemaDefinitions["vector::internal_events::file::FileInternalMetricsConfig"]
 	}
 	line_delimiter: {
 		description: "String sequence used to separate one file line from another."
@@ -232,7 +203,7 @@ generated: components: sources: ifile: configuration: {
 		type: string: {
 			default: "\n"
 			examples: [
-				"\r\n",
+				"\r\n"
 			]
 		}
 	}
@@ -269,68 +240,7 @@ generated: components: sources: ifile: configuration: {
 			If not specified, multiline aggregation is disabled.
 			"""
 		required: false
-		type: object: options: {
-			condition_pattern: {
-				description: """
-					Regular expression pattern that is used to determine whether or not more lines should be read.
-
-					This setting must be configured in conjunction with `mode`.
-					"""
-				required: true
-				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
-			}
-			mode: {
-				description: """
-					Aggregation mode.
-
-					This setting must be configured in conjunction with `condition_pattern`.
-					"""
-				required: true
-				type: string: enum: {
-					continue_past: """
-						All consecutive lines matching this pattern, plus one additional line, are included in the group.
-
-						This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
-						that the following line is part of the same message.
-						"""
-					continue_through: """
-						All consecutive lines matching this pattern are included in the group.
-
-						The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
-
-						This is useful in cases such as a Java stack trace, where some indicator in the line (such as a leading
-						whitespace) indicates that it is an extension of the proceeding line.
-						"""
-					halt_before: """
-						All consecutive lines not matching this pattern are included in the group.
-
-						This is useful where a log line contains a marker indicating that it begins a new message.
-						"""
-					halt_with: """
-						All consecutive lines, up to and including the first line matching this pattern, are included in the group.
-
-						This is useful where a log line ends with a termination marker, such as a semicolon.
-						"""
-				}
-			}
-			start_pattern: {
-				description: "Regular expression pattern that is used to match the start of a new message."
-				required:    true
-				type: string: examples: ["^[\\s]+", "\\\\$", "^(INFO|ERROR) ", ";$"]
-			}
-			timeout_ms: {
-				description: """
-					The maximum amount of time to wait for the next additional line, in milliseconds.
-
-					Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
-					"""
-				required: true
-				type: uint: {
-					examples: [1000, 600000]
-					unit: "milliseconds"
-				}
-			}
-		}
+		type:     _schemaDefinitions["core::option::Option<vector::sources::util::multiline_config::MultilineConfig>"]
 	}
 	offset_key: {
 		description: """
@@ -342,7 +252,7 @@ generated: components: sources: ifile: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"offset",
+			"offset"
 		]
 	}
 	oldest_first: {
