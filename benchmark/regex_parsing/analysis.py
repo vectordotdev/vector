@@ -1,4 +1,4 @@
-import json, sys
+import json, os, sys
 from collections import defaultdict
 
 run_dir = sys.argv[1]
@@ -39,8 +39,14 @@ with open(f"{run_dir}/vector.stdout") as f:
 # --- Remap CPU breakdown ---
 categories = defaultdict(int)
 total = 0
-with open(f"{run_dir}/sample.folded") as f:
-    for line in f:
+have_folded = True
+try:
+    src = open(f"{run_dir}/sample.folded")
+except FileNotFoundError:
+    have_folded = False
+    src = open(os.devnull)
+with src:
+    for line in src:
         line = line.strip()
         if not line: continue
         parts = line.rsplit(' ', 1)
@@ -80,8 +86,11 @@ with open(f"{run_dir}/sample.folded") as f:
             categories['other'] += count
 
 print()
-print(f"  Remap samples: {total}")
-for k, v in sorted(categories.items(), key=lambda x: -x[1]):
-    pct = 100.0 * v / total if total else 0
-    bar = '█' * int(pct / 2)
-    print(f"    {pct:5.1f}% {bar:<25} {k} ({v})")
+if not have_folded:
+    print("  Remap samples: skipped (sample.folded not present)")
+else:
+    print(f"  Remap samples: {total}")
+    for k, v in sorted(categories.items(), key=lambda x: -x[1]):
+        pct = 100.0 * v / total
+        bar = '█' * int(pct / 2)
+        print(f"    {pct:5.1f}% {bar:<25} {k} ({v})")

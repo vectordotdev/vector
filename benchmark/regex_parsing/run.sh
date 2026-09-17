@@ -10,6 +10,7 @@
 #   run.sh                           # default label = timestamp
 #   run.sh baseline                  # named run
 #   VECTOR_BIN=/path/to/vector run.sh baseline
+#   SKIP_FLAMEGRAPH=true run.sh baseline   # lading metrics/analysis only; no sampling or flamegraph
 #
 # Prerequisites (macOS):
 #   - lading             (cargo install lading)
@@ -36,6 +37,7 @@ OUT_DIR="${OUT_DIR:-/tmp/vector-regex-bench}"
 SAMPLE_SECONDS="${SAMPLE_SECONDS:-30}"
 WARMUP_SECONDS="${WARMUP_SECONDS:-12}"
 EXPERIMENT_SECONDS="${EXPERIMENT_SECONDS:-60}"
+SKIP_FLAMEGRAPH="${SKIP_FLAMEGRAPH:-false}"
 
 LABEL="${1:-$(date +%Y%m%d-%H%M%S)}"
 RUN_DIR="$OUT_DIR/$LABEL"
@@ -44,7 +46,9 @@ RUN_DIR="$OUT_DIR/$LABEL"
 [[ -x "$VECTOR_BIN" ]]      || { echo "Vector binary not found: $VECTOR_BIN" >&2; exit 1; }
 [[ -f "$VECTOR_CONFIG" ]]   || { echo "Vector config not found: $VECTOR_CONFIG" >&2; exit 1; }
 [[ -f "$LADING_CONFIG" ]]   || { echo "Lading config not found: $LADING_CONFIG" >&2; exit 1; }
-for tool in lading sample inferno-collapse-sample inferno-flamegraph; do
+required_tools=(lading)
+[[ "$SKIP_FLAMEGRAPH" == "true" ]] || required_tools+=(sample inferno-collapse-sample inferno-flamegraph)
+for tool in "${required_tools[@]}"; do
     command -v "$tool" >/dev/null || { echo "Required tool not on PATH: $tool" >&2; exit 1; }
 done
 
@@ -96,16 +100,20 @@ echo "  PID $LADING_PID"
 echo "==> Warming up ${WARMUP_SECONDS}s"
 sleep "$WARMUP_SECONDS"
 
-echo "  CPU at sample-start:"
-ps -p "$VECTOR_PID" -o pcpu= -o pmem= | awk '{printf "    %.0f%% CPU, %.1f%% RSS\n", $1, $2}'
+if [[ "$SKIP_FLAMEGRAPH" == "true" ]]; then
+    echo "==> Skipping sampling and flamegraph (SKIP_FLAMEGRAPH=true)"
+else
+    echo "  CPU at sample-start:"
+    ps -p "$VECTOR_PID" -o pcpu= -o pmem= | awk '{printf "    %.0f%% CPU, %.1f%% RSS\n", $1, $2}'
 
-echo "==> Sampling for ${SAMPLE_SECONDS}s"
-sample "$VECTOR_PID" "$SAMPLE_SECONDS" -file "$RUN_DIR/sample.txt" > /dev/null
+    echo "==> Sampling for ${SAMPLE_SECONDS}s"
+    sample "$VECTOR_PID" "$SAMPLE_SECONDS" -file "$RUN_DIR/sample.txt" > /dev/null
 
-echo "==> Generating flamegraph"
-inferno-collapse-sample "$RUN_DIR/sample.txt" > "$RUN_DIR/sample.folded"
-inferno-flamegraph --title "Vector regex parsing ($LABEL)" \
-    "$RUN_DIR/sample.folded" > "$RUN_DIR/flamegraph.svg"
+    echo "==> Generating flamegraph"
+    inferno-collapse-sample "$RUN_DIR/sample.txt" > "$RUN_DIR/sample.folded"
+    inferno-flamegraph --title "Vector regex parsing ($LABEL)" \
+        "$RUN_DIR/sample.folded" > "$RUN_DIR/flamegraph.svg"
+fi
 
 # Stop both processes and wait for them to exit before continuing.
 # Must wait explicitly here — bash stalls at script exit until all tracked
@@ -121,8 +129,12 @@ python3 "$SCRIPT_DIR"/analysis.py "$RUN_DIR"
 
 echo
 echo "==> Outputs in $RUN_DIR"
-echo "  flamegraph.svg     open with: open $RUN_DIR/flamegraph.svg"
-echo "  sample.txt         raw macOS sample output"
-echo "  sample.folded      collapsed stacks (inferno format)"
+if [[ "$SKIP_FLAMEGRAPH" == "true" ]]; then
+    echo "  (sampling/flamegraph skipped)"
+else
+    echo "  flamegraph.svg     open with: open $RUN_DIR/flamegraph.svg"
+    echo "  sample.txt         raw macOS sample output"
+    echo "  sample.folded      collapsed stacks (inferno format)"
+fi
 echo "  lading.captures    lading metrics (JSONL)"
 echo "  vector.stdout      Vector logs"
