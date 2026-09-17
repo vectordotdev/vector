@@ -5,7 +5,7 @@ use anyhow::{Result, bail};
 use crate::testing::{
     config::ComposeTestConfig,
     integration::{ComposeTest, ComposeTestLocalConfig},
-    runner::{LOCAL_COVERAGE_OUTPUT_DIR, coverage_filename},
+    runner::{coverage_filename, local_coverage_output_dir},
 };
 
 use super::active_projects::find_active_environment_for_integration;
@@ -34,10 +34,20 @@ pub fn exec(
         (None, None) => Box::new(envs.keys()),
     };
 
-    let mut ran_environments: Vec<String> = Vec::new();
+    if coverage {
+        clear_coverage();
+    }
+
+    let mut ran_environments = Vec::new();
     for environment in environments {
-        ComposeTest::generate(local_config, integration, environment, retries, coverage)?
-            .test(args.to_owned())?;
+        run_environment(
+            local_config,
+            integration,
+            environment,
+            retries,
+            args,
+            coverage,
+        )?;
         if coverage {
             ran_environments.push(environment.clone());
         }
@@ -46,34 +56,78 @@ pub fn exec(
     // Consolidate per-environment coverage files into the canonical lcov.info
     // so callers get a single, predictable output path regardless of how many
     // environments ran.
-    if coverage && !ran_environments.is_empty() {
-        let coverage_dir = std::path::Path::new(LOCAL_COVERAGE_OUTPUT_DIR);
-        let merged_path = coverage_dir.join(coverage_filename(None));
-        // Remove any stale lcov.info from a previous run so callers never pick
-        // up outdated data if the merge below fails to read a per-env file.
-        std::fs::remove_file(&merged_path).ok();
-        let mut merged = String::new();
-        for env_name in &ran_environments {
-            let env_file = coverage_dir.join(coverage_filename(Some(env_name)));
-            match std::fs::read_to_string(&env_file) {
-                Ok(contents) => {
-                    merged.push_str(&contents);
-                    std::fs::remove_file(&env_file).ok();
-                }
-                Err(e) => {
-                    warn!("Could not read coverage file {}: {e}", env_file.display());
-                }
-            }
-        }
-        if !merged.is_empty() {
-            std::fs::write(&merged_path, merged)?;
-            info!(
-                "Wrote coverage for {} environment(s) to {}",
-                ran_environments.len(),
-                merged_path.display()
-            );
-        }
+    if coverage {
+        merge_coverage(&ran_environments)?;
     }
 
     Ok(())
+}
+
+pub(crate) fn run_environment(
+    local_config: ComposeTestLocalConfig,
+    integration: &str,
+    environment: &str,
+    retries: u8,
+    args: &[String],
+    coverage: bool,
+) -> Result<()> {
+    ComposeTest::generate(local_config, integration, environment, retries, coverage)?
+        .test(args.to_owned())
+}
+
+pub(crate) fn clear_coverage() {
+    let coverage_dir = local_coverage_output_dir();
+    std::fs::remove_file(coverage_dir.join(coverage_filename(None))).ok();
+}
+
+pub(crate) fn merge_coverage(environments: &[String]) -> Result<()> {
+    if environments.is_empty() {
+        return Ok(());
+    }
+
+    let coverage_dir = local_coverage_output_dir();
+    let merged_path = coverage_dir.join(coverage_filename(None));
+    let mut merged = String::new();
+
+    for environment in environments {
+        let coverage_path = coverage_dir.join(coverage_filename(Some(environment)));
+        match std::fs::read_to_string(&coverage_path) {
+            Ok(contents) => {
+                merged.push_str(&normalize_coverage_paths(&contents));
+                std::fs::remove_file(&coverage_path).ok();
+            }
+            Err(e) => warn!(
+                "Could not read coverage file {}: {e}",
+                coverage_path.display()
+            ),
+        }
+    }
+
+    if !merged.is_empty() {
+        std::fs::write(&merged_path, merged)?;
+        info!(
+            "Wrote coverage for {} environment(s) to {}",
+            environments.len(),
+            merged_path.display()
+        );
+    }
+
+    Ok(())
+}
+
+fn normalize_coverage_paths(contents: &str) -> String {
+    contents.replace("SF:/home/vector/", "SF:")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_coverage_paths;
+
+    #[test]
+    fn normalizes_container_source_paths() {
+        assert_eq!(
+            normalize_coverage_paths("SF:/home/vector/src/main.rs\nDA:1,1\n"),
+            "SF:src/main.rs\nDA:1,1\n"
+        );
+    }
 }

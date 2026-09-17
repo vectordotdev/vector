@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: splunk_hec_logs
+    inputs:
+      - my-source-or-transform-id
+    default_token: SECRET[splunk_secrets.token]
+    encoding:
+      codec: json
+    endpoint: https://http-inputs-hec.splunkcloud.com

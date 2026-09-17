@@ -27,11 +27,9 @@ pub struct UnixConfig {
     pub path: PathBuf,
 
     #[serde(default = "default_sanitize")]
-    #[configurable(derived)]
     pub sanitize: bool,
 
     #[serde(default = "default_convert_to")]
-    #[configurable(derived)]
     pub convert_to: ConversionUnit,
 }
 

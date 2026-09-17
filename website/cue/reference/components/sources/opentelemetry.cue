@@ -39,7 +39,6 @@ components: sources: opentelemetry: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
@@ -76,7 +75,6 @@ components: sources: opentelemetry: {
 				attributes: {
 					description: "Attributes that describe the specific event occurrence."
 					required:    false
-					common:      true
 					type: object: {
 						examples: [
 							{
@@ -99,7 +97,6 @@ components: sources: opentelemetry: {
 				resources: {
 					description: "Set of attributes that describe the resource."
 					required:    false
-					common:      true
 					type: object: {
 						examples: [
 							{
@@ -116,7 +113,6 @@ components: sources: opentelemetry: {
 				"scope.name": {
 					description: "Instrumentation scope name (often logger name)."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["some.module.name"]
@@ -125,7 +121,6 @@ components: sources: opentelemetry: {
 				"scope.version": {
 					description: "Instrumentation scope version."
 					required:    false
-					common:      false
 					type: string: {
 						default: null
 						examples: ["1.2.3"]
@@ -134,7 +129,6 @@ components: sources: opentelemetry: {
 				"scope.attributes": {
 					description: "Set of attributes that belong to the instrumentation scope."
 					required:    false
-					common:      false
 					type: object: {
 						examples: [
 							{
@@ -148,7 +142,6 @@ components: sources: opentelemetry: {
 				"scope.dropped_attributes_count": {
 					description: "Number of attributes dropped from the instrumentation scope (if not zero)."
 					required:    false
-					common:      false
 					type: uint: {
 						unit: null
 					}
@@ -156,7 +149,6 @@ components: sources: opentelemetry: {
 				message: {
 					description: "Contains the body of the log record."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["20200415T072306-0700 INFO I like donuts"]
@@ -165,7 +157,6 @@ components: sources: opentelemetry: {
 				trace_id: {
 					description: "Request trace id as defined in W3C Trace Context. Can be set for logs that are part of request processing and have an assigned trace id."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["66346462623365646437363566363230"]
@@ -174,7 +165,6 @@ components: sources: opentelemetry: {
 				span_id: {
 					description: "Can be set for logs that are part of a particular processing span."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["43222c2d51a7abe3"]
@@ -187,7 +177,6 @@ components: sources: opentelemetry: {
 						Smaller numerical values correspond to less severe events (such as debug events), larger numerical values correspond to more severe events (such as errors and critical events).
 						"""
 					required: false
-					common:   true
 					type: uint: {
 						default: null
 						unit:    null
@@ -197,7 +186,6 @@ components: sources: opentelemetry: {
 				severity_text: {
 					description: "Severity text (also known as log level)."
 					required:    false
-					common:      true
 					type: string: {
 						default: null
 						examples: ["TRACE3", "INFO", "ERROR", "FATAL4"]
@@ -206,7 +194,6 @@ components: sources: opentelemetry: {
 				flags: {
 					description: "Trace flag as defined in W3C Trace Context specification."
 					required:    false
-					common:      true
 					type: uint: {
 						default: null
 						unit:    null

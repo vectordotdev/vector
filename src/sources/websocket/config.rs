@@ -82,19 +82,16 @@ pub struct WebSocketConfig {
     pub common: WebSocketCommonConfig,
 
     /// Decoder to use on each received message.
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
     /// Framing to use in the decoding.
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
     /// Number of seconds before timing out while connecting.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_connect_timeout_secs")]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = 10))]
     pub connect_timeout_secs: Duration,
 
@@ -102,26 +99,22 @@ pub struct WebSocketConfig {
     /// This is only used when `initial_message` is also configured.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_initial_message_timeout_secs")]
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = 5))]
     pub initial_message_timeout_secs: Duration,
 
     /// An optional message to send to the server upon connection.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "SUBSCRIBE logs"))]
     #[serde(default)]
     pub initial_message: Option<String>,
 
     /// An optional application-level ping message to send over the WebSocket connection.
     /// If not set, a standard WebSocket ping control frame is sent instead.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub ping_message: Option<String>,
 
     /// The expected application-level pong message to listen for as a response to a custom `ping_message`.
     /// This is only used when `ping_message` is also configured. When a custom ping is sent,
     /// receiving this specific message confirms that the connection is still alive.
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub pong_message: Option<PongMessage>,
 
@@ -163,8 +156,8 @@ impl SourceConfig for WebSocketConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
-        let connector =
-            WebSocketConnector::new(self.common.uri.clone(), tls, self.common.auth.clone())?;
+        let uri = WebSocketConnector::parse_uri(&self.common.uri)?;
+        let connector = WebSocketConnector::from_validated(uri, tls, self.common.auth.clone());
 
         let log_namespace = cx.log_namespace(self.log_namespace);
         let decoder =

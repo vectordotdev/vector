@@ -13,7 +13,6 @@ pub struct MetricData {
     #[serde(flatten)]
     pub time: MetricTime,
 
-    #[configurable(derived)]
     pub kind: MetricKind,
 
     #[serde(flatten)]

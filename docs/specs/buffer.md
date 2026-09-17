@@ -58,8 +58,8 @@ _All buffers_ MUST emit a `BufferEventsReceived` event:
 - Metric
   - MUST increment the `buffer_received_events_total` counter by the defined `count`
   - MUST increment the `buffer_received_bytes_total` counter by the defined `byte_size`
-  - MUST increment the `buffer_size_events` gauge by the defined `count`, and emit `buffer_events` for backward compatibility
-  - MUST increment the `buffer_size_bytes` gauge by the defined `byte_size`, and emit `buffer_byte_size` for backward compatibility
+  - MUST increment the `buffer_size_events` gauge by the defined `count`
+  - MUST increment the `buffer_size_bytes` gauge by the defined `byte_size`
 
 #### BufferEventsSent
 
@@ -71,8 +71,8 @@ _All buffers_ MUST emit a `BufferEventsSent` event after sending one or more Vec
 - Metric
   - MUST increment the `buffer_sent_events_total` counter by the defined `count`
   - MUST increment the `buffer_sent_bytes_total` counter by the defined `byte_size`
-  - MUST decrement the `buffer_size_events` gauge by the defined `count`, and emit `buffer_events` for backward compatibility
-  - MUST decrement the `buffer_size_bytes` gauge by the defined `byte_size`, and emit `buffer_byte_size` for backward compatibility
+  - MUST decrement the `buffer_size_events` gauge by the defined `count`
+  - MUST decrement the `buffer_size_bytes` gauge by the defined `byte_size`
 
 #### BufferError
 

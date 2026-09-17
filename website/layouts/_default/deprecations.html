@@ -17,10 +17,10 @@
       {{ partial "hero.html" . }}
     </div>
 
-    <div id="page-content" class="mt-10">
+    <div id="page-content" data-pagefind-body class="mt-10">
       {{ if gt (len $pending) 0 }}
       <div>
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Active Deprecations" "level" 2) }}
           <p>The current Vector release is <strong>v{{ $latest }}</strong>. Deprecated configuration and features are retained for at least one minor release before they are eligible for removal.</p>
         </div>
@@ -35,7 +35,7 @@
               Deprecated since {{ .deprecated_since }}
             </div>
             {{ with .description }}
-            <div class="mt-2.5 prose dark:prose-dark max-w-none">
+            <div class="mt-2.5 prose dark:prose-invert max-w-none">
               {{ . | markdownify }}
             </div>
             {{ end }}
@@ -47,7 +47,7 @@
 
       {{ if gt (len $enacted) 0 }}
       <div class="mt-12">
-        <div class="prose dark:prose-dark max-w-none">
+        <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Past Deprecations" "level" 2) }}
           <p>These features have been removed from Vector since version 0.57.0, when the new deprecation system was introduced.</p>
         </div>
@@ -62,7 +62,7 @@
               Deprecated since {{ .deprecated_since }} &middot; Removed in {{ .removed_in }}
             </div>
             {{ with .description }}
-            <div class="mt-2.5 prose dark:prose-dark max-w-none">
+            <div class="mt-2.5 prose dark:prose-invert max-w-none">
               {{ . | markdownify }}
             </div>
             {{ end }}

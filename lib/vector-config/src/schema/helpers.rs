@@ -1,7 +1,7 @@
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeSet, HashMap},
-    env, mem,
+    mem,
 };
 
 use indexmap::IndexMap;
@@ -16,15 +16,19 @@ use crate::{
     Configurable, ConfigurableRef, GenerateError, Metadata, ToValue, num::ConfigurableNumber,
 };
 
-/// Applies metadata to the given schema.
-///
-/// Metadata can include semantic information (title, description, etc), validation (min/max, allowable
-/// patterns, etc), as well as actual arbitrary key/value data.
-pub fn apply_base_metadata(schema: &mut SchemaObject, metadata: Metadata) {
-    apply_metadata(&<()>::as_configurable_ref(), schema, metadata)
+/// Applies metadata that is not associated with a configurable type to the given schema.
+pub fn apply_metadata(schema: &mut SchemaObject, metadata: Metadata) {
+    apply_configurable_metadata(&<()>::as_configurable_ref(), schema, metadata)
 }
 
-fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata: Metadata) {
+/// Applies resolved metadata to the given schema.
+///
+/// All metadata, whether it comes from a type, field, or enum variant, flows through this function.
+fn apply_configurable_metadata(
+    config: &ConfigurableRef,
+    schema: &mut SchemaObject,
+    metadata: Metadata,
+) {
     let type_name = config.type_name();
     let base_metadata = config.make_metadata();
 
@@ -60,26 +64,35 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
         );
     }
 
-    // If a default value was given, serialize it.
-    let schema_default = metadata.default_value().map(ToValue::to_value);
+    apply_custom_attributes(schema, &metadata, type_name);
+    apply_validations(schema, &metadata);
+    apply_schema_metadata(schema, schema_title, schema_description, &metadata);
+}
 
-    // Take the existing schema metadata, if any, or create a default version of it, and then apply
-    // all of our newly-calculated values to it.
-    //
-    // Similar to the above title/description logic, we update both title/description if either of
-    // them have been set, to avoid mixing/matching between base and override metadata.
+fn apply_schema_metadata(
+    schema: &mut SchemaObject,
+    title: Option<&'static str>,
+    description: Option<&'static str>,
+    metadata: &Metadata,
+) {
     let mut schema_metadata = schema.metadata.take().unwrap_or_default();
-    if schema_title.is_some() || schema_description.is_some() {
-        schema_metadata.title = schema_title.map(|s| s.to_string());
-        schema_metadata.description = schema_description.map(|s| s.to_string());
+    if title.is_some() || description.is_some() {
+        schema_metadata.title = title.map(str::to_owned);
+        schema_metadata.description = description.map(str::to_owned);
     }
-    schema_metadata.default = schema_default.or(schema_metadata.default);
+    schema_metadata.default = metadata
+        .default_value()
+        .map(ToValue::to_value)
+        .or(schema_metadata.default);
     schema_metadata.deprecated = metadata.deprecated();
+    schema.metadata = Some(schema_metadata);
+}
 
-    // Set any custom attributes as extensions on the schema. If an attribute is declared multiple
-    // times, we turn the value into an array and merge them together. We _do_ not that, however, if
-    // the original value is a flag, or the value being added to an existing key is a flag, as
-    // having a flag declared multiple times, or mixing a flag with a KV pair, doesn't make sense.
+fn apply_custom_attributes(
+    schema: &mut SchemaObject,
+    metadata: &Metadata,
+    type_name: &'static str,
+) {
     let map_entries_len = {
         let custom_map = schema
             .extensions
@@ -141,13 +154,12 @@ fn apply_metadata(config: &ConfigurableRef, schema: &mut SchemaObject, metadata:
     if map_entries_len == 0 {
         schema.extensions.remove("_metadata");
     }
+}
 
-    // Now apply any relevant validations.
+fn apply_validations(schema: &mut SchemaObject, metadata: &Metadata) {
     for validation in metadata.validations() {
         validation.apply(schema);
     }
-
-    schema.metadata = Some(schema_metadata);
 }
 
 pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: Vec<SchemaObject>) {
@@ -409,6 +421,103 @@ pub(crate) fn generate_optional_schema(
     Ok(schema)
 }
 
+/// Generates the schema for a `#[serde(flatten)] Option<T>` field.
+///
+/// `generate_optional_schema` encodes optionality as `oneOf: [null, T]`, which is correct for a
+/// nullable *property*. Flattened fields are merged into the parent object via `allOf`, where the
+/// value being validated is never JSON `null`.
+///
+/// When `T` is an internally (or adjacently) tagged enum, this wraps `T` as
+/// `anyOf: [ { not: { required: [<tag>] } }, T ]` so omission matches serde. The wrapper is `anyOf`
+/// rather than `oneOf` because a trailing `#[serde(untagged)]` object or map variant also has no
+/// tag field; both alternatives then match a serialized `Some(fallback)` value.
+///
+/// A sibling property that serializes under the same name as the tag is rejected: the absence
+/// encoding would treat that sibling as a present variant. That includes an enclosing
+/// internally-tagged enum's tag field, which is not a variant field of its own. That layout is
+/// unused and is not modeled.
+///
+/// When `T` is not tagged that way, this falls back to `Option<T>`'s normal (nullable property)
+/// schema so flatten-of-struct and similar shapes stay unchanged.
+///
+/// The wrapper is built from `T` rather than from a shared `Option<T>` definition, so a normal
+/// `Option<T>` property keeps its null branch and field-specific metadata stays on this site.
+pub fn generate_flattened_optional_schema(
+    inner: &ConfigurableRef,
+    optional: &ConfigurableRef,
+    generator: &RefCell<SchemaGenerator>,
+    overrides: Option<Metadata>,
+    sibling_field_names: &[&str],
+) -> Result<SchemaObject, GenerateError> {
+    let Some(tag_field) = enum_tag_field_from_metadata(&inner.make_metadata()) else {
+        return get_or_generate_schema(optional, generator, overrides);
+    };
+
+    if let Some(sibling_field) = sibling_field_names
+        .iter()
+        .copied()
+        .find(|name| *name == tag_field)
+    {
+        return Err(GenerateError::FlattenedOptionalEnumTagCollision {
+            enum_type: inner.type_name(),
+            tag_field,
+            sibling_field: sibling_field.to_owned(),
+        });
+    }
+
+    let inner_schema = get_or_generate_schema(inner, generator, None)?;
+    let mut schema = SchemaObject {
+        subschemas: Some(Box::new(SubschemaValidation {
+            any_of: Some(vec![
+                Schema::Object(absent_tag_schema(tag_field)),
+                Schema::Object(inner_schema),
+            ]),
+            ..Default::default()
+        })),
+        ..Default::default()
+    };
+
+    // Match `generate_optional_schema`: mark the wrapper optional for docs, and apply field
+    // metadata to this site. `optional` is transparent, so a flatten field without its own
+    // description does not inherit the inner enum's docs.
+    let mut metadata = overrides.unwrap_or_default();
+    metadata.add_custom_attribute(CustomAttribute::flag(constants::DOCS_META_OPTIONAL));
+    optional.validate_metadata(&metadata)?;
+    apply_configurable_metadata(optional, &mut schema, metadata);
+
+    Ok(schema)
+}
+
+fn enum_tag_field_from_metadata(metadata: &Metadata) -> Option<String> {
+    metadata
+        .custom_attributes()
+        .iter()
+        .find_map(|attribute| match attribute {
+            CustomAttribute::KeyValue { key, value }
+                if key == constants::DOCS_META_ENUM_TAG_FIELD =>
+            {
+                value.as_str().map(str::to_owned)
+            }
+            _ => None,
+        })
+}
+
+fn absent_tag_schema(tag_field: String) -> SchemaObject {
+    SchemaObject {
+        subschemas: Some(Box::new(SubschemaValidation {
+            not: Some(Box::new(Schema::Object(SchemaObject {
+                object: Some(Box::new(ObjectValidation {
+                    required: [tag_field].into_iter().collect(),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
 pub fn generate_one_of_schema(subschemas: &[SchemaObject]) -> SchemaObject {
     let subschemas = subschemas
         .iter()
@@ -499,21 +608,43 @@ where
     generate_root_schema_with_settings::<T>(default_schema_settings())
 }
 
+thread_local! {
+    static GENERATING_ROOT_SCHEMA: Cell<bool> = const { Cell::new(false) };
+}
+
+struct SchemaGeneration {
+    previous: bool,
+}
+
+impl SchemaGeneration {
+    fn enable() -> Self {
+        let previous = GENERATING_ROOT_SCHEMA.replace(true);
+        Self { previous }
+    }
+}
+
+impl Drop for SchemaGeneration {
+    fn drop(&mut self) {
+        GENERATING_ROOT_SCHEMA.set(self.previous);
+    }
+}
+
+/// Returns whether the current thread is generating a root configuration schema.
+pub fn is_generating_root_schema() -> bool {
+    GENERATING_ROOT_SCHEMA.get()
+}
+
 pub fn generate_root_schema_with_settings<T>(
     schema_settings: SchemaSettings,
 ) -> Result<RootSchema, GenerateError>
 where
     T: Configurable + 'static,
 {
+    let _generation = SchemaGeneration::enable();
     let schema_gen = RefCell::new(schema_settings.into_generator());
-
-    // Set env variable to enable generating all schemas, including platform-specific ones.
-    unsafe { env::set_var("VECTOR_GENERATE_SCHEMA", "true") };
 
     let schema =
         get_or_generate_schema(&T::as_configurable_ref(), &schema_gen, Some(T::metadata()))?;
-
-    unsafe { env::remove_var("VECTOR_GENERATE_SCHEMA") };
 
     Ok(schema_gen.into_inner().into_root_schema(schema))
 }
@@ -551,7 +682,7 @@ pub fn get_or_generate_schema(
                 // be unwittingly applying a default for all usages of the type that didn't override
                 // the default themselves.
                 let mut schema = config.generate_schema(generator)?;
-                apply_metadata(config, &mut schema, metadata);
+                apply_configurable_metadata(config, &mut schema, metadata);
 
                 generator
                     .borrow_mut()
@@ -585,7 +716,7 @@ pub fn get_or_generate_schema(
         // it was given.
         None => {
             if let Some(metadata) = overrides {
-                apply_metadata(config, &mut schema, metadata);
+                apply_configurable_metadata(config, &mut schema, metadata);
             }
         }
 
@@ -593,8 +724,10 @@ pub fn get_or_generate_schema(
         // metadata here, which we need to merge the override metadata into if it was given. If
         // there was no override metadata, then we just use the base by itself.
         Some(base) => match overrides {
-            None => apply_metadata(config, &mut schema, base),
-            Some(overrides) => apply_metadata(config, &mut schema, base.merge(overrides)),
+            None => apply_configurable_metadata(config, &mut schema, base),
+            Some(overrides) => {
+                apply_configurable_metadata(config, &mut schema, base.merge(overrides))
+            }
         },
     };
 
@@ -787,6 +920,26 @@ fn instance_type_for_value(value: &Value) -> InstanceType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn root_schema_generation_state_is_scoped_to_the_current_thread() {
+        assert!(!is_generating_root_schema());
+
+        let outer = SchemaGeneration::enable();
+        assert!(is_generating_root_schema());
+        std::thread::spawn(|| assert!(!is_generating_root_schema()))
+            .join()
+            .unwrap();
+
+        {
+            let _inner = SchemaGeneration::enable();
+            assert!(is_generating_root_schema());
+        }
+        assert!(is_generating_root_schema());
+
+        drop(outer);
+        assert!(!is_generating_root_schema());
+    }
 
     #[test]
     fn single_discriminant_is_not_ambiguous() {

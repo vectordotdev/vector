@@ -1,6 +1,3 @@
-// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{
     collections::{BTreeMap, HashMap},
     fs::File,
@@ -56,9 +53,8 @@ type CacheValue = (Program, String, MeaningList);
     "remap",
     "Modify your observability data as it passes through your topology using Vector Remap Language (VRL)."
 ))]
-#[derive(Derivative)]
+#[derive(Default, derive_more::Debug)]
 #[serde(deny_unknown_fields)]
-#[derivative(Default, Debug)]
 pub struct RemapConfig {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
@@ -111,7 +107,6 @@ pub struct RemapConfig {
     /// [global_timezone]: https://vector.dev/docs/reference/configuration//global-options#timezone
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
-    #[configurable(metadata(docs::advanced))]
     pub timezone: Option<TimeZone>,
 
     /// Drops any event that encounters an error during processing.
@@ -155,13 +150,13 @@ pub struct RemapConfig {
     #[configurable(metadata(docs::human_name = "Reroute Dropped Events"))]
     pub reroute_dropped: bool,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub runtime: VrlRuntime,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     /// Cache can't be `BTreeMap` or `HashMap` because of `TableRegistry`, which doesn't allow us to inspect tables inside it.
     /// And even if we allowed the inspection, the tables can be huge, resulting in a long comparison or hash computation
     /// while using `Vec` allows us to use just a shallow comparison
@@ -431,6 +426,8 @@ where
 }
 
 pub trait VrlRunner {
+    fn new() -> Self;
+
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -453,6 +450,12 @@ impl Clone for AstRunner {
 }
 
 impl VrlRunner for AstRunner {
+    fn new() -> Self {
+        Self {
+            runtime: Runtime::default(),
+        }
+    }
+
     fn run(
         &mut self,
         target: &mut VrlTarget,
@@ -470,16 +473,7 @@ impl Remap<AstRunner> {
         config: RemapConfig,
         context: &TransformContext,
     ) -> crate::Result<(Self, String)> {
-        let (program, warnings, _) = config.compile_vrl_program(
-            context.enrichment_tables.clone(),
-            context.metrics_storage.clone(),
-            context.merged_schema_definition.clone(),
-        )?;
-
-        let runtime = Runtime::default();
-        let runner = AstRunner { runtime };
-
-        Self::new(config, context, program, runner).map(|remap| (remap, warnings))
+        Self::new(config, context)
     }
 }
 
@@ -487,24 +481,30 @@ impl<Runner> Remap<Runner>
 where
     Runner: VrlRunner,
 {
-    fn new(
-        config: RemapConfig,
-        context: &TransformContext,
-        program: Program,
-        runner: Runner,
-    ) -> crate::Result<Self> {
-        Ok(Remap {
-            component_key: context.key.clone(),
-            program,
-            timezone: config
-                .timezone
-                .unwrap_or_else(|| context.globals.timezone()),
-            drop_on_error: config.drop_on_error,
-            drop_on_abort: config.drop_on_abort,
-            reroute_dropped: config.reroute_dropped,
-            runner,
-            metric_tag_values: config.metric_tag_values,
-        })
+    pub fn new(config: RemapConfig, context: &TransformContext) -> crate::Result<(Self, String)> {
+        let (program, warnings, _) = config.compile_vrl_program(
+            context.enrichment_tables.clone(),
+            context.metrics_storage.clone(),
+            context.merged_schema_definition.clone(),
+        )?;
+
+        let runner = Runner::new();
+
+        Ok((
+            Remap {
+                component_key: context.key.clone(),
+                program,
+                timezone: config
+                    .timezone
+                    .unwrap_or_else(|| context.globals.timezone()),
+                drop_on_error: config.drop_on_error,
+                drop_on_abort: config.drop_on_abort,
+                reroute_dropped: config.reroute_dropped,
+                runner,
+                metric_tag_values: config.metric_tag_values,
+            },
+            warnings,
+        ))
     }
 
     #[cfg(test)]

@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: aws_sns
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    topic_arn: arn:aws:sns:us-east-2:123456789012:MyTopic

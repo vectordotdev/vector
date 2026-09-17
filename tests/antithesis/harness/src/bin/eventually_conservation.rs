@@ -10,13 +10,13 @@
 #[cfg(target_os = "linux")]
 extern crate antithesis_instrumentation;
 
-use antithesis_harness::payload_field;
+use antithesis_harness::{all_endpoints_healthy, OracleClient, VectorClient};
 use antithesis_sdk::{
     antithesis_init, assert_always, assert_always_less_than_or_equal_to,
     assert_sometimes_greater_than, assert_unreachable,
 };
 use clap::Parser;
-use serde_json::{json, Value};
+use serde_json::json;
 use tokio::time;
 
 #[derive(Parser)]
@@ -34,98 +34,14 @@ struct Args {
     metrics_urls: Vec<String>,
 }
 
-/// The oracle's verdict.
-struct Report {
-    acked: u64,
-    delivered: u64,
-    delivered_total: u64,
-    missing_count: u64,
-    missing_sample: Vec<u64>,
-    spurious_count: u64,
-    corrupted_count: u64,
-}
-
-async fn fetch_report(client: &reqwest::Client, oracle_url: &str) -> Option<Report> {
-    let body = client
-        .get(format!("{oracle_url}/report"))
-        .timeout(time::Duration::from_secs(5))
-        .send()
-        .await
-        .ok()?
-        .text()
-        .await
-        .ok()?;
-    let v: Value = serde_json::from_str(&body).ok()?;
-    Some(Report {
-        acked: v["acked"].as_u64()?,
-        delivered: v["delivered"].as_u64()?,
-        delivered_total: v["delivered_total"].as_u64()?,
-        missing_count: v["missing_count"].as_u64()?,
-        missing_sample: v["missing_sample"]
-            .as_array()
-            .map(|a| a.iter().filter_map(Value::as_u64).collect())
-            .unwrap_or_default(),
-        spurious_count: v["spurious_count"].as_u64()?,
-        corrupted_count: v["corrupted_count"].as_u64()?,
-    })
-}
-
-async fn delivered_contains(client: &reqwest::Client, oracle_url: &str, id: u64) -> bool {
-    let Ok(resp) = client
-        .get(format!("{oracle_url}/delivered?id={id}"))
-        .timeout(time::Duration::from_secs(5))
-        .send()
-        .await
-    else {
-        return false;
-    };
-    resp.text().await.map(|s| s.trim() == "1").unwrap_or(false)
-}
-
-async fn node_healthy(client: &reqwest::Client, metrics_url: &str) -> bool {
-    matches!(
-        client.get(metrics_url).timeout(time::Duration::from_secs(3)).send().await,
-        Ok(resp) if resp.status().is_success()
-    )
-}
-
-async fn all_healthy(client: &reqwest::Client, metrics_urls: &[String]) -> bool {
-    for u in metrics_urls {
-        if !node_healthy(client, u).await {
-            return false;
-        }
-    }
-    true
-}
-
-async fn claim(client: &reqwest::Client, oracle_url: &str) -> Option<u64> {
-    let resp = client
-        .post(format!("{oracle_url}/claim"))
-        .timeout(time::Duration::from_secs(10))
-        .send()
-        .await
-        .ok()?;
-    resp.text().await.ok()?.trim().parse().ok()
-}
-
-async fn post_probe(client: &reqwest::Client, source_url: &str, id: u64) -> bool {
-    // Same deterministic payload as the producer, so the probe's delivery passes
-    // the oracle's content check instead of counting as corruption.
-    let event = json!([{ "id": id, "data": payload_field(id) }]);
-    matches!(
-        client.post(source_url).timeout(time::Duration::from_secs(10)).json(&event).send().await,
-        Ok(resp) if resp.status().is_success()
-    )
-}
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     antithesis_init();
     let args = Args::parse();
-    let client = reqwest::Client::new();
-
-    let source_url = args.source_url;
-    let oracle_url = args.oracle_url;
+    let http = reqwest::Client::new();
+    let oracle_url = args.oracle_url.clone();
+    let oracle = OracleClient::new(http.clone(), args.oracle_url);
+    let vector = VectorClient::new(http.clone(), args.source_url);
     let metrics_urls = args.metrics_urls;
 
     // This is an Antithesis `eventually_` command. When it starts Antithesis stops all
@@ -137,7 +53,9 @@ async fn main() {
 
     // Faults stop instantly but recovery is not, so wait for every node to serve again.
     let recovery_deadline = time::Instant::now() + time::Duration::from_secs(180);
-    while time::Instant::now() < recovery_deadline && !all_healthy(&client, &metrics_urls).await {
+    while time::Instant::now() < recovery_deadline
+        && !all_endpoints_healthy(&http, &metrics_urls, time::Duration::from_secs(3)).await
+    {
         time::sleep(time::Duration::from_secs(3)).await;
     }
 
@@ -149,7 +67,7 @@ async fn main() {
     let mut plateau = 0u32;
     while time::Instant::now() < drain_deadline {
         time::sleep(time::Duration::from_secs(3)).await;
-        let Some(r) = fetch_report(&client, &oracle_url).await else {
+        let Some(r) = oracle.report().await else {
             continue;
         };
         if r.missing_count == 0 {
@@ -166,7 +84,7 @@ async fn main() {
         last_delivered = r.delivered;
     }
 
-    let Some(report) = fetch_report(&client, &oracle_url).await else {
+    let Some(report) = oracle.report().await else {
         // On a healthy run the oracle is up. Reaching this arm is itself the failure.
         assert_unreachable!(
             "oracle unreachable while building the conservation report",
@@ -238,14 +156,14 @@ async fn main() {
     let mut progressed = false;
     while !progressed && time::Instant::now() < deadline {
         if probe.is_none() {
-            if let Some(id) = claim(&client, &oracle_url).await {
-                if post_probe(&client, &source_url, id).await {
+            if let Some(id) = oracle.claim().await {
+                if vector.post_event(id, time::Duration::from_secs(10)).await {
                     probe = Some(id);
                 }
             }
         }
         if let Some(id) = probe {
-            progressed = delivered_contains(&client, &oracle_url, id).await;
+            progressed = oracle.delivered(id).await;
         }
         if !progressed {
             time::sleep(time::Duration::from_secs(2)).await;

@@ -1,0 +1,9 @@
+sinks:
+  my_sink_id:
+    type: sematext_metrics
+    inputs:
+      - my-source-or-transform-id
+    default_namespace: service
+    endpoint: http://127.0.0.1
+    region: us
+    token: ${SEMATEXT_TOKEN}

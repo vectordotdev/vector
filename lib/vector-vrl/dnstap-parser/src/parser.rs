@@ -106,7 +106,7 @@ impl DnstapParser {
                 event,
                 &root,
                 &DNSTAP_VALUE_PATHS.server_identity,
-                String::from_utf8(server_id.clone()).unwrap_or_default(),
+                String::from_utf8(server_id).unwrap_or_default(),
             );
         }
 
@@ -253,7 +253,7 @@ impl DnstapParser {
 
         DnstapParser::parse_dnstap_message_type(
             event,
-            prefix.clone(),
+            prefix,
             dnstap_message_type_id,
             dnstap_message,
             parsing_options,
@@ -518,7 +518,7 @@ impl DnstapParser {
         if let Some(response_port) = dnstap_message.response_port {
             DnstapParser::insert(
                 event,
-                prefix.clone(),
+                prefix,
                 &DNSTAP_VALUE_PATHS.response_port,
                 response_port,
             );
@@ -535,7 +535,7 @@ impl DnstapParser {
         DnstapParser::insert(event, prefix.clone(), &DNSTAP_VALUE_PATHS.time, time);
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.time_precision,
             time_precision.to_string(),
         );
@@ -548,7 +548,7 @@ impl DnstapParser {
     ) {
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.raw_data,
             BASE64_STANDARD.encode(raw_dns_message),
         );
@@ -661,7 +661,7 @@ impl DnstapParser {
         );
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.ar_count,
             header.additional_count,
         );
@@ -705,7 +705,7 @@ impl DnstapParser {
         );
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.class,
             question.class.clone(),
         );
@@ -813,7 +813,7 @@ impl DnstapParser {
 
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.ad_count,
             header.additional_count,
         );
@@ -846,7 +846,7 @@ impl DnstapParser {
         );
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.zone_class,
             zone.class.clone(),
         );
@@ -909,12 +909,7 @@ impl DnstapParser {
             DnstapParser::insert(event, prefix.clone(), &DNSTAP_VALUE_PATHS.purpose, purpose);
         }
         if let Some(extra_text) = entry.extra_text() {
-            DnstapParser::insert(
-                event,
-                prefix.clone(),
-                &DNSTAP_VALUE_PATHS.extra_text,
-                extra_text,
-            );
+            DnstapParser::insert(event, prefix, &DNSTAP_VALUE_PATHS.extra_text, extra_text);
         }
     }
 
@@ -944,7 +939,7 @@ impl DnstapParser {
         );
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.opt_data,
             opt.opt_data.clone(),
         );
@@ -1000,7 +995,7 @@ impl DnstapParser {
         if let Some(rdata_bytes) = &record.rdata_bytes {
             DnstapParser::insert(
                 event,
-                prefix.clone(),
+                prefix,
                 &DNSTAP_VALUE_PATHS.rdata_bytes,
                 BASE64_STANDARD.encode(rdata_bytes),
             );

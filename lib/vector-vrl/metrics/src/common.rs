@@ -226,7 +226,7 @@ mod tests {
         let state = TypeState::default();
 
         let mut config = CompileConfig::default();
-        config.set_custom(storage.clone());
+        config.set_custom(storage);
         config.set_read_only();
 
         compile_vrl(vrl_source, &functions, &state, config)
