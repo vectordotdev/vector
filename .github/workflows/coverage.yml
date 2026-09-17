@@ -70,6 +70,7 @@ jobs:
       coverage: true
       cli: true
       vector-api: true
+      ifile: true
 
   integration-tests:
     needs: prepare
