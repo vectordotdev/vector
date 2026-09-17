@@ -1363,12 +1363,7 @@ mod tests {
             let _err = (estimated - actual).abs() / actual;
             assert!(
                 err <= relative_accuracy,
-                "relative accuracy out of bounds: q={}, estimate={}, actual={}, target-rel-acc={}, actual-rel-acc={}, bin-count={}",
-                q,
-                estimated,
-                actual,
-                relative_accuracy,
-                err,
+                "relative accuracy out of bounds: q={q}, estimate={estimated}, actual={actual}, target-rel-acc={relative_accuracy}, actual-rel-acc={err}, bin-count={}",
                 sketch.bin_count()
             );
         }
@@ -1630,10 +1625,9 @@ mod tests {
             let actual = round_to_even(*input);
             assert!(
                 alike(actual, *expected),
-                "input -> {}, expected {}, got {}",
+                "input -> {}, expected {}, got {actual}",
                 *input,
-                *expected,
-                actual
+                *expected
             );
         }
     }

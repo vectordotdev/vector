@@ -223,7 +223,7 @@ where
     let mut config_builder = SdkConfig::builder()
         .http_client(connector)
         .sleep_impl(Arc::new(TokioSleep::new()))
-        .identity_cache(auth.credentials_cache().await?)
+        .identity_cache(auth.credentials_cache()?)
         .credentials_provider(
             auth.credentials_provider(region.clone(), proxy, tls_options)
                 .await?,

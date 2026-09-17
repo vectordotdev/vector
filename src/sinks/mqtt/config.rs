@@ -150,6 +150,7 @@ impl ValidatedSink for MqttSinkConfig {
                 }));
             }
         }
+        self.encoding.validate()?;
         let topic = self
             .topic
             .clone()
@@ -167,7 +168,7 @@ impl ValidatedSink for MqttSinkConfig {
         let sink = MqttSink::new(self, topic, connector.clone())?;
         Ok((
             VectorSink::from_event_streamsink(sink),
-            Box::pin(async move { connector.healthcheck().await }),
+            Box::pin(async move { connector.healthcheck() }),
         ))
     }
 }

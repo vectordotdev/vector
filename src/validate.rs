@@ -190,7 +190,7 @@ pub async fn validate(opts: &Opts, signals: &mut Signals, color: bool) -> ExitCo
         Ok(None) => return exitcode::CONFIG,
     };
 
-    validated &= validate_transforms(&config, &mut fmt).await;
+    validated &= validate_transforms(&config, &mut fmt);
     validated &= validate_sinks_with_context(&config, &mut fmt);
 
     if !opts.no_environment {
@@ -310,7 +310,7 @@ fn stub_enrichment_tables(config: &Config) -> TableRegistry {
     enrichment_tables
 }
 
-async fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
+fn validate_transforms(config: &Config, fmt: &mut Formatter) -> bool {
     let enrichment_tables = stub_enrichment_tables(config);
     let mut definition_cache = HashMap::new();
     let mut errors = Vec::new();
@@ -622,7 +622,7 @@ impl Formatter {
         I::Item: fmt::Display,
     {
         for msg in msgs {
-            self.print(format!("{} {}\n", intro.as_ref(), msg));
+            self.print(format!("{} {msg}\n", intro.as_ref()));
         }
         self.space();
     }

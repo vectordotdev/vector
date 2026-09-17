@@ -604,8 +604,7 @@ where
         if serialized_len <= 8 || self.ser_buf.len() != serialized_len {
             return Err(WriterError::InconsistentState {
                 reason: format!(
-                    "serializer position invalid after serializing record: pos={} len={}",
-                    serialized_len,
+                    "serializer position invalid after serializing record: pos={serialized_len} len={}",
                     self.ser_buf.len(),
                 ),
             });

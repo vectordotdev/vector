@@ -463,6 +463,7 @@ async fn handle_reload(
         {
             return Some(signal);
         }
+
     }
 
     if plan.enrichment_tables {

@@ -86,6 +86,8 @@ where
         value: *const Self,
         context: &mut C,
     ) -> Result<&'b Self, Self::Error> {
+        // SAFETY: The `CheckBytes` contract guarantees that `value` is aligned and points to enough
+        // bytes for `Self`; each field is validated before the final reference is created.
         unsafe {
             Archived::<u32>::check_bytes(addr_of!((*value).checksum), context).map_err(|e| {
                 StructCheckError {
