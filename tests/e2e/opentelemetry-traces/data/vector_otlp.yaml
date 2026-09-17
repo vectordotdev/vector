@@ -12,7 +12,7 @@ sources:
 
   internal_metrics:
     type: internal_metrics
-    scrape_interval_secs: 60
+    scrape_interval_secs: 1
 
 sinks:
   otel_sink:

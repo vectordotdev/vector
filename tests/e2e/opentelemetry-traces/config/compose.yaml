@@ -52,8 +52,9 @@ services:
           --traces=100 \
           --rate=0
 
-  # A detached `compose up` waits for both dependency conditions before starting this service.
-  # This keeps the test runner behind generator completion and exporter readiness.
+  # A detached `compose up` waits for all dependency conditions before starting this service.
+  # This keeps the test runner behind generator completion, exporter readiness, and a
+  # post-ingestion internal metrics scrape.
   traces-ready:
     image: alpine:3.20
     depends_on:
@@ -82,8 +83,9 @@ services:
         - >-
           source_spans=$$(grep -o '"spanId"' /output/opentelemetry-traces/collector-source-file-exporter.log 2>/dev/null | wc -l);
           sink_spans=$$(grep -o '"spanId"' /output/opentelemetry-traces/collector-file-exporter.log 2>/dev/null | wc -l);
-          echo "source=$$source_spans sink=$$sink_spans";
-          [ "$$source_spans" -ge 200 ] && [ "$$sink_spans" -ge 400 ]
+          metrics_ready=$$(grep '"name":"component_received_events_total"' /output/opentelemetry-traces/vector-internal-metrics-sink.log 2>/dev/null | grep '"component_id":"source0"' | grep -Ec '"value":400(\.0)?');
+          echo "source=$$source_spans sink=$$sink_spans metrics_ready=$$metrics_ready";
+          [ "$$source_spans" -ge 200 ] && [ "$$sink_spans" -ge 400 ] && [ "$$metrics_ready" -ge 1 ]
       interval: 500ms
       timeout: 1s
       retries: 240
