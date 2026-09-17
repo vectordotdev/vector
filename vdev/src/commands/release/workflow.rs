@@ -29,11 +29,24 @@ pub struct Cli {
 }
 
 #[derive(clap::Subcommand, Debug)]
+#[allow(clippy::enum_variant_names)] // These command names identify read-only workflow checks.
 enum WorkflowCommand {
     /// Validate a request before generating a release preparation PR.
     PrepareCheck(PrepareCheck),
     /// Validate a generated release preparation PR.
     PrCheck(PrCheck),
+    /// Validate an approved minor-release squash merge before creating its refs.
+    AutotagCheck(AutotagCheck),
+}
+
+#[derive(clap::Args, Debug)]
+struct AutotagCheck {
+    #[arg(long)]
+    before_sha: String,
+    #[arg(long)]
+    sha: String,
+    #[arg(long)]
+    repository: String,
 }
 
 #[derive(clap::Args, Debug)]
@@ -64,12 +77,39 @@ struct ExistingPullRequest {
     url: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct AssociatedPullRequest {
+    merged_at: Option<String>,
+    merge_commit_sha: Option<String>,
+    user: PullRequestAuthor,
+    base: PullRequestRef,
+    head: PullRequestRef,
+}
+
+#[derive(Debug, Deserialize)]
+struct PullRequestAuthor {
+    login: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PullRequestRef {
+    #[serde(rename = "ref")]
+    name: String,
+    repo: Option<PullRequestRepo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PullRequestRepo {
+    full_name: String,
+}
+
 impl Cli {
     pub fn exec(self) -> Result<()> {
         env::set_current_dir(paths::find_repo_root()?)?;
         match self.command {
             WorkflowCommand::PrepareCheck(args) => args.exec(),
             WorkflowCommand::PrCheck(args) => args.exec(),
+            WorkflowCommand::AutotagCheck(args) => args.exec(),
         }
     }
 }
@@ -107,6 +147,69 @@ impl PrepareCheck {
             set_github_output("skip", "false")?;
         }
         Ok(())
+    }
+}
+
+impl AutotagCheck {
+    fn exec(self) -> Result<()> {
+        git::ensure_sha(&self.before_sha, "before SHA")?;
+        git::ensure_sha(&self.sha, "release SHA")?;
+        ensure!(
+            git::run_and_check_output(&["rev-parse", "HEAD"])?.trim() == self.sha,
+            "checkout must match the release SHA"
+        );
+        let version = current_cargo_version()?;
+        let previous = cargo_version_at(&self.before_sha)?;
+        // Ordinary changes, development bumps, and manual patch releases do not tag.
+        if previous == version || version.pre.as_str() == "dev" || version.patch != 0 {
+            set_github_output("tag_required", "false")?;
+            return Ok(());
+        }
+        ensure_stable(&version, "release version")?;
+        let parents = git::run_and_check_output(&["rev-list", "--parents", "-n", "1", "HEAD"])?;
+        ensure!(
+            parents.split_whitespace().collect::<Vec<_>>()
+                == [self.sha.as_str(), self.before_sha.as_str()],
+            "release must be a single squash-merge commit on the frozen base"
+        );
+        let head_ref = preparation_branch(&version);
+        PrCheck {
+            base_sha: self.before_sha,
+            head_ref: head_ref.clone(),
+            expected_vrl_version: None,
+        }
+        .exec()?;
+
+        let endpoint = format!("repos/{}/commits/{}/pulls", self.repository, self.sha);
+        let output = Command::new("gh")
+            .args(["api", "--paginate", "--slurp", &endpoint])
+            .check_output()?;
+        let pages: Vec<Vec<AssociatedPullRequest>> =
+            serde_json::from_str(&output).context("invalid associated pull requests response")?;
+        let matches = pages
+            .iter()
+            .flatten()
+            .filter(|pr| {
+                pr.merged_at.is_some()
+                    && pr.merge_commit_sha.as_deref() == Some(self.sha.as_str())
+                    && pr.user.login == "vectordotdev-bot[bot]"
+                    && pr.base.name == git::MASTER_BRANCH
+                    && pr.head.name == head_ref
+                    && pr.head.repo.as_ref().map(|repo| repo.full_name.as_str())
+                        == Some(self.repository.as_str())
+            })
+            .count();
+        ensure!(
+            matches == 1,
+            "expected one merged bot preparation PR for {}, found {matches}",
+            self.sha
+        );
+        set_github_output("tag_required", "true")?;
+        set_github_output("tag", &format!("v{version}"))?;
+        set_github_output(
+            "release_branch",
+            &format!("v{}.{}", version.major, version.minor),
+        )
     }
 }
 
