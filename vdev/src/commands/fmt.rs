@@ -28,7 +28,7 @@ impl Cli {
                 "--ignore-path",
                 ".prettierignore",
                 "--log-level",
-                "silent",
+                "error",
                 "--write",
             ]
             .into_iter()
