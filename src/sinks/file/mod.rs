@@ -479,6 +479,121 @@ pub struct FileSink {
     confinement: Option<PathConfinement>,
 }
 
+/// Per-path pending batches and their flush deadlines. Each batch holds
+/// `(events, generation, bytes)`; `bytes` tracks size without rescanning. A
+/// deadline is queued only for a pending fresh batch, so one flushed at its
+/// item/byte limit leaves no heap entry behind.
+struct PendingBatches {
+    buffers: std::collections::HashMap<Bytes, (Vec<Event>, u64, usize)>,
+    generation: u64,
+    deadlines: std::collections::BinaryHeap<std::cmp::Reverse<(tokio::time::Instant, Bytes, u64)>>,
+    timeout: Duration,
+}
+
+impl PendingBatches {
+    fn new(timeout: Duration) -> Self {
+        Self {
+            buffers: std::collections::HashMap::new(),
+            generation: 0,
+            deadlines: std::collections::BinaryHeap::new(),
+            timeout,
+        }
+    }
+
+    /// Queues one event, returning the batches to flush now: an old full batch
+    /// replaced by this event, and the fresh batch if it already hits its limit.
+    fn push(
+        &mut self,
+        path: Bytes,
+        event: Event,
+        event_size: usize,
+        size_limit: usize,
+        item_limit: usize,
+    ) -> Vec<(Bytes, Vec<Event>)> {
+        let mut flush = Vec::new();
+        let fresh = if let Some((events, _generation, bytes)) = self.buffers.get_mut(&path) {
+            if *bytes + event_size > size_limit || events.len() >= item_limit {
+                // Buffer full — flush old batch and start fresh with this event.
+                let (old_events, _old_generation, _old_bytes) = self.buffers.remove(&path).unwrap();
+                flush.push((path.clone(), old_events));
+                let generation = self.generation;
+                self.generation = self.generation.wrapping_add(1);
+                self.buffers
+                    .insert(path.clone(), (vec![event], generation, event_size));
+                true
+            } else {
+                *bytes += event_size;
+                events.push(event);
+                false
+            }
+        } else {
+            let generation = self.generation;
+            self.generation = self.generation.wrapping_add(1);
+            self.buffers
+                .insert(path.clone(), (vec![event], generation, event_size));
+            true
+        };
+
+        // Flush at the item/byte limit; only pending fresh batches queue a deadline.
+        let full = self
+            .buffers
+            .get(&path)
+            .is_some_and(|(events, _, bytes)| *bytes >= size_limit || events.len() >= item_limit);
+        if full {
+            let (events, _generation, _bytes) = self.buffers.remove(&path).unwrap();
+            flush.push((path, events));
+        } else if fresh {
+            let generation = self.buffers.get(&path).unwrap().1;
+            let deadline = tokio::time::Instant::now() + self.timeout;
+            self.deadlines
+                .push(std::cmp::Reverse((deadline, path, generation)));
+        }
+        flush
+    }
+
+    /// Pops deadline entries that fired or must be drained to satisfy the buffer
+    /// cap, returning the batches ready to flush. Stale entries whose generation
+    /// no longer matches the current buffer are dropped.
+    fn pop_ready(&mut self, now: tokio::time::Instant, cap: usize) -> Vec<(Bytes, Vec<Event>)> {
+        let mut ready = Vec::new();
+        while self
+            .deadlines
+            .peek()
+            .is_some_and(|std::cmp::Reverse((d, _, _))| *d <= now || self.buffers.len() > cap)
+        {
+            let std::cmp::Reverse((_, path, generation)) = match self.deadlines.pop() {
+                Some(e) => e,
+                None => break,
+            };
+            if let Some((events, current_generation, bytes)) = self.buffers.remove(&path) {
+                if current_generation == generation {
+                    ready.push((path, events));
+                } else {
+                    self.buffers
+                        .insert(path, (events, current_generation, bytes));
+                }
+            }
+        }
+        ready
+    }
+
+    fn take(&mut self, path: &Bytes) -> Option<(Vec<Event>, u64, usize)> {
+        self.buffers.remove(path)
+    }
+
+    /// Returns all remaining batches and clears the pending buffers.
+    fn take_all(&mut self) -> Vec<(Bytes, Vec<Event>)> {
+        std::mem::take(&mut self.buffers)
+            .into_iter()
+            .map(|(path, (events, _, _))| (path, events))
+            .collect()
+    }
+
+    fn next_deadline(&self) -> Option<tokio::time::Instant> {
+        self.deadlines.peek().map(|&std::cmp::Reverse((d, _, _))| d)
+    }
+}
+
 impl FileSink {
     pub fn new(config: &FileSinkConfig, cx: SinkContext) -> crate::Result<Self> {
         let validated = config.validate()?;
@@ -550,24 +665,14 @@ impl FileSink {
             path: self.path.clone(),
         };
         let batch_settings = self.batch_settings;
-        // Per-path buffers of `(events, generation, bytes)`; `bytes` tracks
-        // size without rescanning, a global `generation` marks stale deadlines.
-        // A global (not per-path) counter avoids retaining retired-path state.
-        let mut buffers: std::collections::HashMap<Bytes, (Vec<Event>, u64, usize)> =
-            std::collections::HashMap::new();
-        let mut next_generation: u64 = 0;
-        let mut flush_deadlines: std::collections::BinaryHeap<
-            std::cmp::Reverse<(tokio::time::Instant, Bytes, u64)>,
-        > = std::collections::BinaryHeap::new();
+        let mut pending = PendingBatches::new(batch_settings.timeout);
 
         tokio::pin!(input);
 
         loop {
             let input_next = input.next();
 
-            let next_timer_deadline = flush_deadlines
-                .peek()
-                .map(|&std::cmp::Reverse((d, _, _))| d);
+            let next_timer_deadline = pending.next_deadline();
 
             tokio::select! {
                 event = input_next => {
@@ -619,97 +724,28 @@ impl FileSink {
                                 }
                             };
                             let event_size = event.estimated_json_encoded_size_of().get();
-                            // Queue a deadline only for a pending fresh batch; one
-                            // flushed at its item/byte limit never needs a heap entry.
-                            let fresh_batch =
-                                if let Some((events, _generation, bytes)) = buffers.get_mut(&path) {
-                                    if *bytes + event_size > batch_settings.size_limit
-                                        || events.len() >= batch_settings.item_limit
-                                    {
-                                        // Buffer is full — flush old batch and start fresh.
-                                        let (old_events, _old_generation, _old_bytes) =
-                                            buffers.remove(&path).unwrap();
-                                        self.process_batch(path.clone(), old_events).await;
-                                        let generation = next_generation;
-                                        next_generation = next_generation.wrapping_add(1);
-                                        buffers.insert(
-                                            path.clone(),
-                                            (vec![event], generation, event_size),
-                                        );
-                                        true
-                                    } else {
-                                        *bytes += event_size;
-                                        events.push(event);
-                                        false
-                                    }
-                                } else {
-                                    let generation = next_generation;
-                                    next_generation = next_generation.wrapping_add(1);
-                                    buffers.insert(
-                                        path.clone(),
-                                        (vec![event], generation, event_size),
-                                    );
-                                    true
-                                };
-                            // Flush at the item/byte limit; only pending fresh
-                            // batches queue a timeout deadline.
-                            let needs_flush = buffers.get(&path).is_some_and(
-                                |(events, _, bytes)| {
-                                    *bytes >= batch_settings.size_limit
-                                        || events.len() >= batch_settings.item_limit
-                                },
-                            );
-                            if needs_flush {
-                                let (events, _generation, _bytes) =
-                                    buffers.remove(&path).unwrap();
-                                self.process_batch(path.clone(), events).await;
-                            } else if fresh_batch {
-                                let generation = buffers.get(&path).unwrap().1;
-                                let deadline = tokio::time::Instant::now()
-                                    + batch_settings.timeout;
-                                flush_deadlines.push(
-                                    std::cmp::Reverse((deadline, path, generation)),
-                                );
+                            for (path, events) in pending.push(
+                                path,
+                                event,
+                                event_size,
+                                batch_settings.size_limit,
+                                batch_settings.item_limit,
+                            ) {
+                                self.process_batch(path, events).await;
                             }
                             // Bound active-buffer memory under high-cardinality templates.
                             // Also flush expired buffers inline.
+                            for (path, events) in
+                                pending.pop_ready(tokio::time::Instant::now(), 1000)
                             {
-                                let now = tokio::time::Instant::now();
-                                loop {
-                                    let expire_or_cap =
-                                        flush_deadlines.peek().is_some_and(
-                                            |std::cmp::Reverse((d, _, _))| {
-                                                *d <= now || buffers.len() > 1000
-                                            },
-                                        );
-                                    if !expire_or_cap {
-                                        break;
-                                    }
-                                    let std::cmp::Reverse((_, path, generation)) =
-                                        match flush_deadlines.pop() {
-                                            Some(e) => e,
-                                            None => break,
-                                        };
-                                    if let Some((events, current_generation, bytes)) =
-                                        buffers.remove(&path)
-                                    {
-                                        if current_generation == generation {
-                                            self.process_batch(path, events).await;
-                                        } else {
-                                            buffers.insert(path, (events, current_generation, bytes));
-                                        }
-                                    }
-                                }
+                                self.process_batch(path, events).await;
                             }
                         }
                         None => {
                             // Stream exhausted — flush all remaining buffers, then close files.
                             debug!(message = "Receiver exhausted, flushing remaining buffers.");
-                            let paths: Vec<Bytes> = buffers.keys().cloned().collect();
-                            for p in paths {
-                                if let Some((events, _generation, _bytes)) = buffers.remove(&p) {
-                                    self.process_batch(p, events).await;
-                                }
+                            for (path, events) in pending.take_all() {
+                                self.process_batch(path, events).await;
                             }
                             debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
@@ -735,7 +771,7 @@ impl FileSink {
                         None => unreachable!(),
                         Some((expired_file, expired_path)) => {
                             let path = expired_path.get_ref().clone();
-                            if let Some((events, _generation, _bytes)) = buffers.remove(&path) {
+                            if let Some((events, _generation, _bytes)) = pending.take(&path) {
                                 // Keep the file open so after-close truncation
                                 // can't erase earlier output; keep the original
                                 // deadline so `should_truncate` sees the true mtime.
@@ -760,25 +796,8 @@ impl FileSink {
             }
 
             // Flush any expired buffers after every wake-up.
-            let now = tokio::time::Instant::now();
-            loop {
-                let expired = flush_deadlines
-                    .peek()
-                    .is_some_and(|std::cmp::Reverse((d, _, _))| *d <= now);
-                if !expired {
-                    break;
-                }
-                let std::cmp::Reverse((_, path, generation)) = match flush_deadlines.pop() {
-                    Some(e) => e,
-                    None => break,
-                };
-                if let Some((events, current_generation, bytes)) = buffers.remove(&path) {
-                    if current_generation == generation {
-                        self.process_batch(path, events).await;
-                    } else {
-                        buffers.insert(path, (events, current_generation, bytes));
-                    }
-                }
+            for (path, events) in pending.pop_ready(tokio::time::Instant::now(), usize::MAX) {
+                self.process_batch(path, events).await;
             }
         }
 
@@ -1470,38 +1489,30 @@ mod tests {
         }
     }
 
-    // `max_events: 1` flushes each batch immediately, with no queued deadline.
+    // Regression: a batch flushed at its item/byte limit must not queue a
+    // deadline; `max_events: 1` would otherwise grow the heap by one entry per
+    // event until the timeout catches up.
     #[tokio::test]
-    async fn log_single_partition_max_events_one() {
-        let template = temp_file();
-
-        let batch = serde_json::from_value::<BatchConfig<RealtimeSizeBasedDefaultBatchSettings>>(
-            serde_json::json!({ "max_events": 1, "timeout_secs": 5.0, "max_bytes": 10_000_000 }),
-        )
-        .unwrap();
-        let config = FileSinkConfig {
-            path: template.clone().try_into().unwrap(),
-            idle_timeout: default_idle_timeout(),
-            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
-            compression: Compression::None,
-            acknowledgements: Default::default(),
-            timezone: Default::default(),
-            internal_metrics: FileInternalMetricsConfig {
-                include_file_tag: true,
-            },
-            truncate: Default::default(),
-            base_dir: None,
-            confinement: ConfinementConfig::default(),
-            batch,
-        };
-
-        let (input, _events) = random_lines_with_stream(100, 64, None);
-
-        run_assert_log_sink(&config, input.clone()).await;
-
-        let output = lines_from_file(template);
-        for (input, output) in input.into_iter().zip(output) {
-            assert_eq!(input, output);
+    async fn immediate_flush_queues_no_deadline() {
+        let mut pending = PendingBatches::new(Duration::from_secs(60));
+        // Every event is its own full batch: flushed immediately, never queued.
+        let (size_limit, item_limit) = (10_000_000, 1);
+        for i in 0..100 {
+            let event = Event::Log(LogEvent::from(format!("line {i}")));
+            let flushed = pending.push(
+                Bytes::from_static(b"/out.log"),
+                event,
+                1,
+                size_limit,
+                item_limit,
+            );
+            assert_eq!(flushed.len(), 1, "each event is its own batch");
+            assert_eq!(flushed[0].1.len(), 1);
+            assert!(pending.buffers.is_empty());
+            assert!(
+                pending.deadlines.is_empty(),
+                "no deadline may be queued for an immediately flushed batch"
+            );
         }
     }
 
