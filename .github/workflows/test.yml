@@ -65,6 +65,7 @@ jobs:
     with:
       default: true
       component-validation: true
+      ifile: true
     secrets: inherit
 
   check-scripts:
