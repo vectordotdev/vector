@@ -106,7 +106,7 @@ async fn get_sketches_from_pipeline(address: String) -> SketchIntake {
 
     common_sketch_assertions(&sketches);
 
-    info!("{:?}", sketches);
+    info!("{sketches:?}");
 
     sketches
 }

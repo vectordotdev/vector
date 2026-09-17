@@ -41,7 +41,6 @@ components: sinks: opentelemetry: {
 				See [#22054](https://github.com/vectordotdev/vector/issues/22054).
 				""",
 		]
-		notices: []
 	}
 
 	configuration: generated.components.sinks.opentelemetry.configuration

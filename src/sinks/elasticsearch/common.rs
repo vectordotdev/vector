@@ -115,7 +115,7 @@ impl ElasticsearchCommon {
                     }
                 }
             }
-            format!("{}/_bulk?{}", base_url, query.finish())
+            format!("{base_url}/_bulk?{}", query.finish())
         };
         let bulk_uri = bulk_url.parse::<Uri>().unwrap();
 

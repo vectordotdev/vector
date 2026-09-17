@@ -4,10 +4,11 @@ use std::collections::BTreeMap;
 
 use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
+use crate::template::ConfinedUriTemplate;
 
 pub(super) struct HttpSink<S> {
     service: S,
-    uri: ConfinedTemplate,
+    uri: ConfinedUriTemplate,
     headers: BTreeMap<String, ConfinedTemplate>,
     batch_settings: BatcherSettings,
     request_builder: HttpRequestBuilder,
@@ -23,7 +24,7 @@ where
     /// Creates a new `HttpSink`.
     pub(super) const fn new(
         service: S,
-        uri: ConfinedTemplate,
+        uri: ConfinedUriTemplate,
         headers: BTreeMap<String, ConfinedTemplate>,
         batch_settings: BatcherSettings,
         request_builder: HttpRequestBuilder,
@@ -95,12 +96,12 @@ pub struct PartitionKey {
 }
 
 struct KeyPartitioner {
-    uri: ConfinedTemplate,
+    uri: ConfinedUriTemplate,
     headers: BTreeMap<String, ConfinedTemplate>,
 }
 
 impl KeyPartitioner {
-    const fn new(uri: ConfinedTemplate, headers: BTreeMap<String, ConfinedTemplate>) -> Self {
+    const fn new(uri: ConfinedUriTemplate, headers: BTreeMap<String, ConfinedTemplate>) -> Self {
         Self { uri, headers }
     }
 }

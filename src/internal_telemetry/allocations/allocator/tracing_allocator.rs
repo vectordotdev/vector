@@ -25,9 +25,11 @@ impl<A, T> GroupedTraceableAllocator<A, T> {
     }
 }
 
+// SAFETY: Allocation and deallocation are delegated to `A` with matching layouts.
 unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator<A, T> {
     #[inline]
     unsafe fn alloc(&self, object_layout: Layout) -> *mut u8 {
+        // SAFETY: The caller upholds `GlobalAlloc::alloc`'s contract.
         unsafe {
             if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
                 return self.allocator.alloc(object_layout);
@@ -57,6 +59,7 @@ unsafe impl<A: GlobalAlloc, T: Tracer> GlobalAlloc for GroupedTraceableAllocator
 
     #[inline]
     unsafe fn dealloc(&self, object_ptr: *mut u8, object_layout: Layout) {
+        // SAFETY: The caller provides a pointer and layout returned by `alloc`.
         unsafe {
             if !TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
                 self.allocator.dealloc(object_ptr, object_layout);

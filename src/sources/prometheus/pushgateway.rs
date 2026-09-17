@@ -391,13 +391,7 @@ mod test {
                 .unwrap()
                 .http_protocol_name();
             let push_path = "metrics/job/async_worker";
-            let push_url = format!(
-                "{}://{}:{}/{}",
-                proto,
-                address.ip(),
-                address.port(),
-                push_path
-            );
+            let push_url = format!("{proto}://{}:{}/{push_path}", address.ip(), address.port());
             let push_body = r#"
                 # TYPE jobs_total counter
                 # HELP jobs_total Total number of jobs

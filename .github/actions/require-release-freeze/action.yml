@@ -1,0 +1,27 @@
+name: Require active release freeze
+description: Fail unless the repository's Release freeze ruleset is active.
+runs:
+  using: composite
+  steps:
+    # This is a best-effort guard and remains susceptible to TOCTOU changes after the check.
+    # Maintainers must respect the release freeze window until housekeeping has merged.
+    - name: Check release freeze ruleset
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      with:
+        script: |
+          const rulesets = await github.paginate(
+            "GET /repos/{owner}/{repo}/rulesets",
+            context.repo,
+          );
+          const matches = rulesets.filter(
+            (ruleset) => ruleset.name === "Release freeze",
+          );
+          if (matches.length !== 1) {
+            core.setFailed(
+              `Expected exactly one Release freeze ruleset, found ${matches.length}.`,
+            );
+            return;
+          }
+          if (matches[0].enforcement !== "active") {
+            core.setFailed("The Release freeze ruleset must stay active until housekeeping merges.");
+          }

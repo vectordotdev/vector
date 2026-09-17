@@ -466,8 +466,7 @@ mod tests {
         if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
             assert!(
                 trace.get(timestamp_key).is_none(),
-                "Trace event should not have spurious timestamp field '{}' injected when using LogNamespace::Legacy",
-                timestamp_key
+                "Trace event should not have spurious timestamp field '{timestamp_key}' injected when using LogNamespace::Legacy"
             );
         }
 

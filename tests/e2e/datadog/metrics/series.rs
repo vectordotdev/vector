@@ -244,7 +244,7 @@ async fn get_v1_series_from_pipeline(address: String) -> SeriesIntake {
 
     common_series_assertions(&intake);
 
-    info!("{:?}", intake);
+    info!("{intake:?}");
 
     intake
 }
@@ -265,7 +265,7 @@ async fn get_v2_series_from_pipeline(address: String) -> SeriesIntake {
 
     common_series_assertions(&intake);
 
-    info!("{:?}", intake);
+    info!("{intake:?}");
 
     intake
 }
