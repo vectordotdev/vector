@@ -20,5 +20,6 @@ paths:
   - "tests/e2e/opentelemetry/traces/**"
   - "tests/e2e/opentelemetry/mod.rs"
   - "tests/e2e/opentelemetry-traces/**"
+  - "tests/e2e/opentelemetry-common/**"
   - "lib/codecs/src/**/otlp.rs"
   - "lib/opentelemetry-proto/**"
