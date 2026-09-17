@@ -1,7 +1,7 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::commands::release::generate_cue;
+use crate::commands::release::{ensure_stable, generate_cue, preparation_branch};
 use crate::utils::{command::run_command, git, paths};
 use anyhow::{Context, Result, anyhow, bail};
 use semver::Version;
@@ -42,12 +42,8 @@ struct Prepare {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        if !self.version.pre.is_empty() || !self.version.build.is_empty() {
-            bail!("release version must be a stable semantic version");
-        }
-        if !self.vrl_version.pre.is_empty() || !self.vrl_version.build.is_empty() {
-            bail!("VRL version must be a stable semantic version");
-        }
+        ensure_stable(&self.version, "release version")?;
+        ensure_stable(&self.vrl_version, "VRL version")?;
         let repo_root = paths::find_repo_root()?;
         env::set_current_dir(&repo_root)?;
 
@@ -57,12 +53,7 @@ impl Cli {
             repo_root,
             latest_vector_version: git::latest_release_version()?,
             release_branch: format!("v{}.{}", self.version.major, self.version.minor),
-            // Websites containing `website` will also generate website previews.
-            // Caveat is these branches can only contain alphanumeric chars and dashes.
-            release_preparation_branch: format!(
-                "prepare-v-{}-{}-{}-website",
-                self.version.major, self.version.minor, self.version.patch
-            ),
+            release_preparation_branch: preparation_branch(&self.version),
             dry_run: self.dry_run,
         };
         prepare.run()
@@ -81,14 +72,7 @@ impl Prepare {
         self.update_vector_version(&self.repo_root.join(KUBECLT_CUE_FILE))?;
         self.update_vector_version(&self.repo_root.join(INSTALL_SCRIPT))?;
 
-        if !self.dry_run {
-            git::add_files_in_current_dir()?;
-            git::commit(&format!(
-                "chore(releasing): Prepare version {}",
-                self.new_vector_version
-            ))?;
-            self.open_release_pr()?;
-        }
+        self.publish_release_preparation()?;
 
         Ok(())
     }
@@ -98,33 +82,26 @@ impl Prepare {
         debug!("create_release_branches");
 
         if self.dry_run {
-            // In dry-run mode the release is based on whatever is currently
-            // checked out. Surface that explicitly so a stale or feature
-            // branch doesn't silently produce a release from the wrong base.
             let head = git::run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])
                 .unwrap_or_else(|_| "<unknown>".to_string());
             warn!(
-                "dry-run: using HEAD ({}) as the release base; \
-                 verify this matches what you'd expect from master.",
+                "dry-run: generating changes on HEAD ({}) without switching branches",
                 head.trim()
             );
-        } else {
-            // Step 1: Sync with remote and start from master.
-            git::run_and_check_output(&["fetch"])?;
-            git::checkout_main_branch()?;
+            return Ok(());
         }
 
+        // Step 1: Sync with remote and start from master.
+        git::run_and_check_output(&["fetch"])?;
+        git::checkout_main_branch()?;
+
         git::checkout_or_create_branch(self.release_branch.as_str())?;
-        if !self.dry_run {
-            git::push_and_set_upstream(self.release_branch.as_str())?;
-        }
+        git::push_and_set_upstream(self.release_branch.as_str())?;
 
         // Step 2: Create a new release preparation branch
         //         The branch website contains 'website' to generate vector.dev preview.
         git::checkout_or_create_branch(self.release_preparation_branch.as_str())?;
-        if !self.dry_run {
-            git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
-        }
+        git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
         Ok(())
     }
 
@@ -179,7 +156,6 @@ impl Prepare {
         let latest_version = &self.latest_vector_version;
         let new_version = &self.new_vector_version;
         let old_version_str = format!("{}.{}", latest_version.major, latest_version.minor);
-        let new_version_str = format!("{}.{}", new_version.major, new_version.minor);
 
         if !contents.contains(&old_version_str) {
             return Err(anyhow!(
@@ -189,14 +165,25 @@ impl Prepare {
             ));
         }
 
-        let updated_contents =
-            contents.replace(&latest_version.to_string(), &new_version.to_string());
-        let updated_contents = updated_contents.replace(&old_version_str, &new_version_str);
+        let updated_contents = replace_version_references(&contents, latest_version, new_version);
 
         fs::write(file_path, updated_contents)
             .map_err(|e| anyhow!("Failed to write {}: {}", file_path.display(), e))?;
 
         Ok(())
+    }
+
+    fn publish_release_preparation(&self) -> Result<()> {
+        if self.dry_run {
+            return Ok(());
+        }
+
+        git::add_files_in_current_dir()?;
+        git::commit(&format!(
+            "chore(releasing): Prepare version {}",
+            self.new_vector_version
+        ))?;
+        self.open_release_pr()
     }
 
     /// Final step. Create a release prep PR against the release branch.
@@ -258,9 +245,25 @@ impl Prepare {
 
 // FREE FUNCTIONS AFTER THIS LINE
 
+pub(super) fn replace_version_references(
+    contents: &str,
+    previous: &Version,
+    next: &Version,
+) -> String {
+    contents
+        .replace(&previous.to_string(), &next.to_string())
+        .replace(
+            &format!("{}.{}", previous.major, previous.minor),
+            &format!("{}.{}", next.major, next.minor),
+        )
+}
+
 /// Transforms a Cargo.toml string by replacing vrl's git dependency with a version dependency.
 /// Updates the vrl entry in [workspace.dependencies] from git + branch to a version.
-fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result<String> {
+pub(super) fn update_vrl_to_version(
+    cargo_toml_contents: &str,
+    vrl_version: &str,
+) -> Result<String> {
     let mut doc = cargo_toml_contents
         .parse::<DocumentMut>()
         .context("Failed to parse Cargo.toml")?;
@@ -278,7 +281,7 @@ fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result
     Ok(doc.to_string())
 }
 
-fn update_vector_package_version(
+pub(super) fn update_vector_package_version(
     cargo_toml_contents: &str,
     expected_version: &str,
     release_version: &str,
