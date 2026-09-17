@@ -105,3 +105,8 @@ test = ["vector-common/test", "proptest"]
 name = "event"
 path = "benches/event/main.rs"
 harness = false
+
+[[bench]]
+name = "source_sender"
+path = "benches/source_sender/main.rs"
+harness = false
