@@ -105,6 +105,12 @@ updates:
         update-types:
           - "patch"
           - "minor"
+      opendal:
+        patterns:
+          - "opendal*"
+        update-types:
+          - "patch"
+          - "minor"
       phf:
         patterns:
           - "phf*"
