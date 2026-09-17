@@ -439,10 +439,22 @@ fn restart_watcher_checkpoint(
     checkpoints: &CheckpointsView,
     file_id: FileFingerprint,
 ) {
+    restart_watcher_checkpoint_with_fingerprint(watcher, checkpoints, Some(file_id));
+}
+
+fn restart_watcher_checkpoint_with_fingerprint(
+    watcher: &mut FileWatcher,
+    checkpoints: &CheckpointsView,
+    fingerprint: Option<FileFingerprint>,
+) {
     let previous = watcher.generation();
     let generation = watcher.take_new_generation();
-    if !checkpoints.restart_reader(file_id, previous, generation) {
-        checkpoints.register_reader(Some(file_id), generation, 0);
+    let restarted = match fingerprint {
+        Some(fingerprint) => checkpoints.restart_reader(fingerprint, previous, generation),
+        None => checkpoints.restart_reader_without_fingerprint(previous, generation),
+    };
+    if !restarted {
+        checkpoints.register_reader(fingerprint, generation, 0);
     }
 }
 
@@ -833,6 +845,10 @@ where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
 {
+    /// Shared across shutdown readers so continuous writes cannot extend draining forever.
+    /// With `oldest_first`, this also bounds predecessors without letting newer readers pass them.
+    const MAX_SHUTDOWN_READ_BATCHES: usize = 64;
+
     async fn drain_retired_readers<C>(
         &self,
         readers: &mut ReaderRegistry,
@@ -842,8 +858,11 @@ where
     where
         C: Sink<Vec<Line>> + Unpin,
     {
+        let mut batches_remaining = Self::MAX_SHUTDOWN_READ_BATCHES;
+        let mut stop_reading = false;
         for (&file_id, watcher) in readers.shutdown_readers_mut(self.oldest_first) {
-            while !watcher.dead() {
+            while !watcher.dead() && batches_remaining > 0 && !stop_reading {
+                batches_remaining -= 1;
                 let mut batch = Vec::new();
                 let result =
                     read_watcher_batch(watcher, file_id, &mut batch, self.max_read_bytes, |buf| {
@@ -862,7 +881,7 @@ where
                 if let Err(error) = result {
                     self.emitter.emit_file_watch_error(&watcher.path, error);
                     if self.oldest_first {
-                        return Ok(());
+                        stop_reading = true;
                     }
                     break;
                 }
@@ -870,7 +889,14 @@ where
                     break;
                 }
             }
-            if watcher.dead() {
+            if !stop_reading && (watcher.dead() || watcher.reached_eof()) {
+                // Continue the metadata-only pass after the shared read budget is spent. In
+                // particular, a later reader already at EOF still needs its generation completed
+                // so it can expire normally. Do not flush a buffered partial line without another
+                // read: data may have been appended since the last EOF observation, and advancing
+                // its acknowledgement could split that record across a restart. Conversely, once
+                // an older reader errors under `oldest_first`, do not finish this or any newer
+                // generation: that would let a blocked predecessor be bypassed during shutdown.
                 checkpoints.finish_reader(watcher.generation(), watcher.get_file_position());
             }
         }
@@ -1677,41 +1703,96 @@ where
             PrefixWanted::No
         };
         for path in self.paths_provider.paths().into_iter() {
-            let outcome = self
-                .fingerprinter
-                .fingerprint_or_emit_detailed(
-                    &path,
-                    known_small_files,
-                    &self.emitter,
-                    prefix_wanted,
+            let has_retired_identities = fp_map.has_retired_identities();
+            let (outcome, fingerprint_identity) = if has_retired_identities {
+                self.fingerprinter
+                    .fingerprint_or_emit_detailed_with_identity(
+                        &path,
+                        known_small_files,
+                        &self.emitter,
+                        prefix_wanted,
+                    )
+                    .await
+            } else {
+                (
+                    self.fingerprinter
+                        .fingerprint_or_emit_detailed(
+                            &path,
+                            known_small_files,
+                            &self.emitter,
+                            prefix_wanted,
+                        )
+                        .await,
+                    None,
                 )
-                .await;
+            };
             let rewrite_suspected = outcome.is_incomplete();
             let path_absent = outcome.is_absent();
             // An archive can appear in the glob while its opened inode is still being drained.
             // It already has a reader, even though that reader no longer owns a discovery key.
-            // Resolve the candidate once, not once per retired reader. The index is updated
+            // Reuse the identity from this pass's fingerprint descriptor; fall back to opening the
+            // path only if the platform could not provide that identity. The index is updated
             // during this pass as rotations retire more readers, including same-fingerprint ones.
-            let retired_reader = if fp_map.has_retired_identities() {
-                crate::file_watcher::path_identity(&path)
-                    .await
-                    .and_then(|identity| fp_map.retired_with_identity(identity))
+            let retired_reader = if has_retired_identities {
+                let identity = match fingerprint_identity {
+                    Some(identity) => Some(identity),
+                    None => crate::file_watcher::path_identity(&path).await,
+                };
+                identity.and_then(|identity| {
+                    fp_map
+                        .retired_with_identity(identity)
+                        .map(|reader_id| (reader_id, identity))
+                })
             } else {
                 None
             };
-            if let Some(reader_id) = retired_reader {
-                let watcher = fp_map
-                    .get_by_id_mut(reader_id)
-                    .expect("retained reader exists");
-                if checkpoints.reader_needs_fingerprint(watcher.generation())
+            if let Some((reader_id, identity)) = retired_reader {
+                let Some(watcher) = fp_map.get_by_id_mut(reader_id) else {
+                    warn!(
+                        message = "Retired reader disappeared before its archive path could be reconciled.",
+                        reader_id = ?reader_id,
+                        path = ?path,
+                    );
+                    continue;
+                };
+                if watcher.identity() != Some(identity) {
+                    continue;
+                }
+                if let Err(error) = watcher
+                    .reactivate_at_path_if_same_identity(path.clone(), identity)
+                    .await
+                {
+                    self.emitter.emit_file_watch_error(&path, error);
+                    continue;
+                }
+
+                let generation = watcher.generation();
+                let needs_fingerprint = checkpoints.reader_needs_fingerprint(generation);
+                let reader_restarted = watcher.take_reader_restarted();
+                let matching_fingerprint = if (reader_restarted || needs_fingerprint)
                     && let Some(fingerprint) = outcome.fingerprint()
-                    && let Some(identity) = watcher.identity()
                     && self
                         .fingerprinter
                         .fingerprint_matches_identity(&path, Some(fingerprint), identity)
                         .await
                 {
-                    checkpoints.bind_reader(watcher.generation(), fingerprint);
+                    Some(fingerprint)
+                } else {
+                    None
+                };
+                if reader_restarted {
+                    // Retired readers are excluded from the end-of-discovery checkpoint sweep.
+                    // If reopening found a truncation or format change, reset their checkpoint here
+                    // before the ordinary read loop emits data from the new position. If this pass
+                    // cannot verify the new fingerprint, keep the generation unkeyed so a later
+                    // complete fingerprint can bind it instead of reviving the stale key.
+                    restart_watcher_checkpoint_with_fingerprint(
+                        watcher,
+                        checkpoints,
+                        matching_fingerprint,
+                    );
+                } else if let Some(fingerprint) = matching_fingerprint {
+                    checkpoints.bind_reader(generation, fingerprint);
                 }
                 continue;
             }
@@ -6881,6 +6962,298 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn shutdown_bounds_a_retired_reader_while_it_keeps_growing() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"x\n").unwrap();
+        let paths = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, directory.path().to_path_buf());
+        server.max_read_bytes = 1;
+
+        let key = FileFingerprint::FirstLinesChecksum(1);
+        let watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        let generation = watcher.generation();
+        let mut readers = ReaderRegistry::from([(key, watcher)]);
+        assert!(readers.retire(key));
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(Some(key), generation, 0);
+
+        let output = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let append_path = path.clone();
+        let mut sink = CollectSink(Arc::clone(&output)).with(move |batch: Vec<Line>| {
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&append_path)
+                .unwrap();
+            std::io::Write::write_all(&mut file, b"x\n").unwrap();
+            futures::future::ready(Ok::<_, std::convert::Infallible>(batch))
+        });
+        server
+            .drain_retired_readers(&mut readers, &checkpoints, &mut sink)
+            .await
+            .unwrap();
+
+        let output = output.lock().unwrap();
+        assert_eq!(output.len(), 64, "shutdown must stop at its batch budget");
+        assert_eq!(checkpoints.get_acknowledged(key), Some(0));
+        let retired_id = readers.retired_ids()[0];
+        let watcher = readers.get_by_id_mut(retired_id).unwrap();
+        assert!(!watcher.dead(), "the reader still has an unread tail");
+        assert_eq!(
+            watcher.get_file_position(),
+            output.last().unwrap().end_offset
+        );
+        assert!(watcher.get_file_position() < std::fs::metadata(&path).unwrap().len());
+    }
+
+    #[tokio::test]
+    async fn shutdown_finishes_later_retired_readers_already_at_eof_after_budget_exhaustion() {
+        let directory = tempfile::tempdir().unwrap();
+        let busy_path = directory.path().join("a-busy.log");
+        let eof_path = directory.path().join("b-eof.log");
+        std::fs::write(&busy_path, b"x\n".repeat(100)).unwrap();
+        std::fs::write(&eof_path, b"finished-tail").unwrap();
+        let paths = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, directory.path().to_path_buf());
+        server.max_read_bytes = 1;
+
+        let busy_key = FileFingerprint::FirstLinesChecksum(1);
+        let eof_key = FileFingerprint::FirstLinesChecksum(2);
+        let busy = FileWatcher::new(
+            busy_path,
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        let eof = FileWatcher::new(
+            eof_path,
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        let busy_generation = busy.generation();
+        let eof_generation = eof.generation();
+        let mut readers = ReaderRegistry::from([(busy_key, busy), (eof_key, eof)]);
+        let eof_id = readers.reader_id(&eof_key).unwrap();
+        assert!(readers.retire(busy_key));
+        assert!(readers.retire(eof_key));
+        let eof_reader = readers.get_by_id_mut(eof_id).unwrap();
+        assert!(eof_reader.read_line().await.unwrap().raw_line.is_none());
+        assert!(eof_reader.reached_eof());
+
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(Some(busy_key), busy_generation, 0);
+        checkpoints.register_reader(Some(eof_key), eof_generation, 0);
+        let output = Arc::new(std::sync::Mutex::new(Vec::new()));
+        server
+            .drain_retired_readers(
+                &mut readers,
+                &checkpoints,
+                &mut CollectSink(Arc::clone(&output)),
+            )
+            .await
+            .unwrap();
+
+        let eof_reader = readers.get_by_id_mut(eof_id).unwrap();
+        assert!(eof_reader.retired);
+        assert!(eof_reader.reached_eof());
+        assert!(
+            !eof_reader.dead(),
+            "without a read batch, the reader must not discard a possibly appended partial line"
+        );
+        let output = output.lock().unwrap();
+        assert!(
+            output.iter().all(|line| line.generation != eof_generation),
+            "an EOF observation alone must not flush a partial line after the budget is spent"
+        );
+        assert_eq!(checkpoints.get_acknowledged(eof_key), Some(0));
+    }
+
+    #[tokio::test]
+    async fn shutdown_oldest_first_error_does_not_finish_a_later_eof_reader() {
+        let directory = tempfile::tempdir().unwrap();
+        let broken_path = directory.path().join("a-broken.gz");
+        let eof_path = directory.path().join("b-eof.log");
+        // A gzip magic header followed by an invalid stream makes the older reader fail while
+        // decoding, before shutdown reaches the already-EOF newer reader.
+        std::fs::write(&broken_path, b"\x1f\x8b\x08\x00not a deflate stream").unwrap();
+        std::fs::write(&eof_path, b"complete\n").unwrap();
+        let paths = crate::paths_provider::Glob::new(
+            &[directory.path().join("*")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, directory.path().to_path_buf());
+        server.oldest_first = true;
+
+        let broken_key = FileFingerprint::FirstLinesChecksum(1);
+        let eof_key = FileFingerprint::FirstLinesChecksum(2);
+        let broken = FileWatcher::new(
+            broken_path,
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        let eof = FileWatcher::new(
+            eof_path,
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        let broken_generation = broken.generation();
+        let eof_generation = eof.generation();
+        let mut readers = ReaderRegistry::from([(broken_key, broken), (eof_key, eof)]);
+        let eof_id = readers.reader_id(&eof_key).unwrap();
+        assert!(readers.retire(eof_key));
+
+        let eof_reader = readers.get_by_id_mut(eof_id).unwrap();
+        assert!(eof_reader.read_line().await.unwrap().raw_line.is_some());
+        assert!(eof_reader.read_line().await.unwrap().raw_line.is_none());
+        assert!(eof_reader.reached_eof());
+
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(Some(broken_key), broken_generation, 0);
+        checkpoints.register_reader(Some(eof_key), eof_generation, 0);
+        let output = Arc::new(std::sync::Mutex::new(Vec::new()));
+        server
+            .drain_retired_readers(
+                &mut readers,
+                &checkpoints,
+                &mut CollectSink(Arc::clone(&output)),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            checkpoints.get(eof_key),
+            Some(0),
+            "an older read error must prevent finishing a newer EOF generation"
+        );
+        assert!(output.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn shutdown_bounds_oldest_first_predecessors_before_a_retired_reader() {
+        let directory = tempfile::tempdir().unwrap();
+        let older_path = directory.path().join("a-older.log");
+        let retired_path = directory.path().join("b-retired.log");
+        std::fs::write(&older_path, b"x\n").unwrap();
+        std::fs::write(&retired_path, b"retired\n").unwrap();
+        let paths = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, directory.path().to_path_buf());
+        server.oldest_first = true;
+        server.max_read_bytes = 1;
+
+        let older_key = FileFingerprint::FirstLinesChecksum(1);
+        let retired_key = FileFingerprint::FirstLinesChecksum(2);
+        let older = FileWatcher::new(
+            older_path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        let retired = FileWatcher::new(
+            retired_path,
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        let older_generation = older.generation();
+        let retired_generation = retired.generation();
+        let mut readers = ReaderRegistry::from([(older_key, older), (retired_key, retired)]);
+        assert!(readers.retire(retired_key));
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(Some(older_key), older_generation, 0);
+        checkpoints.register_reader(Some(retired_key), retired_generation, 0);
+
+        let output = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let append_path = older_path.clone();
+        let mut sink = CollectSink(Arc::clone(&output)).with(move |batch: Vec<Line>| {
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&append_path)
+                .unwrap();
+            std::io::Write::write_all(&mut file, b"x\n").unwrap();
+            futures::future::ready(Ok::<_, std::convert::Infallible>(batch))
+        });
+        server
+            .drain_retired_readers(&mut readers, &checkpoints, &mut sink)
+            .await
+            .unwrap();
+
+        let output = output.lock().unwrap();
+        assert_eq!(
+            output.len(),
+            64,
+            "shutdown must stop at its shared batch budget"
+        );
+        assert!(output.iter().all(|line| line.text == b"x"[..]));
+        assert_eq!(checkpoints.get_acknowledged(retired_key), Some(0));
+        let retired_id = readers.retired_ids()[0];
+        assert_eq!(
+            readers
+                .get_by_id_mut(retired_id)
+                .unwrap()
+                .get_file_position(),
+            0,
+            "oldest-first shutdown must not pass the continuously written predecessor"
+        );
+    }
+
+    #[tokio::test]
     async fn a_matching_fingerprint_cannot_replace_a_different_open_inode() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("app.log");
@@ -7041,6 +7414,433 @@ mod tests {
         checkpoints.acknowledge_reader(line.generation, line.end_offset);
         assert_eq!(checkpoints.get_acknowledged(middle), Some(7));
         assert_eq!(checkpoints.get_acknowledged(original), Some(0));
+    }
+
+    #[tokio::test]
+    async fn retired_idle_reader_reopens_at_its_archive_and_reads_late_appends() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("a-current.log");
+        let archive = directory.path().join("z-archive.log");
+        std::fs::write(&path, b"old-header\n").unwrap();
+        let paths = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, directory.path().to_path_buf());
+        let mut small = file_source_common::KnownSmallFiles::default();
+        let old_key = server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut small, &NoopEmitter)
+            .await
+            .unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        watcher.read_line().await.unwrap().raw_line.unwrap();
+        watcher.deactivate().await;
+        assert!(watcher.is_idle());
+        let old_identity = watcher.identity().unwrap();
+        let old_generation = watcher.generation();
+
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(Some(old_key), old_generation, watcher.get_file_position());
+        let mut readers = ReaderRegistry::from([(old_key, watcher)]);
+
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&path, b"new-header\nnew-tail\n").unwrap();
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&archive)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"late-tail\n"))
+            .unwrap();
+        let discovered_paths = server.paths_provider.paths();
+        assert_eq!(
+            discovered_paths.first(),
+            Some(&path),
+            "the replacement is discovered before the archive"
+        );
+
+        let _ = server
+            .discover(
+                &mut readers,
+                &mut small,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+            )
+            .await;
+
+        let retired_id = readers.retired_with_identity(old_identity).unwrap();
+        let watcher = readers.get_by_id_mut(retired_id).unwrap();
+        assert_eq!(watcher.path, archive);
+        assert!(
+            watcher.is_active(),
+            "the idle archive reader must be reopened"
+        );
+        assert_eq!(watcher.identity(), Some(old_identity));
+
+        let mut lines = Vec::new();
+        read_watcher_batch(watcher, old_key, &mut lines, 1024, |_| {})
+            .await
+            .unwrap();
+        assert_eq!(
+            lines
+                .iter()
+                .map(|line| line.text.as_ref())
+                .collect::<Vec<_>>(),
+            vec![b"late-tail".as_slice()]
+        );
+        assert!(watcher.dead());
+    }
+
+    #[tokio::test]
+    async fn retired_idle_reader_resets_its_checkpoint_if_the_archive_was_truncated() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("a-current.log");
+        let archive = directory.path().join("z-archive.log");
+        std::fs::write(&path, b"old-header\n").unwrap();
+        let paths = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, directory.path().to_path_buf());
+        let mut small = file_source_common::KnownSmallFiles::default();
+        let old_key = server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut small, &NoopEmitter)
+            .await
+            .unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        watcher.read_line().await.unwrap().raw_line.unwrap();
+        assert_eq!(watcher.get_file_position(), 11);
+        watcher.deactivate().await;
+        let old_identity = watcher.identity().unwrap();
+        let old_generation = watcher.generation();
+
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(Some(old_key), old_generation, watcher.get_file_position());
+        let mut readers = ReaderRegistry::from([(old_key, watcher)]);
+
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&archive, b"rewritten\n").unwrap();
+        std::fs::write(&path, b"new-header\nnew-tail\n").unwrap();
+        let rewritten_key = server
+            .fingerprinter
+            .fingerprint_or_emit(&archive, &mut small, &NoopEmitter)
+            .await
+            .unwrap();
+        assert_ne!(rewritten_key, old_key);
+
+        let _ = server
+            .discover(
+                &mut readers,
+                &mut small,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+            )
+            .await;
+
+        let retired_id = readers.retired_with_identity(old_identity).unwrap();
+        let watcher = readers.get_by_id_mut(retired_id).unwrap();
+        assert_eq!(watcher.path, archive);
+        assert_eq!(watcher.get_file_position(), 0);
+        assert_ne!(watcher.generation(), old_generation);
+        assert_eq!(checkpoints.get_acknowledged(old_key), None);
+        assert_eq!(checkpoints.get_acknowledged(rewritten_key), Some(0));
+    }
+
+    #[tokio::test]
+    async fn retired_active_reader_resets_its_checkpoint_if_the_archive_was_truncated() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("a-current.log");
+        let archive = directory.path().join("z-archive.log");
+        std::fs::write(&path, b"old-header\n").unwrap();
+        let paths = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, directory.path().to_path_buf());
+        let mut small = file_source_common::KnownSmallFiles::default();
+        let old_key = server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut small, &NoopEmitter)
+            .await
+            .unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        watcher.read_line().await.unwrap().raw_line.unwrap();
+        assert!(
+            watcher.is_active(),
+            "the reader must stay active for this path"
+        );
+        assert_eq!(watcher.get_file_position(), 11);
+        let old_identity = watcher.identity().unwrap();
+        let old_generation = watcher.generation();
+
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(Some(old_key), old_generation, watcher.get_file_position());
+        let mut readers = ReaderRegistry::from([(old_key, watcher)]);
+
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&archive, b"rewritten\n").unwrap();
+        std::fs::write(&path, b"new-header\nnew-tail\n").unwrap();
+        let rewritten_key = server
+            .fingerprinter
+            .fingerprint_or_emit(&archive, &mut small, &NoopEmitter)
+            .await
+            .unwrap();
+        assert_ne!(rewritten_key, old_key);
+
+        let _ = server
+            .discover(
+                &mut readers,
+                &mut small,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+            )
+            .await;
+
+        let retired_id = readers.retired_with_identity(old_identity).unwrap();
+        let watcher = readers.get_by_id_mut(retired_id).unwrap();
+        assert_eq!(watcher.path, archive);
+        assert!(watcher.is_active());
+        assert_eq!(watcher.get_file_position(), 0);
+        assert_ne!(watcher.generation(), old_generation);
+        assert_eq!(checkpoints.get_acknowledged(old_key), None);
+        assert_eq!(checkpoints.get_acknowledged(rewritten_key), Some(0));
+    }
+
+    #[tokio::test]
+    async fn rewritten_skipped_gzip_archive_gets_a_new_checkpoint_generation() {
+        use async_compression::tokio::bufread::GzipEncoder;
+        use tokio::io::AsyncReadExt as _;
+
+        async fn encode(data: &[u8]) -> Vec<u8> {
+            let mut out = Vec::new();
+            GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+            out
+        }
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("a-current.gz");
+        let archive = directory.path().join("z-archive.gz");
+        let original = encode(&b"old backlog line\n".repeat(4096)).await;
+        let replacement = encode(b"new archive generation\n").await;
+        assert!(replacement.len() < original.len());
+        std::fs::write(&path, original).unwrap();
+
+        let paths = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.gz")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, directory.path().to_path_buf());
+        let mut small = file_source_common::KnownSmallFiles::default();
+        let old_key = server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut small, &NoopEmitter)
+            .await
+            .unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Checkpoint(128),
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(watcher.get_file_position(), 128);
+        assert!(
+            watcher.read_line().await.unwrap().raw_line.is_none(),
+            "the checkpointed gzip backlog must remain skipped"
+        );
+        let old_identity = watcher.identity().unwrap();
+        let old_generation = watcher.generation();
+
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(Some(old_key), old_generation, watcher.get_file_position());
+        let mut readers = ReaderRegistry::from([(old_key, watcher)]);
+
+        // Discovery sees the replacement path first, retiring the old reader, then finds the
+        // rewritten gzip inode at its archive path and must reset that reader's checkpoint.
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&archive, replacement).unwrap();
+        std::fs::write(&path, b"current generation\n").unwrap();
+        let rewritten_key = server
+            .fingerprinter
+            .fingerprint_or_emit(&archive, &mut small, &NoopEmitter)
+            .await
+            .unwrap();
+        assert_ne!(rewritten_key, old_key);
+        assert_eq!(server.paths_provider.paths().first(), Some(&path));
+
+        let _ = server
+            .discover(
+                &mut readers,
+                &mut small,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+            )
+            .await;
+
+        let retired_id = readers.retired_with_identity(old_identity).unwrap();
+        let watcher = readers.get_by_id_mut(retired_id).unwrap();
+        let rewritten_generation = watcher.generation();
+        assert_eq!(watcher.path, archive);
+        assert!(watcher.is_active());
+        assert_eq!(watcher.get_file_position(), 0);
+        assert_ne!(rewritten_generation, old_generation);
+        assert!(
+            watcher.read_line().await.unwrap().raw_line.is_none(),
+            "reconciliation must reset the checkpoint without decoding skipped gzip history"
+        );
+
+        assert_eq!(
+            checkpoints.get_acknowledged(old_key),
+            None,
+            "the rewritten archive must not retain the old content's checkpoint"
+        );
+        assert_eq!(checkpoints.get_acknowledged(rewritten_key), Some(0));
+        assert!(
+            !checkpoints.reader_needs_fingerprint(rewritten_generation),
+            "the new generation should be bound to the confirmed archive fingerprint"
+        );
+    }
+
+    #[tokio::test]
+    async fn truncated_retired_reader_waits_for_a_confirmed_fingerprint() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("a-current.log");
+        let archive = directory.path().join("z-archive.log");
+        std::fs::write(&path, b"old-header-one\nold-header-two\nold-tail\n").unwrap();
+        let paths = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut server = test_file_server(paths, directory.path().to_path_buf());
+        server.fingerprinter = Fingerprinter::new(
+            file_source_common::FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 2,
+            },
+            1024,
+            true,
+        );
+        let mut small = file_source_common::KnownSmallFiles::default();
+        let old_key = server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut small, &NoopEmitter)
+            .await
+            .unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        let old_identity = watcher.identity().unwrap();
+        let old_generation = watcher.generation();
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(Some(old_key), old_generation, watcher.get_file_position());
+        let mut readers = ReaderRegistry::from([(old_key, watcher)]);
+
+        // Rotation exposes an archive whose inode is still tracked, then truncates that inode to
+        // fewer lines than the checksum strategy needs. Its old fingerprint must not be reused.
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&archive, b"tiny\n").unwrap();
+        std::fs::write(&path, b"current-one\ncurrent-two\n").unwrap();
+        let _ = server
+            .discover(
+                &mut readers,
+                &mut small,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+            )
+            .await;
+
+        let retired_id = readers.retired_with_identity(old_identity).unwrap();
+        let watcher = readers.get_by_id_mut(retired_id).unwrap();
+        let rewritten_generation = watcher.generation();
+        assert_ne!(rewritten_generation, old_generation);
+        assert_eq!(watcher.get_file_position(), 0);
+        assert!(checkpoints.reader_needs_fingerprint(rewritten_generation));
+        assert_eq!(checkpoints.get_acknowledged(old_key), None);
+
+        // Once the archive has enough complete lines, the same generation binds to its actual
+        // fingerprint, not to the checkpoint key from the discarded content.
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&archive)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"late-second-line\n"))
+            .unwrap();
+        let rewritten_key = server
+            .fingerprinter
+            .fingerprint_or_emit(&archive, &mut small, &NoopEmitter)
+            .await
+            .unwrap();
+        assert_ne!(rewritten_key, old_key);
+        let _ = server
+            .discover(
+                &mut readers,
+                &mut small,
+                &checkpoints,
+                None,
+                &NotifyWakeup::default(),
+            )
+            .await;
+
+        assert!(!checkpoints.reader_needs_fingerprint(rewritten_generation));
+        assert_eq!(checkpoints.get_acknowledged(old_key), None);
+        assert_eq!(checkpoints.get_acknowledged(rewritten_key), Some(0));
     }
 
     #[tokio::test]

@@ -238,6 +238,109 @@ pub struct FileWatcher {
 /// The device/inode pair used to identify a file across a rename.
 pub type FileIdentity = (u64, u64);
 
+/// Roll back the synchronous state changes made while reconciling an active reader at a new path
+/// if a later asynchronous step fails or the reconciliation future is cancelled.
+struct ActivePathReconciliation<'a> {
+    watcher: &'a mut FileWatcher,
+    snapshot: Option<ActivePathSnapshot>,
+}
+
+struct ActivePathSnapshot {
+    path: PathBuf,
+    canonical_path: Option<PathBuf>,
+    file_position: FilePosition,
+    reader_restarted: bool,
+    gzip_read_skipped: bool,
+    is_gzip: bool,
+    gzip_raw_metadata: Option<(u64, Option<SystemTime>)>,
+    content_epoch: u64,
+    last_rewind_epoch: Option<u64>,
+    rewound_at_len: Option<u64>,
+    rewound_for_prefix: Option<PartialPrefix>,
+    reached_eof: bool,
+    read_retry_delay: Duration,
+}
+
+impl<'a> ActivePathReconciliation<'a> {
+    fn new(watcher: &'a mut FileWatcher) -> Self {
+        let (reached_eof, read_retry_delay) = match &watcher.state {
+            WatcherState::Active {
+                reached_eof,
+                read_retry_delay,
+                ..
+            } => (*reached_eof, *read_retry_delay),
+            WatcherState::Idle { .. } => unreachable!("only active readers need rollback"),
+        };
+
+        Self {
+            snapshot: Some(ActivePathSnapshot {
+                path: watcher.path.clone(),
+                canonical_path: watcher.canonical_path.clone(),
+                file_position: watcher.file_position,
+                reader_restarted: watcher.reader_restarted,
+                gzip_read_skipped: watcher.gzip_read_skipped,
+                is_gzip: watcher.is_gzip,
+                gzip_raw_metadata: watcher.gzip_raw_metadata,
+                content_epoch: watcher.content_epoch,
+                last_rewind_epoch: watcher.last_rewind_epoch,
+                rewound_at_len: watcher.rewound_at_len,
+                rewound_for_prefix: watcher.rewound_for_prefix.clone(),
+                reached_eof,
+                read_retry_delay,
+            }),
+            watcher,
+        }
+    }
+
+    fn commit(mut self) {
+        self.snapshot = None;
+    }
+}
+
+impl std::ops::Deref for ActivePathReconciliation<'_> {
+    type Target = FileWatcher;
+
+    fn deref(&self) -> &Self::Target {
+        self.watcher
+    }
+}
+
+impl std::ops::DerefMut for ActivePathReconciliation<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.watcher
+    }
+}
+
+impl Drop for ActivePathReconciliation<'_> {
+    fn drop(&mut self) {
+        let Some(snapshot) = self.snapshot.take() else {
+            return;
+        };
+
+        let watcher = &mut *self.watcher;
+        watcher.path = snapshot.path;
+        watcher.canonical_path = snapshot.canonical_path;
+        watcher.file_position = snapshot.file_position;
+        watcher.reader_restarted = snapshot.reader_restarted;
+        watcher.gzip_read_skipped = snapshot.gzip_read_skipped;
+        watcher.is_gzip = snapshot.is_gzip;
+        watcher.gzip_raw_metadata = snapshot.gzip_raw_metadata;
+        watcher.content_epoch = snapshot.content_epoch;
+        watcher.last_rewind_epoch = snapshot.last_rewind_epoch;
+        watcher.rewound_at_len = snapshot.rewound_at_len;
+        watcher.rewound_for_prefix = snapshot.rewound_for_prefix;
+        if let WatcherState::Active {
+            reached_eof,
+            read_retry_delay,
+            ..
+        } = &mut watcher.state
+        {
+            *reached_eof = snapshot.reached_eof;
+            *read_retry_delay = snapshot.read_retry_delay;
+        }
+    }
+}
+
 impl FileWatcher {
     /// Create a new `FileWatcher`
     ///
@@ -471,7 +574,7 @@ impl FileWatcher {
     /// The inode is unchanged, so the offset survives while the contents do not: resuming at it
     /// either seeks past EOF or splices new bytes onto the tail of the old content.
     pub async fn restart_after_rewrite(&mut self) -> io::Result<()> {
-        self.restart_after_rewrite_for(None).await
+        self.restart_after_rewrite_for(None, false).await
     }
 
     /// [`Self::restart_after_rewrite`], told which rewrite discovery is currently looking at.
@@ -480,11 +583,14 @@ impl FileWatcher {
     async fn restart_after_rewrite_for(
         &mut self,
         observed: Option<&PartialPrefix>,
+        force_restart: bool,
     ) -> io::Result<()> {
         // Idempotent *per epoch*, so no caller has to ask first, while a genuine second rewrite --
-        // which bumps the epoch -- still repositions the reader.
+        // which bumps the epoch -- still repositions the reader. A shrink against the active
+        // reader's baseline or a confirmed compression-format change is conclusive evidence of a
+        // new content generation, even when the usual rewind guard cannot distinguish it.
         if self.rewind_pending() {
-            if !self.rewritten_again_since_rewind(observed).await {
+            if !force_restart && !self.rewritten_again_since_rewind(observed).await {
                 return Ok(());
             }
             // A rewrite on top of the one just rewound for, before it grew enough to fingerprint.
@@ -498,11 +604,51 @@ impl FileWatcher {
             // configuration asked to ignore. But if the rewrite replaced it with a plain file, such a
             // watcher holds a null reader and would never consume the new contents. Re-probe first.
             let file_handle = open_regular_file(&self.path).await?;
+            let file_info = file_handle.file_info().await?;
+            let opened_identity = (file_info.portable_dev(), file_info.portable_ino());
+            if self
+                .identity
+                .is_some_and(|tracked| tracked != opened_identity)
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "file was replaced while checking a skipped gzip reader",
+                ));
+            }
+            let raw_metadata = file_handle.metadata().await?;
             let mut probe = BufReader::new(file_handle);
             if is_gzipped(&mut probe).await? {
+                if force_restart {
+                    // Preserve the deliberate gzip skip, but the checkpoint still belongs to the
+                    // old content. Reset its position/generation and rebase the compressed-size
+                    // high-water mark so the same truncation is not rediscovered on every pass.
+                    let raw_len = raw_metadata.len();
+                    self.file_position = 0;
+                    self.reader_restarted = true;
+                    self.gzip_raw_metadata = Some((raw_len, raw_metadata.modified().ok()));
+                    self.last_rewind_epoch = Some(self.content_epoch);
+                    self.rewound_at_len = Some(raw_len);
+                    self.rewound_for_prefix = observed.cloned();
+                    if let WatcherState::Active {
+                        reached_eof,
+                        read_retry_delay,
+                        ..
+                    } = &mut self.state
+                    {
+                        *reached_eof = false;
+                        *read_retry_delay = EOF_READ_BACKOFF_MIN;
+                    }
+                    if let WatcherState::Idle {
+                        pending_partial_line,
+                        ..
+                    } = &mut self.state
+                    {
+                        *pending_partial_line = None;
+                    }
+                    self.invalidate_idle_bookkeeping();
+                }
                 return Ok(());
             }
-            self.gzip_read_skipped = false;
         }
 
         if !self.is_active() {
@@ -528,6 +674,7 @@ impl FileWatcher {
             {
                 *pending_partial_line = None;
             }
+            self.gzip_read_skipped = false;
             self.invalidate_idle_bookkeeping();
             return Ok(());
         }
@@ -562,6 +709,7 @@ impl FileWatcher {
             Box::new(reader)
         };
 
+        self.gzip_read_skipped = false;
         self.is_gzip = gzipped;
         // From the descriptor just read, not a fresh stat of the path: this is the length the reader
         // actually restarted on.
@@ -1096,7 +1244,7 @@ impl FileWatcher {
         // The rewind first, while the guard still stands: it is what says the reader is already at
         // the start of this content. Lowering the guard first makes the call below rewind a second
         // time and replay everything emitted since.
-        let outcome = self.restart_after_rewrite_for(observed).await;
+        let outcome = self.restart_after_rewrite_for(observed, false).await;
         if fingerprint_complete {
             self.fingerprint_completed();
         }
@@ -1229,6 +1377,56 @@ impl FileWatcher {
     /// two polls leaves nothing on disk to detect afterwards -- `polling` mode has the same blind
     /// spot for active files.
     pub async fn reactivate(&mut self) -> io::Result<()> {
+        self.reactivate_with_identity(None).await
+    }
+
+    /// Reconcile this reader at a discovered alias only if it still resolves to the same inode.
+    /// Idle readers are reopened; active readers retain their handle unless truncation or a gzip /
+    /// plain format change requires a restart before continuing to drain a renamed archive.
+    pub(crate) async fn reactivate_at_path_if_same_identity(
+        &mut self,
+        path: PathBuf,
+        identity: FileIdentity,
+    ) -> io::Result<()> {
+        if self.is_active() {
+            let mut reconciliation = ActivePathReconciliation::new(self);
+            // `update_path_checked` records the candidate's current gzip size. Keep the prior
+            // high-water mark until the shrink check runs, or an in-place rewrite would erase the
+            // evidence before it can be compared.
+            let previous_gzip_raw_metadata = reconciliation.gzip_raw_metadata;
+            reconciliation.update_path_if_same_identity(path).await?;
+            reconciliation.gzip_raw_metadata = previous_gzip_raw_metadata;
+
+            let shrink = reconciliation.shrank_below_reader().await;
+            let candidate_is_gzip = is_gzipped_for_identity(&reconciliation.path, identity).await?;
+            let format_changed = candidate_is_gzip != reconciliation.is_gzip;
+            let force_restart = shrink.shrank || format_changed;
+            if force_restart {
+                reconciliation
+                    .restart_after_rewrite_for(None, force_restart)
+                    .await?;
+            } else {
+                reconciliation.observe_raw_size(shrink.observed);
+            }
+
+            reconciliation.commit();
+            return Ok(());
+        }
+
+        let previous_path = std::mem::replace(&mut self.path, path);
+        match self.reactivate_with_identity(Some(identity)).await {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                self.path = previous_path;
+                Err(error)
+            }
+        }
+    }
+
+    async fn reactivate_with_identity(
+        &mut self,
+        expected_identity: Option<FileIdentity>,
+    ) -> io::Result<()> {
         if self.is_active() {
             return Ok(());
         }
@@ -1244,6 +1442,11 @@ impl FileWatcher {
         let f = open_regular_file(&self.path).await?;
         let file_info = f.file_info().await?;
         let new_identity = (file_info.portable_dev(), file_info.portable_ino());
+        if expected_identity.is_some_and(|expected| expected != new_identity) {
+            return Err(io::Error::other(
+                "file identity changed while reactivating a retired reader",
+            ));
+        }
         let raw_metadata = f.metadata().await?;
         let identity_changed = matches!(self.identity, Some(old) if old != new_identity);
         let old_file_position = self.file_position;
@@ -1827,6 +2030,23 @@ async fn open_regular_file(path: &Path) -> io::Result<File> {
     }
 
     Ok(file)
+}
+
+/// Check the format from a descriptor whose identity still matches the retired reader. The path
+/// may be replaced between discovery and this probe, so a path-level format check alone is not
+/// sufficient before deciding whether to restart the reader.
+async fn is_gzipped_for_identity(path: &Path, expected_identity: FileIdentity) -> io::Result<bool> {
+    let file = open_regular_file(path).await?;
+    let file_info = file.file_info().await?;
+    let opened_identity = (file_info.portable_dev(), file_info.portable_ino());
+    if opened_identity != expected_identity {
+        return Err(io::Error::other(
+            "file identity changed while checking its compression format",
+        ));
+    }
+
+    let mut reader = BufReader::new(file);
+    is_gzipped(&mut reader).await
 }
 
 /// Resolve the identities of notify rename candidates once per reconciliation pass.

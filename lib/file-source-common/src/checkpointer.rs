@@ -321,6 +321,27 @@ impl CheckpointsView {
         old: OwnerGeneration,
         new: OwnerGeneration,
     ) -> bool {
+        self.restart_reader_as(Some(fingerprint), old, new)
+    }
+
+    /// Restart a reader whose rewritten content does not yet have a confirmed fingerprint.
+    ///
+    /// The previous generation must still be completed and unindexed: leaving it live under its
+    /// old fingerprint would make the stale checkpoint look like it belongs to the new content.
+    pub fn restart_reader_without_fingerprint(
+        &self,
+        old: OwnerGeneration,
+        new: OwnerGeneration,
+    ) -> bool {
+        self.restart_reader_as(None, old, new)
+    }
+
+    fn restart_reader_as(
+        &self,
+        fingerprint: Option<FileFingerprint>,
+        old: OwnerGeneration,
+        new: OwnerGeneration,
+    ) -> bool {
         let mut readers = self.readers.write().expect("reader checkpoints poisoned");
         let Some(previous) = readers.get_mut(&old) else {
             return false;
@@ -329,11 +350,13 @@ impl CheckpointsView {
         previous.fingerprint = None;
         previous.provisional_fingerprint = None;
         previous.completed_at = Some(Utc::now());
-        self.loaded.remove(&fingerprint);
+        if let Some(fingerprint) = fingerprint {
+            self.loaded.remove(&fingerprint);
+        }
         let replaced = readers.insert(
             new,
             GenerationCheckpoint {
-                fingerprint: Some(fingerprint),
+                fingerprint,
                 provisional_fingerprint: None,
                 acknowledged: 0,
                 read_position: 0,
@@ -345,7 +368,7 @@ impl CheckpointsView {
         self.index_reader(
             new,
             replaced.and_then(|reader| reader.fingerprint),
-            Some(fingerprint),
+            fingerprint,
         );
         true
     }
@@ -655,6 +678,33 @@ mod test {
         view.acknowledge_reader(first, 300);
         view.acknowledge_reader(second, 10);
         assert_eq!(view.get_acknowledged(key), Some(10));
+    }
+
+    #[test]
+    fn restarting_without_a_fingerprint_completes_the_previous_generation() {
+        let view = CheckpointsView::default();
+        let stale = FileFingerprint::FirstLinesChecksum(1);
+        let old = next_owner_generation();
+        let new = next_owner_generation();
+        view.register_reader(Some(stale), old, 100);
+
+        assert!(view.restart_reader_without_fingerprint(old, new));
+
+        let readers = view.readers.read().unwrap();
+        let previous = readers.get(&old).unwrap();
+        assert!(previous.completed_at.is_some());
+        assert_eq!(previous.fingerprint, None);
+        assert_eq!(previous.provisional_fingerprint, None);
+        drop(readers);
+        assert_eq!(view.get(stale), None, "the stale fingerprint is unindexed");
+        assert!(view.reader_needs_fingerprint(new));
+
+        view.remove_expired_before(Utc::now() + Duration::hours(1));
+        assert!(
+            !view.readers.read().unwrap().contains_key(&old),
+            "the completed generation must be eligible for normal checkpoint expiry"
+        );
+        assert!(view.reader_needs_fingerprint(new));
     }
 
     #[test]

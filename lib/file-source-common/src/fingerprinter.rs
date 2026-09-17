@@ -220,8 +220,7 @@ impl Fingerprinter {
                 .await;
                 match read {
                     Ok(bytes_read) => {
-                        if capture_identity {
-                            let file_info = fp.file_info().await?;
+                        if capture_identity && let Ok(file_info) = fp.file_info().await {
                             *identity = Some((file_info.portable_dev(), file_info.portable_ino()));
                         }
                         // The same bytes the checksum is taken over. A rewrite that has *grown* into
@@ -256,9 +255,42 @@ impl Fingerprinter {
         emitter: &impl FileSourceInternalEvents,
         want_prefix: PrefixWanted,
     ) -> FingerprintOutcome {
+        self.fingerprint_or_emit_detailed_inner(
+            path,
+            known_small_files,
+            emitter,
+            want_prefix,
+            false,
+        )
+        .await
+        .0
+    }
+
+    /// [`Self::fingerprint_or_emit_detailed`], also returning the identity of the descriptor used
+    /// for fingerprinting when it can be obtained. This avoids opening the same candidate again
+    /// just to compare it with a retired reader; callers should use it only when that lookup is
+    /// needed, since Windows obtains the identity with an additional handle query.
+    pub async fn fingerprint_or_emit_detailed_with_identity(
+        &mut self,
+        path: &Path,
+        known_small_files: &mut crate::KnownSmallFiles,
+        emitter: &impl FileSourceInternalEvents,
+        want_prefix: PrefixWanted,
+    ) -> (FingerprintOutcome, Option<(u64, u64)>) {
+        self.fingerprint_or_emit_detailed_inner(path, known_small_files, emitter, want_prefix, true)
+            .await
+    }
+
+    async fn fingerprint_or_emit_detailed_inner(
+        &mut self,
+        path: &Path,
+        known_small_files: &mut crate::KnownSmallFiles,
+        emitter: &impl FileSourceInternalEvents,
+        want_prefix: PrefixWanted,
+        capture_identity: bool,
+    ) -> (FingerprintOutcome, Option<(u64, u64)>) {
         // Taken from the stat this function already performs, so the common path pays nothing. The
-        // identity probe that would make this airtight costs an open per file per pass -- 20k opens
-        // on a real config -- and is deferred to the rare branch that actually needs it.
+        // identity probe is requested only by the retired-reader lookup, not by ordinary discovery.
         let mut stat_before = None;
         let mut read_identity = None;
         let mut read_prefix = None;
@@ -271,7 +303,7 @@ impl Fingerprinter {
                         &mut read_identity,
                         &mut read_prefix,
                         want_prefix,
-                        false,
+                        capture_identity,
                     )
                     .await
                     .map(Some)
@@ -294,9 +326,14 @@ impl Fingerprinter {
         // Successful reads need no cleanup when there is no small-file state.
         match &metadata {
             Ok(Some(fingerprint)) if known_small_files.is_empty() => {
-                return FingerprintOutcome::Fingerprinted(*fingerprint, read_prefix);
+                return (
+                    FingerprintOutcome::Fingerprinted(*fingerprint, read_prefix),
+                    read_identity,
+                );
             }
-            Ok(None) if known_small_files.is_empty() => return FingerprintOutcome::Absent,
+            Ok(None) if known_small_files.is_empty() => {
+                return (FingerprintOutcome::Absent, read_identity);
+            }
             _ => {}
         }
         let key = match fs::canonicalize(path).await {
@@ -309,12 +346,15 @@ impl Fingerprinter {
                 // Enough data to fingerprint: forget it, under both the identity it was recorded as
                 // and this path -- the two can differ once a file has been replaced.
                 known_small_files.remove(&key, path);
-                FingerprintOutcome::Fingerprinted(fingerprint, read_prefix)
+                (
+                    FingerprintOutcome::Fingerprinted(fingerprint, read_prefix),
+                    read_identity,
+                )
             }
             // Not a regular file: a directory or device now occupies the path.
             Ok(None) => {
                 known_small_files.remove(&key, path);
-                FingerprintOutcome::Absent
+                (FingerprintOutcome::Absent, read_identity)
             }
             Err(error) => {
                 let absent = error.kind() == ErrorKind::NotFound;
@@ -351,7 +391,7 @@ impl Fingerprinter {
                         // would silently answer "same rewrite" to every comparison.
                         let prefix = incomplete_prefix_len(&error)
                             .map(|len| PartialPrefix(self.buffer[..len].into()));
-                        return FingerprintOutcome::Incomplete(prefix);
+                        return (FingerprintOutcome::Incomplete(prefix), read_identity);
                     }
                     ErrorKind::NotFound => {
                         if !self.ignore_not_found {
@@ -365,9 +405,9 @@ impl Fingerprinter {
                 // For scenarios other than UnexpectedEOF, remove the path from the small files map.
                 known_small_files.remove(&key, path);
                 if absent {
-                    FingerprintOutcome::Absent
+                    (FingerprintOutcome::Absent, read_identity)
                 } else {
-                    FingerprintOutcome::Failed
+                    (FingerprintOutcome::Failed, read_identity)
                 }
             }
         }

@@ -599,6 +599,185 @@ async fn restart_after_rewrite_reprobes_a_skipped_gzip_watcher() {
 }
 
 #[tokio::test]
+async fn active_retired_reader_restarts_when_gzip_format_changes_without_shrinking() {
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("active.log");
+    let archive = dir.path().join("active.log.1");
+    fs::write(&path, b"old\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        4096,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+        "old"
+    );
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    let identity = watcher_identity(&watcher).unwrap();
+    let old_position = watcher.get_file_position();
+
+    // First rewrite the same inode from plain to gzip. The gzip header/trailer make this larger
+    // than the four-byte plain file, so size alone does not trigger a restart.
+    fs::rename(&path, &archive).unwrap();
+    let compressed = encode(b"gzip generation\n").await;
+    assert!(compressed.len() as u64 > old_position);
+    fs::write(&archive, &compressed).unwrap();
+    watcher
+        .reactivate_at_path_if_same_identity(archive.clone(), identity)
+        .await
+        .unwrap();
+    assert!(watcher.is_gzip());
+    assert_eq!(watcher.get_file_position(), 0);
+    assert!(watcher.take_reader_restarted());
+    assert_eq!(
+        watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+        "gzip generation"
+    );
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+    assert!(watcher.rewind_pending());
+
+    // Before the new fingerprint completes, rewrite the same inode back to plain. Make the plain
+    // bytes larger than the compressed generation too, so neither shrink heuristic can explain
+    // the restart. The format change must also override the pending-rewind idempotence guard.
+    let plain = b"plain generation with enough bytes to exceed the compressed stream\n".repeat(8);
+    assert!(plain.len() as u64 > compressed.len() as u64);
+    fs::write(&archive, &plain).unwrap();
+    watcher
+        .reactivate_at_path_if_same_identity(archive, identity)
+        .await
+        .unwrap();
+
+    assert!(!watcher.is_gzip());
+    assert_eq!(watcher.get_file_position(), 0);
+    assert!(watcher.take_reader_restarted());
+    let line = watcher.read_line().await.unwrap().raw_line.unwrap();
+    assert_eq!(
+        line.bytes,
+        "plain generation with enough bytes to exceed the compressed stream"
+    );
+}
+
+#[tokio::test]
+async fn forced_rewrite_of_skipped_gzip_reader_resets_checkpoint_but_keeps_skip() {
+    use async_compression::tokio::bufread::GzipEncoder;
+    use tokio::io::AsyncReadExt as _;
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("checkpointed.log.gz");
+    let archive = dir.path().join("checkpointed.log.gz.1");
+    let original = encode(&b"old backlog\n".repeat(4096)).await;
+    let replacement = encode(b"new gzip generation\n").await;
+    assert!(replacement.len() < original.len());
+    fs::write(&path, original).unwrap();
+
+    // A gzip checkpoint is deliberately not decoded; its saved position is only meaningful for
+    // the old content and must not survive an in-place rewrite of that archive.
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Checkpoint(128),
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .unwrap();
+    assert!(watcher.gzip_read_skipped);
+    assert_eq!(watcher.get_file_position(), 128);
+    let identity = watcher_identity(&watcher).unwrap();
+
+    fs::rename(&path, &archive).unwrap();
+    fs::write(&archive, replacement).unwrap();
+    watcher
+        .reactivate_at_path_if_same_identity(archive, identity)
+        .await
+        .unwrap();
+
+    assert!(
+        watcher.gzip_read_skipped,
+        "the gzip backlog must remain skipped"
+    );
+    assert_eq!(
+        watcher.get_file_position(),
+        0,
+        "the old checkpoint position must not be attached to rewritten content"
+    );
+    assert!(
+        watcher.take_reader_restarted(),
+        "FileServer must be told to install a fresh checkpoint generation"
+    );
+    assert!(
+        !watcher.shrank_below_reader().await.shrank,
+        "the compressed-size baseline must be rebased, or this rewrite is rediscovered each pass"
+    );
+    assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+}
+
+#[tokio::test]
+async fn active_path_reconciliation_rolls_back_path_after_a_later_error() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("active.log");
+    let archive = dir.path().join("active.log.1");
+    fs::write(&path, b"line\n").unwrap();
+
+    let mut watcher = FileWatcher::new(
+        path.clone(),
+        ReadFrom::Beginning,
+        None,
+        1024,
+        Bytes::from_static(b"\n"),
+        true,
+    )
+    .await
+    .unwrap();
+    while watcher.read_line().await.unwrap().raw_line.is_some() {}
+    assert!(watcher.reached_eof());
+    let canonical_path = watcher.canonical_path().map(PathBuf::from);
+    fs::rename(&path, &archive).unwrap();
+
+    // Simulate the format probe/restart failing after update_path has accepted the alias. Dropping
+    // the transaction guard must restore the path and active read state along with the content
+    // bookkeeping, just as an error or task cancellation does in production.
+    let result = async {
+        let mut reconciliation = super::ActivePathReconciliation::new(&mut watcher);
+        reconciliation
+            .update_path_if_same_identity(archive.clone())
+            .await?;
+        assert_eq!(reconciliation.path, archive);
+        assert!(!reconciliation.reached_eof());
+        Err::<(), std::io::Error>(std::io::Error::other("simulated format-probe failure"))
+    }
+    .await;
+    assert!(result.is_err());
+
+    assert_eq!(watcher.path, path);
+    assert_eq!(watcher.canonical_path().map(PathBuf::from), canonical_path);
+    assert!(watcher.reached_eof());
+}
+
+#[tokio::test]
 async fn shrank_below_reader_uses_compressed_size_for_gzip() {
     // Regression test for a bug found in review: guarding the rewrite check with `!is_gzip()` fixed
     // the false positive on compressible files but disabled rewrite detection for gzip entirely, so
