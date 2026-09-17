@@ -20,11 +20,11 @@ generated: components: sources: http_server: configuration: {
 	}
 	address: {
 		description: """
-			The socket address to listen for connections on.
+			The TCP socket address to listen for connections on.
 
-			It _must_ include a port.
+			It _must_ include a port. This is mutually exclusive with `socket_path`.
 			"""
-		required: true
+		required: false
 		type: string: examples: ["0.0.0.0:80", "localhost:80"]
 	}
 	auth: {
@@ -146,6 +146,39 @@ generated: components: sources: http_server: configuration: {
 				202
 			]
 		}
+	}
+	socket_file_gid: {
+		description: "Group ID to own the Unix socket file."
+		required:    false
+		type: uint: examples: [
+			1000,
+		]
+	}
+	socket_file_mode: {
+		description: """
+			Unix file mode bits to apply to the Unix socket file.
+
+			Note: The file mode value can be specified in any numeric format supported by your configuration
+			language, but it is most intuitive to use an octal number.
+			"""
+		required: false
+		type: uint: examples: [432, 438]
+	}
+	socket_file_uid: {
+		description: "User ID to own the Unix socket file."
+		required:    false
+		type: uint: examples: [
+			1000,
+		]
+	}
+	socket_path: {
+		description: """
+			The Unix domain socket path to listen for connections on.
+
+			This is mutually exclusive with `address`.
+			"""
+		required: false
+		type: string: examples: ["/var/run/vector-http.sock"]
 	}
 	strict_path: {
 		description: """
