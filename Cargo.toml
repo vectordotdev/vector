@@ -109,6 +109,7 @@ members = [
   "lib/loki-logproto",
   "lib/opentelemetry-proto",
   "lib/prometheus-parser",
+  "lib/trace-conversion",
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-buffers",

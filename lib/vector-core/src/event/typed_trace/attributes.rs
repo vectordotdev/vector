@@ -43,6 +43,15 @@ impl Attributes {
         self.0.insert(key.into(), value)
     }
 
+    /// Inserts `key` as a string attribute when `value` is present and non-empty.
+    pub fn insert_nonempty(&mut self, key: impl Into<KeyString>, value: Option<String>) {
+        if let Some(text) = value
+            && !text.is_empty()
+        {
+            self.insert(key, AttrValue::String(text));
+        }
+    }
+
     /// Removes `key` if present.
     pub fn remove(&mut self, key: &str) -> Option<AttrValue> {
         self.0.remove(key)
@@ -221,14 +230,13 @@ impl From<f64> for AttrValue {
 mod tests {
     use similar_asserts::assert_eq;
 
-    use super::{AttrMap, AttrValue};
+    use super::{AttrMap, AttrValue, Attributes};
 
     #[test]
     fn equality_uses_float_bits() {
         assert_eq!(AttrValue::Float(f64::NAN), AttrValue::Float(f64::NAN));
         assert_ne!(AttrValue::Float(0.0), AttrValue::Float(-0.0));
     }
-
     #[test]
     fn variant_accessors_return_only_their_variant() {
         assert_eq!(AttrValue::from("s").into_string(), Some("s".to_owned()));
@@ -245,5 +253,16 @@ mod tests {
         assert_eq!(AttrValue::from(1.0).into_integer(), None);
         assert_eq!(AttrValue::from(1_i64).into_float(), None);
         assert_eq!(AttrValue::Null.into_map(), None);
+    }
+
+    #[test]
+    fn insert_nonempty_skips_absent_and_empty() {
+        let mut attributes = Attributes::new();
+        attributes.insert_nonempty("a", None);
+        attributes.insert_nonempty("b", Some(String::new()));
+        attributes.insert_nonempty("c", Some("ok".into()));
+        assert!(attributes.get("a").is_none());
+        assert!(attributes.get("b").is_none());
+        assert_eq!(attributes.get("c"), Some(&AttrValue::String("ok".into())));
     }
 }
