@@ -375,10 +375,8 @@ impl SourceConfig for SimpleHttpConfig {
         };
         self.validate_address()?;
 
-        let address = self.address.clone();
-
         source.run(
-            address,
+            self.address,
             #[cfg(unix)]
             self.socket_path.clone(),
             #[cfg(unix)]
