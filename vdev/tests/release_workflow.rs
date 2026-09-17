@@ -32,13 +32,15 @@ fn version(repo: &Path, version: &str) {
         repo,
         "Cargo.toml",
         &format!(
-            "[package]\nname = \"vector\"\nversion = \"{version}\"\nedition = \"2021\"\n[workspace.dependencies]\nvrl = {{ {vrl} }}\n"
+            "[package]\nname = \"vector\"\nversion = \"{version}\"\nedition = \"2021\"\n[dependencies]\nvrl = {{ workspace = true }}\n[workspace.dependencies]\nvrl = {{ {vrl} }}\n"
         ),
     );
     write(
         repo,
         "Cargo.lock",
-        &format!("version = 4\n[[package]]\nname = \"vector\"\nversion = \"{version}\"\n"),
+        &format!(
+            "version = 4\n[[package]]\nname = \"vector\"\nversion = \"{version}\"\ndependencies = [\"vrl\"]\n[[package]]\nname = \"vrl\"\nversion = \"0.28.0\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\n"
+        ),
     );
 }
 
@@ -61,6 +63,23 @@ fn preparation_with_breaking_changes(breaking: bool) -> (TempDir, String) {
     git(repo, &["config", "user.name", "Release test"]);
     git(repo, &["config", "user.email", "release@example.invalid"]);
     write(repo, "src/lib.rs", "");
+    // Resolve a tiny registry dependency offline while exercising real Cargo metadata.
+    write(
+        repo,
+        ".cargo/config.toml",
+        "[source.crates-io]\nreplace-with = \"fixture\"\n[source.fixture]\ndirectory = \".git/vendor\"\n",
+    );
+    write(
+        repo,
+        ".git/vendor/vrl/Cargo.toml",
+        "[package]\nname = \"vrl\"\nversion = \"0.28.0\"\nedition = \"2021\"\n",
+    );
+    write(repo, ".git/vendor/vrl/src/lib.rs", "");
+    write(
+        repo,
+        ".git/vendor/vrl/.cargo-checksum.json",
+        r#"{"files":{},"package":null}"#,
+    );
     write(
         repo,
         "website/cue/reference/administration/interfaces/kubectl.cue",
@@ -136,8 +155,6 @@ fn check(repo: &Path, base: &str, success: bool) -> String {
             base,
             "--head-ref",
             "prepare-v-0-59-0-website",
-            "--vrl-version",
-            "0.28.0",
         ])
         .current_dir(repo)
         .output()
@@ -217,6 +234,38 @@ fn release_preparation_rejects_invalid_versions_index() {
         git(repo, &["add", "."]);
         git(repo, &["commit", "--amend", "--no-edit"]);
         assert!(check(repo, &base, false).contains("versions.cue must match the generated index"));
+    }
+}
+
+#[test]
+fn release_preparation_requires_a_stable_vrl_pin() {
+    for requirement in ["*", "^0.28.0", "0.28", "0.28.0-rc.1", "0.28.0+build"] {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        let manifest = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
+        write(repo, "Cargo.toml", &manifest.replace("0.28.0", requirement));
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "--amend", "--no-edit"]);
+        assert!(check(repo, &base, false).contains("VRL version"));
+    }
+}
+
+#[test]
+fn release_preparation_requires_matching_registry_vrl_in_lockfile() {
+    for (old, new) in [
+        ("0.28.0", "0.28.1"),
+        (
+            "registry+https://github.com/rust-lang/crates.io-index",
+            "git+https://github.com/vectordotdev/vrl.git#abc",
+        ),
+    ] {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        let lock = fs::read_to_string(repo.join("Cargo.lock")).unwrap();
+        write(repo, "Cargo.lock", &lock.replace(old, new));
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "--amend", "--no-edit"]);
+        assert!(check(repo, &base, false).contains("Cargo.lock must resolve VRL"));
     }
 }
 
