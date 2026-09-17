@@ -36,7 +36,7 @@ use crate::{
     components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
-        Event, EventStatus, Metric, Value, into_event_stream,
+        Event, EventStatus, Metric, TraceLayout, Value, into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
     },
     metrics::Controller,
@@ -60,7 +60,6 @@ use crate::{
 #[cfg(all(feature = "sinks-vector", feature = "sources-vector"))]
 use crate::{
     config::Config,
-    event::TRACE_LAYOUT_DATADOG,
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::vector::VectorConfig as VectorSourceConfig,
     test_util::{mock::basic_sink, start_topology},
@@ -1312,7 +1311,7 @@ async fn decode_traces() {
             let trace = events[0].as_trace();
             assert_eq!(
                 events[0].metadata().trace_layout(),
-                Some(vector_lib::event::TRACE_LAYOUT_DATADOG)
+                Some(TraceLayout::Datadog)
             );
             assert_eq!(
                 events[0].metadata().datadog_api_key().as_deref().unwrap(),
@@ -1425,7 +1424,7 @@ async fn trace_layout_survives_vector_hop_unlike_source_type() {
     .expect("timed out waiting for relayed trace")
     .expect("relay produced no event");
 
-    assert_eq!(event.metadata().trace_layout(), Some(TRACE_LAYOUT_DATADOG));
+    assert_eq!(event.metadata().trace_layout(), Some(TraceLayout::Datadog));
     assert_eq!(event.metadata().source_type(), Some("vector"));
 
     topology.stop().await;

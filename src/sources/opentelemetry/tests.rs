@@ -9,7 +9,7 @@ use crate::{
     config::{OutputId, SourceConfig, SourceContext},
     event::{
         Event, EventStatus, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
-        ObjectMap, TRACE_LAYOUT_OPENTELEMETRY, TRACE_LAYOUT_OTLP, Value, into_event_stream,
+        ObjectMap, TraceLayout, Value, into_event_stream,
         metric::{Bucket, Quantile},
     },
     sources::opentelemetry::config::{
@@ -1485,7 +1485,7 @@ async fn http_headers_traces_use_otlp_decoding_false() {
         );
         assert_eq!(
             event.metadata().trace_layout(),
-            Some(TRACE_LAYOUT_OPENTELEMETRY)
+            Some(TraceLayout::OpenTelemetry)
         );
     })
     .await;
@@ -1522,7 +1522,7 @@ async fn http_headers_traces_use_otlp_decoding_true() {
                 .unwrap(),
             &value!("Test")
         );
-        assert_eq!(event.metadata().trace_layout(), Some(TRACE_LAYOUT_OTLP));
+        assert_eq!(event.metadata().trace_layout(), Some(TraceLayout::Otlp));
     })
     .await;
 }
@@ -1539,9 +1539,9 @@ async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
         let mut events = test_util::collect_ready(env.output);
         assert_eq!(events.len(), 1);
         let expected = if use_otlp_decoding {
-            TRACE_LAYOUT_OTLP
+            TraceLayout::Otlp
         } else {
-            TRACE_LAYOUT_OPENTELEMETRY
+            TraceLayout::OpenTelemetry
         };
         assert_eq!(
             events.pop().unwrap().metadata().trace_layout(),

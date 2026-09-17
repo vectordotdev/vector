@@ -8,7 +8,7 @@ use ordered_float::NotNan;
 use prost::Message;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    event::TRACE_LAYOUT_DATADOG,
+    event::TraceLayout,
     internal_event::{CountByteSize, InternalEventHandle as _},
 };
 use vrl::event_path;
@@ -170,7 +170,7 @@ fn new_trace_event() -> TraceEvent {
     let mut trace_event = TraceEvent::default();
     trace_event
         .metadata_mut()
-        .set_trace_layout(TRACE_LAYOUT_DATADOG);
+        .set_trace_layout(TraceLayout::Datadog);
     trace_event
 }
 

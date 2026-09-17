@@ -8,8 +8,7 @@ pub use finalization::{
 };
 pub use log_event::LogEvent;
 pub use metadata::{
-    DatadogMetricOriginMetadata, EventMetadata, Secrets, TRACE_LAYOUT_DATADOG, TRACE_LAYOUT_KEY,
-    TRACE_LAYOUT_OPENTELEMETRY, TRACE_LAYOUT_OTLP, WithMetadata,
+    DatadogMetricOriginMetadata, EventMetadata, Secrets, TraceLayout, WithMetadata,
 };
 pub use metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};

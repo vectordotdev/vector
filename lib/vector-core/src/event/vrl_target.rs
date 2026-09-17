@@ -1200,7 +1200,7 @@ mod test {
         let mut trace = TraceEvent::from(btreemap! {"foo" => "bar"});
         trace
             .metadata_mut()
-            .set_trace_layout(super::super::TRACE_LAYOUT_DATADOG);
+            .set_trace_layout(super::super::TraceLayout::Datadog);
 
         let info = ProgramInfo {
             fallible: false,

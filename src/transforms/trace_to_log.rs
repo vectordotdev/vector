@@ -80,7 +80,7 @@ mod tests {
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::{
         config::LogNamespace,
-        event::{TRACE_LAYOUT_DATADOG, TraceEvent},
+        event::{TraceEvent, TraceLayout},
     };
 
     #[test]
@@ -143,7 +143,7 @@ mod tests {
             "host" => "a_hostname",
             "span_id" => "abc123",
         });
-        trace.metadata_mut().set_trace_layout(TRACE_LAYOUT_DATADOG);
+        trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
 
         let log = do_transform(trace).await.unwrap();
         assert_eq!(log.namespace(), LogNamespace::Legacy);
