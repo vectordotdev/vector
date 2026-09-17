@@ -672,7 +672,7 @@ async fn read_watcher_batch(
     mut report_discarded: impl FnMut(&bytes::BytesMut),
 ) -> std::io::Result<usize> {
     let start_position = watcher.get_file_position();
-    loop {
+    let bytes_read = loop {
         let RawLineResult {
             raw_line,
             discarded_for_size_and_truncated,
@@ -688,7 +688,7 @@ async fn read_watcher_batch(
         let Some(line) = raw_line else {
             if !watcher.is_idle() && !watcher.reached_eof() && !watcher.dead() {
                 if bytes_read > max_read_bytes {
-                    return Ok(bytes_read);
+                    break bytes_read;
                 }
                 continue;
             }
@@ -696,7 +696,7 @@ async fn read_watcher_batch(
                 salvage_final_partial_line(watcher, file_id, lines);
                 watcher.set_dead();
             }
-            return Ok(bytes_read);
+            break bytes_read;
         };
         watcher.emitted_position = watcher.get_file_position();
         lines.push(Line {
@@ -708,9 +708,13 @@ async fn read_watcher_batch(
             end_offset: watcher.get_file_position(),
         });
         if bytes_read > max_read_bytes {
-            return Ok(bytes_read);
+            break bytes_read;
         }
+    };
+    if bytes_read > 0 {
+        watcher.refresh_gzip_raw_size_baseline().await;
     }
+    Ok(bytes_read)
 }
 
 /// Whether the caller can continue using notify-based discovery after reconciliation.
@@ -5901,6 +5905,59 @@ mod tests {
             watcher.get_file_position(),
             position_before,
             "a gzip watcher must not be restarted by a decoded-vs-compressed size comparison"
+        );
+    }
+
+    #[tokio::test]
+    async fn reading_an_appended_gzip_member_advances_the_raw_size_baseline() {
+        use async_compression::tokio::bufread::GzipEncoder;
+        use tokio::io::AsyncReadExt as _;
+
+        async fn encode(data: &[u8]) -> Vec<u8> {
+            let mut out = Vec::new();
+            GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+            out
+        }
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log.gz");
+        let first = encode(b"first\n").await;
+        std::fs::write(&path, &first).unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            true,
+        )
+        .await
+        .unwrap();
+
+        let file_id = FileFingerprint::DevInode(0, 0);
+        let mut lines = Vec::new();
+        read_watcher_batch(&mut watcher, file_id, &mut lines, usize::MAX, |_| {})
+            .await
+            .unwrap();
+        assert_eq!(lines[0].text, b"first"[..]);
+        watcher.deactivate().await;
+
+        let mut grown = first.clone();
+        grown.extend_from_slice(&encode(b"second\n").await);
+        std::fs::write(&path, &grown).unwrap();
+        assert!(watcher.check_for_new_data().await.unwrap());
+        watcher.reactivate().await.unwrap();
+        read_watcher_batch(&mut watcher, file_id, &mut lines, usize::MAX, |_| {})
+            .await
+            .unwrap();
+        assert_eq!(lines[1].text, b"second"[..]);
+
+        let rewritten = encode(b"rewritten-to-a-middling-length\n").await;
+        assert!(rewritten.len() > first.len() && rewritten.len() < grown.len());
+        std::fs::write(&path, &rewritten).unwrap();
+        assert!(
+            watcher.shrank_below_reader().await.shrank,
+            "the read batch must retain the larger raw-size high-water mark"
         );
     }
 

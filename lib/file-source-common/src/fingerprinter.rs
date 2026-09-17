@@ -289,8 +289,13 @@ impl Fingerprinter {
         want_prefix: PrefixWanted,
         capture_identity: bool,
     ) -> (FingerprintOutcome, Option<(u64, u64)>) {
-        // Taken from the stat this function already performs, so the common path pays nothing. The
-        // identity probe is requested only by the retired-reader lookup, not by ordinary discovery.
+        // If short files are present, capture the identity of each successful read from the file
+        // handle already used for fingerprinting. It lets the successful path clear an incomplete
+        // entry recorded through another spelling without canonicalizing every matched path.
+        let capture_identity = capture_identity || !known_small_files.is_empty();
+        // Taken from the descriptor this function already opened, so no extra open is needed. The
+        // probe is skipped on the common path and requested for pending short-file cleanup or the
+        // retired-reader lookup.
         let mut stat_before = None;
         let mut read_identity = None;
         let mut read_prefix = None;
@@ -336,6 +341,30 @@ impl Fingerprinter {
             }
             _ => {}
         }
+
+        if let Ok(Some(fingerprint)) = &metadata
+            && let Some(read_identity) = read_identity
+        {
+            // A complete read through an alias makes the previous short-file record stale too.
+            // The descriptor identity is authoritative for the bytes just fingerprinted, unlike a
+            // second path lookup which could race with a replacement.
+            known_small_files.remove_by_read_identity(read_identity);
+            // The configured spelling may now name a different inode than the one previously
+            // recorded there. Only then resolve its canonical key, to preserve the existing
+            // replacement cleanup semantics without paying for unrelated successful paths.
+            if known_small_files.contains_path(path) {
+                let key = match fs::canonicalize(path).await {
+                    Ok(canonical) => canonical,
+                    Err(_) => crate::normalize_path_key(path),
+                };
+                known_small_files.remove(&key, path);
+            }
+            return (
+                FingerprintOutcome::Fingerprinted(*fingerprint, read_prefix),
+                Some(read_identity),
+            );
+        }
+
         let key = match fs::canonicalize(path).await {
             Ok(canonical) => canonical,
             Err(_) => crate::normalize_path_key(path),
@@ -787,6 +816,85 @@ mod test {
         assert!(
             known_small_files.is_empty(),
             "a stale alias would let remove_after delete a now-valid file: {known_small_files:?}"
+        );
+    }
+
+    /// A different configured spelling can finish the same inode's short record. Its descriptor
+    /// identity must clear the entry without resolving every successful path through the filesystem.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn successful_fingerprint_through_an_unrecorded_alias_clears_small_file_state() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("app.log");
+        let link = dir.path().join("link.log");
+        fs::write(&target, b"partial").unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            true,
+        );
+        let mut known_small_files = crate::KnownSmallFiles::default();
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&link, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_none()
+        );
+        assert_eq!(known_small_files.len(), 1);
+
+        fs::write(&target, b"partial\n").unwrap();
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&target, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_some()
+        );
+        assert!(
+            known_small_files.is_empty(),
+            "a completed alias must not leave the configured symlink eligible for removal"
+        );
+    }
+
+    #[tokio::test]
+    async fn successful_replacement_clears_stale_small_file_state() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("app.log");
+        let replacement = dir.path().join("replacement.log");
+        fs::write(&path, b"partial").unwrap();
+
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            true,
+        );
+        let mut known_small_files = crate::KnownSmallFiles::default();
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&path, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_none()
+        );
+
+        fs::write(&replacement, b"complete\n").unwrap();
+        fs::remove_file(&path).unwrap();
+        fs::rename(&replacement, &path).unwrap();
+        assert!(
+            fingerprinter
+                .fingerprint_or_emit(&path, &mut known_small_files, &AllowsShortFiles)
+                .await
+                .is_some()
+        );
+        assert!(
+            known_small_files.is_empty(),
+            "a successful replacement must not leave stale path state that could unlink it"
         );
     }
 
@@ -1265,12 +1373,10 @@ mod test {
     }
 
     /// Like `NoErrors`, but tolerates the checksum failure a deliberately short file produces.
-    /// Used only by the unix-gated symlink tests.
-    #[cfg(unix)]
+    /// Used by tests that deliberately fingerprint an incomplete file.
     #[derive(Clone)]
     struct AllowsShortFiles;
 
-    #[cfg(unix)]
     impl FileSourceInternalEvents for AllowsShortFiles {
         // The one event a short file legitimately produces.
         fn emit_file_checksum_failed(&self, _: &Path) {}

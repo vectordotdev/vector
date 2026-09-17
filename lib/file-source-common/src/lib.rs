@@ -103,6 +103,14 @@ pub struct KnownSmallFiles {
     /// Without it, taking a spelling over from another file scans every entry, and during initial
     /// discovery every spelling is new -- measured at 24s for 20k short files, quadratic.
     owner_by_path: std::collections::HashMap<std::path::PathBuf, std::path::PathBuf>,
+    /// Canonical entries indexed by the identity of the descriptor their fingerprint read.
+    ///
+    /// A successful fingerprint reached through another spelling of a short file must clear the
+    /// old entry too, but canonicalizing every successful path whenever *any* short file exists
+    /// makes ordinary discovery pay a path-resolution syscall per file. The descriptor identity
+    /// lets that cleanup stay targeted.
+    owners_by_read_identity:
+        std::collections::HashMap<(u64, u64), std::collections::HashSet<std::path::PathBuf>>,
 }
 
 impl KnownSmallFiles {
@@ -124,6 +132,10 @@ impl KnownSmallFiles {
         first_seen: std::time::Instant,
         read_identity: Option<(u64, u64)>,
     ) -> bool {
+        let previous_read_identity = self
+            .by_identity
+            .get(&identity)
+            .and_then(|entry| entry.read_identity);
         let (is_new_file, is_new_spelling) = match self.by_identity.entry(identity.clone()) {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 let entry = entry.get_mut();
@@ -150,6 +162,12 @@ impl KnownSmallFiles {
                 (true, true)
             }
         };
+
+        let current_read_identity = self
+            .by_identity
+            .get(&identity)
+            .and_then(|entry| entry.read_identity);
+        self.reindex_read_identity(&identity, previous_read_identity, current_read_identity);
 
         // A path names one file, so a spelling this entry did not already hold has to be taken away
         // from whichever other identity held it -- that file was replaced, and leaving the spelling
@@ -200,7 +218,44 @@ impl KnownSmallFiles {
             return;
         };
         for path in entry.removal_paths {
-            self.owner_by_path.remove(&path);
+            if self
+                .owner_by_path
+                .get(&path)
+                .is_some_and(|owner| owner == identity)
+            {
+                self.owner_by_path.remove(&path);
+            }
+        }
+        self.reindex_read_identity(identity, entry.read_identity, None);
+    }
+
+    /// Keep the reverse index in sync when an incomplete path is replaced in place or discarded.
+    fn reindex_read_identity(
+        &mut self,
+        identity: &std::path::Path,
+        previous: Option<(u64, u64)>,
+        current: Option<(u64, u64)>,
+    ) {
+        if previous == current {
+            return;
+        }
+        if let Some(previous) = previous {
+            let remove_previous =
+                self.owners_by_read_identity
+                    .get_mut(&previous)
+                    .is_some_and(|owners| {
+                        owners.remove(identity);
+                        owners.is_empty()
+                    });
+            if remove_previous {
+                self.owners_by_read_identity.remove(&previous);
+            }
+        }
+        if let Some(current) = current {
+            self.owners_by_read_identity
+                .entry(current)
+                .or_default()
+                .insert(identity.to_owned());
         }
     }
 
@@ -210,11 +265,7 @@ impl KnownSmallFiles {
         // Every spelling of the removed entry leaves the index with it. Clearing only the path
         // passed in was a review finding: a file named by three or more spellings left the rest
         // pointing at an identity that no longer existed.
-        if let Some(entry) = self.by_identity.remove(identity) {
-            for path in &entry.removal_paths {
-                self.owner_by_path.remove(path);
-            }
-        }
+        self.remove_identity_entry(identity);
         // `removal_path` may belong to a *different* file -- the caller saw it vanish or fingerprint
         // under one identity while the map recorded it under another. Drop it from that entry too.
         if let Some(previous) = self.owner_by_path.remove(removal_path) {
@@ -225,6 +276,42 @@ impl KnownSmallFiles {
             }
             self.drop_if_unremovable(&previous);
         }
+    }
+
+    /// Forget all small-file entries whose last fingerprint read this same file object.
+    ///
+    /// The caller has just fingerprinted a complete record through an open descriptor, so these
+    /// entries no longer need `remove_after` protection even if they were first observed through a
+    /// different symlink spelling.
+    pub fn remove_by_read_identity(&mut self, read_identity: (u64, u64)) {
+        let Some(identities) = self.owners_by_read_identity.remove(&read_identity) else {
+            return;
+        };
+        for identity in identities {
+            self.remove_identity_entry(&identity);
+        }
+    }
+
+    /// Whether this exact configured spelling has a stale small-file entry. A caller can use this
+    /// to reserve canonicalization for a path whose old entry might belong to a replaced inode.
+    pub fn contains_path(&self, path: &std::path::Path) -> bool {
+        self.owner_by_path.contains_key(path)
+    }
+
+    fn remove_identity_entry(&mut self, identity: &std::path::Path) {
+        let Some(entry) = self.by_identity.remove(identity) else {
+            return;
+        };
+        for path in entry.removal_paths {
+            if self
+                .owner_by_path
+                .get(&path)
+                .is_some_and(|owner| owner == identity)
+            {
+                self.owner_by_path.remove(&path);
+            }
+        }
+        self.reindex_read_identity(identity, entry.read_identity, None);
     }
 
     /// Entries older than `grace_period`, as `(identity, removal path)` pairs.

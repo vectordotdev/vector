@@ -527,7 +527,7 @@ async fn the_gzip_baseline_rises_with_consumed_appends() {
     while watcher.read_line().await.unwrap().raw_line.is_some() {}
     let check = watcher.shrank_below_reader().await;
     assert!(!check.shrank, "growth is not a shrink");
-    watcher.observe_raw_size(check.observed);
+    watcher.refresh_gzip_raw_size_baseline().await;
 
     // Rewritten to a size between the original and the grown one. Against the opening baseline this
     // looks like growth; against what was actually read it is a truncation.

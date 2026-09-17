@@ -908,6 +908,36 @@ impl FileWatcher {
         }
     }
 
+    /// Refresh the gzip raw-size high-water mark after this reader consumed data.
+    ///
+    /// An appended member can be read while the watcher remains active, after the discovery pass
+    /// that last observed the file size. Without advancing this baseline, a later copytruncate to
+    /// a size between the open-time size and the consumed size looks like growth. Read metadata
+    /// from a newly opened descriptor only if it still names the tracked inode; the path may have
+    /// rotated between the read and this best-effort refresh.
+    pub(crate) async fn refresh_gzip_raw_size_baseline(&mut self) {
+        if !self.is_gzip {
+            return;
+        }
+        let Some(expected_identity) = self.identity else {
+            return;
+        };
+        let Ok(file) = open_regular_file(&self.path).await else {
+            return;
+        };
+        let Ok(file_info) = file.file_info().await else {
+            return;
+        };
+        let identity = (file_info.portable_dev(), file_info.portable_ino());
+        if identity != expected_identity {
+            return;
+        }
+        let Ok(metadata) = file.metadata().await else {
+            return;
+        };
+        self.observe_raw_size(Some((metadata.len(), metadata.modified().ok())));
+    }
+
     /// Whether the file was rewritten *again* since the reader was rewound, so the rewind guard
     /// must not suppress another restart.
     ///
