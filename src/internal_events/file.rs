@@ -9,7 +9,7 @@ use vector_lib::{
 pub(crate) use self::file_source::*;
 #[cfg(feature = "sinks-file")]
 pub(crate) use self::sink::*;
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(feature = "sources-file", feature = "sources-ifile", feature = "sources-kubernetes_logs"))]
 pub(crate) use self::source::*;
 
 /// Configuration of internal metrics for file-based components.
@@ -223,7 +223,7 @@ mod file_source {
     }
 }
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(feature = "sources-file", feature = "sources-ifile", feature = "sources-kubernetes_logs"))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 

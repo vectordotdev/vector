@@ -1,0 +1,38 @@
+[package]
+name = "ifile-source"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>", "Mark Story <mark@mark-story.com>", "Tamer Hassan <thameruddin@gmail.com>"]
+edition = "2021"
+publish = false
+license = "MIT"
+
+[target.'cfg(windows)'.dependencies]
+libc = "0.2"
+winapi = { version = "0.3", features = ["winioctl"] }
+
+[dependencies]
+glob.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+notify = { version = "8.2.0", default-features = false, features = ["macos_kqueue"] }
+bytes.workspace = true
+indexmap.workspace = true
+vector-common = { path = "../vector-common", default-features = false }
+vector-config = { path = "../vector-config", default-features = false }
+file-source-common = { path = "../file-source-common" }
+dashmap.workspace = true
+futures = { version = "0.3.31", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+async-compression.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+tempfile.workspace = true
+
+[features]
+test = []
+
+[[bench]]
+name = "buffer"
+harness = false
