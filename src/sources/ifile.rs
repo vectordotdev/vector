@@ -524,7 +524,7 @@ pub fn ifile_source(
             .unwrap_or(false)
         {
             warn!(
-                "{} contains a * in it's first path component. If a match resolves to a symlink it will not be watched",
+                "{} contains a * in its first path component. If a match resolves to a symlink it will not be watched.",
                 original_path.display(),
             );
         }
@@ -544,7 +544,7 @@ pub fn ifile_source(
                         canonical.push(popped);
                     }
                     info!(
-                        "{} is a symlink, watching canonical path {} instead",
+                        "{} is a symlink, watching canonical path {} instead.",
                         original_path.display(),
                         canonical.display()
                     );
@@ -557,7 +557,7 @@ pub fn ifile_source(
         }
 
         warn!(
-            "Could not find {}. If the path is later created as a or containing a symlink it will not be watched",
+            "Could not find {}. If the path is later created as or contains a symlink it will not be watched.",
             original_path.display(),
         );
 
@@ -1009,7 +1009,7 @@ mod tests {
             }
             _ = async {
                 while let Some(ev) = rx.recv().await {
-                    trace!(?ev, "test rx got event");
+                    trace!(?ev, "Test receiver got event.");
 
                     match ev {
                         TestEvent::Read(path, _) => {
