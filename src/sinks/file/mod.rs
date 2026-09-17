@@ -436,7 +436,15 @@ impl ValidatedSink for FileSinkConfig {
                 .map_err(Box::new)?;
         }
 
-        let batch_settings = self.batch.validate()?.into_batcher_settings()?;
+        let batch = self.batch.validate()?;
+        // `into_batcher_settings` calls the panicking `from_secs_f64`; reject
+        // unrepresentable timeouts (NaN, ±inf, > `Duration::MAX`) here.
+        if let Some(timeout) = batch.timeout_secs
+            && let Err(error) = Duration::try_from_secs_f64(timeout)
+        {
+            return Err(Box::new(error));
+        }
+        let batch_settings = batch.into_batcher_settings()?;
 
         Ok(ValidatedFileSink {
             transformer,
@@ -1397,6 +1405,28 @@ mod tests {
             config.encoding.config().1,
             SerializerConfig::Text(_)
         ));
+    }
+
+    // Regression: `BatchConfig::validate` only rejects `timeout <= 0`, so NaN,
+    // ±inf, and too-large values used to panic in `Duration::from_secs_f64`.
+    #[test]
+    fn validate_rejects_unrepresentable_batch_timeout() {
+        for timeout in [f64::NAN, f64::INFINITY, 1.0e20] {
+            let mut batch = BatchConfig::default();
+            batch.timeout_secs = Some(timeout);
+            let mut cfg = base_config("/tmp/vector-test.log");
+            cfg.batch = batch;
+            assert!(
+                cfg.validate().is_err(),
+                "expected validation error for timeout_secs={timeout}"
+            );
+        }
+
+        let mut batch = BatchConfig::default();
+        batch.timeout_secs = Some(10.0);
+        let mut cfg = base_config("/tmp/vector-test.log");
+        cfg.batch = batch;
+        cfg.validate().expect("representable timeout must pass");
     }
 
     #[tokio::test]
@@ -2431,6 +2461,7 @@ mod tests {
             let file = tokio::fs::OpenOptions::new()
                 .create(true)
                 .write(true)
+                .truncate(false)
                 .open(&template)
                 .await
                 .unwrap();
@@ -2489,6 +2520,7 @@ mod tests {
             let file = tokio::fs::OpenOptions::new()
                 .create(true)
                 .write(true)
+                .truncate(false)
                 .open(&template)
                 .await
                 .unwrap();
