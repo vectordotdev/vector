@@ -29,9 +29,13 @@ pub(crate) struct KafkaOAuthBearerConfig {
     pub(crate) scope: Option<String>,
     pub(crate) principal_name: String,
     pub(crate) extra_params: Vec<(String, String)>,
-    /// Resolved PEM content for the token endpoint CA, sourced from
-    /// `https.ca.pem` or `https.ca.location` in librdkafka_options.
-    pub(crate) https_ca_pem: Option<String>,
+    pub(crate) https_ca: Option<KafkaOAuthCa>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum KafkaOAuthCa {
+    Pem(String),
+    Directory(PathBuf),
 }
 
 /// Parses space-separated `name=value` pairs from `sasl.oauthbearer.config`.
@@ -74,8 +78,14 @@ pub(crate) fn extract_oauthbearer_config(
 
     let token_url = options.get("sasl.oauthbearer.token.endpoint.url")?.clone();
 
-    let client_id = options.get("sasl.oauthbearer.client.id").cloned();
-    let client_secret = options.get("sasl.oauthbearer.client.secret").cloned();
+    let client_id = options
+        .get("sasl.oauthbearer.client.id")
+        .or_else(|| options.get("sasl.oauthbearer.client.credentials.client.id"))
+        .cloned();
+    let client_secret = options
+        .get("sasl.oauthbearer.client.secret")
+        .or_else(|| options.get("sasl.oauthbearer.client.credentials.client.secret"))
+        .cloned();
     let scope = options.get("sasl.oauthbearer.scope").cloned();
 
     let (mut principal_name, extra_params) =
@@ -85,19 +95,15 @@ pub(crate) fn extract_oauthbearer_config(
         principal_name = client_id.as_deref().unwrap_or_default().to_owned();
     }
 
-    let https_ca_pem = if let Some(pem) = options.get("https.ca.pem") {
-        Some(pem.clone())
+    let https_ca = if let Some(pem) = options.get("https.ca.pem") {
+        Some(KafkaOAuthCa::Pem(pem.clone()))
     } else if let Some(path) = options.get("https.ca.location") {
-        let p = std::path::Path::new(path);
+        let p = Path::new(path);
         if p.is_dir() {
-            warn!(
-                message = "https.ca.location is a directory, which is not supported; provide a PEM bundle file instead. Using system CA bundle.",
-                path = %path,
-            );
-            None
+            Some(KafkaOAuthCa::Directory(p.to_path_buf()))
         } else {
             match fs::read_to_string(p) {
-                Ok(pem) => Some(pem),
+                Ok(pem) => Some(KafkaOAuthCa::Pem(pem)),
                 Err(e) => {
                     warn!(
                         message = "Failed to read https.ca.location for OAUTHBEARER token endpoint; using system CA bundle.",
@@ -119,8 +125,40 @@ pub(crate) fn extract_oauthbearer_config(
         scope,
         principal_name,
         extra_params,
-        https_ca_pem,
+        https_ca,
     })
+}
+
+fn load_oauth_ca_certificates(
+    ca: &KafkaOAuthCa,
+) -> Result<Vec<reqwest::Certificate>, Box<dyn std::error::Error>> {
+    match ca {
+        KafkaOAuthCa::Pem(pem) => Ok(reqwest::Certificate::from_pem_bundle(pem.as_bytes())?),
+        KafkaOAuthCa::Directory(path) => {
+            let mut certificates = Vec::new();
+            for entry in fs::read_dir(path)? {
+                let entry = entry?;
+                if !entry.metadata()?.is_file() {
+                    continue;
+                }
+
+                let bytes = fs::read(entry.path())?;
+                if let Ok(mut parsed) = reqwest::Certificate::from_pem_bundle(&bytes) {
+                    certificates.append(&mut parsed);
+                }
+            }
+
+            if certificates.is_empty() {
+                return Err(format!(
+                    "https.ca.location contains no readable PEM certificates: {}",
+                    path.display()
+                )
+                .into());
+            }
+
+            Ok(certificates)
+        }
+    }
 }
 
 /// Supported compression types for Kafka.
@@ -329,9 +367,10 @@ impl ClientContext for KafkaStatisticsContext {
 
         let http_client = {
             let mut builder = reqwest::Client::builder();
-            if let Some(pem) = &config.https_ca_pem {
-                let cert = reqwest::Certificate::from_pem(pem.as_bytes())?;
-                builder = builder.add_root_certificate(cert);
+            if let Some(ca) = &config.https_ca {
+                for certificate in load_oauth_ca_certificates(ca)? {
+                    builder = builder.add_root_certificate(certificate);
+                }
             }
             builder.build()?
         };
@@ -457,6 +496,80 @@ mod tests {
         assert_eq!(c.client_secret.as_deref(), Some("my-secret"));
         assert_eq!(c.scope.as_deref(), Some("kafka:write"));
         assert_eq!(c.principal_name, "my-client"); // falls back to client_id
+    }
+
+    #[test]
+    fn extract_credential_aliases() {
+        let o = opts(&[
+            (
+                "sasl.oauthbearer.token.endpoint.url",
+                "https://example.com/token",
+            ),
+            (
+                "sasl.oauthbearer.client.credentials.client.id",
+                "alias-client",
+            ),
+            (
+                "sasl.oauthbearer.client.credentials.client.secret",
+                "alias-secret",
+            ),
+        ]);
+        let c = extract_oauthbearer_config(&o).unwrap();
+        assert_eq!(c.client_id.as_deref(), Some("alias-client"));
+        assert_eq!(c.client_secret.as_deref(), Some("alias-secret"));
+        assert_eq!(c.principal_name, "alias-client");
+    }
+
+    #[test]
+    fn canonical_credentials_take_precedence_over_aliases() {
+        let o = opts(&[
+            (
+                "sasl.oauthbearer.token.endpoint.url",
+                "https://example.com/token",
+            ),
+            ("sasl.oauthbearer.client.id", "canonical-client"),
+            ("sasl.oauthbearer.client.secret", "canonical-secret"),
+            (
+                "sasl.oauthbearer.client.credentials.client.id",
+                "alias-client",
+            ),
+            (
+                "sasl.oauthbearer.client.credentials.client.secret",
+                "alias-secret",
+            ),
+        ]);
+        let c = extract_oauthbearer_config(&o).unwrap();
+        assert_eq!(c.client_id.as_deref(), Some("canonical-client"));
+        assert_eq!(c.client_secret.as_deref(), Some("canonical-secret"));
+    }
+
+    #[test]
+    fn loads_all_certificates_from_pem_bundle() {
+        let pem = fs::read_to_string("tests/data/ca/intermediate_server/certs/ca-chain.cert.pem")
+            .unwrap();
+        let certificates = load_oauth_ca_certificates(&KafkaOAuthCa::Pem(pem)).unwrap();
+        assert_eq!(certificates.len(), 2);
+    }
+
+    #[test]
+    fn loads_certificates_from_directory() {
+        let directory = tempfile::tempdir().unwrap();
+        fs::copy(
+            "tests/data/ca/certs/ca.cert.pem",
+            directory.path().join("root.pem"),
+        )
+        .unwrap();
+        fs::copy(
+            "tests/data/ca/intermediate_server/certs/intermediate_server.cert.pem",
+            directory.path().join("intermediate.pem"),
+        )
+        .unwrap();
+        fs::write(directory.path().join("README"), "not a certificate").unwrap();
+
+        let certificates =
+            load_oauth_ca_certificates(&KafkaOAuthCa::Directory(directory.path().to_path_buf()))
+                .unwrap();
+        assert_eq!(certificates.len(), 2);
     }
 
     #[test]
@@ -587,7 +700,7 @@ mod tests {
                 scope: None,
                 principal_name: "my-client".into(),
                 extra_params: vec![],
-                https_ca_pem: None,
+                https_ca: None,
             }),
         };
 
@@ -624,7 +737,7 @@ mod tests {
                     ("grant_type".into(), "authorization_code".into()),
                     ("code".into(), "PAC123".into()),
                 ],
-                https_ca_pem: None,
+                https_ca: None,
             }),
         };
 
@@ -653,7 +766,7 @@ mod tests {
                 scope: None,
                 principal_name: "svc-account".into(),
                 extra_params: vec![],
-                https_ca_pem: None,
+                https_ca: None,
             }),
         };
 
@@ -689,7 +802,7 @@ mod tests {
                 scope: None,
                 principal_name: "".into(),
                 extra_params: vec![],
-                https_ca_pem: None,
+                https_ca: None,
             }),
         };
         let result = ctx.generate_oauth_token(None);
