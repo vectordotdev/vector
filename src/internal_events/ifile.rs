@@ -1,25 +1,15 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
+#![allow(dead_code)] // FIXME
 use std::borrow::Cow;
-
+use vector_lib::internal_event::{CounterName, GaugeName};
 use vector_lib::{
-    NamedInternalEvent,
     configurable::configurable_component,
-    counter, gauge,
-    internal_event::{
-        ComponentEventsDropped, CounterName, GaugeName, INTENTIONAL, InternalEvent, UNINTENTIONAL,
-        error_stage, error_type,
-    },
+    internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
 };
+use vector_lib::{counter, gauge};
 
-use crate::sinks::util::path_confinement::ConfineError;
-
-#[cfg(any(
-    feature = "sources-file",
-    feature = "sources-ifile",
-    feature = "sources-kubernetes_logs"
-))]
 pub use self::source::*;
+
+use vector_lib::internal_event::{error_stage, error_type};
 
 /// Configuration of internal metrics for file-based components.
 #[configurable_component]
@@ -34,7 +24,7 @@ pub struct FileInternalMetricsConfig {
     pub include_file_tag: bool,
 }
 
-#[derive(Debug, NamedInternalEvent)]
+#[derive(Debug, vector_lib::NamedInternalEvent)]
 pub struct FileOpen {
     pub count: usize,
 }
@@ -45,7 +35,7 @@ impl InternalEvent for FileOpen {
     }
 }
 
-#[derive(Debug, NamedInternalEvent)]
+#[derive(Debug, vector_lib::NamedInternalEvent)]
 pub struct FileBytesSent<'a> {
     pub byte_size: usize,
     pub file: Cow<'a, str>,
@@ -76,7 +66,7 @@ impl InternalEvent for FileBytesSent<'_> {
     }
 }
 
-#[derive(Debug, NamedInternalEvent)]
+#[derive(Debug, vector_lib::NamedInternalEvent)]
 pub struct FileIoError<'a, P> {
     pub error: std::io::Error,
     pub code: &'static str,
@@ -94,6 +84,7 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
             error_code = %self.code,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
+            internal_log_rate_limit = true,
         );
         counter!(
             CounterName::ComponentErrorsTotal,
@@ -112,57 +103,22 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
     }
 }
 
-#[derive(Debug, NamedInternalEvent)]
-pub struct FilePathOutsideBaseDirError<'a> {
-    pub path: &'a std::path::Path,
-    pub base_dir: &'a std::path::Path,
-    pub error: ConfineError,
-}
-
-impl InternalEvent for FilePathOutsideBaseDirError<'_> {
-    fn emit(self) {
-        error!(
-            message = "Rendered path is outside the configured base directory; dropping event.",
-            path = ?self.path,
-            base_dir = ?self.base_dir,
-            error = %self.error,
-            error_type = error_type::CONFINEMENT_FAILED,
-            stage = error_stage::PROCESSING,
-        );
-        counter!(
-            CounterName::ComponentErrorsTotal,
-            "error_type" => error_type::CONFINEMENT_FAILED,
-            "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
-        emit!(ComponentEventsDropped::<INTENTIONAL> {
-            count: 1,
-            reason: "Rendered path outside base_dir.",
-        });
-    }
-}
-
-#[cfg(any(
-    feature = "sources-file",
-    feature = "sources-ifile",
-    feature = "sources-kubernetes_logs"
-))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
-    use bytes::BytesMut;
+    use vector_lib::file_source_common::internal_events::FileSourceInternalEvents;
+    use vector_lib::{counter, internal_event::CounterName};
+
+    use crate::internal_events::FileLineTooBigError;
+
+    use super::{FileOpen, InternalEvent};
+    use vector_lib::emit;
     use vector_lib::{
-        NamedInternalEvent, counter, emit,
-        file_source_common::internal_events::FileSourceInternalEvents,
-        internal_event::{
-            ComponentEventsDropped, CounterName, INTENTIONAL, error_stage, error_type,
-        },
+        internal_event::{error_stage, error_type},
         json_size::JsonSize,
     };
 
-    use super::{FileOpen, InternalEvent};
-
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileBytesReceived<'a> {
         pub byte_size: usize,
         pub file: &'a str,
@@ -174,26 +130,26 @@ mod source {
             trace!(
                 message = "Bytes received.",
                 byte_size = %self.byte_size,
-                protocol = "file",
+                protocol = "ifile",
                 file = %self.file,
             );
             if self.include_file_metric_tag {
                 counter!(
                     CounterName::ComponentReceivedBytesTotal,
-                    "protocol" => "file",
-                    "file" => self.file.to_owned()
+                    "protocol" => "ifile",
+                    "ifile" => self.file.to_owned()
                 )
             } else {
                 counter!(
                     CounterName::ComponentReceivedBytesTotal,
-                    "protocol" => "file",
+                    "protocol" => "ifile",
                 )
             }
             .increment(self.byte_size as u64);
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileEventsReceived<'a> {
         pub count: usize,
         pub file: &'a str,
@@ -228,7 +184,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileChecksumFailed<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
@@ -252,7 +208,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileFingerprintReadError<'a> {
         pub file: &'a Path,
         pub error: Error,
@@ -268,6 +224,7 @@ mod source {
                 error_code = "reading_fingerprint",
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
+                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -291,7 +248,7 @@ mod source {
 
     const DELETION_FAILED: &str = "deletion_failed";
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileDeleteError<'a> {
         pub file: &'a Path,
         pub error: Error,
@@ -307,6 +264,7 @@ mod source {
                 error_code = DELETION_FAILED,
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
+                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -328,7 +286,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileDeleted<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
@@ -352,7 +310,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileUnwatched<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
@@ -383,7 +341,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     struct FileWatchError<'a> {
         pub file: &'a Path,
         pub error: Error,
@@ -399,6 +357,7 @@ mod source {
                 error_type = error_type::COMMAND_FAILED,
                 stage = error_stage::RECEIVING,
                 file = %self.file.display(),
+                internal_log_rate_limit = true,
             );
             if self.include_file_metric_tag {
                 counter!(
@@ -420,7 +379,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileResumed<'a> {
         pub file: &'a Path,
         pub file_position: u64,
@@ -446,7 +405,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileAdded<'a> {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
@@ -470,7 +429,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileCheckpointed {
         pub count: usize,
         pub duration: Duration,
@@ -487,7 +446,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileCheckpointWriteError {
         pub error: Error,
     }
@@ -500,6 +459,7 @@ mod source {
                 error_code = "writing_checkpoints",
                 error_type = error_type::WRITER_FAILED,
                 stage = error_stage::RECEIVING,
+                internal_log_rate_limit = true,
             );
             counter!(
                 CounterName::ComponentErrorsTotal,
@@ -511,7 +471,7 @@ mod source {
         }
     }
 
-    #[derive(Debug, NamedInternalEvent)]
+    #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct PathGlobbingError<'a> {
         pub path: &'a Path,
         pub error: &'a Error,
@@ -526,6 +486,7 @@ mod source {
                 error_type = error_type::READER_FAILED,
                 stage = error_stage::RECEIVING,
                 path = %self.path.display(),
+                internal_log_rate_limit = true,
             );
             counter!(
                 CounterName::ComponentErrorsTotal,
@@ -534,37 +495,6 @@ mod source {
                 "stage" => error_stage::RECEIVING,
             )
             .increment(1);
-        }
-    }
-
-    #[derive(Debug, NamedInternalEvent)]
-    pub struct FileLineTooBigError<'a> {
-        pub truncated_bytes: &'a BytesMut,
-        pub configured_limit: usize,
-        pub encountered_size_so_far: usize,
-    }
-
-    impl InternalEvent for FileLineTooBigError<'_> {
-        fn emit(self) {
-            error!(
-                message = "Found line that exceeds max_line_bytes; discarding.",
-                truncated_bytes = ?self.truncated_bytes,
-                configured_limit = self.configured_limit,
-                encountered_size_so_far = self.encountered_size_so_far,
-                error_type = error_type::CONDITION_FAILED,
-                stage = error_stage::RECEIVING,
-            );
-            counter!(
-                CounterName::ComponentErrorsTotal,
-                "error_code" => "reading_line_from_file",
-                "error_type" => error_type::CONDITION_FAILED,
-                "stage" => error_stage::RECEIVING,
-            )
-            .increment(1);
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "Found line that exceeds max_line_bytes; discarding.",
-            });
         }
     }
 

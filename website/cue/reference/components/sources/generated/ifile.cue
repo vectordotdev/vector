@@ -1,6 +1,6 @@
 package metadata
 
-generated: components: sources: file: configuration: {
+generated: components: sources: ifile: configuration: {
 	acknowledgements: {
 		deprecated: true
 		description: """
@@ -17,6 +17,25 @@ generated: components: sources: file: configuration: {
 			"""
 		required: false
 		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+	}
+	checkpoint_interval: {
+		description: """
+			The interval between writing the current read position to disk during normal operation.
+
+			This controls how frequently the current read position is saved to disk during normal operation.
+			Vector always saves the current read position before a proper shutdown (for example, when receiving
+			SIGINT), so data will not be reprocessed when Vector is gracefully restarted.
+			This setting only affects recovery after an abrupt termination (such as SIGKILL or power loss).
+			In such cases, Vector may reprocess up to `checkpoint_interval` seconds worth of data from each file.
+			A lower value results in less data being reprocessed if Vector is terminated abruptly,
+			but increases the performance impact of checkpointing during normal operation.
+			"""
+		required: false
+		type: uint: {
+			default: 500
+			examples: [500, 1000, 2000, 5000]
+			unit: "milliseconds"
+		}
 	}
 	data_dir: {
 		description: """
@@ -55,7 +74,7 @@ generated: components: sources: file: configuration: {
 		description: """
 			Overrides the name of the log field used to add the file path to each event.
 
-			The value is the full path to the file where the event was read message.
+			The value is the full path to the file where the event was a read message.
 
 			Set to `""` to suppress this key.
 			"""
@@ -97,7 +116,7 @@ generated: components: sources: file: configuration: {
 					The number of lines are determined from the uncompressed content if the file is compressed. Only
 					gzip is supported at this time.
 
-					If the file has less than this amount of lines, it won’t be read at all.
+					If the file has fewer than this number of lines, it won’t be read at all.
 					"""
 				relevant_when: "strategy = \"checksum\""
 				required:      false
@@ -125,20 +144,6 @@ generated: components: sources: file: configuration: {
 					}
 				}
 			}
-		}
-	}
-	glob_minimum_cooldown_ms: {
-		description: """
-			The delay between file discovery calls.
-
-			This controls the interval at which files are searched. A higher value results in greater
-			chances of some short-lived files being missed between searches, but a lower value increases
-			the performance impact of file discovery.
-			"""
-		required: false
-		type: uint: {
-			default: 1000
-			unit:    "milliseconds"
 		}
 	}
 	host_key: {
