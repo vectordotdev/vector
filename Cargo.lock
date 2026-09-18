@@ -4553,6 +4553,8 @@ dependencies = [
  "futures",
  "futures-util",
  "glob",
+ "libc",
+ "notify",
  "indexmap 2.14.2",
  "quickcheck",
  "tempfile",

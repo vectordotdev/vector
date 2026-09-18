@@ -40,6 +40,32 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
     buf: &'a mut BytesMut,
     max_size: usize,
 ) -> io::Result<ReadResult> {
+    let start_position = *position;
+    let mut discarded = Vec::new();
+    loop {
+        let (mut result, yielded) =
+            read_until_with_max_size_or_discard(reader, position, delim, buf, max_size).await?;
+        discarded.append(&mut result.discarded_for_size_and_truncated);
+        if !yielded {
+            result.discarded_for_size_and_truncated = discarded;
+            if result.successfully_read.is_some() {
+                result.successfully_read =
+                    Some(usize::try_from(*position - start_position).unwrap_or(usize::MAX));
+            }
+            return Ok(result);
+        }
+    }
+}
+
+/// Like [`read_until_with_max_size`], but return after discarding one complete oversized record.
+/// The boolean is true for that scheduling yield and false for a delivered record or actual EOF.
+pub async fn read_until_with_max_size_or_discard<R: AsyncBufRead + ?Sized + Unpin>(
+    reader: &mut R,
+    position: &mut FilePosition,
+    delim: &[u8],
+    buf: &mut BytesMut,
+    max_size: usize,
+) -> io::Result<(ReadResult, bool)> {
     let mut total_read = 0;
     let mut discarding = false;
     let delim_finder = Finder::new(delim);
@@ -80,10 +106,16 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
 
                 // Found a complete delimiter, return the current buffer so we can proceed with the
                 // next record after this delimiter in the next call.
-                return Ok(ReadResult {
-                    successfully_read: Some(total_read),
-                    discarded_for_size_and_truncated,
-                });
+                if discarding {
+                    buf.clear();
+                }
+                return Ok((
+                    ReadResult {
+                        successfully_read: (!discarding).then_some(total_read),
+                        discarded_for_size_and_truncated,
+                    },
+                    discarding,
+                ));
             } else {
                 // Not a complete delimiter after all.
                 // Add partial_delim to output buffer as it is actual data.
@@ -188,13 +220,22 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
 
         if done {
             if !discarding {
-                return Ok(ReadResult {
-                    successfully_read: Some(total_read),
-                    discarded_for_size_and_truncated,
-                });
+                return Ok((
+                    ReadResult {
+                        successfully_read: Some(total_read),
+                        discarded_for_size_and_truncated,
+                    },
+                    false,
+                ));
             } else {
-                discarding = false;
                 buf.clear();
+                return Ok((
+                    ReadResult {
+                        successfully_read: None,
+                        discarded_for_size_and_truncated,
+                    },
+                    true,
+                ));
             }
         } else if used == 0 && at_eof {
             // We've hit EOF but haven't seen a delimiter. This can happen when:
@@ -202,10 +243,13 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
             // 2. We're observing an incomplete write
             //
             // Return None to signal the caller to retry later.
-            return Ok(ReadResult {
-                successfully_read: None,
-                discarded_for_size_and_truncated,
-            });
+            return Ok((
+                ReadResult {
+                    successfully_read: None,
+                    discarded_for_size_and_truncated,
+                },
+                false,
+            ));
         }
     }
 }
@@ -218,7 +262,45 @@ mod test {
     use quickcheck::{QuickCheck, TestResult};
     use tokio::io::BufReader;
 
-    use super::read_until_with_max_size;
+    use super::{read_until_with_max_size, read_until_with_max_size_or_discard};
+
+    #[tokio::test]
+    async fn discarded_record_yields_after_a_split_delimiter() {
+        let mut reader = BufReader::with_capacity(4, b"xxxxxxx\r\nok\r\n".as_slice());
+        let mut position = 0;
+        let mut buffer = BytesMut::new();
+        let (discarded, yielded) = read_until_with_max_size_or_discard(
+            &mut reader,
+            &mut position,
+            b"\r\n",
+            &mut buffer,
+            3,
+        )
+        .await
+        .unwrap();
+        assert!(yielded);
+        assert_eq!(discarded.successfully_read, None);
+        assert_eq!(discarded.discarded_for_size_and_truncated.len(), 1);
+        assert!(
+            buffer.is_empty(),
+            "a discarded record must not become an empty output record"
+        );
+        assert_eq!(position, 9);
+        let (record, yielded) = read_until_with_max_size_or_discard(
+            &mut reader,
+            &mut position,
+            b"\r\n",
+            &mut buffer,
+            3,
+        )
+        .await
+        .unwrap();
+        assert!(!yielded);
+        assert_eq!(record.successfully_read, Some(4));
+        assert!(record.discarded_for_size_and_truncated.is_empty());
+        assert_eq!(buffer.as_ref(), b"ok");
+        assert_eq!(position, 13);
+    }
     use crate::buffer::ReadResult;
 
     async fn qc_inner(chunks: Vec<Vec<u8>>, delim: u8, max_size: NonZeroU8) -> TestResult {
