@@ -453,11 +453,6 @@ check-generated-docs: generate-docs ## Checks that machine-generated component d
 	$(VDEV) check generated-docs
 	$(VDEV) check component-examples
 
-##@ Rustdoc
-build-rustdoc: ## Build Vector's Rustdocs
-	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
-	cargo doc --no-deps --workspace
-
 ##@ Packaging (forwarded to Makefile.packaging)
 
 # Packaging targets that depend on VERSION live in Makefile.packaging to avoid

@@ -144,7 +144,6 @@ jobs:
               - "./.github/**/!(regression.yml)"
               - "./.gitignore"
               - "distribution/**"
-              - "rust-doc/**"
               - "docs/**"
               - "rfcs/**"
               - "testing/**"
