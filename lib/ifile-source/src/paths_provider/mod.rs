@@ -13,11 +13,6 @@ pub use glob::MatchOptions as GlobMatchOptions;
 /// include patterns and don't match exclude patterns, instead of continuously globbing.
 pub mod notify;
 
-/// Provides a boxed implementation of the `PathsProvider` trait.
-///
-/// This allows us to use dynamic dispatch with PathsProvider implementations.
-pub mod boxed;
-
 use std::future::Future;
 use std::pin::Pin;
 

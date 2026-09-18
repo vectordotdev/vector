@@ -18,8 +18,8 @@ use vector_lib::finalizer::OrderedFinalizer;
 #[cfg(test)]
 use vector_lib::ifile_source::TestEvent;
 use vector_lib::ifile_source::{
-    BoxedPathsProvider, Checkpointer, FileServer, Line, NotifyPathsProvider, ReadFrom,
-    ReadFromConfig, calculate_ignore_before, paths_provider::GlobMatchOptions,
+    Checkpointer, FileServer, Line, NotifyPathsProvider, ReadFrom, ReadFromConfig,
+    calculate_ignore_before, paths_provider::GlobMatchOptions,
 };
 use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
@@ -595,12 +595,12 @@ pub fn ifile_source(
         include_patterns = ?include,
         exclude_patterns = ?exclude_patterns,
     );
-    let paths_provider = BoxedPathsProvider::new(NotifyPathsProvider::new(
+    let paths_provider = NotifyPathsProvider::new(
         &include,
         &exclude_patterns,
         GlobMatchOptions::default(),
         emitter.clone(),
-    ));
+    );
 
     let encoding_charset = config.encoding.clone().map(|e| e.charset);
 
