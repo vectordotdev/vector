@@ -166,8 +166,9 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
+            // The old limiter always started with at least two permits. Preserve that behavior.
             let request_limiter =
-                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads());
+                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads().max(2));
 
             listener
                 .accept_stream_limited(max_connections)
