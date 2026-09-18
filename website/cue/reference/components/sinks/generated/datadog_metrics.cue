@@ -98,13 +98,12 @@ generated: components: sinks: datadog_metrics: configuration: {
 		description: """
 			Controls which Datadog series API endpoint is used to submit metrics.
 
-			Defaults to `v2` (`/api/v2/series`). Set to `v3` (`/api/intake/metrics/v3/series`) to use
-			the columnar protobuf format, or to `v1` (`/api/v1/series`) only if you need to fall back
-			to the legacy endpoint.
+			Defaults to `v3` (`/api/intake/metrics/v3/series`). Set to `v2` (`/api/v2/series`) or
+			to `v1` (`/api/v1/series`) only if you need to fall back to the legacy endpoint.
 			"""
 		required: false
 		type: string: {
-			default: "v2"
+			default: "v3"
 			enum: {
 				v1: {
 					deprecated: true
@@ -114,17 +113,15 @@ generated: components: sinks: datadog_metrics: configuration: {
 						This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
 						"""
 				}
-				v2: """
-					Use the v2 series endpoint (`/api/v2/series`).
-
-					This is the recommended and default endpoint.
-					"""
+				v2: "Use the v2 series endpoint (`/api/v2/series`)."
 				v3: """
 					Use the v3 series endpoint (`/api/intake/metrics/v3/series`).
 
 					Columnar protobuf format with dictionary-based string deduplication and delta
 					encoding. More efficient than v2 for workloads with many metrics that share
 					common tags or names.
+
+					This is the recommended and default endpoint.
 					"""
 			}
 		}
@@ -143,25 +140,6 @@ generated: components: sinks: datadog_metrics: configuration: {
 			"""
 		required: false
 		type: string: examples: ["us3.datadoghq.com", "datadoghq.eu"]
-	}
-	sketches_api_version: {
-		description: """
-			Controls which Datadog sketches API endpoint is used to submit distributions and
-			histograms.
-
-			Only `v2` (`/api/beta/sketches`) can currently be configured. The V3 sketches intake
-			routes do not exist yet (`/api/intake/metrics/v3/sketches` and its beta counterpart both
-			404), so V3 sketches support is temporarily disabled at the configuration level.
-			"""
-		required: false
-		type: string: {
-			default: "v2"
-			enum: v2: """
-				Use the legacy sketches endpoint (`/api/beta/sketches`).
-
-				This is the recommended and default endpoint.
-				"""
-		}
 	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."

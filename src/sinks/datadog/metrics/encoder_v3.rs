@@ -13,12 +13,11 @@ use chrono::{DateTime, Utc};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
-    event::{Metric, MetricTags, MetricValue, metric::MetricSketch},
-    metrics::AgentDDSketch,
+    event::{Metric, MetricTags, MetricValue},
     request_metadata::GroupedCountByteSize,
 };
 
-use datadog_agent_metrics_v3::{V3MetricBuilder, V3MetricType, V3Writer};
+use datadog_agent_metrics_v3::{V3MetricType, V3Writer};
 use protobuf::{CodedOutputStream, rt::WireType};
 
 use super::{
@@ -167,18 +166,18 @@ fn encode_metric_to_v3(
         MetricValue::Counter { .. } => V3MetricType::Count,
         MetricValue::Gauge { .. } => V3MetricType::Gauge,
         MetricValue::Set { .. } => V3MetricType::Gauge,
-        MetricValue::Sketch { .. } => V3MetricType::Sketch,
-        // `AggregatedSummary` is split into counters/gauges, and `Distribution`/
-        // `AggregatedHistogram` are converted into `Sketch(AgentDDSketch)`, by the shared
-        // `DatadogMetricsNormalizer` before metrics ever reach either encoder (see `sink.rs`).
-        // This should never happen — mirrors V2's `series_to_proto_message`, which errors
-        // instead of silently re-deriving a sketch with encoder-local logic that could drift
-        // from the normalizer's.
-        value @ (MetricValue::AggregatedSummary { .. }
+        // Sketch-valued metrics are routed to the sketches endpoint (see `sink.rs`), which
+        // always uses the V1/V2 encoder, so they never reach this encoder. `AggregatedSummary`
+        // is split into counters/gauges, and `Distribution`/`AggregatedHistogram` are converted
+        // into `Sketch(AgentDDSketch)`, by the shared `DatadogMetricsNormalizer` before metrics
+        // ever reach either encoder. None of these should happen — mirrors V2's
+        // `series_to_proto_message`, which errors rather than guessing at a conversion here.
+        value @ (MetricValue::Sketch { .. }
+        | MetricValue::AggregatedSummary { .. }
         | MetricValue::Distribution { .. }
         | MetricValue::AggregatedHistogram { .. }) => {
             return Err(EncoderError::InvalidMetric {
-                expected: "series or sketch",
+                expected: "series",
                 metric_value: value.as_name(),
             });
         }
@@ -315,13 +314,9 @@ fn encode_metric_to_v3(
         MetricValue::Set { values } => {
             builder.add_point(timestamp, values.len() as f64);
         }
-        MetricValue::Sketch {
-            sketch: MetricSketch::AgentDDSketch(ddsketch),
-        } => {
-            encode_ddsketch(&mut builder, ddsketch, timestamp);
-        }
         // Unreachable: already errored out of this function via the `metric_type` match above.
-        MetricValue::AggregatedSummary { .. }
+        MetricValue::Sketch { .. }
+        | MetricValue::AggregatedSummary { .. }
         | MetricValue::Distribution { .. }
         | MetricValue::AggregatedHistogram { .. } => {
             unreachable!("filtered out by the metric_type match above")
@@ -383,25 +378,6 @@ fn assemble_resources<'a>(
     resources
 }
 
-fn encode_ddsketch(builder: &mut V3MetricBuilder<'_>, ddsketch: &AgentDDSketch, timestamp: i64) {
-    if ddsketch.is_empty() {
-        return;
-    }
-    let (bins_i16, counts_u16) = ddsketch.bin_map().into_parts();
-    let bin_keys: Vec<i32> = bins_i16.into_iter().map(|k| k as i32).collect();
-    let bin_counts: Vec<u32> = counts_u16.into_iter().map(|c| c as u32).collect();
-
-    builder.add_sketch(
-        timestamp,
-        ddsketch.count() as i64,
-        ddsketch.sum().unwrap_or(0.0),
-        ddsketch.min().unwrap_or(0.0),
-        ddsketch.max().unwrap_or(0.0),
-        &bin_keys,
-        &bin_counts,
-    );
-}
-
 fn encode_timestamp(ts: Option<DateTime<Utc>>) -> i64 {
     ts.map(|t| t.timestamp())
         .unwrap_or_else(|| Utc::now().timestamp())
@@ -415,7 +391,10 @@ mod tests {
 
     use super::super::config::SeriesApiVersion;
     use super::*;
-    use vector_lib::event::{MetricKind, MetricValue};
+    use vector_lib::{
+        event::{MetricKind, MetricValue, metric::MetricSketch},
+        metrics::AgentDDSketch,
+    };
 
     fn gauge(name: &str, value: f64) -> Metric {
         Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
@@ -598,12 +577,12 @@ mod tests {
     }
 
     #[test]
-    fn v3_aggregated_summary_distribution_and_histogram_are_rejected() {
-        // Regression test: `AggregatedSummary` is split into counters/gauges, and
-        // `Distribution`/`AggregatedHistogram` are converted into `Sketch(AgentDDSketch)`, by
-        // the shared `DatadogMetricsNormalizer` before metrics ever reach either encoder (see
-        // `sink.rs`) — this should never happen. V3 used to silently re-derive a sketch inline
-        // instead of erroring like V2 does; now it errors too.
+    fn v3_non_series_metric_values_are_rejected() {
+        // `AggregatedSummary` is split into counters/gauges, and `Distribution`/
+        // `AggregatedHistogram` are converted into `Sketch(AgentDDSketch)`, by the shared
+        // `DatadogMetricsNormalizer`, whose sketch output is then routed to the sketches
+        // endpoint and its V1/V2 encoder (see `sink.rs`) — so none of these values, sketches
+        // included, can reach the V3 encoder. Mirror V2 and error rather than guess.
         use vector_lib::event::metric::{Bucket, Quantile, Sample};
 
         let mut enc = DatadogMetricsV3Encoder::new(
@@ -624,7 +603,10 @@ mod tests {
         );
         assert!(enc.try_encode(summary).is_err());
 
-        let mut enc = DatadogMetricsV3Encoder::new(DatadogMetricsEndpoint::Sketches, None);
+        let mut enc = DatadogMetricsV3Encoder::new(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3),
+            None,
+        );
         let distribution = Metric::new(
             "dist",
             MetricKind::Incremental,
@@ -638,7 +620,10 @@ mod tests {
         );
         assert!(enc.try_encode(distribution).is_err());
 
-        let mut enc = DatadogMetricsV3Encoder::new(DatadogMetricsEndpoint::Sketches, None);
+        let mut enc = DatadogMetricsV3Encoder::new(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3),
+            None,
+        );
         let histogram = Metric::new(
             "hist",
             MetricKind::Incremental,
@@ -652,6 +637,23 @@ mod tests {
             },
         );
         assert!(enc.try_encode(histogram).is_err());
+
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+        sketch.insert(1.0);
+        let mut enc = DatadogMetricsV3Encoder::new(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3),
+            None,
+        );
+        assert!(
+            enc.try_encode(Metric::new(
+                "dist",
+                MetricKind::Incremental,
+                MetricValue::Sketch {
+                    sketch: MetricSketch::AgentDDSketch(sketch),
+                },
+            ))
+            .is_err()
+        );
     }
 
     #[test]
@@ -709,23 +711,5 @@ mod tests {
         );
         assert!(enc.try_encode(set).unwrap().is_none());
         enc.finish().unwrap();
-    }
-
-    #[test]
-    fn v3_sketch_encoder_routes_correctly() {
-        let mut sketch = AgentDDSketch::with_agent_defaults();
-        sketch.insert(1.0);
-        sketch.insert(2.0);
-        let metric = Metric::new(
-            "dist",
-            MetricKind::Incremental,
-            MetricValue::Sketch {
-                sketch: MetricSketch::AgentDDSketch(sketch),
-            },
-        );
-        let mut enc = DatadogMetricsV3Encoder::new(DatadogMetricsEndpoint::Sketches, None);
-        enc.try_encode(metric).unwrap();
-        let (result, _) = enc.finish().unwrap();
-        assert!(!result.into_payload().is_empty());
     }
 }

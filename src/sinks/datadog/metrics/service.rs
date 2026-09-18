@@ -20,7 +20,6 @@ use vector_lib::{
 
 use crate::{
     http::{BuildRequestSnafu, HttpClient},
-    internal_events::DatadogMetricsRequestFailed,
     sinks::{datadog::DatadogApiError, util::retries::RetryLogic},
 };
 
@@ -65,8 +64,7 @@ impl DatadogMetricsRequest {
                 HeaderValue::from_str(&key).expect("API key should be only valid ASCII characters")
             },
         );
-
-        Request::post(self.uri)
+        let request = Request::post(self.uri)
             .header("DD-API-KEY", api_key)
             // TODO: The Datadog Agent sends this header to indicate the version of the Go library
             // it uses which contains the Protocol Buffers definitions used for the Sketches API.
@@ -80,8 +78,9 @@ impl DatadogMetricsRequest {
             // this header.
             .header("DD-Agent-Payload", "4.87.0")
             .header(CONTENT_TYPE, self.content_type)
-            .header(CONTENT_ENCODING, self.content_encoding)
-            .body(Body::from(self.payload))
+            .header(CONTENT_ENCODING, self.content_encoding);
+
+        request.body(Body::from(self.payload))
     }
 }
 
@@ -165,67 +164,19 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
 
         Box::pin(async move {
             let request_metadata = std::mem::take(request.metadata_mut());
-            let uri = request.uri.clone();
 
-            let call_result: Result<_, DatadogApiError> = async {
-                let http_request = request
-                    .into_http_request(api_key)
-                    .context(BuildRequestSnafu)
-                    .map_err(|error| DatadogApiError::HttpError { error })?;
+            let request = request
+                .into_http_request(api_key)
+                .context(BuildRequestSnafu)
+                .map_err(|error| DatadogApiError::HttpError { error })?;
 
-                let result = client.send(http_request).await;
-                DatadogApiError::from_result(result)
-            }
-            .await;
-
-            let result = call_result.inspect_err(|error| {
-                emit!(DatadogMetricsRequestFailed {
-                    error: &error.to_string(),
-                    uri: &uri,
-                });
-            })?;
+            let result = client.send(request).await;
+            let result = DatadogApiError::from_result(result)?;
 
             Ok(DatadogMetricsResponse {
                 status_code: result.status(),
                 request_metadata,
             })
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The `X-Metrics-Request-*` correlation headers only ever existed to pair a legacy
-    /// payload with its V3 shadow twin so the intake could compare them. With shadow
-    /// dual-write gone there is nothing to correlate, so requests must not carry them.
-    #[test]
-    fn requests_carry_no_correlation_headers() {
-        let request = DatadogMetricsRequest {
-            api_key: None,
-            payload: Bytes::from_static(b"payload"),
-            uri: "https://example.com/api/v2/series".parse().unwrap(),
-            content_type: "application/x-protobuf",
-            content_encoding: "zstd",
-            finalizers: EventFinalizers::default(),
-            metadata: RequestMetadata::new(0, 0, 0, 0, GroupedCountByteSize::new_untagged()),
-        };
-
-        let http_request = request
-            .into_http_request(HeaderValue::from_static("atoken"))
-            .expect("request should build");
-
-        let unexpected: Vec<&str> = http_request
-            .headers()
-            .keys()
-            .map(http::HeaderName::as_str)
-            .filter(|name| name.starts_with("x-metrics-request"))
-            .collect();
-
-        assert!(
-            unexpected.is_empty(),
-            "unexpected shadow correlation headers: {unexpected:?}"
-        );
     }
 }

@@ -9,10 +9,7 @@ use vector_lib::{
 };
 
 use super::{
-    config::{
-        DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration, SeriesApiVersion,
-        SketchesApiVersion,
-    },
+    config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration, SeriesApiVersion},
     encoder::{DatadogMetricsEncoder, EncoderError, FinishError},
     encoder_v3::DatadogMetricsV3Encoder,
     service::DatadogMetricsRequest,
@@ -96,9 +93,8 @@ impl MetricsEncoder for DatadogMetricsV3Encoder {
     }
 }
 
-/// Encoder dispatch: either V1/V2 incremental or V3 batch. Used uniformly for both
-/// the series and sketches encoders — which variant is picked depends only on the
-/// configured `SeriesApiVersion`, not on the endpoint.
+/// Series encoder dispatch: either V1/V2 incremental or V3 batch, picked from the
+/// configured `SeriesApiVersion`. Sketches always use the V1/V2 encoder.
 enum EncoderKind {
     V1V2(Box<DatadogMetricsEncoder>),
     V3(Box<DatadogMetricsV3Encoder>),
@@ -124,7 +120,7 @@ impl MetricsEncoder for EncoderKind {
 pub struct DatadogMetricsRequestBuilder {
     endpoint_configuration: DatadogMetricsEndpointConfiguration,
     series_encoder: EncoderKind,
-    sketches_encoder: EncoderKind,
+    sketches_encoder: DatadogMetricsEncoder,
 }
 
 impl DatadogMetricsRequestBuilder {
@@ -132,7 +128,6 @@ impl DatadogMetricsRequestBuilder {
         endpoint_configuration: DatadogMetricsEndpointConfiguration,
         default_namespace: Option<String>,
         series_api_version: SeriesApiVersion,
-        sketches_api_version: SketchesApiVersion,
     ) -> Self {
         let series_encoder = if series_api_version.is_v3_format() {
             EncoderKind::V3(Box::new(DatadogMetricsV3Encoder::new(
@@ -146,24 +141,22 @@ impl DatadogMetricsRequestBuilder {
             )))
         };
 
-        // Independent of `series_api_version`: Datadog's intake gates V3 series and V3 sketches
-        // separately, so the sketches wire format must be chosen by its own setting.
-        let sketches_encoder = if sketches_api_version.is_v3_format() {
-            EncoderKind::V3(Box::new(DatadogMetricsV3Encoder::new(
-                DatadogMetricsEndpoint::Sketches,
-                default_namespace,
-            )))
-        } else {
-            EncoderKind::V1V2(Box::new(DatadogMetricsEncoder::new(
-                DatadogMetricsEndpoint::Sketches,
-                default_namespace,
-            )))
-        };
+        // Sketches are unaffected by `series_api_version`: the V3 intake has no sketches route,
+        // so they always go to `/api/beta/sketches` with the V1/V2 encoder.
+        let sketches_encoder =
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, default_namespace);
 
         Self {
             endpoint_configuration,
             series_encoder,
             sketches_encoder,
+        }
+    }
+
+    fn get_encoder(&mut self, endpoint: DatadogMetricsEndpoint) -> &mut dyn MetricsEncoder {
+        match endpoint {
+            DatadogMetricsEndpoint::Series { .. } => &mut self.series_encoder,
+            DatadogMetricsEndpoint::Sketches => &mut self.sketches_encoder,
         }
     }
 }
@@ -185,12 +178,7 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
 
         let metrics = stamp_missing_timestamps(metrics);
 
-        let encoder = match endpoint {
-            DatadogMetricsEndpoint::Series(_) => &mut self.series_encoder,
-            DatadogMetricsEndpoint::Sketches => &mut self.sketches_encoder,
-        };
-
-        encode_batch(encoder, api_key, endpoint, metrics)
+        encode_batch(self.get_encoder(endpoint), api_key, endpoint, metrics)
     }
 
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
@@ -248,8 +236,8 @@ type EncodedResults =
 // for V3 the inner loop simply drains every metric before finishing once, matching its
 // batch-then-split semantics.
 
-fn encode_batch<E: MetricsEncoder>(
-    encoder: &mut E,
+fn encode_batch(
+    encoder: &mut dyn MetricsEncoder,
     api_key: Option<Arc<str>>,
     endpoint: DatadogMetricsEndpoint,
     mut metrics: Vec<Metric>,
@@ -355,10 +343,20 @@ fn encode_batch<E: MetricsEncoder>(
                     while remaining_splits > 1 {
                         split_idx -= stride;
                         let chunk = metrics.split_off(split_idx);
-                        results.push(encode_chunk(encoder, api_key.clone(), endpoint, chunk));
+                        results.push(encode_now_or_never(
+                            encoder,
+                            api_key.clone(),
+                            endpoint,
+                            chunk,
+                        ));
                         remaining_splits -= 1;
                     }
-                    results.push(encode_chunk(encoder, api_key.clone(), endpoint, metrics));
+                    results.push(encode_now_or_never(
+                        encoder,
+                        api_key.clone(),
+                        endpoint,
+                        metrics,
+                    ));
                 }
                 Err(suberr) => {
                     // Not an error we can do anything about, so just forward it on.
@@ -374,10 +372,16 @@ fn encode_batch<E: MetricsEncoder>(
     results
 }
 
-/// Encodes one chunk in a single shot, treating any error as unrecoverable. Used for
-/// split-retry after a `FinishError::TooLarge`.
-fn encode_chunk<E: MetricsEncoder>(
-    encoder: &mut E,
+/// Simple encoder implementation that treats any error during encoding or finishing as unrecoverable.
+///
+/// We only call this method when our main encoding loop tried to finish a payload and was told
+/// that the payload was too large compared to the payload size limits.  That error gives back any
+/// metrics that were correctly encoded so that we can attempt to encode them again in smaller
+/// chunks.  However, rather than continually trying smaller and smaller chunks, which could be
+/// caused by a pathological error, we only attempt that operation once.  This method facilitates
+/// the "only try it once" aspect by treating all errors as unrecoverable.
+fn encode_now_or_never(
+    encoder: &mut dyn MetricsEncoder,
     api_key: Option<Arc<str>>,
     endpoint: DatadogMetricsEndpoint,
     metrics: Vec<Metric>,
