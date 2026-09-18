@@ -64,6 +64,7 @@ impl CheckpointsView {
         self.removed_times.remove(&fng);
     }
 
+    #[must_use]
     pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(&fng).map(|r| *r.value())
     }
@@ -110,7 +111,7 @@ impl CheckpointsView {
         }
     }
 
-    fn load(&self, checkpoint: Checkpoint) {
+    fn load(&self, checkpoint: &Checkpoint) {
         self.checkpoints
             .insert(checkpoint.fingerprint, checkpoint.position);
         self.modified_times
@@ -126,7 +127,7 @@ impl CheckpointsView {
                     {
                         continue;
                     }
-                    self.load(checkpoint);
+                    self.load(&checkpoint);
                 }
             }
         }
@@ -146,8 +147,7 @@ impl CheckpointsView {
                         modified: self
                             .modified_times
                             .get(fingerprint)
-                            .map(|r| *r.value())
-                            .unwrap_or_else(Utc::now),
+                            .map_or_else(Utc::now, |r| *r.value()),
                     }
                 })
                 .collect(),
@@ -156,6 +156,7 @@ impl CheckpointsView {
 }
 
 impl Checkpointer {
+    #[must_use]
     pub fn new(data_dir: &Path) -> Checkpointer {
         let tmp_file_path = data_dir.join(TMP_FILE_NAME);
         let stable_file_path = data_dir.join(CHECKPOINT_FILE_NAME);
@@ -185,6 +186,11 @@ impl Checkpointer {
     /// Persist the current checkpoints state to disk, making our best effort to
     /// do so in an atomic way that allow for recovering the previous state in
     /// the event of a crash.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serializing, writing, syncing, or renaming the
+    /// checkpoint file fails, or if the blocking write task fails to complete.
     pub async fn write_checkpoints(&self) -> Result<usize, io::Error> {
         // First drop any checkpoints for files that were removed more than 60
         // seconds ago. This keeps our working set as small as possible and
@@ -330,7 +336,7 @@ mod test {
             let chkptr = Checkpointer::new(data_dir.path());
 
             for (fingerprint, modified) in &[&newer, &oldish, &older] {
-                chkptr.checkpoints.load(Checkpoint {
+                chkptr.checkpoints.load(&Checkpoint {
                     fingerprint: *fingerprint,
                     position,
                     modified: *modified,
@@ -429,7 +435,7 @@ mod test {
             (FileFingerprint::FirstLinesChecksum(123), 0, 30),
             (FileFingerprint::FirstLinesChecksum(456), 1, 60),
             (FileFingerprint::FirstLinesChecksum(789), 2, 90),
-            (FileFingerprint::FirstLinesChecksum(101112), 3, 120),
+            (FileFingerprint::FirstLinesChecksum(101_112), 3, 120),
         ];
 
         let data_dir = tempdir().unwrap();
@@ -574,7 +580,7 @@ mod test {
         chkptr.read_checkpoints(None).await;
 
         for fingerprint in fingerprints {
-            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(1234))
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(1234));
         }
     }
 }
