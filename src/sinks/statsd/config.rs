@@ -10,8 +10,6 @@ use vector_lib::{
 };
 
 use super::{request_builder::StatsdRequestBuilder, service::StatsdService, sink::StatsdSink};
-#[cfg(unix)]
-use crate::sinks::util::service::net::UnixConnectorConfig;
 use crate::{
     config::{SinkConfig, SinkContext, ValidatedSink},
     internal_events::SocketMode,
@@ -19,7 +17,10 @@ use crate::{
         Healthcheck,
         util::{
             BatchConfig, SinkBatchSettings,
-            service::net::{NetworkConnector, TcpConnectorConfig, UdpConnectorConfig},
+            service::net::{
+                NetError, NetworkConnector, TcpConnectorConfig, UdpConnectorConfig,
+                UnixConnectorConfig,
+            },
         },
     },
 };
@@ -72,7 +73,6 @@ pub enum Mode {
     Udp(UdpConnectorConfig),
 
     /// Send over a Unix domain socket (UDS).
-    #[cfg(unix)]
     Unix(UnixConnectorConfig),
 }
 
@@ -81,16 +81,14 @@ impl Mode {
         match self {
             Self::Tcp(_) => SocketMode::Tcp,
             Self::Udp(_) => SocketMode::Udp,
-            #[cfg(unix)]
             Self::Unix(_) => SocketMode::Unix,
         }
     }
 
-    fn as_connector(&self) -> NetworkConnector {
+    fn as_connector(&self) -> Result<NetworkConnector, NetError> {
         match self {
-            Self::Tcp(config) => config.as_connector(),
-            Self::Udp(config) => config.as_connector(),
-            #[cfg(unix)]
+            Self::Tcp(config) => Ok(config.as_connector()),
+            Self::Udp(config) => Ok(config.as_connector()),
             Self::Unix(config) => config.as_connector(),
         }
     }
@@ -154,7 +152,7 @@ impl ValidatedSink for StatsdSinkConfig {
             StatsdRequestBuilder::new(self.default_namespace.clone(), socket_mode);
         let protocol = Protocol::from(socket_mode.as_str());
 
-        let connector = self.mode.as_connector();
+        let connector = self.mode.as_connector()?;
         let service = connector.service();
         let healthcheck = connector.healthcheck();
 
@@ -176,6 +174,18 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StatsdSinkConfig>();
+    }
+
+    #[test]
+    fn unix_mode_deserializes_on_all_platforms() {
+        let config: StatsdSinkConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            mode: unix
+            path: /tmp/vector-statsd.sock
+            unix_mode: Datagram
+        "#})
+        .unwrap();
+
+        assert!(matches!(config.mode, Mode::Unix(_)));
     }
 
     #[test]
