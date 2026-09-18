@@ -12,7 +12,7 @@ components: sinks: datadog_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				max_bytes:    4_250_000
+				max_bytes:    4_250_000 // default: max_payload_bytes (5 MB) - 750 KB headroom
 				max_events:   1000
 				timeout_secs: 5.0
 			}
@@ -81,12 +81,8 @@ components: sinks: datadog_logs: {
 				endpoint. It defaults to `5,000,000` bytes (5 MB), which matches the standard Datadog API
 				limit. Increase it when targeting a compatible endpoint that accepts larger payloads.
 
-				The batch goal is derived automatically as `max_payload_bytes - 750,000` bytes, preserving a
-				750 KB safety headroom. Events larger than the batch goal are sent alone in their own
-				request. `batch.max_bytes` can be raised up to this derived cap; attempting to set it above
-				the cap is rejected at startup.
-
-				The value of `max_payload_bytes` must be at least `5,000,000`.
+				A batch that exceeds `max_payload_bytes` is split across multiple requests. A single event
+				that exceeds `max_payload_bytes` is dropped.
 				"""
 		}
 	}

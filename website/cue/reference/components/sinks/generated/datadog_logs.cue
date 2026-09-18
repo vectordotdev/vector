@@ -24,10 +24,7 @@ generated: components: sinks: datadog_logs: configuration: {
 					serialized or compressed.
 					"""
 				required: false
-				type: uint: {
-					default: 4250000
-					unit:    "bytes"
-				}
+				type: uint: unit: "bytes"
 			}
 			max_events: {
 				description: "The maximum size of a batch before it is flushed."
@@ -127,11 +124,12 @@ generated: components: sinks: datadog_logs: configuration: {
 	}
 	max_payload_bytes: {
 		description: """
-			Maximum uncompressed payload size in bytes sent to the endpoint. Must be at least
-			5,000,000 (5 MB, the standard Datadog API limit). Increase this when targeting a
-			compatible endpoint that accepts larger payloads. The batch goal is derived as
-			`max_payload_bytes - 750,000` bytes; events larger than the batch goal are sent
-			alone in their batch.
+			Maximum uncompressed payload size in bytes sent to the endpoint. It is recommended
+			to not set it above 5,000,000 (5 MB, the standard Datadog API limit). Increase
+			this when targeting a compatible endpoint that accepts larger payloads. The batch
+			goal is derived as `max_payload_bytes - 750,000` bytes; events larger than the
+			batch goal are sent alone in their batch. Events exceeding `max_payload_bytes` are
+			dropped.
 			"""
 		required: false
 		type: uint: {}
