@@ -33,7 +33,6 @@ pub struct MessageBufferingConfig {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub message_id_path: Option<ConfigValuePath>,
 
-    #[configurable(derived)]
     pub client_ack_config: Option<BufferingAckConfig>,
 }
 
@@ -44,7 +43,6 @@ pub struct MessageBufferingConfig {
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 pub struct BufferingAckConfig {
-    #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
     #[serde(default = "default_decoding")]
     pub ack_decoding: DeserializerConfig,
@@ -53,7 +51,6 @@ pub struct BufferingAckConfig {
     /// the message.
     pub message_id_path: ConfigValuePath,
 
-    #[configurable(derived)]
     #[serde(default = "default_client_key_config")]
     pub client_key: ClientKeyConfig,
 }

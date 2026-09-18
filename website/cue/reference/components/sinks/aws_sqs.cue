@@ -62,7 +62,6 @@ components: sinks: aws_sqs: components._aws & {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.aws_sqs.configuration & {

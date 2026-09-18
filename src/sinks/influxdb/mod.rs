@@ -488,7 +488,7 @@ pub mod test_util {
         // this with empty writes and loop if it reports the database
         // does not exist yet.
         crate::test_util::wait_for(|| {
-            let write_url = format!("{}/write?db={}", endpoint, &database);
+            let write_url = format!("{endpoint}/write?db={}", &database);
             async move {
                 match client()
                     .post(&write_url)

@@ -1,12 +1,6 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use std::{collections::HashMap, future::ready, task::Poll};
 
 use bytes::{Bytes, BytesMut};
-use derivative::Derivative;
 use futures::{FutureExt, SinkExt, future::BoxFuture, stream};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
@@ -21,8 +15,7 @@ use super::Region;
 use crate::{
     Result,
     config::{
-        AcknowledgementsConfig, DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext,
-        ValidatedSink,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink,
     },
     event::{
         Event, KeyString,
@@ -70,7 +63,6 @@ pub struct SematextMetricsConfig {
     pub default_namespace: String,
 
     #[serde(default = "super::default_region")]
-    #[configurable(derived)]
     pub region: Region,
 
     /// The endpoint to send data to.
@@ -85,15 +77,12 @@ pub struct SematextMetricsConfig {
     #[configurable(metadata(docs::examples = "some-sematext-token"))]
     pub token: SensitiveString,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -143,18 +132,13 @@ impl SinkConfig for SematextMetricsConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedSematextMetrics {
     endpoint: String,
     uri: Uri,
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     batch: BatchSettings<MetricsBuffer>,
 }
 

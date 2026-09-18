@@ -10,8 +10,8 @@ use super::{
 use crate::{
     aws::{ClientBuilder, RegionOrEndpoint, create_client},
     config::{
-        AcknowledgementsConfig, DataType, DynValidatedSink, GenerateConfig, Input, ProxyConfig,
-        SinkConfig, SinkContext, ValidatedSink,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext, ValidatedSink,
     },
     template::UnconfinedTemplate,
 };
@@ -76,10 +76,6 @@ impl SinkConfig for SnsSinkConfig {
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.base_config.acknowledgements
     }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
-    }
 }
 
 #[derive(Clone)]
@@ -105,6 +101,7 @@ impl ValidatedSink for SnsSinkConfig {
         )?;
         let message_deduplication_id =
             message_deduplication_id(self.base_config.message_deduplication_id.clone())?;
+        self.base_config.encoding.validate()?;
 
         Ok(ValidatedSnsSink {
             message_group_id,
@@ -119,7 +116,7 @@ impl ValidatedSink for SnsSinkConfig {
     ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
         let publisher = SnsMessagePublisher::new(client.clone(), self.topic_arn.clone());
-        let healthcheck = Box::pin(healthcheck(client.clone(), self.topic_arn.clone()));
+        let healthcheck = Box::pin(healthcheck(client, self.topic_arn.clone()));
 
         let request_builder = SSRequestBuilder::new(
             validated.message_group_id.clone(),

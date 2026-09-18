@@ -230,22 +230,18 @@ pub struct KafkaSourceConfig {
     /// transparently by the underlying client library and does not require this option.
     ///
     /// Payloads are decompressed before `framing` and `decoding` are applied.
-    #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     decompression: Option<DecompressionConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -254,7 +250,6 @@ pub struct KafkaSourceConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     metrics: Metrics,
 }
@@ -413,7 +408,7 @@ impl SourceConfig for KafkaSourceConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                keys.key_field.clone().map(LegacyKey::Overwrite),
+                keys.key_field.map(LegacyKey::Overwrite),
                 &owned_value_path!("message_key"),
                 Kind::bytes(),
                 None,
@@ -456,7 +451,7 @@ async fn kafka_source(
 
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     if let Err(e) = consumer.subscribe(&topics).context(SubscribeSnafu) {
-        error!("{}", e);
+        error!("{e}");
         return Err(());
     }
 
@@ -661,7 +656,7 @@ impl ConsumerStateInner<Consuming> {
                         None => unreachable!("MessageStream never calls Ready(None)"),
                         Some(Err(error)) => match error {
                             rdkafka::error::KafkaError::PartitionEOF(partition) if exit_eof => {
-                                debug!("EOF for partition {}.", partition);
+                                debug!("EOF for partition {partition}.");
                                 status = PartitionConsumerStatus::PartitionEOF;
                                 finalizer.take();
                             },
@@ -1274,11 +1269,6 @@ fn create_consumer(
         }
     }
 
-    let oauthbearer = config
-        .librdkafka_options
-        .as_ref()
-        .and_then(kafka::extract_oauthbearer_config);
-
     let (callbacks, callback_rx) = mpsc::unbounded_channel();
     let consumer = client_config
         .create_with_context::<_, StreamConsumer<_>>(KafkaSourceContext::new(
@@ -1286,7 +1276,6 @@ fn create_consumer(
             acknowledgements,
             callbacks,
             Span::current(),
-            oauthbearer,
         ))
         .context(CreateSnafu)?;
 
@@ -1327,13 +1316,11 @@ impl KafkaSourceContext {
         acknowledgements: bool,
         callbacks: UnboundedSender<KafkaCallback>,
         span: Span,
-        oauthbearer: Option<kafka::KafkaOAuthBearerConfig>,
     ) -> Self {
         Self {
             stats: kafka::KafkaStatisticsContext {
                 expose_lag_metrics,
                 span,
-                oauthbearer,
             },
             acknowledgements,
             consumer: OnceLock::default(),
@@ -1419,17 +1406,8 @@ impl KafkaSourceContext {
 }
 
 impl ClientContext for KafkaSourceContext {
-    const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
-
     fn stats(&self, statistics: Statistics) {
         self.stats.stats(statistics)
-    }
-
-    fn generate_oauth_token(
-        &self,
-        oauthbearer_config: Option<&str>,
-    ) -> Result<rdkafka::client::OAuthToken, Box<dyn std::error::Error>> {
-        self.stats.generate_oauth_token(oauthbearer_config)
     }
 }
 
@@ -1444,7 +1422,7 @@ impl ConsumerContext for KafkaSourceContext {
             }
 
             Rebalance::Error(message) => {
-                error!("Error during Kafka consumer group rebalance: {}.", message);
+                error!("Error during Kafka consumer group rebalance: {message}.");
             }
         }
     }
@@ -2005,13 +1983,10 @@ mod integration_test {
                         .is_timestamp()
                 );
 
-                assert_eq!(
-                    event.as_log().value(),
-                    &value!(format!("{} {:03}", TEXT, i))
-                );
+                assert_eq!(event.as_log().value(), &value!(format!("{TEXT} {i:03}")));
                 assert_eq!(
                     meta.get(path!("kafka", "message_key")).unwrap(),
-                    &value!(format!("{} {}", KEY, i))
+                    &value!(format!("{KEY} {i}"))
                 );
 
                 assert_eq!(
@@ -2268,9 +2243,8 @@ mod integration_test {
 
         debug!("Consumer group.id: {}", &group_id);
         debug!(
-            "First consumer read {} of {} messages.",
-            events1.len(),
-            expect_count
+            "First consumer read {} of {expect_count} messages.",
+            events1.len()
         );
 
         // 4. Run the kafka source again to finish reading the events
@@ -2286,9 +2260,8 @@ mod integration_test {
         };
 
         debug!(
-            "Second consumer read {} of {} messages.",
-            events2.len(),
-            expect_count
+            "Second consumer read {} of {expect_count} messages.",
+            events2.len()
         );
 
         // 5. Total number of events processed should equal the number sent
@@ -2379,20 +2352,17 @@ mod integration_test {
         .await;
 
         debug!(
-            "First consumer read {} of {} messages.",
-            events1.len(),
-            expect_count
+            "First consumer read {} of {expect_count} messages.",
+            events1.len()
         );
 
         debug!(
-            "Second consumer read {} of {} messages.",
-            events2.len(),
-            expect_count
+            "Second consumer read {} of {expect_count} messages.",
+            events2.len()
         );
         debug!(
-            "Third consumer read {} of {} messages.",
-            events3.len(),
-            expect_count
+            "Third consumer read {} of {expect_count} messages.",
+            events3.len()
         );
 
         // 5. Total number of events processed should equal the number sent

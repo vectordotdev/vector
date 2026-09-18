@@ -3,7 +3,7 @@ use std::time::Duration;
 use rdkafka::{
     ClientConfig,
     error::KafkaError,
-    producer::{FutureProducer, Producer},
+    producer::{BaseProducer, FutureProducer, Producer},
 };
 use snafu::{ResultExt, Snafu};
 use tower::limit::RateLimit;
@@ -38,13 +38,11 @@ pub struct KafkaSink {
 
 pub(crate) fn create_producer(
     client_config: ClientConfig,
-    oauthbearer: Option<crate::kafka::KafkaOAuthBearerConfig>,
 ) -> crate::Result<FutureProducer<KafkaStatisticsContext>> {
     let producer = client_config
         .create_with_context(KafkaStatisticsContext {
             expose_lag_metrics: false,
             span: Span::current(),
-            oauthbearer,
         })
         .context(KafkaCreateFailedSnafu)?;
     Ok(producer)
@@ -53,8 +51,7 @@ pub(crate) fn create_producer(
 impl KafkaSink {
     pub(crate) fn new(config: KafkaSinkConfig, topic: ConfinedTemplate) -> crate::Result<Self> {
         let producer_config = config.to_rdkafka()?;
-        let oauthbearer = crate::kafka::extract_oauthbearer_config(&config.librdkafka_options);
-        let producer = create_producer(producer_config, oauthbearer)?;
+        let producer = create_producer(producer_config)?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -122,7 +119,6 @@ pub(crate) async fn healthcheck(
 ) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client_config = config.to_rdkafka().unwrap();
-    let oauthbearer = crate::kafka::extract_oauthbearer_config(&config.librdkafka_options);
     let topic: Option<String> = match config.healthcheck_topic {
         Some(topic) => Some(topic),
         _ => match topic_template.render_string(&LogEvent::from_str_legacy("")) {
@@ -137,23 +133,14 @@ pub(crate) async fn healthcheck(
         },
     };
 
-    tokio::task::spawn_blocking(move || -> crate::Result<()> {
-        // FutureProducer wraps a ThreadedProducer whose background thread processes
-        // OAUTHBEARER token refresh events. BaseProducer has no such thread and hangs.
-        let producer: FutureProducer<KafkaStatisticsContext> = client_config
-            .create_with_context(KafkaStatisticsContext {
-                span: Span::current(),
-                expose_lag_metrics: false,
-                oauthbearer,
-            })
-            .context(KafkaCreateFailedSnafu)?;
+    tokio::task::spawn_blocking(move || {
+        let producer: BaseProducer = client_config.create().unwrap();
         let topic = topic.as_deref();
 
         producer
             .client()
             .fetch_metadata(topic, healthcheck_options.timeout)
             .map(|_| ())
-            .map_err(Into::into)
     })
     .await??;
     trace!("Healthcheck completed.");

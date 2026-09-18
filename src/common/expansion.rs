@@ -29,14 +29,13 @@ pub(crate) fn pair_expansion(
             let key = slugify_text(&format!("{opening_prefix}{k}"));
             let val = Value::from(v).to_string_lossy().into_owned();
             if val == "<null>" {
-                warn!("Encountered \"null\" value for dynamic pair. key: {}", key);
+                warn!("Encountered \"null\" value for dynamic pair. key: {key}");
                 continue;
             }
             if let Some(prev) = dynamic_pairs.insert(key.clone(), val.clone()) {
                 warn!(
                     "Encountered duplicated dynamic pair. \
-                                key: {}, value: {:?}, discarded value: {:?}",
-                    key, val, prev
+                                key: {key}, value: {val:?}, discarded value: {prev:?}"
                 );
             };
             expanded_pairs.insert(key, val);
