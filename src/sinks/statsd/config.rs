@@ -11,15 +11,14 @@ use vector_lib::{
 
 use super::{request_builder::StatsdRequestBuilder, service::StatsdService, sink::StatsdSink};
 use crate::{
-    config::{SinkConfig, SinkContext, ValidatedSink},
+    config::{SinkConfig, SinkContext, UnixOnly, ValidatedSink},
     internal_events::SocketMode,
     sinks::{
         Healthcheck,
         util::{
             BatchConfig, SinkBatchSettings,
             service::net::{
-                NetError, NetworkConnector, TcpConnectorConfig, UdpConnectorConfig,
-                UnixConnectorConfig,
+                NetworkConnector, TcpConnectorConfig, UdpConnectorConfig, UnixConnectorConfig,
             },
         },
     },
@@ -73,7 +72,7 @@ pub enum Mode {
     Udp(UdpConnectorConfig),
 
     /// Send over a Unix domain socket (UDS).
-    Unix(UnixConnectorConfig),
+    Unix(UnixOnly<UnixConnectorConfig>),
 }
 
 impl Mode {
@@ -85,11 +84,15 @@ impl Mode {
         }
     }
 
-    fn as_connector(&self) -> Result<NetworkConnector, NetError> {
+    fn as_connector(&self) -> crate::Result<NetworkConnector> {
         match self {
             Self::Tcp(config) => Ok(config.as_connector()),
             Self::Udp(config) => Ok(config.as_connector()),
-            Self::Unix(config) => config.as_connector(),
+            Self::Unix(config) => config.as_ref().on_unix(
+                (),
+                #[cfg(unix)]
+                |config, ()| config.as_connector().map_err(Into::into),
+            ),
         }
     }
 }

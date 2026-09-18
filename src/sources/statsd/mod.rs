@@ -27,7 +27,7 @@ use super::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_s
 use crate::{
     SourceSender,
     codecs::Decoder,
-    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, UnixOnly},
     event::Event,
     internal_events::{
         EventsReceived, SocketBindError, SocketBytesReceived, SocketMode, SocketReceiveError,
@@ -62,7 +62,7 @@ pub enum StatsdConfig {
     Udp(UdpConfig),
 
     /// Listen on a Unix domain Socket (UDS).
-    Unix(UnixConfig),
+    Unix(UnixOnly<UnixConfig>),
 }
 
 /// Unix domain socket configuration for the `statsd` source.
@@ -250,18 +250,11 @@ impl SourceConfig for StatsdConfig {
                     LogNamespace::Legacy,
                 )
             }
-            StatsdConfig::Unix(config) => {
+            StatsdConfig::Unix(config) => config.as_ref().on_unix(
+                cx,
                 #[cfg(unix)]
-                {
-                    statsd_unix(config.clone(), cx.shutdown, cx.out)
-                }
-
-                #[cfg(not(unix))]
-                {
-                    let _ = (config, cx);
-                    Err(unsupported_unix_socket_error())
-                }
-            }
+                |config, cx| statsd_unix(config.clone(), cx.shutdown, cx.out),
+            ),
         }
     }
 
@@ -314,15 +307,6 @@ impl StatsdDeserializer {
             parser: Parser::new(sanitize, convert_to),
         }
     }
-}
-
-#[cfg(not(unix))]
-fn unsupported_unix_socket_error() -> crate::Error {
-    format!(
-        "Unix Domain Socket sources are not supported on {}.",
-        std::env::consts::OS
-    )
-    .into()
 }
 
 impl decoding::format::Deserializer for StatsdDeserializer {
@@ -552,11 +536,14 @@ mod test {
     async fn test_statsd_unix() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
             let in_path = tempfile::tempdir().unwrap().keep().join("unix_test");
-            let config = StatsdConfig::Unix(UnixConfig {
-                path: in_path.clone(),
-                sanitize: true,
-                convert_to: ConversionUnit::Seconds,
-            });
+            let config = StatsdConfig::Unix(
+                UnixConfig {
+                    path: in_path.clone(),
+                    sanitize: true,
+                    convert_to: ConversionUnit::Seconds,
+                }
+                .into(),
+            );
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
                 while let Some(bytes) = receiver.next().await {

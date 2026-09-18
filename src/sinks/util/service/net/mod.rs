@@ -113,12 +113,6 @@ pub enum NetError {
 
     #[snafu(display("Failed to get socket back after send as channel closed unexpectedly."))]
     ServiceSocketChannelClosed,
-
-    #[snafu(display("{} is not supported on {}.", feature, platform))]
-    UnsupportedPlatform {
-        feature: &'static str,
-        platform: &'static str,
-    },
 }
 
 /// Unix socket modes.
@@ -166,15 +160,6 @@ impl UnixConnectorConfig {
             unix_mode: UnixMode::Stream,
             send_buffer_size: None,
         }
-    }
-
-    #[cfg(not(unix))]
-    /// Attempts to create a network connector for this configuration.
-    pub fn as_connector(&self) -> Result<NetworkConnector, NetError> {
-        Err(NetError::UnsupportedPlatform {
-            feature: "Unix Domain Sockets",
-            platform: std::env::consts::OS,
-        })
     }
 }
 
