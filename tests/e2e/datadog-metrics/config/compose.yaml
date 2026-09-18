@@ -53,14 +53,19 @@ services:
   # Receives metric data from the `datadog-agent` directly. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-agent:
-    # TODO: temporarily pegging the image as latest results in failures
-    image: docker.io/datadog/fakeintake:v77a06f2b
+    # Pinned by digest rather than a floating tag. This build decodes the V3 columnar
+    # series intake (`/api/intake/metrics/v3/series`) into the same JSON shape it returns
+    # for V2, which the `v3` leg of the `series_api_version` matrix relies on. The previous
+    # `v77a06f2b` pin doesn't know that route at all: it rejects the payloads and answers
+    # `{"errors":["invalid route parameter"]}` when queried for them.
+    image: docker.io/datadog/fakeintake@sha256:bd5f58f1fdd7b45f25fd4b8c522b6705b0f805c1d0651e43cc3bcfdb1354334c
 
   # Receives metric data from the `vector` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-vector:
-    # TODO: temporarily pegging the image as latest results in failures
-    image: docker.io/datadog/fakeintake:v77a06f2b
+    # Must stay in lockstep with `fakeintake-agent` above: the test compares the payloads
+    # both services received, so they have to decode them identically.
+    image: docker.io/datadog/fakeintake@sha256:bd5f58f1fdd7b45f25fd4b8c522b6705b0f805c1d0651e43cc3bcfdb1354334c
 
 networks:
   default:
