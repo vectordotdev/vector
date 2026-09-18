@@ -9,6 +9,8 @@ use vector_lib::stats::EwmaDefault;
 const EWMA_WEIGHT: f64 = 0.1;
 const MINIMUM_PERMITS: usize = 2;
 
+pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
+
 pub struct RequestLimiterPermit {
     semaphore_permit: Option<OwnedSemaphorePermit>,
     request_limiter_data: Arc<Mutex<RequestLimiterData>>,
@@ -30,7 +32,7 @@ impl Drop for RequestLimiterPermit {
             match target.cmp(&current) {
                 Ordering::Greater => request_limiter_data.increase_permits(),
                 Ordering::Equal => {
-                    // only release the current permit (when the inner permit is dropped automatically)
+                    // Only release the current permit when the inner permit is dropped.
                 }
                 Ordering::Less => {
                     let permit = self.semaphore_permit.take().unwrap();
@@ -43,6 +45,7 @@ impl Drop for RequestLimiterPermit {
 
 struct RequestLimiterData {
     event_limit_target: usize,
+    minimum_permits: usize,
     total_permits: usize,
     average_request_size: EwmaDefault,
     semaphore: Arc<Semaphore>,
@@ -50,27 +53,29 @@ struct RequestLimiterData {
 }
 
 impl RequestLimiterData {
-    pub fn update_average(&mut self, num_events: usize) {
+    fn update_average(&mut self, num_events: usize) {
         if num_events > 0 {
             self.average_request_size.update(num_events as f64);
         }
     }
 
-    pub fn target_requests_in_flight(&self) -> usize {
+    fn target_requests_in_flight(&self) -> usize {
         let target = (self.event_limit_target as f64) / self.average_request_size.average();
         #[allow(clippy::manual_clamp)]
         (target as usize)
-            .max(MINIMUM_PERMITS)
+            .max(self.minimum_permits)
             .min(self.max_requests)
     }
 
-    pub fn increase_permits(&mut self) {
-        self.total_permits += 1;
-        self.semaphore.add_permits(1);
+    fn increase_permits(&mut self) {
+        if self.total_permits < self.max_requests {
+            self.total_permits += 1;
+            self.semaphore.add_permits(1);
+        }
     }
 
-    pub fn decrease_permits(&mut self, permit: OwnedSemaphorePermit) {
-        if self.total_permits > MINIMUM_PERMITS {
+    fn decrease_permits(&mut self, permit: OwnedSemaphorePermit) {
+        if self.total_permits > self.minimum_permits {
             permit.forget();
             self.total_permits -= 1;
         }
@@ -84,18 +89,23 @@ pub struct RequestLimiter {
 }
 
 impl RequestLimiter {
-    /// event_limit_target: The limit to the number of events that will be in-flight at one time.
-    /// max_requests: The most number of requests that can be processed concurrently
-    /// The numbers of events in a request is not known until after it has been decoded, so this is not a hard limit.
-    pub fn new(event_limit_target: usize, max_requests: usize) -> RequestLimiter {
+    /// Creates a limiter targeting `event_limit_target` in-flight events, capped at
+    /// `max_requests` concurrent requests.
+    ///
+    /// The number of events in a request is not known until after decoding, so the event target is
+    /// adaptive rather than a hard limit.
+    pub fn new(event_limit_target: usize, max_requests: usize) -> Self {
         assert!(event_limit_target > 0);
+        assert!(max_requests > 0);
 
-        let semaphore = Arc::new(Semaphore::new(MINIMUM_PERMITS));
-        RequestLimiter {
+        let initial_permits = MINIMUM_PERMITS.min(max_requests);
+        let semaphore = Arc::new(Semaphore::new(initial_permits));
+        Self {
             semaphore: Arc::clone(&semaphore),
             data: Arc::new(Mutex::new(RequestLimiterData {
                 event_limit_target,
-                total_permits: MINIMUM_PERMITS,
+                minimum_permits: initial_permits,
+                total_permits: initial_permits,
                 average_request_size: EwmaDefault::new(EWMA_WEIGHT, event_limit_target as f64),
                 semaphore,
                 max_requests,
@@ -104,9 +114,23 @@ impl RequestLimiter {
     }
 
     pub async fn acquire(&self) -> RequestLimiterPermit {
-        let permit = Arc::clone(&self.semaphore).acquire_owned().await;
+        let permit = Arc::clone(&self.semaphore)
+            .acquire_owned()
+            .await
+            .expect("request limiter semaphore must remain open");
+        self.build_permit(permit)
+    }
+
+    pub fn try_acquire(&self) -> Option<RequestLimiterPermit> {
+        Arc::clone(&self.semaphore)
+            .try_acquire_owned()
+            .ok()
+            .map(|permit| self.build_permit(permit))
+    }
+
+    fn build_permit(&self, semaphore_permit: OwnedSemaphorePermit) -> RequestLimiterPermit {
         RequestLimiterPermit {
-            semaphore_permit: permit.ok(),
+            semaphore_permit: Some(semaphore_permit),
             request_limiter_data: Arc::clone(&self.data),
         }
     }
@@ -156,5 +180,28 @@ mod test {
         }
         let data = limiter.data.lock().unwrap();
         assert_eq!(data.target_requests_in_flight(), request_limit);
+    }
+
+    #[test]
+    fn try_acquire_is_non_blocking_and_adaptive() {
+        let limiter = RequestLimiter::new(100, 10);
+        let first = limiter.try_acquire().unwrap();
+        let second = limiter.try_acquire().unwrap();
+        assert!(limiter.try_acquire().is_none());
+
+        first.decoding_finished(1);
+        drop(first);
+        assert!(limiter.try_acquire().is_some());
+
+        drop(second);
+    }
+
+    #[test]
+    fn configured_maximum_below_default_initial_permits_is_respected() {
+        let limiter = RequestLimiter::new(100, 1);
+        let permit = limiter.try_acquire().unwrap();
+        assert!(limiter.try_acquire().is_none());
+        drop(permit);
+        assert!(limiter.try_acquire().is_some());
     }
 }

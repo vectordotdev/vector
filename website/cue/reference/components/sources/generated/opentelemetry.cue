@@ -105,6 +105,36 @@ generated: components: sources: opentelemetry: configuration: {
 			}
 		}
 	}
+	max_concurrent_requests: {
+		description: """
+			The maximum number of HTTP and gRPC requests that can be processed concurrently.
+
+			The adaptive limit is shared across both protocols. It starts with up to two concurrent requests, adapts based on observed request sizes, and never exceeds this maximum. Requests above the current limit are rejected immediately with an overload response.
+
+			When unset, the maximum defaults to Vector's configured runtime worker count, falling back to the detected available parallelism.
+			"""
+		required: false
+		type: uint: {
+			examples: [
+				8
+			]
+		}
+	}
+	request_timeout_secs: {
+		description: """
+			The maximum time to cooperatively wait for an admitted HTTP or gRPC request.
+
+			The timeout covers receiving and decoding the request body, sending events to the pipeline, and waiting for end-to-end acknowledgements. Timed-out requests receive a retryable response and release their concurrency permit. Synchronous decompression and decoding cannot be preempted, so a request can exceed this duration.
+			"""
+		default: 30
+		required: false
+		type: uint: {
+			examples: [
+				30
+			]
+			unit: "seconds"
+		}
+	}
 	use_otlp_decoding: {
 		description: """
 			Configuration for OTLP decoding behavior.

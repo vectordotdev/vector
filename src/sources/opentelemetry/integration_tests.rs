@@ -63,6 +63,9 @@ async fn receive_logs_legacy_namespace() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs:
+                crate::sources::opentelemetry::config::default_request_timeout_secs(),
             use_otlp_decoding: false.into(),
         };
 
@@ -163,6 +166,9 @@ async fn receive_trace() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs:
+                crate::sources::opentelemetry::config::default_request_timeout_secs(),
             use_otlp_decoding: false.into(),
         };
 
@@ -269,6 +275,9 @@ async fn receive_metric() {
             },
             acknowledgements: Default::default(),
             log_namespace: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs:
+                crate::sources::opentelemetry::config::default_request_timeout_secs(),
             use_otlp_decoding: false.into(),
         };
 

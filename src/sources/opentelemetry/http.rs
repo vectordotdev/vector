@@ -1,13 +1,19 @@
-use std::{convert::Infallible, net::SocketAddr, time::Duration};
+use std::{
+    convert::Infallible,
+    net::SocketAddr,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use bytes::Bytes;
 use futures_util::FutureExt;
 use http::StatusCode;
-use hyper::{Server, service::make_service_fn};
+use hyper::{Body, Request as HttpRequest, Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
-use tower::ServiceBuilder;
+use tower::{Service, ServiceBuilder};
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -39,7 +45,11 @@ use crate::{
     sources::{
         http_server::HttpConfigParamKind,
         opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
-        util::{add_headers, decompress_body, http::capped_body},
+        util::{
+            add_headers, decompress_body,
+            http::capped_body,
+            request_limiter::{RequestLimiter, RequestLimiterPermit},
+        },
     },
     tls::{MaybeTlsSettings, TlsAcceptorReloader},
 };
@@ -51,6 +61,7 @@ pub(crate) enum ApiError {
 
 impl warp::reject::Reject for ApiError {}
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_http_server(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -58,6 +69,8 @@ pub(crate) async fn run_http_server(
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
+    request_limiter: RequestLimiter,
+    request_timeout: Duration,
 ) -> crate::Result<()> {
     let listener = tls_settings
         .bind_reloadable(&address, tls_reloader)
@@ -78,7 +91,11 @@ pub(crate) async fn run_http_server(
                     conn.peer_addr(),
                 )
             }))
-            .service(warp::service(routes.clone()));
+            .service(HttpRequestLimiterService {
+                inner: warp::service(routes.clone()),
+                request_limiter: request_limiter.clone(),
+                request_timeout,
+            });
         futures_util::future::ok::<_, Infallible>(svc)
     });
 
@@ -88,6 +105,91 @@ pub(crate) async fn run_http_server(
         .await?;
 
     Ok(())
+}
+
+#[derive(Clone)]
+struct HttpRequestLimiterService<S> {
+    inner: S,
+    request_limiter: RequestLimiter,
+    request_timeout: Duration,
+}
+
+impl<S> Service<HttpRequest<Body>> for HttpRequestLimiterService<S>
+where
+    S: Service<HttpRequest<Body>, Response = Response> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Error: Send + 'static,
+{
+    type Response = Response;
+    type Error = S::Error;
+    type Future = futures_util::future::BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, mut request: HttpRequest<Body>) -> Self::Future {
+        if !is_otlp_http_request(&request) {
+            return self.inner.call(request).boxed();
+        }
+
+        match self.request_limiter.try_acquire() {
+            Some(permit) => {
+                let permit = Arc::new(permit);
+                request.extensions_mut().insert(Arc::clone(&permit));
+                let future = self.inner.call(request);
+                let request_timeout = self.request_timeout;
+                async move {
+                    let response = match tokio::time::timeout(request_timeout, future).await {
+                        Ok(response) => return response,
+                        Err(_) => otlp_error_response(
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            tonic::Code::Unavailable,
+                            "request processing timed out",
+                        ),
+                    };
+                    drop(permit);
+                    Ok(response)
+                }
+                .boxed()
+            }
+            None => futures_util::future::ready(Ok(otlp_error_response(
+                StatusCode::TOO_MANY_REQUESTS,
+                tonic::Code::Unavailable,
+                "too many concurrent requests",
+            )))
+            .boxed(),
+        }
+    }
+}
+
+fn is_otlp_http_request(request: &HttpRequest<Body>) -> bool {
+    request.method() == http::Method::POST
+        && matches!(
+            request.uri().path(),
+            "/v1/logs"
+                | "/v1/logs/"
+                | "/v1/metrics"
+                | "/v1/metrics/"
+                | "/v1/traces"
+                | "/v1/traces/"
+        )
+        && request
+            .headers()
+            .get(http::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.eq_ignore_ascii_case("application/x-protobuf"))
+}
+
+fn otlp_error_response(status_code: StatusCode, code: tonic::Code, message: &str) -> Response {
+    let mut response = protobuf(Status {
+        code: code as i32,
+        message: message.into(),
+        ..Default::default()
+    })
+    .into_response();
+    *response.status_mut() = status_code;
+    response
 }
 
 #[allow(clippy::too_many_arguments)] // TODO change to a builder struct
@@ -160,12 +262,17 @@ fn emit_decode_error(error: impl std::fmt::Display) -> ErrorMessage {
     ErrorMessage::new(StatusCode::BAD_REQUEST, message)
 }
 
+struct DecodedEvents {
+    events: Vec<Event>,
+    count: usize,
+}
+
 fn parse_with_deserializer(
     deserializer: &OtlpDeserializer,
     body: Bytes,
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
-) -> Result<Vec<Event>, ErrorMessage> {
+) -> Result<DecodedEvents, ErrorMessage> {
     let events = deserializer
         .parse(body, log_namespace)
         .map(|r| r.into_vec())
@@ -178,7 +285,7 @@ fn parse_with_deserializer(
         events.estimated_json_encoded_size_of(),
     ));
 
-    Ok(events)
+    Ok(DecodedEvents { events, count })
 }
 
 fn build_ingest_filter<Resp, F>(
@@ -193,10 +300,9 @@ where
         + Send
         + Sync
         + 'static
-        + Fn(Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
+        + Fn(Option<String>, HeaderMap, Bytes) -> Result<DecodedEvents, ErrorMessage>,
 {
     let body_filter = capped_body();
-
     warp::post()
         .and(warp::path("v1"))
         .and(warp::path(telemetry_type))
@@ -207,22 +313,32 @@ where
         ))
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::headers_cloned())
+        .and(warp::filters::ext::get::<Arc<RequestLimiterPermit>>())
         .and(body_filter)
         .and_then(
-            move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
+            move |encoding_header: Option<String>,
+                  headers: HeaderMap,
+                  permit: Arc<RequestLimiterPermit>,
+                  body: Bytes| {
                 let events = make_events(encoding_header, headers, body);
-                handle_request(
-                    events,
-                    acknowledgements,
-                    out.clone(),
-                    telemetry_type,
-                    Resp::default(),
-                )
+                let out = out.clone();
+                async move {
+                    handle_request(
+                        events,
+                        acknowledgements,
+                        out,
+                        telemetry_type,
+                        Resp::default(),
+                        permit,
+                    )
+                    .await
+                }
             },
         )
         .boxed()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_warp_log_filter(
     acknowledgements: bool,
     log_namespace: LogNamespace,
@@ -250,9 +366,9 @@ fn build_warp_log_filter(
                 } else {
                     decode_log_body(decoded_body, log_namespace, &events_received)
                 }
-                .map(|mut events| {
-                    enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
-                    events
+                .map(|mut decoded| {
+                    enrich_events(&mut decoded.events, &headers_cfg, &headers, log_namespace);
+                    decoded
                 })
             })
     };
@@ -264,6 +380,7 @@ fn build_warp_log_filter(
         make_events,
     )
 }
+#[allow(clippy::too_many_arguments)]
 fn build_warp_metrics_filter(
     acknowledgements: bool,
     log_namespace: LogNamespace,
@@ -291,9 +408,9 @@ fn build_warp_metrics_filter(
                 } else {
                     decode_metrics_body(decoded_body, &events_received)
                 }
-                .map(|mut events| {
-                    enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
-                    events
+                .map(|mut decoded| {
+                    enrich_events(&mut decoded.events, &headers_cfg, &headers, log_namespace);
+                    decoded
                 })
             })
     };
@@ -337,9 +454,14 @@ fn build_warp_trace_filter(
                 } else {
                     decode_trace_body(decoded_body, &events_received)
                 }
-                .map(|mut events| {
-                    enrich_events(&mut events, &headers_cfg, &headers, LogNamespace::default());
-                    events
+                .map(|mut decoded| {
+                    enrich_events(
+                        &mut decoded.events,
+                        &headers_cfg,
+                        &headers,
+                        LogNamespace::default(),
+                    );
+                    decoded
                 })
             })
     };
@@ -355,7 +477,7 @@ fn build_warp_trace_filter(
 fn decode_trace_body(
     body: Bytes,
     events_received: &Registered<EventsReceived>,
-) -> Result<Vec<Event>, ErrorMessage> {
+) -> Result<DecodedEvents, ErrorMessage> {
     let request = ExportTraceServiceRequest::decode(body).map_err(emit_decode_error)?;
 
     let events: Vec<Event> = request
@@ -364,19 +486,20 @@ fn decode_trace_body(
         .flat_map(|v| v.into_event_iter())
         .collect();
 
+    let count = events.len();
     events_received.emit(CountByteSize(
-        events.len(),
+        count,
         events.estimated_json_encoded_size_of(),
     ));
 
-    Ok(events)
+    Ok(DecodedEvents { events, count })
 }
 
 fn decode_log_body(
     body: Bytes,
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
-) -> Result<Vec<Event>, ErrorMessage> {
+) -> Result<DecodedEvents, ErrorMessage> {
     let request = ExportLogsServiceRequest::decode(body).map_err(emit_decode_error)?;
 
     let events: Vec<Event> = request
@@ -385,18 +508,19 @@ fn decode_log_body(
         .flat_map(|v| v.into_event_iter(log_namespace))
         .collect();
 
+    let count = events.len();
     events_received.emit(CountByteSize(
-        events.len(),
+        count,
         events.estimated_json_encoded_size_of(),
     ));
 
-    Ok(events)
+    Ok(DecodedEvents { events, count })
 }
 
 fn decode_metrics_body(
     body: Bytes,
     events_received: &Registered<EventsReceived>,
-) -> Result<Vec<Event>, ErrorMessage> {
+) -> Result<DecodedEvents, ErrorMessage> {
     let request = ExportMetricsServiceRequest::decode(body).map_err(emit_decode_error)?;
 
     let events: Vec<Event> = request
@@ -405,30 +529,35 @@ fn decode_metrics_body(
         .flat_map(|v| v.into_event_iter())
         .collect();
 
+    let count = events.len();
     events_received.emit(CountByteSize(
-        events.len(),
+        count,
         events.estimated_json_encoded_size_of(),
     ));
 
-    Ok(events)
+    Ok(DecodedEvents { events, count })
 }
 
 async fn handle_request(
-    events: Result<Vec<Event>, ErrorMessage>,
+    events: Result<DecodedEvents, ErrorMessage>,
     acknowledgements: bool,
     mut out: SourceSender,
     output: &str,
     resp: impl Message,
+    permit: Arc<RequestLimiterPermit>,
 ) -> Result<Response, Rejection> {
     match events {
-        Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
-            let count = events.len();
+        Ok(mut decoded) => {
+            permit.decoding_finished(decoded.count);
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut decoded.events);
+            let count = decoded.events.len();
 
-            out.send_batch_named(output, events).await.map_err(|_| {
-                emit!(StreamClosedError { count });
-                warp::reject::custom(ApiError::ServerShutdown)
-            })?;
+            out.send_batch_named(output, decoded.events)
+                .await
+                .map_err(|_| {
+                    emit!(StreamClosedError { count });
+                    warp::reject::custom(ApiError::ServerShutdown)
+                })?;
 
             match receiver {
                 None => Ok(protobuf(resp).into_response()),
@@ -471,5 +600,90 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::In
             reply,
             StatusCode::INTERNAL_SERVER_ERROR,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use hyper::body::HttpBody as _;
+
+    use super::*;
+
+    fn request(uri: &str, body: Body) -> HttpRequest<Body> {
+        HttpRequest::post(uri)
+            .header(http::header::CONTENT_TYPE, "application/x-protobuf")
+            .body(body)
+            .unwrap()
+    }
+
+    #[test]
+    fn identifies_warp_otlp_paths() {
+        for path in [
+            "/v1/logs",
+            "/v1/logs/",
+            "/v1/logs?client=test",
+            "/v1/logs/?client=test",
+            "/v1/metrics",
+            "/v1/metrics/",
+            "/v1/traces",
+            "/v1/traces/",
+        ] {
+            assert!(
+                is_otlp_http_request(&request(path, Body::empty())),
+                "{path}"
+            );
+        }
+
+        for path in [
+            "/v1/logs//",
+            "/v1/logs/extra",
+            "/v1/metrics//",
+            "/v1/traces/extra",
+        ] {
+            assert!(
+                !is_otlp_http_request(&request(path, Body::empty())),
+                "{path}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn stalled_body_times_out_and_releases_permit() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let inner_calls = Arc::clone(&calls);
+        let inner = tower::service_fn(move |request: HttpRequest<Body>| {
+            let calls = Arc::clone(&inner_calls);
+            async move {
+                calls.fetch_add(1, Ordering::Relaxed);
+                request.into_body().collect().await.unwrap().to_bytes();
+                Ok::<_, Infallible>(Response::new(Body::empty()))
+            }
+        });
+        let mut service = HttpRequestLimiterService {
+            inner,
+            request_limiter: RequestLimiter::new(100, 1),
+            request_timeout: Duration::from_millis(10),
+        };
+        let (body_sender, stalled_body) = Body::channel();
+
+        let response = service
+            .call(request("/v1/logs", stalled_body))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let status =
+            Status::decode(response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+        assert_eq!(status.code, tonic::Code::Unavailable as i32);
+        assert_eq!(status.message, "request processing timed out");
+
+        let response = service
+            .call(request("/v1/logs", Body::empty()))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(calls.load(Ordering::Relaxed), 2);
+        drop(body_sender);
     }
 }
