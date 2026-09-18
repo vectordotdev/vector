@@ -9,6 +9,8 @@ use vector_lib::stats::EwmaDefault;
 const EWMA_WEIGHT: f64 = 0.1;
 const MINIMUM_PERMITS: usize = 2;
 
+pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
+
 pub struct RequestLimiterPermit {
     semaphore_permit: Option<OwnedSemaphorePermit>,
     request_limiter_data: Arc<Mutex<RequestLimiterData>>,
