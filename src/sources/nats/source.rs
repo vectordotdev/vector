@@ -116,6 +116,14 @@ pub async fn process_message(
     ProcessingStatus::Success(receiver)
 }
 
+fn ack_deadline(ack_wait: Duration, backoff: &[Duration]) -> Duration {
+    backoff
+        .first()
+        .copied()
+        .filter(|delay| !delay.is_zero())
+        .unwrap_or(ack_wait)
+}
+
 fn ack_progress_interval(ack_wait: Duration) -> Duration {
     if ack_wait.is_zero() {
         Duration::from_secs(1)
@@ -127,21 +135,28 @@ fn ack_progress_interval(ack_wait: Duration) -> Duration {
     }
 }
 
+async fn send_progress(acker: &Acker, ack_wait: Duration) {
+    let mut progress = tokio::time::interval(ack_progress_interval(ack_wait));
+    loop {
+        progress.tick().await;
+        if let Err(error) = acker.ack_with(AckKind::Progress).await {
+            error!(
+                message = "Failed to extend JetStream message acknowledgement deadline.",
+                %error
+            );
+        }
+    }
+}
+
 async fn wait_for_delivery(
     acker: &Acker,
     receiver: &mut BatchStatusReceiver,
     ack_wait: Duration,
 ) -> BatchStatus {
-    let mut progress = tokio::time::interval(ack_progress_interval(ack_wait));
-
-    loop {
-        tokio::select! {
-            status = &mut *receiver => return status,
-            _ = progress.tick() => {
-                if let Err(err) = acker.ack_with(AckKind::Progress).await {
-                    error!(message = "Failed to extend JetStream message acknowledgement deadline.", %err);
-                }
-            }
+    tokio::select! {
+        status = &mut *receiver => status,
+        () = send_progress(acker, ack_wait) => {
+            unreachable!("progress acknowledgements never complete");
         }
     }
 }
@@ -190,7 +205,7 @@ pub(crate) async fn create_consumer_stream(
             policy: consumer_config.ack_policy,
         });
     }
-    let ack_wait = consumer_config.ack_wait;
+    let ack_wait = ack_deadline(consumer_config.ack_wait, &consumer_config.backoff);
     let messages = consumer
         .stream()
         .max_messages_per_batch(js_config.batch_config.batch)
@@ -248,16 +263,20 @@ pub async fn run_nats_jetstream(
                             backoff.reset();
                             bytes_received.emit(ByteSize(msg.payload.len()));
 
-                            let status = process_message(
-                                &msg,
-                                &config,
-                                &decoder,
-                                log_namespace,
-                                &mut out,
-                                &events_received,
-                                acknowledgements,
-                            )
-                            .await;
+                            let status = tokio::select! {
+                                status = process_message(
+                                    &msg,
+                                    &config,
+                                    &decoder,
+                                    log_namespace,
+                                    &mut out,
+                                    &events_received,
+                                    acknowledgements,
+                                ) => status,
+                                () = send_progress(&acker, ack_wait) => {
+                                    unreachable!("progress acknowledgements never complete");
+                                }
+                            };
 
                             match status {
                                 ProcessingStatus::Success(Some(receiver)) => {
@@ -398,4 +417,43 @@ pub async fn create_subscription(
     let subscription = subscription.context(SubscribeSnafu)?;
 
     Ok((nc, subscription))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{ack_deadline, ack_progress_interval};
+
+    #[test]
+    fn ack_deadline_prefers_first_backoff() {
+        assert_eq!(
+            ack_deadline(Duration::from_secs(30), &[Duration::from_millis(100)]),
+            Duration::from_millis(100)
+        );
+    }
+
+    #[test]
+    fn ack_deadline_ignores_zero_backoff() {
+        assert_eq!(
+            ack_deadline(Duration::from_secs(30), &[Duration::ZERO]),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn ack_deadline_uses_ack_wait_without_backoff() {
+        assert_eq!(
+            ack_deadline(Duration::from_secs(30), &[]),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn ack_progress_interval_is_half_deadline() {
+        assert_eq!(
+            ack_progress_interval(Duration::from_millis(100)),
+            Duration::from_millis(50)
+        );
+    }
 }

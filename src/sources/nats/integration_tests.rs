@@ -648,6 +648,74 @@ async fn nats_jetstream_keeps_ack_progress_while_output_is_blocked() {
 }
 
 #[tokio::test]
+async fn nats_jetstream_uses_consumer_backoff_for_ack_progress() {
+    let (subject, stream_name, consumer_name) = random_jetstream_id("test_js_backoff_progress");
+    let url = std::env::var("NATS_JETSTREAM_ADDRESS")
+        .unwrap_or_else(|_| "nats://localhost:4222".to_string());
+
+    let client = async_nats::connect(&url).await.unwrap();
+    let js = async_nats::jetstream::new(client);
+    let stream = js
+        .get_or_create_stream(async_nats::jetstream::stream::Config {
+            name: stream_name.clone(),
+            subjects: vec![subject.clone()],
+            storage: StorageType::Memory,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let mut consumer = stream
+        .create_consumer(async_nats::jetstream::consumer::pull::Config {
+            durable_name: Some(consumer_name.clone()),
+            ack_wait: Duration::from_secs(30),
+            backoff: vec![Duration::from_millis(100)],
+            max_deliver: 2,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    js.publish(subject.clone(), "backoff progress".into())
+        .await
+        .unwrap()
+        .await
+        .unwrap();
+
+    let mut conf = generate_source_config(&url, &subject);
+    conf.jetstream = Some(JetStreamConfig {
+        stream: stream_name,
+        consumer: consumer_name,
+        ..Default::default()
+    });
+    conf.acknowledgements = true.into();
+
+    let events = assert_source_compliance(&SOURCE_TAGS, async move {
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let mut cx = SourceContext::new_test(tx, None);
+        cx.acknowledgements = true;
+        tokio::spawn(conf.build(cx).await.unwrap());
+        sleep(Duration::from_millis(250)).await;
+        collect_n(rx, 1).await
+    })
+    .await;
+
+    assert_eq!(events.len(), 1);
+
+    timeout(Duration::from_secs(5), async {
+        loop {
+            let info = consumer.info().await.unwrap();
+            if info.num_ack_pending == 0 {
+                assert_eq!(info.num_redelivered, 0);
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("JetStream message was redelivered despite progress acknowledgements.");
+}
+
+#[tokio::test]
 async fn nats_jetstream_requires_explicit_ack_policy() {
     let (subject, stream_name, consumer_name) = random_jetstream_id("test_js_ack_policy");
     let url = std::env::var("NATS_JETSTREAM_ADDRESS")
