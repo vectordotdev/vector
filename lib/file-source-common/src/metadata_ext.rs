@@ -149,12 +149,6 @@ pub fn cvt(result: i32) -> std::io::Result<usize> {
     if result < 0 {
         Err(std::io::Error::from_raw_os_error(-result))
     } else {
-        // The negative case is handled above; Windows pointer widths are at least 32 bits.
-        #[expect(
-            clippy::cast_sign_loss,
-            reason = "The result is nonnegative in this branch"
-        )]
-        let result = result as usize;
-        Ok(result)
+        Ok(result.unsigned_abs() as usize)
     }
 }
