@@ -9,7 +9,7 @@ use std::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use file_source_common::{
-    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom, TaskSet,
+    FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
     checkpointer::{Checkpointer, CheckpointsView},
 };
 use futures::{
@@ -23,6 +23,7 @@ use tokio::{
     time::sleep,
 };
 
+use tokio_util::task::JoinMap;
 use tracing::{debug, error, info, trace};
 
 use crate::{
@@ -240,7 +241,7 @@ where
 
             // Cleanup the known_small_files
             if let Some(grace_period) = self.remove_after {
-                let mut set = TaskSet::new();
+                let mut set = JoinMap::new();
 
                 known_small_files
                     .iter()
