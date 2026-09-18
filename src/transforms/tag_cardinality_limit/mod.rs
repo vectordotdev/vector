@@ -1,4 +1,8 @@
-use std::{future::ready, pin::Pin};
+use std::{
+    future::ready,
+    pin::Pin,
+    time::{Duration, Instant},
+};
 
 use futures::{Stream, StreamExt};
 use hashbrown::HashMap;
@@ -25,6 +29,11 @@ use tag_value_set::AcceptedTagValueSet;
 use crate::event::metric::TagValueSet;
 
 type MetricId = (Option<String>, String);
+
+/// Minimum gap between full exact-TTL purges during `max_tracked_keys` reclaim.
+/// Cap misses between windows still inspect bucket lengths via the cheap
+/// `maybe_sweep` path, so empty buckets can be freed without scanning every map.
+const RECLAIM_FULL_PURGE_INTERVAL: Duration = Duration::from_secs(1);
 
 /// Replaces the bloom filter size in a `Probabilistic` mode with the override. No-op when
 /// `override_size` is `None`.
@@ -64,6 +73,10 @@ pub struct TagCardinalityLimit {
     /// Total count of currently-tracked (metric_bucket, tag_key) pairs.
     /// Used to enforce `config.max_tracked_keys`.
     tracked_keys_count: usize,
+    /// Last time `reclaim_empty_buckets` ran a full exact-TTL purge across all
+    /// buckets. Used to amortize O(total cached values) scans under sustained
+    /// `max_tracked_keys` pressure.
+    last_full_reclaim: Option<Instant>,
 }
 
 impl TagCardinalityLimit {
@@ -72,6 +85,7 @@ impl TagCardinalityLimit {
             config,
             accepted_tags: HashMap::new(),
             tracked_keys_count: 0,
+            last_full_reclaim: None,
         }
     }
 
@@ -91,6 +105,74 @@ impl TagCardinalityLimit {
         emit!(TagCardinalityTrackedKeys {
             count: self.tracked_keys_count,
         });
+    }
+
+    /// Drop empty `AcceptedTagValueSet` buckets left behind by TTL eviction,
+    /// decrementing `tracked_keys_count` so freed slots can be reused under
+    /// `max_tracked_keys`. Called lazily on cap-hit paths so steady-state
+    /// overhead is zero.
+    ///
+    /// Full exact-TTL purges (`len_reclaiming`) are rate-limited: under
+    /// sustained key churn with no empty buckets, scanning every map on every
+    /// miss would be O(total cached values) repeatedly. Between full purges we
+    /// still consult ordinary `len()` (periodic `maybe_sweep`), which frees
+    /// buckets that the sweep has already emptied.
+    ///
+    /// Intentionally empty `value_limit: 0` buckets are kept: they enforce that
+    /// every value for that tag is rejected without storing state.
+    fn reclaim_empty_buckets(&mut self) {
+        let now = Instant::now();
+        let full_purge = match self.last_full_reclaim {
+            Some(last) if now.duration_since(last) < RECLAIM_FULL_PURGE_INTERVAL => false,
+            _ => {
+                self.last_full_reclaim = Some(now);
+                true
+            }
+        };
+
+        let mut reclaimed = 0usize;
+        let empty_buckets: Vec<(Option<MetricId>, String)> = self
+            .accepted_tags
+            .iter_mut()
+            .flat_map(|(metric_key, inner)| {
+                inner.iter_mut().filter_map(|(tag_key, set)| {
+                    let live = if full_purge {
+                        set.len_reclaiming()
+                    } else {
+                        set.len()
+                    };
+                    if live != 0 {
+                        return None;
+                    }
+                    Some((metric_key.clone(), tag_key.clone()))
+                })
+            })
+            .collect();
+
+        let keys_to_drop: Vec<_> = empty_buckets
+            .into_iter()
+            .filter(|(metric_key, tag_key)| {
+                !matches!(
+                    self.get_config_for_metric_tag(metric_key.as_ref(), tag_key),
+                    TagSettings::Tracked(cfg) if cfg.value_limit == 0
+                )
+            })
+            .collect();
+
+        for (metric_key, tag_key) in keys_to_drop {
+            if let Some(inner) = self.accepted_tags.get_mut(&metric_key)
+                && inner.remove(&tag_key).is_some()
+            {
+                reclaimed += 1;
+            }
+        }
+        self.accepted_tags.retain(|_, inner| !inner.is_empty());
+        if reclaimed > 0 {
+            self.tracked_keys_count = self.tracked_keys_count.saturating_sub(reclaimed);
+            emit!(TagCardinalityTrackedKeys {
+                count: self.tracked_keys_count,
+            });
+        }
     }
 
     /// Resolve the configuration that applies to a specific (metric, tag) pair.
@@ -131,6 +213,11 @@ impl TagCardinalityLimit {
         let limit_exceeded_action = per_metric.config.limit_exceeded_action;
         let metric_value_limit = per_metric.config.value_limit;
         let internal_metrics = per_metric.config.internal_metrics;
+        // Per-metric TTL is a *full override* of the global TTL for this metric:
+        // unset (`None`) means "no TTL for this metric" rather than "inherit from
+        // global", mirroring how per-metric `value_limit` shadows the global value.
+        let ttl_secs = per_metric.config.ttl_secs;
+        let ttl_generations = per_metric.config.ttl_generations;
 
         // Per-tag entry: LimitOverride uses an explicit value_limit (and optional
         // cache_size_per_key override); Excluded opts the tag out. All other settings
@@ -147,6 +234,8 @@ impl TagCardinalityLimit {
                         limit_exceeded_action,
                         mode: apply_cache_size_override(metric_mode, cache_size_per_key),
                         internal_metrics,
+                        ttl_secs,
+                        ttl_generations,
                     });
                 }
             }
@@ -156,6 +245,8 @@ impl TagCardinalityLimit {
             limit_exceeded_action,
             mode: metric_mode,
             internal_metrics,
+            ttl_secs,
+            ttl_generations,
         })
     }
 
@@ -222,23 +313,43 @@ impl TagCardinalityLimit {
 
         if !pair_exists {
             if !self.can_allocate_new_key() {
-                return AcceptResult::Untracked;
+                // TTL may have emptied buckets that still count against `max_tracked_keys`.
+                self.reclaim_empty_buckets();
+                if !self.can_allocate_new_key() {
+                    return AcceptResult::Untracked;
+                }
             }
             self.record_new_key_allocation();
         }
 
         let metric_accepted_tags = self.accepted_tags.entry(metric_key_owned).or_default();
-        let tag_value_set = metric_accepted_tags
-            .entry_ref(key)
-            .or_insert_with(|| AcceptedTagValueSet::new(&config.mode));
+        let tag_value_set = metric_accepted_tags.entry_ref(key).or_insert_with(|| {
+            AcceptedTagValueSet::new(&config.mode, config.ttl_secs, config.ttl_generations)
+        });
 
-        if tag_value_set.contains(value) {
-            // Tag value has already been accepted, nothing more to do.
+        // A rolling-bloom refresh can re-seed a retained value into the newest
+        // shard and thereby fill the summed slot budget. Detect that uncommon
+        // transition inside the storage backend so other modes do not pay for
+        // extra `len()` calls on every lookup.
+        let (already_tracked, reached_limit) =
+            tag_value_set.contains_with_limit_transition(value, config.value_limit);
+        if already_tracked {
+            if reached_limit {
+                emit!(TagCardinalityValueLimitReached { key });
+            }
             return AcceptResult::Tracked;
         }
 
+        // Ordinary `len` stays O(1) between exact-TTL sweeps. Only when the
+        // approximate count says we are full do we purge lapsed entries and
+        // re-check, so filling `value_limit` is O(N) rather than O(N²).
+        let mut live = tag_value_set.len();
+        if live >= config.value_limit {
+            live = tag_value_set.len_reclaiming();
+        }
+
         // Tag value not yet part of the accepted set.
-        if tag_value_set.len() < config.value_limit {
+        if live < config.value_limit {
             // accept the new value
             tag_value_set.insert(value.clone());
 
@@ -255,8 +366,12 @@ impl TagCardinalityLimit {
 
     /// Checks if recording a key and value corresponding to a tag on an incoming Metric would
     /// exceed the cardinality limit.
+    ///
+    /// Note: takes `&mut self` because TTL-enabled backends (`TtlSet`,
+    /// `RollingBloom`) perform lazy sweep/rotation inside `contains`/`len`.
+    /// The non-TTL backends are still effectively read-only here.
     fn tag_limit_exceeded(
-        &self,
+        &mut self,
         metric_key: Option<&MetricId>,
         key: &str,
         value: &TagValueSet,
@@ -265,22 +380,38 @@ impl TagCardinalityLimit {
             TagSettings::Excluded => return false,
             TagSettings::Tracked(inner) => inner,
         };
-        match self
+
+        if let Some(value_set) = self
             .accepted_tags
-            .get(&metric_key.cloned())
-            .and_then(|metric_accepted_tags| metric_accepted_tags.get(key))
+            .get_mut(&metric_key.cloned())
+            .and_then(|metric_accepted_tags| metric_accepted_tags.get_mut(key))
         {
-            // Already accepted — never exceeds.
-            Some(value_set) if value_set.contains(value) => false,
-            // Adding this value would push us at or past the configured cap. Treat a
-            // missing bucket as an empty set so `value_limit: 0` correctly rejects
-            // the first occurrence too — but only when the (metric, tag) pair would
-            // actually be tracked. If `max_tracked_keys` is exhausted, `record_tag_value`
-            // will pass the tag through unchecked and emit `TagCardinalityLimitUntracked`,
-            // so we must not pre-empt that path by reporting the limit as exceeded here.
-            Some(value_set) => value_set.len() >= resolved.value_limit,
-            None => resolved.value_limit == 0 && self.can_allocate_new_key(),
+            // Non-refreshing: `DropEvent` may still reject this event on
+            // a later tag; refresh happens on the accept path via
+            // `record_tag_value`.
+            return if value_set.contains_no_refresh(value) {
+                false
+            } else {
+                let mut live = value_set.len();
+                if live >= resolved.value_limit {
+                    live = value_set.len_reclaiming();
+                }
+                live >= resolved.value_limit
+            };
         }
+
+        // Missing bucket: only `value_limit == 0` can flag the first
+        // sighting as exceeded; every other limit fits an empty set.
+        if resolved.value_limit != 0 {
+            return false;
+        }
+        // Mirror `record_tag_value`'s capacity view: reclaim empty TTL
+        // buckets first so we don't pass-through-untracked here and let
+        // the record path silently admit a value that should be rejected.
+        if !self.can_allocate_new_key() {
+            self.reclaim_empty_buckets();
+        }
+        self.can_allocate_new_key()
     }
 
     /// Record an accepted tag value (mutation-only, no limit check). Used by the `DropEvent`
@@ -309,7 +440,11 @@ impl TagCardinalityLimit {
 
         if !pair_exists {
             if !self.can_allocate_new_key() {
-                return true;
+                // See `try_accept_tag` for rationale.
+                self.reclaim_empty_buckets();
+                if !self.can_allocate_new_key() {
+                    return true;
+                }
             }
             self.record_new_key_allocation();
         }
@@ -317,7 +452,9 @@ impl TagCardinalityLimit {
         let metric_accepted_tags = self.accepted_tags.entry(metric_key_owned).or_default();
         metric_accepted_tags
             .entry_ref(key)
-            .or_insert_with(|| AcceptedTagValueSet::new(&config.mode))
+            .or_insert_with(|| {
+                AcceptedTagValueSet::new(&config.mode, config.ttl_secs, config.ttl_generations)
+            })
             .insert(value.clone());
         false
     }
