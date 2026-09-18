@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex, PoisonError},
+    time::Duration,
+};
 use tokio::time::interval;
 use tokio_stream::{wrappers::IntervalStream, StreamExt};
 use vector_common::shutdown::ShutdownSignal;
@@ -8,7 +12,6 @@ use vrl::{
     value,
 };
 
-use arc_swap::ArcSwap;
 use vector_core::{event::Metric, metrics::Controller};
 
 #[derive(Debug)]
@@ -45,9 +48,7 @@ impl DiagnosticMessage for Error {
 
 #[derive(Debug, Default, Clone)]
 pub struct MetricsStorage {
-    // Made pub only for vrl-test module
-    #[doc(hidden)]
-    pub cache: Arc<ArcSwap<Vec<Metric>>>,
+    cache: Arc<Mutex<Arc<[Metric]>>>,
 }
 
 impl MetricsStorage {
@@ -56,16 +57,14 @@ impl MetricsStorage {
         metric: &str,
         tags: BTreeMap<String, String>,
     ) -> Option<Metric> {
-        self.cache
-            .load()
+        self.metrics()
             .iter()
             .find(|m| m.name() == metric && tags.iter().all(|tag| tag_matches(m, tag)))
             .cloned()
     }
 
     pub(crate) fn find_metrics(&self, metric: &str, tags: BTreeMap<String, String>) -> Vec<Metric> {
-        self.cache
-            .load()
+        self.metrics()
             .iter()
             .filter(|m| m.name() == metric && tags.iter().all(|tag| tag_matches(m, tag)))
             .cloned()
@@ -76,7 +75,17 @@ impl MetricsStorage {
         let new_metrics = Controller::get()
             .expect("metrics not initialized")
             .capture_metrics();
-        self.cache.store(new_metrics.into());
+        self.set_metrics(new_metrics.into());
+    }
+
+    /// Replace the cached metrics. Exposed for the VRL test crate.
+    #[doc(hidden)]
+    pub fn set_metrics(&self, metrics: Arc<[Metric]>) {
+        *self.cache.lock().unwrap_or_else(PoisonError::into_inner) = metrics;
+    }
+
+    fn metrics(&self) -> Arc<[Metric]> {
+        Arc::clone(&self.cache.lock().unwrap_or_else(PoisonError::into_inner))
     }
 
     pub async fn run_periodic_refresh(
@@ -280,7 +289,7 @@ mod tests {
     #[test]
     fn test_get_vector_metric() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![Metric::new(
                 "test",
                 MetricKind::Absolute,
@@ -304,7 +313,7 @@ mod tests {
     #[test]
     fn test_find_vector_metrics() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",
@@ -354,7 +363,7 @@ mod tests {
     #[test]
     fn test_get_vector_metric_by_tag() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",
@@ -393,7 +402,7 @@ mod tests {
     #[test]
     fn test_find_vector_metrics_wildcard() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",
@@ -450,7 +459,7 @@ mod tests {
     #[test]
     fn test_find_vector_metrics_wildcard_start() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",
@@ -510,7 +519,7 @@ mod tests {
     #[test]
     fn test_find_vector_metrics_wildcard_end() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",
@@ -570,7 +579,7 @@ mod tests {
     #[test]
     fn test_find_vector_metrics_wildcard_middle() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",
@@ -630,7 +639,7 @@ mod tests {
     #[test]
     fn test_aggregate_vector_metrics_sum() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",
@@ -678,7 +687,7 @@ mod tests {
     #[test]
     fn test_aggregate_vector_metrics_avg() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",
@@ -726,7 +735,7 @@ mod tests {
     #[test]
     fn test_aggregate_vector_metrics_max() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",
@@ -774,7 +783,7 @@ mod tests {
     #[test]
     fn test_aggregate_vector_metrics_min() {
         let storage = MetricsStorage::default();
-        storage.cache.store(
+        storage.set_metrics(
             vec![
                 Metric::new(
                     "test",

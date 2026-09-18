@@ -3,11 +3,10 @@ use std::{
     future::Future,
     net::SocketAddr,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, Mutex, PoisonError},
     task::{Context, Poll},
 };
 
-use arc_swap::ArcSwap;
 use futures::{FutureExt, Stream, future::BoxFuture, stream};
 use ipnet::IpNet;
 use openssl::{
@@ -72,7 +71,7 @@ impl MaybeTlsSettings {
         let acceptor = match (self, reloader) {
             (Self::Raw(()), _) => None,
             (Self::Tls(_), Some(reloader)) => Some(reloader.shared()),
-            (Self::Tls(tls), None) => Some(Arc::new(ArcSwap::from_pointee(tls.acceptor()?))),
+            (Self::Tls(tls), None) => Some(Arc::new(Mutex::new(Arc::new(tls.acceptor()?)))),
         };
 
         Ok(MaybeTlsListener {
@@ -86,7 +85,7 @@ impl MaybeTlsSettings {
 
 pub struct MaybeTlsListener {
     listener: TcpListener,
-    acceptor: Option<Arc<ArcSwap<SslAcceptor>>>,
+    acceptor: Option<Arc<Mutex<Arc<SslAcceptor>>>>,
     origin_filter: Option<Vec<IpNet>>,
     keepalive: Option<TcpKeepaliveConfig>,
 }
@@ -112,9 +111,13 @@ impl MaybeTlsListener {
         let listener = MaybeTlsIncomingStream::new(
             stream,
             peer_addr,
-            self.acceptor
-                .as_ref()
-                .map(|accptr| accptr.load().as_ref().clone()),
+            self.acceptor.as_ref().map(|acceptor| {
+                acceptor
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .as_ref()
+                    .clone()
+            }),
         );
 
         if let Some(origin_filter) = &self.origin_filter {

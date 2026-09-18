@@ -3,7 +3,7 @@ use vector_vrl_metrics::MetricsStorage;
 
 pub(crate) fn test_vrl_metrics_storage() -> MetricsStorage {
     let storage = MetricsStorage::default();
-    storage.cache.store(
+    storage.set_metrics(
         vec![
             Metric::new(
                 "utilization",

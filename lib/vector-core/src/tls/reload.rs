@@ -7,9 +7,8 @@
 //! connection then handshakes with the latest acceptor while in-flight connections keep what they
 //! negotiated.
 
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, Mutex, PoisonError, Weak};
 
-use arc_swap::ArcSwap;
 use openssl::ssl::SslAcceptor;
 
 use super::{MaybeTlsSettings, TlsSettings};
@@ -20,26 +19,27 @@ use super::{MaybeTlsSettings, TlsSettings};
 /// established keep whatever they negotiated at handshake time.
 #[derive(Clone)]
 pub struct TlsAcceptorReloader {
-    acceptor: Arc<ArcSwap<SslAcceptor>>,
+    acceptor: Arc<Mutex<Arc<SslAcceptor>>>,
 }
 
 impl TlsAcceptorReloader {
     /// Wrap an initial acceptor in a swappable cell.
     pub(super) fn new(acceptor: SslAcceptor) -> Self {
         Self {
-            acceptor: Arc::new(ArcSwap::from_pointee(acceptor)),
+            acceptor: Arc::new(Mutex::new(Arc::new(acceptor))),
         }
     }
 
     /// The shared cell the bound listener reads from on each accept.
-    pub(super) fn shared(&self) -> Arc<ArcSwap<SslAcceptor>> {
+    pub(super) fn shared(&self) -> Arc<Mutex<Arc<SslAcceptor>>> {
         Arc::clone(&self.acceptor)
     }
 
     /// Swap in a freshly built acceptor from `settings`. New connections pick it up
     /// immediately; the previous acceptor is dropped once its last in-flight handshake completes.
     pub fn reload(&self, settings: &TlsSettings) -> crate::tls::Result<()> {
-        self.acceptor.store(Arc::new(settings.acceptor()?));
+        let acceptor = Arc::new(settings.acceptor()?);
+        *self.acceptor.lock().unwrap_or_else(PoisonError::into_inner) = acceptor;
         Ok(())
     }
 
@@ -54,7 +54,7 @@ impl TlsAcceptorReloader {
 /// A non-owning handle to a served TLS acceptor, obtained from [`TlsAcceptorReloader::downgrade`].
 #[derive(Clone)]
 pub struct WeakTlsAcceptorReloader {
-    acceptor: Weak<ArcSwap<SslAcceptor>>,
+    acceptor: Weak<Mutex<Arc<SslAcceptor>>>,
 }
 
 impl WeakTlsAcceptorReloader {
