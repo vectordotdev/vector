@@ -6076,7 +6076,6 @@ dependencies = [
  "bytes",
  "chrono",
  "criterion",
- "dashmap",
  "file-source-common",
  "futures",
  "glob",

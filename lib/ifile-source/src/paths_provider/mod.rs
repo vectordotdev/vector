@@ -14,7 +14,6 @@ pub use glob::MatchOptions as GlobMatchOptions;
 pub mod notify;
 
 use std::future::Future;
-use std::pin::Pin;
 
 /// Represents the ability to enumerate paths.
 ///
@@ -28,6 +27,5 @@ pub trait PathsProvider {
     type IntoIter: IntoIterator<Item = PathBuf>;
 
     /// Provides a set of paths asynchronously.
-    fn paths(&self, should_glob: bool)
-        -> Pin<Box<dyn Future<Output = Self::IntoIter> + Send + '_>>;
+    fn paths(&mut self, should_glob: bool) -> impl Future<Output = Self::IntoIter> + Send;
 }
