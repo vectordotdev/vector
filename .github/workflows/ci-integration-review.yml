@@ -205,7 +205,8 @@ jobs:
             "datadog-metrics",
             "opentelemetry-logs",
             "opentelemetry-metrics",
-            "opentelemetry-metrics-native"
+            "opentelemetry-metrics-native",
+            "opentelemetry-traces"
           ]
     steps:
       - name: Evaluate run condition
