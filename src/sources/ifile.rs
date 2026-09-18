@@ -621,7 +621,6 @@ pub fn ifile_source(
         ignore_before,
         max_line_bytes: config.max_line_bytes,
         line_delimiter: line_delimiter_as_bytes,
-        data_dir,
         fingerprinter: Fingerprinter::new(
             config.fingerprint.clone().into(),
             config.max_line_bytes,
