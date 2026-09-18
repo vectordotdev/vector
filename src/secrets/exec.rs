@@ -119,7 +119,7 @@ impl SecretBackend for ExecBackend {
     async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
-        signal_rx: &mut signal::SignalRx,
+        signal_rx: &mut tokio::sync::watch::Receiver<signal::ShutdownState>,
     ) -> crate::Result<HashMap<String, String>> {
         let mut output = query_backend(
             &self.command,
@@ -154,7 +154,7 @@ async fn query_backend(
     cmd: &[String],
     query: ExecQuery,
     timeout: u64,
-    signal_rx: &mut signal::SignalRx,
+    signal_rx: &mut tokio::sync::watch::Receiver<signal::ShutdownState>,
 ) -> crate::Result<HashMap<String, ExecResponse>> {
     let command = &cmd[0];
     let mut command = Command::new(command);
@@ -188,7 +188,7 @@ async fn query_backend(
     loop {
         tokio::select! {
             biased;
-            Ok(signal::SignalTo::Shutdown(_) | signal::SignalTo::Quit) = signal_rx.recv() => {
+            _ = signal::wait_for_shutdown(signal_rx) => {
                 drop(command);
                 return Err("Secret retrieval was interrupted.".into());
             }
@@ -224,12 +224,12 @@ mod tests {
     };
 
     use rstest::rstest;
-    use tokio::sync::broadcast;
     use vrl::value;
 
     use crate::{
         config::SecretBackend,
         secrets::exec::{ExecBackend, ExecVersion},
+        signal::SignalHandler,
     };
 
     fn make_test_backend(protocol: ExecVersion) -> ExecBackend {
@@ -255,7 +255,8 @@ mod tests {
     )]
     async fn test_exec_backend(protocol: ExecVersion) {
         let mut backend = make_test_backend(protocol);
-        let (_tx, mut rx) = broadcast::channel(1);
+        let (handler, _reloads, _shutdown) = SignalHandler::new();
+        let mut rx = handler.shutdown.subscribe();
         // These fake secrets are statically contained in mock_secrets_exec.py
         let fake_secret_values: HashMap<String, String> = [
             ("fake_secret_1", "123456"),
@@ -283,7 +284,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_exec_backend_missing_secrets() {
         let mut backend = make_test_backend(ExecVersion::V1);
-        let (_tx, mut rx) = broadcast::channel(1);
+        let (handler, _reloads, _shutdown) = SignalHandler::new();
+        let mut rx = handler.shutdown.subscribe();
         let query_secrets: HashSet<String> =
             ["fake_secret_900"].into_iter().map(String::from).collect();
         let fetched_keys = backend.retrieve(query_secrets.clone(), &mut rx).await;

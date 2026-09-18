@@ -173,7 +173,7 @@ fn poll_http(
     proxy: ProxyConfig,
     config_format: Format,
     interpolate_env: bool,
-) -> impl Stream<Item = signal::SignalTo> {
+) -> impl Stream<Item = signal::ReloadSignal> {
     let duration = time::Duration::from_secs(poll_interval_secs);
     let mut interval = time::interval_at(time::Instant::now() + duration, duration);
 
@@ -182,7 +182,7 @@ fn poll_http(
             interval.tick().await;
 
             match http_request_to_config_builder(&url, tls_options.as_ref(), &headers, &proxy, &config_format, interpolate_env).await {
-                Ok(config_builder) => yield signal::SignalTo::ReloadFromConfigBuilder(config_builder),
+                Ok(config_builder) => yield signal::ReloadSignal::ConfigBuilder(config_builder),
                 Err(_) => {},
             };
 
