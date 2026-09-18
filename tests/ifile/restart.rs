@@ -33,6 +33,7 @@ async fn abrupt_restart_replays_only_since_checkpoint_without_loss() -> vector::
     let fixture = Fixture::new()?;
     let committed = records("committed", 3);
     let pending = records("pending", 100);
+    let unread = records("after-crash", 10);
     let options = json!({"checkpoint_interval": 3_600_000, "max_read_bytes": 1});
     fixture.write("active.log", &committed)?;
     let mut run = fixture.start("*.log", options.clone())?;
@@ -45,14 +46,19 @@ async fn abrupt_restart_replays_only_since_checkpoint_without_loss() -> vector::
     let mut run = fixture.start("*.log", options.clone())?;
     run.wait_count(3).await?;
     let interrupted = run.stop(Signal::SIGKILL).await?.messages;
-    assert!(!interrupted.is_empty() && interrupted.len() < pending.len());
+    assert!(!interrupted.is_empty() && interrupted.len() <= pending.len());
     assert_eq!(interrupted, pending[..interrupted.len()]);
     assert_eq!(fixture.checkpoint_position()?, offset);
+
+    // Append while Vector is stopped so unread data does not depend on how
+    // quickly the process handles SIGKILL after we observe its output.
+    fixture.append("active.log", &unread)?;
+    let expected = [pending, unread].concat();
 
     // Documented guarantee: an abrupt stop can replay uncheckpointed data.
     // Require every pending record, but no replay from before the durable checkpoint.
     let mut run = fixture.start("*.log", options)?;
-    run.wait_count(pending.len()).await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, pending);
+    run.wait_count(expected.len()).await?;
+    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
     Ok(())
 }
