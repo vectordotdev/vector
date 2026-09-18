@@ -3140,6 +3140,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "convert_case"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1af709f1f33454bf52eadfc8c78b3b9ef9cb26fb54d16dc9cd9a7299f899fd1b"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "cookie"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3722,6 +3731,14 @@ dependencies = [
  "tonic-prost-build",
  "tonic-types",
  "tracing 0.1.44",
+]
+
+[[package]]
+name = "datadog-proto"
+version = "0.1.0"
+dependencies = [
+ "prost 0.12.6",
+ "prost-build 0.12.6",
 ]
 
 [[package]]
@@ -13285,7 +13302,7 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "clap_complete",
- "convert_case 0.10.0",
+ "convert_case 0.12.0",
  "directories",
  "git2",
  "glob",
@@ -13370,6 +13387,7 @@ dependencies = [
  "cuckoo-clock",
  "databend-client",
  "databricks-zerobus-ingest-sdk",
+ "datadog-proto",
  "deadpool 0.13.1",
  "derivative",
  "derive_more",
@@ -13660,7 +13678,7 @@ dependencies = [
 name = "vector-config-common"
 version = "0.1.0"
 dependencies = [
- "convert_case 0.10.0",
+ "convert_case 0.12.0",
  "darling 0.24.1",
  "proc-macro2 1.0.107",
  "quote 1.0.47",
