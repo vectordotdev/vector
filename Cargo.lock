@@ -13730,6 +13730,7 @@ dependencies = [
  "indexmap 2.14.2",
  "inventory",
  "ipnet",
+ "jiff",
  "metrics",
  "metrics-tracing-context",
  "metrics-util",

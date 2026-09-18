@@ -46,6 +46,7 @@ impl TransformConfig for FilterConfig {
         Ok(Transform::function(Filter::new(self.condition.build(
             &context.enrichment_tables,
             &context.metrics_storage,
+            context.globals.timezone(),
         )?)))
     }
 

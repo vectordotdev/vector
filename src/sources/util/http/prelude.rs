@@ -128,7 +128,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
         let auth_matcher = auth
-            .map(|a| a.build(&cx.enrichment_tables, &cx.metrics_storage))
+            .map(|a| {
+                a.build(
+                    &cx.enrichment_tables,
+                    &cx.metrics_storage,
+                    cx.globals.timezone(),
+                )
+            })
             .transpose()?;
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(acknowledgements);

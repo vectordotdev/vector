@@ -5,7 +5,7 @@ use vector_core::{
     compile_vrl,
     config::{DataType, LogNamespace},
     event::{Event, MetricTagMode, TargetEvents, VrlTarget},
-    schema,
+    schema, validate_timezone,
 };
 use vrl::{
     compiler::{CompileConfig, Program, TimeZone, TypeState, runtime::Runtime, state::ExternalEnv},
@@ -62,11 +62,15 @@ impl VrlDeserializerConfig {
             &state,
             CompileConfig::default(),
         ) {
-            Ok(result) => Ok(VrlDeserializer {
-                program: result.program,
-                timezone: self.vrl.timezone.unwrap_or(TimeZone::Local),
-                metadata_template: None,
-            }),
+            Ok(result) => {
+                let timezone = self.vrl.timezone.unwrap_or(TimeZone::Local);
+                validate_timezone(timezone)?;
+                Ok(VrlDeserializer {
+                    program: result.program,
+                    timezone,
+                    metadata_template: None,
+                })
+            }
             Err(diagnostics) => Err(Formatter::new(&self.vrl.source, diagnostics)
                 .to_string()
                 .into()),

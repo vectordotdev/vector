@@ -186,7 +186,13 @@ impl TransformConfig for SampleConfig {
         let exclude = self
             .exclude
             .as_ref()
-            .map(|condition| condition.build(&context.enrichment_tables, &context.metrics_storage))
+            .map(|condition| {
+                condition.build(
+                    &context.enrichment_tables,
+                    &context.metrics_storage,
+                    context.globals.timezone(),
+                )
+            })
             .transpose()?;
 
         let sample = if self.ratio_field.is_some() || self.rate_field.is_some() {
