@@ -24,8 +24,7 @@ use crate::{
     FilePosition, ReadFrom,
 };
 use file_source_common::{
-    internal_events::FileSourceExtendedInternalEvents as FileSourceInternalEvents, FileFingerprint,
-    Fingerprinter, TaskSet,
+    internal_events::FileSourceInternalEvents, FileFingerprint, Fingerprinter, TaskSet,
 };
 
 #[cfg(any(test, feature = "test"))]
@@ -60,7 +59,6 @@ where
     pub ignore_before: Option<DateTime<Utc>>,
     pub max_line_bytes: usize,
     pub line_delimiter: Bytes,
-    pub data_dir: PathBuf,
     pub fingerprinter: Fingerprinter,
     pub oldest_first: bool,
     pub remove_after: Option<Duration>,
@@ -116,7 +114,6 @@ where
 
         let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
 
-        // We no longer need backoff_cap since we use a fixed backoff
         let mut lines = Vec::new();
 
         checkpointer.read_checkpoints(self.ignore_before).await;
@@ -195,15 +192,6 @@ where
         ));
 
         let mut last_stats_report: Option<Instant> = None;
-        // Alright friends, how does this work?
-        //
-        // We want to avoid burning up users' CPUs. To do this we sleep after
-        // reading lines out of files. But! We want to be responsive as well. We
-        // keep track of a 'backoff_cap' to decide how long we'll wait in any
-        // given loop. This cap grows each time we fail to read lines in an
-        // exponential fashion to some hard-coded cap. To reduce time using glob,
-        // we do not re-scan for major file changes (new files, moves, deletes),
-        // or write new checkpoints, on every iteration.
         let mut next_glob_time = time::Instant::now();
         loop {
             // Determine if we need to perform file discovery
@@ -211,8 +199,7 @@ where
             // Check for new files frequently to minimize the delay between when a file is discovered
             // by the notify watcher and when it's actually processed, but not on every iteration
             // to avoid excessive CPU usage
-            let should_discover_glob = next_glob_time <= now_time
-                || now_time.duration_since(next_glob_time) > Duration::from_millis(100);
+            let should_discover_glob = next_glob_time <= now_time;
 
             // Report stats periodically, but only if enough time has passed since the last report
             // This prevents excessive logging when the main loop is running frequently
@@ -342,7 +329,6 @@ where
             }
 
             // Collect lines by polling files.
-            let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
                 let start = time::Instant::now();
@@ -373,9 +359,7 @@ where
                 }
                 stats.record("reading", start.elapsed());
 
-                if bytes_read > 0 {
-                    global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                } else {
+                if bytes_read == 0 {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after {
                         if watcher.last_read_success().elapsed() >= grace_period {

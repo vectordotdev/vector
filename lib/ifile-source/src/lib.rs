@@ -9,13 +9,13 @@ pub mod paths_provider;
 pub use self::file_server::TestEvent;
 pub use self::{
     file_server::{calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown},
-    file_watcher::{FileWatcher, WatcherState},
+    file_watcher::FileWatcher,
     paths_provider::notify::NotifyPathsProvider,
 };
 pub use file_source_common::{
     buffer,
     checkpointer::{Checkpointer, CheckpointsView, CHECKPOINT_FILE_NAME},
-    internal_events::FileSourceExtendedInternalEvents as FileSourceInternalEvents,
+    internal_events::FileSourceInternalEvents,
     FileFingerprint, FingerprintStrategy, Fingerprinter, PortableFileExt,
 };
 

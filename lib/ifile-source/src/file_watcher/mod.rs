@@ -35,16 +35,6 @@ pub struct RawLine {
     pub bytes: Bytes,
 }
 
-/// Represents the state of the file watcher
-///
-/// Note: Previously, we had Active and Passive states, but now we only use
-/// notification-based watching for all files, so we only need one state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WatcherState {
-    /// Watching the file using filesystem notifications
-    Notify,
-}
-
 /// The `FileWatcher` struct defines the state machine which reads
 /// from a file path, transparently handling file rollovers as is common for logs.
 ///
@@ -63,7 +53,6 @@ pub struct FileWatcher {
     inode: u64,
     is_dead: bool,
     reached_eof: bool,
-    last_read_attempt: Instant,
     last_read_success: Instant,
     last_seen: Instant,
     max_line_bytes: usize,
@@ -191,7 +180,6 @@ impl FileWatcher {
             inode: ino,
             is_dead: false,
             reached_eof: false,
-            last_read_attempt: ts,
             last_read_success: ts,
             last_seen: ts,
             max_line_bytes,
@@ -263,8 +251,6 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time.
     pub(super) async fn read_line(&mut self) -> io::Result<Option<RawLine>> {
-        self.track_read_attempt();
-
         if self.is_dead {
             return Ok(None);
         }
@@ -355,11 +341,6 @@ impl FileWatcher {
     }
 
     #[inline]
-    fn track_read_attempt(&mut self) {
-        self.last_read_attempt = Instant::now();
-    }
-
-    #[inline]
     fn track_read_success(&mut self) {
         self.last_read_success = Instant::now();
     }
@@ -388,8 +369,6 @@ impl FileWatcher {
     pub fn last_read_success(&self) -> Instant {
         self.last_read_success
     }
-
-    // should_read method removed - we now always read all files on every iteration
 
     #[inline]
     pub fn last_seen(&self) -> Instant {
