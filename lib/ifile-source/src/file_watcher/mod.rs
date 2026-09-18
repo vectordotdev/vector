@@ -10,7 +10,7 @@ use tokio::{
     fs::{self, File},
     io::{AsyncBufRead, AsyncBufReadExt, AsyncSeekExt, BufReader},
 };
-use tracing::{debug, trace};
+use tracing::debug;
 use vector_common::compression::gzip_multiple_decoder;
 use vector_common::constants::GZIP_MAGIC;
 
@@ -20,9 +20,6 @@ use file_source_common::{
     buffer::{read_until_with_max_size, ReadResult},
     AsyncFileInfo,
 };
-mod notify_watcher;
-
-use notify_watcher::NotifyWatcher;
 
 /// The `RawLine` struct is a thin wrapper around the bytes that have been read
 /// in order to retain the context of where in the file they have been read from.
@@ -59,8 +56,6 @@ pub struct FileWatcher {
     line_delimiter: Bytes,
     buf: BytesMut,
     reader: FileReader,
-    /// Notify-based watcher for all files
-    notify_watcher: NotifyWatcher,
 }
 
 enum FileReader {
@@ -161,17 +156,6 @@ impl FileWatcher {
             .and_then(|diff| Instant::now().checked_sub(diff))
             .unwrap_or_else(Instant::now);
 
-        // Create a notify watcher for all files
-        let notify_watcher = {
-            let mut watcher = NotifyWatcher::new();
-
-            // Start watching this file immediately
-            if let Err(e) = watcher.watch_file(path.clone(), file_position).await {
-                debug!(message = "Failed to set up file watcher", path = ?path, error = ?e);
-            }
-            watcher
-        };
-
         Ok(FileWatcher {
             path: path.clone(),
             findable: true,
@@ -186,7 +170,6 @@ impl FileWatcher {
             line_delimiter,
             buf: BytesMut::new(),
             reader,
-            notify_watcher,
         })
     }
 
@@ -194,15 +177,6 @@ impl FileWatcher {
         let file_handle = File::open(&path).await?;
         let file_info = file_handle.file_info().await?;
         if (file_info.portable_dev(), file_info.portable_ino()) != (self.devno, self.inode) {
-            // Update the notify watcher with the new path
-            // Use the tokio runtime to run the async watch_file method
-            if let Err(e) = self
-                .notify_watcher
-                .watch_file(path.clone(), self.file_position)
-                .await
-            {
-                debug!(message = "Failed to update notify watcher", error = ?e);
-            }
             if matches!(self.reader, FileReader::Plain(_)) {
                 let mut reader = BufReader::new(file_handle);
                 reader.seek(SeekFrom::Start(self.file_position)).await?;
@@ -253,23 +227,6 @@ impl FileWatcher {
     pub(super) async fn read_line(&mut self) -> io::Result<Option<RawLine>> {
         if self.is_dead {
             return Ok(None);
-        }
-
-        // Check for events from the notify watcher, but don't update the watcher here
-        // This avoids an infinite loop where reading the file triggers events
-        // Use the tokio runtime to run the async check_events method
-        let events = self.notify_watcher.check_events().await;
-
-        if !events.is_empty() {
-            trace!(message = "Checking events for file", count = events.len(), path = ?self.path);
-            for (path, kind) in events {
-                if path == self.path {
-                    debug!(message = "Detected relevant file event", ?path, ?kind);
-                    // We don't need to update the watcher here since we're about to read the file
-                    // and the position will be updated naturally
-                    break;
-                }
-            }
         }
 
         let reader: &mut (dyn AsyncBufRead + Send + Unpin) = match &mut self.reader {
@@ -345,26 +302,6 @@ impl FileWatcher {
         self.last_read_success = Instant::now();
     }
 
-    /// Update the watcher with the current file position
-    ///
-    /// This updates the notify watcher with the current file position.
-    pub async fn update_watcher(&mut self) -> io::Result<()> {
-        // Only log at trace level to avoid excessive logging
-        trace!(message = "Updating file watcher", ?self.path, position = %self.file_position);
-
-        // Update the notify watcher with the current position
-        // Use the tokio runtime to run the async watch_file method
-        if let Err(e) = self
-            .notify_watcher
-            .watch_file(self.path.clone(), self.file_position)
-            .await
-        {
-            debug!(message = "Failed to update notify watcher", error = ?e);
-        }
-
-        Ok(())
-    }
-
     #[inline]
     pub fn last_read_success(&self) -> Instant {
         self.last_read_success
@@ -373,13 +310,6 @@ impl FileWatcher {
     #[inline]
     pub fn last_seen(&self) -> Instant {
         self.last_seen
-    }
-}
-
-impl Drop for FileWatcher {
-    fn drop(&mut self) {
-        self.notify_watcher.shutdown();
-        debug!(message = "FileWatcher shut down", ?self.path);
     }
 }
 

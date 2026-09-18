@@ -37,17 +37,8 @@ pub enum TestEvent {
 /// `FileServer` is a Source which schedules reads over files,
 /// converting the lines of said files into `LogLine` structures.
 ///
-/// `FileServer` uses a hybrid approach for file monitoring:
-/// 1. Active polling: For files that are actively being read
-/// 2. Passive watching: For idle files, using filesystem notifications via notify-rs/notify
-///
-/// This approach allows `FileServer` to efficiently monitor many files without
-/// holding open file handles for all of them, while still maintaining checkpoints
-/// in case files receive future writes.
-///
-/// `FileServer` is configured on a path to watch. The files do _not_ need to
-/// exist at startup. `FileServer` will discover new files which match
-/// its path in at most 60 seconds.
+/// Readers retain open file handles across renames. A source-level notification
+/// watcher wakes idle reads, while periodic scans reconcile missed notifications.
 pub struct FileServer<PP, E: FileSourceInternalEvents>
 where
     PP: PathsProvider,
@@ -384,33 +375,12 @@ where
                 }
             }
 
-            // Handle file watcher state transitions
-            for (_, watcher) in &mut fp_map {
-                // Mark files as dead if they're not findable and have been missing for too long
-                if !watcher.file_findable() && watcher.last_seen().elapsed() > self.rotate_wait {
-                    watcher.set_dead();
-                    continue;
-                }
-
-                // Only update the watcher if we've read data from the file
-                // This avoids unnecessary updates that can cause excessive logging
-                if watcher.reached_eof()
-                    && watcher.last_read_success().elapsed() < Duration::from_secs(1)
-                {
-                    // Update the notify watcher with the current position
-                    if let Err(e) = watcher.update_watcher().await {
-                        debug!(
-                            message = "Failed to update watcher",
-                            ?watcher.path,
-                            error = ?e
-                        );
-                    }
-                }
-            }
-
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
             fp_map.retain(|file_id, watcher| {
+                if !watcher.file_findable() && watcher.last_seen().elapsed() > self.rotate_wait {
+                    watcher.set_dead();
+                }
                 if watcher.dead() {
                     self.emitter
                         .emit_file_unwatched(&watcher.path, watcher.reached_eof());
@@ -435,17 +405,31 @@ where
                 }
             }
             let start = time::Instant::now();
-            let to_send = std::mem::take(&mut lines);
-            match chans.send(to_send).await {
-                Ok(()) => {}
-                Err(error) => {
+            let made_progress = !lines.is_empty();
+            if made_progress {
+                if let Err(error) = chans.send(std::mem::take(&mut lines)).await {
                     error!(message = "Output channel closed.", %error);
                     return Err(error);
                 }
             }
             stats.record("sending", start.elapsed());
 
-            if let std::task::Poll::Ready(_shutdown_token) = futures::poll!(&mut shutdown_data) {
+            let shutdown_token = tokio::select! {
+                biased;
+                token = &mut shutdown_data => Some(token),
+                _ = async {
+                    if made_progress {
+                        // Keep draining backlogs, but let other source tasks run.
+                        tokio::task::yield_now().await;
+                    } else {
+                        tokio::select! {
+                            _ = self.paths_provider.wait_for_changes() => {},
+                            _ = tokio::time::sleep_until(next_glob_time.into()) => {},
+                        }
+                    }
+                } => None,
+            };
+            if let Some(_shutdown_token) = shutdown_token {
                 // Keep the shutdown token alive until acknowledgements and the
                 // final checkpoint write have completed.
                 // Shut down all file watchers to prevent further events
@@ -453,8 +437,7 @@ where
                     message = "Shutting down all file watchers",
                     count = fp_map.len()
                 );
-                // This will drop all watchers. See `FileWatcher::drop`
-                fp_map.retain(|_, _| false);
+                fp_map.clear();
 
                 chans
                     .close()
