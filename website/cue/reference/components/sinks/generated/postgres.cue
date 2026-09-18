@@ -49,8 +49,9 @@ generated: components: sinks: postgres: configuration: {
 					fail the entire batch.
 
 					**Note**: If multiple events in a single batch will update the
-					same row, only the first event will be used to update the row.
-					To avoid this, use a *dedupe* transform long enough for the
+					same row, only the first event will be used to update the row
+					base on your upsert.order_column(s). To handle this behavior
+					yourself, use a *dedupe* transform long enough for the sink's
 					batch size.
 					"""
 			}
@@ -316,6 +317,26 @@ generated: components: sinks: postgres: configuration: {
 		description: "Upsert-specific options"
 		required:    false
 		type: object: options: {
+			order_column: {
+				description: """
+					Column(s) to use to determine the order events should be ordered
+					when upserting.
+					"""
+				required: true
+				type: string: {}
+			}
+			ordering: {
+				description: "Direction to order the order columns in."
+				required:    true
+				type: string: enum: {
+					ascending: """
+						Order columns in ascending order.
+
+						This is the default.
+						"""
+					descending: "Order columns in descending order."
+				}
+			}
 			primary_key: {
 				description: """
 					Column(s) part of the table's primary key.
@@ -343,6 +364,7 @@ generated: components: sinks: postgres: configuration: {
 
 					**Note**: If a column name needs to be quoted, you must place
 					double quotes around the column name here.
+					ex: "\\"column name\\""
 					"""
 				required: true
 				type: string: {}

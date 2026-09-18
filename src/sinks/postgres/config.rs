@@ -51,10 +51,33 @@ pub enum ActionKindConfig {
     /// fail the entire batch.
     ///
     /// **Note**: If multiple events in a single batch will update the
-    /// same row, only the first event will be used to update the row.
-    /// To avoid this, use a *dedupe* transform long enough for the
+    /// same row, only the first event will be used to update the row
+    /// base on your upsert.order_column(s). To handle this behavior
+    /// yourself, use a *dedupe* transform long enough for the sink's
     /// batch size.
     Upsert,
+}
+
+/// Direction to order the order columns in.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum UpsertOrdering {
+    /// Order columns in ascending order.
+    ///
+    /// This is the default.
+    #[derivative(Default)]
+    Ascending,
+
+    /// Order columns in descending order.
+    Descending,
+}
+
+impl UpsertOrdering {
+    pub fn is_ascending(&self) -> bool {
+        matches!(self, Self::Ascending)
+    }
 }
 
 /// Upsert-specific options
@@ -84,8 +107,17 @@ pub struct UpsertOption {
     ///
     /// **Note**: If a column name needs to be quoted, you must place
     /// double quotes around the column name here.
+    /// ex: "\"column name\""
     #[serde(alias = "update_columns")]
     pub update_column: OneOrMany<String>,
+
+    /// Column(s) to use to determine the order events should be ordered
+    /// when upserting.
+    #[serde(alias = "order_columns")]
+    pub order_column: OneOrMany<String>,
+
+    /// Direction to order the order columns in.
+    pub ordering: UpsertOrdering,
 }
 
 const fn default_pool_size() -> u32 {
@@ -222,6 +254,30 @@ fn pg_connect_options(endpoint: &str) -> crate::Result<PgConnectOptions> {
     })
 }
 
+/// Validates that all items, the one or many, are non-empty strings
+fn confirm_non_empty_items(items: &OneOrMany<String>, name: &str) -> crate::Result<()> {
+    match items {
+        OneOrMany::One(item) => {
+            if item.is_empty() {
+                return Err(format!("`{name}` cannot be empty.").into());
+            }
+        }
+        OneOrMany::Many(items) => {
+            if items.is_empty() {
+                return Err(format!("`{name}` must contain at least one column.").into());
+            }
+
+            for item in items {
+                if item.is_empty() {
+                    return Err(format!("`{name}` cannot be empty.").into());
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[async_trait::async_trait]
 impl ValidatedSink for PostgresConfig {
     type Validated = ValidatedPostgres;
@@ -243,46 +299,34 @@ impl ValidatedSink for PostgresConfig {
                     return Err("`upsert` must be defined when using the upsert action.".into());
                 };
 
-                match &options.primary_key {
-                    OneOrMany::One(item) => {
-                        if item.is_empty() {
-                            return Err("`primary_key` cannot be empty.".into());
-                        }
-                    }
-                    OneOrMany::Many(items) => {
-                        if items.is_empty() {
-                            return Err("`primary_key` must contain at least one column.".into());
-                        }
+                confirm_non_empty_items(&options.primary_key, "primary_key")?;
+                confirm_non_empty_items(&options.update_column, "update_column")?;
+                confirm_non_empty_items(&options.order_column, "order_column")?;
 
-                        for item in items {
-                            if item.is_empty() {
-                                return Err("`primary_key` cannot be empty.".into());
-                            }
-                        }
-                    }
-                };
+                // Ordering columns must start with select distinct expression columns (the primary key columns)
+                let primary_keys = options.primary_key.clone().to_vec();
+                let order_columns = options.order_column.clone().to_vec();
 
-                match &options.update_column {
-                    OneOrMany::One(item) => {
-                        if item.is_empty() {
-                            return Err("`update_column` cannot be empty.".into());
-                        }
-                    }
-                    OneOrMany::Many(items) => {
-                        if items.is_empty() {
-                            return Err("`update_column` must contain at least one column.".into());
-                        }
+                if order_columns.len() < primary_keys.len() {
+                    return Err("`order_column` must start with `primary_key`".into());
+                }
 
-                        for item in items {
-                            if item.is_empty() {
-                                return Err("`update_column` cannot be empty.".into());
-                            }
-                        }
-                    }
-                };
+                if order_columns
+                    .iter()
+                    .zip(primary_keys.iter())
+                    .any(|(order, primary)| order != primary)
+                {
+                    return Err("`order_column` must start with `primary_key`".into());
+                }
+
+                if order_columns.len() == primary_keys.len() {
+                    warn!(
+                        "`order_column` are the same as `primary_key`, this doesn't guarantee any ordering of conflicting upsert updates."
+                    );
+                }
 
                 PostgresAction::Upsert {
-                    primary_keys: options.primary_key.clone().to_vec().join(","),
+                    primary_keys: primary_keys.join(","),
                     update_columns: options
                         .update_column
                         .clone()
@@ -291,6 +335,8 @@ impl ValidatedSink for PostgresConfig {
                         .map(|column| format!("{column}=EXCLUDED.{column}"))
                         .collect::<Vec<String>>()
                         .join(","),
+                    order_columns: order_columns.join(","),
+                    ascending: options.ordering.is_ascending(),
                 }
             }
         };

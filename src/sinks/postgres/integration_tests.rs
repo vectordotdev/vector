@@ -174,6 +174,8 @@ async fn prepare_config() -> (PostgresConfig, String, PgConnection) {
 async fn prepare_upsert_config(
     primary_keys: Vec<&str>,
     update_columns: Vec<&str>,
+    order_columns: Vec<&str>,
+    ascending: bool,
     max_events: usize,
 ) -> (PostgresConfig, String, PgConnection) {
     let table = random_table_name();
@@ -187,7 +189,10 @@ async fn prepare_upsert_config(
             action = "upsert"
             upsert.primary_keys = {primary_keys:?}
             upsert.update_columns = {update_columns:?}
+            upsert.order_columns = {order_columns:?}
+            upsert.ordering = "{}"
         "#,
+        if ascending { "ascending" } else { "descending" }
     );
 
     let (config, _) = load_sink::<PostgresConfig>(&config_str).unwrap();
@@ -293,6 +298,8 @@ async fn upsert_single_event_without_conflict() {
     let (config, table, mut connection) = prepare_upsert_config(
         vec!["id"],
         vec!["host", "timestamp", "message", "payload"],
+        vec!["id", "timestamp"],
+        true,
         1,
     )
     .await;
@@ -373,6 +380,8 @@ async fn upsert_multiple_events_without_conflict() {
     let (config, table, mut connection) = prepare_upsert_config(
         vec!["id"],
         vec!["host", "timestamp", "message", "payload"],
+        vec!["id", "timestamp"],
+        true,
         1,
     )
     .await;
@@ -640,6 +649,8 @@ async fn upsert_two_events_with_primary_key_violation_succeeds() {
     let (config, table, mut connection) = prepare_upsert_config(
         vec!["id"],
         vec!["host", "timestamp", "message", "payload"],
+        vec!["id", "timestamp"],
+        true,
         1,
     )
     .await;
@@ -689,6 +700,8 @@ async fn upsert_two_events_with_primary_key_violation_within_same_batch() {
     let (config, table, mut connection) = prepare_upsert_config(
         vec!["id"],
         vec!["host", "timestamp", "message", "payload"],
+        vec!["id", "timestamp"],
+        true,
         2,
     )
     .await;
@@ -735,8 +748,14 @@ async fn upsert_two_events_with_primary_key_violation_within_same_batch() {
 async fn upsert_fails_on_unquoted_field() {
     trace_init();
 
-    let (config, table, mut connection) =
-        prepare_upsert_config(vec!["id"], vec!["column with spaces"], 1).await;
+    let (config, table, mut connection) = prepare_upsert_config(
+        vec!["id"],
+        vec!["column with spaces"],
+        vec!["id", "timestamp"],
+        true,
+        1,
+    )
+    .await;
 
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
     let create_table_sql = format!(
@@ -766,8 +785,14 @@ async fn upsert_fails_on_unquoted_field() {
 async fn upsert_success_on_quoted_field() {
     trace_init();
 
-    let (config, table, mut connection) =
-        prepare_upsert_config(vec!["id"], vec![r#""column with spaces""#], 1).await;
+    let (config, table, mut connection) = prepare_upsert_config(
+        vec!["id"],
+        vec![r#""column with spaces""#],
+        vec!["id", "timestamp"],
+        true,
+        1,
+    )
+    .await;
 
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
     let create_table_sql = format!(
@@ -831,6 +856,8 @@ async fn upsert_with_multi_column_primary_key_succeeds() {
     let (config, table, mut connection) = prepare_upsert_config(
         vec!["id1", "id2"],
         vec!["host", "timestamp", "message", "payload"],
+        vec!["id1", "id2", "timestamp"],
+        true,
         1,
     )
     .await;

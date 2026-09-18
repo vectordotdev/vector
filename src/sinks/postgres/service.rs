@@ -51,6 +51,8 @@ pub enum PostgresAction {
     Upsert {
         primary_keys: String,
         update_columns: String,
+        order_columns: String,
+        ascending: bool,
     },
 }
 
@@ -178,15 +180,21 @@ impl Service<PostgresRequest> for PostgresService {
                 PostgresAction::Upsert {
                     primary_keys,
                     update_columns,
+                    order_columns,
+                    ascending,
                 } => {
                     sqlx::query(&format!(
                         "INSERT INTO {table}
-                            SELECT DISTINCT ON ({primary_keys}) * FROM jsonb_populate_recordset(NULL::{table}, $1)
-                            ON CONFLICT ({primary_keys}) DO UPDATE SET {update_columns}"))
-                        .bind(Json(serialized_values))
-                        .execute(&service.connection_pool)
-                        .await
-                        .context(PostgresSnafu)?;
+                            SELECT DISTINCT ON ({primary_keys}) *
+                                FROM jsonb_populate_recordset(NULL::{table}, $1)
+                                ORDER BY {order_columns} {}
+                            ON CONFLICT ({primary_keys}) DO UPDATE SET {update_columns}",
+                        if ascending { "ASC" } else { "DESC" }
+                    ))
+                    .bind(Json(serialized_values))
+                    .execute(&service.connection_pool)
+                    .await
+                    .context(PostgresSnafu)?;
                 }
             }
 
