@@ -20,9 +20,9 @@ pub fn change_socket_ownership(
 
     let uid = uid.map_or(!0, libc::uid_t::from);
     let gid = gid.map_or(!0, libc::gid_t::from);
-    // SAFETY: `path` is converted to a nul-terminated C string by `CString`; `chown` does not
-    // retain the pointer beyond this call.
     let path_cstr = std::ffi::CString::new(path.as_os_str().as_bytes())?;
+    // SAFETY: `path_cstr` is a nul-terminated C string that outlives this call, and `chown`
+    // does not retain the pointer beyond it.
     let result = unsafe { libc::chown(path_cstr.as_ptr(), uid, gid) };
 
     if result == 0 {
