@@ -21,3 +21,19 @@ async fn discovers_files_before_and_after_startup() -> vector::Result<()> {
     assert_eq!(seen.received_events, 3.0);
     Ok(())
 }
+
+#[tokio::test]
+async fn discovers_files_when_watch_directory_is_created_later() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    let mut run = fixture.start("missing/*.log", json!({}))?;
+    run.wait_for("empty source readiness", |seen| {
+        seen.open_files == Some(0.0)
+    })
+    .await?;
+    std::fs::create_dir(fixture.input.join("missing"))?;
+    let expected = records("late-directory", 3);
+    fixture.write("missing/new.log", &expected)?;
+    run.wait_count(expected.len()).await?;
+    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
+    Ok(())
+}
