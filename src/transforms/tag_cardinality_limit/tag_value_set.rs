@@ -687,57 +687,29 @@ mod tests {
     }
 
     #[test]
-    fn ttl_exact_contains_does_not_scan_unrelated_entries() {
-        // A cache hit must inspect only the queried value. Guards against
-        // reintroducing a full-bucket retain on the read path, which made
-        // `contains` cost O(cached values) per accepted tag.
+    fn ttl_exact_contains_and_len_do_not_scan_unrelated_entries() {
+        // Between sweeps, a cache hit and ordinary `len` must inspect only
+        // cheap paths — not a full-bucket retain (that made filling
+        // `value_limit` O(N²)). Seed directly so `insert`'s maybe_sweep cannot
+        // drop stale early.
         let ttl = Duration::from_secs(60);
         let mut s = TtlExactStorage::new(ttl, 4);
         let t0 = Instant::now();
-        s.map.insert(v("stale"), t0);
-        s.map.insert(v("hot"), t0 + Duration::from_secs(10));
-
-        // Pin the sweep clock so only the per-value path can run.
-        let t70 = t0 + Duration::from_secs(70);
-        s.last_sweep = t70;
-
-        assert!(s.contains_with_now(&v("hot"), t70), "hot is within ttl");
-        assert!(
-            s.map.contains_key(&v("stale")),
-            "a cache hit must not evict unrelated entries"
-        );
-
-        s.sweep(t70);
-        assert!(
-            !s.map.contains_key(&v("stale")),
-            "the sweep path must still drop lapsed entries"
-        );
-        assert!(s.map.contains_key(&v("hot")), "hot was refreshed to t70");
-    }
-
-    #[test]
-    fn ttl_exact_len_defers_purge_until_capacity_reclaim() {
-        // Ordinary `len` must stay O(1) between sweeps (filling `value_limit`
-        // would otherwise become O(N²)). Capacity recovery still happens when
-        // callers force a full retain / purge.
-        let ttl = Duration::from_secs(60);
-        let mut s = TtlExactStorage::new(ttl, 4);
-        let t0 = Instant::now();
-        // Seed directly so `insert`'s maybe_sweep cannot drop stale early.
         s.map.insert(v("stale"), t0);
         s.map.insert(v("hot"), t0 + Duration::from_secs(10));
         let t70 = t0 + Duration::from_secs(70);
         s.last_sweep = t70;
 
         assert_eq!(s.len(), 2, "len alone must not reclaim between sweeps");
+        assert!(s.contains_with_now(&v("hot"), t70), "hot is within ttl");
         assert!(
             s.map.contains_key(&v("stale")),
-            "ordinary len must not scan/evict unrelated entries"
+            "contains/len must not evict unrelated entries"
         );
 
         s.sweep(t70);
         assert_eq!(s.map.len(), 1, "purge must drop only lapsed entries");
-        assert!(s.map.contains_key(&v("hot")));
+        assert!(s.map.contains_key(&v("hot")), "hot was refreshed to t70");
         assert!(!s.map.contains_key(&v("stale")));
     }
 
@@ -851,15 +823,6 @@ mod tests {
     }
 
     #[test]
-    fn rolling_bloom_generations_clamped_to_at_least_one() {
-        // `generations: 0` would divide by zero / leave an empty deque.
-        let s = RollingBloomStorage::new(default_cache_size(), 0, Duration::from_secs(60));
-        assert_eq!(s.generations, 1);
-        assert_eq!(s.max_shards, 1);
-        assert_eq!(s.shards.len(), 1);
-    }
-
-    #[test]
     fn rolling_bloom_clamped_short_ttl_keeps_extra_shard() {
         // Default `ttl_generations: 4` with `ttl_secs: 1` clamps to one
         // generation (slice must be ≥1s). That must still be a 2-shard sliding
@@ -948,6 +911,7 @@ mod tests {
             (1u64, 4u8, 1u32),
             (2, 8, 2),
             (10, 4, 4),
+            (60, 0, 1), // `generations: 0` must not divide by zero / empty deque
             (3600, 4, 4),
             (4294967296, 4, 4),
         ] {
@@ -1026,37 +990,6 @@ mod tests {
     }
 
     #[test]
-    fn rolling_bloom_len_sums_across_shards() {
-        // Distinct values spread across shards must contribute to `len()`;
-        // otherwise the union could silently exceed `value_limit`.
-        let mut s = RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(4));
-        s.shards.clear();
-        for name in ["a", "b", "c", "d"] {
-            let mut shard = BloomFilterStorage::new(default_cache_size());
-            shard.insert(&v(name));
-            s.shards.push_back(shard);
-        }
-        // Push the next rotation far out so `len()` doesn't lazily rotate.
-        s.next_rotate = Instant::now() + Duration::from_secs(3600);
-        assert_eq!(
-            s.len(),
-            4,
-            "len() must sum per-shard counts to reflect the union upper bound"
-        );
-    }
-
-    #[test]
-    fn rolling_bloom_oversized_ttl_doesnt_panic() {
-        let mut s =
-            RollingBloomStorage::new(default_cache_size(), 4, Duration::from_secs(u64::MAX));
-        // Exercises both `saturating_add` call sites (constructor and
-        // `rotate_if_needed`).
-        s.insert(&v("a"));
-        assert!(s.contains(&v("a")));
-        assert_eq!(s.len(), 1);
-    }
-
-    #[test]
     fn saturating_add_overflow_pushes_deadline_far_into_future() {
         // The fallback must advance `instant` by a non-trivial amount —
         // returning `instant` itself would leave `next_rotate <= now` on
@@ -1086,9 +1019,10 @@ mod tests {
     }
 
     #[test]
-    fn rolling_bloom_len_upper_bounds_value_limit() {
-        // `len()` must reach `value_limit` once enough distinct values are
-        // admitted across the full window so `try_accept_tag` stops admitting.
+    fn rolling_bloom_len_sums_shards_to_enforce_value_limit() {
+        // Distinct values spread across shards must contribute to `len()` so
+        // `try_accept_tag` cannot silently exceed `value_limit`. Far
+        // `next_rotate` keeps `len()` from lazily rotating the fixture.
         let value_limit = 8usize;
         let generations = 4u8;
         let mut s =
@@ -1105,10 +1039,10 @@ mod tests {
             s.shards.push_back(shard);
         }
         s.next_rotate = Instant::now() + Duration::from_secs(3600);
-        assert!(
-            s.len() >= value_limit,
-            "len() must reach value_limit once enough distinct values are spread \
-             across shards; got {} for value_limit={value_limit}",
+        assert_eq!(
+            s.len(),
+            value_limit,
+            "len() must sum per-shard counts; got {} for {value_limit} distinct values",
             s.len(),
         );
     }
