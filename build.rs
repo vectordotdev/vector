@@ -133,21 +133,12 @@ fn main() {
     {
         println!("cargo:rerun-if-changed=proto/third-party/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/third-party/google/rpc/status.proto");
-        println!("cargo:rerun-if-changed=proto/vector/dd_metric.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/agent_payload.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/tracer_payload.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/span.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/idx/tracer_payload.proto");
-        println!("cargo:rerun-if-changed=proto/datadog/trace/idx/span.proto");
         println!("cargo:rerun-if-changed=proto/vector/ddsketch_full.proto");
         println!("cargo:rerun-if-changed=proto/vector/vector.proto");
         println!("cargo:rerun-if-changed=proto/vector/observability.proto");
 
         // Create and store the "file descriptor set" from the compiled Protocol Buffers packages.
-        //
-        // This allows us to use runtime reflection to manually build Protocol Buffers payloads
-        // in a type-safe way, which is necessary for incrementally building certain payloads, like
-        // the ones generated in the `datadog_metrics` sink.
+        // Used for gRPC reflection of Vector's own observability/API protos.
         let protobuf_fds_path =
             Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR environment variable not set"))
                 .join("protobuf-fds.bin");
@@ -165,9 +156,6 @@ fn main() {
                 &[
                     "lib/vector-core/proto/event.proto",
                     "proto/vector/ddsketch_full.proto",
-                    "proto/vector/dd_metric.proto",
-                    "proto/datadog/trace/agent_payload.proto",
-                    "proto/datadog/trace/idx/tracer_payload.proto",
                     "proto/third-party/google/pubsub/v1/pubsub.proto",
                     "proto/third-party/google/rpc/status.proto",
                     "proto/vector/vector.proto",
