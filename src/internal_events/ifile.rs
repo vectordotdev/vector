@@ -106,9 +106,7 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
-    use vector_lib::file_source_common::internal_events::{
-        FileSourceExtendedInternalEvents, FileSourceInternalEvents,
-    };
+    use vector_lib::file_source_common::internal_events::FileSourceInternalEvents;
     use vector_lib::{counter, internal_event::CounterName};
 
     use crate::internal_events::FileLineTooBigError;
@@ -594,42 +592,6 @@ mod source {
                 configured_limit,
                 encountered_size_so_far
             });
-        }
-    }
-
-    impl FileSourceExtendedInternalEvents for FileSourceInternalEventsEmitter {
-        fn emit_file_switched_to_passive(&self, file: &Path, file_position: u64) {
-            debug!(
-                message = "File switched to passive watching mode.",
-                file = %file.display(),
-                position = %file_position,
-            );
-            if self.include_file_metric_tag {
-                counter!(
-                    CounterName::FilesPassiveTotal,
-                    "file" => file.to_string_lossy().into_owned(),
-                )
-            } else {
-                counter!(CounterName::FilesPassiveTotal)
-            }
-            .increment(1);
-        }
-
-        fn emit_file_switched_to_active(&self, file: &Path, file_position: u64) {
-            debug!(
-                message = "File switched to active watching mode.",
-                file = %file.display(),
-                position = %file_position,
-            );
-            if self.include_file_metric_tag {
-                counter!(
-                    CounterName::FilesActiveTotal,
-                    "file" => file.to_string_lossy().into_owned(),
-                )
-            } else {
-                counter!(CounterName::FilesActiveTotal)
-            }
-            .increment(1);
         }
     }
 }
