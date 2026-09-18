@@ -148,6 +148,7 @@ impl Fixture {
         )?;
         let stderr_path = self.root.join("stderr.log");
         let mut child = Command::new(env!("CARGO_BIN_EXE_vector"))
+            .args(["--threads", "1"])
             .arg("--config")
             .arg(config)
             .stdin(Stdio::null())

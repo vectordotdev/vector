@@ -24,3 +24,15 @@ async fn shutdown_saves_final_acknowledged_offset_before_exit() -> vector::Resul
     assert_eq!([first, second].concat(), expected);
     Ok(())
 }
+
+#[tokio::test]
+async fn empty_source_shuts_down_on_single_worker() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    let mut run = fixture.start("*.log", json!({}))?;
+    run.wait_for("empty source readiness", |seen| {
+        seen.open_files == Some(0.0)
+    })
+    .await?;
+    assert!(run.stop(Signal::SIGTERM).await?.messages.is_empty());
+    Ok(())
+}
