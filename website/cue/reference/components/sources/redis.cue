@@ -29,8 +29,7 @@ components: sources: redis: {
 	}
 
 	classes: {
-		commonly_used: false
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "stream"
@@ -76,7 +75,6 @@ components: sources: redis: {
 				redis_key: {
 					description: "The Redis key the event came from"
 					required:    false
-					common:      false
 					type: string: {
 						examples: ["some_key"]
 						default: null

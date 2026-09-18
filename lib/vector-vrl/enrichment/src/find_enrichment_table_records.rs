@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::LazyLock};
+use std::collections::BTreeMap;
 
 use vector_vrl_category::Category;
 use vrl::prelude::*;
@@ -8,36 +8,34 @@ use crate::{
     vrl_util::{self, DEFAULT_CASE_SENSITIVE, add_index, evaluate_condition, is_case_sensitive},
 };
 
-static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
-    vec![
-        Parameter::required(
-            "table",
-            kind::BYTES,
-            "The [enrichment table](/docs/reference/glossary/#enrichment-tables) to search.",
-        ),
-        Parameter::required(
-            "condition",
-            kind::OBJECT,
-            "The condition to search on. Since the condition is used at boot time to create indices into the data, these conditions must be statically defined.",
-        ),
-        Parameter::optional(
-            "select",
-            kind::ARRAY,
-            "A subset of fields from the enrichment table to return. If not specified, all fields are returned.",
-        ),
-        Parameter::optional(
-            "case_sensitive",
-            kind::BOOLEAN,
-            "Whether text fields need to match cases exactly.",
-        )
-        .default(&DEFAULT_CASE_SENSITIVE),
-        Parameter::optional(
-            "wildcard",
-            kind::BYTES,
-            "Value to use for wildcard matching in the search.",
-        ),
-    ]
-});
+const PARAMETERS: &[Parameter] = &[
+    Parameter::required(
+        "table",
+        kind::BYTES,
+        "The [enrichment table](/docs/reference/glossary/#enrichment-tables) to search.",
+    ),
+    Parameter::required(
+        "condition",
+        kind::OBJECT,
+        "The condition to search on. Since the condition is used at boot time to create indices into the data, these conditions must be statically defined.",
+    ),
+    Parameter::optional(
+        "select",
+        kind::ARRAY,
+        "A subset of fields from the enrichment table to return. If not specified, all fields are returned.",
+    ),
+    Parameter::optional(
+        "case_sensitive",
+        kind::BOOLEAN,
+        "Whether text fields need to match cases exactly.",
+    )
+    .default(&DEFAULT_CASE_SENSITIVE),
+    Parameter::optional(
+        "wildcard",
+        kind::BYTES,
+        "Value to use for wildcard matching in the search.",
+    ),
+];
 
 fn find_enrichment_table_records(
     select: Option<Value>,
@@ -99,7 +97,7 @@ impl Function for FindEnrichmentTableRecords {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &PARAMETERS
+        PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {

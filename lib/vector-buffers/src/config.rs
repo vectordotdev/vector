@@ -153,8 +153,11 @@ impl<'de> Deserialize<'de> for BufferType {
     }
 }
 
+/// # Panics
+///
+/// Never panics; the value 500 is non-zero.
 pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
-    unsafe { NonZeroUsize::new_unchecked(500) }
+    NonZeroUsize::new(500).expect("500 is non-zero")
 }
 
 /// Disk usage configuration for disk-backed buffers.

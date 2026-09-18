@@ -4,7 +4,6 @@ components: sinks: honeycomb: {
 	title: "Honeycomb"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: honeycomb: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    100_000
 				timeout_secs: 1.0
 			}

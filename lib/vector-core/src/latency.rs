@@ -1,12 +1,14 @@
 use std::time::Instant;
 
-use metrics::{Histogram, gauge, histogram};
+use metrics::Histogram;
 use vector_common::stats::EwmaGauge;
+use vector_common::{
+    gauge, histogram,
+    internal_event::{GaugeName, HistogramName},
+};
 
 use crate::event::EventArray;
 
-const COMPONENT_LATENCY: &str = "component_latency_seconds";
-const COMPONENT_LATENCY_MEAN: &str = "component_latency_mean_seconds";
 const DEFAULT_LATENCY_EWMA_ALPHA: f64 = 0.9;
 
 #[derive(Debug)]
@@ -18,9 +20,9 @@ pub struct LatencyRecorder {
 impl LatencyRecorder {
     pub fn new(ewma_alpha: Option<f64>) -> Self {
         Self {
-            histogram: histogram!(COMPONENT_LATENCY),
+            histogram: histogram!(HistogramName::ComponentLatencySeconds),
             gauge: EwmaGauge::new(
-                gauge!(COMPONENT_LATENCY_MEAN),
+                gauge!(GaugeName::ComponentLatencyMeanSeconds),
                 ewma_alpha.or(Some(DEFAULT_LATENCY_EWMA_ALPHA)),
             ),
         }

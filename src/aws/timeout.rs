@@ -69,13 +69,11 @@ mod tests {
 
     #[test]
     fn parsing_timeout_configuration() {
-        let config = toml::from_str::<AwsTimeout>(
-            r"
-            connect_timeout_seconds = 20
-            operation_timeout_seconds = 20
-            read_timeout_seconds = 60
-        ",
-        )
+        let config = serde_yaml::from_str::<AwsTimeout>(indoc::indoc! {r"
+            connect_timeout_seconds: 20
+            operation_timeout_seconds: 20
+            read_timeout_seconds: 60
+        "})
         .unwrap();
 
         assert_eq!(config.connect_timeout, Some(20));

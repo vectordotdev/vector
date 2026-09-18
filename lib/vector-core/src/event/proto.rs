@@ -215,6 +215,8 @@ impl From<Metric> for super::Metric {
 
         let namespace = (!metric.namespace.is_empty()).then_some(metric.namespace);
 
+        // Sign can never be lost as ts.nanos is always non negative (per proto spec)
+        #[allow(clippy::cast_sign_loss)]
         let timestamp = metric.timestamp.map(|ts| {
             chrono::Utc
                 .timestamp_opt(ts.seconds, ts.nanos as u32)
@@ -422,6 +424,9 @@ impl From<super::Metric> for WithMetadata<Metric> {
         let name = series.name.name;
         let namespace = series.name.namespace.unwrap_or_default();
 
+        // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
+        // (as per chrono leap-second specs), which is below i32::MAX
+        #[allow(clippy::cast_possible_wrap)]
         let timestamp = data.time.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),
             nanos: ts.timestamp_subsec_nanos() as i32,
@@ -699,6 +704,8 @@ impl From<Metadata> for EventMetadata {
 fn decode_value(input: Value) -> Option<super::Value> {
     match input.kind {
         Some(value::Kind::RawBytes(data)) => Some(super::Value::Bytes(data)),
+        // Sign is never lost as ts.nanos is always non negative (per proto spec)
+        #[allow(clippy::cast_sign_loss)]
         Some(value::Kind::Timestamp(ts)) => Some(super::Value::Timestamp(
             chrono::Utc
                 .timestamp_opt(ts.seconds, ts.nanos as u32)
@@ -739,6 +746,9 @@ fn encode_value(value: super::Value) -> Value {
         kind: match value {
             super::Value::Bytes(b) => Some(value::Kind::RawBytes(b)),
             super::Value::Regex(regex) => Some(value::Kind::RawBytes(regex.as_bytes())),
+            // Value never wraps as timestamp_subsec_nanos returns a value <= 1_999_999_999
+            // (as per chrono leap-second specs), which is below i32::MAX
+            #[allow(clippy::cast_possible_wrap)]
             super::Value::Timestamp(ts) => Some(value::Kind::Timestamp(prost_types::Timestamp {
                 seconds: ts.timestamp(),
                 nanos: ts.timestamp_subsec_nanos() as i32,

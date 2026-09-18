@@ -89,8 +89,8 @@ generated: components: sinks: datadog_metrics: configuration: {
 		description: """
 			The endpoint to send observability data to.
 
-			The endpoint must contain an HTTP scheme, and may specify a hostname or IP
-			address and port. The API path should NOT be specified as this is handled by
+			The endpoint must be an absolute HTTP(S) URL. A missing scheme defaults
+			to `https`. The API path should NOT be specified as this is handled by
 			the sink.
 
 			If set, overrides the `site` option.
@@ -295,11 +295,14 @@ generated: components: sinks: datadog_metrics: configuration: {
 		type: string: {
 			default: "v2"
 			enum: {
-				v1: """
-					Use the v1 series endpoint (`/api/v1/series`).
+				v1: {
+					deprecated: true
+					description: """
+						Use the v1 series endpoint (`/api/v1/series`).
 
-					This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
-					"""
+						This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
+						"""
+				}
 				v2: """
 					Use the v2 series endpoint (`/api/v2/series`).
 

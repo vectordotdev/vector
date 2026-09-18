@@ -5,22 +5,26 @@ use std::{collections::HashMap, time::Instant};
 use futures::Stream;
 #[cfg(any(test, feature = "test"))]
 use futures::StreamExt as _;
-#[cfg(any(test, feature = "test"))]
-use metrics::histogram;
 use vector_buffers::EventCount;
 #[cfg(any(test, feature = "test"))]
 use vector_buffers::topology::channel::LimitedReceiver;
+#[cfg(any(test, feature = "test"))]
+use vector_common::histogram;
 #[cfg(any(test, feature = "test"))]
 use vector_common::internal_event::DEFAULT_OUTPUT;
 #[cfg(doc)]
 use vector_common::internal_event::{ComponentEventsDropped, EventsSent};
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    finalization::{AddBatchNotifier, BatchNotifier},
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizerGroups, EventFinalizers, Finalizable,
+    },
     json_size::JsonSize,
 };
 
-use super::{Builder, Output, SendError};
+use std::sync::Arc;
+
+use super::{Builder, Output, PostProcessor, SendError};
 #[cfg(any(test, feature = "test"))]
 use super::{
     LAG_TIME_NAME, OutputMetrics, SEND_BATCH_LATENCY_NAME, SEND_LATENCY_NAME, TEST_BUFFER_SIZE,
@@ -52,6 +56,16 @@ pub struct SourceSenderItem {
 impl AddBatchNotifier for SourceSenderItem {
     fn add_batch_notifier(&mut self, notifier: BatchNotifier) {
         self.events.add_batch_notifier(notifier);
+    }
+}
+
+impl Finalizable for SourceSenderItem {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.events.take_finalizers()
+    }
+
+    fn take_finalizer_groups(&mut self) -> EventFinalizerGroups {
+        self.events.take_finalizer_groups()
     }
 }
 
@@ -102,6 +116,17 @@ pub struct SourceSender {
 impl SourceSender {
     pub fn builder() -> Builder {
         Builder::default()
+    }
+
+    /// Attach a post-processing step to every output on this sender, replacing any previously set
+    /// one.
+    pub fn set_post_processor(&mut self, pp: &Arc<dyn PostProcessor>) {
+        if let Some(output) = &mut self.default_output {
+            output.set_post_processor(Arc::clone(pp));
+        }
+        for output in self.named_outputs.values_mut() {
+            output.set_post_processor(Arc::clone(pp));
+        }
     }
 
     #[cfg(any(test, feature = "test"))]

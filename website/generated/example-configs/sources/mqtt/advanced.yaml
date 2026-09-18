@@ -1,0 +1,9 @@
+sources:
+  my_source_id:
+    type: mqtt
+    host: mqtt.example.com
+    keep_alive: 60
+    max_packet_size: 10240
+    port: 1883
+    topic: vector
+    topic_key: topic

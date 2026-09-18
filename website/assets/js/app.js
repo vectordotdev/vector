@@ -1,8 +1,10 @@
 {{ $latest := index site.Data.docs.versions 0 }}
 {{ $defaultPlatformTab := index site.Home.Params.platform.tabs 0 }}
 {{ $siteGeneration := site.Params.site_generation }}
-import '@ryangjchandler/spruce';
-import 'alpinejs';
+import Alpine from 'alpinejs';
+import persist from '@alpinejs/persist';
+
+Alpine.plugin(persist);
 
 const sayHello = () => {
   console.log('Welcome to the Vector website and documentation!');
@@ -13,7 +15,9 @@ const clearLocalStorageOnNewGeneration = () => {
   const storedGeneration = localStorage.getItem('generation');
 
   if ((storedGeneration != null) && (storedGeneration < currentGeneration)) {
-    ['__spruce:global'].forEach((item) => localStorage.removeItem(item));
+    Object.keys(localStorage)
+      .filter((item) => item.startsWith('__alpine:global:'))
+      .forEach((item) => localStorage.removeItem(item));
   }
 
   localStorage.setItem('generation', currentGeneration);
@@ -21,27 +25,28 @@ const clearLocalStorageOnNewGeneration = () => {
 
 /* Global state management */
 const manageState = () => {
-  // Persist global state in localStorage
-  const useLocalStorage = true;
-
   // Detect the user's dark mode preference and set that to the default
   const darkModeDefault = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const persistValue = (key, defaultValue) =>
+    Alpine.$persist(defaultValue)
+      .using(localStorage)
+      .as(`__alpine:global:${key}`);
 
-  window.Spruce.store('global', {
+  Alpine.store('global', {
     // Dark mode state
-    dark: darkModeDefault,
+    dark: persistValue('dark', darkModeDefault),
     // Whether the top banner is showing (user can dismiss)
-    banner: true,
+    banner: persistValue('banner', true),
     // The Vector version selected (for the download and releases pages)
-    version: '{{ $latest }}',
+    version: persistValue('version', '{{ $latest }}'),
     // A "backup" version for use in release toggling
-    versionBackup: '{{ $latest }}',
+    versionBackup: persistValue('versionBackup', '{{ $latest }}'),
     // Release version
-    release: 'stable',
+    release: persistValue('release', 'stable'),
     // Home page platform tab
-    platformTab: '{{ $defaultPlatformTab }}',
+    platformTab: persistValue('platformTab', '{{ $defaultPlatformTab }}'),
     // Config format
-    format: 'yaml',
+    format: persistValue('format', 'yaml'),
 
     // Helper functions
     setFormat(f) {
@@ -98,13 +103,15 @@ const manageState = () => {
     isNightly() {
       return this.release === 'nightly';
     },
-  }, useLocalStorage);
+  });
+
 }
 
 const main = () => {
   sayHello();
   clearLocalStorageOnNewGeneration();
   manageState();
+  Alpine.start();
 }
 
 main();

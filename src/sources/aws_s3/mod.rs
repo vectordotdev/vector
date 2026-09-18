@@ -1,14 +1,18 @@
 use std::convert::TryInto;
 
 use async_compression::tokio::bufread;
+use aws_sdk_s3::types::RequestPayer;
 use aws_smithy_types::byte_stream::ByteStream;
 use futures::{TryStreamExt, stream, stream::StreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
+use vector_common::compression::gzip_multiple_decoder;
 use vector_lib::{
     codecs::{
         NewlineDelimitedDecoderConfig,
-        decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions},
+        decoding::{
+            DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions, OversizedAction,
+        },
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
@@ -33,7 +37,6 @@ pub mod sqs;
 
 /// Compression scheme for objects retrieved from S3.
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Compression {
@@ -54,6 +57,23 @@ pub enum Compression {
 
     /// ZSTD.
     Zstd,
+}
+
+/// Payer for requests to Amazon S3.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum S3RequestPayer {
+    /// The requester accepts the S3 request and data transfer charges.
+    Requester,
+}
+
+impl From<S3RequestPayer> for RequestPayer {
+    fn from(request_payer: S3RequestPayer) -> Self {
+        match request_payer {
+            S3RequestPayer::Requester => Self::Requester,
+        }
+    }
 }
 
 /// Strategies for consuming objects from AWS S3.
@@ -131,6 +151,17 @@ pub struct AwsS3Config {
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
+    /// Enables retrieving objects from [S3 Requester Pays buckets][requester_pays].
+    ///
+    /// Set this to `requester` to acknowledge that the AWS account associated with Vector's
+    /// configured credentials accepts the request and data transfer charges.
+    ///
+    /// When unset, Vector does not specify a request payer.
+    ///
+    /// [requester_pays]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/RequesterPaysBuckets.html
+    #[configurable(metadata(docs::advanced))]
+    request_payer: Option<S3RequestPayer>,
+
     /// Specifies which addressing style to use.
     ///
     /// This controls whether the bucket name is in the hostname, or part of the URL.
@@ -142,7 +173,10 @@ pub struct AwsS3Config {
 const fn default_framing() -> FramingConfig {
     // This is used for backwards compatibility. It used to be the only (hardcoded) option.
     FramingConfig::NewlineDelimited(NewlineDelimitedDecoderConfig {
-        newline_delimited: NewlineDelimitedDecoderOptions { max_length: None },
+        newline_delimited: NewlineDelimitedDecoderOptions {
+            max_length: None,
+            oversized_action: OversizedAction::Drop,
+        },
     })
 }
 
@@ -277,7 +311,10 @@ impl AwsS3Config {
                     sqs_client,
                     s3_client,
                     sqs.clone(),
-                    self.compression,
+                    sqs::S3Options {
+                        compression: self.compression,
+                        request_payer: self.request_payer,
+                    },
                     multiline,
                     decoder,
                 )
@@ -330,11 +367,7 @@ async fn s3_object_decoder(
     match compression {
         Auto => unreachable!(), // is mapped above
         None => Box::new(r),
-        Gzip => Box::new({
-            let mut decoder = bufread::GzipDecoder::new(r);
-            decoder.multiple_members(true);
-            decoder
-        }),
+        Gzip => Box::new(gzip_multiple_decoder(r)),
         Zstd => Box::new({
             let mut decoder = bufread::ZstdDecoder::new(r);
             decoder.multiple_members(true);
@@ -394,6 +427,25 @@ mod test {
     use tokio::io::AsyncReadExt;
 
     use super::*;
+
+    #[test]
+    fn request_payer_config() {
+        let config: AwsS3Config = serde_yaml::from_str("{}").unwrap();
+        assert_eq!(config.request_payer, None);
+
+        let config: AwsS3Config = serde_yaml::from_str("request_payer: requester").unwrap();
+        assert_eq!(config.request_payer, Some(S3RequestPayer::Requester));
+
+        assert!(serde_yaml::from_str::<AwsS3Config>("request_payer: bucket_owner").is_err());
+    }
+
+    #[test]
+    fn request_payer_converts_to_aws_sdk_type() {
+        assert_eq!(
+            RequestPayer::from(S3RequestPayer::Requester),
+            RequestPayer::Requester
+        );
+    }
 
     #[test]
     fn determine_compression() {

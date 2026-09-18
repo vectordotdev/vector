@@ -9,7 +9,6 @@ components: transforms: reduce: {
 		"""
 
 	classes: {
-		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      true

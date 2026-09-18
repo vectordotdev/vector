@@ -7,7 +7,7 @@ use vector::{app::Application, extra_context::ExtraContext};
 
 #[cfg(unix)]
 fn main() -> ExitCode {
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(all(unix, feature = "tikv-jemallocator"))]
     {
         use std::sync::atomic::Ordering;
 

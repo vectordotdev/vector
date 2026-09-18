@@ -27,6 +27,6 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - run: sudo apt-get install --yes bc
+      - run: timeout 30m sudo apt-get install --yes bc
       - run: bash distribution/install.sh -- -y
       - run: ~/.vector/bin/vector --version

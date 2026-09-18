@@ -18,12 +18,14 @@ mod integration_test {
         event::{BatchNotifier, BatchStatus},
         lookup::lookup_v2::ConfigTargetPath,
     };
+    use vrl::event_path;
 
     use super::super::{config::KafkaSinkConfig, sink::KafkaSink, *};
     use crate::{
         event::{ObjectMap, TraceEvent, Value},
         kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig},
         sinks::prelude::*,
+        template::ConfinementConfig,
         test_util::{
             components::{
                 DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
@@ -42,15 +44,27 @@ mod integration_test {
         format!("{}:{}", kafka_host(), port)
     }
 
+    // Tests exercise the sink itself, not confinement; build a checkerless confined topic.
+    fn confined_topic(topic: Template) -> ConfinedTemplate {
+        topic
+            .confine(
+                &ConfinementConfig::default(),
+                KafkaSinkConfig::NAME,
+                "topic",
+            )
+            .unwrap()
+    }
+
     #[tokio::test]
     async fn healthcheck() {
         crate::test_util::trace_init();
 
         let topic = format!("test-{}", random_string(10));
+        let topic = Template::try_from(topic.clone()).unwrap();
 
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
-            topic: Template::try_from(topic.clone()).unwrap(),
+            topic: topic.clone(),
             healthcheck_topic: None,
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
@@ -64,8 +78,9 @@ mod integration_test {
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
-        self::sink::healthcheck(config, Default::default())
+        self::sink::healthcheck(config.clone(), confined_topic(topic), Default::default())
             .await
             .unwrap();
     }
@@ -75,10 +90,11 @@ mod integration_test {
         crate::test_util::trace_init();
 
         let topic = format!("{{ {} }}", random_string(10));
+        let topic = Template::try_from(topic.clone()).unwrap();
 
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
-            topic: Template::try_from(topic.clone()).unwrap(),
+            topic: topic.clone(),
             healthcheck_topic: Some(String::from("topic-1234")),
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
@@ -92,8 +108,9 @@ mod integration_test {
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
-        self::sink::healthcheck(config, Default::default())
+        self::sink::healthcheck(config.clone(), confined_topic(topic), Default::default())
             .await
             .unwrap();
     }
@@ -176,9 +193,10 @@ mod integration_test {
         librdkafka_options: HashMap<String, String>,
     ) -> crate::Result<KafkaSink> {
         let topic = format!("test-{}", random_string(10));
+        let topic = Template::try_from(format!("{topic}-%Y%m%d")).unwrap();
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
-            topic: Template::try_from(format!("{topic}-%Y%m%d")).unwrap(),
+            topic: topic.clone(),
             compression: KafkaCompression::None,
             healthcheck_topic: None,
             encoding: TextSerializerConfig::default().into(),
@@ -195,10 +213,12 @@ mod integration_test {
             librdkafka_options,
             headers_key: None,
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         config.clone().to_rdkafka()?;
-        self::sink::healthcheck(config.clone(), Default::default()).await?;
-        KafkaSink::new(config)
+        let topic = confined_topic(topic);
+        self::sink::healthcheck(config.clone(), topic.clone(), Default::default()).await?;
+        KafkaSink::new(config.clone(), topic)
     }
 
     #[tokio::test]
@@ -317,7 +337,8 @@ mod integration_test {
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let topic_prefix = format!("test-trace-{}", random_string(10));
-            let topic = format!("{}-{}", topic_prefix, chrono::Utc::now().format("%Y%m%d"));
+            let topic_now = format!("{}-{}", topic_prefix, chrono::Utc::now().format("%Y%m%d"));
+            let topic = Template::try_from(format!("{topic_prefix}-%Y%m%d")).unwrap();
             let key_field = ConfigTargetPath::try_from("trace_key".to_string()).unwrap();
             let headers_key = ConfigTargetPath::try_from("trace_headers".to_string()).unwrap();
             let trace_key = "trace-partition-key";
@@ -326,7 +347,7 @@ mod integration_test {
 
             let config = KafkaSinkConfig {
                 bootstrap_servers: kafka_address(9091),
-                topic: Template::try_from(format!("{topic_prefix}-%Y%m%d")).unwrap(),
+                topic: topic.clone(),
                 healthcheck_topic: None,
                 key_field: Some(key_field.clone()),
                 encoding: JsonSerializerConfig::default().into(),
@@ -340,6 +361,7 @@ mod integration_test {
                 librdkafka_options: HashMap::new(),
                 headers_key: Some(headers_key.clone()),
                 acknowledgements: Default::default(),
+                confinement: Default::default(),
             };
 
             let num_events = 100;
@@ -352,9 +374,9 @@ mod integration_test {
                 expected_messages.push(message.clone());
 
                 let mut trace = TraceEvent::default();
-                trace.insert("message", message);
-                trace.insert("trace_key", trace_key);
-                trace.insert("timestamp", chrono::Utc::now());
+                trace.insert(event_path!("message"), message);
+                trace.insert(event_path!("trace_key"), trace_key);
+                trace.insert(event_path!("timestamp"), chrono::Utc::now());
 
                 let mut trace_headers = ObjectMap::new();
                 trace_headers.insert(header_key.into(), Value::Bytes(Bytes::from(header_value)));
@@ -363,7 +385,7 @@ mod integration_test {
                 events.push(Event::Trace(trace.with_batch_notifier(&batch)));
             }
 
-            let sink = KafkaSink::new(config).unwrap();
+            let sink = KafkaSink::new(config.clone(), confined_topic(topic)).unwrap();
             let sink = VectorSink::from_event_streamsink(sink);
             let stream = map_event_batch_stream(stream::iter(events), Some(batch));
             sink.run(stream).await.unwrap();
@@ -375,14 +397,14 @@ mod integration_test {
             client_config.set("group.id", random_string(10));
             client_config.set("enable.partition.eof", "true");
             let mut tpl = TopicPartitionList::new();
-            tpl.add_partition(&topic, 0)
+            tpl.add_partition(&topic_now, 0)
                 .set_offset(Offset::Beginning)
                 .unwrap();
             let consumer: BaseConsumer = client_config.create().unwrap();
             consumer.assign(&tpl).unwrap();
 
             wait_for(
-                || match consumer.fetch_watermarks(&topic, 0, Duration::from_secs(3)) {
+                || match consumer.fetch_watermarks(&topic_now, 0, Duration::from_secs(3)) {
                     Ok((_low, high)) => ready(high >= num_events as i64),
                     Err(err) => {
                         println!("retrying due to error fetching watermarks: {err}");
@@ -393,7 +415,7 @@ mod integration_test {
             .await;
 
             let (low, high) = consumer
-                .fetch_watermarks(&topic, 0, Duration::from_secs(3))
+                .fetch_watermarks(&topic_now, 0, Duration::from_secs(3))
                 .unwrap();
             assert_eq!((0, num_events as i64), (low, high));
 
@@ -454,11 +476,12 @@ mod integration_test {
         }
 
         let topic = format!("test-{}", random_string(10));
+        let topic_template = Template::try_from(format!("{topic}-%Y%m%d")).unwrap();
         let headers_key = ConfigTargetPath::try_from("headers_key".to_string()).unwrap();
         let kafka_auth = KafkaAuthConfig { sasl, tls };
         let config = KafkaSinkConfig {
             bootstrap_servers: server.clone(),
-            topic: Template::try_from(format!("{topic}-%Y%m%d")).unwrap(),
+            topic: topic_template.clone(),
             healthcheck_topic: None,
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
@@ -472,6 +495,7 @@ mod integration_test {
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),
+            confinement: Default::default(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {topic:?}");
@@ -495,9 +519,10 @@ mod integration_test {
             events
         });
 
+        let topic_template = confined_topic(topic_template);
         if test_telemetry_tags {
             assert_data_volume_sink_compliance(&DATA_VOLUME_SINK_TAGS, async move {
-                let sink = KafkaSink::new(config).unwrap();
+                let sink = KafkaSink::new(config.clone(), topic_template).unwrap();
                 let sink = VectorSink::from_event_streamsink(sink);
                 sink.run(input_events).await
             })
@@ -505,7 +530,7 @@ mod integration_test {
             .expect("Running sink failed");
         } else {
             assert_sink_compliance(&SINK_TAGS, async move {
-                let sink = KafkaSink::new(config).unwrap();
+                let sink = KafkaSink::new(config.clone(), topic_template).unwrap();
                 let sink = VectorSink::from_event_streamsink(sink);
                 sink.run(input_events).await
             })

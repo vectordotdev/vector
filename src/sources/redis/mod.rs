@@ -134,16 +134,17 @@ pub struct RedisSourceConfig {
 }
 
 impl GenerateConfig for RedisSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
             r#"
-            url = "redis://127.0.0.1:6379/0"
-            key = "vector"
-            data_type = "list"
-            list.method = "lpop"
-            redis_key = "redis_key"
+            url: "redis://127.0.0.1:6379/0"
+            key: vector
+            data_type: list
+            list:
+              method: lpop
+            redis_key: redis_key
             "#,
-        )
+        })
         .unwrap()
     }
 }

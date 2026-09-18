@@ -3,7 +3,7 @@ import * as cheerio from "cheerio";
 import { Element } from "domhandler";
 import dotEnv from "dotenv-defaults";
 import fs from "fs";
-import glob from "glob-promise";
+import { glob } from "glob";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";

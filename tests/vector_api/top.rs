@@ -410,3 +410,72 @@ async fn multi_output_transform_reports_per_output_sent_events() {
         "Never received non-empty output_totals for splitter transform within timeout"
     );
 }
+
+/// Regression test: `component_errors_total` emitted from a spawned task must carry
+/// the component's tracing span so that the metric is labelled with `component_id`.
+///
+/// The gcp_pubsub source immediately tries to connect to a non-existent endpoint from
+/// inside a `tokio::spawn`-ed per-stream task.  Before the `spawn_in_current_span` fix
+/// the task ran without the component span, so the counter had no `component_id` tag
+/// and never appeared in the API's `ErrorsTotal` stream.  With the fix the tag is
+/// present and the stream delivers an entry for `component_id = "gcp"`.
+#[tokio::test]
+async fn gcp_pubsub_spawned_task_errors_carry_component_span() {
+    // Point the source at an unreachable local endpoint so the per-stream task
+    // immediately gets ECONNREFUSED, emitting GcpPubsubConnectError
+    // (component_errors_total) on every retry.
+    let mut runner = TestHarness::new(indoc! {"
+        sources:
+          gcp:
+            type: gcp_pubsub
+            project: test-project
+            subscription: test-subscription
+            endpoint: http://127.0.0.1:1
+            skip_authentication: true
+
+        sinks:
+          blackhole:
+            type: blackhole
+            inputs: ['gcp']
+    "})
+    .await
+    .expect("Failed to start Vector");
+
+    // Stream ErrorsTotal every 200 ms; look for a non-zero entry attributed to "gcp".
+    let mut stream = runner
+        .api_client()
+        .stream_component_metrics(MetricName::ErrorsTotal, 200)
+        .await
+        .expect("Failed to open errors_total stream");
+
+    let deadline = tokio::time::Instant::now() + EVENT_PROCESSING_TIMEOUT;
+    let mut found = false;
+
+    while tokio::time::Instant::now() < deadline {
+        match tokio::time::timeout(std::time::Duration::from_millis(500), stream.next()).await {
+            Ok(Some(Ok(msg))) => {
+                if msg.component_id == "gcp"
+                    && let Some(Value::Total(total)) = msg.value
+                {
+                    assert!(
+                        total.value > 0,
+                        "Expected a positive component_errors_total for 'gcp', got {}",
+                        total.value
+                    );
+                    found = true;
+                    break;
+                }
+            }
+            Ok(Some(Err(e))) => panic!("Stream error: {e}"),
+            Ok(None) => panic!("Stream ended unexpectedly"),
+            Err(_) => continue, // poll timeout, keep looping
+        }
+    }
+
+    assert!(
+        found,
+        "component_errors_total was never attributed to component_id='gcp' within the timeout. \
+         This means the spawned per-stream task ran without the component's tracing span, \
+         so its metrics counters had no component_id tag and were invisible to the API."
+    );
+}

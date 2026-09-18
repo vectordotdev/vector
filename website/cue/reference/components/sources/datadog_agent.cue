@@ -10,8 +10,7 @@ components: sources: datadog_agent: {
 		"""
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"
@@ -83,6 +82,13 @@ components: sources: datadog_agent: {
 				If [multiple_outputs](#multiple_outputs) is enabled, received trace events will go to this output stream. Use `<component_id>.traces` as an input to downstream transforms and sinks.
 				"""
 		},
+		{
+			name: "llmobs"
+			description: """
+				If [multiple_outputs](#multiple_outputs) is enabled, received LLM Observability events will go to this output stream. Use `<component_id>.llmobs` as an input to downstream transforms and sinks.
+				"""
+		},
+
 	]
 
 	output: {

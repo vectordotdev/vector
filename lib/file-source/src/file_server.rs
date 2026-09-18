@@ -148,7 +148,7 @@ where
         let mut stats = TimingStats::default();
 
         // Spawn the checkpoint writer task
-        let checkpoint_task_handle = tokio::spawn(checkpoint_writer(
+        let checkpoint_task_handle = vector_common::spawn_in_current_span(checkpoint_writer(
             checkpointer,
             self.glob_minimum_cooldown,
             shutdown_checkpointer,
@@ -411,7 +411,7 @@ where
             };
             futures::pin_mut!(sleep);
             match select(shutdown_data, sleep).await {
-                Either::Left((_, _)) => {
+                Either::Left((_shutdown_token, _)) => {
                     chans
                         .close()
                         .await
@@ -423,6 +423,8 @@ where
                         error!(?error, "Error writing checkpoints before shutdown");
                     }
                     return Ok(Shutdown);
+                    // _shutdown_token is dropped here, after checkpoints are written,
+                    // which signals shutdown_done to the caller.
                 }
                 Either::Right((_, future)) => shutdown_data = future,
             }

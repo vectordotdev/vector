@@ -14,7 +14,6 @@ components: sinks: azure_logs_ingestion: {
 		"""
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -29,7 +28,6 @@ components: sinks: azure_logs_ingestion: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}

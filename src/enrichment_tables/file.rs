@@ -239,6 +239,7 @@ impl EnrichmentTableConfig for FileConfig {
     async fn build(
         &self,
         globals: &crate::config::GlobalOptions,
+        _prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         Ok(Box::new(File::new(
             self.clone(),

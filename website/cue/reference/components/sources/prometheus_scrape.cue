@@ -2,11 +2,9 @@ package metadata
 
 components: sources: prometheus_scrape: {
 	title: "Prometheus Scrape"
-	alias: "prometheus"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"

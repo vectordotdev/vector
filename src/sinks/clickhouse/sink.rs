@@ -6,8 +6,8 @@ use crate::sinks::{prelude::*, util::http::HttpRequest};
 pub struct ClickhouseSink<S> {
     batch_settings: BatcherSettings,
     service: S,
-    database: Template,
-    table: Template,
+    database: ConfinedTemplate,
+    table: ConfinedTemplate,
     format: Format,
     request_builder: ClickhouseRequestBuilder,
 }
@@ -22,8 +22,8 @@ where
     pub const fn new(
         batch_settings: BatcherSettings,
         service: S,
-        database: Template,
-        table: Template,
+        database: ConfinedTemplate,
+        table: ConfinedTemplate,
         format: Format,
         request_builder: ClickhouseRequestBuilder,
     ) -> Self {
@@ -92,13 +92,13 @@ pub struct PartitionKey {
 
 /// KeyPartitioner that partitions events by (database, table) pair.
 struct KeyPartitioner {
-    database: Template,
-    table: Template,
+    database: ConfinedTemplate,
+    table: ConfinedTemplate,
     format: Format,
 }
 
 impl KeyPartitioner {
-    const fn new(database: Template, table: Template, format: Format) -> Self {
+    const fn new(database: ConfinedTemplate, table: ConfinedTemplate, format: Format) -> Self {
         Self {
             database,
             table,
@@ -106,7 +106,7 @@ impl KeyPartitioner {
         }
     }
 
-    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
+    fn render(template: &ConfinedTemplate, item: &Event, field: &'static str) -> Option<String> {
         template
             .render_string(item)
             .map_err(|error| {

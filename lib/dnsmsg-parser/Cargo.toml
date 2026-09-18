@@ -6,8 +6,8 @@ edition = "2024"
 publish = false
 license = "MIT"
 
-[lints.clippy]
-unwrap-used = "forbid"
+[lints]
+workspace = true
 
 [dependencies]
 data-encoding = "2.10"

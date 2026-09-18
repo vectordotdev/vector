@@ -101,9 +101,75 @@ impl Finalizable for EventFinalizers {
     }
 }
 
+impl MergeFinalizable for EventFinalizers {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.merge(finalizers);
+    }
+}
+
 impl std::iter::FromIterator<EventFinalizers> for EventFinalizers {
     fn from_iter<T: IntoIterator<Item = EventFinalizers>>(iter: T) -> Self {
         Self(iter.into_iter().flat_map(|f| f.0.into_iter()).collect())
+    }
+}
+
+/// Ordered groups of event finalizers.
+///
+/// This is used when a bufferable record contains multiple independently-finalized events and the
+/// finalizers must be removed before the record is consumed. The group order matches the event
+/// order, allowing finalizers to be reattached to their original event if the record is recovered
+/// for retry.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct EventFinalizerGroups(Vec<EventFinalizers>);
+
+impl EventFinalizerGroups {
+    /// Creates grouped finalizers from a single flat finalizer collection.
+    #[must_use]
+    pub fn from_flat(finalizers: EventFinalizers) -> Self {
+        Self(vec![finalizers])
+    }
+
+    /// Creates grouped finalizers from ordered per-event finalizer collections.
+    #[must_use]
+    pub fn from_groups(groups: Vec<EventFinalizers>) -> Self {
+        Self(groups)
+    }
+
+    /// Returns the number of finalizer groups.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns `true` if there are no finalizer groups.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Consumes this value and returns the ordered finalizer groups.
+    #[must_use]
+    pub fn into_groups(self) -> Vec<EventFinalizers> {
+        self.0
+    }
+
+    /// Consumes this value and flattens all groups into one finalizer collection.
+    #[must_use]
+    pub fn flatten(self) -> EventFinalizers {
+        self.0.into_iter().collect()
+    }
+
+    /// Updates the status of all finalizers in all groups.
+    pub fn update_status(&self, status: EventStatus) {
+        for group in &self.0 {
+            group.update_status(status);
+        }
+    }
+}
+
+impl FromIterator<EventFinalizers> for EventFinalizerGroups {
+    fn from_iter<T: IntoIterator<Item = EventFinalizers>>(iter: T) -> Self {
+        EventFinalizerGroups(Vec::from_iter(iter))
     }
 }
 
@@ -378,6 +444,38 @@ pub trait Finalizable {
     /// Typically used for coalescing the finalizers of multiple items, such as when batching finalizable objects where
     /// all finalizations will be processed when the batch itself is processed.
     fn take_finalizers(&mut self) -> EventFinalizers;
+
+    /// Consumes this object's finalizers while preserving independent finalizer groups.
+    ///
+    /// The default implementation treats this object as a single finalization group. Container
+    /// types that can later split into independently-finalized events should override this method
+    /// and return one group per event.
+    fn take_finalizer_groups(&mut self) -> EventFinalizerGroups {
+        EventFinalizerGroups::from_flat(self.take_finalizers())
+    }
+}
+
+/// A scalar [`Finalizable`] object whose finalizers can be reattached after being taken.
+pub trait MergeFinalizable: Finalizable {
+    /// Merges the given finalizers back into this object.
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers);
+}
+
+/// A [`Finalizable`] buffer record whose grouped finalizers can be reattached after being taken.
+///
+/// Used to reattach finalizers to a record that is being returned for retry, such as when a
+/// `disk_v2` write is rejected because the buffer is full. Scalar records receive this behavior
+/// automatically through [`MergeFinalizable`]. Containers that can later split into independently
+/// finalized events must implement this trait directly to preserve each finalizer group's owner.
+pub trait GroupedFinalizable: Finalizable {
+    /// Merges grouped finalizers back into this object.
+    fn merge_finalizer_groups(&mut self, finalizers: EventFinalizerGroups);
+}
+
+impl<T: MergeFinalizable> GroupedFinalizable for T {
+    fn merge_finalizer_groups(&mut self, finalizers: EventFinalizerGroups) {
+        self.merge_finalizers(finalizers.flatten());
+    }
 }
 
 impl<T: Finalizable> Finalizable for Vec<T> {
@@ -450,6 +548,22 @@ mod tests {
         assert_eq!(receiver1.try_recv(), Err(Empty));
         assert_eq!(receiver2.try_recv(), Err(Empty));
         drop(fin0);
+        assert_eq!(receiver1.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver2.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[test]
+    fn scalar_grouped_merge_flattens_groups() {
+        let (fin1, mut receiver1) = make_finalizer();
+        let (fin2, mut receiver2) = make_finalizer();
+        let mut merged = EventFinalizers::default();
+
+        merged.merge_finalizer_groups(EventFinalizerGroups::from_groups(vec![fin1, fin2]));
+        assert_eq!(merged.len(), 2);
+        assert_eq!(receiver1.try_recv(), Err(Empty));
+        assert_eq!(receiver2.try_recv(), Err(Empty));
+
+        drop(merged);
         assert_eq!(receiver1.try_recv(), Ok(BatchStatus::Delivered));
         assert_eq!(receiver2.try_recv(), Ok(BatchStatus::Delivered));
     }

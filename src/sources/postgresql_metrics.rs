@@ -295,7 +295,7 @@ impl PostgresqlClient {
                             endpoint: &self.endpoint,
                         }
                     })?;
-                tokio::spawn(connection);
+                crate::spawn_in_current_span(connection);
                 client
             }
             None => {
@@ -306,7 +306,7 @@ impl PostgresqlClient {
                         .with_context(|_| ConnectionFailedSnafu {
                             endpoint: &self.endpoint,
                         })?;
-                tokio::spawn(connection);
+                crate::spawn_in_current_span(connection);
                 client
             }
         };

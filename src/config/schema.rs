@@ -30,6 +30,8 @@ pub struct Options {
 
     /// Controls how metadata is stored in log events.
     ///
+    /// This feature is in beta and behavior may change.
+    ///
     /// When set to `false` (legacy mode), metadata fields like `host`, `timestamp`, and `source_type`
     /// are stored as top-level fields alongside your log data.
     ///
@@ -38,6 +40,10 @@ pub struct Options {
     ///
     /// See the [Log Namespacing guide](/guides/level-up/log_namespace/) for detailed information
     /// about when to use Vector namespace mode and how to migrate from legacy mode.
+    #[configurable(metadata(
+        status = "beta",
+        docs::warnings = "Enabling log namespacing currently does not work when disk buffers are used. Avoid combining `schema.log_namespace = true` with disk buffers until [#18574](https://github.com/vectordotdev/vector/issues/18574) is resolved."
+    ))]
     pub log_namespace: Option<bool>,
 }
 

@@ -1,10 +1,11 @@
 use std::time::Duration;
 
 use http::response::Response;
-use metrics::{counter, histogram};
 use tonic::Code;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_lib::{
+    NamedInternalEvent, counter, histogram,
+    internal_event::{CounterName, HistogramName, InternalEvent, error_stage, error_type},
+};
 
 const GRPC_STATUS_LABEL: &str = "grpc_status";
 
@@ -13,7 +14,7 @@ pub struct GrpcServerRequestReceived;
 
 impl InternalEvent for GrpcServerRequestReceived {
     fn emit(self) {
-        counter!("grpc_server_messages_received_total").increment(1);
+        counter!(CounterName::GrpcServerMessagesReceivedTotal).increment(1);
     }
 }
 
@@ -34,8 +35,8 @@ impl<B> InternalEvent for GrpcServerResponseSent<'_, B> {
         let grpc_code = grpc_code_to_name(grpc_code);
 
         let labels = &[(GRPC_STATUS_LABEL, grpc_code)];
-        counter!("grpc_server_messages_sent_total", labels).increment(1);
-        histogram!("grpc_server_handler_duration_seconds", labels).record(self.latency);
+        counter!(CounterName::GrpcServerMessagesSentTotal, labels).increment(1);
+        histogram!(HistogramName::GrpcServerHandlerDurationSeconds, labels).record(self.latency);
     }
 }
 
@@ -53,7 +54,7 @@ impl InternalEvent for GrpcInvalidCompressionSchemeError<'_> {
             stage = error_stage::RECEIVING
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         )
@@ -78,7 +79,7 @@ where
             stage = error_stage::RECEIVING
         );
         counter!(
-            "component_errors_total",
+            CounterName::ComponentErrorsTotal,
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::RECEIVING,
         )

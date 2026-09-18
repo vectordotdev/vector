@@ -14,7 +14,6 @@ Vector team member will find this document useful.
   - [Git Commits](#git-commits)
     - [Style](#style)
   - [GitHub Pull Requests](#github-pull-requests)
-    - [Title](#title)
     - [Reviews & Approvals](#reviews--approvals)
     - [Merge Style](#merge-style)
   - [CI](#ci)
@@ -39,6 +38,8 @@ Vector team member will find this document useful.
 2. **You've read Vector's [docs](https://vector.dev/docs/).**
 3. **You know about the [Vector community](https://vector.dev/community/).
    Please use this for help.**
+4. **You've read our [AI Policy](AI_POLICY.md)** if you plan to use AI tools
+   in your contribution.
 
 ## Your First Contribution
 
@@ -148,8 +149,10 @@ make check-deny
 make check-docs
 make check-examples
 make check-scripts
+make check-changelog-fragments
 
-./scripts/check_changelog_fragments.sh
+# Spell-check the codebase (fast, requires typos-cli: cargo install typos-cli)
+typos
 
 # The following check is very slow.
 # make check-component-features
@@ -162,29 +165,6 @@ relevant to your PR. This command is defined in the
 ### GitHub Pull Requests
 
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
-
-#### Title
-
-The pull request title must follow the format outlined in the [conventional commits spec](https://www.conventionalcommits.org).
-[Conventional commits](https://www.conventionalcommits.org) is a standardized
-format for commit messages. Vector only requires this format for commits on
-the `master` branch. And because Vector squashes commits before merging
-branches, this means that only the pull request title must conform to this
-format. Vector performs a pull request check to verify the pull request title
-in case you forget.
-
-A list of allowed sub-categories is defined in the
-[semantic.yml workflow](https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L21).
-
-The following are all good examples of pull request titles:
-
-```text
-feat(new sink): new `xyz` sink
-feat(tcp source): add foo bar baz feature
-fix(tcp source): fix foo bar baz bug
-chore: improve build process
-docs: fix typos
-```
 
 #### Reviews & Approvals
 
@@ -309,7 +289,7 @@ git push
 
 ### Deprecations
 
-When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.md).
+When deprecating functionality in Vector, see [DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md).
 
 ### Dependencies
 
@@ -325,7 +305,7 @@ documents:
 
 1. **[DEVELOPING.md](docs/DEVELOPING.md)** - Everything necessary to develop
 2. **[DOCUMENTING.md](docs/DOCUMENTING.md)** - Preparing your change for Vector users
-3. **[DEPRECATION.md](docs/DEPRECATION.md)** - Deprecating functionality in Vector
+3. **[DEPRECATION_POLICY.md](docs/DEPRECATION_POLICY.md)** - Deprecating functionality in Vector
 
 ## Legal
 

@@ -1,6 +1,6 @@
 use hickory_proto::{
     ProtoError,
-    serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder},
+    serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder, DecodeError},
 };
 
 pub const EDE_OPTION_CODE: u16 = 15u16;
@@ -77,14 +77,15 @@ impl BinEncodable for EDE {
 }
 
 impl<'a> BinDecodable<'a> for EDE {
-    fn read(decoder: &mut BinDecoder<'a>) -> Result<Self, ProtoError> {
+    fn read(decoder: &mut BinDecoder<'a>) -> Result<Self, DecodeError> {
         let info_code = decoder.read_u16()?.unverified();
         let extra_text = if decoder.is_empty() {
             None
         } else {
-            Some(String::from_utf8(
-                decoder.read_vec(decoder.len())?.unverified(),
-            )?)
+            Some(
+                String::from_utf8(decoder.read_vec(decoder.len())?.unverified())
+                    .map_err(DecodeError::Utf8)?,
+            )
         };
         Ok(Self {
             info_code,

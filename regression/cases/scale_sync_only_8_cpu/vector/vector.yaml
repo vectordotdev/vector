@@ -1,0 +1,150 @@
+data_dir: "/var/lib/vector"
+
+# 12-step sync chain: parse, enrich, normalize, filter, classify.
+
+sources:
+  internal_metrics:
+    type: "internal_metrics"
+  http_source:
+    type: "http"
+    acknowledgements: false
+    address: "0.0.0.0:8282"
+    decoding:
+      codec: "json"
+
+transforms:
+  # Decode the JSON-encoded raw_message into a nested object.
+  parse_raw_message:
+    type: "remap"
+    inputs: ["http_source"]
+    source: |
+      parsed, err = parse_json(string!(.raw_message))
+      if err == null && is_object(parsed) {
+        .raw_message = parsed
+      }
+
+  # Parse the nginx access-log string in .message.
+  parse_nginx_log:
+    type: "remap"
+    inputs: ["parse_raw_message"]
+    source: |
+      parsed, err = parse_grok(.message, "%{IP:client_ip} - %{NOTSPACE:username} \\[%{HTTPDATE:log_timestamp}\\] \"%{WORD:http_method} %{NOTSPACE:http_url} HTTP/%{NUMBER:http_proto}\" %{INT:http_status} %{INT:http_bytes}")
+      if err == null {
+        .http = {
+          "client_ip": parsed.client_ip,
+          "method": parsed.http_method,
+          "url": parsed.http_url,
+          "status": to_int(parsed.http_status) ?? 0,
+          "bytes": to_int(parsed.http_bytes) ?? 0
+        }
+        .log_timestamp = parsed.log_timestamp
+      }
+
+  # Decode the XML-encoded raw_xml into a nested object.
+  parse_raw_xml:
+    type: "remap"
+    inputs: ["parse_nginx_log"]
+    source: |
+      parsed, err = parse_xml(string!(.raw_xml), attr_prefix: "@", text_key: "#text", parse_bool: true, parse_null: true, parse_number: true)
+      if err == null {
+        .raw_xml = parsed
+      }
+
+  # Stamp the hostname on every event.
+  add_hostname:
+    type: "remap"
+    inputs: ["parse_raw_xml"]
+    source: |
+      .hostname = get_env_var("HOSTNAME") ?? "unknown"
+
+  # Copy PIPELINE_ENV into each event.
+  add_pipeline_env:
+    type: "remap"
+    inputs: ["add_hostname"]
+    source: |
+      .pipeline_env = get_env_var("PIPELINE_ENV") ?? "unknown"
+
+  # Static pipeline metadata.
+  add_fields:
+    type: "remap"
+    inputs: ["add_pipeline_env"]
+    source: |
+      .pipeline_stage = "ingested"
+      .region_canonical = "us-east-1-prod"
+
+  # Rename host to src_host and region to geo_region.
+  rename_fields:
+    type: "remap"
+    inputs: ["add_fields"]
+    source: |
+      .src_host = del(.host)
+      .geo_region = del(.region)
+
+  # Drop infrastructure-noise keys from ddtags array.
+  filter_ddtags:
+    type: "remap"
+    inputs: ["rename_fields"]
+    source: |
+      excluded = ["filename", "container_id", "image_id", "docker_image"]
+      if is_array(.ddtags) {
+        .ddtags = filter(array!(.ddtags)) -> |_i, tag| {
+          parts = split(string!(tag), ":", limit: 2)
+          !includes(excluded, string!(parts[0]))
+        }
+      }
+
+  # All-pass filter: template emits only the 4 listed services so every event passes.
+  filter_service:
+    type: "filter"
+    inputs: ["filter_ddtags"]
+    condition: |
+      includes(["api-service", "auth-service", "internal-metrics-agent", "billing-service"], to_string(.service) ?? "")
+
+  # Sample 50% per service.
+  sample:
+    type: "sample"
+    inputs: ["filter_service"]
+    rate: 2
+    group_by: "{{ service }}"
+
+  # Classify severity; every event falls into info branch since template emits level=info.
+  classify_severity:
+    type: "remap"
+    inputs: ["sample"]
+    source: |
+      lvl = to_string(.level) ?? "info"
+      msg_low = downcase(to_string(.message) ?? "")
+      if includes(["error", "err", "fatal", "critical"], lvl) || contains(msg_low, "error") || contains(msg_low, "failed") {
+        .severity_class = "error"
+      } else if includes(["warn", "warning"], lvl) || contains(msg_low, "deprecated") {
+        .severity_class = "warning"
+      } else {
+        .severity_class = "info"
+      }
+      .processed_by = "scale_sync_only"
+
+  # Drop now-redundant fields.
+  remove_fields:
+    type: "remap"
+    inputs: ["classify_severity"]
+    source: |
+      del(.span_id)
+      del(.region_canonical)
+
+sinks:
+  prometheus:
+    type: "prometheus_exporter"
+    inputs: ["internal_metrics"]
+    address: "0.0.0.0:9090"
+
+  http_sink:
+    type: "http"
+    inputs: ["remove_fields"]
+    uri: "http://localhost:8080"
+    encoding:
+      codec: "json"
+    healthcheck:
+      enabled: false
+    buffer:
+      type: "memory"
+      max_events: 50000

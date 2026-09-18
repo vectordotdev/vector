@@ -4,7 +4,6 @@ components: sinks: greptimedb_logs: {
 	title: "GreptimeDB Logs"
 
 	classes: {
-		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: greptimedb_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   20
 				timeout_secs: 1.0
 			}

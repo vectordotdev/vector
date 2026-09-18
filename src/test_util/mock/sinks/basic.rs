@@ -26,6 +26,11 @@ pub struct BasicSinkConfig {
     #[serde(skip)]
     healthy: bool,
 
+    /// Optional template-confinement config, so tests can exercise the
+    /// topology-owned `security_confinement_disabled` gauge.
+    #[serde(skip)]
+    confinement: Option<crate::template::ConfinementConfig>,
+
     /// Dummy field used for generating unique configurations to trigger reloads.
     data: Option<String>,
 }
@@ -45,6 +50,7 @@ impl BasicSinkConfig {
         Self {
             sink: Mode::Normal(sink),
             healthy,
+            confinement: None,
             data: None,
         }
     }
@@ -53,8 +59,20 @@ impl BasicSinkConfig {
         Self {
             sink: Mode::Normal(sink),
             healthy,
+            confinement: None,
             data: Some(data.into()),
         }
+    }
+
+    /// Attach a template-confinement config, marking this sink as
+    /// confinement-aware so the topology emits its
+    /// `security_confinement_disabled` gauge. `allowed` sets
+    /// `dangerously_allow_unconfined_template_resolution`.
+    pub fn with_confinement(mut self, allowed: bool) -> Self {
+        self.confinement = Some(crate::template::ConfinementConfig {
+            dangerously_allow_unconfined_template_resolution: allowed,
+        });
+        self
     }
 }
 
@@ -92,6 +110,10 @@ impl SinkConfig for BasicSinkConfig {
 
     fn input(&self) -> Input {
         Input::all()
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        self.confinement.as_ref()
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {

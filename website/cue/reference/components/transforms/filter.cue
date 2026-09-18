@@ -8,7 +8,6 @@ components: transforms: filter: {
 		"""
 
 	classes: {
-		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
 		stateful:      false

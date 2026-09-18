@@ -1,7 +1,7 @@
 use std::{cell::RefCell, marker::PhantomData};
 
+use serde_json::Value;
 use snafu::Snafu;
-use toml::Value;
 use vector_config_common::{attributes::CustomAttribute, constants};
 
 use super::{ComponentMarker, GenerateConfig};
@@ -105,7 +105,7 @@ where
         let mut tag_subschema =
             schema::generate_const_string_schema(self.component_name.to_string());
         let variant_tag_metadata = Metadata::with_description(self.description);
-        schema::apply_base_metadata(&mut tag_subschema, variant_tag_metadata);
+        schema::apply_metadata(&mut tag_subschema, variant_tag_metadata);
 
         let tag_schema =
             schema::generate_internal_tagged_variant_schema("type".to_string(), tag_subschema);
@@ -126,7 +126,7 @@ where
         ));
         variant_metadata
             .add_custom_attribute(CustomAttribute::kv("logical_name", self.logical_name));
-        schema::apply_base_metadata(&mut subschema, variant_metadata);
+        schema::apply_metadata(&mut subschema, variant_metadata);
 
         Ok(subschema)
     }

@@ -3,7 +3,6 @@ package metadata
 components: sinks: redis: {
 	title: "Redis"
 	classes: {
-		commonly_used: false
 		delivery:      "best_effort"
 		development:   "stable"
 		egress_method: "batch"
@@ -18,7 +17,6 @@ components: sinks: redis: {
 			compression: enabled: false
 			batch: {
 				enabled:      true
-				common:       true
 				max_bytes:    null
 				max_events:   1
 				timeout_secs: 1.0
@@ -81,7 +79,5 @@ components: sinks: redis: {
 		}
 	}
 
-	telemetry: metrics: {
-		send_errors_total: components.sources.internal_metrics.output.metrics.send_errors_total
-	}
+	telemetry: metrics: {}
 }

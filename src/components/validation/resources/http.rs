@@ -188,8 +188,8 @@ fn spawn_input_http_server(
         // Wait for the runner to signal us to shutdown
         resource_shutdown_rx.wait().await;
 
-        // Shutdown the server
-        _ = http_server_shutdown_tx.send(());
+        // Shutdown the server; error is ignored since it only fails if the server already stopped.
+        http_server_shutdown_tx.send(()).ok();
 
         info!("HTTP server external input resource marking as done.");
         resource_completed.mark_as_done();
@@ -427,7 +427,7 @@ impl HttpResourceOutputContext<'_> {
             resource_shutdown_rx.wait().await;
 
             // signal the server to shutdown
-            let _ = http_server_shutdown_tx.send(());
+            http_server_shutdown_tx.send(()).ok();
 
             // mark ourselves as done
             resource_completed.mark_as_done();

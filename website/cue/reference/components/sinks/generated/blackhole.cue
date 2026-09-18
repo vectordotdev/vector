@@ -37,7 +37,7 @@ generated: components: sinks: blackhole: configuration: {
 		type: uint: {
 			default: 0
 			examples: [
-				10,
+				10
 			]
 			unit: "seconds"
 		}
@@ -50,7 +50,7 @@ generated: components: sinks: blackhole: configuration: {
 			"""
 		required: false
 		type: uint: examples: [
-			1000,
+			1000
 		]
 	}
 }

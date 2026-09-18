@@ -26,6 +26,7 @@ pub enum ExecVersion {
         /// The configuration to pass to the secrets executable. This is the `config` field in the
         /// backend request. Refer to the documentation of your `backend_type `to see which options
         /// are required to be set.
+        #[configurable(metadata(docs::required = true))]
         backend_config: Value,
     },
 }
@@ -54,8 +55,8 @@ impl ExecVersion {
 }
 
 impl GenerateConfig for ExecVersion {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(ExecVersion::V1).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(ExecVersion::V1).unwrap()
     }
 }
 
@@ -78,8 +79,8 @@ pub struct ExecBackend {
 }
 
 impl GenerateConfig for ExecBackend {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(ExecBackend {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(ExecBackend {
             command: vec![String::from("/path/to/script")],
             timeout: 5,
             protocol: ExecVersion::V1,
@@ -179,7 +180,7 @@ async fn query_backend(
         .ok_or("unable to acquire stdout")?;
 
     let query = serde_json::to_vec(&query)?;
-    tokio::spawn(async move { stdin.write_all(&query).await });
+    crate::spawn_in_current_span(async move { stdin.write_all(&query).await });
 
     let timeout = time::sleep(time::Duration::from_secs(timeout));
     tokio::pin!(timeout);

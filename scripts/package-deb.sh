@@ -13,6 +13,7 @@ set -x
 #   $TARGET         a target triple. ex: arm64-apple-darwin (no default)
 
 TARGET="${TARGET:?"You must specify a target triple, ex: arm64-apple-darwin"}"
+PROFILE="${PROFILE:-release}"
 
 #
 # Local vars
@@ -39,8 +40,8 @@ echo "TARGET: $TARGET"
 td="$(mktemp -d)"
 pushd "$td"
 tar -xvf "$ABSOLUTE_ARCHIVE_PATH"
-mkdir -p "$PROJECT_ROOT/target/$TARGET/release"
-mv "vector-$TARGET/bin/vector" "$PROJECT_ROOT/target/$TARGET/release"
+mkdir -p "$PROJECT_ROOT/target/$TARGET/$PROFILE"
+mv "vector-$TARGET/bin/vector" "$PROJECT_ROOT/target/$TARGET/$PROFILE"
 popd
 rm -rf "$td"
 
@@ -71,7 +72,7 @@ cat LICENSE NOTICE >"$PROJECT_ROOT/target/debian-license.txt"
 #   --no-build
 #     because this step should follow a build
 
-cargo deb --target "$TARGET" --deb-version "${PACKAGE_VERSION}-1" --variant "$TARGET" --no-build --no-strip
+cargo deb --target "$TARGET" --deb-version "${PACKAGE_VERSION}-1" --variant "$TARGET" --no-build --no-strip --profile "$PROFILE"
 
 # Rename the resulting .deb file to remove TARGET from name.
 for file in target/"${TARGET}"/debian/*.deb; do

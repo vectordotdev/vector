@@ -27,7 +27,7 @@ pub(crate) struct PulsarSink {
     encoder: Encoder<()>,
     service: PulsarService<TokioExecutor>,
     config: PulsarSinkConfig,
-    topic_template: Template,
+    topic_template: ConfinedTemplate,
 }
 
 /// Stores the event together with the extracted keys, topics, etc.
@@ -71,9 +71,12 @@ impl EstimatedJsonEncodedSizeOf for PulsarEvent {
     }
 }
 
-pub(crate) async fn healthcheck(config: PulsarSinkConfig) -> crate::Result<()> {
+pub(crate) async fn healthcheck(
+    config: PulsarSinkConfig,
+    topic_template: ConfinedTemplate,
+) -> crate::Result<()> {
     let client = config.create_pulsar_client().await?;
-    let topic = config.topic.render_string(&LogEvent::from_str_legacy(""))?;
+    let topic = topic_template.render_string(&LogEvent::from_str_legacy(""))?;
     client.lookup_topic(topic).await?;
     Ok(())
 }
@@ -82,13 +85,13 @@ impl PulsarSink {
     pub(crate) fn new(
         client: Pulsar<TokioExecutor>,
         config: PulsarSinkConfig,
+        topic_template: ConfinedTemplate,
     ) -> crate::Result<Self> {
         let producer_opts = config.build_producer_options();
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let service = PulsarService::new(client, producer_opts, config.producer_name.clone());
-        let topic_template = config.topic.clone();
 
         Ok(PulsarSink {
             config,

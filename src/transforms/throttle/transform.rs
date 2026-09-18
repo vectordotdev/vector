@@ -3,6 +3,7 @@ use std::{hash::Hash, num::NonZeroU32, pin::Pin, time::Duration};
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use governor::{Quota, clock};
+use metrics::Counter;
 use snafu::Snafu;
 
 use super::{
@@ -14,7 +15,7 @@ use crate::{
     config::TransformContext,
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::TaskTransform,
 };
 
@@ -22,10 +23,11 @@ use crate::{
 pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     pub quota: Quota,
     pub flush_keys_interval: Duration,
-    key_field: Option<Template>,
+    key_field: Option<UnconfinedTemplate>,
     exclude: Option<Condition>,
     pub clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,
+    pub cpu_ns: Option<Counter>,
 }
 
 impl<C, I> Throttle<C, I>
@@ -64,6 +66,7 @@ where
             key_field: config.key_field.clone(),
             exclude,
             internal_metrics: config.internal_metrics.clone(),
+            cpu_ns: context.cpu_ns.clone(),
         })
     }
 
@@ -72,7 +75,7 @@ where
     where
         K: Hash + Eq + Clone + Send + Sync + 'static,
     {
-        RateLimiterRunner::start(self.quota, self.clock.clone(), self.flush_keys_interval)
+        RateLimiterRunner::start(self)
     }
 
     pub fn emit_event_discarded(&self, key: String) {
@@ -147,8 +150,10 @@ mod tests {
     use std::task::Poll;
 
     use futures::SinkExt;
+    use indoc::indoc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -160,12 +165,10 @@ mod tests {
     #[tokio::test]
     async fn throttle_events() {
         let clock = clock::FakeRelativeClock::default();
-        let config = toml::from_str::<ThrottleConfig>(
-            r"
-threshold = 2
-window_secs = 5
-",
-        )
+        let config = serde_yaml::from_str::<ThrottleConfig>(indoc! {"
+            threshold: 2
+            window_secs: 5
+        "})
         .unwrap();
 
         let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
@@ -228,15 +231,11 @@ window_secs = 5
     #[tokio::test]
     async fn throttle_exclude() {
         let clock = clock::FakeRelativeClock::default();
-        let config = toml::from_str::<ThrottleConfig>(
-            r#"
-threshold = 2
-window_secs = 5
-exclude = """
-exists(.special)
-"""
-"#,
-        )
+        let config = serde_yaml::from_str::<ThrottleConfig>(indoc! {"
+            threshold: 2
+            window_secs: 5
+            exclude: \"exists(.special)\"
+        "})
         .unwrap();
 
         let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
@@ -276,7 +275,7 @@ exists(.special)
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
         let mut special_log = LogEvent::default();
-        special_log.insert("special", "true");
+        special_log.insert(event_path!("special"), "true");
         tx.send(special_log.into()).await.unwrap();
         // The rate limiter should allow this log through regardless of current limit
         match out_stream.next().await {
@@ -310,13 +309,11 @@ exists(.special)
     #[tokio::test]
     async fn throttle_buckets() {
         let clock = clock::FakeRelativeClock::default();
-        let config = toml::from_str::<ThrottleConfig>(
-            r#"
-threshold = 1
-window_secs = 5
-key_field = "{{ bucket }}"
-"#,
-        )
+        let config = serde_yaml::from_str::<ThrottleConfig>(indoc! {r#"
+            threshold: 1
+            window_secs: 5
+            key_field: "{{ bucket }}"
+        "#})
         .unwrap();
 
         let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
@@ -333,9 +330,9 @@ key_field = "{{ bucket }}"
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
         let mut log_a = LogEvent::default();
-        log_a.insert("bucket", "a");
+        log_a.insert(event_path!("bucket"), "a");
         let mut log_b = LogEvent::default();
-        log_b.insert("bucket", "b");
+        log_b.insert(event_path!("bucket"), "b");
         tx.send(log_a.into()).await.unwrap();
         tx.send(log_b.into()).await.unwrap();
 

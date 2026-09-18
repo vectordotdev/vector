@@ -123,9 +123,25 @@ generated: components: sinks: nats: configuration: {
 		type: string: {
 			default: "vector"
 			examples: [
-				"foo",
+				"foo"
 			]
 		}
+	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
 	}
 	encoding: {
 		description: """
@@ -189,7 +205,7 @@ generated: components: sinks: nats: configuration: {
 																The collection of key-value pairs. Keys are the keys of the extensions, and values are paths that point to the extension values of a log event.
 																The event can have any number of key-value pairs in any order.
 																"""
-						required: false
+						required: true
 						type: object: options: "*": {
 							description: "This is a path that points to the extension value of a log event."
 							required:    true
@@ -444,12 +460,18 @@ generated: components: sinks: nats: configuration: {
 
 					When set to `single`, only the last non-bare value of tags are displayed with the
 					metric. When set to `full`, all metric tags are exposed as separate assignments.
+					When set to `auto`, tag values are encoded using their underlying shape.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
 				type: string: {
 					default: "single"
 					enum: {
+						auto: """
+															Tag values are exposed using their underlying shape: single-value tags as strings,
+															multi-value tags as arrays. A length-1 array round-trips as a scalar; use `Full` to
+															force array shape.
+															"""
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config
@@ -588,7 +610,7 @@ generated: components: sinks: nats: configuration: {
 						"""
 					required: false
 					type: string: {
-						examples: ["{{ event_id }}"]
+						examples: ["event-{{ event_id }}"]
 						syntax: "template"
 					}
 				}
@@ -789,7 +811,7 @@ generated: components: sinks: nats: configuration: {
 			"""
 		required: true
 		type: string: {
-			examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
+			examples: ["events-{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
 			syntax: "template"
 		}
 	}

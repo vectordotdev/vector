@@ -128,7 +128,7 @@ generated: components: sinks: appsignal: configuration: {
 		description: "The URI for the AppSignal API to send data to."
 		required:    false
 		type: string: {
-			default: "https://appsignal-endpoint.net"
+			default: "https://appsignal-endpoint.net/"
 			examples: ["https://appsignal-endpoint.net"]
 		}
 	}

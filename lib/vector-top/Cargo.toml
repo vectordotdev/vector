@@ -5,6 +5,9 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
+[lints]
+workspace = true
+
 [dependencies]
 clap.workspace = true
 chrono.workspace = true
@@ -27,4 +30,3 @@ vector-common = { path = "../vector-common" }
 vector-api-client = { path = "../vector-api-client" }
 
 [features]
-allocation-tracing = []

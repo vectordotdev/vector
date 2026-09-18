@@ -9,6 +9,7 @@ use vector_lib::{
     codecs::{JsonSerializerConfig, MetricTagValues, encoding::FramingConfig},
     event::{BatchNotifier, BatchStatusReceiver, Event, LogEvent, Value},
 };
+use vrl::event_path;
 // use vector_common::finalization::BatchStatus;
 use vector_common::sensitive_string::SensitiveString;
 
@@ -37,7 +38,7 @@ fn doris_address() -> String {
 fn make_event() -> (Event, BatchStatusReceiver) {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let mut event = LogEvent::from("raw log line").with_batch_notifier(&batch);
-    event.insert("host", "example.com");
+    event.insert(event_path!("host"), "example.com");
     (event.into(), receiver)
 }
 
@@ -50,7 +51,10 @@ fn assert_fields_match(
 ) {
     for field in fields {
         // Get field value from event
-        let event_value = event_log.get(*field).cloned().unwrap_or(Value::Null);
+        let event_value = event_log
+            .get(&vrl::path::parse_target_path(field).unwrap())
+            .cloned()
+            .unwrap_or(Value::Null);
 
         // Get field value from database row
         let db_value = db_row.get(*field).cloned().unwrap_or(DbValue::Null);

@@ -40,7 +40,7 @@ Vector is [open source][oss] and welcomes contributions. A few guidelines to hel
 
 2. Start with [good first issues][first_issues].
 
-3. Join our [discord] if you have any questions. We are happy to help!
+3. Use [GitHub Discussions][vector_discussions] if you have any questions. We are happy to help!
 
 ### What is Vector's governance model?
 

@@ -101,7 +101,7 @@ impl Finalizer {
                 OrderedFinalizer::<FinalizerEntry>::new(Some(shutdown.clone()));
 
             // Spawn background task to process acknowledgments and update checkpoints
-            tokio::spawn(async move {
+            crate::spawn_in_current_span(async move {
                 while let Some((status, entry)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
@@ -361,7 +361,7 @@ impl WindowsEventLogSource {
             }
         };
         let shutdown_watcher = shutdown.clone();
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             shutdown_watcher.await;
             unsafe {
                 let handle =

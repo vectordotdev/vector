@@ -30,6 +30,7 @@ use crate::{
     config::{
         DataType, Input, OutputId, ProxyConfig, TransformConfig, TransformContext, TransformOutput,
     },
+    cpu_time::spawn_timed,
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -237,12 +238,17 @@ impl TransformConfig for Ec2Metadata {
             }
         }
 
-        tokio::spawn(
+        // The metadata-refresh loop runs as its own tokio task, so the main
+        // transform task's CPU-time wrapper does not see it. Spawn the
+        // background task with the same component-tagged counter so its CPU
+        // is attributed to this transform.
+        spawn_timed(
             async move {
                 client.run().await;
             }
             // TODO: Once #1338 is done we can fetch the current span
             .instrument(info_span!("aws_ec2_metadata: worker").or_current()),
+            context.cpu_ns.clone(),
         );
 
         Ok(Transform::event_task(Ec2MetadataTransform { state }))
@@ -753,7 +759,10 @@ mod integration_tests {
             lookup_v2::{OwnedSegment, OwnedValuePath},
         },
     };
-    use vrl::value::{ObjectMap, Value};
+    use vrl::{
+        path::parse_target_path,
+        value::{ObjectMap, Value},
+    };
     use warp::Filter;
 
     use super::*;
@@ -1021,10 +1030,16 @@ mod integration_tests {
 
             let log = LogEvent::default();
             let mut expected_log = log.clone();
-            expected_log.insert(format!("\"{PUBLIC_IPV4_KEY}\"").as_str(), "192.0.2.54");
-            expected_log.insert(format!("\"{REGION_KEY}\"").as_str(), "us-east-1");
             expected_log.insert(
-                format!("\"{TAGS_KEY}\"").as_str(),
+                &vrl::path::parse_target_path(&format!("\"{PUBLIC_IPV4_KEY}\"")).unwrap(),
+                "192.0.2.54",
+            );
+            expected_log.insert(
+                &vrl::path::parse_target_path(&format!("\"{REGION_KEY}\"")).unwrap(),
+                "us-east-1",
+            );
+            expected_log.insert(
+                &vrl::path::parse_target_path(&format!("\"{TAGS_KEY}\"")).unwrap(),
                 ObjectMap::from([
                     ("Name".into(), Value::from("test-instance")),
                     ("Test".into(), Value::from("test-tag")),
@@ -1113,7 +1128,9 @@ mod integration_tests {
                 let event = out.recv().await.unwrap();
 
                 assert_eq!(
-                    event.as_log().get("ec2.metadata.\"availability-zone\""),
+                    event
+                        .as_log()
+                        .get(&parse_target_path("ec2.metadata.\"availability-zone\"").unwrap()),
                     Some(&"us-east-1a".into())
                 );
 

@@ -69,6 +69,9 @@ case "$TARGET" in
   armv7-*-gnueabihf) STRIP_TOOL="arm-linux-gnueabihf-strip" ;;
   *) STRIP_TOOL="strip" ;;
 esac
+# Fall back to the host's strip when building natively on the target arch
+# (e.g., aarch64 native build doesn't have aarch64-linux-gnu-strip).
+command -v "$STRIP_TOOL" >/dev/null 2>&1 || STRIP_TOOL="strip"
 
 # Perform the build.
 rpmbuild \

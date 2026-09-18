@@ -153,7 +153,6 @@ pub struct KafkaAuthConfig {
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     pub(crate) tls: Option<TlsEnableableConfig>,
 }
 
@@ -373,7 +372,10 @@ impl ClientContext for KafkaStatisticsContext {
         let expires_in = match resp["expires_in"].as_u64() {
             Some(v) => v,
             None => {
-                warn!(message = "Expires_in missing from OAUTHBEARER token response, defaulting to 3600s.");
+                warn!(
+                    message =
+                        "Expires_in missing from OAUTHBEARER token response, defaulting to 3600s."
+                );
                 3600
             }
         };
@@ -694,6 +696,12 @@ mod tests {
         };
         let result = ctx.generate_oauth_token(None);
         assert!(result.is_err());
-        assert!(result.err().unwrap().to_string().contains("principal_name is empty"));
+        assert!(
+            result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("principal_name is empty")
+        );
     }
 }

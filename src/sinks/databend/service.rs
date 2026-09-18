@@ -9,7 +9,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use databend_client::{APIClient as DatabendAPIClient, Error as DatabendError};
 use futures::future::BoxFuture;
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use rand_distr::Alphanumeric;
 use snafu::Snafu;
 use tower::Service;

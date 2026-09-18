@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use futures::stream;
 use vector_lib::event::{Event, LogEvent};
+use vrl::event_path;
 
 use crate::{
     config::{SinkConfig, SinkContext},
@@ -137,10 +138,10 @@ impl GreptimeClient {
 
 fn create_event(i: i32, base_time: DateTime<Utc>) -> Event {
     let mut event = LogEvent::default();
-    event.insert("message", format!("test message {i}"));
-    event.insert("timestamp", base_time);
-    event.insert("name", "test");
-    event.insert("namespace", "default");
-    event.insert("kind", "test");
+    event.insert(event_path!("message"), format!("test message {i}"));
+    event.insert(event_path!("timestamp"), base_time);
+    event.insert(event_path!("name"), "test");
+    event.insert(event_path!("namespace"), "default");
+    event.insert(event_path!("kind"), "test");
     Event::Log(event)
 }

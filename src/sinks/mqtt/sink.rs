@@ -13,7 +13,7 @@ pub struct MqttSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: MqttConnector,
-    topic: Template,
+    topic: ConfinedTemplate,
     quality_of_service: MqttQoS,
     retain: bool,
 }
@@ -24,10 +24,13 @@ pub(super) struct MqttEvent {
 }
 
 impl MqttSink {
-    pub fn new(config: &MqttSinkConfig, connector: MqttConnector) -> crate::Result<Self> {
+    pub fn new(
+        config: &MqttSinkConfig,
+        topic: ConfinedTemplate,
+        connector: MqttConnector,
+    ) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
-        let topic = config.topic.clone();
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
@@ -60,7 +63,7 @@ impl MqttSink {
         let (client, mut connection) = self.connector.connect();
 
         // This is necessary to keep the mqtt event loop moving forward.
-        tokio::spawn(async move {
+        crate::spawn_in_current_span(async move {
             loop {
                 // If an error is returned here there is currently no way to tie this back
                 // to the event that was posted which means we can't accurately provide

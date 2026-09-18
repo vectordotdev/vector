@@ -1,0 +1,10 @@
+sinks:
+  my_sink_id:
+    type: aws_sqs
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    endpoint: http://127.0.0.0:5000/path/to/service
+    queue_url: https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue
+    region: us-east-1

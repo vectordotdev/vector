@@ -4,8 +4,7 @@ components: sources: journald: {
 	title: "Journald"
 
 	classes: {
-		commonly_used: true
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "batch"
@@ -73,7 +72,6 @@ components: sources: journald: {
 					description: "The time at which the event appeared in the journal."
 				}
 				"*": {
-					common:      false
 					description: "Any Journald field"
 					required:    false
 					type: string: {

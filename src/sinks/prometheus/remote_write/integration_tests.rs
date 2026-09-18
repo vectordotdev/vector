@@ -9,6 +9,7 @@ use crate::{
     sinks::{
         influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
         prometheus::remote_write::config::RemoteWriteConfig,
+        util::HttpEndpoint,
     },
     test_util::components::{HTTP_SINK_TAGS, assert_sink_compliance},
     tls::{self, TlsConfig},
@@ -34,7 +35,8 @@ async fn insert_metrics(url: &str) {
         let cx = SinkContext::default();
 
         let config = RemoteWriteConfig {
-            endpoint: format!("{url}/api/v1/prom/write?db={database}"),
+            endpoint: HttpEndpoint::parse(&format!("{url}/api/v1/prom/write?db={database}"))
+                .unwrap(),
             tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()

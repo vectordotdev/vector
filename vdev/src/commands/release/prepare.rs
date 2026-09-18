@@ -1,25 +1,21 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
+use crate::commands::release::generate_cue;
 use crate::utils::{command::run_command, git, paths};
-use anyhow::{Context, Result, anyhow};
-use reqwest::blocking::Client;
+use anyhow::{Context, Result, anyhow, bail};
 use semver::Version;
 use std::{
     env, fs,
-    fs::File,
-    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::Command,
 };
-use toml::Value;
 use toml_edit::DocumentMut;
 
 const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
 const ALPINE_DOCKERFILE: &str = "distribution/docker/alpine/Dockerfile";
 const DEBIAN_PREFIX: &str = "FROM docker.io/debian:";
 const DEBIAN_DOCKERFILE: &str = "distribution/docker/debian/Dockerfile";
-const RELEASE_CUE_SCRIPT: &str = "scripts/generate-release-cue.rb";
 const KUBECLT_CUE_FILE: &str = "website/cue/reference/administration/interfaces/kubectl.cue";
 const INSTALL_SCRIPT: &str = "distribution/install.sh";
 
@@ -70,7 +66,7 @@ impl Cli {
             alpine_version: self.alpine_version,
             debian_version: self.debian_version,
             repo_root,
-            latest_vector_version: get_latest_version_from_vector_tags()?,
+            latest_vector_version: git::latest_release_version()?,
             release_branch: format!("v{}.{}", self.version.major, self.version.minor),
             // Websites containing `website` will also generate website previews.
             // Caveat is these branches can only contain alphanumeric chars and dashes.
@@ -107,10 +103,6 @@ impl Prepare {
         self.update_vector_version(&self.repo_root.join(KUBECLT_CUE_FILE))?;
         self.update_vector_version(&self.repo_root.join(INSTALL_SCRIPT))?;
 
-        self.add_new_version_to_versions_cue()?;
-
-        self.create_new_release_md()?;
-
         if !self.dry_run {
             self.open_release_pr()?;
         }
@@ -121,9 +113,23 @@ impl Prepare {
     /// Steps 1 & 2
     fn create_release_branches(&self) -> Result<()> {
         debug!("create_release_branches");
-        // Step 1: Create a new release branch
-        git::run_and_check_output(&["fetch"])?;
-        git::checkout_main_branch()?;
+
+        if self.dry_run {
+            // In dry-run mode the release is based on whatever is currently
+            // checked out. Surface that explicitly so a stale or feature
+            // branch doesn't silently produce a release from the wrong base.
+            let head = git::run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])
+                .unwrap_or_else(|_| "<unknown>".to_string());
+            warn!(
+                "dry-run: using HEAD ({}) as the release base; \
+                 verify this matches what you'd expect from master.",
+                head.trim()
+            );
+        } else {
+            // Step 1: Sync with remote and start from master.
+            git::run_and_check_output(&["fetch"])?;
+            git::checkout_main_branch()?;
+        }
 
         git::checkout_or_create_branch(self.release_branch.as_str())?;
         if !self.dry_run {
@@ -210,16 +216,8 @@ impl Prepare {
     // Step 6
     fn generate_release_cue(&self) -> Result<()> {
         debug!("generate_release_cue");
-        let script = self.repo_root.join(RELEASE_CUE_SCRIPT);
-        let new_vector_version = &self.new_vector_version;
-        if script.is_file() {
-            run_command(&format!(
-                "{} --new-version {new_vector_version} --no-interactive",
-                script.to_string_lossy().as_ref()
-            ));
-        } else {
-            return Err(anyhow!("Script not found: {}", script.display()));
-        }
+        generate_cue::run(&self.new_vector_version)?;
+        generate_cue::retire_all_fragments()?;
 
         self.append_vrl_changelog_to_release_cue()?;
         git::add_files_in_current_dir()?;
@@ -258,95 +256,6 @@ impl Prepare {
             file_path.strip_prefix(&self.repo_root).unwrap().display(),
         ))?;
 
-        Ok(())
-    }
-
-    /// Step 9: Add new version to `versions.cue`
-    fn add_new_version_to_versions_cue(&self) -> Result<()> {
-        debug!("add_new_version_to_versions_cue");
-        let cure_reference_path = &self.repo_root.join("website").join("cue").join("reference");
-        let versions_cue_path = cure_reference_path.join("versions.cue");
-        if !versions_cue_path.is_file() {
-            return Err(anyhow!("{} not found", versions_cue_path.display()));
-        }
-
-        let vector_version = &self.new_vector_version;
-        let temp_file_path = cure_reference_path.join(format!("{vector_version}.cue.tmp"));
-        let input_file = File::open(&versions_cue_path)?;
-        let reader = BufReader::new(input_file);
-        let mut output_file = File::create(&temp_file_path)?;
-
-        for line in reader.lines() {
-            let line = line?;
-            writeln!(output_file, "{line}")?;
-            if line.contains("versions:") {
-                writeln!(output_file, "\t\"{vector_version}\",")?;
-            }
-        }
-
-        fs::rename(&temp_file_path, &versions_cue_path)?;
-
-        git::commit(&format!(
-            "chore(releasing): Add {vector_version} to versions.cue"
-        ))?;
-        Ok(())
-    }
-
-    /// Step 10: Create a new release md file
-    fn create_new_release_md(&self) -> Result<()> {
-        debug!("create_new_release_md");
-        let releases_dir = self
-            .repo_root
-            .join("website")
-            .join("content")
-            .join("en")
-            .join("releases");
-
-        let old_version = &self.latest_vector_version;
-        let new_version = &self.new_vector_version;
-        let old_file_path = releases_dir.join(format!("{old_version}.md"));
-        if !old_file_path.exists() {
-            return Err(anyhow!(
-                "Source file not found: {}",
-                old_file_path.display()
-            ));
-        }
-
-        let content = fs::read_to_string(&old_file_path)?;
-        let updated_content = content.replace(&old_version.to_string(), &new_version.to_string());
-        let lines: Vec<&str> = updated_content.lines().collect();
-        let mut updated_lines = Vec::new();
-        let mut weight_updated = false;
-
-        for line in lines {
-            if line.trim().starts_with("weight: ") && !weight_updated {
-                // Extract the current weight value
-                let weight_str = line
-                    .trim()
-                    .strip_prefix("weight: ")
-                    .ok_or_else(|| anyhow!("Invalid weight format"))?;
-                let weight: i32 = weight_str
-                    .parse()
-                    .map_err(|e| anyhow!("Failed to parse weight: {e}"))?;
-                // Increase by 1
-                let new_weight = weight + 1;
-                updated_lines.push(format!("weight: {new_weight}"));
-                weight_updated = true;
-            } else {
-                updated_lines.push(line.to_string());
-            }
-        }
-
-        if !weight_updated {
-            error!("Couldn't update 'weight' line from {old_file_path:?}");
-        }
-
-        let new_file_path = releases_dir.join(format!("{new_version}.md"));
-        updated_lines.push(String::new()); // File should end with a newline.
-        let updated_content = updated_lines.join("\n");
-        fs::write(&new_file_path, updated_content)?;
-        git::add_files_in_current_dir()?;
-        git::commit("chore(releasing): Created release md file")?;
         Ok(())
     }
 
@@ -429,18 +338,6 @@ fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result
     Ok(doc.to_string())
 }
 
-fn get_latest_version_from_vector_tags() -> Result<Version> {
-    let tags = run_command("git tag --list --sort=-v:refname");
-    let latest_tag = tags
-        .lines()
-        .find(|tag| tag.starts_with('v') && !tag.starts_with("vdev-v"))
-        .ok_or_else(|| anyhow::anyhow!("Could not find latest Vector release tag"))?;
-
-    let version_str = latest_tag.trim_start_matches('v');
-    Version::parse(version_str)
-        .map_err(|e| anyhow::anyhow!("Failed to parse version from tag '{latest_tag}': {e}"))
-}
-
 fn format_vrl_changelog_block(changelog: &str) -> String {
     let double_tab = "\t\t";
     let body = changelog
@@ -456,8 +353,8 @@ fn format_vrl_changelog_block(changelog: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let opening = "\tvrl_changelog: \"\"\"";
-    let closing = format!("{double_tab}\"\"\"");
+    let opening = "\tvrl_changelog: #\"\"\"";
+    let closing = format!("{double_tab}\"\"\"#");
 
     format!("{opening}\n{body}\n{closing}")
 }
@@ -465,12 +362,17 @@ fn format_vrl_changelog_block(changelog: &str) -> String {
 fn insert_block_after_changelog(original: &str, block: &str) -> String {
     let mut result = Vec::new();
     let mut inserted = false;
+    let mut in_changelog = false;
 
     for line in original.lines() {
         result.push(line.to_string());
 
-        // Insert *after* the line containing only the closing `]` (end of changelog array)
-        if !inserted && line.trim() == "]" {
+        if line.trim_start().starts_with("changelog:") {
+            in_changelog = true;
+        }
+
+        // Insert after the closing `]` of the changelog array specifically.
+        if !inserted && in_changelog && line.trim() == "]" {
             result.push(String::new()); // empty line before
             result.push(block.to_string());
             inserted = true;
@@ -481,53 +383,56 @@ fn insert_block_after_changelog(original: &str, block: &str) -> String {
 }
 
 fn get_latest_vrl_tag_and_changelog() -> Result<String> {
-    let client = Client::new();
+    // Step 1: get the latest tag
+    let tag_output = Command::new("gh")
+        .args(["api", "repos/vectordotdev/vrl/tags", "--jq", ".[0].name"])
+        .output()
+        .context("Failed to run `gh api` for VRL tags")?;
 
-    // Step 1: Get latest tag from GitHub API
-    let tags_url = "https://api.github.com/repos/vectordotdev/vrl/tags";
-    let tags_response = client
-        .get(tags_url)
-        .header("User-Agent", "rust-reqwest") // GitHub API requires User-Agent
-        .send()?
-        .text()?;
+    if !tag_output.status.success() {
+        let stderr = String::from_utf8_lossy(&tag_output.stderr);
+        bail!("gh api tags failed: {stderr}");
+    }
 
-    let tags: Vec<Value> = serde_json::from_str(&tags_response)?;
-    let latest_tag = tags
-        .first()
-        .and_then(|tag| tag.get("name"))
-        .and_then(|name| name.as_str())
-        .ok_or_else(|| anyhow!("Failed to extract latest tag"))?
-        .to_string();
+    let tag = String::from_utf8(tag_output.stdout).context("gh api output is not valid UTF-8")?;
+    let tag = tag.trim().to_string();
 
-    // Step 2: Download CHANGELOG.md for the specific tag
-    let changelog_url =
-        format!("https://raw.githubusercontent.com/vectordotdev/vrl/{latest_tag}/CHANGELOG.md",);
-    let changelog = client
-        .get(&changelog_url)
-        .header("User-Agent", "rust-reqwest")
-        .send()?
-        .text()?;
+    // Step 2: fetch CHANGELOG.md for that tag
+    let changelog_output = Command::new("gh")
+        .args([
+            "api",
+            &format!("repos/vectordotdev/vrl/contents/CHANGELOG.md?ref={tag}"),
+            "-H",
+            "Accept: application/vnd.github.raw+json",
+        ])
+        .output()
+        .context("Failed to run `gh api` for VRL CHANGELOG.md")?;
 
-    // Step 3: Extract text from first ## to next ##
-    let lines: Vec<&str> = changelog.lines().collect();
+    if !changelog_output.status.success() {
+        let stderr = String::from_utf8_lossy(&changelog_output.stderr);
+        bail!("gh api CHANGELOG.md failed: {stderr}");
+    }
+
+    let changelog =
+        String::from_utf8(changelog_output.stdout).context("CHANGELOG.md is not valid UTF-8")?;
+
+    // Extract the first release section (from the first ## to the next ##)
     let mut section = Vec::new();
     let mut found_first = false;
-
-    for line in lines {
+    for line in changelog.lines() {
         if line.starts_with("## ") {
             if found_first {
-                section.push(line.to_string());
                 break;
             }
             found_first = true;
-            section.push(line.to_string());
-        } else if found_first {
-            section.push(line.to_string());
+        }
+        if found_first {
+            section.push(line);
         }
     }
 
     if !found_first {
-        return Err(anyhow!("No ## headers found in CHANGELOG.md"));
+        bail!("No ## headers found in VRL CHANGELOG.md");
     }
 
     Ok(section.join("\n"))
@@ -567,11 +472,11 @@ mod tests {
         let vrl_changelog_block = format_vrl_changelog_block(vrl_changelog);
 
         let expected = concat!(
-            "\tvrl_changelog: \"\"\"\n",
+            "\tvrl_changelog: #\"\"\"\n",
             "\t\t#### [0.2.0]\n",
             "\t\t- Feature\n",
             "\t\t- Fix\n",
-            "\t\t\"\"\""
+            "\t\t\"\"\"#"
         );
 
         assert_eq!(vrl_changelog_block, expected);

@@ -49,7 +49,7 @@ generated: components: sinks: elasticsearch: configuration: {
 					[es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
 					"""
 				v6: "Use the Elasticsearch 6.x API."
-				v7: "Use the Elasticsearch 7.x API."
+				v7: "Use the Elasticsearch 7.x-compatible API, including OpenSearch."
 				v8: "Use the Elasticsearch 8.x API."
 			}
 		}
@@ -359,6 +359,22 @@ generated: components: sinks: elasticsearch: configuration: {
 			}
 		}
 	}
+	dangerously_allow_unconfined_template_resolution: {
+		description: """
+			Disable all template confinement checks for this sink.
+
+			**DANGEROUS — disables a security control.**
+
+			Bypasses both startup validation and runtime confinement for every
+			templated field on this sink. When enabled, a log producer that
+			controls any field used in a template can write to arbitrary keys,
+			paths, or routing destinations. This flag is a full opt-out: it
+			disables confinement even for templates that have a usable static
+			prefix.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	data_stream: {
 		description: "Elasticsearch data stream mode configuration."
 		required:    false
@@ -485,8 +501,12 @@ generated: components: sinks: elasticsearch: configuration: {
 
 			The endpoint must contain an HTTP scheme, and may specify a
 			hostname or IP address and port.
+
+			Exactly one of `endpoint` or `endpoints` must be set.
 			"""
 		required: false
+		required_one_of: ["endpoint", "endpoints"]
+		required_one_of_group: "endpoint"
 		type: string: {}
 	}
 	endpoints: {
@@ -501,8 +521,12 @@ generated: components: sinks: elasticsearch: configuration: {
 
 			If `auth` is specified and the endpoint contains credentials,
 			a configuration error will be raised.
+
+			Exactly one of `endpoint` or `endpoints` must be set.
 			"""
 		required: false
+		required_one_of: ["endpoint", "endpoints"]
+		required_one_of_group: "endpoint"
 		type: array: {
 			default: []
 			items: type: string: examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
@@ -544,6 +568,7 @@ generated: components: sinks: elasticsearch: configuration: {
 					When set to `single`, only the last non-bare value of tags is displayed with the
 					metric.  When set to `full`, all metric tags are exposed as separate assignments as
 					described by [the `native_json` codec][vector_native_json].
+					When set to `auto`, tag values are encoded using their underlying shape.
 
 					[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 					"""
@@ -551,6 +576,11 @@ generated: components: sinks: elasticsearch: configuration: {
 				type: string: {
 					default: "single"
 					enum: {
+						auto: """
+															Tag values are exposed using their underlying shape: single-value tags as strings,
+															multi-value tags as arrays. A length-1 array round-trips as a scalar; use `Full` to
+															force array shape.
+															"""
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config

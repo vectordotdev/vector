@@ -4,7 +4,6 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 	title: "AWS Kinesis Firehose"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    4000000
 				max_events:   500
 				timeout_secs: 1.0

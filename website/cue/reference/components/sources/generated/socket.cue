@@ -44,11 +44,8 @@ generated: components: sources: socket: configuration: {
 						type: string: examples: ["{ \"type\": \"record\", \"name\": \"log\", \"fields\": [{ \"name\": \"message\", \"type\": \"string\" }] }"]
 					}
 					strip_schema_id_prefix: {
-						description: """
-																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix.
-																According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
-																"""
-						required: true
+						description: "For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix, as described in [Confluent Kafka's documentation](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format)."
+						required:    true
 						type: bool: {}
 					}
 				}
@@ -60,7 +57,7 @@ generated: components: sources: socket: configuration: {
 					default: "bytes"
 					enum: {
 						avro: """
-															Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+															Decodes the raw bytes as an [Apache Avro][apache_avro] message.
 
 															[apache_avro]: https://avro.apache.org/
 															"""
@@ -72,13 +69,13 @@ generated: components: sources: socket: configuration: {
 
 															The GELF specification is more strict than the actual Graylog receiver.
 															Vector's decoder adheres more strictly to the GELF spec, with
-															the exception that some characters such as `@`  are allowed in field names.
+															the exception that some characters such as `@` are allowed in field names.
 
-															Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
-															by Graylog, and is much more relaxed than the GELF spec.
+															Other GELF codecs, such as Loki's, use a [Go SDK][implementation] that is maintained
+															by Graylog and is much more relaxed than the GELF spec.
 
-															Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
-															the codec may continue to relax the enforcement of specification.
+															Going forward, Vector will use the [Go SDK][implementation] as the reference implementation, which means
+															the codec may continue to relax the enforcement of the specification.
 
 															[gelf]: https://docs.graylog.org/docs/gelf
 															[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
@@ -96,7 +93,7 @@ generated: components: sources: socket: configuration: {
 						native: """
 															Decodes the raw bytes as [native Protocol Buffers format][vector_native_protobuf].
 
-															This decoder can output all types of events (logs, metrics, traces).
+															This decoder can output all types of events: logs, metrics, and traces.
 
 															This codec is **[experimental][experimental]**.
 
@@ -106,7 +103,7 @@ generated: components: sources: socket: configuration: {
 						native_json: """
 															Decodes the raw bytes as [native JSON format][vector_native_json].
 
-															This decoder can output all types of events (logs, metrics, traces).
+															This decoder can output all types of events: logs, metrics, and traces.
 
 															This codec is **[experimental][experimental]**.
 
@@ -168,7 +165,7 @@ generated: components: sources: socket: configuration: {
 								relaxed: """
 																			Uses more relaxed validation that skips strict GELF specification checks.
 
-																			This mode will not treat specification violations as errors, allowing the decoder
+																			This mode does not treat specification violations as errors, allowing the decoder
 																			to accept messages from sources that don't strictly follow the GELF spec.
 																			"""
 								strict: "Uses strict validation that closely follows the GELF spec."
@@ -236,7 +233,7 @@ generated: components: sources: socket: configuration: {
 
 																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`.
 
-																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
+																For more information, see [How Buf images work](https://buf.build/docs/reference/images/#how-buf-images-work).
 																"""
 						required: false
 						type: string: default: ""
@@ -254,7 +251,7 @@ generated: components: sources: socket: configuration: {
 																Use JSON field names (camelCase) instead of protobuf field names (snake_case).
 
 																When enabled, the deserializer will output fields using their JSON names as defined
-																in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+																in the `.proto` file (for example, `jobDescription` instead of `job_description`).
 
 																This is useful when working with data that needs to be converted to JSON or
 																when interfacing with systems that use JSON naming conventions.
@@ -268,11 +265,11 @@ generated: components: sources: socket: configuration: {
 				description: """
 					Signal types to attempt parsing, in priority order.
 
-					The deserializer will try parsing in the order specified. This allows you to optimize
+					The deserializer tries to parse signals in the specified order. This allows you to optimize
 					performance when you know the expected signal types. For example, if you only receive
 					traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
 
-					If not specified, defaults to trying all types in order: logs, metrics, traces.
+					If not specified, defaults to trying all types in this order: logs, metrics, traces.
 					Duplicate signal types are automatically removed while preserving order.
 					"""
 				relevant_when: "codec = \"otlp\""
@@ -310,8 +307,8 @@ generated: components: sources: socket: configuration: {
 					source: {
 						description: """
 																The [Vector Remap Language][vrl] (VRL) program to execute for each event.
-																Note that the final contents of the `.` target will be used as the decoding result.
-																Compilation error or use of 'abort' in a program will result in a decoding error.
+																The final contents of the `.` target are used as the decoding result.
+																Compilation errors or use of `abort` in the program result in a decoding error.
 
 																[vrl]: https://vector.dev/docs/reference/vrl
 																"""
@@ -361,16 +358,39 @@ generated: components: sources: socket: configuration: {
 
 																This length does *not* include the trailing delimiter.
 
-																By default, there is no maximum length enforced. If events are malformed, this can lead to
+																By default, no maximum length is enforced. If events are malformed, this can lead to
 																additional resource usage as events continue to be buffered in memory, and can potentially
 																lead to memory exhaustion in extreme cases.
 
 																If there is a risk of processing malformed data, such as logs with user-controlled input,
 																consider setting the maximum length to a reasonably large value as a safety net. This
-																ensures that processing is not actually unbounded.
+																prevents processing from being unbounded.
 																"""
 						required: false
 						type: uint: {}
+					}
+					oversized_action: {
+						description: """
+																The behavior when a frame exceeds `max_length`.
+
+																When set to `drop` (the default), the entire oversized frame is discarded.
+																When set to `truncate`, the frame is truncated to `max_length` bytes and the
+																remainder is discarded up to the next delimiter.
+
+																This option has no effect if `max_length` is not set.
+																"""
+						required: false
+						type: string: {
+							default: "drop"
+							enum: {
+								drop: "Drop the entire oversized frame."
+								truncate: """
+																			Truncate the frame to the maximum allowed size and emit the partial content.
+
+																			The remainder of the oversized frame is discarded up to the next delimiter.
+																			"""
+							}
+						}
 					}
 				}
 			}
@@ -394,15 +414,15 @@ generated: components: sources: socket: configuration: {
 					}
 					max_length: {
 						description: """
-																The maximum length of a single GELF message, in bytes. Messages longer than this length will
-																be dropped. If this option is not set, the decoder does not limit the length of messages and
+																The maximum length of a single GELF message, in bytes. Messages longer than this length are
+																dropped. If this option is not set, the decoder does not limit the length of messages and
 																the per-message memory is unbounded.
 
-																**Note**: A message can be composed of multiple chunks and this limit is applied to the whole
+																**Note**: A message can be composed of multiple chunks, and this limit applies to the whole
 																message, not to individual chunks.
 
-																This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
-																The message's payload is the concatenation of all the chunks' payloads.
+																This limit takes into account only the message payload. GELF header bytes are excluded from the calculation.
+																The message payload is the concatenation of all chunk payloads.
 																"""
 						required: false
 						type: uint: {}
@@ -420,7 +440,7 @@ generated: components: sources: socket: configuration: {
 					timeout_secs: {
 						description: """
 																The timeout, in seconds, for a message to be fully received. If the timeout is reached, the
-																decoder drops all the received chunks of the timed out message.
+																decoder drops all received chunks for the timed-out message.
 																"""
 						required: false
 						type: float: default: 5.0
@@ -488,22 +508,47 @@ generated: components: sources: socket: configuration: {
 				description:   "Options for the newline delimited decoder."
 				relevant_when: "method = \"newline_delimited\""
 				required:      false
-				type: object: options: max_length: {
-					description: """
-						The maximum length of the byte buffer.
+				type: object: options: {
+					max_length: {
+						description: """
+																The maximum length of the byte buffer.
 
-						This length does *not* include the trailing delimiter.
+																This length does *not* include the trailing delimiter.
 
-						By default, there is no maximum length enforced. If events are malformed, this can lead to
-						additional resource usage as events continue to be buffered in memory, and can potentially
-						lead to memory exhaustion in extreme cases.
+																By default, no maximum length is enforced. If events are malformed, this can lead to
+																additional resource usage as events continue to be buffered in memory, and can potentially
+																lead to memory exhaustion in extreme cases.
 
-						If there is a risk of processing malformed data, such as logs with user-controlled input,
-						consider setting the maximum length to a reasonably large value as a safety net. This
-						ensures that processing is not actually unbounded.
-						"""
-					required: false
-					type: uint: {}
+																If there is a risk of processing malformed data, such as logs with user-controlled input,
+																consider setting the maximum length to a reasonably large value as a safety net. This
+																prevents processing from being unbounded.
+																"""
+						required: false
+						type: uint: {}
+					}
+					oversized_action: {
+						description: """
+																The behavior when a line exceeds `max_length`.
+
+																When set to `drop` (the default), the entire oversized line is discarded.
+																When set to `truncate`, the line is truncated to `max_length` bytes and the
+																remainder is discarded up to the next newline.
+
+																This option has no effect if `max_length` is not set.
+																"""
+						required: false
+						type: string: {
+							default: "drop"
+							enum: {
+								drop: "Drop the entire oversized frame."
+								truncate: """
+																			Truncate the frame to the maximum allowed size and emit the partial content.
+
+																			The remainder of the oversized frame is discarded up to the next delimiter.
+																			"""
+							}
+						}
+					}
 				}
 			}
 			octet_counting: {
@@ -596,6 +641,26 @@ generated: components: sources: socket: configuration: {
 			default: []
 			items: type: string: examples: ["['224.0.0.2', '224.0.0.4']"]
 		}
+	}
+	multicast_interface: {
+		description: """
+			The IPv4 interface address used when joining multicast groups.
+
+			Specifies which local network interface to use for receiving multicast traffic.
+			When not set, defaults to the socket's binding address.
+
+			Set this explicitly when the host has multiple interfaces and you need to control
+			which one receives multicast traffic. For example, `127.0.0.1` restricts multicast
+			reception to the loopback interface.
+
+			On macOS, specifying `0.0.0.0` only joins on the default network interface (typically
+			the primary Ethernet or Wi-Fi interface), unlike Linux, which joins on all interfaces.
+			If multicast traffic is expected on a specific interface (including loopback), set this
+			field explicitly.
+			"""
+		relevant_when: "mode = \"udp\""
+		required:      false
+		type: string: {}
 	}
 	path: {
 		description: """
@@ -762,5 +827,17 @@ generated: components: sources: socket: configuration: {
 				type: bool: {}
 			}
 		}
+	}
+	tls_handshake_timeout_secs: {
+		description: """
+			The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+
+			This bounds how long a connection can hold its slot against `connection_limit`
+			before the TLS handshake finishes, protecting against clients that open a
+			connection but never complete (or never start) a handshake.
+			"""
+		relevant_when: "mode = \"tcp\""
+		required:      false
+		type: uint: unit: "seconds"
 	}
 }

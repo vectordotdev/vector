@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.55.0": {
-	date:     "2026-04-22"
-	codename: ""
+	date: "2026-04-22"
 
 	whats_next: []
 
@@ -502,7 +501,7 @@ releases: "0.55.0": {
 		{sha: "84abc68df859d58b2a7681757e52aca7a8094ad2", date: "2026-03-27 04:24:22 UTC", description: "bump bollard from 0.19.2 to 0.20.2", pr_number: 25026, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 4, insertions_count: 9, deletions_count: 13},
 		{sha: "6267fcc78d8cd347f6405ab03ca100b97944a5ef", date: "2026-03-27 06:31:32 UTC", description: "log error", pr_number: 24708, scopes: ["opentelemetry source"], type: "fix", breaking_change: false, author: "bas smit", files_count: 2, insertions_count: 10, deletions_count: 2},
 		{sha: "e8526b2a3ef7ac257d0fb816f611cddbc494a478", date: "2026-03-27 06:32:43 UTC", description: "bump deadpool from 0.12.2 to 0.13.0", pr_number: 25014, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 3, insertions_count: 23, deletions_count: 6},
-		{sha: "af15a5a595f342038fd3368854fa75c74c31e932", date: "2026-03-27 05:09:12 UTC", description: "vanila `cargo build` should run on windows", pr_number: 24991, scopes: ["dev"], type: "fix", breaking_change: false, author: "Pavlos Rontidis", files_count: 4, insertions_count: 13, deletions_count: 7},
+		{sha: "af15a5a595f342038fd3368854fa75c74c31e932", date: "2026-03-27 05:09:12 UTC", description: "vanilla `cargo build` should run on windows", pr_number: 24991, scopes: ["dev"], type: "fix", breaking_change: false, author: "Pavlos Rontidis", files_count: 4, insertions_count: 13, deletions_count: 7},
 		{sha: "4e6b49d6951b1f6ed9e2851aec674577ccc4c2b2", date: "2026-03-27 20:47:55 UTC", description: "deduct downstream utilization on task transforms", pr_number: 24731, scopes: ["metrics"], type: "fix", breaking_change: false, author: "Yoenn Burban", files_count: 3, insertions_count: 221, deletions_count: 18},
 		{sha: "a7450cdbba3eb86782d67bea39b81e5b641067d9", date: "2026-03-27 18:50:50 UTC", description: "bump tempfile from 3.23.0 to 3.27.0", pr_number: 25016, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 2, insertions_count: 14, deletions_count: 14},
 		{sha: "7066adccecc24fe005f1fb7c934bbda4b557ea6c", date: "2026-03-27 18:51:39 UTC", description: "bump proptest from 1.10.0 to 1.11.0", pr_number: 25021, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 5, insertions_count: 7, deletions_count: 7},

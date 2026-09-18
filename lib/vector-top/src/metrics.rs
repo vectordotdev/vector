@@ -118,14 +118,14 @@ fn component_to_row(component: &Component) -> state::ComponentRow {
         sent_bytes_throughput_sec: 0,
         sent_events_total: metrics.and_then(|m| m.sent_events_total).unwrap_or(0),
         sent_events_throughput_sec: 0,
-        #[cfg(feature = "allocation-tracing")]
+        #[cfg(unix)]
         allocated_bytes: 0,
         errors: 0,
     }
 }
 
 /// Allocated bytes per component
-#[cfg(feature = "allocation-tracing")]
+#[cfg(unix)]
 async fn allocated_bytes(
     mut client: Client,
     tx: state::EventTx,
@@ -472,7 +472,7 @@ pub async fn subscribe(
         initial_components,
     ));
 
-    #[cfg_attr(not(feature = "allocation-tracing"), allow(unused_mut))]
+    #[cfg_attr(not(unix), allow(unused_mut))]
     let mut metric_handles = vec![
         tokio::spawn(received_bytes_totals(
             client.clone(),
@@ -531,7 +531,7 @@ pub async fn subscribe(
         tokio::spawn(uptime_changed(client.clone(), tx.clone(), interval)),
     ];
 
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     metric_handles.push(tokio::spawn(allocated_bytes(
         client,
         tx,
@@ -569,7 +569,7 @@ pub async fn init_components(
         })
         .collect::<BTreeMap<_, _>>();
 
-    #[cfg(feature = "allocation-tracing")]
+    #[cfg(unix)]
     {
         // Allocation tracing is a compile-time + startup-time setting on the
         // server, so querying once per connection is sufficient. On error
@@ -585,6 +585,6 @@ pub async fn init_components(
         Ok(state)
     }
 
-    #[cfg(not(feature = "allocation-tracing"))]
+    #[cfg(not(unix))]
     Ok(state::State::new(rows))
 }

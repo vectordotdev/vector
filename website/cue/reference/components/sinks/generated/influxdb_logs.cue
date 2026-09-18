@@ -65,8 +65,11 @@ generated: components: sinks: influxdb_logs: configuration: {
 
 			Only relevant when using InfluxDB v2.x and above.
 			"""
-		required: true
-		type: string: examples: ["vector-bucket", "4d2225e4d3d49f75"]
+		minimal:       true
+		relevant_when: "version = \"2\""
+		required:      false
+		required_when: "version = \"2\""
+		type: string: examples: ["vector-bucket"]
 	}
 	consistency: {
 		description: """
@@ -74,8 +77,11 @@ generated: components: sinks: influxdb_logs: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
-		required: false
-		type: string: examples: ["any", "one", "quorum", "all"]
+		relevant_when: "version = \"1\""
+		required:      false
+		type: string: examples: [
+			"any"
+		]
 	}
 	database: {
 		description: """
@@ -83,8 +89,10 @@ generated: components: sinks: influxdb_logs: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
-		required: true
-		type: string: examples: ["vector-database", "iot-store"]
+		relevant_when: "version = \"1\""
+		required:      false
+		required_when: "version = \"1\""
+		type: string: examples: ["vector-database"]
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -134,7 +142,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 	}
 	measurement: {
 		description: "The name of the InfluxDB measurement that is written to."
-		required:    false
+		required:    true
 		type: string: examples: ["vector-logs"]
 	}
 	message_key: {
@@ -145,19 +153,8 @@ generated: components: sinks: influxdb_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"text",
+			"text"
 		]
-	}
-	namespace: {
-		deprecated:         true
-		deprecated_message: "This field is deprecated, and `measurement` should be used instead."
-		description: """
-			The namespace of the measurement name to use.
-
-			When specified, the measurement name is `<namespace>.vector`.
-			"""
-		required: false
-		type: string: examples: ["service"]
 	}
 	org: {
 		description: """
@@ -165,8 +162,13 @@ generated: components: sinks: influxdb_logs: configuration: {
 
 			Only relevant when using InfluxDB v2.x and above.
 			"""
-		required: true
-		type: string: examples: ["my-org", "33f2cff0a28e5b63"]
+		minimal:       true
+		relevant_when: "version = \"2\""
+		required:      false
+		required_when: "version = \"2\""
+		type: string: examples: [
+			"my-org"
+		]
 	}
 	password: {
 		description: """
@@ -174,8 +176,9 @@ generated: components: sinks: influxdb_logs: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
-		required: false
-		type: string: examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
+		relevant_when: "version = \"1\""
+		required:      false
+		type: string: examples: ["${INFLUXDB_PASSWORD}"]
 	}
 	request: {
 		description: """
@@ -369,8 +372,9 @@ generated: components: sinks: influxdb_logs: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
-		required: false
-		type: string: examples: ["autogen", "one_day_only"]
+		relevant_when: "version = \"1\""
+		required:      false
+		type: string: examples: ["autogen"]
 	}
 	source_type_key: {
 		description: """
@@ -380,7 +384,7 @@ generated: components: sinks: influxdb_logs: configuration: {
 			"""
 		required: false
 		type: string: examples: [
-			"source",
+			"source"
 		]
 	}
 	tags: {
@@ -498,8 +502,11 @@ generated: components: sinks: influxdb_logs: configuration: {
 
 			[token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 			"""
-		required: true
-		type: string: examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
+		minimal:       true
+		relevant_when: "version = \"2\""
+		required:      false
+		required_when: "version = \"2\""
+		type: string: examples: ["${INFLUXDB_TOKEN}"]
 	}
 	username: {
 		description: """
@@ -507,7 +514,27 @@ generated: components: sinks: influxdb_logs: configuration: {
 
 			Only relevant when using InfluxDB v0.x/v1.x.
 			"""
+		relevant_when: "version = \"1\""
+		required:      false
+		type: string: examples: [
+			"todd"
+		]
+	}
+	version: {
+		description: """
+			The InfluxDB API version to use.
+
+			Omitting this option is deprecated and it will be required in a future release. When
+			unset, the version is temporarily inferred from the configured settings.
+			"""
+		minimal:  true
 		required: false
-		type: string: examples: ["todd", "vector-source"]
+		type: string: {
+			enum: {
+				"1": "InfluxDB v0.x/v1.x."
+				"2": "InfluxDB v2.x."
+			}
+			examples: ["2", "1"]
+		}
 	}
 }

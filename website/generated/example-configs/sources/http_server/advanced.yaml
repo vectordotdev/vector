@@ -1,0 +1,14 @@
+sources:
+  my_source_id:
+    type: http_server
+    address: 0.0.0.0:80
+    headers:
+      - User-Agent
+    host_key: hostname
+    method: POST
+    path: /
+    path_key: path
+    query_parameters:
+      - application
+    response_code: 200
+    strict_path: true

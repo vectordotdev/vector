@@ -28,15 +28,19 @@ pub(super) struct AmqpEvent {
 
 pub(super) struct AmqpSink {
     pub(super) channels: AmqpSinkChannels,
-    exchange: Template,
-    routing_key: Option<Template>,
+    exchange: ConfinedTemplate,
+    routing_key: Option<ConfinedTemplate>,
     properties: Option<AmqpPropertiesConfig>,
     transformer: Transformer,
     encoder: vector_lib::codecs::Encoder<()>,
 }
 
 impl AmqpSink {
-    pub(super) async fn new(config: AmqpSinkConfig) -> crate::Result<Self> {
+    pub(super) async fn new(
+        config: AmqpSinkConfig,
+        exchange: ConfinedTemplate,
+        routing_key: Option<ConfinedTemplate>,
+    ) -> crate::Result<Self> {
         let channels = super::channel::new_channel_pool(&config)
             .map_err(|e| BuildError::AmqpCreateFailed { source: e })?;
 
@@ -46,8 +50,8 @@ impl AmqpSink {
 
         Ok(AmqpSink {
             channels,
-            exchange: config.exchange,
-            routing_key: config.routing_key,
+            exchange,
+            routing_key,
             properties: config.properties,
             transformer,
             encoder,

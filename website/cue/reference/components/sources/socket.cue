@@ -6,8 +6,7 @@ components: sources: socket: {
 	title: "Socket"
 
 	classes: {
-		commonly_used: true
-		delivery:      "best_effort"
+		delivery: "best_effort"
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
@@ -81,7 +80,6 @@ components: sources: socket: {
 				port: {
 					description: "The peer source port."
 					required:    false
-					common:      true
 					type: uint: {
 						default: null
 						unit:    null

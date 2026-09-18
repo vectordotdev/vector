@@ -12,7 +12,6 @@ components: sinks: datadog_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    4_250_000
 				max_events:   1000
 				timeout_secs: 5.0

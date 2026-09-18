@@ -17,7 +17,7 @@ use crate::{
         splunk_hec::common::integration_test_helpers::{
             get_token, splunk_api_address, splunk_hec_address,
         },
-        util::{BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
     },
     template::Template,
     test_util::components::{
@@ -36,7 +36,7 @@ async fn config() -> HecMetricsSinkConfig {
     HecMetricsSinkConfig {
         default_namespace: None,
         default_token: get_token().await.into(),
-        endpoint: splunk_hec_address(),
+        endpoint: HttpEndpoint::parse(&splunk_hec_address()).unwrap(),
         host_key: OptionalValuePath::new("host"),
         index: None,
         sourcetype: None,
@@ -46,6 +46,7 @@ async fn config() -> HecMetricsSinkConfig {
         request: TowerRequestConfig::default(),
         tls: None,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     }
 }
 

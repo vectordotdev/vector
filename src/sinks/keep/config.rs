@@ -79,11 +79,11 @@ impl SinkBatchSettings for KeepDefaultBatchSettings {
 }
 
 impl GenerateConfig for KeepConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"api_key = "${KEEP_API_KEY}"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"api_key: ${KEEP_API_KEY}
             "#,
-        )
+        })
         .unwrap()
     }
 }

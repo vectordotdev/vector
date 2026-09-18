@@ -4,7 +4,6 @@ components: sinks: new_relic: {
 	title: "New Relic"
 
 	classes: {
-		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
@@ -19,7 +18,6 @@ components: sinks: new_relic: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   50
 				timeout_secs: 30.0
 			}

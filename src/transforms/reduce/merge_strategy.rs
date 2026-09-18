@@ -5,7 +5,8 @@ use chrono::{DateTime, Utc};
 use dyn_clone::DynClone;
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
-use vrl::path::OwnedTargetPath;
+use vrl::compiler::value::VrlValueArithmetic;
+use vrl::path::{OwnedSegment, OwnedTargetPath};
 
 use crate::event::{LogEvent, Value};
 
@@ -366,10 +367,14 @@ impl ReduceValueMerger for TimestampWindowMerger {
         path: &OwnedTargetPath,
         v: &mut LogEvent,
     ) -> Result<(), String> {
-        v.insert(
-            format!("{path}_end").as_str(),
-            Value::Timestamp(self.latest),
-        );
+        // Build "<path>_end" by suffixing the last segment. String
+        // round-tripping via Display fails on quoted/literal paths whose
+        // rendered form isn't valid path syntax once "_end" is appended.
+        let mut end_path = path.clone();
+        if let Some(OwnedSegment::Field(last)) = end_path.path.segments.last_mut() {
+            *last = format!("{last}_end").into();
+        }
+        v.insert(&end_path, Value::Timestamp(self.latest));
         v.insert(path, Value::Timestamp(self.started));
         Ok(())
     }
@@ -408,24 +413,17 @@ impl ReduceValueMerger for AddNumbersMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         // Try and keep max precision with integer values, but once we've
         // received a float downgrade to float precision.
-        match v {
-            Value::Integer(i) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Int(i + j),
-                NumberMergerValue::Float(j) => {
-                    self.v = NumberMergerValue::Float(NotNan::new(i as f64).unwrap() + j)
-                }
-            },
-            Value::Float(f) => match self.v {
-                NumberMergerValue::Int(j) => self.v = NumberMergerValue::Float(f + j as f64),
-                NumberMergerValue::Float(j) => self.v = NumberMergerValue::Float(f + j),
-            },
-            _ => {
-                return Err(format!(
-                    "expected numeric value, found: '{}'",
-                    v.to_string_lossy()
-                ));
-            }
-        }
+        let current = match &self.v {
+            NumberMergerValue::Int(value) => Value::Integer(*value),
+            NumberMergerValue::Float(value) => Value::Float(*value),
+        };
+        let sum = current.try_add(v).map_err(|error| error.to_string())?;
+        self.v = match sum {
+            Value::Integer(value) => NumberMergerValue::Int(value),
+            Value::Float(value) => NumberMergerValue::Float(value),
+            _ => return Err("summing numeric values produced a non-numeric value".to_owned()),
+        };
+
         Ok(())
     }
 
@@ -824,6 +822,14 @@ mod test {
             Ok(42.into())
         );
         assert_eq!(
+            merge(21.into(), 21.0.into(), &MergeStrategy::Sum),
+            Ok(42.0.into())
+        );
+        assert_eq!(
+            merge(21.0.into(), 21.into(), &MergeStrategy::Sum),
+            Ok(42.0.into())
+        );
+        assert_eq!(
             merge(41.into(), 42.into(), &MergeStrategy::Max),
             Ok(42.into())
         );
@@ -930,6 +936,18 @@ mod test {
         }
     }
 
+    #[test]
+    fn sum_returns_nan_errors() {
+        assert_eq!(
+            merge(
+                f64::INFINITY.into(),
+                f64::NEG_INFINITY.into(),
+                &MergeStrategy::Sum,
+            ),
+            Err("operation would produce NaN".to_owned())
+        );
+    }
+
     fn merge(initial: Value, additional: Value, strategy: &MergeStrategy) -> Result<Value, String> {
         let mut merger = get_value_merger(initial, strategy)?;
         merger.add(additional)?;
@@ -937,5 +955,27 @@ mod test {
         let out_path = owned_event_path!("out");
         merger.insert_into(&out_path, &mut output)?;
         Ok(output.remove(&out_path).unwrap())
+    }
+
+    // Regression: `TimestampWindowMerger::insert_into` used to build the
+    // "<path>_end" companion path by round-tripping through `Display` and
+    // `parse_target_path`, which panics when the rendered path form isn't
+    // valid syntax (e.g. quoted/literal segments containing a dot).
+    #[test]
+    fn timestamp_window_merger_handles_quoted_path() {
+        let t1 = Utc::now();
+        let t2 = t1 + chrono::Duration::seconds(5);
+
+        // TimestampWindowMerger is selected implicitly for Timestamp values.
+        let mut merger: Box<dyn ReduceValueMerger> = Value::Timestamp(t1).into();
+        merger.add(Value::Timestamp(t2)).unwrap();
+
+        let mut out = LogEvent::default();
+        let path = vrl::path::parse_target_path("\"foo.bar\"").unwrap();
+        merger.insert_into(&path, &mut out).expect("insert_into");
+
+        assert_eq!(out.get(&path), Some(&Value::Timestamp(t1)));
+        let end_path = vrl::path::parse_target_path("\"foo.bar_end\"").unwrap();
+        assert_eq!(out.get(&end_path), Some(&Value::Timestamp(t2)));
     }
 }

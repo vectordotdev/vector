@@ -1,0 +1,4 @@
+sources:
+  my_source_id:
+    type: websocket
+    uri: ws://localhost:8080

@@ -21,7 +21,7 @@ pub struct DorisCommon {
 }
 
 impl DorisCommon {
-    pub async fn parse_config(config: &DorisConfig, endpoint: &UriSerde) -> crate::Result<Self> {
+    pub fn parse_config(config: &DorisConfig, endpoint: &UriSerde) -> crate::Result<Self> {
         if endpoint.uri.host().is_none() {
             return Err(
                 format!("Invalid host: {}, host must include hostname", endpoint.uri).into(),
@@ -50,10 +50,10 @@ impl DorisCommon {
             tls_settings,
         })
     }
-    pub async fn parse_many(config: &DorisConfig) -> crate::Result<Vec<Self>> {
+    pub fn parse_many(config: &DorisConfig) -> crate::Result<Vec<Self>> {
         let mut commons = Vec::new();
         for endpoint in config.endpoints.iter() {
-            commons.push(Self::parse_config(config, endpoint).await?);
+            commons.push(Self::parse_config(config, endpoint)?);
         }
         Ok(commons)
     }

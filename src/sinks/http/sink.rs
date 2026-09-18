@@ -7,8 +7,8 @@ use crate::sinks::{prelude::*, util::http::HttpRequest};
 
 pub(super) struct HttpSink<S> {
     service: S,
-    uri: Template,
-    headers: BTreeMap<String, Template>,
+    uri: ConfinedTemplate,
+    headers: BTreeMap<String, ConfinedTemplate>,
     batch_settings: BatcherSettings,
     request_builder: HttpRequestBuilder,
 }
@@ -23,8 +23,8 @@ where
     /// Creates a new `HttpSink`.
     pub(super) const fn new(
         service: S,
-        uri: Template,
-        headers: BTreeMap<String, Template>,
+        uri: ConfinedTemplate,
+        headers: BTreeMap<String, ConfinedTemplate>,
         batch_settings: BatcherSettings,
         request_builder: HttpRequestBuilder,
     ) -> Self {
@@ -95,12 +95,12 @@ pub struct PartitionKey {
 }
 
 struct KeyPartitioner {
-    uri: Template,
-    headers: BTreeMap<String, Template>,
+    uri: ConfinedTemplate,
+    headers: BTreeMap<String, ConfinedTemplate>,
 }
 
 impl KeyPartitioner {
-    const fn new(uri: Template, headers: BTreeMap<String, Template>) -> Self {
+    const fn new(uri: ConfinedTemplate, headers: BTreeMap<String, ConfinedTemplate>) -> Self {
         Self { uri, headers }
     }
 }

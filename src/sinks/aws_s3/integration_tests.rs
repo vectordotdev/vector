@@ -7,35 +7,13 @@ use std::{
     time::Duration,
 };
 
+use super::S3SinkConfig;
 #[cfg(feature = "codecs-parquet")]
 use super::config::S3BatchEncoding;
-use aws_sdk_s3::{
-    Client as S3Client,
-    operation::{create_bucket::CreateBucketError, get_object::GetObjectOutput},
-    types::{
-        DefaultRetention, ObjectLockConfiguration, ObjectLockEnabled, ObjectLockRetentionMode,
-        ObjectLockRule,
-    },
-};
-use aws_smithy_runtime_api::client::result::SdkError;
-use bytes::Buf;
-use flate2::read::MultiGzDecoder;
-use futures::{Stream, stream};
-use similar_asserts::assert_eq;
-use tempfile::TempDir;
-use tokio_stream::StreamExt;
-use vector_lib::{
-    buffers::{BufferConfig, BufferType, WhenFull},
-    codecs::{TextSerializerConfig, encoding::FramingConfig},
-    config::{ComponentKey, proxy::ProxyConfig},
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
-};
-
-use super::S3SinkConfig;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client},
     common::s3::S3ClientBuilder,
-    config::{Config, SinkContext},
+    config::{Config, SinkContext, ValidatedSink},
     sinks::{
         aws_s3::config::default_filename_time_format,
         s3_common::config::{S3Options, S3ServerSideEncryption},
@@ -50,6 +28,27 @@ use crate::{
         mock::basic_source,
         random_lines_with_stream, random_string, start_topology,
     },
+};
+use aws_sdk_s3::{
+    Client as S3Client,
+    operation::{create_bucket::CreateBucketError, get_object::GetObjectOutput},
+    types::{
+        DefaultRetention, ObjectLockConfiguration, ObjectLockEnabled, ObjectLockRetentionMode,
+        ObjectLockRule,
+    },
+};
+use aws_smithy_runtime_api::client::result::SdkError;
+use bytes::Buf;
+use futures::{Stream, stream};
+use similar_asserts::assert_eq;
+use tempfile::TempDir;
+use tokio_stream::StreamExt;
+use vector_common::decompression::CappedDecoder;
+use vector_lib::{
+    buffers::{BufferConfig, BufferType, WhenFull},
+    codecs::{TextSerializerConfig, encoding::FramingConfig},
+    config::{ComponentKey, proxy::ProxyConfig},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
 };
 
 fn s3_address() -> String {
@@ -70,7 +69,8 @@ async fn s3_insert_message_into_with_flat_key_prefix() {
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -106,7 +106,8 @@ async fn s3_insert_message_into_with_folder_key_prefix() {
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -148,7 +149,8 @@ async fn s3_insert_message_into_with_ssekms_key_id() {
     let prefix = config.key_prefix.clone();
 
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -186,7 +188,8 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -199,7 +202,7 @@ async fn s3_rotate_files_after_the_buffer_size_is_reached() {
         } else {
             3
         };
-        e.insert("i", i.to_string());
+        e.insert(vrl::event_path!("i"), i.to_string());
         Event::from(e)
     });
 
@@ -245,7 +248,8 @@ async fn s3_gzip() {
 
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -290,7 +294,8 @@ async fn s3_zstd() {
 
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -352,7 +357,8 @@ async fn s3_insert_message_into_object_lock() {
     let config = config(&bucket, 1000000, 5.0);
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (lines, events, receiver) = make_events_batch(100, 10);
     run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -385,7 +391,8 @@ async fn acknowledges_failures() {
     };
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (_lines, events, receiver) = make_events_batch(1, 1);
     run_and_assert_sink_error(sink, events, &COMPONENT_ERROR_TAGS).await;
@@ -440,7 +447,8 @@ async fn s3_flush_on_exhaustion() {
     let config = config(&bucket, 10, 10.0);
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (lines, _events) = random_lines_with_stream(100, 2, None); // only generate two events (less than batch size)
 
@@ -453,7 +461,7 @@ async fn s3_flush_on_exhaustion() {
         } else {
             3
         };
-        e.insert("i", i.to_string());
+        e.insert(vrl::event_path!("i"), i.to_string());
         Event::from(e)
     });
 
@@ -490,6 +498,7 @@ async fn s3_parquet_insert_message() {
     use vector_lib::codecs::encoding::format::{
         ParquetCompression, ParquetSchemaMode, ParquetSerializerConfig,
     };
+    use vrl::event_path;
 
     let cx = SinkContext::default();
     let bucket = uuid::Uuid::new_v4().to_string();
@@ -508,13 +517,14 @@ async fn s3_parquet_insert_message() {
 
     let prefix = config.key_prefix.clone();
     let service = config.create_service(&cx.globals.proxy).await.unwrap();
-    let sink = config.build_processor(service, cx).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(service, cx, &validated).unwrap();
 
     let (batch_notifier, receiver) = BatchNotifier::new_with_receiver();
     let events: Vec<Event> = (0..10)
         .map(|i| {
             let mut log = LogEvent::from(format!("message_{}", i));
-            log.insert("host", format!("host_{}", i % 3));
+            log.insert(event_path!("host"), format!("host_{}", i % 3));
             Event::from(log).with_batch_notifier(&batch_notifier)
         })
         .collect();
@@ -736,6 +746,7 @@ fn config(bucket: &str, batch_size: usize, timeout_secs: f64) -> S3SinkConfig {
         timezone: Default::default(),
         force_path_style: true,
         retry_strategy: Default::default(),
+        confinement: Default::default(),
     }
 }
 
@@ -815,14 +826,17 @@ async fn get_lines(obj: GetObjectOutput) -> Vec<String> {
 
 async fn get_gzipped_lines(obj: GetObjectOutput) -> Vec<String> {
     let body = get_object_output_body(obj).await;
-    let buf_read = BufReader::new(MultiGzDecoder::new(body));
+    let buf_read = BufReader::new(CappedDecoder::gzip(body).into_reader());
     buf_read.lines().map(|l| l.unwrap()).collect()
 }
 
 async fn get_zstd_lines(obj: GetObjectOutput) -> Vec<String> {
     let body = get_object_output_body(obj).await;
-    let decoder = zstd::Decoder::new(body).expect("zstd decoder initialization failed");
-    let buf_read = BufReader::new(decoder);
+    let buf_read = BufReader::new(
+        CappedDecoder::zstd(body)
+            .expect("zstd decoder initialization failed")
+            .into_reader(),
+    );
     buf_read.lines().map(|l| l.unwrap()).collect()
 }
 

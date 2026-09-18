@@ -1,4 +1,5 @@
 CUE = ../scripts/cue.sh
+VDEV ?= cargo vdev
 
 export CI ?= false
 
@@ -10,7 +11,12 @@ export SERVER_PORT ?= 1313
 clean:
 	rm -rf public resources data/cargo-lock.toml data/docs.json
 
-setup:
+.PHONY: setup-vdev
+setup-vdev:
+	cd .. && scripts/environment/prepare.sh --modules=vdev,prettier
+
+.PHONY: setup
+setup: setup-vdev
 	yarn
 
 # Copy Cargo data such as the dependency information file
@@ -18,19 +24,27 @@ cargo-data:
 	cp -f ../Cargo.lock data/cargo-lock.toml
 
 # Build JSON from CUE sources with `make cue-build`. Run other commands with `make cue-*`
+cue-build:
+	$(VDEV) build docs-json
+
 cue-%:
 	${CUE} $*
 
-config-examples:
-	yarn config-examples
+.PHONY: component-examples
+component-examples: setup-vdev
+	$(VDEV) build component-examples website/generated/example-configs
 
-VDEV ?= cargo vdev
+.PHONY: config-examples
+config-examples: component-examples
 
 generate-vrl-docs:
 	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions \
 		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA),)
 
-structured-data: generate-vrl-docs cue-build config-examples
+generate-deprecations-json:
+	$(VDEV) deprecation generate
+
+structured-data: generate-vrl-docs generate-deprecations-json component-examples
 
 serve: clean setup cargo-data structured-data
 	hugo server \

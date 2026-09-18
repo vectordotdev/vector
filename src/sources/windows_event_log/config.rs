@@ -292,8 +292,8 @@ impl Default for WindowsEventLogConfig {
 }
 
 impl GenerateConfig for WindowsEventLogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(WindowsEventLogConfig::default()).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(WindowsEventLogConfig::default()).unwrap()
     }
 }
 

@@ -1,0 +1,11 @@
+sources:
+  my_source_id:
+    type: postgresql_metrics
+    endpoints:
+      - postgresql://postgres:vector@localhost:5432/postgres
+    exclude_databases:
+      - ^postgres$
+    include_databases:
+      - ^postgres$
+    namespace: postgresql
+    scrape_interval_secs: 15
