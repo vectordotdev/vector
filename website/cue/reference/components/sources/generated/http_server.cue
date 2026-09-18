@@ -150,9 +150,7 @@ generated: components: sources: http_server: configuration: {
 	socket_file_gid: {
 		description: "Group ID to own the Unix socket file."
 		required:    false
-		type: uint: examples: [
-			1000,
-		]
+		type: uint: examples: [1000]
 	}
 	socket_file_mode: {
 		description: """
@@ -167,9 +165,7 @@ generated: components: sources: http_server: configuration: {
 	socket_file_uid: {
 		description: "User ID to own the Unix socket file."
 		required:    false
-		type: uint: examples: [
-			1000,
-		]
+		type: uint: examples: [1000]
 	}
 	socket_path: {
 		description: """
