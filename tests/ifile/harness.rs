@@ -30,6 +30,7 @@ const DEADLINE: Duration = Duration::from_secs(10);
 pub(super) struct Observed {
     pub(super) messages: Vec<String>,
     pub(super) received_events: f64,
+    pub(super) open_files: Option<f64>,
 }
 
 impl Observed {
@@ -42,6 +43,9 @@ impl Observed {
                 || event["tags"]["component_kind"] != "source"
             {
                 return Err(format!("metric from an unexpected component: {event}").into());
+            }
+            if event["name"] == "open_files" {
+                self.open_files = event["gauge"]["value"].as_f64();
             }
             if event["name"] == "component_received_events_total" {
                 if event["kind"] != "absolute" {

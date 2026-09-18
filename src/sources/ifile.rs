@@ -984,6 +984,30 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn discovery_scan_removes_paths_without_notifications() {
+        use vector_lib::ifile_source::paths_provider::PathsProvider;
+
+        let root = tempfile::tempdir().unwrap();
+        let directory = root.path().join("not-created-yet");
+        // Watch registration fails because this directory does not exist yet.
+        let mut provider = super::NotifyPathsProvider::new(
+            &[directory.join("*.log")],
+            &[],
+            super::GlobMatchOptions::default(),
+            super::FileSourceInternalEventsEmitter {
+                include_file_metric_tag: false,
+            },
+        );
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("test.log");
+        std::fs::write(&path, "hello\n").unwrap();
+        assert_eq!(provider.paths(true).await, vec![path.clone()]);
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(provider.paths(false).await, vec![path]);
+        assert!(provider.paths(true).await.is_empty());
+    }
+
     async fn wait_checkpoint_and_n_reads(
         rx: &mut UnboundedReceiver<TestEvent>,
         original_files: Vec<&PathBuf>,

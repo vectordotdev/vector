@@ -21,7 +21,6 @@ indexmap.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 file-source-common = { path = "../file-source-common" }
-dashmap.workspace = true
 futures = { version = "0.3.31", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 async-compression.workspace = true
