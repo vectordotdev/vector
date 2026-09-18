@@ -26,6 +26,9 @@ pub trait PathsProvider {
     /// Provides the iterator that returns paths.
     type IntoIter: IntoIterator<Item = PathBuf>;
 
+    /// Wait until filesystem activity may require another read or discovery pass.
+    fn wait_for_changes(&mut self) -> impl Future<Output = ()> + Send;
+
     /// Provides a set of paths asynchronously.
     fn paths(&mut self, should_glob: bool) -> impl Future<Output = Self::IntoIter> + Send;
 }

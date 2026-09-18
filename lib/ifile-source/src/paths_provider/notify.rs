@@ -9,7 +9,7 @@ use std::{
 
 use glob::{MatchOptions, Pattern};
 use notify::{Event, EventKind, RecursiveMode, Watcher};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 use tracing::{debug, error, warn};
 
 use super::PathsProvider;
@@ -24,6 +24,7 @@ pub struct NotifyPathsProvider<E: FileSourceInternalEvents> {
     watcher: Option<notify::RecommendedWatcher>,
     events: mpsc::Receiver<notify::Result<Event>>,
     needs_rescan: Arc<AtomicBool>,
+    changed: Arc<Notify>,
     emitter: E,
 }
 
@@ -44,6 +45,8 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
         let (send, events) = mpsc::channel(100);
         let needs_rescan = Arc::new(AtomicBool::new(false));
         let overflow = Arc::clone(&needs_rescan);
+        let changed = Arc::new(Notify::new());
+        let wake = Arc::clone(&changed);
         let watcher = notify::recommended_watcher(move |event: notify::Result<Event>| {
             if matches!(&event, Ok(event) if matches!(event.kind, EventKind::Access(_) | EventKind::Other))
             {
@@ -56,6 +59,7 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
             ) {
                 overflow.store(true, Ordering::Relaxed);
             }
+            wake.notify_one();
         });
         let mut provider = Self {
             include_patterns: compile_patterns(include_patterns),
@@ -65,6 +69,7 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
             watcher: None,
             events,
             needs_rescan,
+            changed,
             emitter,
         };
         let registration = watcher.and_then(|watcher| {
@@ -220,6 +225,10 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
 
 impl<E: FileSourceInternalEvents> PathsProvider for NotifyPathsProvider<E> {
     type IntoIter = Vec<PathBuf>;
+
+    fn wait_for_changes(&mut self) -> impl std::future::Future<Output = ()> + Send {
+        self.changed.notified()
+    }
 
     async fn paths(&mut self, should_glob: bool) -> Self::IntoIter {
         let needs_rescan = self.process_events();
