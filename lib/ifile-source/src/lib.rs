@@ -10,7 +10,7 @@ pub use self::file_server::TestEvent;
 pub use self::{
     file_server::{calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown},
     file_watcher::{FileWatcher, WatcherState},
-    paths_provider::{boxed::BoxedPathsProvider, notify::NotifyPathsProvider},
+    paths_provider::notify::NotifyPathsProvider,
 };
 pub use file_source_common::{
     buffer,
