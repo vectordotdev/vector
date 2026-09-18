@@ -88,7 +88,7 @@ async fn http_to_http(status: StatusCode, response: StatusCode) {
         &format!(
             r#"
 [sources.in]
-type = "http"
+type = "http_server"
 address = "{address1}"
 acknowledgements.enabled = true
 

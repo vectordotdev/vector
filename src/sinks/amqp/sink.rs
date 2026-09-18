@@ -36,7 +36,7 @@ pub(super) struct AmqpSink {
 }
 
 impl AmqpSink {
-    pub(super) async fn new(
+    pub(super) fn new(
         config: AmqpSinkConfig,
         exchange: ConfinedTemplate,
         routing_key: Option<ConfinedTemplate>,
@@ -117,7 +117,7 @@ impl AmqpSink {
             .filter_map(|request| async move {
                 match request {
                     Err(e) => {
-                        error!("Failed to build AMQP request: {:?}.", e);
+                        error!("Failed to build AMQP request: {e:?}.");
                         None
                     }
                     Ok(req) => Some(req),

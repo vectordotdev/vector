@@ -47,7 +47,6 @@ components: sources: mqtt: {
 		}
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sources.mqtt.configuration

@@ -50,14 +50,14 @@ impl GrpcServer {
         // Bind the TCP listener first to ensure the port is available
         // This will fail fast if the address is already in use
         let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
-            crate::Error::from(format!("Failed to bind gRPC API server to {}: {}", addr, e))
+            crate::Error::from(format!("Failed to bind gRPC API server to {addr}: {e}"))
         })?;
 
         let actual_addr = listener
             .local_addr()
-            .map_err(|e| crate::Error::from(format!("Failed to get local address: {}", e)))?;
+            .map_err(|e| crate::Error::from(format!("Failed to get local address: {e}")))?;
 
-        info!("GRPC API server bound to {}.", actual_addr);
+        info!("GRPC API server bound to {actual_addr}.");
 
         let service = ObservabilityService::new(watch_rx);
 
@@ -72,9 +72,9 @@ impl GrpcServer {
         // Convert the tokio TcpListener into a std listener for hyper's Server.
         let std_listener = listener
             .into_std()
-            .map_err(|e| crate::Error::from(format!("Failed to convert TCP listener: {}", e)))?;
+            .map_err(|e| crate::Error::from(format!("Failed to convert TCP listener: {e}")))?;
         std_listener.set_nonblocking(true).map_err(|e| {
-            crate::Error::from(format!("Failed to set TCP listener non-blocking: {}", e))
+            crate::Error::from(format!("Failed to set TCP listener non-blocking: {e}"))
         })?;
 
         let router_serving = Arc::clone(&serving);
@@ -120,7 +120,7 @@ impl GrpcServer {
             }
         });
 
-        info!("GRPC API server started on {}.", actual_addr);
+        info!("GRPC API server started on {actual_addr}.");
 
         Ok(Self {
             _shutdown,
@@ -152,8 +152,8 @@ impl GrpcServer {
 ///
 /// Returns `200 {"ok":true}` while the server is serving and
 /// `503 {"ok":false}` once [`GrpcServer::set_not_serving`] has been called.
-/// Matches the response shape of the pre-gRPC GraphQL-era endpoint so
-/// existing HTTP health probes (Kubernetes, load balancers) keep working.
+/// Preserves the response shape expected by existing HTTP health probes such as
+/// Kubernetes and load balancers.
 fn http_router(state: ServingState) -> Router {
     Router::new()
         .route("/health", get(health_handler).head(health_handler))

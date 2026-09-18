@@ -242,7 +242,7 @@ fn encode_metric_to_v3(
             }
 
             match value {
-                Some(v) => tags_for_v3.push(format!("{}:{}", key, v)),
+                Some(v) => tags_for_v3.push(format!("{key}:{v}")),
                 None => tags_for_v3.push(key.to_string()),
             }
         }

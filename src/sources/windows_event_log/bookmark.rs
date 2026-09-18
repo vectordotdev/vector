@@ -140,7 +140,7 @@ impl BookmarkManager {
 
             if required_size > MAX_BOOKMARK_XML_SIZE as u32 {
                 return Err(WindowsEventLogError::RenderError {
-                    message: format!("Bookmark buffer size too large: {}", required_size),
+                    message: format!("Bookmark buffer size too large: {required_size}"),
                 });
             }
 
@@ -158,7 +158,7 @@ impl BookmarkManager {
                 &mut property_count,
             )
             .map_err(|e| WindowsEventLogError::RenderError {
-                message: format!("Failed to render bookmark XML: {}", e),
+                message: format!("Failed to render bookmark XML: {e}"),
             })?;
 
             // Convert UTF-16 buffer to String
@@ -220,7 +220,7 @@ impl BookmarkManager {
 
             if buffer_used > MAX_BOOKMARK_XML_SIZE as u32 {
                 return Err(WindowsEventLogError::RenderError {
-                    message: format!("Bookmark buffer size too large: {}", buffer_used),
+                    message: format!("Bookmark buffer size too large: {buffer_used}"),
                 });
             }
 
@@ -238,7 +238,7 @@ impl BookmarkManager {
                 &mut property_count,
             )
             .map_err(|e| WindowsEventLogError::RenderError {
-                message: format!("Failed to render bookmark XML: {}", e),
+                message: format!("Failed to render bookmark XML: {e}"),
             })?;
 
             let xml = String::from_utf16_lossy(&buffer[0..((actual_used / 2) as usize)]);

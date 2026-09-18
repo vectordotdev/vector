@@ -7,18 +7,13 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 
 use crate::commands::changelog::{
-    is_valid_anchor, new::TODO_HANDLE, parse_breaking_sections, slugify,
+    FRAGMENT_TYPES, FragmentType, is_valid_anchor, new::TODO_HANDLE, parse_breaking_sections,
+    slugify,
 };
 use crate::utils::{git, paths};
 
 const CHANGELOG_DIR: &str = "changelog.d";
 const DEFAULT_MAX_FRAGMENTS: usize = 1000;
-
-/// Allowed changelog fragment types.
-///
-/// NOTE: keep this list in sync with `vdev/src/commands/release/generate_cue.rs`
-/// and `changelog.d/README.md`.
-const FRAGMENT_TYPES: &[&str] = &["breaking", "security", "feature", "enhancement", "fix"];
 
 /// Validate changelog fragments added on this branch/PR.
 #[derive(clap::Args, Debug)]
@@ -99,16 +94,33 @@ impl Cli {
     }
 }
 
-/// Load every `*.breaking.md` in `changelog.d/`, compute its anchor (explicit override or
-/// slugified title), and verify the resulting set is non-empty, well-formed, and unique.
+/// Load every fragment in `changelog.d/` whose type is flagged `breaking`, compute its anchor
+/// (explicit override or slugified title), and verify the resulting set is non-empty,
+/// well-formed, and unique.
 fn validate_breaking_anchor_set(changelog_dir: &std::path::Path) -> Result<()> {
     let mut seen: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     for entry in std::fs::read_dir(changelog_dir)? {
         let path = entry?.path();
         let name = match path.file_name().and_then(|s| s.to_str()) {
-            Some(n) if n.ends_with(".breaking.md") => n.to_string(),
+            Some(n) => n.to_string(),
             _ => continue,
         };
+        // Only breaking fragments carry an upgrade-guide anchor. Select them via the
+        // canonical type metadata rather than the literal `.breaking.md` suffix, so a
+        // renamed or added type with `breaking: true` is covered too. Require the full
+        // `<name>.<type>.md` shape first so editor backups or disabled files such as
+        // `foo.breaking.md.bak` are skipped, matching release generation.
+        let parts: Vec<&str> = name.split('.').collect();
+        if parts.len() != 3 || parts[2] != "md" {
+            continue;
+        }
+        let fragment_type = parts[1];
+        let Some(entry) = FRAGMENT_TYPES.iter().find(|t| t.name == fragment_type) else {
+            continue;
+        };
+        if !entry.breaking {
+            continue;
+        }
         let content = std::fs::read_to_string(&path)?;
         let body_before_authors = content
             .rsplit_once("\nauthors: ")
@@ -151,7 +163,7 @@ fn diff_fragments(merge_base: &str, filter: &str) -> Result<Vec<PathBuf>> {
         .collect())
 }
 
-fn validate_filename(filename: &str) -> Result<&'static str> {
+fn validate_filename(filename: &str) -> Result<&'static FragmentType> {
     let parts: Vec<&str> = filename.split('.').collect();
     if parts.len() != 3 {
         bail!(
@@ -159,19 +171,27 @@ fn validate_filename(filename: &str) -> Result<&'static str> {
         );
     }
     let fragment_type = parts[1];
-    let Some(known) = FRAGMENT_TYPES.iter().find(|t| **t == fragment_type) else {
+    let Some(known) = FRAGMENT_TYPES.iter().find(|t| t.name == fragment_type) else {
         bail!(
             "invalid fragment filename '{filename}': fragment type must be one of ({}).",
-            FRAGMENT_TYPES.join("|")
+            FRAGMENT_TYPES
+                .iter()
+                .map(|t| t.name)
+                .collect::<Vec<_>>()
+                .join("|")
         );
     };
     if parts[2] != "md" {
         bail!("invalid fragment filename '{filename}': extension must be markdown (.md).");
     }
-    Ok(*known)
+    Ok(known)
 }
 
-fn validate_contents(path: &std::path::Path, filename: &str, fragment_type: &str) -> Result<()> {
+fn validate_contents(
+    path: &std::path::Path,
+    filename: &str,
+    fragment_type: &FragmentType,
+) -> Result<()> {
     let content = std::fs::read_to_string(path)?;
     // Match generate_cue.rs, which reads `lines().last()` verbatim: the authors
     // line must be the last line, no trailing blank lines allowed.
@@ -211,7 +231,7 @@ fn validate_contents(path: &std::path::Path, filename: &str, fragment_type: &str
         );
     }
 
-    if fragment_type == "breaking" {
+    if fragment_type.breaking {
         validate_breaking_fragment(&content, filename)?;
     }
 
@@ -404,5 +424,57 @@ mod tests {
         let raw = wrap("# TODO one-line title", "y", "N/A");
         let err = validate_breaking_fragment(&raw, "x.breaking.md").unwrap_err();
         assert!(err.to_string().contains("placeholder 'TODO'"), "{err}");
+    }
+
+    #[test]
+    fn breaking_anchor_set_rejects_invalid_anchor() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            tmp.path().join("bad.breaking.md"),
+            wrap("# One change {#Not Valid!}", "Summary.", "N/A"),
+        )
+        .unwrap();
+        let err = validate_breaking_anchor_set(tmp.path()).unwrap_err();
+        assert!(err.to_string().contains("kebab-case slug"), "{err}");
+    }
+
+    #[test]
+    fn breaking_anchor_set_rejects_duplicate_anchors() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(
+            tmp.path().join("one.breaking.md"),
+            wrap("# One change {#shared}", "Summary.", "N/A"),
+        )
+        .unwrap();
+        std::fs::write(
+            tmp.path().join("two.breaking.md"),
+            wrap("# Two change {#shared}", "Summary.", "N/A"),
+        )
+        .unwrap();
+        let err = validate_breaking_anchor_set(tmp.path()).unwrap_err();
+        assert!(
+            err.to_string().contains("duplicate upgrade-guide anchor"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn breaking_anchor_set_skips_non_breaking_fragments() {
+        let tmp = tempfile::tempdir().unwrap();
+        // A non-breaking fragment must not be anchor-checked, even with a breaking-shaped body.
+        std::fs::write(
+            tmp.path().join("not_breaking.fix.md"),
+            wrap("# One change {#Not Valid!}", "Summary.", "N/A"),
+        )
+        .unwrap();
+        assert!(validate_breaking_anchor_set(tmp.path()).is_ok());
+    }
+
+    #[test]
+    fn breaking_anchor_set_skips_non_fragment_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        // An editor backup like `foo.breaking.md.bak` must not be treated as a breaking fragment.
+        std::fs::write(tmp.path().join("foo.breaking.md.bak"), "not a fragment").unwrap();
+        assert!(validate_breaking_anchor_set(tmp.path()).is_ok());
     }
 }

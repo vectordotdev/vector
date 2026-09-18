@@ -25,7 +25,6 @@ static WELL_KNOWN_REPLACEMENTS: LazyLock<HashMap<String, &'static str>> = LazyLo
         ("influxdb", "InfluxDB"),
         ("webhdfs", "WebHDFS"),
         ("cloudwatch", "CloudWatch"),
-        ("logdna", "LogDNA"),
         ("geoip", "GeoIP"),
         ("ssekms", "SSE-KMS"),
         ("aes256", "AES-256"),

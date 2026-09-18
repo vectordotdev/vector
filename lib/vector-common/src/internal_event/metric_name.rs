@@ -24,6 +24,7 @@ pub enum CounterName {
     // Internal events from src/internal_events/
     AggregateEventsRecordedTotal,
     AggregateFailedUpdates,
+    AggregateFailedUpdatesTotal,
     AggregateFlushesTotal,
     ApiStartedTotal,
     CheckpointsTotal,
@@ -90,18 +91,43 @@ pub enum CounterName {
     K8sEventNodeAnnotationFailuresTotal,
     K8sFormatPickerEdgeCasesTotal,
     K8sDockerFormatParseFailuresTotal,
+    K8sMergedLineTruncatedTotal,
     SqsS3EventRecordIgnoredTotal,
     ComponentAllocatedBytesTotal,
     ComponentDeallocatedBytesTotal,
     MemoryEnrichmentTableFailedInsertions,
+    MemoryEnrichmentTableFailedInsertionsTotal,
     MemoryEnrichmentTableFailedReads,
+    MemoryEnrichmentTableFailedReadsTotal,
     MemoryEnrichmentTableFlushesTotal,
     MemoryEnrichmentTableInsertionsTotal,
     MemoryEnrichmentTableReadsTotal,
     MemoryEnrichmentTableRemovedTotal,
     MemoryEnrichmentTableTtlExpirations,
+    MemoryEnrichmentTableTtlExpirationsTotal,
     ComponentCpuUsageNsTotal,
     DatadogLogsReservedAttributeConflictsTotal,
+    // Data-plane counter names emitted by the `host_metrics` source.
+    CpuSecondsTotal,
+    CgroupCpuUsageSecondsTotal,
+    CgroupCpuUserSecondsTotal,
+    CgroupCpuSystemSecondsTotal,
+    DiskReadBytesTotal,
+    DiskReadsCompletedTotal,
+    DiskWrittenBytesTotal,
+    DiskWritesCompletedTotal,
+    MemorySwappedInBytesTotal,
+    MemorySwappedOutBytesTotal,
+    MemoryOomKillEventsTotal,
+    NetworkReceiveBytesTotal,
+    NetworkReceiveErrsTotal,
+    NetworkReceivePacketsTotal,
+    NetworkTransmitBytesTotal,
+    NetworkTransmitPacketsDropTotal,
+    NetworkTransmitPacketsTotal,
+    NetworkTransmitErrsTotal,
+    ProcessRuntime,
+    ProcessRuntimeTotal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -191,10 +217,8 @@ pub enum GaugeName {
     BufferMaxEventSize,
     BufferMaxSizeBytes,
     BufferMaxByteSize,
-    BufferEvents,
     BufferSizeEvents,
     BufferSizeBytes,
-    BufferByteSize,
     Utilization,
     ComponentAllocatedBytes,
     OpenFiles,
@@ -212,6 +236,51 @@ pub enum GaugeName {
     MemoryEnrichmentTableByteSize,
     TagCardinalityTrackedKeys,
     SecurityConfinementDisabled,
+    // Data-plane gauge names emitted by the `host_metrics` source.
+    Load1,
+    Load5,
+    Load15,
+    Uptime,
+    BootTime,
+    CgroupMemoryCurrentBytes,
+    CgroupMemoryAnonBytes,
+    CgroupMemoryFileBytes,
+    CgroupMemoryAnonActiveBytes,
+    CgroupMemoryAnonInactiveBytes,
+    CgroupMemoryFileActiveBytes,
+    CgroupMemoryFileInactiveBytes,
+    LogicalCpus,
+    PhysicalCpus,
+    MemoryTotalBytes,
+    MemoryFreeBytes,
+    MemoryAvailableBytes,
+    MemoryActiveBytes,
+    MemoryBuffersBytes,
+    MemoryCachedBytes,
+    MemorySharedBytes,
+    MemoryUsedBytes,
+    MemoryInactiveBytes,
+    MemoryWiredBytes,
+    MemorySwapFreeBytes,
+    MemorySwapTotalBytes,
+    MemorySwapUsedBytes,
+    ProcessCpuUsage,
+    ProcessMemoryUsage,
+    ProcessMemoryVirtualUsage,
+    FilesystemFreeBytes,
+    FilesystemTotalBytes,
+    FilesystemUsedBytes,
+    FilesystemUsedRatio,
+    FilesystemInodesTotal,
+    FilesystemInodesFree,
+    FilesystemInodesUsed,
+    FilesystemInodesUsedRatio,
+    TcpConnectionsTotal,
+    TcpTxQueuedBytesTotal,
+    TcpRxQueuedBytesTotal,
+    TemperatureCelsius,
+    TemperatureMaxCelsius,
+    TemperatureCriticalCelsius,
 }
 
 impl GaugeName {
@@ -235,10 +304,8 @@ impl GaugeName {
             Self::BufferMaxEventSize => "buffer_max_event_size",
             Self::BufferMaxSizeBytes => "buffer_max_size_bytes",
             Self::BufferMaxByteSize => "buffer_max_byte_size",
-            Self::BufferEvents => "buffer_events",
             Self::BufferSizeEvents => "buffer_size_events",
             Self::BufferSizeBytes => "buffer_size_bytes",
-            Self::BufferByteSize => "buffer_byte_size",
             Self::Utilization => "utilization",
             Self::ComponentAllocatedBytes => "component_allocated_bytes",
             Self::OpenFiles => "open_files",
@@ -256,6 +323,50 @@ impl GaugeName {
             Self::MemoryEnrichmentTableByteSize => "memory_enrichment_table_byte_size",
             Self::TagCardinalityTrackedKeys => "tag_cardinality_tracked_keys",
             Self::SecurityConfinementDisabled => "security_confinement_disabled",
+            Self::Load1 => "load1",
+            Self::Load5 => "load5",
+            Self::Load15 => "load15",
+            Self::Uptime => "uptime",
+            Self::BootTime => "boot_time",
+            Self::CgroupMemoryCurrentBytes => "cgroup_memory_current_bytes",
+            Self::CgroupMemoryAnonBytes => "cgroup_memory_anon_bytes",
+            Self::CgroupMemoryFileBytes => "cgroup_memory_file_bytes",
+            Self::CgroupMemoryAnonActiveBytes => "cgroup_memory_anon_active_bytes",
+            Self::CgroupMemoryAnonInactiveBytes => "cgroup_memory_anon_inactive_bytes",
+            Self::CgroupMemoryFileActiveBytes => "cgroup_memory_file_active_bytes",
+            Self::CgroupMemoryFileInactiveBytes => "cgroup_memory_file_inactive_bytes",
+            Self::LogicalCpus => "logical_cpus",
+            Self::PhysicalCpus => "physical_cpus",
+            Self::MemoryTotalBytes => "memory_total_bytes",
+            Self::MemoryFreeBytes => "memory_free_bytes",
+            Self::MemoryAvailableBytes => "memory_available_bytes",
+            Self::MemoryActiveBytes => "memory_active_bytes",
+            Self::MemoryBuffersBytes => "memory_buffers_bytes",
+            Self::MemoryCachedBytes => "memory_cached_bytes",
+            Self::MemorySharedBytes => "memory_shared_bytes",
+            Self::MemoryUsedBytes => "memory_used_bytes",
+            Self::MemoryInactiveBytes => "memory_inactive_bytes",
+            Self::MemoryWiredBytes => "memory_wired_bytes",
+            Self::MemorySwapFreeBytes => "memory_swap_free_bytes",
+            Self::MemorySwapTotalBytes => "memory_swap_total_bytes",
+            Self::MemorySwapUsedBytes => "memory_swap_used_bytes",
+            Self::ProcessCpuUsage => "process_cpu_usage",
+            Self::ProcessMemoryUsage => "process_memory_usage",
+            Self::ProcessMemoryVirtualUsage => "process_memory_virtual_usage",
+            Self::FilesystemFreeBytes => "filesystem_free_bytes",
+            Self::FilesystemTotalBytes => "filesystem_total_bytes",
+            Self::FilesystemUsedBytes => "filesystem_used_bytes",
+            Self::FilesystemUsedRatio => "filesystem_used_ratio",
+            Self::FilesystemInodesTotal => "filesystem_inodes_total",
+            Self::FilesystemInodesFree => "filesystem_inodes_free",
+            Self::FilesystemInodesUsed => "filesystem_inodes_used",
+            Self::FilesystemInodesUsedRatio => "filesystem_inodes_used_ratio",
+            Self::TcpConnectionsTotal => "tcp_connections_total",
+            Self::TcpTxQueuedBytesTotal => "tcp_tx_queued_bytes_total",
+            Self::TcpRxQueuedBytesTotal => "tcp_rx_queued_bytes_total",
+            Self::TemperatureCelsius => "temperature_celsius",
+            Self::TemperatureMaxCelsius => "temperature_max_celsius",
+            Self::TemperatureCriticalCelsius => "temperature_critical_celsius",
         }
     }
 }
@@ -284,6 +395,7 @@ impl CounterName {
             Self::BufferErrorsTotal => "buffer_errors_total",
             Self::AggregateEventsRecordedTotal => "aggregate_events_recorded_total",
             Self::AggregateFailedUpdates => "aggregate_failed_updates",
+            Self::AggregateFailedUpdatesTotal => "aggregate_failed_updates_total",
             Self::AggregateFlushesTotal => "aggregate_flushes_total",
             Self::ApiStartedTotal => "api_started_total",
             Self::CheckpointsTotal => "checkpoints_total",
@@ -356,13 +468,20 @@ impl CounterName {
             Self::K8sEventNodeAnnotationFailuresTotal => "k8s_event_node_annotation_failures_total",
             Self::K8sFormatPickerEdgeCasesTotal => "k8s_format_picker_edge_cases_total",
             Self::K8sDockerFormatParseFailuresTotal => "k8s_docker_format_parse_failures_total",
+            Self::K8sMergedLineTruncatedTotal => "k8s_merged_line_truncated_total",
             Self::SqsS3EventRecordIgnoredTotal => "sqs_s3_event_record_ignored_total",
             Self::ComponentAllocatedBytesTotal => "component_allocated_bytes_total",
             Self::ComponentDeallocatedBytesTotal => "component_deallocated_bytes_total",
             Self::MemoryEnrichmentTableFailedInsertions => {
                 "memory_enrichment_table_failed_insertions"
             }
+            Self::MemoryEnrichmentTableFailedInsertionsTotal => {
+                "memory_enrichment_table_failed_insertions_total"
+            }
             Self::MemoryEnrichmentTableFailedReads => "memory_enrichment_table_failed_reads",
+            Self::MemoryEnrichmentTableFailedReadsTotal => {
+                "memory_enrichment_table_failed_reads_total"
+            }
             Self::MemoryEnrichmentTableFlushesTotal => "memory_enrichment_table_flushes_total",
             Self::MemoryEnrichmentTableInsertionsTotal => {
                 "memory_enrichment_table_insertions_total"
@@ -370,10 +489,68 @@ impl CounterName {
             Self::MemoryEnrichmentTableReadsTotal => "memory_enrichment_table_reads_total",
             Self::MemoryEnrichmentTableRemovedTotal => "memory_enrichment_table_removed_total",
             Self::MemoryEnrichmentTableTtlExpirations => "memory_enrichment_table_ttl_expirations",
+            Self::MemoryEnrichmentTableTtlExpirationsTotal => {
+                "memory_enrichment_table_ttl_expirations_total"
+            }
             Self::ComponentCpuUsageNsTotal => "component_cpu_usage_ns_total",
             Self::DatadogLogsReservedAttributeConflictsTotal => {
                 "datadog_logs_reserved_attribute_conflicts_total"
             }
+            Self::CpuSecondsTotal => "cpu_seconds_total",
+            Self::CgroupCpuUsageSecondsTotal => "cgroup_cpu_usage_seconds_total",
+            Self::CgroupCpuUserSecondsTotal => "cgroup_cpu_user_seconds_total",
+            Self::CgroupCpuSystemSecondsTotal => "cgroup_cpu_system_seconds_total",
+            Self::DiskReadBytesTotal => "disk_read_bytes_total",
+            Self::DiskReadsCompletedTotal => "disk_reads_completed_total",
+            Self::DiskWrittenBytesTotal => "disk_written_bytes_total",
+            Self::DiskWritesCompletedTotal => "disk_writes_completed_total",
+            Self::MemorySwappedInBytesTotal => "memory_swapped_in_bytes_total",
+            Self::MemorySwappedOutBytesTotal => "memory_swapped_out_bytes_total",
+            Self::MemoryOomKillEventsTotal => "memory_oom_kill_events_total",
+            Self::NetworkReceiveBytesTotal => "network_receive_bytes_total",
+            Self::NetworkReceiveErrsTotal => "network_receive_errs_total",
+            Self::NetworkReceivePacketsTotal => "network_receive_packets_total",
+            Self::NetworkTransmitBytesTotal => "network_transmit_bytes_total",
+            Self::NetworkTransmitPacketsDropTotal => "network_transmit_packets_drop_total",
+            Self::NetworkTransmitPacketsTotal => "network_transmit_packets_total",
+            Self::NetworkTransmitErrsTotal => "network_transmit_errs_total",
+            Self::ProcessRuntime => "process_runtime",
+            Self::ProcessRuntimeTotal => "process_runtime_total",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use strum::IntoEnumIterator;
+
+    use super::CounterName;
+
+    #[test]
+    fn counters_end_in_total_except_deprecated() {
+        // Deprecated legacy aliases of `_total` successors, still emitted for
+        // backward compatibility.
+        let mut exempt = HashSet::from([
+            "memory_enrichment_table_failed_insertions",
+            "memory_enrichment_table_failed_reads",
+            "memory_enrichment_table_ttl_expirations",
+            "process_runtime",
+            "aggregate_failed_updates",
+        ]);
+
+        for variant in CounterName::iter() {
+            let name = CounterName::as_str(variant);
+            if name.ends_with("_total") {
+                continue;
+            }
+            assert!(
+                exempt.remove(name),
+                "counter `{name}` must end in `_total` or be listed as exempt"
+            );
+        }
+
+        assert!(exempt.is_empty(), "exempt counters not emitted: {exempt:?}");
     }
 }

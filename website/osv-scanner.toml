@@ -1,3 +1,0 @@
-[[IgnoredVulns]]
-id = "MAL-2025-3174"
-reason = "typesense-sync: package pulled in from s3 and not from npm"

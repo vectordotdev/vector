@@ -2,7 +2,6 @@ sources:
   my_source_id:
     type: http_server
     address: 0.0.0.0:80
-    encoding: binary
     headers:
       - User-Agent
     host_key: hostname

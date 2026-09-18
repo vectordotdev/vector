@@ -164,6 +164,10 @@ relevant to your PR. This command is defined in the
 
 ### GitHub Pull Requests
 
+Please see [Community response expectations](COMMUNITY_RESPONSE_EXPECTATIONS.md)
+for information about how maintainers prioritize pull requests, issues, and
+discussions.
+
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
 
 #### Reviews & Approvals

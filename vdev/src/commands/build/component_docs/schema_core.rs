@@ -68,18 +68,17 @@ impl SchemaContext {
             let expanded_ref = if let Some(cached) = self.expanded_schema_cache.get(&r) {
                 cached.clone()
             } else {
-                debug!("Expanding top-level schema ref of '{}'...", r);
+                debug!("Expanding top-level schema ref of '{r}'...");
                 let unexpanded = self.get_schema_by_name(&r)?;
                 let expanded = self.expand_schema_references(&unexpanded)?;
-                self.expanded_schema_cache
-                    .insert(r.clone(), expanded.clone());
+                self.expanded_schema_cache.insert(r, expanded.clone());
                 expanded
             };
 
             let obj = schema.as_object_mut().unwrap();
             obj.shift_remove("$ref");
 
-            let mut new_schema = expanded_ref.clone();
+            let mut new_schema = expanded_ref;
             nested_merge(&mut new_schema, &Value::Object(obj.clone()));
             schema = new_schema;
         }

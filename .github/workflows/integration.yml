@@ -126,6 +126,7 @@ jobs:
             "mqtt",
             "nats",
             "nginx",
+            "opensearch",
             "opentelemetry",
             "postgres",
             "prometheus",

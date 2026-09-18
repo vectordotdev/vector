@@ -1,8 +1,0 @@
-sinks:
-  my_sink_id:
-    type: azure_monitor_logs
-    inputs:
-      - my-source-or-transform-id
-    customer_id: 5ce893d9-2c32-4b6c-91a9-b0887c2de2d6
-    log_type: MyTableName
-    shared_key: SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA==
