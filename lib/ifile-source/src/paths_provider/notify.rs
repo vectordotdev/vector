@@ -45,8 +45,6 @@ pub struct NotifyPathsProvider<E: FileSourceInternalEvents + Clone> {
     emitter: E,
     /// Mutex for thread-safe access to the event receiver
     event_mutex: Arc<Mutex<()>>,
-    /// Flag to indicate if we should use glob scanning as fallback
-    use_glob_fallback: bool,
     /// Reconcile directory changes and notification errors outside the callback.
     needs_rescan: Arc<AtomicBool>,
 }
@@ -84,14 +82,12 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
 
             emitter,
             event_mutex: Arc::new(Mutex::new(())),
-            use_glob_fallback: false,
             needs_rescan: Arc::new(AtomicBool::new(false)),
         };
 
         // Initialize the watcher
         if let Err(e) = provider.initialize_watcher() {
             warn!(message = "Failed to initialize notify watcher, falling back to glob scanning", error = ?e);
-            provider.use_glob_fallback = true;
         }
 
         // Do an initial glob scan to discover existing files
@@ -369,7 +365,6 @@ impl<E: FileSourceInternalEvents + Clone> Clone for NotifyPathsProvider<E> {
 
             emitter: self.emitter.clone(),
             event_mutex: self.event_mutex.clone(),
-            use_glob_fallback: self.use_glob_fallback,
             needs_rescan: self.needs_rescan.clone(),
         }
     }

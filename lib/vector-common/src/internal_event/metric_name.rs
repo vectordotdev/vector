@@ -44,8 +44,6 @@ pub enum CounterName {
     DorisRowsLoadedTotal,
     EncoderUnmappableReplacementWarningsTotal,
     EventsDiscardedTotal,
-    FilesActiveTotal,
-    FilesPassiveTotal,
     FilesAddedTotal,
     FilesDeletedTotal,
     FilesResumedTotal,
@@ -421,8 +419,6 @@ impl CounterName {
                 "encoder_unmappable_replacement_warnings_total"
             }
             Self::EventsDiscardedTotal => "events_discarded_total",
-            Self::FilesActiveTotal => "files_active_total",
-            Self::FilesPassiveTotal => "files_passive_total",
             Self::FilesAddedTotal => "files_added_total",
             Self::FilesDeletedTotal => "files_deleted_total",
             Self::FilesResumedTotal => "files_resumed_total",
