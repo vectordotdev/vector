@@ -22,7 +22,7 @@ use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker
 use crate::{
     config::{
         DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput, log_schema,
+        SourceContext, SourceOutput, UnixOnly, log_schema,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
@@ -58,7 +58,7 @@ pub enum FluentMode {
     Tcp(FluentTcpConfig),
 
     /// Listen on unix stream socket
-    Unix(FluentUnixConfig),
+    Unix(UnixOnly<FluentUnixConfig>),
 }
 
 /// Serde doesn't provide a way to specify a default tagged variant when deserializing
@@ -77,7 +77,7 @@ mod deser {
         Tcp(FluentTcpConfig),
 
         #[serde(rename = "unix")]
-        Unix(FluentUnixConfig),
+        Unix(UnixOnly<FluentUnixConfig>),
     }
 
     #[derive(Deserialize)]
@@ -138,7 +138,7 @@ mod deser {
 
             let parsed: FluentConfig = serde_json::from_value(json_data).unwrap();
             assert!(
-                matches!(parsed.mode, FluentMode::Unix(c) if c.path.to_string_lossy() == "/foo")
+                matches!(parsed.mode, FluentMode::Unix(c) if c.platform_independent().path.to_string_lossy() == "/foo")
             );
         }
     }
@@ -237,40 +237,23 @@ pub struct FluentUnixConfig {
 }
 
 impl FluentUnixConfig {
+    #[cfg(unix)]
     fn build(
         &self,
         cx: SourceContext,
         log_namespace: LogNamespace,
     ) -> crate::Result<super::Source> {
-        #[cfg(not(unix))]
-        {
-            let _ = (cx, log_namespace);
-            return Err(unsupported_unix_socket_error());
-        }
+        let source = FluentSource::new(log_namespace);
 
-        #[cfg(unix)]
-        {
-            let source = FluentSource::new(log_namespace);
-
-            crate::sources::util::build_unix_stream_source(
-                self.path.clone(),
-                self.socket_file_mode,
-                source.decoder(),
-                move |events, host| source.handle_events_impl(events, host.into()),
-                cx.shutdown,
-                cx.out,
-            )
-        }
+        crate::sources::util::build_unix_stream_source(
+            self.path.clone(),
+            self.socket_file_mode,
+            source.decoder(),
+            move |events, host| source.handle_events_impl(events, host.into()),
+            cx.shutdown,
+            cx.out,
+        )
     }
-}
-
-#[cfg(not(unix))]
-fn unsupported_unix_socket_error() -> crate::Error {
-    format!(
-        "Unix Domain Socket sources are not supported on {}.",
-        std::env::consts::OS
-    )
-    .into()
 }
 
 impl GenerateConfig for FluentConfig {
@@ -299,7 +282,11 @@ impl SourceConfig for FluentConfig {
         let log_namespace = cx.log_namespace(self.log_namespace);
         match &self.mode {
             FluentMode::Tcp(t) => t.build(cx, log_namespace),
-            FluentMode::Unix(u) => u.build(cx, log_namespace),
+            FluentMode::Unix(u) => u.as_ref().on_unix(
+                (cx, log_namespace),
+                #[cfg(unix)]
+                |config, (cx, log_namespace)| config.build(cx, log_namespace),
+            ),
         }
     }
 

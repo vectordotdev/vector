@@ -44,6 +44,7 @@ mod sink_validated;
 mod source;
 mod transform;
 pub mod unit_test;
+mod unix;
 mod validation;
 mod vars;
 pub mod watcher;
@@ -66,6 +67,7 @@ pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
 };
 pub use unit_test::{UnitTestResult, build_unit_tests, build_unit_tests_main};
+pub use unix::UnixOnly;
 pub use validation::warnings;
 pub use vars::{ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX, interpolate};
 pub use vector_lib::{

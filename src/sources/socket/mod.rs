@@ -16,7 +16,7 @@ use vrl::value::{Kind, kind::Collection};
 
 use crate::{
     codecs::DecodingConfig,
-    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, Resource, SourceConfig, SourceContext, SourceOutput, UnixOnly},
     sources::util::net::TcpSource,
     tls::MaybeTlsSettings,
 };
@@ -43,11 +43,11 @@ pub enum Mode {
     Udp(udp::UdpConfig),
 
     /// Listen on a Unix domain socket (UDS), in datagram mode.
-    UnixDatagram(UnixConfig),
+    UnixDatagram(UnixOnly<UnixConfig>),
 
     /// Listen on a Unix domain socket (UDS), in stream mode.
     #[serde(alias = "unix")]
-    UnixStream(UnixConfig),
+    UnixStream(UnixOnly<UnixConfig>),
 }
 
 impl SocketConfig {
@@ -63,8 +63,8 @@ impl SocketConfig {
         match &self.mode {
             Mode::Tcp(config) => config.decoding().clone(),
             Mode::Udp(config) => config.decoding().clone(),
-            Mode::UnixDatagram(config) => config.decoding().clone(),
-            Mode::UnixStream(config) => config.decoding().clone(),
+            Mode::UnixDatagram(config) => config.platform_independent().decoding().clone(),
+            Mode::UnixStream(config) => config.platform_independent().decoding().clone(),
         }
     }
 
@@ -72,8 +72,12 @@ impl SocketConfig {
         match &self.mode {
             Mode::Tcp(config) => global_log_namespace.merge(config.log_namespace),
             Mode::Udp(config) => global_log_namespace.merge(config.log_namespace),
-            Mode::UnixDatagram(config) => global_log_namespace.merge(config.log_namespace),
-            Mode::UnixStream(config) => global_log_namespace.merge(config.log_namespace),
+            Mode::UnixDatagram(config) => {
+                global_log_namespace.merge(config.platform_independent().log_namespace)
+            }
+            Mode::UnixStream(config) => {
+                global_log_namespace.merge(config.platform_independent().log_namespace)
+            }
         }
     }
 }
@@ -165,15 +169,10 @@ impl SourceConfig for SocketConfig {
                     log_namespace,
                 ))
             }
-            Mode::UnixDatagram(config) => {
-                #[cfg(not(unix))]
-                {
-                    let _ = (config, cx);
-                    return Err(unsupported_unix_socket_error());
-                }
-
+            Mode::UnixDatagram(config) => config.on_unix(
+                cx,
                 #[cfg(unix)]
-                {
+                |config, cx| {
                     let log_namespace = cx.log_namespace(config.log_namespace);
                     let decoding = config.decoding.clone();
                     let framing = config
@@ -183,20 +182,15 @@ impl SourceConfig for SocketConfig {
                     let decoder = DecodingConfig::new(framing, decoding, log_namespace).build()?;
 
                     unix::unix_datagram(config, decoder, cx.shutdown, cx.out, log_namespace)
-                }
-            }
-            Mode::UnixStream(config) => {
-                #[cfg(not(unix))]
-                {
-                    let _ = (config, cx);
-                    return Err(unsupported_unix_socket_error());
-                }
-
+                },
+            ),
+            Mode::UnixStream(config) => config.on_unix(
+                cx,
                 #[cfg(unix)]
-                {
+                |config, cx| {
                     let log_namespace = cx.log_namespace(config.log_namespace);
 
-                    let decoding = config.decoding().clone();
+                    let decoding = config.decoding.clone();
                     let decoder = DecodingConfig::new(
                         config
                             .framing
@@ -208,8 +202,8 @@ impl SourceConfig for SocketConfig {
                     .build()?;
 
                     unix::unix_stream(config, decoder, cx.shutdown, cx.out, log_namespace)
-                }
-            }
+                },
+            ),
         }
     }
 
@@ -280,7 +274,12 @@ impl SourceConfig for SocketConfig {
                     )
             }
             Mode::UnixDatagram(config) => {
-                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config
+                    .platform_independent()
+                    .host_key()
+                    .clone()
+                    .path
+                    .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
@@ -291,7 +290,12 @@ impl SourceConfig for SocketConfig {
                 )
             }
             Mode::UnixStream(config) => {
-                let legacy_host_key = config.host_key().clone().path.map(LegacyKey::InsertIfEmpty);
+                let legacy_host_key = config
+                    .platform_independent()
+                    .host_key()
+                    .clone()
+                    .path
+                    .map(LegacyKey::InsertIfEmpty);
 
                 schema_definition.with_source_metadata(
                     Self::NAME,
@@ -325,15 +329,6 @@ impl SourceConfig for SocketConfig {
 
 pub(crate) fn default_host_key() -> OptionalValuePath {
     log_schema().host_key().cloned().into()
-}
-
-#[cfg(not(unix))]
-fn unsupported_unix_socket_error() -> crate::Error {
-    format!(
-        "Unix Domain Socket sources are not supported on {}.",
-        std::env::consts::OS
-    )
-    .into()
 }
 
 #[cfg(test)]
@@ -1604,9 +1599,9 @@ mod test {
         }
 
         let mode = if stream {
-            Mode::UnixStream(config)
+            Mode::UnixStream(config.into())
         } else {
-            Mode::UnixDatagram(config)
+            Mode::UnixDatagram(config.into())
         };
 
         let server = SocketConfig { mode }
@@ -1882,7 +1877,7 @@ mod test {
 
         let mut config = UnixConfig::new(in_path.clone());
         config.socket_file_mode = Some(0o555);
-        let mode = Mode::UnixDatagram(config);
+        let mode = Mode::UnixDatagram(config.into());
         let server = SocketConfig { mode }
             .build(SourceContext::new_test(tx, None))
             .await
@@ -2027,7 +2022,7 @@ mod test {
 
         let mut config = UnixConfig::new(in_path.clone());
         config.socket_file_mode = Some(0o421);
-        let mode = Mode::UnixStream(config);
+        let mode = Mode::UnixStream(config.into());
         let server = SocketConfig { mode }
             .build(SourceContext::new_test(tx, None))
             .await
