@@ -9,20 +9,37 @@ generated: components: transforms: throttle: configuration: {
 	internal_metrics: {
 		description: "Configuration of internal metrics for the Throttle transform."
 		required:    false
-		type: object: options: emit_events_discarded_per_key: {
-			description: """
-				Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
+		type: object: options: {
+			emit_events_discarded_per_key: {
+				description: """
+					Whether or not to emit the `events_discarded_total` internal metric with the `key` tag.
 
-				If true, the counter will be incremented for each discarded event, including the key value
-				associated with the discarded event. If false, the counter will not be emitted. Instead, the
-				number of discarded events can be seen through the `component_discarded_events_total` internal
-				metric.
+					If true, the counter will be incremented for each discarded event, including the key value
+					associated with the discarded event. If false, the counter will not be emitted. Instead, the
+					number of discarded events can be seen through the `component_discarded_events_total` internal
+					metric.
 
-				Note that this defaults to false because the `key` tag has potentially unbounded cardinality.
-				Only set this to true if you know that the number of unique keys is bounded.
-				"""
-			required: false
-			type: bool: default: false
+					Note that this defaults to false because the `key` tag has potentially unbounded cardinality.
+					Only set this to true if you know that the number of unique keys is bounded.
+					"""
+				required: false
+				type: bool: default: false
+			}
+			include_group_tag: {
+				description: """
+					Whether or not to include the `group` tag on the `component_discarded_events_total`
+					internal metric.
+
+					If true, the counter will be incremented for each discarded event with the value of
+					`key_field` associated with the discarded event. If false, the counter will not include
+					the `group` tag.
+
+					Note that this defaults to false because the `group` tag has potentially unbounded
+					cardinality. Only set this to true if you know that the number of unique groups is bounded.
+					"""
+				required: false
+				type: bool: default: false
+			}
 		}
 	}
 	key_field: {
