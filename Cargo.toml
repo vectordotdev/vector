@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.59.0"
+version = "0.59.0-dev"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -99,6 +99,7 @@ depends = ""
 members = [
   ".",
   "lib/codecs",
+  "lib/datadog-proto",
   "lib/dnsmsg-parser",
   "lib/docs-renderer",
   "lib/fakedata",
@@ -107,8 +108,8 @@ members = [
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
   "lib/loki-logproto",
-  "lib/prometheus-parser",
   "lib/opentelemetry-proto",
+  "lib/prometheus-parser",
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-buffers",
@@ -151,6 +152,7 @@ uninlined_format_args = "warn"
 borrow_as_ptr = "warn"
 checked_conversions = "warn"
 ptr_as_ptr = "warn"
+ref_as_ptr = "warn"
 rc_buffer = "warn"
 todo = "warn"
 
@@ -172,7 +174,7 @@ clap = { version = "4.5.60", default-features = false, features = ["derive", "er
 clap_complete = "4.6.5"
 colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.1.0", default-features = false }
-convert_case = { version = "0.10", default-features = false }
+convert_case = { version = "0.12", default-features = false }
 criterion = "0.8"
 crossbeam-utils = { version = "0.8.21", default-features = false }
 cuckoo-clock = { version = "0.2.7" , default-features = false }
@@ -277,6 +279,7 @@ vector-config-common.workspace = true
 vector-config-macros.workspace = true
 vector-vrl-functions = { workspace = true, features = ["vrl-metrics"] }
 vector-vrl-metrics = { path = "lib/vector-vrl/metrics" }
+datadog-proto = { path = "lib/datadog-proto", optional = true }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
@@ -567,8 +570,6 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # installed, and so rdkafka's build script doesn't link GSSAPI.
 default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
-# Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
-docs = ["enable-api-client", "sources-dnstap"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
 default-cmake = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 
@@ -755,7 +756,7 @@ sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64", "sources-http_server", "sources-utils-http-encoding"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
-sources-datadog_agent = ["sources-utils-http-encoding", "protobuf-build", "dep:prost"]
+sources-datadog_agent = ["sources-utils-http-encoding", "dep:datadog-proto", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost", "vector-vrl-functions/dnstap"]
 sources-docker_logs = ["docker"]
@@ -968,8 +969,8 @@ sinks-databend = ["dep:databend-client"]
 sinks-databricks_zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow", "arrow/ipc_compression"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
-sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
-sinks-datadog_traces = ["protobuf-build", "dep:prost", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
+sinks-datadog_metrics = ["dep:datadog-proto", "dep:prost", "dep:prost-reflect"]
+sinks-datadog_traces = ["protobuf-build", "dep:datadog-proto", "dep:prost", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sinks-doris = ["sqlx/mysql"]
 sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
