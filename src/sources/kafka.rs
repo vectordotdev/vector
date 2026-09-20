@@ -135,9 +135,11 @@ pub struct KafkaSourceConfig {
     /// consumer group rebalance.
     ///
     /// When Vector shuts down or the Kafka consumer group revokes partitions from this
-    /// consumer, wait a maximum of `drain_timeout_ms` for the source to
-    /// process pending acknowledgements. Must be less than `session_timeout_ms`
-    /// to ensure the consumer is not excluded from the group during a rebalance.
+    /// consumer, wait up to `drain_timeout_ms` for the source to process pending
+    /// acknowledgements. Partitions that have not drained by then are stopped, and any
+    /// of their acknowledgements still in flight are dropped. Must be less than
+    /// `session_timeout_ms` to ensure the consumer is not excluded from the group
+    /// during a rebalance.
     ///
     /// Default value is half of `session_timeout_ms`.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -505,9 +507,17 @@ async fn kafka_source(
 /// A ConsumerStateInner<Draining> keeps track of partitions that are expected
 /// to complete, and also owns the signal that, when dropped, indicates to the
 /// client driver task that it is safe to proceed with the rebalance or shutdown.
-/// When draining is complete, or the deadline is reached, Draining is traded in for
-/// either a Consuming (after a revoke) or Complete (in the case of shutdown) state,
-/// via the `finish_drain` method.
+/// When the drain deadline is reached, the remaining partition tasks are aborted,
+/// but the state stays Draining until every one of them has actually ended.
+/// Only then is Draining traded in for either a Consuming (after a revoke) or
+/// Complete (in the case of shutdown) state, via the `finish_drain` method.
+///
+/// Waiting for aborted tasks matters: a partition task owns the rdkafka partition
+/// queue. If the rebalance were allowed to continue while an aborted task was still
+/// being dropped, the partition could be re-assigned and a new queue split off for it
+/// before the old queue is gone. Both queues share one librdkafka queue, and dropping
+/// the old one removes the wake-up callback the new one relies on, which silently
+/// stops consumption of that partition (see vectordotdev/vector#22006).
 ///
 /// A ConsumerStateInner<Complete> is the final state, reached after a shutdown
 /// signal is received. This can not be traded for another state, and the
@@ -543,6 +553,11 @@ struct Draining {
     /// a Consuming state.
     shutdown: bool,
 
+    /// Whether the drain deadline has already fired and the remaining partition
+    /// tasks have been aborted. The drain then only waits for those tasks to end,
+    /// which is not bounded: proceeding without them could re-introduce the stall.
+    aborted: bool,
+
     /// The source's tracing Span used to instrument metrics emitted by consumer tasks
     span: Span,
 }
@@ -558,6 +573,7 @@ impl Draining {
             signal,
             shutdown,
             expect_drain: HashSet::new(),
+            aborted: false,
             span,
         }
     }
@@ -718,12 +734,19 @@ impl ConsumerStateInner<Draining> {
     }
 
     /// Add the given TopicPartition to the set of known "drained" partitions,
-    /// i.e. the consumer has drained the acknowledgement channel. A signal is
-    /// sent on the signal channel, indicating to the client that offsets may be committed
+    /// i.e. the consumer has drained the acknowledgement channel, or its task was
+    /// aborted and has ended. For a drained partition a signal is sent on the signal
+    /// channel, indicating to the client that offsets may be committed. Once tasks have
+    /// been aborted no signal is sent anymore: each signal costs the client a synchronous
+    /// commit while the rebalance callback is blocked, and the client commits once more
+    /// after the drain anyway (in `pre_rebalance` after a revoke, and at the end of
+    /// `kafka_source` on shutdown), which covers any offsets stored by these tasks.
     fn partition_drained(&mut self, tp: TopicPartition) {
-        // This send() will only return Err if the receiver has already been disconnected (i.e. the
-        // kafka client task is no longer running)
-        _ = self.consumer_state.signal.send(());
+        if !self.consumer_state.aborted {
+            // This send() will only return Err if the receiver has already been disconnected (i.e. the
+            // kafka client task is no longer running)
+            _ = self.consumer_state.signal.send(());
+        }
         self.consumer_state.expect_drain.remove(&tp);
     }
 
@@ -783,15 +806,46 @@ async fn coordinate_kafka_callbacks(
     // Handles that will let us end any consumer task that exceeds a drain deadline
     let mut abort_handles: HashMap<TopicPartition, tokio::task::AbortHandle> = HashMap::new();
 
+    // Maps a consumer task id back to its partition, so that a task that ended without
+    // returning a value (aborted or panicked) can still be accounted for.
+    let mut task_partitions: HashMap<tokio::task::Id, TopicPartition> = HashMap::new();
+
     let exit_eof = eof.is_some();
 
     while let ConsumerState::Consuming(_) | ConsumerState::Draining(_) = consumer_state {
         tokio::select! {
-            Some(Ok((finished_partition, status))) = partition_consumers.join_next(), if !partition_consumers.is_empty() => {
+            Some(result) = partition_consumers.join_next_with_id(), if !partition_consumers.is_empty() => {
+                let (task_id, finished_partition, status) = match result {
+                    Ok((task_id, (tp, status))) => (task_id, tp, status),
+                    Err(join_error) => match task_partitions.get(&join_error.id()) {
+                        Some(tp) => {
+                            if join_error.is_cancelled() {
+                                debug!(message = "Partition consumer task was aborted.", topic = %tp.0, partition = tp.1);
+                            } else {
+                                error!(
+                                    message = "Partition consumer task ended unexpectedly.",
+                                    topic = %tp.0,
+                                    partition = tp.1,
+                                    error = %join_error,
+                                );
+                            }
+                            (join_error.id(), tp.clone(), PartitionConsumerStatus::NormalExit)
+                        }
+                        None => {
+                            error!(message = "Unknown partition consumer task ended.", error = %join_error);
+                            continue;
+                        }
+                    },
+                };
                 debug!("Partition consumer finished for {}:{}", &finished_partition.0, finished_partition.1);
-                // If this task ended on its own, the end_signal for it will still be in here.
-                end_signals.remove(&finished_partition);
-                abort_handles.remove(&finished_partition);
+                task_partitions.remove(&task_id);
+                // Only clean up the handles if they belong to this task and not to a newer
+                // consumer task for the same partition. If this task ended on its own, the
+                // end_signal for it will still be in here.
+                if abort_handles.get(&finished_partition).is_some_and(|handle| handle.id() == task_id) {
+                    abort_handles.remove(&finished_partition);
+                    end_signals.remove(&finished_partition);
+                }
 
                 (drain_deadline, consumer_state) = match consumer_state {
                     ConsumerState::Complete => unreachable!("Partition consumer finished after completion."),
@@ -837,6 +891,7 @@ async fn coordinate_kafka_callbacks(
                             match consumer.split_partition_queue(topic, partition) { Some(pq) => {
                                 debug!("Consuming partition {}:{}.", &tp.0, tp.1);
                                 let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
+                                task_partitions.insert(handle.id(), tp.clone());
                                 abort_handles.insert(tp.clone(), handle);
                                 end_signals.insert(tp, end_tx);
                             } _ => {
@@ -920,14 +975,40 @@ async fn coordinate_kafka_callbacks(
                     warn!("A drain deadline fired outside of draining mode.");
                     state.keep_consuming(None.into())
                 },
-                ConsumerState::Draining(mut draining) => {
-                    debug!("Acknowledgement drain deadline reached. Dropping any pending ack streams for revoked partitions.");
-                    for tp in draining.consumer_state.expect_drain.drain() {
-                        if let Some(handle) = abort_handles.remove(&tp) {
+                ConsumerState::Draining(mut draining) if !draining.consumer_state.aborted => {
+                    debug!("Acknowledgement drain deadline reached. Aborting consumer tasks for revoked partitions.");
+                    // Abort the tasks that did not drain in time. They are still expected to
+                    // finish: the JoinSet reports each aborted task once its future (and the
+                    // partition queue it owns) has actually been dropped, and only then may the
+                    // rebalance or shutdown proceed. Every partition still expected to drain has a
+                    // task that has not been reaped yet, so its abort handle must be present.
+                    draining.consumer_state.expect_drain.retain(|tp| match abort_handles.get(tp) {
+                        Some(handle) => {
                             handle.abort();
+                            true
                         }
+                        None => {
+                            error!(message = "Partition expected to drain has no consumer task.", topic = %tp.0, partition = tp.1);
+                            false
+                        }
+                    });
+                    draining.consumer_state.aborted = true;
+                    if draining.is_drain_complete() {
+                        draining.finish_drain(None.into())
+                    } else {
+                        // Aborted tasks end at their next await point, so this should be quick.
+                        // The timer is only re-armed to make an unexpectedly long wait visible.
+                        draining.keep_draining(Some(Box::pin(tokio::time::sleep(max_drain_ms))).into())
                     }
-                    draining.finish_drain(drain_deadline)
+                }
+                ConsumerState::Draining(draining) => {
+                    // Continuing without the aborted tasks would re-open the race this drain
+                    // protects against, so keep waiting for them and make the delay visible.
+                    warn!(
+                        message = "Still waiting for aborted partition consumer tasks to end.",
+                        partitions = ?draining.consumer_state.expect_drain,
+                    );
+                    draining.keep_draining(Some(Box::pin(tokio::time::sleep(max_drain_ms))).into())
                 }
             },
         }
@@ -2442,6 +2523,161 @@ mod integration_test {
         // Cooperative rebalance strategies generally result in fewer revokes,
         // as only reassigned partitions are revoked
         consume_with_rebalance("cooperative-sticky".into()).await;
+    }
+
+    /// Build a test pipeline that marks every event it receives as delivered without delay.
+    /// The receiver is only polled when the test asks for it, so leaving it unpolled applies
+    /// backpressure to the source once the channel (`capacity`) is full.
+    fn ack_pipeline(capacity: usize) -> (SourceSender, impl Stream<Item = EventArray> + Unpin) {
+        let (pipe, recv) = SourceSender::new_test_sender_with_options(capacity, None);
+        let recv = recv.into_stream().map(|item| {
+            let mut events = item.events;
+            events.iter_events_mut().for_each(|mut event| {
+                let metadata = event.metadata_mut();
+                metadata.update_status(EventStatus::Delivered);
+                metadata.update_sources();
+            });
+            events
+        });
+        (pipe, Box::pin(recv))
+    }
+
+    /// Collect unique `(partition, offset)` pairs from `rx` into `received` until it holds
+    /// `expected` entries or `deadline` has passed.
+    async fn collect_offsets(
+        rx: &mut (impl Stream<Item = EventArray> + Unpin),
+        received: &mut HashSet<(i64, i64)>,
+        expected: usize,
+        deadline: Duration,
+    ) {
+        let deadline = tokio::time::Instant::now() + deadline;
+        while received.len() < expected {
+            match tokio::time::timeout_at(deadline, rx.next()).await {
+                Ok(Some(events)) => {
+                    let events: Vec<Event> = events.into_events().collect();
+                    received.extend(message_offsets(&events));
+                }
+                Ok(None) => panic!("Source output closed unexpectedly."),
+                Err(_) => break,
+            }
+        }
+    }
+
+    /// Exercises the aborted-drain path of https://github.com/vectordotdev/vector/issues/22006.
+    ///
+    /// A source whose output is blocked cannot drain its partitions in time when the group
+    /// rebalances, so the drain deadline fires and the partition tasks are aborted. The partitions
+    /// are then re-assigned to the same source, which must keep consuming every one of them and
+    /// must not hang while waiting for the aborted tasks. The original race (a stale partition
+    /// queue dropped after a new one was split) depends on tokio scheduling and is not reliably
+    /// reproducible without hooks in production code, so this test guards the coordination
+    /// logic rather than the race itself.
+    async fn consume_after_aborted_drain(rebalance_strategy: String) {
+        const PARTITIONS: i32 = 4;
+        const INITIAL_COUNT: usize = 2000;
+        const FOLLOW_UP_COUNT: usize = 400;
+        const REBALANCES: usize = 2;
+        const SETTLE: Duration = Duration::from_secs(4);
+
+        // Always use a fresh topic: the offset count below assumes exactly the messages sent here.
+        let topic = format!("test-topic-{}", random_string(10));
+        let group_id = format!("test-group-{}", random_string(10));
+        send_events(topic.clone(), PARTITIONS, INITIAL_COUNT).await;
+
+        let mut kafka_options = HashMap::new();
+        kafka_options.insert("partition.assignment.strategy".into(), rebalance_strategy);
+        let mut config = make_config(&topic, &group_id, LogNamespace::Legacy, Some(kafka_options));
+        // Force the drain deadline to fire long before the rebalance completes.
+        config.drain_timeout_ms = Some(100);
+
+        // Source A: output is not polled yet, so its partition tasks block on a full channel.
+        let (tx_a, mut rx_a) = ack_pipeline(1);
+        let (_trigger_a, _done_a) =
+            spawn_kafka(tx_a, config.clone(), true, false, LogNamespace::Legacy);
+        sleep(SETTLE).await;
+
+        // Repeatedly add and remove a second, equally blocked, member of the group. Every join
+        // revokes partitions from A (aborting its blocked tasks), every leave hands them back.
+        // B's output is never polled, so B never acknowledges and never stores an offset; the
+        // offset counts below rely on A being the only member that commits.
+        for _ in 0..REBALANCES {
+            let (tx_b, _rx_b) = ack_pipeline(1);
+            let (trigger_b, done_b) =
+                spawn_kafka(tx_b, config.clone(), true, false, LogNamespace::Legacy);
+            sleep(SETTLE).await;
+            drop(trigger_b);
+            done_b.await;
+            sleep(SETTLE).await;
+        }
+
+        // Release the backpressure and drain everything that was produced so far. Afterwards
+        // every partition stream is parked on an empty queue, so consuming the follow-up messages
+        // below requires the stream to be woken up; a stream whose wake-up was lost never gets them.
+        let mut received: HashSet<(i64, i64)> = HashSet::new();
+        collect_offsets(
+            &mut rx_a,
+            &mut received,
+            INITIAL_COUNT,
+            Duration::from_secs(60),
+        )
+        .await;
+        assert_eq!(
+            received.len(),
+            INITIAL_COUNT,
+            "Source A did not deliver the initial messages after the rebalances."
+        );
+        sleep(Duration::from_secs(1)).await;
+        let initial_high_offsets: HashMap<i64, i64> =
+            received.iter().fold(HashMap::new(), |mut acc, (p, o)| {
+                acc.entry(*p)
+                    .and_modify(|h| *h = (*h).max(*o))
+                    .or_insert(*o);
+                acc
+            });
+
+        let expect_offsets = INITIAL_COUNT + FOLLOW_UP_COUNT;
+        send_events(topic.clone(), PARTITIONS, FOLLOW_UP_COUNT).await;
+        collect_offsets(
+            &mut rx_a,
+            &mut received,
+            expect_offsets,
+            Duration::from_secs(30),
+        )
+        .await;
+
+        // Partitions whose highest received offset did not move are the ones that stalled.
+        let stuck: Vec<i64> = (0..i64::from(PARTITIONS))
+            .filter(|p| {
+                let high = received
+                    .iter()
+                    .filter(|(partition, _)| partition == p)
+                    .map(|(_, offset)| *offset)
+                    .max();
+                high <= initial_high_offsets.get(p).copied()
+            })
+            .collect();
+        assert_eq!(
+            received.len(),
+            expect_offsets,
+            "Source A stopped consuming after the rebalance: received {} of {} unique offsets, \
+             partitions without follow-up messages: {stuck:?}",
+            received.len(),
+            expect_offsets
+        );
+    }
+
+    // Both variants use a multi-threaded runtime so that aborted tasks are dropped concurrently
+    // with the coordination task, like in a real Vector process.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn consumes_after_aborted_drain_default_assignments() {
+        // the default, eager rebalance strategies revoke and re-assign every partition
+        consume_after_aborted_drain("range,roundrobin".into()).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn consumes_after_aborted_drain_sticky_assignments() {
+        // Cooperative rebalance strategies only revoke the partitions that move to another member
+        consume_after_aborted_drain("cooperative-sticky".into()).await;
     }
 
     fn map_logs(events: EventArray) -> impl Iterator<Item = String> {
