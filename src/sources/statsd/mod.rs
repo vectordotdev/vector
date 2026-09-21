@@ -300,6 +300,7 @@ impl StatsdDeserializer {
         }
     }
 
+    #[cfg(unix)]
     pub const fn unix(sanitize: bool, convert_to: ConversionUnit) -> Self {
         Self {
             socket_mode: Some(SocketMode::Unix),
