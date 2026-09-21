@@ -14,6 +14,7 @@ winapi = { version = "0.3", features = ["winioctl"] }
 glob.workspace = true
 chrono.workspace = true
 tokio.workspace = true
+tokio-util = { version = "0.7", default-features = false, features = ["join-map"] }
 tracing.workspace = true
 notify = { version = "8.2.0", default-features = false, features = ["macos_kqueue"] }
 bytes.workspace = true
