@@ -2,6 +2,64 @@ use super::{Error, ValueCoercer};
 use serde_json::json;
 
 #[test]
+fn structured_values_are_not_coerced_to_strings() {
+    let schema = json!({"type": "string"});
+    for mut value in [json!({"source": "bad"}), json!(["bad"])] {
+        let original = value.clone();
+        assert!(matches!(
+            ValueCoercer::new(&schema).coerce(&mut value),
+            Err(Error::ExpectedString { .. })
+        ));
+        assert_eq!(value, original);
+    }
+}
+
+#[test]
+fn failing_object_union_does_not_fall_back_to_json_string() {
+    let schema = json!({"properties": {"condition": {"anyOf": [
+        {"type": "string"},
+        {"type": "object", "properties": {"count": {"type": "integer"}}}
+    ]}}});
+    let mut value = json!({"condition": {"count": "bad"}});
+    let original = value.clone();
+    let error = ValueCoercer::new(&schema).coerce(&mut value).unwrap_err();
+    assert!(matches!(error, Error::Coerce { ref path, .. } if path == "condition"));
+    assert_eq!(value, original);
+}
+
+#[test]
+fn nullable_array_keeps_null_when_item_union_rejects_it() {
+    let schema = json!({
+        "type": ["array", "null"],
+        "items": {"anyOf": [{"type": "string"}, {"type": "object"}]}
+    });
+    let mut value = json!(null);
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(value, json!(null));
+}
+
+#[test]
+fn rejected_union_is_not_a_successful_noop() {
+    let schema = json!({"anyOf": [{"type": "string"}, {"type": "object"}]});
+    let mut value = json!(null);
+    assert!(ValueCoercer::new(&schema).coerce(&mut value).is_err());
+    assert_eq!(value, json!(null));
+}
+
+#[test]
+fn generated_test_output_preserves_null_conditions() {
+    let schema = serde_json::to_value(
+        vector_config::schema::generate_root_schema::<crate::config::TestOutput<String>>().unwrap(),
+    )
+    .unwrap();
+    let mut value = json!({"extract_from": ["transform"], "conditions": null});
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(value["conditions"], json!(null));
+    let output: crate::config::TestOutput<String> = serde_json::from_value(value).unwrap();
+    assert!(output.conditions.is_none());
+}
+
+#[test]
 fn scalar_coercions() {
     for (kind, input, expected) in [
         ("integer", json!("42"), json!(42)),

@@ -348,6 +348,12 @@ impl<'a> ValueCoercer<'a> {
         allowed_types: &[&str],
         schema: &Value,
     ) -> Result<(), Error> {
+        // Preserve an explicitly allowed null before trying conversions such as
+        // wrapping a scalar into an array. Nested unions may defer to serde.
+        if value.is_null() && allowed_types.contains(&NULL_JSON_TYPE) {
+            return Ok(());
+        }
+
         for allowed_type in allowed_types {
             let mut new_value = value.clone();
 
@@ -751,7 +757,7 @@ impl<'a> ValueCoercer<'a> {
         false
     }
 
-    /// Prefer a structurally compatible variant, deferring unmatched values to serde.
+    /// Prefer a structurally compatible variant, failing if none can be coerced.
     fn coerce_any_of(&mut self, value: &mut Value, schemas: &[Value]) -> Result<(), Error> {
         let initial_len = self.path.len();
 
@@ -776,7 +782,11 @@ impl<'a> ValueCoercer<'a> {
         }
 
         self.path.truncate(initial_len);
-        Ok(())
+        CoerceSnafu {
+            path: self.path.join("."),
+            message: "No matching anyOf variant".to_owned(),
+        }
+        .fail()
     }
 
     fn schema_matches_value_type(&self, schema: &Value, value: &Value) -> bool {
@@ -877,11 +887,11 @@ impl<'a> ValueCoercer<'a> {
     fn coerce_string(&mut self, value: &mut Value) -> Result<(), Error> {
         match value {
             Value::String(_) => Ok(()),
-            Value::Null => fail_expected!(String, value, self.path),
-            _ => {
+            Value::Bool(_) | Value::Number(_) => {
                 *value = Value::String(value.to_string());
                 Ok(())
             }
+            _ => fail_expected!(String, value, self.path),
         }
     }
 }
