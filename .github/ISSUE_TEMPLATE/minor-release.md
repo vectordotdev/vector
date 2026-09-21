@@ -48,10 +48,7 @@ The tag starts the release workflow; do not create the tag or release branch man
 
 # Post-release housekeeping
 
-- [ ] Create a PR against `master` from a new branch based on `origin/master`, with title starting as `chore(releasing):`
-  - [ ] Run `cargo vdev build manifests` and commit changes.
-  - [ ] Bump the version in `Cargo.toml` to the next minor development version, for example `0.60.0-dev`.
-  - [ ] Also, update `Cargo.lock` with: `cargo update -p vector`.
-  - [ ] Restore VRL to its git `main` branch and run `cargo update -p vrl`.
-- [ ] Squash-merge the housekeeping PR into `master` using the release-freeze bypass.
+- [ ] Wait for the release workflow to merge its housekeeping PR after checks pass.
+      It begins the next minor `-dev` version, restores VRL `main`, and refreshes licenses and documentation.
 - [ ] Set the `Release freeze` ruleset back to **Disabled**.
+- [ ] Run `cargo vdev build manifests` after the Helm chart release and open a separate PR with the changes.

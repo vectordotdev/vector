@@ -26,6 +26,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      checks: read
     uses: ./.github/workflows/release_housekeeping.yml
     with:
       tag: ${{ github.ref_name }}
