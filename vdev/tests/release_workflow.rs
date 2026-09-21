@@ -443,3 +443,160 @@ fn release_preparation_rejects_a_merge_commit() {
     commit(repo);
     assert!(check(repo, &base, false).contains("release PR must contain only non-merge commits"));
 }
+
+#[cfg(unix)]
+mod autotag {
+    use super::*;
+    use serde_json::{Value, json};
+    use std::{env, os::unix::fs::PermissionsExt as _, process::Output};
+
+    fn approved_pr(sha: &str) -> Value {
+        json!({
+            "merged_at": "2026-09-17T12:00:00Z",
+            "merge_commit_sha": sha,
+            "user": {"login": "vectordotdev-bot[bot]"},
+            "base": {"ref": "master", "repo": {"full_name": "vectordotdev/vector"}},
+            "head": {"ref": "prepare-v-0-59-0-website", "repo": {"full_name": "vectordotdev/vector"}}
+        })
+    }
+
+    fn check_autotag(repo: &Path, base: &str, sha: &str, prs: Value) -> Output {
+        write(repo, ".git/associated-prs.json", &prs.to_string());
+        write(
+            repo,
+            ".git/test-bin/gh",
+            "#!/bin/sh\ncat .git/associated-prs.json\n",
+        );
+        fs::set_permissions(
+            repo.join(".git/test-bin/gh"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        let path = env::join_paths(
+            std::iter::once(repo.join(".git/test-bin"))
+                .chain(env::split_paths(&env::var_os("PATH").unwrap())),
+        )
+        .unwrap();
+        Command::new(env!("CARGO_BIN_EXE_vdev"))
+            .args([
+                "release",
+                "workflow",
+                "autotag-check",
+                "--before-sha",
+                base,
+                "--sha",
+                sha,
+                "--repository",
+                "vectordotdev/vector",
+            ])
+            .env("PATH", path)
+            .env_remove("GITHUB_OUTPUT")
+            .current_dir(repo)
+            .output()
+            .unwrap()
+    }
+
+    #[test]
+    fn accepts_only_the_approved_squash_commit() {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        let sha = git(repo, &["rev-parse", "HEAD"]);
+        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert!(output.contains("tag_required=true\ntag=v0.59.0\nrelease_branch=v0.59\n"));
+
+        write(
+            repo,
+            "website/content/en/releases/0.59.0.md",
+            "Another commit\n",
+        );
+        let sha = commit(repo);
+        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        assert!(!result.status.success());
+        assert!(String::from_utf8_lossy(&result.stderr).contains("single squash-merge commit"));
+    }
+
+    #[test]
+    fn rejects_unapproved_or_unrelated_prs() {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        let sha = git(repo, &["rev-parse", "HEAD"]);
+        for (pointer, value) in [
+            ("/merged_at", Value::Null),
+            ("/merge_commit_sha", json!(base)),
+            ("/user/login", json!("other-bot[bot]")),
+            ("/base/ref", json!("website")),
+            ("/head/ref", json!("other-branch")),
+            ("/head/repo/full_name", json!("someone/vector")),
+            ("/head/repo", Value::Null),
+        ] {
+            let mut pr = approved_pr(&sha);
+            *pr.pointer_mut(pointer).unwrap() = value;
+            let result = check_autotag(repo, &base, &sha, json!([[pr]]));
+            assert!(!result.status.success(), "accepted invalid {pointer}");
+            assert!(
+                String::from_utf8_lossy(&result.stderr)
+                    .contains("expected one merged bot preparation PR")
+            );
+        }
+        for prs in [
+            json!([[]]),
+            json!([[approved_pr(&sha)], [approved_pr(&sha)]]),
+        ] {
+            let result = check_autotag(repo, &base, &sha, prs);
+            assert!(!result.status.success());
+        }
+    }
+
+    #[test]
+    fn skips_development_unchanged_and_patch_versions() {
+        for new_version in ["0.60.0-dev", "0.59.0", "0.59.1"] {
+            let (temp, _) = preparation();
+            let repo = temp.path();
+            let before = git(repo, &["rev-parse", "HEAD"]);
+            version(repo, new_version);
+            write(repo, "README.md", "Ordinary change\n");
+            let sha = commit(repo);
+            let result = check_autotag(repo, &before, &sha, json!("API must not be needed"));
+            assert!(
+                result.status.success(),
+                "{}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            assert_eq!(
+                String::from_utf8(result.stdout).unwrap(),
+                "tag_required=false\n"
+            );
+        }
+    }
+
+    #[test]
+    fn revalidates_the_merged_release_files() {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        write(repo, "src/lib.rs", "pub fn unexpected() {}\n");
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "--amend", "--no-edit"]);
+        let sha = git(repo, &["rev-parse", "HEAD"]);
+        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        assert!(!result.status.success());
+        assert!(
+            String::from_utf8_lossy(&result.stderr).contains("unexpected release preparation file")
+        );
+    }
+
+    #[test]
+    fn rejects_a_mismatched_checkout() {
+        let (temp, base) = preparation();
+        let result = check_autotag(temp.path(), &base, &base, json!([[]]));
+        assert!(!result.status.success());
+        assert!(
+            String::from_utf8_lossy(&result.stderr).contains("checkout must match the release SHA")
+        );
+    }
+}
