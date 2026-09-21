@@ -1,4 +1,4 @@
-use std::{convert::TryInto, future, path::PathBuf, time::Duration};
+use std::{convert::TryInto, future, num::NonZeroUsize, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -288,12 +288,12 @@ const fn default_rotate_wait() -> Duration {
 /// This is important for `checkpointing` when file rotation is used.
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[serde(tag = "strategy", rename_all = "snake_case")]
+#[serde(tag = "strategy", rename_all = "snake_case", deny_unknown_fields)]
 #[configurable(metadata(
     docs::enum_tag_description = "The strategy used to uniquely identify files.\n\nThis is important for checkpointing when file rotation is used."
 ))]
 pub enum FingerprintConfig {
-    /// Read lines from the beginning of the file and compute a checksum over them.
+    /// Read a fixed number of bytes from the beginning of the file and compute a checksum over them.
     Checksum {
         /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
         /// If the file is compressed, the number of bytes refer to the header in the uncompressed content. Only
@@ -304,15 +304,15 @@ pub enum FingerprintConfig {
         #[configurable(metadata(docs::type_unit = "bytes"))]
         ignored_header_bytes: usize,
 
-        /// The number of lines to read for generating the checksum.
+        /// The number of bytes used to generate the checksum after skipping `ignored_header_bytes`.
         ///
-        /// The number of lines are determined from the uncompressed content if the file is compressed. Only
-        /// gzip is supported at this time.
-        ///
-        /// If the file has fewer than this number of lines, it won’t be read at all.
-        #[serde(default = "default_lines")]
-        #[configurable(metadata(docs::type_unit = "lines"))]
-        lines: usize,
+        /// Defaults to 1024. Must be greater than zero. Files are not read until this many bytes
+        /// are available. For gzip files, this refers to the uncompressed content.
+        /// Files with identical prefixes have the same identity even when their paths differ.
+        /// Changing this value changes file identities and can cause previously read data to be replayed.
+        #[serde(default = "default_fingerprint_bytes")]
+        #[configurable(metadata(docs::type_unit = "bytes"))]
+        bytes: NonZeroUsize,
     },
 
     /// Use the [device and inode][inode] as the identifier.
@@ -326,7 +326,7 @@ impl Default for FingerprintConfig {
     fn default() -> Self {
         Self::Checksum {
             ignored_header_bytes: 0,
-            lines: default_lines(),
+            bytes: default_fingerprint_bytes(),
         }
     }
 }
@@ -335,8 +335,8 @@ const fn default_ignored_header_bytes() -> usize {
     0
 }
 
-const fn default_lines() -> usize {
-    1
+const fn default_fingerprint_bytes() -> NonZeroUsize {
+    NonZeroUsize::new(1024).unwrap()
 }
 
 impl From<FingerprintConfig> for FingerprintStrategy {
@@ -344,10 +344,10 @@ impl From<FingerprintConfig> for FingerprintStrategy {
         match config {
             FingerprintConfig::Checksum {
                 ignored_header_bytes,
-                lines,
-            } => FingerprintStrategy::FirstLinesChecksum {
+                bytes,
+            } => FingerprintStrategy::FirstBytesChecksum {
                 ignored_header_bytes,
-                lines,
+                bytes,
             },
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
         }
@@ -1063,10 +1063,14 @@ mod tests {
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> ifile::FileConfig {
         ifile::FileConfig {
+            // These unit fixtures contain short records; E2E tests exercise the
+            // production 1024-byte default.
             fingerprint: ifile::FingerprintConfig::Checksum {
                 ignored_header_bytes: 0,
-                lines: 1,
+                bytes: NonZeroUsize::new(2).unwrap(),
             },
+            // Checkpoints share the fixture directory but are not input logs.
+            exclude: vec![dir.path().join("checkpoints*.json")],
             data_dir: Some(dir.path().to_path_buf()),
             checkpoint_interval: Duration::from_millis(100),
             internal_metrics: ifile::FileInternalMetricsConfig {
@@ -1082,6 +1086,14 @@ mod tests {
 
     async fn sleep_millis(millis: u64) {
         sleep(Duration::from_millis(millis)).await;
+    }
+
+    #[test]
+    fn fingerprint_rejects_zero_bytes_and_obsolete_lines() {
+        for option in ["bytes: 0", "lines: 1"] {
+            let config = format!("include: []\nfingerprint:\n  strategy: checksum\n  {option}\n");
+            assert!(serde_yaml::from_str::<FileConfig>(&config).is_err());
+        }
     }
 
     #[test]
@@ -1101,7 +1113,7 @@ mod tests {
             config.fingerprint,
             FingerprintConfig::Checksum {
                 ignored_header_bytes: 0,
-                lines: 1
+                bytes: NonZeroUsize::new(1024).unwrap()
             }
         );
 
@@ -1129,7 +1141,7 @@ mod tests {
             config.fingerprint,
             FingerprintConfig::Checksum {
                 ignored_header_bytes: 512,
-                lines: 1
+                bytes: NonZeroUsize::new(128).unwrap()
             }
         );
 

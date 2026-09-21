@@ -94,6 +94,22 @@ generated: components: sources: ifile: configuration: {
 			"""
 		required: false
 		type: object: options: {
+			bytes: {
+				description: """
+					The number of bytes used to generate the checksum after skipping `ignored_header_bytes`.
+
+					Defaults to 1024. Must be greater than zero. Files are not read until this many bytes
+					are available. For gzip files, this refers to the uncompressed content.
+					Files with identical prefixes have the same identity even when their paths differ.
+					Changing this value changes file identities and can cause previously read data to be replayed.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: {
+					default: 1024
+					unit:    "bytes"
+				}
+			}
 			ignored_header_bytes: {
 				description: """
 					The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
@@ -109,22 +125,6 @@ generated: components: sources: ifile: configuration: {
 					unit:    "bytes"
 				}
 			}
-			lines: {
-				description: """
-					The number of lines to read for generating the checksum.
-
-					The number of lines are determined from the uncompressed content if the file is compressed. Only
-					gzip is supported at this time.
-
-					If the file has fewer than this number of lines, it won’t be read at all.
-					"""
-				relevant_when: "strategy = \"checksum\""
-				required:      false
-				type: uint: {
-					default: 1
-					unit:    "lines"
-				}
-			}
 			strategy: {
 				description: """
 					The strategy used to uniquely identify files.
@@ -135,7 +135,7 @@ generated: components: sources: ifile: configuration: {
 				type: string: {
 					default: "checksum"
 					enum: {
-						checksum: "Read lines from the beginning of the file and compute a checksum over them."
+						checksum: "Read a fixed number of bytes from the beginning of the file and compute a checksum over them."
 						device_and_inode: """
 															Use the [device and inode][inode] as the identifier.
 
