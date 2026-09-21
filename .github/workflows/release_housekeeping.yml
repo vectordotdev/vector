@@ -1,0 +1,196 @@
+name: Prepare post-release housekeeping
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      release_commit:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: release-housekeeping
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Generate housekeeping changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      base_sha: ${{ steps.base.outputs.sha }}
+      branch: ${{ steps.state.outputs.branch }}
+      skip: ${{ steps.state.outputs.skip }}
+      version: ${{ steps.state.outputs.version }}
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record base
+        id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up housekeeping tooling
+        uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-cache: true
+          protoc: true
+          dd-rust-license-tool: true
+          vdev: false
+
+      - name: Check housekeeping state
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+        run: >-
+          cargo vdev release workflow housekeeping-check
+          --tag "$RELEASE_TAG" --release-commit "$RELEASE_COMMIT"
+          --repository "$GITHUB_REPOSITORY"
+
+      - name: Require active release freeze
+        if: steps.state.outputs.skip != 'true'
+        uses: ./.github/actions/require-release-freeze
+
+      - name: Generate housekeeping
+        if: steps.state.outputs.skip != 'true' && steps.state.outputs.resume != 'true'
+        env:
+          VERSION: ${{ steps.state.outputs.version }}
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+        run: >-
+          cargo vdev release workflow housekeeping-prepare
+          --version "$VERSION" --release-commit "$RELEASE_COMMIT"
+
+      - name: Install VRL documentation builder
+        if: steps.state.outputs.skip != 'true' && steps.state.outputs.resume != 'true'
+        uses: ./.github/actions/install-vrl-doc-builder
+
+      - name: Refresh dependency files
+        if: steps.state.outputs.skip != 'true' && steps.state.outputs.resume != 'true'
+        run: make build-licenses generate-vector-vrl-docs
+
+      - name: Resume an already published branch
+        if: steps.state.outputs.skip != 'true' && steps.state.outputs.resume == 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          BRANCH: ${{ steps.state.outputs.branch }}
+        run: |
+          cp target/debug/vdev "$RUNNER_TEMP/release-vdev"
+          git fetch --no-tags origin "refs/heads/$BRANCH"
+          git switch --detach FETCH_HEAD
+          "$RUNNER_TEMP/release-vdev" release workflow pr-check \
+            --base-sha "$BASE_SHA" --head-ref "$BRANCH"
+
+      - name: Package housekeeping changes
+        if: steps.state.outputs.skip != 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          git add --all
+          git diff --cached --binary "$BASE_SHA" > "$RUNNER_TEMP/housekeeping.patch"
+          test -s "$RUNNER_TEMP/housekeeping.patch"
+
+      - name: Upload housekeeping changes
+        if: steps.state.outputs.skip != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-housekeeping
+          path: ${{ runner.temp }}/housekeeping.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  open-pr:
+    name: Open housekeeping PR
+    needs: generate
+    if: needs.generate.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      BASE_SHA: ${{ needs.generate.outputs.base_sha }}
+      BRANCH: ${{ needs.generate.outputs.branch }}
+    steps:
+      - name: Checkout frozen master
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require active release freeze
+        uses: ./.github/actions/require-release-freeze
+
+      - name: Set up trusted validator
+        uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-cache: true
+          vdev: false
+
+      - name: Build trusted validator
+        run: |
+          [[ "$(git rev-parse HEAD)" == "$BASE_SHA" ]]
+          cargo build --locked -p vdev
+
+      - name: Download housekeeping changes
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-housekeeping
+          path: ${{ runner.temp }}/housekeeping
+
+      - name: Validate and commit housekeeping
+        env:
+          VERSION: ${{ needs.generate.outputs.version }}
+        run: |
+          git apply --index --binary "$RUNNER_TEMP/housekeeping/housekeeping.patch"
+          git config user.name "vectordotdev-bot[bot]"
+          git config user.email "vectordotdev-bot[bot]@users.noreply.github.com"
+          git commit -m "chore(releasing): housekeeping after v${VERSION}"
+          target/debug/vdev release workflow pr-check --base-sha "$BASE_SHA" --head-ref "$BRANCH"
+
+      - name: Reuse an identical published branch
+        run: |
+          if [[ -n "$(git ls-remote origin "refs/heads/$BRANCH")" ]]; then
+            git fetch --no-tags origin "refs/heads/$BRANCH"
+            git diff --exit-code HEAD FETCH_HEAD
+            git switch --detach FETCH_HEAD
+            target/debug/vdev release workflow pr-check --base-sha "$BASE_SHA" --head-ref "$BRANCH"
+          fi
+          master=$(git ls-remote origin refs/heads/master)
+          [[ "${master%%$'\t'*}" == "$BASE_SHA" ]]
+
+      - name: Create Vector bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Open housekeeping PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.generate.outputs.version }}
+        run: |
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            push origin "HEAD:refs/heads/$BRANCH"
+          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
+            --app vectordotdev-bot --state open --json url --jq '.[0].url // empty')
+          if [[ -z "$url" ]]; then
+            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
+              --title "chore(releasing): housekeeping after v${VERSION}" --label no-changelog \
+              --body "Begin the next minor development version, restore VRL main, and refresh dependency files after successful publication of v${VERSION}. Squash-merge directly during the release freeze; do not use the merge queue.")
+          fi
+          echo "Housekeeping PR: $url" >> "$GITHUB_STEP_SUMMARY"

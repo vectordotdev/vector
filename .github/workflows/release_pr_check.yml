@@ -20,7 +20,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login == 'vectordotdev-bot[bot]' &&
-      startsWith(github.head_ref, 'prepare')
+      (startsWith(github.head_ref, 'prepare') || startsWith(github.head_ref, 'release/housekeeping-v'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

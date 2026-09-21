@@ -20,3 +20,14 @@ jobs:
       git_ref: ${{ github.ref }}
       channel: release
     secrets: inherit
+
+  housekeeping:
+    needs: Release
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/release_housekeeping.yml
+    with:
+      tag: ${{ github.ref_name }}
+      release_commit: ${{ github.sha }}
+    secrets: inherit

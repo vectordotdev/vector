@@ -21,7 +21,7 @@ use super::{
     prepare::{replace_version_references, update_vector_package_version, update_vrl_to_version},
 };
 
-/// Helpers used by the GitHub release preparation workflows.
+/// Helpers used by the GitHub release workflows.
 #[derive(clap::Args, Debug)]
 pub struct Cli {
     #[command(subcommand)]
@@ -29,14 +29,35 @@ pub struct Cli {
 }
 
 #[derive(clap::Subcommand, Debug)]
-#[allow(clippy::enum_variant_names)] // These command names identify read-only workflow checks.
 enum WorkflowCommand {
     /// Validate a request before generating a release preparation PR.
     PrepareCheck(PrepareCheck),
-    /// Validate a generated release preparation PR.
+    /// Validate a generated release preparation or housekeeping PR.
     PrCheck(PrCheck),
     /// Validate an approved minor-release squash merge before creating its refs.
     AutotagCheck(AutotagCheck),
+    /// Check whether a published minor release needs a housekeeping PR.
+    HousekeepingCheck(HousekeepingCheck),
+    /// Begin the next development version and restore VRL main locally.
+    HousekeepingPrepare(HousekeepingPrepare),
+}
+
+#[derive(clap::Args, Debug)]
+struct HousekeepingCheck {
+    #[arg(long)]
+    tag: String,
+    #[arg(long)]
+    release_commit: String,
+    #[arg(long)]
+    repository: String,
+}
+
+#[derive(clap::Args, Debug)]
+struct HousekeepingPrepare {
+    #[arg(long)]
+    version: Version,
+    #[arg(long)]
+    release_commit: String,
 }
 
 #[derive(clap::Args, Debug)]
@@ -110,6 +131,8 @@ impl Cli {
             WorkflowCommand::PrepareCheck(args) => args.exec(),
             WorkflowCommand::PrCheck(args) => args.exec(),
             WorkflowCommand::AutotagCheck(args) => args.exec(),
+            WorkflowCommand::HousekeepingCheck(args) => args.exec(),
+            WorkflowCommand::HousekeepingPrepare(args) => args.exec(),
         }
     }
 }
@@ -180,30 +203,7 @@ impl AutotagCheck {
         }
         .exec()?;
 
-        let endpoint = format!("repos/{}/commits/{}/pulls", self.repository, self.sha);
-        let output = Command::new("gh")
-            .args(["api", "--paginate", "--slurp", &endpoint])
-            .check_output()?;
-        let pages: Vec<Vec<AssociatedPullRequest>> =
-            serde_json::from_str(&output).context("invalid associated pull requests response")?;
-        let matches = pages
-            .iter()
-            .flatten()
-            .filter(|pr| {
-                pr.merged_at.is_some()
-                    && pr.merge_commit_sha.as_deref() == Some(self.sha.as_str())
-                    && pr.user.login == "vectordotdev-bot[bot]"
-                    && pr.base.name == git::MASTER_BRANCH
-                    && pr.head.name == head_ref
-                    && pr.head.repo.as_ref().map(|repo| repo.full_name.as_str())
-                        == Some(self.repository.as_str())
-            })
-            .count();
-        ensure!(
-            matches == 1,
-            "expected one merged bot preparation PR for {}, found {matches}",
-            self.sha
-        );
+        validate_associated_preparation_pr(&self.repository, &self.sha, &head_ref)?;
         set_github_output("tag_required", "true")?;
         set_github_output("tag", &format!("v{version}"))?;
         set_github_output(
@@ -213,10 +213,191 @@ impl AutotagCheck {
     }
 }
 
+fn validate_associated_preparation_pr(repository: &str, sha: &str, head_ref: &str) -> Result<()> {
+    let endpoint = format!("repos/{repository}/commits/{sha}/pulls");
+    let output = Command::new("gh")
+        .args(["api", "--paginate", "--slurp", &endpoint])
+        .check_output()?;
+    let pages: Vec<Vec<AssociatedPullRequest>> =
+        serde_json::from_str(&output).context("invalid associated pull requests response")?;
+    let matches = pages
+        .iter()
+        .flatten()
+        .filter(|pr| {
+            pr.merged_at.is_some()
+                && pr.merge_commit_sha.as_deref() == Some(sha)
+                && pr.user.login == "vectordotdev-bot[bot]"
+                && pr.base.name == git::MASTER_BRANCH
+                && pr.head.name == head_ref
+                && pr.head.repo.as_ref().map(|repo| repo.full_name.as_str()) == Some(repository)
+        })
+        .count();
+    ensure!(
+        matches == 1,
+        "expected one merged bot preparation PR for {sha}, found {matches}"
+    );
+    Ok(())
+}
+
+impl HousekeepingCheck {
+    fn exec(self) -> Result<()> {
+        let version = self
+            .tag
+            .strip_prefix('v')
+            .context("release tag must start with v")?
+            .parse::<Version>()
+            .context("invalid release tag version")?;
+        // Patch and prerelease tags retain their existing, manual housekeeping path.
+        if version.patch != 0 || !version.pre.is_empty() || !version.build.is_empty() {
+            return set_github_output("skip", "true");
+        }
+        git::ensure_sha(&self.release_commit, "release commit")?;
+        git::ensure_worktree_clean()?;
+        ensure!(
+            git::run_and_check_output(&[
+                "rev-parse",
+                &format!("refs/tags/{}^{{commit}}", self.tag)
+            ])?
+            .trim()
+                == self.release_commit,
+            "release tag does not match the published commit"
+        );
+        ensure!(
+            cargo_version_at(&self.release_commit)? == version,
+            "release tag does not match Cargo.toml"
+        );
+        Command::new("git")
+            .args(["merge-base", "--is-ancestor", &self.release_commit, "HEAD"])
+            .check_run()?;
+        let current = current_cargo_version()?;
+        if current >= next_minor_development_version(&version)? {
+            println!("Master has advanced beyond {version}; no housekeeping needed.");
+            return set_github_output("skip", "true");
+        }
+        ensure_release_checkout(&version, &self.release_commit)?;
+        validate_associated_preparation_pr(
+            &self.repository,
+            &self.release_commit,
+            &preparation_branch(&version),
+        )?;
+        let branch = format!("release/housekeeping-v{version}");
+        set_github_output("version", &version.to_string())?;
+        set_github_output("branch", &branch)?;
+        if let Some(url) = find_existing_pr(&self.repository, &branch, "vectordotdev-bot")? {
+            append_github_step_summary(&format!("Existing housekeeping PR: {url}"))?;
+            return set_github_output("skip", "true");
+        }
+        let resume = remote_ref_exists(&format!("refs/heads/{branch}"))?;
+        set_github_output("resume", if resume { "true" } else { "false" })?;
+        set_github_output("skip", "false")
+    }
+}
+
+impl HousekeepingPrepare {
+    fn exec(self) -> Result<()> {
+        git::ensure_worktree_clean()?;
+        ensure_release_checkout(&self.version, &self.release_commit)?;
+        let manifest = housekeeping_manifest(&fs::read_to_string("Cargo.toml")?, &self.version)?;
+        fs::write("Cargo.toml", manifest)?;
+        Command::new("cargo")
+            .args(["update", "-p", "vector"])
+            .check_run()?;
+        Command::new("cargo")
+            .args(["update", "-p", "vrl"])
+            .check_run()
+    }
+}
+
+fn ensure_release_checkout(version: &Version, sha: &str) -> Result<()> {
+    next_minor_development_version(version)?;
+    git::ensure_sha(sha, "release commit")?;
+    ensure!(
+        current_cargo_version()? == *version,
+        "master must still contain release version {version}"
+    );
+    ensure!(
+        git::run_and_check_output(&["rev-parse", "HEAD"])?.trim() == sha,
+        "master must still match the published release commit"
+    );
+    Ok(())
+}
+
+fn next_minor_development_version(version: &Version) -> Result<Version> {
+    ensure_stable(version, "release version")?;
+    ensure!(
+        version.patch == 0,
+        "automated housekeeping supports minor releases only"
+    );
+    let minor = version
+        .minor
+        .checked_add(1)
+        .context("minor version overflow")?;
+    development_version(&Version::new(version.major, minor, 0))
+}
+
+fn housekeeping_manifest(contents: &str, version: &Version) -> Result<String> {
+    let next = next_minor_development_version(version)?;
+    let mut doc = update_vector_package_version(contents, &version.to_string(), &next.to_string())?
+        .parse::<DocumentMut>()?;
+    let vrl = doc["workspace"]["dependencies"]["vrl"]
+        .as_inline_table_mut()
+        .context("VRL must be an inline dependency")?;
+    ensure!(
+        vrl.remove("version").is_some(),
+        "VRL must have a released version to restore"
+    );
+    vrl.insert("git", "https://github.com/vectordotdev/vrl.git".into());
+    vrl.insert("branch", "main".into());
+    Ok(doc.to_string())
+}
+
+fn validate_housekeeping(base: &str, version: &Version) -> Result<()> {
+    let next = next_minor_development_version(version)?;
+    ensure!(
+        cargo_version_at(base)? == *version,
+        "housekeeping base must be {version}"
+    );
+    ensure!(
+        current_cargo_version()? == next,
+        "housekeeping must begin {next}"
+    );
+    validate_linear_history(base)?;
+    let before = git::run_and_check_output(&["show", &format!("{base}:Cargo.toml")])?;
+    let expected: toml::Value = toml::from_str(&housekeeping_manifest(&before, version)?)?;
+    let actual: toml::Value = toml::from_str(&fs::read_to_string("Cargo.toml")?)?;
+    ensure!(
+        actual == expected,
+        "housekeeping may only bump Vector and restore VRL main in Cargo.toml"
+    );
+    for file in changed_files(base, "HEAD")? {
+        ensure!(
+            matches!(
+                file.path.as_str(),
+                "Cargo.toml" | "Cargo.lock" | "LICENSE-3rdparty.csv"
+            ) || file.path.starts_with("docs/generated/"),
+            "unexpected housekeeping file: {}",
+            file.path
+        );
+        ensure!(
+            file.kind != ChangeKind::Deleted || file.path.starts_with("docs/generated/"),
+            "housekeeping cannot delete {}",
+            file.path
+        );
+    }
+    Command::new("cargo")
+        .args(["metadata", "--locked", "--format-version", "1"])
+        .stdout(Stdio::null())
+        .check_run()
+}
+
 impl PrCheck {
     fn exec(self) -> Result<()> {
         git::ensure_sha(&self.base_sha, "base SHA")?;
         git::ensure_worktree_clean()?;
+        if let Some(version) = self.head_ref.strip_prefix("release/housekeeping-v") {
+            let version = parse_stable_version(version, "housekeeping branch version")?;
+            return validate_housekeeping(&self.base_sha, &version);
+        }
         let version = parse_preparation_branch(&self.head_ref)?;
         ensure!(
             version.patch == 0,
