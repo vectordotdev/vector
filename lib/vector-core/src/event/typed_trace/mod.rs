@@ -21,7 +21,10 @@ pub use datadog::{
     DatadogAgentEnvelope, DatadogChunkContext, DatadogEventContext, DatadogSpanContext,
     DatadogTracerContext,
 };
-pub use enums::{SamplingPriority, SpanKind, SpanStatus};
+pub use enums::{
+    SamplingPriority, SpanKind, SpanStatus, UnknownSamplingPriority, UnknownSpanKind,
+    UnknownSpanStatus,
+};
 pub use flags::{TraceFlags, TraceState};
 pub use ids::{InvalidIdError, SpanId, TraceId};
 pub use span::{DroppedCount, Resource, Scope, Span, SpanEvent, SpanLink};
