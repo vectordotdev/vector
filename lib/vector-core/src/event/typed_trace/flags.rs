@@ -47,7 +47,8 @@ impl ByteSizeOf for TraceFlags {
 ///
 /// The string is stored verbatim. Structured accessors parse on demand; [`Self::insert`]
 /// rebuilds the header with the mutated member at the front per W3C Trace Context §3.3.1.
-/// List entries that do not contain `=` are not members; mutations copy them through unchanged.
+/// List entries that do not contain `=`, including empty and whitespace-only entries, are not
+/// members; mutations copy them through unchanged.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TraceState(String);
 
@@ -78,14 +79,16 @@ impl TraceState {
 
     /// Inserts or updates `key`, moving it to the head of the list.
     ///
-    /// List entries that do not contain `=` stay in place, including their original whitespace.
+    /// List entries that do not contain `=` stay in place, including empty entries,
+    /// whitespace-only entries, and their original whitespace.
     pub fn insert(&mut self, key: &str, val: &str) {
         let mut out = String::with_capacity(self.0.len() + key.len() + val.len() + 2);
         out.push_str(key);
         out.push('=');
         out.push_str(val);
+        let mut started = true;
         for entry in self.list_entries() {
-            append_unless_key(&mut out, entry, key);
+            append_unless_key(&mut out, &mut started, entry, key);
         }
         self.0 = out;
     }
@@ -93,12 +96,14 @@ impl TraceState {
     /// Removes every member with `key`.
     ///
     /// Returns `true` if at least one member was removed. List entries that do not contain
-    /// `=` stay in place, including their original whitespace.
+    /// `=` stay in place, including empty entries, whitespace-only entries, and their
+    /// original whitespace.
     pub fn remove(&mut self, key: &str) -> bool {
         let mut out = String::with_capacity(self.0.len());
+        let mut started = false;
         let mut removed = false;
         for entry in self.list_entries() {
-            removed |= append_unless_key(&mut out, entry, key);
+            removed |= append_unless_key(&mut out, &mut started, entry, key);
         }
         if removed {
             self.0 = out;
@@ -112,12 +117,12 @@ impl TraceState {
     }
 
     fn list_entries(&self) -> impl Iterator<Item = ListEntry<'_>> + '_ {
-        self.0.split(',').filter_map(|part| {
-            let trimmed = part.trim();
-            if trimmed.is_empty() {
-                return None;
-            }
-            Some(match trimmed.split_once('=') {
+        // An empty header has no entries. `split` would otherwise yield one empty part.
+        let parts = (!self.0.is_empty()).then(|| self.0.split(','));
+        parts
+            .into_iter()
+            .flatten()
+            .map(|part| match part.trim().split_once('=') {
                 Some((key, value)) => ListEntry {
                     key: key.trim(),
                     value: Some(value),
@@ -127,7 +132,6 @@ impl TraceState {
                     value: None,
                 },
             })
-        })
     }
 
     fn members(&self) -> impl Iterator<Item = (&str, &str)> + '_ {
@@ -157,7 +161,8 @@ impl ByteSizeOf for TraceState {
 /// One comma-separated list entry.
 ///
 /// `value` is `Some` for a `key=value` member. It is `None` when the entry has no `=`,
-/// and `key` then holds the original entry text, including surrounding whitespace.
+/// including when the entry is empty or whitespace-only. `key` then holds the original
+/// entry text.
 #[derive(Copy, Clone)]
 struct ListEntry<'a> {
     key: &'a str,
@@ -167,26 +172,25 @@ struct ListEntry<'a> {
 /// Appends `entry` unless it is a member whose key equals `skip`.
 ///
 /// Returns `true` when the entry was skipped.
-fn append_unless_key(out: &mut String, entry: ListEntry<'_>, skip: &str) -> bool {
-    if let Some(value) = entry.value {
-        if entry.key == skip {
-            return true;
-        }
-        push_comma(out);
-        out.push_str(entry.key);
-        out.push('=');
-        out.push_str(value);
-    } else {
-        push_comma(out);
-        out.push_str(entry.key);
+fn append_unless_key(
+    out: &mut String,
+    started: &mut bool,
+    entry: ListEntry<'_>,
+    skip: &str,
+) -> bool {
+    if entry.value.is_some() && entry.key == skip {
+        return true;
     }
-    false
-}
-
-fn push_comma(out: &mut String) {
-    if !out.is_empty() {
+    if *started {
         out.push(',');
     }
+    *started = true;
+    out.push_str(entry.key);
+    if let Some(value) = entry.value {
+        out.push('=');
+        out.push_str(value);
+    }
+    false
 }
 
 #[cfg(test)]
@@ -266,5 +270,30 @@ mod tests {
         assert_eq!(spaced.as_str(), "vendor=updated, opaque , trailing ");
         assert!(spaced.remove("vendor"));
         assert_eq!(spaced.as_str(), " opaque , trailing ");
+    }
+
+    #[test]
+    fn trace_state_mutation_retains_empty_fragments() {
+        let mut state = TraceState::from_raw("vendor=1,,other=2");
+        assert_eq!(
+            state.iter().collect::<Vec<_>>(),
+            vec![("vendor", "1"), ("other", "2")]
+        );
+
+        state.insert("foo", "bar");
+        assert_eq!(state.as_str(), "foo=bar,vendor=1,,other=2");
+
+        assert!(state.remove("vendor"));
+        assert_eq!(state.as_str(), "foo=bar,,other=2");
+
+        let mut spaced = TraceState::from_raw("vendor=1, ,other=2");
+        assert!(spaced.remove("vendor"));
+        assert_eq!(spaced.as_str(), " ,other=2");
+
+        let mut leading = TraceState::from_raw(",,vendor=1");
+        leading.insert("foo", "bar");
+        assert_eq!(leading.as_str(), "foo=bar,,,vendor=1");
+        assert!(leading.remove("vendor"));
+        assert_eq!(leading.as_str(), "foo=bar,,");
     }
 }
