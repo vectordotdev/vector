@@ -1,0 +1,45 @@
+#!/bin/sh
+set -e
+
+# Complete the rm_conffile transition started in preinst; see preinst for
+# context. dpkg-maintscript-helper requires rm_conffile to be called from
+# preinst, postinst *and* postrm so that aborted upgrades restore the files
+# it moved aside and purges clean up its backups.
+for _example_conffile in \
+  docs_example.yaml \
+  environment_variables.yaml \
+  es_s3_hybrid.yaml \
+  file_to_cloudwatch_metrics.yaml \
+  file_to_prometheus.yaml \
+  http_sink_custom_retry.yaml \
+  prometheus_to_console.yaml \
+  stdio.yaml \
+  varint_framing_protobuf.yaml \
+  wrapped_json.yaml \
+  namespacing/sinks/es_cluster.yaml \
+  namespacing/sinks/s3_archives.yaml \
+  namespacing/sources/apache_logs.yaml \
+  namespacing/transforms/apache_parser.yaml \
+  namespacing/transforms/apache_sample.yaml \
+  namespacing/vector.yaml
+do
+  dpkg-maintscript-helper rm_conffile \
+    "/etc/vector/examples/$_example_conffile" 0.57.0-1 vector -- "$@"
+done
+
+# If preinst moved a pre-existing /etc/vector/vector.yaml aside (see preinst)
+# and the install or upgrade then failed before postinst could restore it,
+# put it back here so a failed upgrade never leaves Vector without the
+# configuration it was running with.
+case "$1" in
+  abort-install|abort-upgrade)
+    if [ -e /etc/vector/vector.yaml.vector-preserve ]; then
+      mv -f /etc/vector/vector.yaml.vector-preserve /etc/vector/vector.yaml
+    fi
+    ;;
+  purge)
+    rm -f /etc/vector/vector.yaml.vector-preserve
+    ;;
+esac
+
+#DEBHELPER#

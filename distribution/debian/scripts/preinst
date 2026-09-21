@@ -43,10 +43,16 @@ chown -R vector:vector /var/lib/vector
 # any such untracked file out of the way so dpkg can install the conffile
 # cleanly; postinst restores it afterwards so the user's content is kept
 # byte-for-byte, without ever prompting.
+#
+# Only move the file when no package owns it: if it belongs to another
+# package, leave it alone so dpkg's own file-conflict check reports the
+# ownership conflict instead of us silently hiding that package's file.
 case "$1" in
   install|upgrade)
     if [ -e /etc/vector/vector.yaml ] && [ ! -L /etc/vector/vector.yaml ]; then
-      if ! dpkg-query -W -f='${Conffiles}' vector 2>/dev/null | grep -qE ' /etc/vector/vector\.yaml [0-9a-f]'; then
+      if ! dpkg-query -W -f='${Conffiles}\n' vector 2>/dev/null \
+        | awk '$1 == "/etc/vector/vector.yaml" && $3 != "obsolete" { found = 1 } END { exit !found }' \
+        && ! dpkg-query -S /etc/vector/vector.yaml >/dev/null 2>&1; then
         mv /etc/vector/vector.yaml /etc/vector/vector.yaml.vector-preserve
       fi
     fi
