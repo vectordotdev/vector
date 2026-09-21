@@ -234,6 +234,7 @@ impl ValidatedSink for RedisSinkConfig {
                 return Err(format!("`endpoint` is not a valid redis URL: {endpoint}").into());
             }
         }
+        self.encoding.validate()?;
         let batch_settings = self.batch.into_batcher_settings()?;
         Ok(ValidatedRedisSink {
             key,

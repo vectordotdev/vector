@@ -1,6 +1,6 @@
 [package]
 name = "vdev"
-version = "0.3.18"
+version = "0.3.19"
 edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
@@ -52,7 +52,7 @@ cfg-if.workspace = true
 convert_case.workspace = true
 # Used by check-events to walk Rust source via syn's AST. The extra features
 # are vdev-local; they do not propagate into the `vector` package's build.
-syn = { workspace = true, features = ["full", "visit", "extra-traits", "printing", "parsing"] }
+syn = { workspace = true, features = ["printing", "parsing"] }
 proc-macro2 = { workspace = true, features = ["span-locations"] }
 quote.workspace = true
 

@@ -2,6 +2,7 @@ use std::num::NonZeroU32;
 
 use bytes::Bytes;
 use chrono::{SubsecRound, Utc};
+use datadog_proto::agentpayload as ddmetric_proto;
 use futures::{StreamExt, channel::mpsc::Receiver, stream};
 use http::request::Parts;
 use hyper::StatusCode;
@@ -33,11 +34,6 @@ use crate::{
         map_event_batch_stream,
     },
 };
-
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
 
 fn generate_counters() -> Vec<Event> {
     let timestamp = Utc::now().trunc_subsecs(3);

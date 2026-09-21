@@ -1,9 +1,6 @@
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{any::Any, cell::RefCell, path::PathBuf, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use derivative::Derivative;
 use dyn_clone::DynClone;
 use serde::Serialize;
 use serde_with::serde_as;
@@ -60,8 +57,7 @@ impl<T: SinkConfig + 'static> From<T> for BoxedSink {
 /// Fully resolved sink component.
 #[configurable_component]
 #[configurable(metadata(docs::component_base_type = "sink"))]
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct SinkOuter<T>
 where
     T: Configurable + Serialize + 'static,
@@ -98,7 +94,7 @@ where
     /// or diffed (see `#[serde(skip)]`), and is shared (via `Arc`) so enrichment-table-derived
     /// sinks can carry it without cloning the underlying value.
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 

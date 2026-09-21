@@ -112,7 +112,7 @@ pub fn build_uri(
     path: &str,
     query: impl IntoIterator<Item = (&'static str, String)>,
 ) -> Result<Uri, http::uri::InvalidUri> {
-    let mut uri = format!("{}{}", host.trim_end_matches('/'), path);
+    let mut uri = format!("{}{path}", host.trim_end_matches('/'));
 
     let mut first = true;
 

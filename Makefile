@@ -454,11 +454,6 @@ check-generated-docs: generate-docs ## Checks that machine-generated component d
 	$(VDEV) check generated-docs
 	$(VDEV) check component-examples
 
-##@ Rustdoc
-build-rustdoc: ## Build Vector's Rustdocs
-	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
-	cargo doc --no-deps --workspace
-
 ##@ Packaging (forwarded to Makefile.packaging)
 
 # Packaging targets that depend on VERSION live in Makefile.packaging to avoid
@@ -555,10 +550,6 @@ signoff: ## Signsoff all previous commits since branch creation
 .PHONY: version
 version: ## Get the current Vector version
 	@$(VDEV) version
-
-.PHONY: git-hooks
-git-hooks: ## Add Vector-local git hooks for commit sign-off
-	@scripts/install-git-hooks.sh
 
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)

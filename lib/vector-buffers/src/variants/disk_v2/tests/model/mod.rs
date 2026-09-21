@@ -10,7 +10,7 @@ use std::{
 
 use crossbeam_queue::SegQueue;
 use proptest::{prop_assert, prop_assert_eq, proptest};
-use temp_dir::TempDir;
+use tempfile::tempdir;
 use tokio::runtime::Builder;
 
 use crate::{
@@ -560,10 +560,8 @@ impl WriterModel {
         match self.record_writer.archive_record(1, record) {
             Ok(token) => token.serialized_len() as u64,
             Err(e) => panic!(
-                "unexpected encode error: archived_len={} max_record_size={} error={:?}",
-                record_len,
+                "unexpected encode error: archived_len={record_len} max_record_size={} error={e:?}",
                 self.ledger.config().max_record_size,
-                e,
             ),
         }
     }
@@ -800,7 +798,7 @@ proptest! {
         // configuration. This allows us to use a utility that will generate a random directory each
         // time -- parallel runs of this test can't clobber each other anymore -- but also ensure
         // that the directory is cleaned up when the test run is over.
-        let buf_dir = TempDir::with_prefix("vector-buffers-disk-v2-model").expect("creating temp dir should never fail");
+        let buf_dir = tempdir().expect("creating temp dir should never fail");
         config.data_dir = buf_dir.path().to_path_buf();
 
         rt.block_on(async move {

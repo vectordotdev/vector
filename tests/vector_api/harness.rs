@@ -339,8 +339,7 @@ pub async fn wait_for_topology_match(
         // Check timeout
         if start.elapsed() >= STARTUP_TIMEOUT {
             return Err(format!(
-                "Topology did not match expected components within {STARTUP_TIMEOUT:?}. Last seen: {:?}, expected: {:?}",
-                last_components, expected_component_ids
+                "Topology did not match expected components within {STARTUP_TIMEOUT:?}. Last seen: {last_components:?}, expected: {expected_component_ids:?}"
             ));
         }
 
