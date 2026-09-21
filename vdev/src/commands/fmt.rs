@@ -1,6 +1,10 @@
 use anyhow::Result;
 
-use crate::{app, commands::style, utils::git::git_ls_files};
+use crate::{
+    app,
+    commands::style,
+    utils::{git::git_ls_files, paths::prettier},
+};
 
 pub(crate) const PRETTIER_EXTENSIONS: &[&str] =
     &["*.yml", "*.yaml", "*.js", "*.ts", "*.tsx", "*.json"];
@@ -24,17 +28,8 @@ impl Cli {
                 continue;
             }
             info!("Formatting {ext} files with prettier...");
-            let args: Vec<&str> = [
-                "--ignore-path",
-                ".prettierignore",
-                "--log-level",
-                "error",
-                "--write",
-            ]
-            .into_iter()
-            .chain(files.iter().map(String::as_str))
-            .collect();
-            app::exec("prettier", &args, true)?;
+            let args = ["--write"].into_iter().chain(files.iter().map(String::as_str));
+            prettier(args, true)?;
         }
 
         Ok(())
