@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![warn(clippy::pedantic)]
 
 pub mod find_enrichment_table_records;
 pub mod get_enrichment_table_record;
@@ -120,6 +121,10 @@ pub trait Table: DynClone {
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
     /// Can return multiple matched records
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the table cannot evaluate the supplied search conditions.
     fn find_table_rows<'a>(
         &self,
         case: Case,
@@ -150,6 +155,7 @@ pub trait Table: DynClone {
 
 dyn_clone::clone_trait_object!(Table);
 
+#[must_use]
 pub fn vrl_functions() -> Vec<Box<dyn Function>> {
     vec![
         Box::new(get_enrichment_table_record::GetEnrichmentTableRecord) as _,
