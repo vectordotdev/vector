@@ -17,6 +17,7 @@ use tokio::{
     fs::{self, remove_file},
     time::timeout,
 };
+use tokio_util::task::JoinMap;
 use tracing::{debug, error, info, trace};
 
 use crate::{
@@ -24,7 +25,7 @@ use crate::{
     FilePosition, ReadFrom,
 };
 use file_source_common::{
-    internal_events::FileSourceInternalEvents, FileFingerprint, Fingerprinter, TaskSet,
+    internal_events::FileSourceInternalEvents, FileFingerprint, Fingerprinter,
 };
 
 #[cfg(any(test, feature = "test"))]
@@ -125,7 +126,7 @@ where
             }
         }
 
-        let mut metadata_set = TaskSet::new();
+        let mut metadata_set = JoinMap::new();
         existing_files.iter().for_each(|(path, _file_id)| {
             metadata_set.spawn(path.clone(), fs::metadata(path.clone()))
         });
@@ -295,7 +296,7 @@ where
 
             // Cleanup the known_small_files
             if let Some(grace_period) = self.remove_after {
-                let mut set = TaskSet::new();
+                let mut set = JoinMap::new();
 
                 known_small_files
                     .iter()

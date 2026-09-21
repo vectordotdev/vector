@@ -6110,6 +6110,7 @@ dependencies = [
  "serde",
  "tempfile",
  "tokio",
+ "tokio-util",
  "tracing 0.1.44",
  "vector-common",
  "vector-config",
