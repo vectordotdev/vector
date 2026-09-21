@@ -220,17 +220,19 @@ components: sources: ifile: {
 
 		fingerprint: {
 			title: "Fingerprinting"
-			body:  """
-				By default, Vector identifies files by running a [cyclic redundancy
-				check](\(urls.crc)) (CRC) on the first N lines of the file. This serves as a
-				*fingerprint* that uniquely identifies the file. The number of lines, N, that are
-				read can be set using the [`fingerprint.lines`](#fingerprint.lines) and
-				[`fingerprint.ignored_header_bytes`](#fingerprint.ignored_header_bytes) options. Note
-				that for compressed files, these lines and header bytes refer to the uncompressed content.
+			body: """
+				By default, Vector identifies files by computing a CRC checksum of the first 1024 bytes.
+				Configure the prefix size with [`fingerprint.bytes`](#fingerprint.bytes) and skip a fixed header
+				with [`fingerprint.ignored_header_bytes`](#fingerprint.ignored_header_bytes).
+				For gzip files, both settings refer to uncompressed content.
 
-				This strategy avoids the common pitfalls associated with using device and inode
-				names since inode names can be reused across files. This enables Vector to properly
-				tail files across various rotation strategies.
+				Files are not read until the entire configured prefix is available. Identical prefixes
+				produce the same identity even at different paths, so choose a prefix that includes
+				distinctive content. Changing the size or skipped header changes file identities and can
+				cause data to be read again. Checkpoints from the earlier line-based fingerprint are not reused.
+
+				This identity remains stable when a file is renamed or appended to. It does not verify
+				that previously consumed content has not been edited.
 				"""
 		}
 
