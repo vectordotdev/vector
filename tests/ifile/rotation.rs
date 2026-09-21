@@ -87,3 +87,29 @@ async fn copy_truncate(options: Value) -> vector::Result<()> {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn rotation_copy_truncate_with_unchanged_fingerprint() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    // Keep the entire fingerprint prefix unchanged: rediscovery cannot supply
+    // a new identity, so the existing reader must detect the shrink and rewind.
+    let header = records("shared-header", 1);
+    let before = [header.clone(), records("before", 20)].concat();
+    let after = [header, records("after", 3)].concat();
+    fixture.write("active.log", &before)?;
+    let mut run = fixture.start("*.log", json!({}))?;
+    run.wait_count(before.len()).await?;
+    fixture.write("active.log", &after)?;
+    run.wait_count(before.len() + after.len()).await?;
+    assert_eq!(
+        run.stop(Signal::SIGTERM).await?.messages,
+        [before, after].concat()
+    );
+
+    let appended = records("after-restart", 1);
+    fixture.append("active.log", &appended)?;
+    let mut run = fixture.start("*.log", json!({}))?;
+    run.wait_count(1).await?;
+    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, appended);
+    Ok(())
+}

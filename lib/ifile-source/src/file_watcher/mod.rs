@@ -220,6 +220,19 @@ impl FileWatcher {
         self.reached_eof
     }
 
+    /// Check once before each bounded read batch, including when the reader has
+    /// buffered data. Seeking after a shrink discards that stale buffered data.
+    pub(super) async fn check_for_truncation(&mut self) -> io::Result<()> {
+        if let FileReader::Plain(reader) = &mut self.reader {
+            if reader.get_ref().metadata().await?.len() < self.file_position {
+                reader.seek(SeekFrom::Start(0)).await?;
+                self.file_position = 0;
+                self.buf.clear();
+            }
+        }
+        Ok(())
+    }
+
     /// Read a single line from the underlying file
     ///
     /// This function will attempt to read a new line from its file, blocking,
@@ -230,15 +243,7 @@ impl FileWatcher {
         }
 
         let reader: &mut (dyn AsyncBufRead + Send + Unpin) = match &mut self.reader {
-            FileReader::Plain(reader) => {
-                // copy-truncate preserves the inode but resets the file's contents.
-                if reader.get_ref().metadata().await?.len() < self.file_position {
-                    reader.seek(SeekFrom::Start(0)).await?;
-                    self.file_position = 0;
-                    self.buf.clear();
-                }
-                reader
-            }
+            FileReader::Plain(reader) => reader,
             FileReader::Gzip(reader) => reader.as_mut(),
             FileReader::Empty => {
                 self.reached_eof = true;
@@ -318,4 +323,68 @@ async fn is_gzipped(r: &mut BufReader<File>) -> io::Result<bool> {
     // WARN: The paired `BufReader::consume` is not called intentionally. If we
     // do we'll chop a decent part of the potential gzip stream off.
     Ok(header_bytes.starts_with(GZIP_MAGIC))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn truncation_discards_buffered_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        fs::write(&path, "old line\n".repeat(128)).await.unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        watcher.check_for_truncation().await.unwrap();
+        for _ in 0..16 {
+            assert_eq!(
+                watcher.read_line().await.unwrap().unwrap().bytes,
+                "old line"
+            );
+        }
+        let FileReader::Plain(reader) = &watcher.reader else {
+            panic!("expected plain reader")
+        };
+        assert!(!reader.buffer().is_empty());
+        fs::write(&path, "new\n").await.unwrap();
+        watcher.check_for_truncation().await.unwrap();
+        let line = watcher.read_line().await.unwrap().unwrap();
+        assert_eq!(line.offset, 0);
+        assert_eq!(line.bytes, "new");
+        assert!(watcher.read_line().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn truncation_discards_partial_line_at_eof() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        fs::write(&path, "old\nunfinished").await.unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        watcher.check_for_truncation().await.unwrap();
+        assert_eq!(watcher.read_line().await.unwrap().unwrap().bytes, "old");
+        assert!(watcher.read_line().await.unwrap().is_none());
+        assert!(!watcher.buf.is_empty());
+        fs::write(&path, "new\n").await.unwrap();
+        watcher.check_for_truncation().await.unwrap();
+        let line = watcher.read_line().await.unwrap().unwrap();
+        assert_eq!(line.offset, 0);
+        assert_eq!(line.bytes, "new");
+        assert!(watcher.read_line().await.unwrap().is_none());
+    }
 }
