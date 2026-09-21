@@ -48,7 +48,7 @@ jobs:
           cargo-cache: true
           protoc: true
           dd-rust-license-tool: true
-          vdev: false
+          vdev: true
 
       - name: Check housekeeping state
         id: state
@@ -57,7 +57,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           RELEASE_COMMIT: ${{ inputs.release_commit }}
         run: >-
-          cargo vdev release workflow housekeeping-check
+          "$VDEV" release workflow housekeeping-check
           --tag "$RELEASE_TAG" --release-commit "$RELEASE_COMMIT"
           --repository "$GITHUB_REPOSITORY"
 
@@ -71,7 +71,7 @@ jobs:
           VERSION: ${{ steps.state.outputs.version }}
           RELEASE_COMMIT: ${{ inputs.release_commit }}
         run: >-
-          cargo vdev release workflow housekeeping-prepare
+          "$VDEV" release workflow housekeeping-prepare
           --version "$VERSION" --release-commit "$RELEASE_COMMIT"
 
       - name: Install VRL documentation builder
@@ -88,10 +88,9 @@ jobs:
           BASE_SHA: ${{ steps.base.outputs.sha }}
           BRANCH: ${{ steps.state.outputs.branch }}
         run: |
-          cp target/debug/vdev "$RUNNER_TEMP/release-vdev"
           git fetch --no-tags origin "refs/heads/$BRANCH"
           git switch --detach FETCH_HEAD
-          "$RUNNER_TEMP/release-vdev" release workflow pr-check \
+          "$VDEV" release workflow pr-check \
             --base-sha "$BASE_SHA" --head-ref "$BRANCH"
 
       - name: Package housekeeping changes
@@ -139,12 +138,11 @@ jobs:
         with:
           rust: true
           cargo-cache: true
-          vdev: false
+          vdev: true
 
-      - name: Build trusted validator
+      - name: Verify frozen base
         run: |
           [[ "$(git rev-parse HEAD)" == "$BASE_SHA" ]]
-          cargo build --locked -p vdev
 
       - name: Download housekeeping changes
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -160,7 +158,7 @@ jobs:
           git config user.name "vectordotdev-bot[bot]"
           git config user.email "vectordotdev-bot[bot]@users.noreply.github.com"
           git commit -m "chore(releasing): housekeeping after v${VERSION}"
-          target/debug/vdev release workflow pr-check --base-sha "$BASE_SHA" --head-ref "$BRANCH"
+          "$VDEV" release workflow pr-check --base-sha "$BASE_SHA" --head-ref "$BRANCH"
 
       - name: Reuse an identical published branch
         run: |
@@ -168,7 +166,7 @@ jobs:
             git fetch --no-tags origin "refs/heads/$BRANCH"
             git diff --exit-code HEAD FETCH_HEAD
             git switch --detach FETCH_HEAD
-            target/debug/vdev release workflow pr-check --base-sha "$BASE_SHA" --head-ref "$BRANCH"
+            "$VDEV" release workflow pr-check --base-sha "$BASE_SHA" --head-ref "$BRANCH"
           fi
           master=$(git ls-remote origin refs/heads/master)
           [[ "${master%%$'\t'*}" == "$BASE_SHA" ]]
