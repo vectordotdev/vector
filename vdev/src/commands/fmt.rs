@@ -28,7 +28,9 @@ impl Cli {
                 continue;
             }
             info!("Formatting {ext} files with prettier...");
-            let args = ["--write"].into_iter().chain(files.iter().map(String::as_str));
+            let args = ["--write"]
+                .into_iter()
+                .chain(files.iter().map(String::as_str));
             prettier(args, true)?;
         }
 

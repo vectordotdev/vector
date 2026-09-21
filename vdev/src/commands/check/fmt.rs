@@ -25,7 +25,9 @@ impl Cli {
                 continue;
             }
             info!("Checking prettier formatting for {ext} files...");
-            let args = ["--check"].into_iter().chain(files.iter().map(String::as_str));
+            let args = ["--check"]
+                .into_iter()
+                .chain(files.iter().map(String::as_str));
             prettier(args, true)?;
         }
 
