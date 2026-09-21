@@ -113,7 +113,6 @@ components: sources: kubernetes_logs: {
 			"kubernetes.namespace_annotations": {
 				description: "Set of annotations attached to the Namespace."
 				required:    false
-				common:      true
 				type: object: {
 					examples: [{"myannotation": "myvalue"}]
 					options: {}
