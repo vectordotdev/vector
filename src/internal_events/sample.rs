@@ -1,15 +1,17 @@
+// ## skip check-dropped-events ##
+
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{CounterName, InternalEvent},
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub struct SampleEventsDropped {
+pub struct SampleEventDiscarded {
     pub group: String,
     pub include_group_tag: bool,
 }
 
-impl InternalEvent for SampleEventsDropped {
+impl InternalEvent for SampleEventDiscarded {
     fn emit(self) {
         let reason = "Sample discarded.";
 
@@ -41,7 +43,7 @@ mod tests {
     use serial_test::serial;
     use vector_lib::{event::MetricValue, internal_event::InternalEvent, metrics::Controller};
 
-    use super::SampleEventsDropped;
+    use super::SampleEventDiscarded;
 
     fn discarded_events_counter(tags: &[(&str, &str)]) -> Option<f64> {
         Controller::get()
@@ -71,7 +73,7 @@ mod tests {
             .reset();
 
         for group in ["group-a", "group-b", "None"] {
-            SampleEventsDropped {
+            SampleEventDiscarded {
                 group: group.to_string(),
                 include_group_tag: true,
             }
@@ -94,7 +96,7 @@ mod tests {
             .expect("metrics controller initialized")
             .reset();
 
-        SampleEventsDropped {
+        SampleEventDiscarded {
             group: "group-a".to_string(),
             include_group_tag: false,
         }
