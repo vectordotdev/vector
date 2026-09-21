@@ -1,16 +1,18 @@
+// ## skip check-dropped-events ##
+
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{CounterName, InternalEvent},
 };
 
 #[derive(Debug, NamedInternalEvent)]
-pub(crate) struct ThrottleEventsDropped {
+pub(crate) struct ThrottleEventDiscarded {
     pub key: String,
     pub emit_events_discarded_per_key: bool,
     pub include_group_tag: bool,
 }
 
-impl InternalEvent for ThrottleEventsDropped {
+impl InternalEvent for ThrottleEventDiscarded {
     fn emit(self) {
         let message = "Rate limit exceeded.";
 
@@ -47,7 +49,7 @@ mod tests {
     use serial_test::serial;
     use vector_lib::{event::MetricValue, internal_event::InternalEvent, metrics::Controller};
 
-    use super::ThrottleEventsDropped;
+    use super::ThrottleEventDiscarded;
 
     fn discarded_events_counter(tags: &[(&str, &str)]) -> Option<f64> {
         Controller::get()
@@ -77,7 +79,7 @@ mod tests {
             .reset();
 
         for key in ["group-a", "group-b", "None"] {
-            ThrottleEventsDropped {
+            ThrottleEventDiscarded {
                 key: key.to_string(),
                 emit_events_discarded_per_key: false,
                 include_group_tag: true,
@@ -101,7 +103,7 @@ mod tests {
             .expect("metrics controller initialized")
             .reset();
 
-        ThrottleEventsDropped {
+        ThrottleEventDiscarded {
             key: "group-a".to_string(),
             emit_events_discarded_per_key: false,
             include_group_tag: false,
