@@ -4557,6 +4557,7 @@ dependencies = [
  "quickcheck",
  "tempfile",
  "tokio",
+ "tokio-util",
  "tracing 0.1.44",
  "vector-common",
 ]
@@ -12348,6 +12349,7 @@ dependencies = [
  "futures-io",
  "futures-sink",
  "futures-util",
+ "hashbrown 0.15.2",
  "pin-project-lite",
  "slab",
  "tokio",

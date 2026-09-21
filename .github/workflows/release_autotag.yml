@@ -1,0 +1,105 @@
+name: Tag approved release
+
+on:
+  push:
+    branches: [master]
+    paths: [Cargo.toml]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: release-autotag
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate approved release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      tag_required: ${{ steps.validation.outputs.tag_required }}
+      tag: ${{ steps.validation.outputs.tag }}
+      release_branch: ${{ steps.validation.outputs.release_branch }}
+    steps:
+      - name: Checkout merged commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up release validator
+        uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-cache: true
+          vdev: false
+
+      - name: Validate release merge
+        id: validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: >-
+          cargo vdev release workflow autotag-check
+          --before-sha "$BEFORE_SHA"
+          --sha "$GITHUB_SHA"
+          --repository "$GITHUB_REPOSITORY"
+
+      - name: Require active release freeze
+        if: steps.validation.outputs.tag_required == 'true'
+        uses: ./.github/actions/require-release-freeze
+
+  tag:
+    name: Create release tag and branch
+    needs: validate
+    if: needs.validate.outputs.tag_required == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Require active release freeze
+        uses: ./.github/actions/require-release-freeze
+
+      - name: Create Vector bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Publish release refs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_BRANCH: ${{ needs.validate.outputs.release_branch }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.0$ ]]
+          [[ "$RELEASE_BRANCH" == "${TAG%.*}" ]]
+          master=$(git ls-remote origin refs/heads/master)
+          [[ "${master%%$'\t'*}" == "$GITHUB_SHA" ]]
+
+          # Re-running is safe only when existing refs already identify this commit.
+          leases=()
+          for ref in "refs/tags/$TAG" "refs/heads/$RELEASE_BRANCH"; do
+            existing=$(git ls-remote origin "$ref")
+            existing=${existing%%$'\t'*}
+            if [[ -n "$existing" && "$existing" != "$GITHUB_SHA" ]]; then
+              echo "$ref already points to $existing, not $GITHUB_SHA" >&2
+              exit 1
+            fi
+            leases+=("--force-with-lease=$ref:$existing")
+          done
+          # Explicit leases prevent a concurrent ref creation from being overwritten.
+          # The bot token lets the tag push trigger the existing release workflow.
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            push --atomic "${leases[@]}" origin \
+            "$GITHUB_SHA:refs/tags/$TAG" "$GITHUB_SHA:refs/heads/$RELEASE_BRANCH"

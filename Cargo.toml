@@ -570,8 +570,6 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 # installed, and so rdkafka's build script doesn't link GSSAPI.
 default = ["enable-api-client", "sources-dnstap", "tikv-jemallocator"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
-# Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
-docs = ["enable-api-client", "sources-dnstap"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
 default-cmake = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 

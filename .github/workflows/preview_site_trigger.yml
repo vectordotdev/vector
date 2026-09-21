@@ -18,8 +18,7 @@ jobs:
     if: >-
       ${{
         contains(github.event.pull_request.labels.*.name, 'preview: website') ||
-        contains(github.event.pull_request.labels.*.name, 'preview: playground') ||
-        contains(github.event.pull_request.labels.*.name, 'preview: rust-doc')
+        contains(github.event.pull_request.labels.*.name, 'preview: playground')
       }}
     steps:
       # Save PR information. The raw branch name is only ever written as file data, hashed for
@@ -38,7 +37,6 @@ jobs:
             const apps = {
               website: labelNames.includes('preview: website'),
               playground: labelNames.includes('preview: playground'),
-              rustDoc: labelNames.includes('preview: rust-doc'),
             };
 
             await fs.mkdir('./pr', { recursive: true });
