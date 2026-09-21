@@ -1,21 +1,21 @@
 //! Trace flags and W3C `tracestate` storage.
 
+use bitmask_enum::bitmask;
 use vector_common::byte_size_of::ByteSizeOf;
 
-bitflags::bitflags! {
-    /// OTLP `Span.flags` / `Link.flags` bitfield.
-    ///
-    /// Unknown bits are retained so reserved OTLP bits and future W3C flags round-trip.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-    pub struct TraceFlags: u32 {
-        /// W3C sampled bit (`traceparent` flags low bit).
-        const SAMPLED = 0x0001;
-        /// OTLP bit indicating that [`Self::CONTEXT_IS_REMOTE`] is meaningful.
-        const CONTEXT_HAS_IS_REMOTE = 0x0100;
-        /// OTLP parent- / link-target-is-remote bit.
-        const CONTEXT_IS_REMOTE = 0x0200;
-        const _ = !0;
-    }
+/// OTLP `Span.flags` / `Link.flags` bitfield.
+///
+/// Unknown bits are retained so reserved OTLP bits and future W3C flags round-trip.
+/// [`From<u32>`] keeps the raw word; [`Self::truncate`] drops bits that have no named flag.
+#[bitmask(u32)]
+#[derive(Default)]
+pub enum TraceFlags {
+    /// W3C sampled bit (`traceparent` flags low bit).
+    SAMPLED = 0x0001,
+    /// OTLP bit indicating that [`Self::CONTEXT_IS_REMOTE`] is meaningful.
+    CONTEXT_HAS_IS_REMOTE = 0x0100,
+    /// OTLP parent- / link-target-is-remote bit.
+    CONTEXT_IS_REMOTE = 0x0200,
 }
 
 impl TraceFlags {
@@ -148,7 +148,7 @@ fn members(header: &str) -> impl Iterator<Item = (&str, &str)> + '_ {
             return None;
         }
         let (key, value) = part.split_once('=')?;
-        Some((key.trim(), value.trim()))
+        Some((key.trim(), value))
     })
 }
 
@@ -160,13 +160,13 @@ mod tests {
 
     #[test]
     fn trace_flags_retain_unknown_bits_and_remoteness() {
-        let flags = TraceFlags::from_bits_retain(0x8000_0001);
+        let flags = TraceFlags::from(0x8000_0001);
         assert!(flags.contains(TraceFlags::SAMPLED));
         assert_eq!(flags.bits() & 0x8000_0000, 0x8000_0000);
         assert_eq!(flags.w3c_byte(), 0x01);
         assert_eq!(flags.context_is_remote(), None);
 
-        let unknown = TraceFlags::from_bits_retain(0x0000_0004);
+        let unknown = TraceFlags::from(0x0000_0004);
         assert_eq!(unknown.w3c_byte(), 0x04);
         assert!(!unknown.contains(TraceFlags::SAMPLED));
 

@@ -54,28 +54,25 @@ pub struct TraceEvent {
 }
 
 impl TraceEvent {
-    /// Creates an empty event for `trace_id`.
-    ///
-    /// An empty span list is representable and retains the event-level ID.
+    /// Creates an event with the given metadata and default resource, scope, and Datadog context.
     #[must_use]
-    pub fn new(trace_id: TraceId) -> Self {
+    pub fn new_with_metadata(trace_id: TraceId, metadata: EventMetadata) -> Self {
         Self {
             trace_id,
             resource: Resource::default(),
             scope: Scope::default(),
             datadog: DatadogEventContext::default(),
             spans: Vec::new(),
-            metadata: EventMetadata::default(),
+            metadata,
         }
     }
 
-    /// Creates an event with the given metadata.
+    /// Creates an empty event for `trace_id`.
+    ///
+    /// An empty span list is representable and retains the event-level ID.
     #[must_use]
-    pub fn new_with_metadata(trace_id: TraceId, metadata: EventMetadata) -> Self {
-        Self {
-            metadata,
-            ..Self::new(trace_id)
-        }
+    pub fn new(trace_id: TraceId) -> Self {
+        Self::new_with_metadata(trace_id, EventMetadata::default())
     }
 
     /// Event-level trace ID. Contained spans have no duplicate of this field.

@@ -154,7 +154,7 @@ impl Span {
             span_id,
             parent_span_id: None,
             trace_state: TraceState::default(),
-            flags: TraceFlags::empty(),
+            flags: TraceFlags::none(),
             name: name.into(),
             kind: SpanKind::Unspecified,
             start_time: DateTime::<Utc>::UNIX_EPOCH,
