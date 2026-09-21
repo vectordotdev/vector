@@ -132,7 +132,7 @@ generated: components: sinks: datadog_logs: configuration: {
 			dropped.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: default: 5000000
 	}
 	request: {
 		description: "Outbound HTTP request settings."

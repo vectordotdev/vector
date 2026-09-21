@@ -83,8 +83,13 @@ pub struct DatadogLogsConfig {
     /// goal is derived as `max_payload_bytes - 750,000` bytes; events larger than the
     /// batch goal are sent alone in their batch. Events exceeding `max_payload_bytes` are
     /// dropped.
-    #[serde(default)]
+    #[derivative(Default(value = "default_max_payload_bytes()"))]
+    #[serde(default = "default_max_payload_bytes")]
     pub max_payload_bytes: Option<usize>,
+}
+
+const fn default_max_payload_bytes() -> Option<usize> {
+    Some(MAX_PAYLOAD_BYTES)
 }
 
 const fn default_compression() -> Option<Compression> {
