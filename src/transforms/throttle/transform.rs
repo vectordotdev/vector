@@ -14,7 +14,7 @@ use crate::{
     conditions::Condition,
     config::TransformContext,
     event::Event,
-    internal_events::{TemplateRenderingError, ThrottleEventsDropped},
+    internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
     template::UnconfinedTemplate,
     transforms::TaskTransform,
 };
@@ -79,7 +79,7 @@ where
     }
 
     pub fn emit_event_discarded(&self, key: String) {
-        emit!(ThrottleEventsDropped {
+        emit!(ThrottleEventDiscarded {
             key,
             emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key,
             include_group_tag: self.internal_metrics.include_group_tag,
