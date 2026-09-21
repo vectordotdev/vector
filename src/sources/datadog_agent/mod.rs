@@ -8,25 +8,13 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-pub(crate) mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
-
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-pub(crate) mod ddmetric_v3_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadoghq.api.metrics.v3.rs"));
-}
-
-#[allow(warnings)]
-pub(crate) mod ddtrace_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
-
 use std::{convert::Infallible, fmt::Debug, net::SocketAddr, sync::Arc, time::Duration};
 
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
+pub(crate) use datadog_proto::agentpayload as ddmetric_proto;
+pub(crate) use datadog_proto::metrics_v3 as ddmetric_v3_proto;
+pub(crate) use datadog_proto::trace as ddtrace_proto;
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::{Server, service::make_service_fn};

@@ -33,7 +33,7 @@ impl DorisService {
             log_request,
         }
     }
-    pub(crate) async fn reporter_run(&self, response: DorisStreamLoadResponse) {
+    pub(crate) fn reporter_run(&self, response: DorisStreamLoadResponse) {
         let stream_load_status = response.stream_load_status;
         let http_status_code = response.http_status_code;
         let response_json = response.response_json;
@@ -123,7 +123,7 @@ impl Service<HttpRequest<DorisPartitionKey>> for DorisService {
                 .send_stream_load(database, table, request.take_payload())
                 .await?;
             let report_response = doris_response.clone();
-            service.reporter_run(report_response).await;
+            service.reporter_run(report_response);
 
             let event_status = if doris_response.stream_load_status == StreamLoadStatus::Successful
             {

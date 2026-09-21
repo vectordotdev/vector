@@ -686,13 +686,13 @@ mod tests {
                 SimpleHttpConfig::NAME.into()
             );
             assert_eq!(log["http_path"], "/".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body 2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -727,13 +727,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body 2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -769,7 +769,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "foo\nbar".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -848,13 +848,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key"], "value".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -953,29 +953,29 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
-    async fn assert_event_metadata(log: &LogEvent) {
+    fn assert_event_metadata(log: &LogEvent) {
         assert!(log.get_timestamp().is_some());
 
         let source_type_key_value = log
@@ -1034,7 +1034,7 @@ mod tests {
             assert_eq!(log["\"Upgrade-Insecure-Requests\""], "false".into());
             assert_eq!(log["\"x-test-header\""], "true".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1079,7 +1079,7 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["\"user-agent\""], "test_client".into());
             assert_eq!(log["\"x-case-sensitive-value\""], "CaseSensitive".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1123,7 +1123,7 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1167,7 +1167,7 @@ mod tests {
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1212,7 +1212,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 

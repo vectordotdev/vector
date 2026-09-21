@@ -86,6 +86,7 @@ where
 
     /// Gets a reference to the archived value.
     pub fn get_archive_ref(&self) -> &T::Archived {
+        // SAFETY: The backing was validated during construction.
         unsafe { archived_root::<T>(self.backing.as_ref()) }
     }
 }
@@ -139,6 +140,7 @@ where
         use rkyv::archived_root_mut;
 
         let pinned = Pin::new(self.backing.as_mut());
+        // SAFETY: The backing was validated during construction and is exclusively borrowed.
         unsafe { archived_root_mut::<T>(pinned) }
     }
 }
