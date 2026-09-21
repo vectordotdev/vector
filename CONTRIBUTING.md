@@ -277,9 +277,6 @@ cargo vdev check licenses
 # Vector's documentation for each component is generated from the comments attached to the Component structs and members.
 # Running this ensures that the generated docs are up to date.
 make check-generated-docs
-# Generate the code documentation for the Vector project.
-# Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
-cd rust-doc && make docs
 ```
 
 ### Updating licences
