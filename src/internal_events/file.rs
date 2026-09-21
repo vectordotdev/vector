@@ -41,6 +41,22 @@ impl InternalEvent for FileOpen {
     }
 }
 
+/// Number of tracked files currently in the passive "idle" state: checkpoint
+/// retained, but no open file handle (see
+/// <https://github.com/vectordotdev/vector/issues/3567>). Reported alongside
+/// [`FileOpen`] so that the effect of moving idle files out of the "open
+/// handle" count is directly observable.
+#[derive(Debug, NamedInternalEvent)]
+pub struct FilesIdle {
+    pub count: usize,
+}
+
+impl InternalEvent for FilesIdle {
+    fn emit(self) {
+        gauge!(GaugeName::IdleFiles).set(self.count as f64);
+    }
+}
+
 #[derive(Debug, NamedInternalEvent)]
 pub struct FileBytesSent<'a> {
     pub byte_size: usize,
@@ -152,7 +168,7 @@ mod source {
         json_size::JsonSize,
     };
 
-    use super::{FileOpen, InternalEvent};
+    use super::{FileOpen, FilesIdle, InternalEvent};
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileBytesReceived<'a> {
@@ -560,6 +576,65 @@ mod source {
         }
     }
 
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FileWatchEventsOverflowed {}
+
+    impl InternalEvent for FileWatchEventsOverflowed {
+        fn emit(self) {
+            warn!(
+                message = "OS-level file watch event queue overflowed; some file changes may have been missed. Relying on periodic reconciliation to catch up.",
+                error_code = "watch_overflow",
+                error_type = error_type::READER_FAILED,
+                stage = error_stage::RECEIVING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "watch_overflow",
+                "error_type" => error_type::READER_FAILED,
+                "stage" => error_stage::RECEIVING,
+            )
+            .increment(1);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FileWatchBackendError {
+        pub error: String,
+    }
+
+    impl InternalEvent for FileWatchBackendError {
+        fn emit(self) {
+            error!(
+                message = "OS-level file watch backend failed. Falling back to periodic reconciliation until watching is re-established.",
+                error = %self.error,
+                error_code = "watch_backend_failed",
+                error_type = error_type::COMMAND_FAILED,
+                stage = error_stage::RECEIVING,
+            );
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "watch_backend_failed",
+                "error_type" => error_type::COMMAND_FAILED,
+                "stage" => error_stage::RECEIVING,
+            )
+            .increment(1);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct FileWatchDirectories {
+        pub count: usize,
+    }
+
+    impl InternalEvent for FileWatchDirectories {
+        fn emit(self) {
+            debug!(
+                message = "Watching directories for file system events.",
+                count = %self.count,
+            );
+        }
+    }
+
     #[derive(Clone)]
     pub struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
@@ -639,6 +714,10 @@ mod source {
             emit!(FileOpen { count });
         }
 
+        fn emit_files_idle(&self, count: usize) {
+            emit!(FilesIdle { count });
+        }
+
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
             emit!(PathGlobbingError { path, error });
         }
@@ -654,6 +733,20 @@ mod source {
                 configured_limit,
                 encountered_size_so_far
             });
+        }
+
+        fn emit_file_watch_events_overflowed(&self) {
+            emit!(FileWatchEventsOverflowed {});
+        }
+
+        fn emit_file_watch_backend_error(&self, error: &Error) {
+            emit!(FileWatchBackendError {
+                error: error.to_string(),
+            });
+        }
+
+        fn emit_file_watch_directories(&self, count: usize) {
+            emit!(FileWatchDirectories { count });
         }
     }
 }
