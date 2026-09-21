@@ -112,7 +112,8 @@ pub fn npm_tool_path(repo_root: &Path, tool: &str) -> Result<PathBuf> {
 }
 
 pub fn prettier<T: AsRef<OsStr>>(args: impl IntoIterator<Item = T>, in_repo: bool) -> Result<()> {
-    let repo_root = find_repo_root()?;
+    // Cached root; the cwd may have been removed by long-running commands.
+    let repo_root = PathBuf::from(crate::app::path());
     let prettier = npm_tool_path(&repo_root, "prettier")?;
     let args: Vec<OsString> = [
         OsString::from("--ignore-path"),
