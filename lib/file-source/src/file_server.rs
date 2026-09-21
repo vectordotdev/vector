@@ -742,6 +742,33 @@ fn schedule_after(now: time::Instant, interval: Duration, current: time::Instant
     deadline
 }
 
+fn pull_forward_discovery_deadline(
+    now: time::Instant,
+    next_interval: Duration,
+    previous_interval: Duration,
+    current_deadline: time::Instant,
+) -> time::Instant {
+    if next_interval < previous_interval {
+        schedule_after(now, next_interval, current_deadline).min(current_deadline)
+    } else {
+        current_deadline
+    }
+}
+
+fn file_read_sleep_duration(
+    backoff_millis: usize,
+    notify_wakeup_pending: bool,
+    next_notify_discovery_time: time::Instant,
+    now: time::Instant,
+) -> Duration {
+    let backoff = Duration::from_millis(backoff_millis as u64);
+    if notify_wakeup_pending {
+        backoff.min(next_notify_discovery_time.saturating_duration_since(now))
+    } else {
+        backoff
+    }
+}
+
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures.
 ///
@@ -1085,16 +1112,15 @@ where
             );
             let notify_wakeup_ready =
                 pending_notify_wakeup.is_pending() && next_notify_discovery_time <= now_time;
-            if discovery_interval < previous_discovery_interval {
-                // Coverage can become incomplete during the discovery pass that scheduled the
-                // current (long) deadline. Pull it in immediately rather than waiting until the
-                // old `reconcile_interval` expires before the fallback polling pass runs.
-                let fallback_deadline =
-                    schedule_after(now_time, discovery_interval, next_glob_time);
-                if fallback_deadline < next_glob_time {
-                    next_glob_time = fallback_deadline;
-                }
-            }
+            // Coverage can become incomplete during the discovery pass that scheduled the current
+            // (long) deadline. Pull it in immediately rather than waiting until the old
+            // `reconcile_interval` expires before the fallback polling pass runs.
+            next_glob_time = pull_forward_discovery_deadline(
+                now_time,
+                discovery_interval,
+                previous_discovery_interval,
+                next_glob_time,
+            );
             previous_discovery_interval = discovery_interval;
             // Idle watchers have no open handle and therefore do not get visited by the normal
             // read loop. Do their deadline-only cleanup independently of reconciliation, but let a
@@ -1402,12 +1428,12 @@ where
             // take a while, and computing the remaining time against a stale timestamp would
             // overstate it, adding back some of the latency this cap exists to remove.
 
-            let mut sleep_duration = if pending_notify_wakeup.is_pending() {
-                Duration::from_millis(backoff as u64)
-                    .min(next_notify_discovery_time.saturating_duration_since(time::Instant::now()))
-            } else {
-                Duration::from_millis(backoff as u64)
-            };
+            let mut sleep_duration = file_read_sleep_duration(
+                backoff,
+                pending_notify_wakeup.is_pending(),
+                next_notify_discovery_time,
+                time::Instant::now(),
+            );
             // A notify-only source may otherwise sleep until its much later reconciliation
             // backstop after an idle watcher becomes eligible for removal. Capping the existing
             // backoff sleep is enough to wake the loop; the deadline-only pass above performs the
@@ -2686,31 +2712,49 @@ where
             }
 
             let mut path_has_tracked_identity = false;
+            let current_path_was_named = notify_wakeup.has_specific_paths()
+                && notify_wakeup.names(
+                    &crate::absolutize(&watcher.path, cwd_for_notify_comparison.as_deref()),
+                    watcher.canonical_path(),
+                );
+            let mut recovered_path_this_pass = false;
             if !watcher.file_findable() {
                 // Event paths are precise and cheap to inspect. Check them even after this
                 // watcher was moved outside the glob: a later rotation can move that same inode
                 // again. Scan the parent tree when raw rename candidates cannot identify this
-                // watcher, or when polling/coarse reconciliation requires a fallback. For an
-                // outside-glob watcher, first avoid that scan while its current path still has
-                // the tracked identity (unless an explicit rename candidate is pending, because
-                // the event can arrive before the filesystem rename has finished); the scan is
-                // still shared per root for the whole pass.
+                // watcher, when polling/coarse reconciliation requires a fallback, or when an
+                // event names this watcher's old path but that path no longer resolves to its
+                // identity. The last case catches backends that report an atomic replacement as
+                // an ordinary change rather than a rename. For an outside-glob watcher, avoid a
+                // broad scan while its current path still has the tracked identity unless an
+                // explicit rename candidate is pending; the scan is shared per root for the pass.
                 let path_outside_glob = watcher.path_is_outside_glob();
                 let broad_scan_required = self.discovery_mode == FileDiscoveryMode::PollingOnly
                     || notify_wakeup.requires_broad_rename_scan();
                 // With a coarse/polling pass there is no precise rename candidate to resolve. A
                 // cheap identity check lets an outside-glob watcher skip the parent-tree scan when
-                // its last verified path is still the same. Do not perform this stat for an
-                // ordinary targeted event: it cannot help a watcher the event did not name.
-                if path_outside_glob && broad_scan_required && event_identities.is_none() {
+                // its last verified path is still the same. A targeted event gets the same check
+                // only when it explicitly names this watcher, keeping unrelated file events from
+                // adding per-reader syscalls.
+                if (path_outside_glob && broad_scan_required && event_identities.is_none())
+                    || current_path_was_named
+                {
                     path_has_tracked_identity = watcher.path_has_tracked_identity().await;
+                    if current_path_was_named && !path_outside_glob && path_has_tracked_identity {
+                        // This exact-path event plus an identity match proves the old in-glob
+                        // watcher is still present even if the glob pass raced the notification.
+                        // Keep it findable so reaching EOF does not mistake it for a deletion.
+                        watcher.mark_found();
+                    }
                 }
+                let scan_for_rename =
+                    broad_scan_required || (current_path_was_named && !path_has_tracked_identity);
                 let path = if let Some(path) =
                     watcher.find_renamed_path_in_identities(event_identities.as_ref())
                 {
                     path_has_tracked_identity = path_outside_glob;
                     Some(path)
-                } else if broad_scan_required
+                } else if scan_for_rename
                     && (!path_outside_glob
                         || event_identities.is_some()
                         || !path_has_tracked_identity)
@@ -2735,8 +2779,9 @@ where
                     } else {
                         watcher.mark_path_outside_glob();
                         path_has_tracked_identity = true;
+                        recovered_path_this_pass = true;
                     }
-                } else if broad_scan_required
+                } else if scan_for_rename
                     && path_outside_glob
                     && !path_has_tracked_identity
                     && watcher.tracked_file_is_gone().await
@@ -2773,7 +2818,10 @@ where
             // still sweeps everything, which is what covers an event the backend dropped.
             //
             // Their removal deadline is still due, and reading a timer costs nothing.
-            if notify_wakeup.has_specific_paths() && !notify_names_current_path {
+            if notify_wakeup.has_specific_paths()
+                && !notify_names_current_path
+                && !recovered_path_this_pass
+            {
                 self.recheck_idle_watcher_before_removal(watcher, file_id, lines)
                     .await;
                 continue;
@@ -4469,6 +4517,63 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn idle_removal_flushes_a_buffered_partial_record() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        let partial_record = b"unterminated record";
+        std::fs::write(&path, [b"complete\n".as_slice(), partial_record].concat()).unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.remove_after = Some(Duration::ZERO);
+
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+            b"complete".as_slice()
+        );
+        assert!(
+            watcher.read_line().await.unwrap().raw_line.is_none(),
+            "the unterminated bytes must stay buffered until the file is retired"
+        );
+        watcher.deactivate().await;
+        assert!(watcher.is_idle());
+
+        let file_id = FileFingerprint::DevInode(0, 0);
+        let mut fp_map = ReaderRegistry::from([(file_id, watcher)]);
+        let mut lines = Vec::new();
+        file_server
+            .poll_idle_watchers(&mut fp_map, &mut lines, &NotifyWakeup::default())
+            .await;
+
+        assert!(!path.exists(), "remove_after should delete the idle file");
+        assert!(fp_map.get(&file_id).unwrap().dead());
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text.as_ref(), partial_record);
+        let partial_start = b"complete\n".len() as u64;
+        assert_eq!(lines[0].start_offset, partial_start);
+        assert_eq!(
+            lines[0].end_offset,
+            partial_start + partial_record.len() as u64
+        );
+    }
+
     /// A failed metadata/removal attempt must not leave an expired idle watcher making the main
     /// loop's sleep duration zero on every iteration.
     #[tokio::test]
@@ -4531,6 +4636,57 @@ mod tests {
         assert!(
             schedule_after(now, Duration::from_secs(u64::MAX), current) > now,
             "an interval the clock cannot represent must still schedule in the future"
+        );
+    }
+
+    #[test]
+    fn incomplete_notify_coverage_pulls_the_polling_deadline_forward() {
+        let now = time::Instant::now();
+        let long_deadline = now + Duration::from_secs(300);
+        let polling_interval = Duration::from_millis(500);
+
+        assert_eq!(
+            pull_forward_discovery_deadline(
+                now,
+                polling_interval,
+                Duration::from_secs(300),
+                long_deadline,
+            ),
+            now + polling_interval,
+            "a fallback poll must not wait out the old notify reconciliation interval"
+        );
+        let earlier_deadline = now + Duration::from_millis(100);
+        assert_eq!(
+            pull_forward_discovery_deadline(
+                now,
+                polling_interval,
+                Duration::from_secs(300),
+                earlier_deadline,
+            ),
+            earlier_deadline,
+            "switching cadence must not postpone a poll already scheduled sooner"
+        );
+    }
+
+    #[test]
+    fn pending_notify_deadline_caps_the_quiet_loop_sleep() {
+        let now = time::Instant::now();
+        let next_notify_discovery_time = now + Duration::from_millis(500);
+
+        assert_eq!(
+            file_read_sleep_duration(2_048, true, next_notify_discovery_time, now,),
+            Duration::from_millis(500),
+            "a pending wakeup must resume when its throttle expires, even without another event"
+        );
+        assert_eq!(
+            file_read_sleep_duration(2_048, false, next_notify_discovery_time, now,),
+            Duration::from_millis(2_048),
+            "without a pending notify event the ordinary read backoff remains in effect"
+        );
+        assert_eq!(
+            file_read_sleep_duration(2_048, true, now, now),
+            Duration::ZERO,
+            "an expired reconciliation deadline must wake immediately"
         );
     }
 
@@ -4602,6 +4758,160 @@ mod tests {
         assert!(
             !reactivated(&unnamed),
             "a file the wakeup did not name must not be statted, let alone resumed"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_named_event_keeps_an_idle_same_identity_watcher_findable() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.discovery_mode = FileDiscoveryMode::Notify;
+
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        watcher.deactivate().await;
+        watcher.set_file_findable(false);
+        let file_id = FileFingerprint::DevInode(0, 0);
+        let mut fp_map = ReaderRegistry::from([(file_id, watcher)]);
+
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"second\n"))
+            .unwrap();
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([path]);
+        let mut lines = Vec::new();
+        file_server
+            .poll_idle_watchers(&mut fp_map, &mut lines, &wakeup)
+            .await;
+
+        let watcher = fp_map.get_mut(&file_id).unwrap();
+        assert!(watcher.file_findable());
+        assert!(watcher.is_active());
+        read_watcher_batch(watcher, file_id, &mut lines, 1024, |_| {})
+            .await
+            .unwrap();
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].text.as_ref(), b"second");
+        assert!(!watcher.dead());
+    }
+
+    #[tokio::test]
+    async fn idle_watcher_recovers_a_rotated_archive_on_a_targeted_event() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        let archive = directory.path().join("app.log.1");
+        std::fs::write(&path, b"header\npartial").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        file_server.discovery_mode = FileDiscoveryMode::Notify;
+
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            watcher.read_line().await.unwrap().raw_line.unwrap().bytes,
+            b"header".as_slice()
+        );
+        assert!(watcher.read_line().await.unwrap().raw_line.is_none());
+        watcher.deactivate().await;
+        watcher.set_file_findable(false);
+        let file_id = FileFingerprint::DevInode(0, 0);
+        let mut fp_map = ReaderRegistry::from([(file_id, watcher)]);
+
+        // The source path is replaced, while the writer keeps appending to the moved inode. Some
+        // backends report this as a plain change to the source path rather than a rename event.
+        std::fs::rename(&path, &archive).unwrap();
+        std::fs::write(&path, b"replacement\n").unwrap();
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&archive)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"-tail\n"))
+            .unwrap();
+
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([path.clone()]);
+        let mut lines = Vec::new();
+        file_server
+            .poll_idle_watchers(&mut fp_map, &mut lines, &wakeup)
+            .await;
+
+        let watcher = fp_map.get_mut(&file_id).unwrap();
+        assert_eq!(watcher.path, archive);
+        assert!(watcher.path_is_outside_glob());
+        assert!(watcher.is_active());
+        read_watcher_batch(watcher, file_id, &mut lines, 1024, |_| {})
+            .await
+            .unwrap();
+        assert_eq!(
+            lines
+                .iter()
+                .map(|line| line.text.as_ref())
+                .collect::<Vec<_>>(),
+            vec![b"partial-tail".as_slice()]
+        );
+
+        // Once the archive path is known, a same-path notify event must also authorize an identity
+        // check; the candidate lookup intentionally excludes the watcher's current spelling.
+        watcher.deactivate().await;
+        watcher.set_file_findable(false);
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&archive)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"later-tail\n"))
+            .unwrap();
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.add_paths([archive.clone()]);
+        let mut later_lines = Vec::new();
+        file_server
+            .poll_idle_watchers(&mut fp_map, &mut later_lines, &wakeup)
+            .await;
+
+        let watcher = fp_map.get_mut(&file_id).unwrap();
+        assert!(watcher.is_active());
+        read_watcher_batch(watcher, file_id, &mut later_lines, 1024, |_| {})
+            .await
+            .unwrap();
+        assert_eq!(
+            later_lines
+                .iter()
+                .map(|line| line.text.as_ref())
+                .collect::<Vec<_>>(),
+            vec![b"later-tail".as_slice()]
         );
     }
 
@@ -6536,6 +6846,73 @@ mod tests {
         assert!(
             watcher.should_read(),
             "a watcher held under an alias spelling must be nudged by an event naming the same file"
+        );
+    }
+
+    #[tokio::test]
+    async fn full_discovery_notify_event_wakes_a_quiet_active_watcher() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.log");
+        std::fs::write(&path, b"first\n").unwrap();
+
+        let paths_provider = crate::paths_provider::Glob::new(
+            &[directory.path().join("*.log")],
+            &[],
+            glob::MatchOptions::default(),
+            NoopEmitter,
+        )
+        .unwrap();
+        let mut file_server = test_file_server(paths_provider, directory.path().to_path_buf());
+        let mut known_small_files = file_source_common::KnownSmallFiles::default();
+        let file_id = file_server
+            .fingerprinter
+            .fingerprint_or_emit(&path, &mut known_small_files, &NoopEmitter)
+            .await
+            .expect("app.log must fingerprint");
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+            false,
+        )
+        .await
+        .unwrap();
+        while watcher.read_line().await.unwrap().raw_line.is_some() {}
+        assert!(
+            !watcher.should_read(),
+            "the test needs an active reader in EOF backoff"
+        );
+        let generation = watcher.generation();
+        let mut fp_map = ReaderRegistry::from([(file_id, watcher)]);
+        let checkpoints = CheckpointsView::default();
+        checkpoints.register_reader(
+            Some(file_id),
+            generation,
+            fp_map[&file_id].get_file_position(),
+        );
+
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| std::io::Write::write_all(&mut file, b"second\n"))
+            .unwrap();
+        let mut wakeup = NotifyWakeup::default();
+        wakeup.mark_all();
+        let _ = file_server
+            .discover(
+                &mut fp_map,
+                &mut known_small_files,
+                &checkpoints,
+                None,
+                &wakeup,
+            )
+            .await;
+
+        assert!(
+            fp_map[&file_id].should_read(),
+            "full discovery must clear EOF/quiet throttling when the wakeup names this file"
         );
     }
 
