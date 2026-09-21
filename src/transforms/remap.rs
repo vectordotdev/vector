@@ -639,6 +639,15 @@ where
                         }
                         ("error", error, self.drop_on_error)
                     }
+                    Terminate::Interrupted => {
+                        if !self.reroute_dropped {
+                            emit!(RemapMappingError {
+                                error: ExpressionError::Interrupted.to_string(),
+                                event_dropped: self.drop_on_error,
+                            });
+                        }
+                        ("interrupt", ExpressionError::Interrupted, self.drop_on_abort)
+                    }
                 };
 
                 if !drop {
