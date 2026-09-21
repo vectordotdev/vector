@@ -155,15 +155,38 @@ pub enum EncodeError {
     NestingTooDeep { cost: usize, budget: usize },
 }
 
-#[derive(Debug, Snafu)]
+/// Error decoding Vector's internal event protobuf into in-memory events.
+///
+/// This is the single error type for that conversion: proto [`TryFrom`] impls
+/// and [`Encodable::decode`] both use it. All conversion failures (missing
+/// oneofs, unrepresentable values) are represented as variants here.
+#[derive(Debug, Eq, PartialEq, Snafu)]
 pub enum DecodeError {
     #[snafu(display(
-        "the provided buffer could not be decoded as a valid Protocol Buffers payload"
+        "the provided buffer could not be decoded as EventArray ({event_array}) or as EventWrapper ({event_wrapper})"
     ))]
-    InvalidProtobufPayload,
+    InvalidProtobufPayload {
+        event_array: prost::DecodeError,
+        event_wrapper: prost::DecodeError,
+    },
     #[snafu(display("unsupported encoding metadata for this context"))]
     UnsupportedEncodingMetadata,
+    #[snafu(display(
+        "event protobuf was structurally valid but an event or metric variant was absent or unrecognized; this often indicates a version mismatch"
+    ))]
+    UnrecognizedEventVariant,
+    #[snafu(display(
+        "event protobuf contained a NaN float, which cannot be represented in Vector's event model"
+    ))]
+    NanFloat,
+    #[snafu(display("event protobuf contained an invalid timestamp"))]
+    InvalidTimestamp,
+    #[snafu(display(
+        "event protobuf contained an AgentDDSketch whose k and n bin lists have different lengths"
+    ))]
+    MismatchedSketchBins,
 }
+
 /// Flags for describing the encoding scheme used by our primary event types that flow through buffers.
 ///
 /// # Stability
@@ -266,13 +289,16 @@ impl Encodable for EventArray {
         B: Buf + Clone,
     {
         if metadata.contains(EventEncodableMetadataFlags::DiskBufferV1CompatibilityMode) {
-            proto::EventArray::decode(buffer.clone())
-                .map(Into::into)
-                .or_else(|_| {
-                    proto::EventWrapper::decode(buffer)
-                        .map(|pe| EventArray::from(Event::from(pe)))
-                        .map_err(|_| DecodeError::InvalidProtobufPayload)
-                })
+            match proto::EventArray::decode(buffer.clone()) {
+                Ok(array) => array.try_into(),
+                Err(event_array) => match proto::EventWrapper::decode(buffer) {
+                    Ok(wrapper) => Event::try_from(wrapper).map(EventArray::from),
+                    Err(event_wrapper) => Err(DecodeError::InvalidProtobufPayload {
+                        event_array,
+                        event_wrapper,
+                    }),
+                },
+            }
         } else {
             Err(DecodeError::UnsupportedEncodingMetadata)
         }

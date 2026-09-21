@@ -1,6 +1,7 @@
 use http::StatusCode;
 use serde::Deserialize;
 use vector_lib::{EstimatedJsonEncodedSizeOf, json_size::JsonSize};
+use vrl::prelude::value::simdutf_bytes_utf8_lossy;
 
 use crate::{
     event::Finalizable,
@@ -67,8 +68,7 @@ enum EsResultItem {
 }
 
 impl EsResultItem {
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    fn result(&self) -> &EsIndexResult {
+    const fn result(&self) -> &EsIndexResult {
         match self {
             EsResultItem::Index(r) => r,
             EsResultItem::Create(r) => r,
@@ -117,18 +117,17 @@ impl RetryLogic for ElasticsearchRetryLogic {
             }
             _ if status.is_server_error() => RetryAction::Retry(
                 format!(
-                    "{}: {}",
-                    status,
-                    String::from_utf8_lossy(response.http_response.body())
+                    "{status}: {}",
+                    simdutf_bytes_utf8_lossy(response.http_response.body())
                 )
                 .into(),
             ),
             _ if status.is_client_error() => {
-                let body = String::from_utf8_lossy(response.http_response.body());
+                let body = simdutf_bytes_utf8_lossy(response.http_response.body());
                 RetryAction::DontRetry(format!("client-side error, {status}: {body}").into())
             }
             _ if status.is_success() => {
-                let body = String::from_utf8_lossy(response.http_response.body());
+                let body = simdutf_bytes_utf8_lossy(response.http_response.body());
 
                 if body.contains("\"errors\":true") {
                     match EsResultResponse::parse(&body) {

@@ -7,7 +7,13 @@ use std::{
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
+use datadog_proto::agentpayload as ddmetric_proto;
+use prost_reflect::DescriptorPool;
 use snafu::{ResultExt, Snafu};
+use vector_common::constants::{
+    ZLIB_FRAME_OVERHEAD, ZLIB_STORED_BLOCK_OVERHEAD, ZLIB_STORED_BLOCK_SIZE,
+    ZSTD_SMALL_INPUT_THRESHOLD,
+};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogSchema, log_schema, telemetry},
@@ -19,18 +25,12 @@ use vector_lib::{
     request_metadata::GroupedCountByteSize,
 };
 
-use vector_common::constants::{
-    ZLIB_FRAME_OVERHEAD, ZLIB_STORED_BLOCK_OVERHEAD, ZLIB_STORED_BLOCK_SIZE,
-    ZSTD_SMALL_INPUT_THRESHOLD,
-};
-
 use super::config::{DatadogMetricsCompression, DatadogMetricsEndpoint, SeriesApiVersion};
 use crate::{
     common::datadog::{
         DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogPoint, DatadogSeriesMetric,
         DatadogSeriesMetricMetadata,
     },
-    proto::fds::protobuf_descriptors,
     sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
 };
 
@@ -50,11 +50,6 @@ pub(super) static ORIGIN_PRODUCT_VALUE: LazyLock<u32> = LazyLock::new(|| {
         })
         .unwrap_or(DEFAULT_DD_ORIGIN_PRODUCT_VALUE)
 });
-
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
 
 #[derive(Debug, Snafu)]
 pub enum EncoderError {
@@ -498,6 +493,15 @@ fn generate_proto_metadata(
             }
         },
     )
+}
+
+fn protobuf_descriptors() -> &'static DescriptorPool {
+    static PROTOBUF_FDS: OnceLock<DescriptorPool> = OnceLock::new();
+    PROTOBUF_FDS.get_or_init(|| {
+        DescriptorPool::decode(datadog_proto::DESCRIPTOR_BYTES).expect(
+            "should not fail to decode protobuf file descriptor set generated from datadog-proto",
+        )
+    })
 }
 
 fn get_sketch_payload_sketches_field_number() -> u32 {

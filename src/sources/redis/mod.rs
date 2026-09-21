@@ -324,7 +324,7 @@ mod integration_test {
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
         let _: i32 = conn.rpush(&key, "2").await.unwrap();
@@ -367,7 +367,7 @@ mod integration_test {
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
 
@@ -406,7 +406,7 @@ mod integration_test {
         let mut conn = client.get_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
-        debug!("Test key name: {}.", key);
+        debug!("Test key name: {key}.");
 
         let _: i32 = conn.rpush(&key, "1").await.unwrap();
         let _: i32 = conn.rpush(&key, "2").await.unwrap();

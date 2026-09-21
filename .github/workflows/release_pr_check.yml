@@ -1,0 +1,71 @@
+name: Validate release PR
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release state transition
+    # Only the new bot-authored minor-release path uses this validator. Existing manual
+    # releases (including patch releases) keep their current checks; patch automation is
+    # separate work. Keep this trigger broad: vdev owns branch-format and version validation.
+    # Release PRs must be directly squash-merged during the freeze, never queued.
+    # Skipped merge-group runs emit the required check for ordinary queued PRs only.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'vectordotdev-bot[bot]' &&
+      startsWith(github.head_ref, 'prepare')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Validate release target
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr.base.ref !== 'master' || pr.head.repo.full_name !== context.repo.owner + '/' + context.repo.repo) {
+              throw new Error('Automated minor release PRs must come from this repository and target master.');
+            }
+
+      - name: Checkout trusted base
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          cargo-cache: true
+          rust: true
+          # The published binary may predate these helpers. Build the exact trusted base below.
+          vdev: false
+
+      - name: Build trusted release validator
+        run: |
+          cargo build --locked --package vdev
+          cp target/debug/vdev "$RUNNER_TEMP/release-vdev"
+
+      # Build and set up exclusively from the base before inspecting PR-controlled files.
+      - name: Checkout PR head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate files, base, and version
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: >-
+          "$RUNNER_TEMP/release-vdev" release workflow pr-check
+          --base-sha "$BASE_SHA"
+          --head-ref "$HEAD_REF"

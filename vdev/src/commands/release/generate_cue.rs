@@ -6,7 +6,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use chrono::Utc;
 use semver::Version;
 use serde_json::json;
@@ -158,7 +158,7 @@ pub(super) fn run(
 /// previously left `versions.cue` stale so the new version was invisible in local Hugo previews.
 pub(super) fn refresh_versions_cue(repo_root: &Path) -> Result<()> {
     let releases_dir = repo_root.join(RELEASES_DIR);
-    let mut versions: std::collections::HashSet<Version> = fs::read_dir(&releases_dir)
+    let versions: Vec<Version> = fs::read_dir(&releases_dir)
         .with_context(|| format!("Failed to read {}", releases_dir.display()))?
         .filter_map(std::result::Result::ok)
         .filter_map(|e| {
@@ -178,12 +178,23 @@ pub(super) fn refresh_versions_cue(repo_root: &Path) -> Result<()> {
         .join("cue")
         .join("reference")
         .join("versions.cue");
-    if let Ok(text) = fs::read_to_string(&versions_cue_path) {
-        for line in text.lines() {
-            let trimmed = line.trim().trim_end_matches(',').trim_matches('"');
-            if let Ok(v) = trimmed.parse::<Version>() {
-                versions.insert(v);
-            }
+    let previous = fs::read_to_string(&versions_cue_path).unwrap_or_default();
+    atomic_write(
+        &versions_cue_path,
+        &render_versions_cue(versions, &previous),
+    )?;
+    Ok(())
+}
+
+pub(super) fn render_versions_cue(
+    versions: impl IntoIterator<Item = Version>,
+    previous: &str,
+) -> String {
+    let mut versions: std::collections::HashSet<Version> = versions.into_iter().collect();
+    for line in previous.lines() {
+        let trimmed = line.trim().trim_end_matches(',').trim_matches('"');
+        if let Ok(v) = trimmed.parse::<Version>() {
+            versions.insert(v);
         }
     }
 
@@ -196,15 +207,7 @@ pub(super) fn refresh_versions_cue(repo_root: &Path) -> Result<()> {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let content = format!("package metadata\n\nversions: [string, ...string] & [\n{list}\n]\n");
-
-    let versions_cue = repo_root
-        .join("website")
-        .join("cue")
-        .join("reference")
-        .join("versions.cue");
-    atomic_write(&versions_cue, &content)?;
-    Ok(())
+    format!("package metadata\n\nversions: [string, ...string] & [\n{list}\n]\n")
 }
 
 /// Write `website/content/en/releases/<version>.md` — the Hugo stub Hugo needs to route
@@ -597,10 +600,23 @@ fn parse_breaking_body(body: &str) -> Result<(String, BreakingDetails)> {
     ))
 }
 
-/// `git rm` every `*.md` under `changelog.d/` except `README.md`. Called by
-/// `release prepare` after a successful `run()` — never by the standalone
-/// `release generate-cue` subcommand.
+/// Remove every `*.md` under `changelog.d/` except `README.md` without staging deletions.
+/// Called by `release prepare` after a successful `run()`; publication stages the changes.
+/// Never called by the standalone `release generate-cue` subcommand.
 pub(super) fn retire_all_fragments() -> Result<()> {
+    ensure!(
+        git::run_and_check_output(&[
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            "--ignored",
+            "--",
+            "changelog.d/*.md",
+            ":(exclude)changelog.d/README.md",
+        ])?
+        .is_empty(),
+        "changelog fragments must be committed before retirement"
+    );
     let repo_root = paths::find_repo_root()?;
     retire_changelog_fragments(&repo_root.join(CHANGELOG_DIR))
 }
@@ -618,8 +634,8 @@ fn retire_changelog_fragments(dir: &Path) -> Result<()> {
         if path.file_name().and_then(|n| n.to_str()) == Some("README.md") {
             continue;
         }
-        let rel = path.strip_prefix(env::current_dir()?).unwrap_or(&path);
-        git::rm(&rel.to_string_lossy())?;
+        fs::remove_file(&path)
+            .with_context(|| format!("Failed to retire changelog fragment {}", path.display()))?;
     }
     Ok(())
 }

@@ -132,6 +132,7 @@ impl ValidatedSink for WebHdfsConfig {
     type Validated = ValidatedWebHdfs;
 
     fn validate(&self) -> crate::Result<ValidatedWebHdfs> {
+        self.encoding.validate()?;
         let batcher_settings = self.batch.into_batcher_settings()?;
         let confined_prefix = self.confined_prefix()?;
 

@@ -257,7 +257,7 @@ impl DnsMessageParser {
             port_string
         };
         Ok((
-            Some(format!("{} {} {}", address, protocol, port.trim_end())),
+            Some(format!("{address} {protocol} {}", port.trim_end())),
             None,
         ))
     }
@@ -549,11 +549,10 @@ impl DnsMessageParser {
                 let crl = BASE64.encode(&cert.cert_data);
                 Ok((
                     Some(format!(
-                        "{} {} {} {}",
+                        "{} {} {} {crl}",
                         u16::from(cert.cert_type),
                         cert.key_tag,
-                        cert.algorithm,
-                        crl
+                        cert.algorithm
                     )),
                     None,
                 ))
@@ -873,7 +872,7 @@ fn format_svcb_record(svcb: &SVCB, options: &DnsParserOptions) -> String {
         svcb.target_name.to_string_with_options(options),
         svcb.svc_params
             .iter()
-            .map(|(key, value)| format!(r#"{}="{}""#, key, value.to_string().trim_end_matches(',')))
+            .map(|(key, value)| format!(r#"{key}="{}""#, value.to_string().trim_end_matches(',')))
             .collect::<Vec<_>>()
             .join(" ")
     )
@@ -1086,11 +1085,10 @@ fn parse_loc_rdata_coordinates(coordinates: u32, dir: &str) -> String {
     let second = minute.fract() * 60.0;
 
     format!(
-        "{} {} {:.3} {}",
+        "{} {} {:.3} {dir}",
         degree.trunc().abs(),
         minute.trunc().abs(),
-        second.abs(),
-        dir
+        second.abs()
     )
 }
 
@@ -1111,8 +1109,7 @@ fn parse_character_string(decoder: &mut BinDecoder<'_>) -> DnsParserResult<Strin
         Ok(verified_text) => Ok(String::from_utf8_lossy(verified_text).to_string()),
         Err(raw_data) => Err(DnsMessageParserError::SimpleError {
             cause: format!(
-                "Unexpected data length: expected {}, got {}. Raw data {}",
-                len,
+                "Unexpected data length: expected {len}, got {}. Raw data {}",
                 raw_data.len(),
                 format_bytes_as_hex_string(raw_data)
             ),
