@@ -45,15 +45,9 @@ jobs:
         with:
           cargo-cache: true
           rust: true
-          # The published binary may predate these helpers. Build the exact trusted base below.
-          vdev: false
+          vdev: true
 
-      - name: Build trusted release validator
-        run: |
-          cargo build --locked --package vdev
-          cp target/debug/vdev "$RUNNER_TEMP/release-vdev"
-
-      # Build and set up exclusively from the base before inspecting PR-controlled files.
+      # Install the base's pinned vdev before inspecting PR-controlled files.
       - name: Checkout PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,6 +60,6 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.head_ref }}
         run: >-
-          "$RUNNER_TEMP/release-vdev" release workflow pr-check
+          "$VDEV" release workflow pr-check
           --base-sha "$BASE_SHA"
           --head-ref "$HEAD_REF"
