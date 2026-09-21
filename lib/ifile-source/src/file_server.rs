@@ -325,28 +325,30 @@ where
             for (&file_id, watcher) in &mut fp_map {
                 let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
-                while let Ok(Some(line)) = watcher.read_line().await {
-                    let sz = line.bytes.len();
-                    trace!(
-                        message = "Read bytes.",
-                        path = ?watcher.path,
-                        bytes = ?sz
-                    );
-                    stats.record_bytes(sz);
+                if watcher.check_for_truncation().await.is_ok() {
+                    while let Ok(Some(line)) = watcher.read_line().await {
+                        let sz = line.bytes.len();
+                        trace!(
+                            message = "Read bytes.",
+                            path = ?watcher.path,
+                            bytes = ?sz
+                        );
+                        stats.record_bytes(sz);
 
-                    bytes_read += sz;
+                        bytes_read += sz;
 
-                    lines.push(Line {
-                        text: line.bytes,
-                        filename: watcher.path.to_str().expect("not a valid path").to_owned(),
-                        file_id,
-                        start_offset: line.offset,
-                        end_offset: watcher.get_file_position(),
-                    });
+                        lines.push(Line {
+                            text: line.bytes,
+                            filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                            file_id,
+                            start_offset: line.offset,
+                            end_offset: watcher.get_file_position(),
+                        });
 
-                    if bytes_read > self.max_read_bytes {
-                        maxed_out_reading_single_file = true;
-                        break;
+                        if bytes_read > self.max_read_bytes {
+                            maxed_out_reading_single_file = true;
+                            break;
+                        }
                     }
                 }
                 stats.record("reading", start.elapsed());
