@@ -3,6 +3,10 @@ package event;
 
 import "google/protobuf/timestamp.proto";
 
+// Deprecated fields remain declared for wire compatibility, which prevents
+// their field numbers from being reused. If a deprecated field is removed, its
+// number must be added to a reserved statement in the containing message.
+
 message EventArray {
   oneof events {
     LogArray logs = 1;
@@ -32,8 +36,8 @@ message EventWrapper {
 }
 
 message Log {
-  // Deprecated, use value instead
-  map<string, Value> fields = 1;
+  // Deprecated, use value instead.
+  map<string, Value> fields = 1 [deprecated = true];
   Value value = 2;
   Value metadata = 3 [deprecated = true];
   Metadata metadata_full = 4;
@@ -99,7 +103,8 @@ message Metadata {
 message Metric {
   string name = 1;
   google.protobuf.Timestamp timestamp = 2;
-  map<string, string> tags_v1 = 3;
+  // Deprecated, use tags_v2 instead.
+  map<string, string> tags_v1 = 3 [deprecated = true];
   map<string, TagValues> tags_v2 = 20;
   enum Kind {
     Incremental = 0;
@@ -110,12 +115,12 @@ message Metric {
     Counter counter = 5;
     Gauge gauge = 6;
     Set set = 7;
-    Distribution1 distribution1 = 8;
-    AggregatedHistogram1 aggregated_histogram1 = 9;
-    AggregatedSummary1 aggregated_summary1 = 10;
+    Distribution1 distribution1 = 8 [deprecated = true];
+    AggregatedHistogram1 aggregated_histogram1 = 9 [deprecated = true];
+    AggregatedSummary1 aggregated_summary1 = 10 [deprecated = true];
     Distribution2 distribution2 = 12;
-    AggregatedHistogram2 aggregated_histogram2 = 13;
-    AggregatedSummary2 aggregated_summary2 = 14;
+    AggregatedHistogram2 aggregated_histogram2 = 13 [deprecated = true];
+    AggregatedSummary2 aggregated_summary2 = 14 [deprecated = true];
     Sketch sketch = 15;
     AggregatedHistogram3 aggregated_histogram3 = 16;
     AggregatedSummary3 aggregated_summary3 = 17;

@@ -284,8 +284,7 @@ pub struct RunnerMetrics {
 fn run_validation(configuration: ValidationConfiguration, test_case_data_path: std::path::PathBuf) {
     let component_name = configuration.component_name();
     info!(
-        "Running validation for component '{}' (type: {:?})...",
-        component_name,
+        "Running validation for component '{component_name}' (type: {:?})...",
         configuration.component_type()
     );
 
@@ -356,14 +355,12 @@ fn run_validation(configuration: ValidationConfiguration, test_case_data_path: s
 
                 if had_failures {
                     panic!(
-                        "Failed to validate component '{}':\n{}",
-                        component_name,
+                        "Failed to validate component '{component_name}':\n{}",
                         details.join("")
                     );
                 } else {
                     info!(
-                        "Successfully validated component '{}':\n{}",
-                        component_name,
+                        "Successfully validated component '{component_name}':\n{}",
                         details.join("")
                     );
                 }
@@ -427,8 +424,7 @@ fn get_validation_configuration_from_test_case_path(
     // Now that we've theoretically got the component type and component name, try to query the
     // validatable component descriptions to find it.
     ValidatableComponentDescription::query(&component_name, component_type).ok_or(format!(
-        "No validation configuration for component '{}' with component type '{}'.",
-        component_name,
+        "No validation configuration for component '{component_name}' with component type '{}'.",
         component_type.as_str()
     ))
 }

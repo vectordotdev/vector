@@ -1,10 +1,6 @@
 use std::collections::BTreeMap;
 
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
-mod ddmetric_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
-
+use datadog_proto::agentpayload as ddmetric_proto;
 use ddmetric_proto::{
     MetricPayload,
     metric_payload::{MetricSeries, MetricType},
@@ -119,44 +115,42 @@ fn common_series_assertions(series: &SeriesIntake) {
         .for_each(|(found, mtype)| assert!(found, "Didn't receive metric type {}", *mtype));
 }
 
-impl From<&DatadogSeriesMetric> for MetricSeries {
-    fn from(input: &DatadogSeriesMetric) -> Self {
-        let mut resources = vec![];
-        if let Some(host) = &input.host {
-            resources.push(Resource {
-                r#type: "host".to_string(),
-                name: host.clone(),
-            });
-        }
+fn metric_series_from_v1(input: &DatadogSeriesMetric) -> MetricSeries {
+    let mut resources = vec![];
+    if let Some(host) = &input.host {
+        resources.push(Resource {
+            r#type: "host".to_string(),
+            name: host.clone(),
+        });
+    }
 
-        let points = input
-            .points
-            .iter()
-            .map(|point| MetricPoint {
-                value: point.1,
-                timestamp: point.0,
-            })
-            .collect();
+    let points = input
+        .points
+        .iter()
+        .map(|point| MetricPoint {
+            value: point.1,
+            timestamp: point.0,
+        })
+        .collect();
 
-        let interval = input.interval.unwrap_or(0) as i64;
+    let interval = input.interval.unwrap_or(0) as i64;
 
-        let r#type = match input.r#type {
-            vector::common::datadog::DatadogMetricType::Gauge => 3,
-            vector::common::datadog::DatadogMetricType::Count => 1,
-            vector::common::datadog::DatadogMetricType::Rate => 2,
-        };
+    let r#type = match input.r#type {
+        vector::common::datadog::DatadogMetricType::Gauge => 3,
+        vector::common::datadog::DatadogMetricType::Count => 1,
+        vector::common::datadog::DatadogMetricType::Rate => 2,
+    };
 
-        MetricSeries {
-            resources,
-            metric: input.metric.clone(),
-            tags: input.tags.clone().unwrap_or_default(),
-            points,
-            r#type,
-            unit: "".to_string(),
-            source_type_name: input.clone().source_type_name.unwrap_or_default(),
-            interval,
-            metadata: None,
-        }
+    MetricSeries {
+        resources,
+        metric: input.metric.clone(),
+        tags: input.tags.clone().unwrap_or_default(),
+        points,
+        r#type,
+        unit: "".to_string(),
+        source_type_name: input.clone().source_type_name.unwrap_or_default(),
+        interval,
+        metadata: None,
     }
 }
 
@@ -164,7 +158,7 @@ fn convert_v1_payloads_v2(input: &[DatadogSeriesMetric]) -> Vec<MetricPayload> {
     input
         .iter()
         .map(|serie| MetricPayload {
-            series: vec![serie.into()],
+            series: vec![metric_series_from_v1(serie)],
         })
         .collect()
 }
@@ -244,7 +238,7 @@ async fn get_v1_series_from_pipeline(address: String) -> SeriesIntake {
 
     common_series_assertions(&intake);
 
-    info!("{:?}", intake);
+    info!("{intake:?}");
 
     intake
 }
@@ -265,7 +259,7 @@ async fn get_v2_series_from_pipeline(address: String) -> SeriesIntake {
 
     common_series_assertions(&intake);
 
-    info!("{:?}", intake);
+    info!("{intake:?}");
 
     intake
 }

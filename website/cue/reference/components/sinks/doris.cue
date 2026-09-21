@@ -68,7 +68,6 @@ components: sinks: doris: {
 				"""#,
 		]
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.doris.configuration

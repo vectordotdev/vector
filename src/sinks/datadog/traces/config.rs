@@ -15,7 +15,7 @@ use super::{
 };
 use crate::{
     common::datadog,
-    config::{DynValidatedSink, GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
+    config::{GenerateConfig, Input, SinkConfig, SinkContext, ValidatedSink},
     http::HttpClient,
     sinks::{
         Healthcheck, VectorSink,
@@ -60,15 +60,12 @@ pub struct DatadogTracesConfig {
     #[serde(flatten)]
     pub local_dd_common: LocalDatadogCommonConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: Option<Compression>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogTracesDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 }
@@ -208,10 +205,6 @@ impl SinkConfig for DatadogTracesConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.local_dd_common.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

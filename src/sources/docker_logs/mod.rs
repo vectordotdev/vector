@@ -165,10 +165,8 @@ pub struct DockerLogsConfig {
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
-    #[configurable(derived)]
     multiline: Option<MultilineConfig>,
 
-    #[configurable(derived)]
     tls: Option<DockerTlsConfig>,
 
     /// The namespace to use for logs. This overrides the global setting.
