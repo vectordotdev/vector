@@ -105,6 +105,23 @@ generated: components: sources: opentelemetry: configuration: {
 			}
 		}
 	}
+	max_concurrent_requests: {
+		description: """
+			Maximum number of queued and processing requests across the HTTP and gRPC servers.
+
+			Defaults to ten times the number of Vector runtime worker threads.
+			"""
+		required: false
+		type: uint: {}
+	}
+	request_timeout_secs: {
+		description: "Maximum time spent queueing and processing a request, including acknowledgement handling."
+		required:    false
+		type: uint: {
+			default: 30
+			unit:    "seconds"
+		}
+	}
 	use_otlp_decoding: {
 		description: """
 			Configuration for OTLP decoding behavior.

@@ -38,7 +38,10 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         http_server::HttpConfigParamKind,
-        opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
+        opentelemetry::{
+            config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
+            request_control::{HttpErrorResponse, RequestControlLayer},
+        },
         util::{add_headers, decompress_body, http::capped_body},
     },
     tls::{MaybeTlsSettings, TlsAcceptorReloader},
@@ -58,6 +61,7 @@ pub(crate) async fn run_http_server(
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
+    request_control: RequestControlLayer<HttpErrorResponse>,
 ) -> crate::Result<()> {
     let listener = tls_settings
         .bind_reloadable(&address, tls_reloader)
@@ -78,6 +82,8 @@ pub(crate) async fn run_http_server(
                     conn.peer_addr(),
                 )
             }))
+            // Admission wraps the Warp service, so queued requests cannot reach `capped_body`.
+            .layer(request_control.clone())
             .service(warp::service(routes.clone()));
         futures_util::future::ok::<_, Infallible>(svc)
     });

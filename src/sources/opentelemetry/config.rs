@@ -1,4 +1,8 @@
-use std::net::SocketAddr;
+use std::{
+    net::SocketAddr,
+    num::{NonZeroU64, NonZeroUsize},
+    time::Duration,
+};
 
 use crate::{
     config::{
@@ -13,10 +17,11 @@ use crate::{
         opentelemetry::{
             grpc::Service,
             http::{build_warp_filter, run_http_server},
+            request_control::RequestControl,
         },
         util::{
             decompression::max_decompressed_size_bytes,
-            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes_and_layer},
         },
     },
 };
@@ -121,6 +126,16 @@ pub struct OpentelemetryConfig {
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
+    /// Maximum number of queued and processing requests across the HTTP and gRPC servers.
+    ///
+    /// Defaults to ten times the number of Vector runtime worker threads.
+    pub max_concurrent_requests: Option<NonZeroUsize>,
+
+    /// Maximum time spent queueing and processing a request, including acknowledgement handling.
+    #[serde(default = "default_request_timeout_secs")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    pub request_timeout_secs: NonZeroU64,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
@@ -156,6 +171,16 @@ pub struct OpentelemetryConfig {
     /// - The events can be forwarded directly (passthrough) to a downstream OTLP collector
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub use_otlp_decoding: OtlpDecodingConfig,
+}
+
+const fn default_request_timeout_secs() -> NonZeroU64 {
+    NonZeroU64::new(30).unwrap()
+}
+
+fn runtime_worker_threads() -> NonZeroUsize {
+    crate::app::worker_threads()
+        .or_else(|| NonZeroUsize::new(crate::num_threads()))
+        .expect("available parallelism is nonzero")
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
@@ -234,6 +259,8 @@ impl GenerateConfig for OpentelemetryConfig {
             grpc: example_grpc_config(),
             http: example_http_config(),
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: default_request_timeout_secs(),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig::default(),
         })
@@ -272,6 +299,16 @@ impl OpentelemetryConfig {
     ) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
+        let worker_threads = runtime_worker_threads().get();
+        let outer_capacity = self
+            .max_concurrent_requests
+            .map(NonZeroUsize::get)
+            .unwrap_or_else(|| worker_threads.saturating_mul(10));
+        let request_control = RequestControl::new(
+            outer_capacity,
+            worker_threads,
+            Duration::from_secs(self.request_timeout_secs.get()),
+        );
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
@@ -326,13 +363,14 @@ impl OpentelemetryConfig {
             .add_service(metrics_service)
             .add_service(trace_service);
 
-        let grpc_source = run_grpc_server_with_routes(
+        let grpc_source = run_grpc_server_with_routes_and_layer(
             self.grpc.address,
             grpc_tls_settings,
             grpc_tls_reloader,
             builder.routes(),
             self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
+            request_control.grpc_layer(),
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source gRPC server failed.", %error);
@@ -363,6 +401,7 @@ impl OpentelemetryConfig {
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
+            request_control.http_layer(),
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source HTTP server failed.", %error);

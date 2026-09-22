@@ -62,6 +62,8 @@ async fn receive_logs_legacy_namespace() {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: 30.try_into().unwrap(),
             log_namespace: Default::default(),
             use_otlp_decoding: false.into(),
         };
@@ -162,6 +164,8 @@ async fn receive_trace() {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: 30.try_into().unwrap(),
             log_namespace: Default::default(),
             use_otlp_decoding: false.into(),
         };
@@ -268,6 +272,8 @@ async fn receive_metric() {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: 30.try_into().unwrap(),
             log_namespace: Default::default(),
             use_otlp_decoding: false.into(),
         };
