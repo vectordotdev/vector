@@ -12,7 +12,9 @@ runner:
     FAKE_INTAKE_VECTOR_ENDPOINT: "http://fakeintake-vector:80"
 
 matrix:
-  agent_version: ["7", "6"]
+  # Keep the last Agent version before v3 series became the default, and also
+  # test the floating v7 tag to cover v3 series intake.
+  agent_version: ["7.80.4", "7", "6"]
   # validate both series API versions
   series_api_version: ["v1", "v2"]
 
