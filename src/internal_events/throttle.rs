@@ -74,10 +74,6 @@ mod tests {
     #[serial]
     fn emits_component_discarded_events_with_group_tag() {
         vector_lib::metrics::init_test();
-        Controller::get()
-            .expect("metrics controller initialized")
-            .reset();
-
         for key in ["group-a", "group-b", "None"] {
             ThrottleEventDiscarded {
                 key: key.to_string(),
@@ -99,10 +95,6 @@ mod tests {
     #[serial]
     fn emits_component_discarded_events_without_group_tag_by_default() {
         vector_lib::metrics::init_test();
-        Controller::get()
-            .expect("metrics controller initialized")
-            .reset();
-
         ThrottleEventDiscarded {
             key: "group-a".to_string(),
             emit_events_discarded_per_key: false,
