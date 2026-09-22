@@ -24,7 +24,7 @@ jobs:
       release_branch: ${{ steps.validation.outputs.release_branch }}
     steps:
       - name: Checkout merged commit
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -34,7 +34,7 @@ jobs:
         with:
           rust: true
           cargo-cache: true
-          vdev: false
+          vdev: true
 
       - name: Validate release merge
         id: validation
@@ -42,7 +42,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BEFORE_SHA: ${{ github.event.before }}
         run: >-
-          cargo vdev release workflow autotag-check
+          "$VDEV" release workflow autotag-check
           --before-sha "$BEFORE_SHA"
           --sha "$GITHUB_SHA"
           --repository "$GITHUB_REPOSITORY"
@@ -59,7 +59,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout validated commit
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
