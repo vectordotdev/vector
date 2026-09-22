@@ -435,12 +435,12 @@ impl<'a> ValueCoercer<'a> {
         // Bool → String
         if let Value::Bool(b) = value {
             let val_str = b.to_string();
-            if allowed.iter().any(|opt| {
-                opt.as_str()
-                    .map(|s| s.eq_ignore_ascii_case(val_str.as_str()))
-                    == Some(true)
-            }) {
-                *value = Value::String(val_str);
+            if let Some(matched) = allowed
+                .iter()
+                .filter_map(Value::as_str)
+                .find(|allowed| allowed.eq_ignore_ascii_case(&val_str))
+            {
+                *value = Value::String(matched.to_owned());
                 return true;
             }
         }
@@ -922,12 +922,17 @@ impl<'a> ValueCoercer<'a> {
 
             if let Some(f) = n.as_f64()
                 && f.fract() == 0.0
-                && f >= (i64::MIN as f64)
-                // i64::MAX rounds up to 2^63 as f64; accepting that bound saturates.
-                && f < (i64::MAX as f64)
             {
-                *value = Value::Number(Number::from(f as i64));
-                return Ok(());
+                if ((i64::MIN as f64)..0.0).contains(&f) {
+                    *value = Value::Number(Number::from(f as i64));
+                    return Ok(());
+                }
+                // u64::MAX rounds up to 2^64 as f64. Exclude that boundary
+                // before casting so out-of-range floats cannot saturate.
+                if (0.0..(u64::MAX as f64)).contains(&f) {
+                    *value = Value::Number(Number::from(f as u64));
+                    return Ok(());
+                }
             }
         } else if let Value::String(s) = value
             && let Some(n) = parse_integer(s)

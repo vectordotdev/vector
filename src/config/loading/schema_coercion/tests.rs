@@ -426,6 +426,36 @@ fn scalar_coercions() {
             expected: json!(i64::MIN),
         },
         CoercionCase {
+            name: "float at 2^63 becomes unsigned without saturating to i64::MAX",
+            schema: json!({"type": "integer"}),
+            input: json!(i64::MAX as f64),
+            expected: json!(1_u64 << 63),
+        },
+        CoercionCase {
+            name: "largest float below 2^64",
+            schema: json!({"type": "integer"}),
+            input: json!((u64::MAX as f64).next_down()),
+            expected: json!(u64::MAX - 2047),
+        },
+        CoercionCase {
+            name: "float at the signed lower bound",
+            schema: json!({"type": "integer"}),
+            input: json!(i64::MIN as f64),
+            expected: json!(i64::MIN),
+        },
+        CoercionCase {
+            name: "negative integral float stays signed",
+            schema: json!({"type": "integer"}),
+            input: json!(-42.0),
+            expected: json!(-42),
+        },
+        CoercionCase {
+            name: "zero float becomes an integer",
+            schema: json!({"type": "integer"}),
+            input: json!(0.0),
+            expected: json!(0),
+        },
+        CoercionCase {
             name: "string to fractional number",
             schema: json!({"type": "number"}),
             input: json!("1.5"),
@@ -476,9 +506,18 @@ fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
             },
         },
         RejectionCase {
-            name: "rounded float boundary must not saturate to i64::MAX",
+            name: "rounded float boundary must not saturate to u64::MAX",
             schema: json!({"type": "integer"}),
-            input: json!(9223372036854775808.0_f64),
+            input: json!(u64::MAX as f64),
+            expected_error: Error::ExpectedInteger {
+                path: "".into(),
+                actual: "number",
+            },
+        },
+        RejectionCase {
+            name: "float below the signed lower bound must not saturate",
+            schema: json!({"type": "integer"}),
+            input: json!((i64::MIN as f64).next_down()),
             expected_error: Error::ExpectedInteger {
                 path: "".into(),
                 actual: "number",
@@ -700,10 +739,16 @@ fn enum_and_const_share_scalar_conversions_but_keep_distinct_errors() {
             expected: json!("42"),
         },
         ConstraintCase {
-            name: "boolean to lowercase string despite uppercase constraint",
+            name: "boolean preserves the allowed uppercase spelling",
             allowed_value: json!("TRUE"),
             input: json!(true),
-            expected: json!("true"),
+            expected: json!("TRUE"),
+        },
+        ConstraintCase {
+            name: "false preserves the allowed mixed-case spelling",
+            allowed_value: json!("False"),
+            input: json!(false),
+            expected: json!("False"),
         },
         ConstraintCase {
             name: "exact array match",
@@ -787,6 +832,56 @@ fn enum_and_const_share_scalar_conversions_but_keep_distinct_errors() {
     ] {
         case.check();
     }
+}
+
+#[test]
+fn generated_unsigned_integer_accepts_integral_float_above_signed_range() {
+    let schema =
+        serde_json::to_value(vector_config::schema::generate_root_schema::<u64>().unwrap())
+            .unwrap();
+    let mut value: Value = serde_json::from_str("1e19").unwrap();
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(
+        serde_json::from_value::<u64>(value).unwrap(),
+        10_000_000_000_000_000_000
+    );
+}
+
+#[test]
+fn generated_signed_integer_leaves_unsigned_overflow_for_serde() {
+    let schema =
+        serde_json::to_value(vector_config::schema::generate_root_schema::<i64>().unwrap())
+            .unwrap();
+    let mut value = json!(i64::MAX as f64);
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(value, json!(1_u64 << 63));
+    assert!(serde_json::from_value::<i64>(value).is_err());
+}
+
+/// Boolean-like strings with case-sensitive serde spellings.
+#[vector_config::configurable_component]
+#[derive(Debug, PartialEq)]
+enum BooleanSpelling {
+    /// Enabled.
+    #[serde(rename = "TRUE")]
+    True,
+    /// Disabled.
+    #[serde(rename = "False")]
+    False,
+}
+
+#[test]
+fn generated_boolean_spelling_deserializes_after_coercion() {
+    let schema = serde_json::to_value(
+        vector_config::schema::generate_root_schema::<BooleanSpelling>().unwrap(),
+    )
+    .unwrap();
+    let mut value = json!(true);
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(
+        serde_json::from_value::<BooleanSpelling>(value).unwrap(),
+        BooleanSpelling::True
+    );
 }
 
 #[test]
