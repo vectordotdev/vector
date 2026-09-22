@@ -10,7 +10,6 @@ pub const COMPONENT_TYPE_SOURCE: &str = "source";
 pub const COMPONENT_TYPE_TRANSFORM: &str = "transform";
 pub const COMPONENT_TYPE_GLOBAL_OPTION: &str = "global_option";
 pub const DOCS_META_ADDITIONAL_PROPS_DESC: &str = "docs::additional_props_description";
-pub const DOCS_META_COMPONENT_BASE_TYPE: &str = "docs::component_base_type";
 pub const DOCS_META_COMPONENT_NAME: &str = "docs::component_name";
 pub const DOCS_META_COMPONENT_TYPE: &str = "docs::component_type";
 pub const DOCS_META_ENUM_CONTENT_FIELD: &str = "docs::enum_content_field";
