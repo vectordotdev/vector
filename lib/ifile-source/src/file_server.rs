@@ -21,8 +21,9 @@ use tokio_util::task::JoinMap;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    file_watcher::FileWatcher, paths_provider::PathsProvider, Checkpointer, CheckpointsView,
-    FilePosition, ReadFrom,
+    file_watcher::FileWatcher,
+    paths_provider::{PathUpdates, PathsProvider},
+    Checkpointer, CheckpointsView, FilePosition, ReadFrom,
 };
 use file_source_common::{
     internal_events::FileSourceInternalEvents, FileFingerprint, Fingerprinter,
@@ -114,7 +115,7 @@ where
 
         let mut existing_files = Vec::new();
 
-        let paths = self.paths_provider.paths(true).await;
+        let paths = self.paths_provider.paths(true).await.into_paths();
         for path in paths.into_iter() {
             debug!(?path, "fingerprinting on startup");
             if let Some(file_id) = self
@@ -184,13 +185,11 @@ where
         ));
 
         let mut last_stats_report: Option<Instant> = None;
-        let mut next_glob_time = time::Instant::now();
+        let mut next_glob_time = time::Instant::now() + Duration::from_secs(1);
         loop {
-            // Determine if we need to perform file discovery
+            // Reconcile periodically even while draining a backlog. Notifications
+            // supply only affected paths between these full scans.
             let now_time = time::Instant::now();
-            // Check for new files frequently to minimize the delay between when a file is discovered
-            // by the notify watcher and when it's actually processed, but not on every iteration
-            // to avoid excessive CPU usage
             let should_discover_glob = next_glob_time <= now_time;
 
             // Report stats periodically, but only if enough time has passed since the last report
@@ -225,12 +224,28 @@ where
 
             // Search for files to detect major file changes.
             let start = time::Instant::now();
-            for (_file_id, watcher) in &mut fp_map {
-                watcher.set_file_findable(false); // assume not findable until found
+            let updates = self.paths_provider.paths(should_discover_glob).await;
+            match &updates {
+                PathUpdates::Snapshot(_) => {
+                    for watcher in fp_map.values_mut() {
+                        watcher.set_file_findable(false);
+                    }
+                }
+                PathUpdates::Changed { updated, removed }
+                    if !updated.is_empty() || !removed.is_empty() =>
+                {
+                    for watcher in fp_map.values_mut() {
+                        if updated.contains(&watcher.path) || removed.contains(&watcher.path) {
+                            watcher.set_file_findable(false);
+                        }
+                    }
+                    for path in removed {
+                        known_small_files.remove(path);
+                    }
+                }
+                PathUpdates::Changed { .. } => {}
             }
-
-            // Use async paths provider
-            let paths = self.paths_provider.paths(should_discover_glob).await;
+            let paths = updates.into_paths();
             for path in paths.into_iter() {
                 if let Some(file_id) = self
                     .fingerprinter

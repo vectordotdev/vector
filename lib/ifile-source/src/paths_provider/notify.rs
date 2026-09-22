@@ -12,7 +12,7 @@ use notify::{Event, EventKind, RecursiveMode, Watcher};
 use tokio::sync::{mpsc, Notify};
 use tracing::{debug, error, warn};
 
-use super::PathsProvider;
+use super::{PathUpdates, PathsProvider};
 use crate::FileSourceInternalEvents;
 
 /// Discovers matching paths using notifications and periodic glob reconciliation.
@@ -85,7 +85,8 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
         provider
     }
 
-    fn process_events(&mut self) -> bool {
+    fn process_events(&mut self) -> (bool, HashSet<PathBuf>) {
+        let mut changed_paths = HashSet::new();
         let mut rescan = self.needs_rescan.swap(false, Ordering::Relaxed);
         while let Ok(event) = self.events.try_recv() {
             let event = match event {
@@ -110,6 +111,13 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
                         )
                         | EventKind::Modify(notify::event::ModifyKind::Name(_))
                 );
+            changed_paths.extend(
+                event
+                    .paths
+                    .iter()
+                    .filter(|path| self.matches(path))
+                    .cloned(),
+            );
             match event.kind {
                 EventKind::Remove(_) => {
                     for path in event.paths {
@@ -126,7 +134,7 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
                 _ => {}
             }
         }
-        rescan
+        (rescan, changed_paths)
     }
 
     fn matches(&self, path: &Path) -> bool {
@@ -224,22 +232,183 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
 }
 
 impl<E: FileSourceInternalEvents> PathsProvider for NotifyPathsProvider<E> {
-    type IntoIter = Vec<PathBuf>;
-
     fn wait_for_changes(&mut self) -> impl std::future::Future<Output = ()> + Send {
         self.changed.notified()
     }
 
-    async fn paths(&mut self, should_glob: bool) -> Self::IntoIter {
-        let needs_rescan = self.process_events();
+    async fn paths(&mut self, should_glob: bool) -> PathUpdates {
+        let (needs_rescan, changed_paths) = self.process_events();
         if should_glob || needs_rescan {
             self.glob_scan().await;
             // Apply notifications received during the scan after its snapshot.
             // Keep any requested reconciliation pending for the next call.
-            if self.process_events() {
+            if self.process_events().0 {
                 self.needs_rescan.store(true, Ordering::Relaxed);
             }
+            PathUpdates::Snapshot(self.discovered_files.clone())
+        } else {
+            let (updated, removed) = changed_paths
+                .into_iter()
+                .partition(|path| self.discovered_files.contains(path));
+            PathUpdates::Changed { updated, removed }
         }
-        self.discovered_files.iter().cloned().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::BytesMut;
+    use std::{io::Error, time::Duration};
+
+    #[derive(Clone)]
+    struct NoopEvents;
+
+    impl FileSourceInternalEvents for NoopEvents {
+        fn emit_file_added(&self, _: &Path) {}
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+        fn emit_file_watch_error(&self, _: &Path, _: Error) {}
+        fn emit_file_unwatched(&self, _: &Path, _: bool) {}
+        fn emit_file_deleted(&self, _: &Path) {}
+        fn emit_file_delete_error(&self, _: &Path, _: Error) {}
+        fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {}
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+        fn emit_file_checksum_failed(&self, _: &Path) {}
+        fn emit_file_checkpoint_write_error(&self, _: Error) {}
+        fn emit_files_open(&self, _: usize) {}
+        fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
+        fn emit_file_line_too_long(&self, _: &BytesMut, _: usize, _: usize) {}
+    }
+
+    // Drive notifications explicitly so tests do not depend on OS coalescing or timing.
+    fn provider(
+        root: &Path,
+    ) -> (
+        NotifyPathsProvider<NoopEvents>,
+        mpsc::Sender<notify::Result<Event>>,
+    ) {
+        let (send, events) = mpsc::channel(100);
+        (
+            NotifyPathsProvider {
+                include_patterns: vec![Pattern::new(root.join("*.log").to_str().unwrap()).unwrap()],
+                exclude_patterns: Vec::new(),
+                glob_match_options: MatchOptions::default(),
+                discovered_files: HashSet::new(),
+                watcher: None,
+                events,
+                needs_rescan: Arc::new(AtomicBool::new(false)),
+                changed: Arc::new(Notify::new()),
+                emitter: NoopEvents,
+            },
+            send,
+        )
+    }
+
+    #[tokio::test]
+    async fn notifications_only_return_affected_paths_once() {
+        let root = tempfile::tempdir().unwrap();
+        let first = root.path().join("first.log");
+        let second = root.path().join("second.log");
+        std::fs::write(&first, "first").unwrap();
+        std::fs::write(&second, "second").unwrap();
+        let (mut provider, send) = provider(root.path());
+        assert_eq!(
+            provider.paths(true).await,
+            PathUpdates::Snapshot([first.clone(), second.clone()].into())
+        );
+        assert_eq!(
+            provider.paths(false).await,
+            PathUpdates::Changed {
+                updated: HashSet::new(),
+                removed: HashSet::new()
+            }
+        );
+        for _ in 0..3 {
+            send.send(Ok(Event::new(EventKind::Modify(
+                notify::event::ModifyKind::Any,
+            ))
+            .add_path(first.clone())))
+                .await
+                .unwrap();
+        }
+        send.send(Ok(Event::new(EventKind::Create(
+            notify::event::CreateKind::File,
+        ))
+        .add_path(root.path().join("excluded.txt"))))
+            .await
+            .unwrap();
+        assert_eq!(
+            provider.paths(false).await,
+            PathUpdates::Changed {
+                updated: [first.clone()].into(),
+                removed: HashSet::new()
+            }
+        );
+        assert_eq!(
+            provider.paths(false).await,
+            PathUpdates::Changed {
+                updated: HashSet::new(),
+                removed: HashSet::new()
+            }
+        );
+        std::fs::remove_file(&first).unwrap();
+        send.send(Ok(Event::new(EventKind::Remove(
+            notify::event::RemoveKind::File,
+        ))
+        .add_path(first.clone())))
+            .await
+            .unwrap();
+        assert_eq!(
+            provider.paths(false).await,
+            PathUpdates::Changed {
+                updated: HashSet::new(),
+                removed: [first].into()
+            }
+        );
+        assert_eq!(
+            provider.paths(true).await,
+            PathUpdates::Snapshot([second].into())
+        );
+    }
+
+    #[tokio::test]
+    async fn reconciliation_recovers_missed_and_overflowed_notifications() {
+        let root = tempfile::tempdir().unwrap();
+        let first = root.path().join("first.log");
+        let second = root.path().join("second.log");
+        std::fs::write(&first, "first").unwrap();
+        let (mut provider, _send) = provider(root.path());
+        assert_eq!(
+            provider.paths(true).await,
+            PathUpdates::Snapshot([first.clone()].into())
+        );
+        std::fs::remove_file(&first).unwrap();
+        std::fs::write(&second, "second").unwrap();
+        // No event arrived: incremental reads do no discovery work.
+        assert_eq!(
+            provider.paths(false).await,
+            PathUpdates::Changed {
+                updated: HashSet::new(),
+                removed: HashSet::new()
+            }
+        );
+        assert_eq!(
+            provider.paths(true).await,
+            PathUpdates::Snapshot([second.clone()].into())
+        );
+        std::fs::write(&first, "first again").unwrap();
+        // The callback sets this flag when its bounded queue overflows.
+        provider.needs_rescan.store(true, Ordering::Relaxed);
+        assert_eq!(
+            provider.paths(false).await,
+            PathUpdates::Snapshot([first, second].into())
+        );
+        assert_eq!(
+            provider.paths(false).await,
+            PathUpdates::Changed {
+                updated: HashSet::new(),
+                removed: HashSet::new()
+            }
+        );
     }
 }
