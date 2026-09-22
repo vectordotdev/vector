@@ -346,6 +346,10 @@ impl FunctionTransform for Sample {
         };
 
         let group_by_key = self.group_by_key(&event);
+        let discarded_group = self
+            .include_group_tag
+            .then(|| group_by_key.clone())
+            .flatten();
         let value = self.static_key_value(&event);
 
         let event_sample_mode = self.event_sample_mode(&event);
@@ -356,12 +360,10 @@ impl FunctionTransform for Sample {
 
         let should_sample = match event_sample_mode {
             Some(EventSampleMode::Ratio(ratio)) => {
-                self.sample_with_dynamic_ratio(ratio, group_by_key.clone())
+                self.sample_with_dynamic_ratio(ratio, group_by_key)
             }
-            Some(EventSampleMode::Rate(rate)) => {
-                self.sample_with_dynamic_rate(rate, group_by_key.clone())
-            }
-            None => self.static_mode.increment(group_by_key.clone(), value),
+            Some(EventSampleMode::Rate(rate)) => self.sample_with_dynamic_rate(rate, group_by_key),
+            None => self.static_mode.increment(group_by_key, value),
         };
 
         if should_sample {
@@ -385,7 +387,7 @@ impl FunctionTransform for Sample {
             output.push(event);
         } else {
             emit!(SampleEventDiscarded {
-                group: group_by_key.unwrap_or_else(|| "None".to_string()),
+                group: discarded_group.unwrap_or_else(|| "None".to_string()),
                 include_group_tag: self.include_group_tag,
             });
         }
