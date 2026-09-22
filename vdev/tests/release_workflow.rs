@@ -991,3 +991,47 @@ mod website_check {
         check_website(repo, "v0.59.0", &website, false);
     }
 }
+
+mod website_preflight {
+    use super::*;
+
+    fn preflight(repo: &Path, tag: &str, success: bool) -> String {
+        let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
+            .args(["release", "workflow", "website-preflight", "--tag", tag])
+            .env_remove("GITHUB_OUTPUT")
+            .env_remove("GITHUB_STEP_SUMMARY")
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.success(), success, "{stderr}");
+        String::from_utf8(output.stdout).unwrap()
+    }
+
+    #[test]
+    fn resets_stable_tags_including_patch_releases() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        for tag in ["v0.59.0", "v0.59.1"] {
+            assert_eq!(preflight(repo, tag, true), "skip=false\n");
+        }
+    }
+
+    #[test]
+    fn skips_prerelease_and_build_metadata_tags() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        for tag in ["v0.60.0-rc.1", "v0.59.0+build"] {
+            assert_eq!(preflight(repo, tag, true), "skip=true\n");
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_tags() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        for tag in ["0.59.0", "v0.59", "v0.59.0.1", "release-v0.59.0"] {
+            preflight(repo, tag, false);
+        }
+    }
+}
