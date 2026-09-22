@@ -1,6 +1,53 @@
 use super::{Error, ValueCoercer};
 use serde_json::json;
 
+#[test]
+fn component_boundaries_follow_root_maps_not_nested_unions() {
+    for section in super::COMPONENT_MAPS {
+        for referenced in [false, true] {
+            let outer = json!({"oneOf": [{
+                "type": "object",
+                "properties": {
+                    "type": {"const": "known"},
+                    "count": {"type": "integer"},
+                    "mode": {"oneOf": [{"properties": {"type": {"const": "valid"}}}]}
+                }
+            }]});
+            let value_schema = if referenced {
+                json!({"$ref": "#/definitions/outer"})
+            } else {
+                outer.clone()
+            };
+            let schema = json!({
+                "allOf": [{"$ref": "#/definitions/config"}],
+                "definitions": {
+                    "config": {"properties": {
+                        section: {"$ref": "#/definitions/map"},
+                        "nested": {"properties": {section: {"$ref": "#/definitions/map"}}}
+                    }},
+                    "map": {"allOf": [{"type": "object", "additionalProperties": value_schema}]},
+                    "outer": outer
+                }
+            });
+            let mut coercer = ValueCoercer::new(&schema);
+            let mut unknown = json!({section: {"example": {"type": "unknown", "count": "bad"}}});
+            let original = unknown.clone();
+            coercer.coerce(&mut unknown).unwrap();
+            assert_eq!(unknown, original);
+            let mut known = json!({section: {"example": {"type": "known", "count": "42"}}});
+            coercer.coerce(&mut known).unwrap();
+            assert_eq!(known[section]["example"]["count"], json!(42));
+            for mut invalid in [
+                json!({section: {"example": {"type": "known", "count": "bad"}}}),
+                json!({section: {"example": {"type": "known", "mode": {"type": "unknown"}}}}),
+                json!({"nested": {section: {"example": {"type": "unknown"}}}}),
+            ] {
+                assert!(coercer.coerce(&mut invalid).is_err());
+            }
+        }
+    }
+}
+
 /// Object alternatives with different required fields.
 #[vector_config::configurable_component]
 #[derive(Debug, PartialEq)]

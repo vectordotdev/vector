@@ -7,7 +7,7 @@
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
 use std::collections::HashSet;
-use vector_config::constants::{DOCS_META_COMPONENT_BASE_TYPE, METADATA, SERDE_ALIASES};
+use vector_config::constants::{METADATA, SERDE_ALIASES};
 
 const NULL_JSON_TYPE: &str = "null";
 const BOOL_JSON_TYPE: &str = "boolean";
@@ -16,6 +16,7 @@ const STRING_JSON_TYPE: &str = "string";
 const ARRAY_JSON_TYPE: &str = "array";
 const OBJECT_JSON_TYPE: &str = "object";
 const DEFINITION_PREFIX: &str = "#/definitions/";
+const COMPONENT_MAPS: [&str; 4] = ["sources", "transforms", "sinks", "enrichment_tables"];
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -86,17 +87,28 @@ macro_rules! fail_expected {
 pub struct ValueCoercer<'a> {
     schema: &'a Value,
     definitions: Option<&'a Value>,
+    component_schemas: Vec<&'a Value>,
     path: Vec<String>,
 }
 
 impl<'a> ValueCoercer<'a> {
     /// Creates a coercer for a root schema and its local definitions.
     pub fn new(schema: &'a Value) -> Self {
-        Self {
+        let mut coercer = Self {
             schema,
             definitions: schema.get("definitions"),
+            component_schemas: Vec::new(),
             path: Vec::new(),
-        }
+        };
+        coercer.component_schemas = coercer
+            .object_schemas(schema)
+            .filter_map(|root| root.get("properties"))
+            .flat_map(|properties| COMPONENT_MAPS.iter().filter_map(|key| properties.get(key)))
+            .flat_map(|map| coercer.object_schemas(map))
+            .filter_map(|map| map.get("additionalProperties"))
+            .filter(|schema| schema.is_object())
+            .collect();
+        coercer
     }
 
     /// Coerces a value in place. On error, some fields may already be coerced.
@@ -110,13 +122,35 @@ impl<'a> ValueCoercer<'a> {
         self.definitions?.as_object()?.get(key)
     }
 
+    // The JSON-value counterpart of RootSchema::root_map_value_schema: follow
+    // flattened fields and local references, not nested properties or unions.
+    fn object_schemas(&self, schema: &'a Value) -> impl Iterator<Item = &'a Value> {
+        let mut pending = vec![schema];
+        let mut seen = HashSet::new();
+        std::iter::from_fn(move || {
+            let schema = pending.pop()?;
+            if let Some(all_of) = schema.get("allOf").and_then(Value::as_array) {
+                pending.extend(all_of.iter().rev());
+            }
+            if let Some(reference) = schema.get("$ref").and_then(Value::as_str)
+                && seen.insert(reference)
+                && let Some(target) = self.definition(reference)
+            {
+                pending.push(target);
+            }
+            Some(schema)
+        })
+    }
+
     fn coerce_value(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         // Unknown component kinds are diagnosed by serde. Restrict this escape
         // hatch to the outer component schema, never an arbitrary union branch.
-        if schema
-            .get(METADATA)
-            .and_then(|m| m.get(DOCS_META_COMPONENT_BASE_TYPE))
-            .is_some()
+        if self.path.len() == 2
+            && COMPONENT_MAPS.contains(&self.path[0].as_str())
+            && self
+                .component_schemas
+                .iter()
+                .any(|outer| std::ptr::eq(*outer, schema))
             && let Some(kind) = value.get("type").and_then(Value::as_str)
             && !self.schema_contains_type_discriminant(schema, kind)
         {
