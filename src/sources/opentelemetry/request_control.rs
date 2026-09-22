@@ -9,24 +9,34 @@ use std::{
 
 use http::{Request, Response, StatusCode};
 use hyper::Body;
+use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tonic::body::BoxBody;
 use tower::{
-    BoxError, Layer, Service, ServiceBuilder, buffer::BufferLayer,
-    limit::GlobalConcurrencyLimitLayer, load_shed::LoadShedLayer, timeout::TimeoutLayer,
-    util::BoxCloneService,
+    BoxError, Layer, Service, ServiceBuilder,
+    buffer::BufferLayer,
+    limit::GlobalConcurrencyLimitLayer,
+    load_shed::LoadShedLayer,
+    timeout::TimeoutLayer,
+    util::{BoxCloneService, MapRequestLayer},
+};
+use vector_lib::{
+    counter, gauge,
+    internal_event::{CounterName, GaugeName},
 };
 use warp::Reply;
 
 use super::{reply::protobuf, status::Status};
+use crate::internal_events::{OpenGauge, OpenToken};
 
 /// Admission limits shared by all HTTP and gRPC requests handled by one OTLP source.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct RequestControl {
     outer: Arc<Semaphore>,
     inner: Arc<Semaphore>,
     outer_capacity: usize,
     timeout: Duration,
+    metrics: Arc<RequestControlMetrics>,
 }
 
 impl RequestControl {
@@ -36,15 +46,20 @@ impl RequestControl {
             inner: Arc::new(Semaphore::new(inner_capacity)),
             outer_capacity,
             timeout,
+            metrics: Arc::new(RequestControlMetrics::new(outer_capacity)),
         }
     }
 
     pub(crate) fn http_layer(&self) -> RequestControlLayer<HttpErrorResponse> {
-        self.layer(HttpErrorResponse)
+        self.layer(HttpErrorResponse {
+            metrics: Arc::clone(&self.metrics),
+        })
     }
 
     pub(crate) fn grpc_layer(&self) -> RequestControlLayer<GrpcErrorResponse> {
-        self.layer(GrpcErrorResponse)
+        self.layer(GrpcErrorResponse {
+            metrics: Arc::clone(&self.metrics),
+        })
     }
 
     fn layer<R>(&self, error_response: R) -> RequestControlLayer<R> {
@@ -53,8 +68,116 @@ impl RequestControl {
             inner: Arc::clone(&self.inner),
             outer_capacity: self.outer_capacity,
             timeout: self.timeout,
+            metrics: Arc::clone(&self.metrics),
             error_response,
         }
+    }
+}
+
+type LevelEmitter = Box<dyn Fn(usize) + Send + Sync>;
+
+#[derive(Clone)]
+struct LevelToken(#[expect(dead_code)] Arc<OpenToken<LevelEmitter>>);
+
+#[derive(Clone, Copy)]
+enum Protocol {
+    Http,
+    Grpc,
+}
+
+#[derive(Clone)]
+struct RequestControlMetrics {
+    queued: OpenGauge,
+    queued_level: Gauge,
+    #[expect(dead_code)]
+    queue_capacity: Gauge,
+    http_timed_out: Counter,
+    grpc_timed_out: Counter,
+}
+
+impl RequestControlMetrics {
+    #[expect(clippy::cast_precision_loss)]
+    fn new(queue_capacity: usize) -> Self {
+        let queue_capacity_gauge = gauge!(GaugeName::ComponentRequestQueueCapacity);
+        queue_capacity_gauge.set(queue_capacity as f64);
+
+        Self {
+            queued: OpenGauge::new(),
+            queued_level: gauge!(GaugeName::ComponentRequestQueueSize),
+            queue_capacity: queue_capacity_gauge,
+            http_timed_out: counter!(
+                CounterName::ComponentTimedOutRequestsTotal,
+                "protocol" => "http"
+            ),
+            grpc_timed_out: counter!(
+                CounterName::ComponentTimedOutRequestsTotal,
+                "protocol" => "grpc"
+            ),
+        }
+    }
+
+    fn queued_token(&self) -> LevelToken {
+        let gauge = self.queued_level.clone();
+        let emitter: LevelEmitter = Box::new(move |count| gauge.set(count as f64));
+        LevelToken(Arc::new(self.queued.clone().open(emitter)))
+    }
+
+    fn time_out(&self, protocol: Protocol) {
+        match protocol {
+            Protocol::Http => &self.http_timed_out,
+            Protocol::Grpc => &self.grpc_timed_out,
+        }
+        .increment(1);
+    }
+}
+
+#[derive(Clone)]
+struct QueuedRequest(#[expect(dead_code)] LevelToken);
+
+fn mark_dequeued(mut request: Request<Body>) -> Request<Body> {
+    drop(request.extensions_mut().remove::<QueuedRequest>());
+    request
+}
+
+#[derive(Clone)]
+struct QueueTrackingLayer {
+    metrics: Arc<RequestControlMetrics>,
+}
+
+impl<S> Layer<S> for QueueTrackingLayer {
+    type Service = QueueTrackingService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        QueueTrackingService {
+            inner,
+            metrics: Arc::clone(&self.metrics),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct QueueTrackingService<S> {
+    inner: S,
+    metrics: Arc<RequestControlMetrics>,
+}
+
+impl<S> Service<Request<Body>> for QueueTrackingService<S>
+where
+    S: Service<Request<Body>>,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, mut request: Request<Body>) -> Self::Future {
+        request
+            .extensions_mut()
+            .insert(QueuedRequest(self.metrics.queued_token()));
+        self.inner.call(request)
     }
 }
 
@@ -64,6 +187,7 @@ pub(crate) struct RequestControlLayer<R> {
     inner: Arc<Semaphore>,
     outer_capacity: usize,
     timeout: Duration,
+    metrics: Arc<RequestControlMetrics>,
     error_response: R,
 }
 
@@ -86,10 +210,14 @@ where
             .layer(GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(
                 &self.outer,
             )))
+            .layer(QueueTrackingLayer {
+                metrics: Arc::clone(&self.metrics),
+            })
             .layer(BufferLayer::new(self.outer_capacity))
             .layer(GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(
                 &self.inner,
             )))
+            .layer(MapRequestLayer::new(mark_dequeued))
             .service(service);
 
         RequestControlService {
@@ -161,13 +289,16 @@ where
 }
 
 #[derive(Clone)]
-pub(crate) struct HttpErrorResponse;
+pub(crate) struct HttpErrorResponse {
+    metrics: Arc<RequestControlMetrics>,
+}
 
 impl ErrorResponse<Response<Body>> for HttpErrorResponse {
     fn make_response(&self, error: BoxError) -> Response<Body> {
         let (status, message) = if error.is::<tower::load_shed::error::Overloaded>() {
             (StatusCode::TOO_MANY_REQUESTS, "OTLP request limit exceeded")
         } else if error.is::<tower::timeout::error::Elapsed>() {
+            self.metrics.time_out(Protocol::Http);
             (StatusCode::SERVICE_UNAVAILABLE, "OTLP request timed out")
         } else {
             error!(message = "OTLP HTTP request middleware failed.", %error);
@@ -184,13 +315,16 @@ impl ErrorResponse<Response<Body>> for HttpErrorResponse {
 }
 
 #[derive(Clone)]
-pub(crate) struct GrpcErrorResponse;
+pub(crate) struct GrpcErrorResponse {
+    metrics: Arc<RequestControlMetrics>,
+}
 
 impl ErrorResponse<Response<BoxBody>> for GrpcErrorResponse {
     fn make_response(&self, error: BoxError) -> Response<BoxBody> {
         let message = if error.is::<tower::load_shed::error::Overloaded>() {
             "OTLP request limit exceeded".to_owned()
         } else if error.is::<tower::timeout::error::Elapsed>() {
+            self.metrics.time_out(Protocol::Grpc);
             "OTLP request timed out".to_owned()
         } else {
             error!(message = "OTLP gRPC request middleware failed.", %error);
@@ -312,6 +446,16 @@ mod tests {
         .expect("observation did not reach expected value");
     }
 
+    async fn wait_for_level(level: &OpenGauge, expected: usize) {
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while level.current() != expected {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("request control metric did not reach expected value");
+    }
+
     #[tokio::test]
     async fn queues_to_outer_limit_and_respects_inner_limit() {
         let control = RequestControl::new(3, 1, Duration::from_secs(5));
@@ -328,6 +472,7 @@ mod tests {
         while control.outer.available_permits() != 0 {
             tokio::task::yield_now().await;
         }
+        wait_for_level(&control.metrics.queued, 2).await;
 
         let overloaded = service
             .clone()
@@ -343,6 +488,7 @@ mod tests {
         }
         assert_eq!(observations.started.load(Ordering::Acquire), 3);
         assert_eq!(observations.maximum_active.load(Ordering::Acquire), 1);
+        wait_for_level(&control.metrics.queued, 0).await;
     }
 
     #[tokio::test]
@@ -368,6 +514,7 @@ mod tests {
         {
             tokio::task::yield_now().await;
         }
+        wait_for_level(&control.metrics.queued, OUTER - INNER).await;
 
         let overloaded = service
             .clone()
@@ -383,6 +530,7 @@ mod tests {
         }
         assert_eq!(observations.started.load(Ordering::Acquire), OUTER);
         assert_eq!(observations.maximum_active.load(Ordering::Acquire), INNER);
+        wait_for_level(&control.metrics.queued, 0).await;
     }
 
     #[tokio::test]
@@ -409,6 +557,7 @@ mod tests {
         assert_eq!(status.code, tonic::Code::Unavailable as i32);
         assert_eq!(control.outer.available_permits(), 1);
         assert_eq!(control.inner.available_permits(), 1);
+        wait_for_level(&control.metrics.queued, 0).await;
 
         let pending = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
         wait_for(&observations.started, 2).await;
@@ -417,6 +566,7 @@ mod tests {
         wait_for(&observations.active, 0).await;
         assert_eq!(control.outer.available_permits(), 1);
         assert_eq!(control.inner.available_permits(), 1);
+        wait_for_level(&control.metrics.queued, 0).await;
     }
 
     #[tokio::test]
@@ -434,11 +584,13 @@ mod tests {
         while control.outer.available_permits() != 0 {
             tokio::task::yield_now().await;
         }
+        wait_for_level(&control.metrics.queued, 1).await;
         buffered.abort();
         assert!(buffered.await.unwrap_err().is_cancelled());
 
         gate.add_permits(1);
         active.await.unwrap().unwrap();
+        wait_for_level(&control.metrics.queued, 0).await;
         sleep(Duration::from_millis(20)).await;
         assert_eq!(observations.started.load(Ordering::Acquire), 1);
         assert_eq!(control.outer.available_permits(), 2);
@@ -472,6 +624,7 @@ mod tests {
         while control.outer.available_permits() != 0 {
             tokio::task::yield_now().await;
         }
+        wait_for_level(&control.metrics.queued, 1).await;
         assert_eq!(grpc_observations.started.load(Ordering::Acquire), 0);
 
         let overloaded = grpc
@@ -485,5 +638,6 @@ mod tests {
         processing.await.unwrap().unwrap();
         queued.await.unwrap().unwrap();
         assert_eq!(grpc_observations.started.load(Ordering::Acquire), 1);
+        wait_for_level(&control.metrics.queued, 0).await;
     }
 }

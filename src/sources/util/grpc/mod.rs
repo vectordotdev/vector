@@ -401,8 +401,7 @@ where
     Ok(())
 }
 
-// This is a bit of a ugly hack to allow us to run two services on the same port.
-// I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
+// TODO: Unify the gRPC server helpers using `Routes` and an identity layer.
 pub async fn run_grpc_server_with_routes_and_layer<L>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,

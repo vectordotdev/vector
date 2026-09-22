@@ -64,6 +64,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_request_queue_capacity: {
+			description:       "The maximum number of requests that can be admitted for queueing and processing by this component."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_request_queue_size: {
+			description:       "The number of admitted requests waiting to be processed by this component."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		aggregate_events_recorded_total: {
 			description:       "The number of events recorded by the aggregate transform."
 			type:              "counter"
@@ -98,7 +110,7 @@ components: sources: internal_metrics: {
 			description:       "The total number of requests for which this source responded with a timeout error."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _request_tags
 		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
@@ -1142,6 +1154,16 @@ components: sources: internal_metrics: {
 			component_kind: _component_kind
 			component_id:   _component_id
 			component_type: _component_type
+		}
+		_request_tags: _component_tags & {
+			protocol?: {
+				description: "The protocol used to receive the request."
+				required:    false
+				enum: {
+					"grpc": "gRPC"
+					"http": "HTTP"
+				}
+			}
 		}
 
 		// All available tags
