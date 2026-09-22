@@ -1,6 +1,6 @@
 [package]
 name = "vdev"
-version = "0.3.20"
+version = "0.3.21"
 edition = "2024"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
