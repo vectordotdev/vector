@@ -277,7 +277,7 @@ async fn send_invalid_output_pattern_match(
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
 /// `LogEvent`s when a component matches one or more of the provided patterns.
 // https://github.com/vectordotdev/vector/issues/23659
-#[expect(
+#[allow(
     clippy::too_many_lines,
     reason = "Defer restructuring topology and sink lifetime handling"
 )]

@@ -200,7 +200,7 @@ impl<'a> TapRunner<'a> {
         quiet: bool,
     ) -> Result<(), TapExecutorError> {
         // https://github.com/vectordotdev/vector/issues/23659
-        #[expect(
+        #[allow(
             clippy::cast_possible_truncation,
             reason = "Preserve existing conversions pending range-validation review"
         )]
