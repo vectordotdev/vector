@@ -34,7 +34,7 @@ jobs:
         with:
           rust: true
           cargo-cache: true
-          vdev: false
+          vdev: true
 
       - name: Validate release merge
         id: validation
@@ -42,7 +42,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BEFORE_SHA: ${{ github.event.before }}
         run: >-
-          cargo vdev release workflow autotag-check
+          "$VDEV" release workflow autotag-check
           --before-sha "$BEFORE_SHA"
           --sha "$GITHUB_SHA"
           --repository "$GITHUB_REPOSITORY"
