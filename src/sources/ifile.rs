@@ -985,7 +985,7 @@ mod tests {
 
     #[tokio::test]
     async fn discovery_scan_removes_paths_without_notifications() {
-        use vector_lib::ifile_source::paths_provider::PathsProvider;
+        use vector_lib::ifile_source::paths_provider::{PathUpdates, PathsProvider};
 
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("not-created-yet");
@@ -1001,10 +1001,22 @@ mod tests {
         std::fs::create_dir(&directory).unwrap();
         let path = directory.join("test.log");
         std::fs::write(&path, "hello\n").unwrap();
-        assert_eq!(provider.paths(true).await, vec![path.clone()]);
+        assert_eq!(
+            provider.paths(true).await,
+            PathUpdates::Snapshot([path.clone()].into())
+        );
         std::fs::remove_file(&path).unwrap();
-        assert_eq!(provider.paths(false).await, vec![path]);
-        assert!(provider.paths(true).await.is_empty());
+        assert_eq!(
+            provider.paths(false).await,
+            PathUpdates::Changed {
+                updated: Default::default(),
+                removed: Default::default()
+            }
+        );
+        assert_eq!(
+            provider.paths(true).await,
+            PathUpdates::Snapshot(Default::default())
+        );
     }
 
     async fn wait_checkpoint_and_n_reads(
@@ -2025,12 +2037,13 @@ mod tests {
         assert_eq!(lines, vec!["the line"]);
 
         // Restart server, it re-reads file since the events were not acknowledged before shutdown
+        let (tx, mut rx) = mpsc::unbounded_channel();
         let received = run_ifile_source(
             &config,
             false,
             Unfinalized,
             LogNamespace::Legacy,
-            None,
+            Some(tx),
             wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000),
         )
         .await;
