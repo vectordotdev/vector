@@ -44,6 +44,7 @@ pub enum ComponentType {
 
 impl ComponentType {
     /// Gets the type of this component as a string.
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             ComponentType::Api => COMPONENT_TYPE_API,
@@ -57,6 +58,7 @@ impl ComponentType {
         }
     }
 
+    #[must_use]
     pub fn is_valid_type(path: &Path) -> bool {
         ComponentType::try_from(path).is_ok()
     }
@@ -86,7 +88,7 @@ impl<'a> TryFrom<&'a Path> for ComponentType {
     fn try_from(path: &'a Path) -> Result<Self, Self::Error> {
         path.get_ident()
             .ok_or(())
-            .map(|id| id.to_string())
+            .map(std::string::ToString::to_string)
             .and_then(|s| Self::try_from(s.as_str()))
     }
 }
