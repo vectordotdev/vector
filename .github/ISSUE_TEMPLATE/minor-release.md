@@ -42,7 +42,10 @@ The tag starts the release workflow; do not create the tag or release branch man
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
     - Refer to the internal releasing doc to monitor the deployment.
 - [ ] Release Linux packages. Refer to the internal releasing doc.
-- [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md).
+- [ ] Review and squash-merge the Helm release PR, then wait for the chart release.
+  - The Vector release workflow starts [Helm release preparation](https://github.com/vectordotdev/helm-charts/actions/workflows/release-prepare.yml)
+    automatically for the latest stable Vector release.
+  - See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md) for the review steps.
 - [ ] Release Homebrew. Refer to the internal releasing doc.
 - [ ] Update the latest [release tag](https://github.com/vectordotdev/vector/releases) description with the release announcement.
 
