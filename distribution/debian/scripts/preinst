@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-# /etc/vector/examples/*.yaml were conffiles through v0.57.0; they moved to
-# /usr/share/doc/vector/examples/. Remove unmodified copies on upgrade.
+# /etc/vector/examples/*.yaml move to /usr/share/doc/vector/examples/ in
+# v0.59.0. Remove unmodified copies from earlier versions on upgrade.
 for _example_conffile in \
   docs_example.yaml \
   environment_variables.yaml \
@@ -22,7 +22,7 @@ for _example_conffile in \
   namespacing/vector.yaml
 do
   dpkg-maintscript-helper rm_conffile \
-    "/etc/vector/examples/$_example_conffile" 0.57.0-1 vector -- "$@"
+    "/etc/vector/examples/$_example_conffile" 0.59.0-1~ vector -- "$@"
 done
 
 # Add vector:vector user & group
@@ -36,15 +36,12 @@ mkdir -p /var/lib/vector
 # Make vector:vector the owner of the Vector data directory
 chown -R vector:vector /var/lib/vector
 
-# /etc/vector/vector.yaml was not a dpkg conffile before this version. If a
-# file already exists at that path, dpkg has no record of it and will treat
-# it as "created by you", prompting interactively (or failing outright on
-# unattended upgrades) before it will unpack the new conffile over it. Move
-# any such untracked file out of the way so dpkg can install the conffile
-# cleanly; postinst restores it afterwards so the user's content is kept
-# byte-for-byte, without ever prompting.
+# Recent versions did not ship /etc/vector/vector.yaml. Preserve both
+# untracked files and obsolete conffiles retained from older versions before
+# introducing the new stub, avoiding interactive prompts on unattended
+# upgrades. postinst restores the user's original content byte-for-byte.
 #
-# Only move the file when no package owns it: if it belongs to another
+# Also preserve obsolete Vector conffiles. If the file belongs to another
 # package, leave it alone so dpkg's own file-conflict check reports the
 # ownership conflict instead of us silently hiding that package's file.
 case "$1" in
@@ -52,8 +49,57 @@ case "$1" in
     if [ -e /etc/vector/vector.yaml ] && [ ! -L /etc/vector/vector.yaml ]; then
       if ! dpkg-query -W -f='${Conffiles}\n' vector 2>/dev/null \
         | awk '$1 == "/etc/vector/vector.yaml" && $3 != "obsolete" { found = 1 } END { exit !found }' \
-        && ! dpkg-query -S /etc/vector/vector.yaml >/dev/null 2>&1; then
+        && ! dpkg-query -S /etc/vector/vector.yaml 2>/dev/null \
+        | grep -qvE '^vector(:[^: ,]+)?: /etc/vector/vector\.yaml$'; then
         mv /etc/vector/vector.yaml /etc/vector/vector.yaml.vector-preserve
+        # An obsolete conffile still has a recorded hash. Leaving its path
+        # absent makes dpkg prompt about a deleted configuration file. Stage
+        # the exact incoming stub instead, then restore the user's file in
+        # postinst (or postrm if installation aborts).
+        # Keep this content byte-for-byte in sync with ../vector.yaml.
+        cat > /etc/vector/vector.yaml <<'VECTOR_CONFIG_STUB'
+#                                    __   __  __
+#                                    \ \ / / / /
+#                                     \ V / / /
+#                                      \_/  \/
+#
+#                                    V E C T O R
+#                                   Configuration
+#
+# ------------------------------------------------------------------------------
+# Website: https://vector.dev
+# Docs: https://vector.dev/docs
+# Chat: https://chat.vector.dev
+# ------------------------------------------------------------------------------
+
+# Change this to use a non-default directory for Vector data storage:
+# data_dir: "/var/lib/vector"
+
+# Example configurations are available at /usr/share/doc/vector/examples/
+
+# Add your sources, transforms, and sinks here.
+# See https://vector.dev/docs/reference/configuration/ for full reference.
+
+# sources:
+#   my_source:
+#     type: "..."
+
+# transforms:
+#   my_transform:
+#     type: "..."
+#     inputs: ["my_source"]
+
+# sinks:
+#   my_sink:
+#     type: "..."
+#     inputs: ["my_transform"]
+
+# Vector's API (disabled by default)
+# Uncomment to try it out with the `vector top` command
+# api:
+#   enabled: true
+#   address: "127.0.0.1:8686"
+VECTOR_CONFIG_STUB
       fi
     fi
     ;;

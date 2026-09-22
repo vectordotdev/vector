@@ -21,7 +21,7 @@ for _example_conffile in \
   namespacing/vector.yaml
 do
   dpkg-maintscript-helper rm_conffile \
-    "/etc/vector/examples/$_example_conffile" 0.57.0-1 vector -- "$@"
+    "/etc/vector/examples/$_example_conffile" 0.59.0-1~ vector -- "$@"
 done
 
 # Restore a pre-existing /etc/vector/vector.yaml that preinst moved aside
