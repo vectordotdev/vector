@@ -443,3 +443,443 @@ fn release_preparation_rejects_a_merge_commit() {
     commit(repo);
     assert!(check(repo, &base, false).contains("release PR must contain only non-merge commits"));
 }
+
+#[cfg(unix)]
+mod housekeeping {
+    use super::*;
+    use serde_json::json;
+    use std::{env, os::unix::fs::PermissionsExt as _, process::Output};
+
+    struct Fixture {
+        repo: TempDir,
+        _remote: TempDir,
+        release: String,
+    }
+
+    impl Fixture {
+        fn new() -> Self {
+            let (repo, _) = preparation();
+            let release = git(repo.path(), &["rev-parse", "HEAD"]);
+            git(repo.path(), &["tag", "v0.59.0"]);
+            let remote = tempdir().unwrap();
+            git(remote.path(), &["init", "--bare"]);
+            git(
+                repo.path(),
+                &["remote", "add", "origin", remote.path().to_str().unwrap()],
+            );
+            git(repo.path(), &["push", "origin", "HEAD:refs/heads/master"]);
+
+            // Real Cargo git resolution, redirected to a tiny local VRL repository.
+            let vrl = repo.path().join(".git/vrl-source");
+            write(
+                &vrl,
+                "Cargo.toml",
+                "[package]\nname = \"vrl\"\nversion = \"0.28.0\"\nedition = \"2021\"\n",
+            );
+            write(&vrl, "src/lib.rs", "");
+            git(&vrl, &["init", "-b", "main"]);
+            for (key, value) in [
+                ("commit.gpgsign", "false"),
+                ("core.hooksPath", "/dev/null"),
+                ("user.name", "Release test"),
+                ("user.email", "release@example.invalid"),
+            ] {
+                git(&vrl, &["config", key, value]);
+            }
+            commit(&vrl);
+            git(
+                repo.path(),
+                &[
+                    "config",
+                    "--file",
+                    ".git/test-gitconfig",
+                    &format!("url.file://{}.insteadOf", vrl.display()),
+                    "https://github.com/vectordotdev/vrl.git",
+                ],
+            );
+            write(repo.path(), ".git/associated-prs.json", &json!([[{
+                "merged_at": "2026-09-21T12:00:00Z",
+                "merge_commit_sha": release,
+                "user": {"login": "vectordotdev-bot[bot]"},
+                "base": {"ref": "master", "repo": {"full_name": "vectordotdev/vector"}},
+                "head": {"ref": "prepare-v-0-59-0-website", "repo": {"full_name": "vectordotdev/vector"}}
+            }]]).to_string());
+            write(repo.path(), ".git/pr-list.json", "[]");
+            write(
+                repo.path(),
+                ".git/test-bin/gh",
+                "#!/bin/sh\ncase \"$1\" in\napi) cat .git/associated-prs.json ;;\npr) cat .git/pr-list.json ;;\n*) exit 1 ;;\nesac\n",
+            );
+            fs::set_permissions(
+                repo.path().join(".git/test-bin/gh"),
+                fs::Permissions::from_mode(0o755),
+            )
+            .unwrap();
+            Self {
+                repo,
+                _remote: remote,
+                release,
+            }
+        }
+
+        fn run(&self, args: &[&str], success: bool) -> Output {
+            let repo = self.repo.path();
+            let path = env::join_paths(
+                std::iter::once(repo.join(".git/test-bin"))
+                    .chain(env::split_paths(&env::var_os("PATH").unwrap())),
+            )
+            .unwrap();
+            let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
+                .args(["release", "workflow"])
+                .args(args)
+                .env("PATH", path)
+                .env("GIT_CONFIG_GLOBAL", repo.join(".git/test-gitconfig"))
+                .env("CARGO_NET_GIT_FETCH_WITH_CLI", "true")
+                // Do not cache the redirected VRL repository in the developer's Cargo home.
+                .env("CARGO_HOME", repo.join(".git/cargo-home"))
+                .env_remove("GITHUB_OUTPUT")
+                .env_remove("GITHUB_STEP_SUMMARY")
+                .current_dir(repo)
+                .output()
+                .unwrap();
+            assert_eq!(
+                output.status.success(),
+                success,
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output
+        }
+
+        fn state(&self, success: bool) -> String {
+            let output = self.run(
+                &[
+                    "housekeeping-check",
+                    "--tag",
+                    "v0.59.0",
+                    "--release-commit",
+                    &self.release,
+                    "--repository",
+                    "vectordotdev/vector",
+                ],
+                success,
+            );
+            if success {
+                String::from_utf8(output.stdout).unwrap()
+            } else {
+                String::from_utf8(output.stderr).unwrap()
+            }
+        }
+
+        fn prepare(&self) {
+            self.run(
+                &[
+                    "housekeeping-prepare",
+                    "--version",
+                    "0.59.0",
+                    "--release-commit",
+                    &self.release,
+                ],
+                true,
+            );
+        }
+
+        fn validate(&self, success: bool) -> String {
+            let output = self.run(
+                &[
+                    "pr-check",
+                    "--base-sha",
+                    &self.release,
+                    "--head-ref",
+                    "release/housekeeping-v0.59.0",
+                ],
+                success,
+            );
+            String::from_utf8(output.stderr).unwrap()
+        }
+    }
+
+    #[test]
+    fn generates_and_validates_the_next_development_version() {
+        let fixture = Fixture::new();
+        fixture.prepare();
+        let repo = fixture.repo.path();
+        let manifest = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
+        assert!(manifest.contains("version = \"0.60.0-dev\""));
+        assert!(manifest.contains("git = \"https://github.com/vectordotdev/vrl.git\""));
+        assert!(manifest.contains("branch = \"main\""));
+        let lock = fs::read_to_string(repo.join("Cargo.lock")).unwrap();
+        assert!(lock.contains("git+https://github.com/vectordotdev/vrl.git?branch=main#"));
+        write(repo, "LICENSE-3rdparty.csv", "Refreshed licenses\n");
+        write(repo, "docs/generated/vrl.json", "{}\n");
+        commit(repo);
+        fixture.validate(true);
+        assert!(git(repo, &["status", "--porcelain"]).is_empty());
+    }
+
+    #[test]
+    fn rejects_unrelated_changes_and_stale_lockfiles() {
+        for (path, contents, error) in [
+            (
+                "src/lib.rs",
+                "pub fn unrelated() {}\n",
+                "unexpected housekeeping file",
+            ),
+            ("Cargo.lock", "version = 4\n", "lock file"),
+            (
+                "Cargo.toml",
+                "[package]\nname = \"vector\"\nversion = \"0.60.0-dev\"\nedition = \"2024\"\n",
+                "housekeeping may only bump",
+            ),
+        ] {
+            let fixture = Fixture::new();
+            fixture.prepare();
+            write(fixture.repo.path(), path, contents);
+            commit(fixture.repo.path());
+            assert!(fixture.validate(false).contains(error), "{path}");
+        }
+    }
+
+    #[test]
+    fn retries_reuse_the_published_branch_and_skip_open_or_completed_prs() {
+        let fixture = Fixture::new();
+        let output = fixture.state(true);
+        assert!(output.contains("branch=release/housekeeping-v0.59.0\n"));
+        assert!(output.contains("resume=false\nskip=false\n"));
+        let repo = fixture.repo.path();
+        fixture.prepare();
+        let housekeeping = commit(repo);
+        git(
+            repo,
+            &[
+                "push",
+                "origin",
+                "HEAD:refs/heads/release/housekeeping-v0.59.0",
+            ],
+        );
+        git(repo, &["switch", "--detach", &fixture.release]);
+        assert!(fixture.state(true).contains("resume=true\nskip=false\n"));
+        write(
+            repo,
+            ".git/pr-list.json",
+            r#"[{"isCrossRepository":false,"url":"https://example.invalid/pr/1"}]"#,
+        );
+        assert!(fixture.state(true).contains("skip=true\n"));
+        git(repo, &["switch", "--detach", &housekeeping]);
+        assert!(fixture.state(true).contains("skip=true\n"));
+    }
+
+    #[test]
+    fn requires_the_published_tag_and_frozen_release_commit() {
+        let fixture = Fixture::new();
+        let repo = fixture.repo.path();
+        write(repo, ".git/associated-prs.json", "[[]]");
+        assert!(
+            fixture
+                .state(false)
+                .contains("expected one merged bot preparation PR")
+        );
+        write(repo, "README.md", "A commit during the freeze\n");
+        commit(repo);
+        assert!(
+            fixture
+                .state(false)
+                .contains("master must still match the published release commit")
+        );
+        git(repo, &["-c", "tag.gpgsign=false", "tag", "-f", "v0.59.0"]);
+        assert!(
+            fixture
+                .state(false)
+                .contains("release tag does not match the published commit")
+        );
+    }
+
+    #[test]
+    fn skips_non_minor_releases_and_rejects_generation_from_the_wrong_commit() {
+        let fixture = Fixture::new();
+        for tag in ["v0.59.1", "v0.60.0-rc.1", "v0.59.0+build"] {
+            let output = fixture.run(
+                &[
+                    "housekeeping-check",
+                    "--tag",
+                    tag,
+                    "--release-commit",
+                    &fixture.release,
+                    "--repository",
+                    "vectordotdev/vector",
+                ],
+                true,
+            );
+            assert_eq!(String::from_utf8(output.stdout).unwrap(), "skip=true\n");
+        }
+        let before = git(fixture.repo.path(), &["rev-parse", "HEAD^"]);
+        fixture.run(
+            &[
+                "housekeeping-prepare",
+                "--version",
+                "0.59.0",
+                "--release-commit",
+                &before,
+            ],
+            false,
+        );
+        assert!(git(fixture.repo.path(), &["status", "--porcelain"]).is_empty());
+    }
+}
+
+#[cfg(unix)]
+mod autotag {
+    use super::*;
+    use serde_json::{Value, json};
+    use std::{env, os::unix::fs::PermissionsExt as _, process::Output};
+
+    fn approved_pr(sha: &str) -> Value {
+        json!({
+            "merged_at": "2026-09-17T12:00:00Z",
+            "merge_commit_sha": sha,
+            "user": {"login": "vectordotdev-bot[bot]"},
+            "base": {"ref": "master", "repo": {"full_name": "vectordotdev/vector"}},
+            "head": {"ref": "prepare-v-0-59-0-website", "repo": {"full_name": "vectordotdev/vector"}}
+        })
+    }
+
+    fn check_autotag(repo: &Path, base: &str, sha: &str, prs: Value) -> Output {
+        write(repo, ".git/associated-prs.json", &prs.to_string());
+        write(
+            repo,
+            ".git/test-bin/gh",
+            "#!/bin/sh\ncat .git/associated-prs.json\n",
+        );
+        fs::set_permissions(
+            repo.join(".git/test-bin/gh"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        let path = env::join_paths(
+            std::iter::once(repo.join(".git/test-bin"))
+                .chain(env::split_paths(&env::var_os("PATH").unwrap())),
+        )
+        .unwrap();
+        Command::new(env!("CARGO_BIN_EXE_vdev"))
+            .args([
+                "release",
+                "workflow",
+                "autotag-check",
+                "--before-sha",
+                base,
+                "--sha",
+                sha,
+                "--repository",
+                "vectordotdev/vector",
+            ])
+            .env("PATH", path)
+            .env_remove("GITHUB_OUTPUT")
+            .current_dir(repo)
+            .output()
+            .unwrap()
+    }
+
+    #[test]
+    fn accepts_only_the_approved_squash_commit() {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        let sha = git(repo, &["rev-parse", "HEAD"]);
+        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let output = String::from_utf8(result.stdout).unwrap();
+        assert!(output.contains("tag_required=true\ntag=v0.59.0\nrelease_branch=v0.59\n"));
+
+        write(
+            repo,
+            "website/content/en/releases/0.59.0.md",
+            "Another commit\n",
+        );
+        let sha = commit(repo);
+        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        assert!(!result.status.success());
+        assert!(String::from_utf8_lossy(&result.stderr).contains("single squash-merge commit"));
+    }
+
+    #[test]
+    fn rejects_unapproved_or_unrelated_prs() {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        let sha = git(repo, &["rev-parse", "HEAD"]);
+        for (pointer, value) in [
+            ("/merged_at", Value::Null),
+            ("/merge_commit_sha", json!(base)),
+            ("/user/login", json!("other-bot[bot]")),
+            ("/base/ref", json!("website")),
+            ("/head/ref", json!("other-branch")),
+            ("/head/repo/full_name", json!("someone/vector")),
+            ("/head/repo", Value::Null),
+        ] {
+            let mut pr = approved_pr(&sha);
+            *pr.pointer_mut(pointer).unwrap() = value;
+            let result = check_autotag(repo, &base, &sha, json!([[pr]]));
+            assert!(!result.status.success(), "accepted invalid {pointer}");
+            assert!(
+                String::from_utf8_lossy(&result.stderr)
+                    .contains("expected one merged bot preparation PR")
+            );
+        }
+        for prs in [
+            json!([[]]),
+            json!([[approved_pr(&sha)], [approved_pr(&sha)]]),
+        ] {
+            let result = check_autotag(repo, &base, &sha, prs);
+            assert!(!result.status.success());
+        }
+    }
+
+    #[test]
+    fn skips_development_unchanged_and_patch_versions() {
+        for new_version in ["0.60.0-dev", "0.59.0", "0.59.1"] {
+            let (temp, _) = preparation();
+            let repo = temp.path();
+            let before = git(repo, &["rev-parse", "HEAD"]);
+            version(repo, new_version);
+            write(repo, "README.md", "Ordinary change\n");
+            let sha = commit(repo);
+            let result = check_autotag(repo, &before, &sha, json!("API must not be needed"));
+            assert!(
+                result.status.success(),
+                "{}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            assert_eq!(
+                String::from_utf8(result.stdout).unwrap(),
+                "tag_required=false\n"
+            );
+        }
+    }
+
+    #[test]
+    fn revalidates_the_merged_release_files() {
+        let (temp, base) = preparation();
+        let repo = temp.path();
+        write(repo, "src/lib.rs", "pub fn unexpected() {}\n");
+        git(repo, &["add", "."]);
+        git(repo, &["commit", "--amend", "--no-edit"]);
+        let sha = git(repo, &["rev-parse", "HEAD"]);
+        let result = check_autotag(repo, &base, &sha, json!([[approved_pr(&sha)]]));
+        assert!(!result.status.success());
+        assert!(
+            String::from_utf8_lossy(&result.stderr).contains("unexpected release preparation file")
+        );
+    }
+
+    #[test]
+    fn rejects_a_mismatched_checkout() {
+        let (temp, base) = preparation();
+        let result = check_autotag(temp.path(), &base, &base, json!([[]]));
+        assert!(!result.status.success());
+        assert!(
+            String::from_utf8_lossy(&result.stderr).contains("checkout must match the release SHA")
+        );
+    }
+}
