@@ -75,7 +75,7 @@ impl GlobMatcher<&str> for Pattern {
 }
 
 /// Patterns (glob) used by tap to match against components and access events
-/// flowing into (for_inputs) or out of (for_outputs) specified components
+/// flowing into (`for_inputs`) or out of (`for_outputs`) specified components
 #[derive(Debug)]
 pub struct TapPatterns {
     pub for_outputs: HashSet<String>,
@@ -83,6 +83,7 @@ pub struct TapPatterns {
 }
 
 impl TapPatterns {
+    #[must_use]
     pub const fn new(for_outputs: HashSet<String>, for_inputs: HashSet<String>) -> Self {
         Self {
             for_outputs,
@@ -91,6 +92,7 @@ impl TapPatterns {
     }
 
     /// Get all user-specified patterns
+    #[must_use]
     pub fn all_patterns(&self) -> HashSet<String> {
         self.for_outputs
             .iter()
@@ -162,6 +164,7 @@ pub struct TapTransformer {
 }
 
 impl TapTransformer {
+    #[must_use]
     pub const fn new(tap_tx: TapSender, output: TapOutput) -> Self {
         Self { tap_tx, output }
     }
@@ -195,7 +198,7 @@ impl TapController {
     /// and a separate inner handler for events. Uses a oneshot channel to trigger shutdown
     /// of handlers when the `TapSink` drops out of scope.
     pub fn new(watch_rx: WatchRx, tap_tx: TapSender, patterns: TapPatterns) -> Self {
-        let (_shutdown, shutdown_rx) = oneshot::channel();
+        let (shutdown, shutdown_rx) = oneshot::channel();
 
         tokio::spawn(
             tap_handler(patterns, tap_tx, watch_rx, shutdown_rx).instrument(error_span!(
@@ -206,7 +209,9 @@ impl TapController {
             )),
         );
 
-        Self { _shutdown }
+        Self {
+            _shutdown: shutdown,
+        }
     }
 }
 
@@ -270,7 +275,12 @@ async fn send_invalid_output_pattern_match(
 }
 
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
-/// `LogEvent`s` when a component matches one or more of the provided patterns.
+/// `LogEvent`s when a component matches one or more of the provided patterns.
+// https://github.com/vectordotdev/vector/issues/23659
+#[expect(
+    clippy::too_many_lines,
+    reason = "Defer restructuring topology and sink lifetime handling"
+)]
 async fn tap_handler(
     patterns: TapPatterns,
     tx: TapSender,
@@ -294,7 +304,7 @@ async fn tap_handler(
     loop {
         tokio::select! {
             _ = &mut shutdown_rx => break,
-            Ok(_) = watch_rx.changed() => {
+            Ok(()) = watch_rx.changed() => {
                 // Cache of matched patterns. A `HashSet` is used here to ignore repetition.
                 let mut matched = HashSet::new();
 
@@ -323,11 +333,11 @@ async fn tap_handler(
                                                                     .map(Pattern::OutputPattern).collect::<HashSet<_>>();
 
                 // Matching an input pattern is equivalent to matching the outputs of the component's inputs
-                for pattern in patterns.for_inputs.iter() {
+                for pattern in &patterns.for_inputs {
                     if let Ok(glob) = glob::Pattern::new(pattern) {
                         match inputs.iter().filter(|(key, _)|
                             glob.matches(&key.to_string())
-                        ).flat_map(|(_, related_inputs)| related_inputs.iter().map(|id| id.to_string()).collect::<Vec<_>>()).collect::<HashSet<_>>() {
+                        ).flat_map(|(_, related_inputs)| related_inputs.iter().map(ToString::to_string).collect::<Vec<_>>()).collect::<HashSet<_>>() {
                             found if !found.is_empty() => {
                                 component_id_patterns.insert(Pattern::InputPattern(pattern.clone(), found.into_iter()
                                                                                                          .filter_map(|p| glob::Pattern::new(&p).ok()).collect::<Vec<_>>()));
@@ -341,7 +351,7 @@ async fn tap_handler(
 
                 // Loop over all outputs, and connect sinks for the components that match one
                 // or more patterns.
-                for (output, control_tx) in outputs.iter() {
+                for (output, control_tx) in &outputs {
                     match component_id_patterns
                         .iter()
                         .filter(|pattern| pattern.matches_glob(&output.output_id.to_string()))
@@ -381,7 +391,7 @@ async fn tap_handler(
                             match control_tx
                                 .send(fanout::ControlMessage::Add(ComponentKey::from(sink_id.as_str()), tap_buffer_tx))
                             {
-                                Ok(_) => {
+                                Ok(()) => {
                                     debug!(
                                         message = "Sink connected.", ?sink_id, ?output.output_id,
                                     );
@@ -431,19 +441,19 @@ async fn tap_handler(
                 }
 
                 // Warnings on invalid matches.
-                for pattern in patterns.for_inputs.iter() {
+                for pattern in &patterns.for_inputs {
                     if let Ok(glob) = glob::Pattern::new(pattern) {
                         let invalid_matches = source_keys.iter().filter(|key| glob.matches(key)).cloned().collect::<Vec<_>>();
                         if !invalid_matches.is_empty() {
-                            notifications.push(send_invalid_input_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                            notifications.push(send_invalid_input_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed());
                         }
                     }
                 }
-                for pattern in patterns.for_outputs.iter() {
+                for pattern in &patterns.for_outputs {
                     if let Ok(glob) = glob::Pattern::new(pattern) {
                         let invalid_matches = sink_keys.iter().filter(|key| glob.matches(key)).cloned().collect::<Vec<_>>();
                         if !invalid_matches.is_empty() {
-                            notifications.push(send_invalid_output_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed())
+                            notifications.push(send_invalid_output_pattern_match(tx.clone(), pattern.clone(), invalid_matches).boxed());
                         }
                     }
                 }
