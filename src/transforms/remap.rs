@@ -620,6 +620,12 @@ where
                     events.for_each(|event| push_default(event, output))
                 }
             },
+            Err(Terminate::Interrupted) => {
+                emit!(RemapMappingError {
+                    error: ExpressionError::Interrupted.to_string(),
+                    event_dropped: true,
+                });
+            }
             Err(reason) => {
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
@@ -639,19 +645,7 @@ where
                         }
                         ("error", error, self.drop_on_error)
                     }
-                    Terminate::Interrupted => {
-                        if !self.reroute_dropped {
-                            emit!(RemapMappingError {
-                                error: ExpressionError::Interrupted.to_string(),
-                                event_dropped: self.drop_on_error,
-                            });
-                        }
-                        (
-                            "interrupt",
-                            ExpressionError::Interrupted,
-                            self.drop_on_error,
-                        )
-                    }
+                    Terminate::Interrupted => unreachable!("interruptions are handled above"),
                 };
 
                 if !drop {
@@ -808,18 +802,24 @@ mod tests {
     }
 
     #[test]
-    fn interrupted_execution_uses_error_drop_policy() {
-        let config = RemapConfig {
-            source: Some(".not_an_int = int!(.bar)".to_owned()),
-            drop_on_error: true,
-            drop_on_abort: false,
-            ..Default::default()
-        };
-        let mut transform = remap_with_runner::<InterruptingRunner>(config).unwrap();
+    fn interrupted_execution_is_dropped() {
+        for reroute_dropped in [false, true] {
+            let config = RemapConfig {
+                source: Some(".foo = 1".to_owned()),
+                drop_on_error: false,
+                reroute_dropped,
+                ..Default::default()
+            };
+            let mut transform = remap_with_runner::<InterruptingRunner>(config).unwrap();
 
-        let output = collect_outputs(&mut transform, Event::from(LogEvent::from("message")));
+            let output = collect_outputs(&mut transform, Event::from(LogEvent::from("message")));
 
-        assert_eq!(output.primary.len(), 0);
+            assert_eq!(output.primary.len(), 0);
+            assert_eq!(
+                output.named.values().map(OutputBuffer::len).sum::<usize>(),
+                0
+            );
+        }
     }
 
     fn get_field_string(event: &Event, field: &str) -> String {
