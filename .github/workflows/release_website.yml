@@ -17,8 +17,9 @@ permissions:
   contents: read # Restrictive default
 
 concurrency:
-  # One website reset at a time; a queued release waits rather than being cancelled.
+  # Serialize resets and retain up to 100 pending runs instead of replacing them.
   group: release-website-reset
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -32,6 +33,13 @@ jobs:
         with:
           ref: ${{ inputs.release_commit }}
           persist-credentials: false
+
+      # The published vdev binary may predate the website check helper. Build the
+      # checkout's vdev from source, like the other release validators.
+      - name: Set up vdev
+        uses: ./.github/actions/setup
+        with:
+          vdev: true
 
       - name: Require stable release tag
         env:
@@ -79,6 +87,13 @@ jobs:
           if [[ "$existing" == "$RELEASE_COMMIT" ]]; then
             echo "Website branch already points to $RELEASE_COMMIT; nothing to do."
             exit 0
+          fi
+
+          # The lease guards concurrent pushes, not a retry of an older release.
+          # Compare against the observed website commit before replacing it.
+          if [[ -n "$existing" ]]; then
+            git fetch --no-tags --depth=1 "$remote" "$existing"
+            vdev release workflow website-check --tag "$TAG" --website-commit "$existing"
           fi
 
           # The explicit lease prevents a concurrent website push from being overwritten.

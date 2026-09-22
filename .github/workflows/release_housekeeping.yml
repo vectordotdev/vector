@@ -17,6 +17,7 @@ permissions:
 
 concurrency:
   group: release-housekeeping
+  queue: max
   cancel-in-progress: false
 
 jobs:

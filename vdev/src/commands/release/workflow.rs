@@ -40,6 +40,8 @@ enum WorkflowCommand {
     HousekeepingCheck(HousekeepingCheck),
     /// Begin the next development version and restore VRL main locally.
     HousekeepingPrepare(HousekeepingPrepare),
+    /// Check that resetting the website branch to a release won't roll it back.
+    WebsiteCheck(WebsiteCheck),
 }
 
 #[derive(clap::Args, Debug)]
@@ -91,6 +93,16 @@ struct PrCheck {
     expected_vrl_version: Option<Version>,
 }
 
+#[derive(clap::Args, Debug)]
+struct WebsiteCheck {
+    /// Stable release tag, e.g. v0.50.0.
+    #[arg(long)]
+    tag: String,
+    /// Current tip of the website branch, already fetched by the workflow.
+    #[arg(long)]
+    website_commit: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct ExistingPullRequest {
     #[serde(rename = "isCrossRepository")]
@@ -133,6 +145,7 @@ impl Cli {
             WorkflowCommand::AutotagCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingPrepare(args) => args.exec(),
+            WorkflowCommand::WebsiteCheck(args) => args.exec(),
         }
     }
 }
@@ -305,6 +318,28 @@ impl HousekeepingPrepare {
         Command::new("cargo")
             .args(["update", "-p", "vrl"])
             .check_run()
+    }
+}
+
+impl WebsiteCheck {
+    fn exec(self) -> Result<()> {
+        let release = parse_stable_version(
+            self.tag
+                .strip_prefix('v')
+                .context("release tag must start with v")?,
+            "release tag version",
+        )?;
+        git::ensure_sha(&self.website_commit, "website commit")?;
+        let current = cargo_version_at(&self.website_commit)?;
+        // Only the version core (major.minor.patch) participates in the comparison;
+        // prerelease and build suffixes on the website version are ignored.
+        let release_tuple = (release.major, release.minor, release.patch);
+        let current_tuple = (current.major, current.minor, current.patch);
+        ensure!(
+            current_tuple <= release_tuple,
+            "refusing to replace website version {current} with {release}"
+        );
+        Ok(())
     }
 }
 
