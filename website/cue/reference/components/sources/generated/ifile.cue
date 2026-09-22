@@ -229,7 +229,7 @@ generated: components: sources: ifile: configuration: {
 			"""
 		required: false
 		type: uint: {
-			default: 2048
+			default: 65536
 			unit:    "bytes"
 		}
 	}
