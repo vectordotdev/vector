@@ -1,6 +1,132 @@
 use super::{Error, ValueCoercer};
 use serde_json::json;
 
+/// Object alternatives with different required fields.
+#[vector_config::configurable_component]
+#[derive(Debug, PartialEq)]
+#[serde(untagged)]
+enum RequiredFields {
+    /// The older settings form.
+    V1 {
+        /// Required database name.
+        database: String,
+    },
+    /// The newer settings form.
+    V2 {
+        /// Required organization name, including legacy spellings.
+        #[serde(rename = "org", alias = "organization", alias = "tenant")]
+        organization: String,
+    },
+}
+
+#[test]
+fn generated_object_union_checks_required_fields_and_aliases() {
+    let schema = serde_json::to_value(
+        vector_config::schema::generate_root_schema::<RequiredFields>().unwrap(),
+    )
+    .unwrap();
+    for key in ["org", "organization", "tenant"] {
+        let mut value = json!({key: 42});
+        ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+        assert_eq!(value, json!({key: "42"}));
+        assert_eq!(
+            serde_json::from_value::<RequiredFields>(value).unwrap(),
+            RequiredFields::V2 {
+                organization: "42".into()
+            }
+        );
+    }
+    assert!(ValueCoercer::new(&schema).coerce(&mut json!({})).is_err());
+}
+
+#[test]
+fn failed_nested_one_of_allows_the_next_any_of_candidate() {
+    let schema = json!({"anyOf": [
+        {"oneOf": [{"type": "object", "required": ["name"],
+            "properties": {"name": {"type": "string"}}}]},
+        {"type": "object", "required": ["count"],
+            "properties": {"count": {"type": "integer"}}}
+    ]});
+    let mut value = json!({"count": "42"});
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(value, json!({"count": 42}));
+    assert!(
+        ValueCoercer::new(&schema)
+            .coerce(&mut json!({"count": "bad"}))
+            .is_err()
+    );
+}
+
+/// An optional flattened tagged setting.
+#[vector_config::configurable_component]
+#[derive(Debug)]
+struct OptionalMode {
+    #[serde(flatten)]
+    mode: Option<Mode>,
+}
+
+/// A mode whose payload needs coercion.
+#[vector_config::configurable_component]
+#[derive(Debug)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+enum Mode {
+    /// Counted mode.
+    Counted {
+        /// Number of items.
+        count: usize,
+    },
+}
+
+#[test]
+fn generated_optional_flattened_enum_checks_tag_absence() {
+    let schema = serde_json::to_value(
+        vector_config::schema::generate_root_schema::<OptionalMode>().unwrap(),
+    )
+    .unwrap();
+    let mut absent = json!({});
+    ValueCoercer::new(&schema).coerce(&mut absent).unwrap();
+    assert!(
+        serde_json::from_value::<OptionalMode>(absent)
+            .unwrap()
+            .mode
+            .is_none()
+    );
+    let mut value = json!({"mode": "counted", "count": "42"});
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(value["count"], json!(42));
+    assert!(matches!(
+        serde_json::from_value::<OptionalMode>(value).unwrap().mode,
+        Some(Mode::Counted { count: 42 })
+    ));
+    for mut invalid in [
+        json!({"mode": "counted", "count": "bad"}),
+        json!({"mode": "unknown", "count": "42"}),
+    ] {
+        assert!(ValueCoercer::new(&schema).coerce(&mut invalid).is_err());
+    }
+}
+
+#[test]
+fn generated_nonzero_number_checks_negation_after_coercion() {
+    let schema = serde_json::to_value(
+        vector_config::schema::generate_root_schema::<std::num::NonZeroI32>().unwrap(),
+    )
+    .unwrap();
+    assert!(ValueCoercer::new(&schema).coerce(&mut json!("0")).is_err());
+    let mut value = json!("42");
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(value, json!(42));
+}
+
+#[test]
+fn negated_null_does_not_coerce_a_string_to_null() {
+    let schema = json!({"not": {"type": "null"}});
+    let mut value = json!("null");
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(value, json!("null"));
+    assert!(ValueCoercer::new(&schema).coerce(&mut json!(null)).is_err());
+}
+
 #[test]
 fn structured_values_are_not_coerced_to_strings() {
     let schema = json!({"type": "string"});
@@ -260,6 +386,18 @@ mod test {
     use vector_config::schema::generate_root_schema;
 
     #[test]
+    fn generated_demo_logs_alias_is_coerced_and_deserializes() {
+        let schema =
+            serde_json::to_value(generate_root_schema::<ConfigBuilder>().unwrap()).unwrap();
+        let mut value = json!({"sources": {"demo": {
+            "type": "demo_logs", "format": "json", "batch_interval": "1.5"
+        }}});
+        ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+        assert_eq!(value["sources"]["demo"]["batch_interval"], json!(1.5));
+        serde_json::from_value::<ConfigBuilder>(value).unwrap();
+    }
+
+    #[test]
     fn test_coercion_with_array_support() {
         let mut input = json!({
             "proxy": {
@@ -382,15 +520,14 @@ mod test {
 
     #[test]
     fn test_unknown_field_in_known_component_passes_through() {
-        // Unknown fields are intentionally non-fatal in the coercion pass while
-        // `vector-config` does not emit `#[serde(alias = ...)]` aliases. The
-        // pass logs a warning and defers to serde, which has alias info.
+        // Unknown fields remain non-fatal; serde validates them downstream.
         let mut input = json!({
             "sources": {
                 "source0": {
                     "type": "demo_logs",
                     "count": 100,
                     "totally_unknown_field": "oops",
+                    "format": "json",
                 }
             }
         });

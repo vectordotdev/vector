@@ -662,6 +662,15 @@ fn generate_container_metadata(
 fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2::TokenStream {
     let field_ty = field.ty();
     let field_schema_ty = get_field_schema_ty(field);
+    let aliases = field.aliases();
+    let alias_metadata = (!aliases.is_empty() && !field.flatten()).then(|| {
+        quote! {
+            #meta_ident.add_custom_attribute(::vector_config::attributes::CustomAttribute::kv(
+                ::vector_config::constants::SERDE_ALIASES,
+                ::serde_json::json!([#(#aliases),*]),
+            ));
+        }
+    });
 
     let maybe_title = get_metadata_title(meta_ident, field.title());
     let maybe_description = get_metadata_description(meta_ident, field.description());
@@ -687,6 +696,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
         #maybe_transparent
         #maybe_validation
         #maybe_custom_attributes
+        #alias_metadata
     }
 }
 

@@ -1,12 +1,13 @@
 //! Coercion for Vector's generated configuration schemas.
 //!
 //! This is a preparation pass, not a general JSON Schema validator. Serde remains
-//! authoritative for required fields, aliases, and component validation.
+//! authoritative for final component validation.
 //! The loader does not invoke this pass yet.
 
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
 use std::collections::HashSet;
+use vector_config::constants::{DOCS_META_COMPONENT_BASE_TYPE, METADATA, SERDE_ALIASES};
 
 const NULL_JSON_TYPE: &str = "null";
 const BOOL_JSON_TYPE: &str = "boolean";
@@ -110,6 +111,17 @@ impl<'a> ValueCoercer<'a> {
     }
 
     fn coerce_value(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        // Unknown component kinds are diagnosed by serde. Restrict this escape
+        // hatch to the outer component schema, never an arbitrary union branch.
+        if schema
+            .get(METADATA)
+            .and_then(|m| m.get(DOCS_META_COMPONENT_BASE_TYPE))
+            .is_some()
+            && let Some(kind) = value.get("type").and_then(Value::as_str)
+            && !self.schema_contains_type_discriminant(schema, kind)
+        {
+            return Ok(());
+        }
         self.handle_bool(schema)?;
         self.handle_ref(value, schema)?;
         self.handle_all_of(value, schema)?;
@@ -118,21 +130,84 @@ impl<'a> ValueCoercer<'a> {
         self.handle_enum(value, schema)?;
         self.handle_const(value, schema)?;
 
-        if let Some(type_spec) = schema.get("type") {
+        let result = if let Some(type_spec) = schema.get("type") {
             if let Some(t) = type_spec.as_str() {
-                return self.coerce_type(value, t, schema);
+                self.coerce_type(value, t, schema)
             } else if let Some(types) = type_spec.as_array() {
                 let allowed: Vec<&str> = types.iter().filter_map(|t| t.as_str()).collect();
-                return self.coerce_multiple_types(value, &allowed, schema);
+                self.coerce_multiple_types(value, &allowed, schema)
+            } else {
+                Ok(())
             }
-        }
+        } else {
+            match value {
+                Value::Object(_) => self.coerce_object(value, schema),
+                Value::Array(_) => self.coerce_array(value, schema),
+                _ => Ok(()),
+            }
+        };
+        result?;
+        self.handle_not(value, schema)
+    }
 
-        // Only fall back to object/array coercion if no type is specified.
-        match value {
-            Value::Object(_) => self.coerce_object(value, schema),
-            Value::Array(_) => self.coerce_array(value, schema),
-            _ => Ok(()),
+    // Vector emits these simple negations for absent tags, nonzero numbers,
+    // and mutually exclusive optional fields. Do not coerce to test a negation.
+    fn handle_not(&self, value: &Value, schema: &Value) -> Result<(), Error> {
+        let Some(negated) = schema.get("not") else {
+            return Ok(());
+        };
+        let matches = if let Some(boolean) = negated.as_bool() {
+            boolean
+        } else if let Some(object) = negated.as_object() {
+            if object.is_empty() {
+                true
+            } else if object.len() == 1 && object.contains_key("required") {
+                let required = object["required"].as_array().ok_or_else(|| Error::Coerce {
+                    path: self.path.join("."),
+                    message: "Invalid negated required predicate".into(),
+                })?;
+                value.as_object().is_none_or(|value| {
+                    required
+                        .iter()
+                        .all(|key| key.as_str().is_some_and(|key| value.contains_key(key)))
+                })
+            } else if object.len() == 1 && object.contains_key("const") {
+                value == &object["const"]
+            } else if object.len() == 1 && object.contains_key("type") {
+                self.schema_matches_value_type(negated, value)
+            } else {
+                return CoerceSnafu {
+                    path: self.path.join("."),
+                    message: "Unsupported negated schema".to_owned(),
+                }
+                .fail();
+            }
+        } else {
+            return CoerceSnafu {
+                path: self.path.join("."),
+                message: "Invalid negated schema".to_owned(),
+            }
+            .fail();
+        };
+        if matches {
+            CoerceSnafu {
+                path: self.path.join("."),
+                message: "Value matches a forbidden schema".to_owned(),
+            }
+            .fail()
+        } else {
+            Ok(())
         }
+    }
+
+    fn field_aliases(schema: &Value) -> impl Iterator<Item = &str> {
+        schema
+            .get(METADATA)
+            .and_then(|m| m.get(SERDE_ALIASES))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
     }
 
     fn handle_ref(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
@@ -426,6 +501,21 @@ impl<'a> ValueCoercer<'a> {
 
         let properties = schema.get("properties").and_then(|p| p.as_object());
         let additional_properties = schema.get("additionalProperties");
+        if let Some(required) = schema.get("required").and_then(Value::as_array) {
+            for key in required.iter().filter_map(Value::as_str) {
+                let present = obj.contains_key(key)
+                    || properties.and_then(|p| p.get(key)).is_some_and(|field| {
+                        Self::field_aliases(field).any(|alias| obj.contains_key(alias))
+                    });
+                if !present {
+                    return CoerceSnafu {
+                        path: self.path.join("."),
+                        message: format!("Missing required property '{key}'"),
+                    }
+                    .fail();
+                }
+            }
+        }
 
         // When unevaluatedProperties:false is set (used by Vector's component outer-wrapper schemas
         // like SourceOuter, SinkOuter, EnrichmentTableOuter), collect all properties declared
@@ -464,19 +554,27 @@ impl<'a> ValueCoercer<'a> {
             let initial_len = self.path.len();
             self.path.push(key_str.to_string());
 
-            let field_schema = properties.and_then(|props| props.get(key_str)).or_else(|| {
-                additional_properties.and_then(|additional| {
-                    if let Some(b) = additional.as_bool() {
-                        if b {
-                            None // allowed, no specific schema
-                        } else {
-                            Some(&Value::Bool(false)) // trigger error below
-                        }
-                    } else {
-                        Some(additional) // schema for additional_properties
-                    }
+            let field_schema = properties
+                .and_then(|props| {
+                    props.get(key_str).or_else(|| {
+                        props
+                            .values()
+                            .find(|field| Self::field_aliases(field).any(|alias| alias == key_str))
+                    })
                 })
-            });
+                .or_else(|| {
+                    additional_properties.and_then(|additional| {
+                        if let Some(b) = additional.as_bool() {
+                            if b {
+                                None // allowed, no specific schema
+                            } else {
+                                Some(&Value::Bool(false)) // trigger error below
+                            }
+                        } else {
+                            Some(additional) // schema for additional_properties
+                        }
+                    })
+                });
 
             if let Some(field_schema) = field_schema {
                 if field_schema == &Value::Bool(false) {
@@ -495,14 +593,9 @@ impl<'a> ValueCoercer<'a> {
                 if let Some(ref known) = known_for_unevaluated
                     && !known.contains(key_str)
                 {
-                    // Vector's generated JSON Schema currently does not emit
-                    // `#[serde(alias = "...")]` aliases (TODO in vector-config),
-                    // so a key absent from the schema may still be a legitimate
-                    // serde alias. Warn here for visibility; serde performs the
-                    // authoritative unknown-field check downstream where it has
-                    // alias information.
+                    // Serde remains authoritative for unknown fields.
                     warn!(
-                        message = "Unknown field in config, deferring to serde for alias resolution.",
+                        message = "Unknown field in config, deferring to serde.",
                         path = %self.path.join("."),
                     );
                 }
@@ -623,7 +716,11 @@ impl<'a> ValueCoercer<'a> {
             }
         }
 
-        Ok(())
+        CoerceSnafu {
+            path: self.path.join("."),
+            message: "No matching oneOf variant".to_owned(),
+        }
+        .fail()
     }
 
     /// Collect property names declared in `schema`, recursively through `$ref`, `allOf`,
@@ -648,6 +745,12 @@ impl<'a> ValueCoercer<'a> {
 
         if let Some(props) = resolved.get("properties").and_then(|p| p.as_object()) {
             out.extend(props.keys().cloned());
+            out.extend(
+                props
+                    .values()
+                    .flat_map(Self::field_aliases)
+                    .map(str::to_owned),
+            );
         }
 
         for kw in ["allOf", "anyOf"] {

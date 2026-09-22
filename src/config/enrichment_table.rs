@@ -13,6 +13,7 @@ use crate::enrichment_tables::EnrichmentTables;
 
 /// Fully resolved enrichment table component.
 #[configurable_component]
+#[configurable(metadata(docs::component_base_type = "enrichment_table"))]
 #[derive(Clone, derive_more::Debug)]
 pub struct EnrichmentTableOuter<T>
 where
