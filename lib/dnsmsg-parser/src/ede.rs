@@ -12,6 +12,7 @@ pub struct EDE {
 }
 
 impl EDE {
+    #[must_use]
     pub fn new(info_code: u16, extra_text: Option<String>) -> Self {
         Self {
             info_code,
@@ -20,6 +21,7 @@ impl EDE {
     }
 
     // https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#extended-dns-error-codes
+    #[must_use]
     pub fn purpose(&self) -> Option<&str> {
         match self.info_code {
             0 => Some("Other Error"),
@@ -57,10 +59,12 @@ impl EDE {
         }
     }
 
+    #[must_use]
     pub fn info_code(&self) -> u16 {
         self.info_code
     }
 
+    #[must_use]
     pub fn extra_text(&self) -> Option<String> {
         self.extra_text.clone()
     }
