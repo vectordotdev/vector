@@ -584,21 +584,19 @@ where
     Runner: VrlRunner + Clone + Send + Sync,
 {
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf) {
-        // If a program can fail, abort, or be interrupted at runtime and we know that we will
-        // still need to forward the event in that case (either to the main output or `dropped`,
-        // depending on the config), we need to clone the original event and keep it around, to
-        // allow us to discard any mutations made to the event while the VRL program runs.
+        // If a program can fail or abort at runtime and we know that we will still need to forward
+        // the event in that case (either to the main output or `dropped`, depending on the
+        // config), we need to clone the original event and keep it around, to allow us to discard
+        // any mutations made to the event while the VRL program runs, before it failed or aborted.
         //
         // The `drop_on_{error, abort}` transform config allows operators to remove events from the
         // main output if they're failed or aborted, in which case we can skip the cloning, since
         // any mutations made by VRL will be ignored regardless. If they have configured
         // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
         // the event to the `dropped` output.
-        // Unlike errors and aborts, an interruption can occur even for a statically infallible,
-        // non-abortable program.
-        let forward_on_error_or_interrupt = !self.drop_on_error || self.reroute_dropped;
+        let forward_on_error = !self.drop_on_error || self.reroute_dropped;
         let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
-        let original_event = if forward_on_error_or_interrupt
+        let original_event = if (self.program.info().fallible && forward_on_error)
             || (self.program.info().abortable && forward_on_abort)
         {
             Some(event.clone())
@@ -822,36 +820,6 @@ mod tests {
         let output = collect_outputs(&mut transform, Event::from(LogEvent::from("message")));
 
         assert_eq!(output.primary.len(), 0);
-    }
-
-    #[test]
-    fn interrupted_infallible_execution_is_forwarded() {
-        let config = RemapConfig {
-            source: Some(".foo = 1".to_owned()),
-            drop_on_error: false,
-            ..Default::default()
-        };
-        let mut transform = remap_with_runner::<InterruptingRunner>(config).unwrap();
-
-        let output = collect_outputs(&mut transform, Event::from(LogEvent::from("message")));
-
-        assert_eq!(output.primary.len(), 1);
-    }
-
-    #[test]
-    fn interrupted_infallible_execution_is_rerouted() {
-        let config = RemapConfig {
-            source: Some(".foo = 1".to_owned()),
-            drop_on_error: true,
-            reroute_dropped: true,
-            ..Default::default()
-        };
-        let mut transform = remap_with_runner::<InterruptingRunner>(config).unwrap();
-
-        let output = collect_outputs(&mut transform, Event::from(LogEvent::from("message")));
-
-        assert_eq!(output.primary.len(), 0);
-        assert_eq!(output.named.get(DROPPED).unwrap().len(), 1);
     }
 
     fn get_field_string(event: &Event, field: &str) -> String {
