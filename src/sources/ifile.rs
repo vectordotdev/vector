@@ -272,7 +272,7 @@ const fn default_multi_line_timeout() -> u64 {
 } // deprecated
 
 const fn default_max_read_bytes() -> usize {
-    2048
+    64 * 1024
 }
 
 fn default_line_delimiter() -> String {
@@ -1115,7 +1115,7 @@ mod tests {
             include = [ "/var/log/**/*.log" ]
             file_key = "file"
             multi_line_timeout = 1000
-            max_read_bytes = 2048
+            max_read_bytes = 65536
             line_delimiter = "\n"
         "#,
         )

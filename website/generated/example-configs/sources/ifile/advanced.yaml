@@ -14,7 +14,7 @@ sources:
       - /var/log/**/*.log
     line_delimiter: "\n"
     max_line_bytes: 102400
-    max_read_bytes: 2048
+    max_read_bytes: 65536
     offset_key: offset
     oldest_first: false
     read_from: beginning
