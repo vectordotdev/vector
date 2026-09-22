@@ -145,9 +145,7 @@ impl Conditional for Vrl {
                 );
                 format!("source execution failed: {err}")
             }
-            Terminate::Interrupted => {
-                "source execution interrupted".to_owned()
-            }
+            Terminate::Interrupted => "source execution interrupted".to_owned(),
         });
 
         let value = match value_result {

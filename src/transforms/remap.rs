@@ -646,7 +646,11 @@ where
                                 event_dropped: self.drop_on_error,
                             });
                         }
-                        ("interrupt", ExpressionError::Interrupted, self.drop_on_abort)
+                        (
+                            "interrupt",
+                            ExpressionError::Interrupted,
+                            self.drop_on_abort,
+                        )
                     }
                 };
 
