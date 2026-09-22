@@ -1485,7 +1485,7 @@ async fn http_headers_traces_use_otlp_decoding_false() {
         );
         assert_eq!(
             event.metadata().trace_layout(),
-            Some(TraceLayout::OpenTelemetry)
+            Some(TraceLayout::OtelFlattened)
         );
     })
     .await;
@@ -1522,7 +1522,10 @@ async fn http_headers_traces_use_otlp_decoding_true() {
                 .unwrap(),
             &value!("Test")
         );
-        assert_eq!(event.metadata().trace_layout(), Some(TraceLayout::Otlp));
+        assert_eq!(
+            event.metadata().trace_layout(),
+            Some(TraceLayout::OtlpResourceSpans)
+        );
     })
     .await;
 }
@@ -1539,9 +1542,9 @@ async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
         let mut events = test_util::collect_ready(env.output);
         assert_eq!(events.len(), 1);
         let expected = if use_otlp_decoding {
-            TraceLayout::Otlp
+            TraceLayout::OtlpResourceSpans
         } else {
-            TraceLayout::OpenTelemetry
+            TraceLayout::OtelFlattened
         };
         assert_eq!(
             events.pop().unwrap().metadata().trace_layout(),

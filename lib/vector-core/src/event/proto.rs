@@ -720,8 +720,8 @@ impl TryFrom<Metadata> for EventMetadata {
 fn encode_trace_layout(layout: Option<super::TraceLayout>) -> Option<i32> {
     Some(match layout? {
         super::TraceLayout::Datadog => TraceLayout::Datadog as i32,
-        super::TraceLayout::OpenTelemetry => TraceLayout::Opentelemetry as i32,
-        super::TraceLayout::Otlp => TraceLayout::Otlp as i32,
+        super::TraceLayout::OtelFlattened => TraceLayout::OtelFlattened as i32,
+        super::TraceLayout::OtlpResourceSpans => TraceLayout::OtlpResourceSpans as i32,
         super::TraceLayout::Unrecognized(value) => value,
     })
 }
@@ -730,8 +730,8 @@ fn decode_trace_layout(value: Option<i32>) -> Option<super::TraceLayout> {
     let value = value?;
     Some(match TraceLayout::try_from(value) {
         Ok(TraceLayout::Datadog) => super::TraceLayout::Datadog,
-        Ok(TraceLayout::Opentelemetry) => super::TraceLayout::OpenTelemetry,
-        Ok(TraceLayout::Otlp) => super::TraceLayout::Otlp,
+        Ok(TraceLayout::OtelFlattened) => super::TraceLayout::OtelFlattened,
+        Ok(TraceLayout::OtlpResourceSpans) => super::TraceLayout::OtlpResourceSpans,
         Ok(TraceLayout::Unspecified) | Err(_) => super::TraceLayout::Unrecognized(value),
     })
 }

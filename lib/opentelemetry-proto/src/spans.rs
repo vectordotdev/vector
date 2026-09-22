@@ -54,7 +54,7 @@ impl ResourceSpan {
         let mut trace = TraceEvent::default();
         trace
             .metadata_mut()
-            .set_trace_layout(TraceLayout::OpenTelemetry);
+            .set_trace_layout(TraceLayout::OtelFlattened);
         let span = self.span;
         trace.insert(
             event_path!(TRACE_ID_KEY),

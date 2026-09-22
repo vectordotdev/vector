@@ -193,7 +193,9 @@ impl Deserializer for OtlpDeserializer {
                         // Convert the log event to a trace event by taking ownership
                         if let Some(Event::Log(log)) = events.pop() {
                             let mut trace = TraceEvent::from(log);
-                            trace.metadata_mut().set_trace_layout(TraceLayout::Otlp);
+                            trace
+                                .metadata_mut()
+                                .set_trace_layout(TraceLayout::OtlpResourceSpans);
                             return Ok(smallvec![Event::Trace(trace)]);
                         }
                     }
@@ -381,7 +383,10 @@ mod tests {
             let trace = events[0].as_trace();
             assert!(trace.get(event_path!(field)).is_some());
             validate_trace_ids(trace.value());
-            assert_eq!(events[0].metadata().trace_layout(), Some(TraceLayout::Otlp));
+            assert_eq!(
+                events[0].metadata().trace_layout(),
+                Some(TraceLayout::OtlpResourceSpans)
+            );
         } else {
             assert!(events[0].as_log().get(event_path!(field)).is_some());
         }

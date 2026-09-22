@@ -25,18 +25,26 @@ const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
 ///
 /// This is an internal, unstable discriminator so Vector's own transforms and
 /// sinks can dispatch on layout after `source_type` is rewritten (for example
-/// across a vector sink/source hop). It is not documented for users, is not a
-/// compatibility contract, and may change or be removed without a deprecation
-/// cycle. It is meaningful only on trace events; it is `None` on logs and
-/// metrics. It is not exposed to VRL.
+/// across a vector sink/source hop). It names the original source layout so a
+/// converter can select a decoder; it is not a guarantee that the event object
+/// still has that shape. `remap` can rewrite or replace the payload while this
+/// field is retained, because it is not exposed to VRL. The converter that
+/// consumes the hint is still responsible for validating the payload.
+///
+/// It is not documented for users, is not a compatibility contract, and may
+/// change or be removed without a deprecation cycle. It is meaningful only on
+/// trace events; it is `None` on logs and metrics.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum TraceLayout {
     /// Layout written by the `datadog_agent` source.
     Datadog,
-    /// Flattened native traces from the `opentelemetry` source.
-    OpenTelemetry,
+    /// Flattened per-span traces from the `opentelemetry` source.
+    ///
+    /// This is Vector's historical projection of an OTLP span (one event per
+    /// span), not an OTLP `resourceSpans` message.
+    OtelFlattened,
     /// Raw OTLP `resourceSpans` batches from the `opentelemetry` source.
-    Otlp,
+    OtlpResourceSpans,
     /// A protobuf value that is present but not a known layout.
     ///
     /// Conversion must treat this as an error rather than falling back to shape
@@ -618,10 +626,13 @@ mod test {
         assert_eq!(metadata.trace_layout(), None);
         metadata.set_trace_layout(TraceLayout::Datadog);
         assert_eq!(metadata.trace_layout(), Some(TraceLayout::Datadog));
-        metadata.set_trace_layout(TraceLayout::OpenTelemetry);
-        assert_eq!(metadata.trace_layout(), Some(TraceLayout::OpenTelemetry));
-        metadata.set_trace_layout(TraceLayout::Otlp);
-        assert_eq!(metadata.trace_layout(), Some(TraceLayout::Otlp));
+        metadata.set_trace_layout(TraceLayout::OtelFlattened);
+        assert_eq!(metadata.trace_layout(), Some(TraceLayout::OtelFlattened));
+        metadata.set_trace_layout(TraceLayout::OtlpResourceSpans);
+        assert_eq!(
+            metadata.trace_layout(),
+            Some(TraceLayout::OtlpResourceSpans)
+        );
     }
 
     #[test]
