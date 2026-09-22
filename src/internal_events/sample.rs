@@ -14,13 +14,9 @@ pub struct SampleEventDiscarded {
 impl InternalEvent for SampleEventDiscarded {
     fn emit(self) {
         let reason = "Sample discarded.";
+        let message = "Events dropped";
 
-        debug!(
-            message = "Events dropped.",
-            intentional = true,
-            count = 1,
-            reason,
-        );
+        debug!(message, intentional = true, count = 1, reason);
 
         if self.include_group_tag {
             counter!(
@@ -68,10 +64,6 @@ mod tests {
     #[serial]
     fn emits_component_discarded_events_with_group_tag() {
         vector_lib::metrics::init_test();
-        Controller::get()
-            .expect("metrics controller initialized")
-            .reset();
-
         for group in ["group-a", "group-b", "None"] {
             SampleEventDiscarded {
                 group: group.to_string(),
@@ -92,10 +84,6 @@ mod tests {
     #[serial]
     fn emits_component_discarded_events_without_group_tag_by_default() {
         vector_lib::metrics::init_test();
-        Controller::get()
-            .expect("metrics controller initialized")
-            .reset();
-
         SampleEventDiscarded {
             group: "group-a".to_string(),
             include_group_tag: false,
