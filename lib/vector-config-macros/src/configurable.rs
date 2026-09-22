@@ -751,6 +751,15 @@ fn generate_variant_tag_metadata(
     // itself along with the tag field to make downstream consumption and processing easier.
     let maybe_title = get_metadata_title(meta_ident, variant.title());
     let maybe_description = get_metadata_description(meta_ident, variant.description());
+    let aliases = variant.aliases();
+    let alias_metadata = (!aliases.is_empty()).then(|| {
+        quote! {
+            #meta_ident.add_custom_attribute(::vector_config::attributes::CustomAttribute::kv(
+                ::vector_config::constants::SERDE_VARIANT_ALIASES,
+                ::serde_json::json!([#(#aliases),*]),
+            ));
+        }
+    });
 
     // We specifically use `()` as the type here because we need to generate the metadata for this
     // variant, but there's no unique concrete type for a variant, only the type of the enum
@@ -760,6 +769,7 @@ fn generate_variant_tag_metadata(
         let mut #meta_ident = ::vector_config::Metadata::default();
         #maybe_title
         #maybe_description
+        #alias_metadata
     }
 }
 
@@ -1107,6 +1117,22 @@ fn generate_enum_variant_schema(
             // TODO: we can maybe reuse the existing struct schema gen stuff here, but we'd need
             // a way to force being required + customized metadata
             if wrapped {
+                // External variant aliases name the wrapper property, so reuse
+                // the field-alias metadata consumed during object coercion.
+                let aliases = variant.aliases();
+                let variant_schema = if aliases.is_empty() {
+                    variant_schema
+                } else {
+                    quote! {
+                        {
+                            let mut schema = { #variant_schema };
+                            schema.extensions.entry(::vector_config::constants::METADATA.to_owned())
+                                .or_insert_with(|| ::serde_json::json!({}))
+                                [::vector_config::constants::SERDE_ALIASES] = ::serde_json::json!([#(#aliases),*]);
+                            schema
+                        }
+                    }
+                };
                 generate_single_field_struct_schema(variant_name, variant_schema)
             } else {
                 variant_schema

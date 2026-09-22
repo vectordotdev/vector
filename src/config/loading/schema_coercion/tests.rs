@@ -2,6 +2,110 @@ use super::{Error, ValueCoercer};
 use serde_json::json;
 
 #[test]
+fn generated_optional_sensitive_string_preserves_literal_null() {
+    use vector_common::sensitive_string::SensitiveString;
+
+    let schema = serde_json::to_value(
+        vector_config::schema::generate_root_schema::<Option<SensitiveString>>().unwrap(),
+    )
+    .unwrap();
+    for mut value in [json!("null"), json!("NULL"), json!(null)] {
+        let expected = serde_json::from_value::<Option<SensitiveString>>(value.clone()).unwrap();
+        ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+        assert_eq!(
+            serde_json::from_value::<Option<SensitiveString>>(value).unwrap(),
+            expected
+        );
+    }
+}
+
+/// Aliases for externally tagged enum variants.
+#[vector_config::configurable_component]
+#[derive(Debug, PartialEq)]
+enum ExternalAliases {
+    /// A named mode.
+    #[serde(rename = "unit", alias = "legacy_unit")]
+    Unit,
+    /// A scalar payload.
+    #[serde(rename = "number", alias = "legacy_number")]
+    Number(u64),
+    /// A structured payload.
+    #[serde(rename = "object", alias = "legacy_object")]
+    Object {
+        /// Number of items.
+        count: u64,
+    },
+}
+
+/// Aliases for internally tagged enum variants.
+#[vector_config::configurable_component]
+#[derive(Debug, PartialEq)]
+#[serde(tag = "type")]
+enum InternalAliases {
+    /// A counted mode.
+    #[serde(rename = "counted", alias = "legacy", alias = "older")]
+    Counted {
+        /// Number of items.
+        count: u64,
+    },
+}
+
+/// Aliases for adjacently tagged enum variants.
+#[vector_config::configurable_component]
+#[derive(Debug, PartialEq)]
+#[serde(tag = "mode", content = "options")]
+enum AdjacentAliases {
+    /// A counted mode.
+    #[serde(rename = "counted", alias = "legacy")]
+    Counted(u64),
+}
+
+#[test]
+fn generated_enum_aliases_preserve_spelling_and_coerce_payloads() {
+    fn check<T: vector_config::Configurable + serde::de::DeserializeOwned + 'static>(
+        input: serde_json::Value,
+        expected: serde_json::Value,
+    ) {
+        let schema =
+            serde_json::to_value(vector_config::schema::generate_root_schema::<T>().unwrap())
+                .unwrap();
+        let mut value = input;
+        ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+        assert_eq!(value, expected);
+        serde_json::from_value::<T>(value).unwrap();
+    }
+    check::<ExternalAliases>(json!("legacy_unit"), json!("legacy_unit"));
+    check::<ExternalAliases>(json!({"legacy_number": "42"}), json!({"legacy_number": 42}));
+    check::<ExternalAliases>(
+        json!({"legacy_object": {"count": "42"}}),
+        json!({"legacy_object": {"count": 42}}),
+    );
+    for tag in ["counted", "legacy", "older"] {
+        check::<InternalAliases>(
+            json!({"type": tag, "count": "42"}),
+            json!({"type": tag, "count": 42}),
+        );
+    }
+    check::<AdjacentAliases>(
+        json!({"mode": "legacy", "options": "42"}),
+        json!({"mode": "legacy", "options": 42}),
+    );
+
+    let schema = serde_json::to_value(
+        vector_config::schema::generate_root_schema::<InternalAliases>().unwrap(),
+    )
+    .unwrap();
+    for mut invalid in [
+        json!({"type": "legacy", "count": "bad"}),
+        json!({"type": "unknown", "count": "42"}),
+        // A variant alias is a tag value, never an alias for the tag key itself.
+        json!({"legacy": "counted", "count": "42"}),
+    ] {
+        assert!(ValueCoercer::new(&schema).coerce(&mut invalid).is_err());
+    }
+}
+
+#[test]
 fn component_boundaries_follow_root_maps_not_nested_unions() {
     for section in super::COMPONENT_MAPS {
         for referenced in [false, true] {
@@ -431,6 +535,40 @@ mod test {
     use crate::config::loading::schema_coercion::ValueCoercer;
     use serde_json::json;
     use vector_config::schema::generate_root_schema;
+
+    #[test]
+    fn generated_demo_logs_variant_alias_deserializes() {
+        let schema =
+            serde_json::to_value(generate_root_schema::<ConfigBuilder>().unwrap()).unwrap();
+        for format in ["rfc5424", "rfc3164"] {
+            let mut value = json!({"sources": {"demo": {"type": "demo_logs", "format": format}}});
+            serde_json::from_value::<ConfigBuilder>(value.clone()).unwrap();
+            ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+            assert_eq!(value["sources"]["demo"]["format"], json!(format));
+            serde_json::from_value::<ConfigBuilder>(value).unwrap();
+        }
+    }
+
+    #[test]
+    fn generated_unknown_provider_and_secret_types_pass_through() {
+        let schema =
+            serde_json::to_value(generate_root_schema::<ConfigBuilder>().unwrap()).unwrap();
+        for mut value in [
+            json!({"provider": {"type": "unknown", "poll_interval_secs": "bad"}}),
+            json!({"secret": {"backend": {"type": "unknown", "timeout": "bad"}}}),
+        ] {
+            let expected = value.clone();
+            ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+            assert_eq!(value, expected);
+            assert!(serde_json::from_value::<ConfigBuilder>(value).is_err());
+        }
+        for mut value in [
+            json!({"provider": {"type": "http", "poll_interval_secs": "bad"}}),
+            json!({"secret": {"backend": {"type": "exec", "command": ["example"], "timeout": "bad"}}}),
+        ] {
+            assert!(ValueCoercer::new(&schema).coerce(&mut value).is_err());
+        }
+    }
 
     #[test]
     fn generated_demo_logs_alias_is_coerced_and_deserializes() {

@@ -29,6 +29,7 @@ pub const DOCS_META_TYPE_UNIT: &str = "docs::type_unit";
 pub const LOGICAL_NAME: &str = "logical_name";
 pub const METADATA: &str = "_metadata";
 pub const SERDE_ALIASES: &str = "serde::aliases";
+pub const SERDE_VARIANT_ALIASES: &str = "serde::variant_aliases";
 
 /// Well-known component types.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

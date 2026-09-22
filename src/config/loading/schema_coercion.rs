@@ -7,7 +7,7 @@
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};
 use std::collections::HashSet;
-use vector_config::constants::{METADATA, SERDE_ALIASES};
+use vector_config::constants::{METADATA, SERDE_ALIASES, SERDE_VARIANT_ALIASES};
 
 const NULL_JSON_TYPE: &str = "null";
 const BOOL_JSON_TYPE: &str = "boolean";
@@ -16,7 +16,14 @@ const STRING_JSON_TYPE: &str = "string";
 const ARRAY_JSON_TYPE: &str = "array";
 const OBJECT_JSON_TYPE: &str = "object";
 const DEFINITION_PREFIX: &str = "#/definitions/";
-const COMPONENT_MAPS: [&str; 4] = ["sources", "transforms", "sinks", "enrichment_tables"];
+const COMPONENT_MAPS: [&str; 5] = [
+    "sources",
+    "transforms",
+    "sinks",
+    "enrichment_tables",
+    "secret",
+];
+const PROVIDER: &str = "provider";
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -107,6 +114,11 @@ impl<'a> ValueCoercer<'a> {
             .flat_map(|map| coercer.object_schemas(map))
             .filter_map(|map| map.get("additionalProperties"))
             .filter(|schema| schema.is_object())
+            .chain(
+                coercer
+                    .object_schemas(schema)
+                    .filter_map(|root| root.get("properties")?.get(PROVIDER)),
+            )
             .collect();
         coercer
     }
@@ -145,8 +157,10 @@ impl<'a> ValueCoercer<'a> {
     fn coerce_value(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         // Unknown component kinds are diagnosed by serde. Restrict this escape
         // hatch to the outer component schema, never an arbitrary union branch.
-        if self.path.len() == 2
-            && COMPONENT_MAPS.contains(&self.path[0].as_str())
+        let at_component = (self.path.len() == 2
+            && COMPONENT_MAPS.contains(&self.path[0].as_str()))
+            || (self.path.len() == 1 && self.path[0] == PROVIDER);
+        if at_component
             && self
                 .component_schemas
                 .iter()
@@ -244,6 +258,14 @@ impl<'a> ValueCoercer<'a> {
             .filter_map(Value::as_str)
     }
 
+    fn matches_variant_alias(schema: &Value, value: &str) -> bool {
+        schema
+            .get(METADATA)
+            .and_then(|metadata| metadata.get(SERDE_VARIANT_ALIASES))
+            .and_then(Value::as_array)
+            .is_some_and(|aliases| aliases.iter().any(|alias| alias.as_str() == Some(value)))
+    }
+
     fn handle_ref(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         let Some(ref_str) = schema.get("$ref").and_then(|r| r.as_str()) else {
             return Ok(());
@@ -325,7 +347,11 @@ impl<'a> ValueCoercer<'a> {
         };
 
         // Exact match
-        if enum_vals.iter().any(|opt| value == opt) {
+        if enum_vals.iter().any(|opt| value == opt)
+            || value
+                .as_str()
+                .is_some_and(|value| Self::matches_variant_alias(schema, value))
+        {
             return Ok(());
         }
 
@@ -393,7 +419,11 @@ impl<'a> ValueCoercer<'a> {
         };
 
         // Exact match
-        if value == const_val {
+        if value == const_val
+            || value
+                .as_str()
+                .is_some_and(|value| Self::matches_variant_alias(schema, value))
+        {
             return Ok(());
         }
 
@@ -703,28 +733,10 @@ impl<'a> ValueCoercer<'a> {
         Ok(())
     }
 
-    /// Try variants in order, leaving final validation to serde.
+    /// Prefer shape-preserving variants, leaving final validation to serde.
     fn coerce_one_of(&mut self, value: &mut Value, schemas: &[Value]) -> Result<(), Error> {
         let initial_len = self.path.len();
-        let mut success: Option<(Value, &Value)> = None; // (coerced value, matched schema)
-
-        for schema in schemas {
-            self.path.truncate(initial_len);
-            let mut candidate = value.clone();
-            if self.coerce_value(&mut candidate, schema).is_ok() {
-                self.path.truncate(initial_len);
-                if success.is_some() {
-                    // Multiple variants match — keep the first and move on.
-                    break;
-                }
-                success = Some((candidate, schema));
-            }
-        }
-
-        self.path.truncate(initial_len);
-
-        if let Some((val, _matched_schema)) = success {
-            *value = val;
+        if self.coerce_any_of(value, schemas).is_ok() {
             return Ok(());
         }
 
@@ -839,9 +851,10 @@ impl<'a> ValueCoercer<'a> {
         if resolved
             .get("properties")
             .and_then(|p| p.get("type"))
-            .and_then(|t| t.get("const"))
-            .and_then(|c| c.as_str())
-            == Some(expected)
+            .is_some_and(|tag| {
+                tag.get("const").and_then(Value::as_str) == Some(expected)
+                    || Self::matches_variant_alias(tag, expected)
+            })
         {
             return true;
         }
@@ -858,7 +871,7 @@ impl<'a> ValueCoercer<'a> {
         false
     }
 
-    /// Returns true if `schema`, after fully resolving `$ref`, `allOf`, and `oneOf`, contains
+    /// Returns true if `schema`, after resolving `$ref`, `allOf`, and unions, contains
     /// any variant that claims `expected` as its `type` discriminant. Used to skip the
     /// unevaluatedProperties unknown-field check for components whose type is not compiled in.
     fn schema_contains_type_discriminant(&self, schema: &Value, expected: &str) -> bool {
@@ -875,23 +888,16 @@ impl<'a> ValueCoercer<'a> {
             return true;
         }
 
-        if let Some(all_of) = resolved.get("allOf").and_then(|v| v.as_array())
-            && all_of
-                .iter()
-                .any(|sub| self.schema_contains_type_discriminant(sub, expected))
-        {
-            return true;
-        }
-
-        if let Some(one_of) = resolved.get("oneOf").and_then(|v| v.as_array())
-            && one_of
-                .iter()
-                .any(|variant| self.schema_matches_type_discriminant(variant, expected))
-        {
-            return true;
-        }
-
-        false
+        ["allOf", "oneOf", "anyOf"].iter().any(|keyword| {
+            resolved
+                .get(keyword)
+                .and_then(Value::as_array)
+                .is_some_and(|schemas| {
+                    schemas
+                        .iter()
+                        .any(|schema| self.schema_contains_type_discriminant(schema, expected))
+                })
+        })
     }
 
     /// Prefer a structurally compatible variant, failing if none can be coerced.
