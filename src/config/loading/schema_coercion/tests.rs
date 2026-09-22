@@ -1,5 +1,60 @@
 use super::{Error, ValueCoercer};
-use serde_json::json;
+use serde_json::{Value, json};
+
+struct CoercionCase {
+    name: &'static str,
+    schema: Value,
+    input: Value,
+    expected: Value,
+}
+
+impl CoercionCase {
+    fn check(self) {
+        let mut value = self.input;
+        ValueCoercer::new(&self.schema)
+            .coerce(&mut value)
+            .unwrap_or_else(|error| panic!("{} (schema {}): {error}", self.name, self.schema));
+        assert_eq!(
+            value, self.expected,
+            "{} (schema {})",
+            self.name, self.schema
+        );
+    }
+}
+
+/// A rejected input that must remain unchanged.
+struct RejectionCase {
+    name: &'static str,
+    schema: Value,
+    input: Value,
+    expected_error: Error,
+}
+
+impl RejectionCase {
+    fn check(self) {
+        let mut value = self.input.clone();
+        let error = ValueCoercer::new(&self.schema)
+            .coerce(&mut value)
+            .expect_err(self.name);
+        assert_eq!(
+            std::mem::discriminant(&error),
+            std::mem::discriminant(&self.expected_error),
+            "{}: {error}",
+            self.name
+        );
+        assert_eq!(
+            error.to_string(),
+            self.expected_error.to_string(),
+            "{}",
+            self.name
+        );
+        assert_eq!(
+            value, self.input,
+            "{}: input changed on rejection",
+            self.name
+        );
+    }
+}
 
 #[test]
 fn generated_optional_sensitive_string_preserves_literal_null() {
@@ -280,14 +335,27 @@ fn negated_null_does_not_coerce_a_string_to_null() {
 
 #[test]
 fn structured_values_are_not_coerced_to_strings() {
-    let schema = json!({"type": "string"});
-    for mut value in [json!({"source": "bad"}), json!(["bad"])] {
-        let original = value.clone();
-        assert!(matches!(
-            ValueCoercer::new(&schema).coerce(&mut value),
-            Err(Error::ExpectedString { .. })
-        ));
-        assert_eq!(value, original);
+    for case in [
+        RejectionCase {
+            name: "an object must not be serialized to a JSON string",
+            schema: json!({"type": "string"}),
+            input: json!({"source": "bad"}),
+            expected_error: Error::ExpectedString {
+                path: "".into(),
+                actual: "object",
+            },
+        },
+        RejectionCase {
+            name: "an array must not be serialized to a JSON string",
+            schema: json!({"type": "string"}),
+            input: json!(["bad"]),
+            expected_error: Error::ExpectedString {
+                path: "".into(),
+                actual: "array",
+            },
+        },
+    ] {
+        case.check();
     }
 }
 
@@ -338,41 +406,131 @@ fn generated_test_output_preserves_null_conditions() {
 
 #[test]
 fn scalar_coercions() {
-    for (kind, input, expected) in [
-        ("integer", json!("42"), json!(42)),
-        ("integer", json!(u64::MAX.to_string()), json!(u64::MAX)),
-        ("integer", json!(i64::MIN.to_string()), json!(i64::MIN)),
-        ("number", json!("1.5"), json!(1.5)),
-        ("boolean", json!("true"), json!(true)),
-        ("null", json!(" null "), json!(null)),
-        ("string", json!(false), json!("false")),
+    for case in [
+        CoercionCase {
+            name: "string to integer",
+            schema: json!({"type": "integer"}),
+            input: json!("42"),
+            expected: json!(42),
+        },
+        CoercionCase {
+            name: "largest unsigned integer",
+            schema: json!({"type": "integer"}),
+            input: json!(u64::MAX.to_string()),
+            expected: json!(u64::MAX),
+        },
+        CoercionCase {
+            name: "smallest signed integer",
+            schema: json!({"type": "integer"}),
+            input: json!(i64::MIN.to_string()),
+            expected: json!(i64::MIN),
+        },
+        CoercionCase {
+            name: "string to fractional number",
+            schema: json!({"type": "number"}),
+            input: json!("1.5"),
+            expected: json!(1.5),
+        },
+        CoercionCase {
+            name: "string to boolean",
+            schema: json!({"type": "boolean"}),
+            input: json!("true"),
+            expected: json!(true),
+        },
+        CoercionCase {
+            name: "trimmed string to null",
+            schema: json!({"type": "null"}),
+            input: json!(" null "),
+            expected: json!(null),
+        },
+        CoercionCase {
+            name: "boolean to string",
+            schema: json!({"type": "string"}),
+            input: json!(false),
+            expected: json!("false"),
+        },
     ] {
-        let schema = json!({"type": kind});
-        let mut value = input;
-        ValueCoercer::new(&schema).coerce(&mut value).unwrap();
-        assert_eq!(value, expected, "{kind}");
+        case.check();
     }
 }
 
 #[test]
 fn invalid_scalars_do_not_saturate_or_become_nonfinite() {
-    for (kind, input) in [
-        ("integer", json!("18446744073709551616")),
-        ("integer", json!("-9223372036854775809")),
-        ("integer", json!(9223372036854775808.0_f64)),
-        ("integer", json!(1.5)),
-        ("number", json!("NaN")),
-        ("number", json!("inf")),
-        ("boolean", json!("yes")),
-        ("string", json!(null)),
+    for case in [
+        RejectionCase {
+            name: "unsigned integer overflow",
+            schema: json!({"type": "integer"}),
+            input: json!("18446744073709551616"),
+            expected_error: Error::ExpectedInteger {
+                path: "".into(),
+                actual: "string",
+            },
+        },
+        RejectionCase {
+            name: "signed integer underflow",
+            schema: json!({"type": "integer"}),
+            input: json!("-9223372036854775809"),
+            expected_error: Error::ExpectedInteger {
+                path: "".into(),
+                actual: "string",
+            },
+        },
+        RejectionCase {
+            name: "rounded float boundary must not saturate to i64::MAX",
+            schema: json!({"type": "integer"}),
+            input: json!(9223372036854775808.0_f64),
+            expected_error: Error::ExpectedInteger {
+                path: "".into(),
+                actual: "number",
+            },
+        },
+        RejectionCase {
+            name: "fractional number is not an integer",
+            schema: json!({"type": "integer"}),
+            input: json!(1.5),
+            expected_error: Error::ExpectedInteger {
+                path: "".into(),
+                actual: "number",
+            },
+        },
+        RejectionCase {
+            name: "NaN is not a JSON number",
+            schema: json!({"type": "number"}),
+            input: json!("NaN"),
+            expected_error: Error::ExpectedNumber {
+                path: "".into(),
+                actual: "string",
+            },
+        },
+        RejectionCase {
+            name: "infinity is not a JSON number",
+            schema: json!({"type": "number"}),
+            input: json!("inf"),
+            expected_error: Error::ExpectedNumber {
+                path: "".into(),
+                actual: "string",
+            },
+        },
+        RejectionCase {
+            name: "yes is not a boolean spelling",
+            schema: json!({"type": "boolean"}),
+            input: json!("yes"),
+            expected_error: Error::ExpectedBool {
+                path: "".into(),
+                actual: "string",
+            },
+        },
+        RejectionCase {
+            name: "null is not stringified",
+            schema: json!({"type": "string"}),
+            input: json!(null),
+            expected_error: Error::ExpectedString {
+                path: "".into(),
+                actual: "null",
+            },
+        },
     ] {
-        let schema = json!({"type": kind});
-        let mut value = input.clone();
-        assert!(
-            ValueCoercer::new(&schema).coerce(&mut value).is_err(),
-            "{input}"
-        );
-        assert_eq!(value, input);
+        case.check();
     }
 }
 
@@ -397,19 +555,27 @@ fn nested_reference_errors_have_paths_and_coercer_is_reusable() {
 
 #[test]
 fn reference_errors_are_explicit() {
-    for (reference, missing) in [
-        ("#/definitions/missing", true),
-        ("https://example.com/schema", false),
+    for case in [
+        RejectionCase {
+            name: "missing local definition",
+            schema: json!({"properties": {"value": {"$ref": "#/definitions/missing"}}}),
+            input: json!({"value": "1"}),
+            expected_error: Error::SchemaReferenceNotFound {
+                path: "value".into(),
+                reference: "#/definitions/missing".into(),
+            },
+        },
+        RejectionCase {
+            name: "external schema references are unsupported",
+            schema: json!({"properties": {"value": {"$ref": "https://example.com/schema"}}}),
+            input: json!({"value": "1"}),
+            expected_error: Error::UnsupportedSchemaReference {
+                path: "value".into(),
+                reference: "https://example.com/schema".into(),
+            },
+        },
     ] {
-        let schema = json!({"properties": {"value": {"$ref": reference}}});
-        let error = ValueCoercer::new(&schema)
-            .coerce(&mut json!({"value": "1"}))
-            .unwrap_err();
-        match error {
-            Error::SchemaReferenceNotFound { path, .. } if missing => assert_eq!(path, "value"),
-            Error::UnsupportedSchemaReference { path, .. } if !missing => assert_eq!(path, "value"),
-            error => panic!("unexpected error: {error}"),
-        }
+        case.check();
     }
 }
 
@@ -437,29 +603,216 @@ fn arrays_and_additional_properties() {
 
 #[test]
 fn enum_const_and_boolean_schemas() {
-    for (schema, mut value, expected) in [
-        (json!({"enum": [1, 2]}), json!("2"), json!(2)),
-        (json!({"const": false}), json!("false"), json!(false)),
-        (
-            json!(true),
-            json!({"untouched": "2"}),
-            json!({"untouched": "2"}),
-        ),
+    for case in [
+        CoercionCase {
+            name: "coerce to an allowed enum value",
+            schema: json!({"enum": [1, 2]}),
+            input: json!("2"),
+            expected: json!(2),
+        },
+        CoercionCase {
+            name: "coerce to a boolean constant",
+            schema: json!({"const": false}),
+            input: json!("false"),
+            expected: json!(false),
+        },
+        CoercionCase {
+            name: "true schema preserves the input",
+            schema: json!(true),
+            input: json!({"untouched": "2"}),
+            expected: json!({"untouched": "2"}),
+        },
+        CoercionCase {
+            name: "exact enum match wins over coercion to null",
+            schema: json!({"enum": [null, "null"]}),
+            input: json!("null"),
+            expected: json!("null"),
+        },
     ] {
-        ValueCoercer::new(&schema).coerce(&mut value).unwrap();
-        assert_eq!(value, expected);
+        case.check();
     }
-    for schema in [
-        json!({"enum": [1, 2]}),
-        json!({"const": false}),
-        json!(false),
+    for case in [
+        RejectionCase {
+            name: "value outside the enum",
+            schema: json!({"enum": [1, 2]}),
+            input: json!("bad"),
+            expected_error: Error::InvalidEnumValue { path: "".into() },
+        },
+        RejectionCase {
+            name: "value does not match the constant",
+            schema: json!({"const": false}),
+            input: json!("bad"),
+            expected_error: Error::InvalidConst {
+                path: "".into(),
+                expected: "false".into(),
+            },
+        },
+        RejectionCase {
+            name: "false schema rejects every value",
+            schema: json!(false),
+            input: json!("bad"),
+            expected_error: Error::DisallowedProperty { path: "".into() },
+        },
     ] {
-        assert!(
-            ValueCoercer::new(&schema)
-                .coerce(&mut json!("bad"))
-                .is_err()
-        );
+        case.check();
     }
+}
+
+#[test]
+fn enum_and_const_share_scalar_conversions_but_keep_distinct_errors() {
+    // Run each conversion against both a constant and a single-value enum.
+    struct ConstraintCase {
+        name: &'static str,
+        allowed_value: Value,
+        input: Value,
+        expected: Value,
+    }
+
+    for case in [
+        ConstraintCase {
+            name: "trimmed string to boolean",
+            allowed_value: json!(true),
+            input: json!(" true "),
+            expected: json!(true),
+        },
+        ConstraintCase {
+            name: "trimmed string to integer",
+            allowed_value: json!(42),
+            input: json!(" 42 "),
+            expected: json!(42),
+        },
+        ConstraintCase {
+            name: "string to fractional number",
+            allowed_value: json!(1.5),
+            input: json!("1.5"),
+            expected: json!(1.5),
+        },
+        ConstraintCase {
+            name: "case-insensitive null with whitespace",
+            allowed_value: json!(null),
+            input: json!(" NULL "),
+            expected: json!(null),
+        },
+        ConstraintCase {
+            name: "number to string",
+            allowed_value: json!("42"),
+            input: json!(42),
+            expected: json!("42"),
+        },
+        ConstraintCase {
+            name: "boolean to lowercase string despite uppercase constraint",
+            allowed_value: json!("TRUE"),
+            input: json!(true),
+            expected: json!("true"),
+        },
+        ConstraintCase {
+            name: "exact array match",
+            allowed_value: json!([1]),
+            input: json!([1]),
+            expected: json!([1]),
+        },
+        ConstraintCase {
+            name: "exact object match",
+            allowed_value: json!({"count": 1}),
+            input: json!({"count": 1}),
+            expected: json!({"count": 1}),
+        },
+    ] {
+        for schema in [
+            json!({"enum": [case.allowed_value]}),
+            json!({"const": case.allowed_value}),
+        ] {
+            CoercionCase {
+                name: case.name,
+                schema,
+                input: case.input.clone(),
+                expected: case.expected.clone(),
+            }
+            .check();
+        }
+    }
+
+    for case in [
+        RejectionCase {
+            name: "enum rejects an unparseable string",
+            schema: json!({"properties": {"count": {"enum": [1]}}}),
+            input: json!({"count": "bad"}),
+            expected_error: Error::InvalidEnumValue {
+                path: "count".into(),
+            },
+        },
+        RejectionCase {
+            name: "enum rejects an array",
+            schema: json!({"properties": {"count": {"enum": [1]}}}),
+            input: json!({"count": [1]}),
+            expected_error: Error::InvalidEnumValue {
+                path: "count".into(),
+            },
+        },
+        RejectionCase {
+            name: "enum rejects an object",
+            schema: json!({"properties": {"count": {"enum": [1]}}}),
+            input: json!({"count": {"count": 1}}),
+            expected_error: Error::InvalidEnumValue {
+                path: "count".into(),
+            },
+        },
+        RejectionCase {
+            name: "const rejects an unparseable string",
+            schema: json!({"properties": {"count": {"const": 1}}}),
+            input: json!({"count": "bad"}),
+            expected_error: Error::InvalidConst {
+                path: "count".into(),
+                expected: "1".into(),
+            },
+        },
+        RejectionCase {
+            name: "const rejects an array",
+            schema: json!({"properties": {"count": {"const": 1}}}),
+            input: json!({"count": [1]}),
+            expected_error: Error::InvalidConst {
+                path: "count".into(),
+                expected: "1".into(),
+            },
+        },
+        RejectionCase {
+            name: "const rejects an object",
+            schema: json!({"properties": {"count": {"const": 1}}}),
+            input: json!({"count": {"count": 1}}),
+            expected_error: Error::InvalidConst {
+                path: "count".into(),
+                expected: "1".into(),
+            },
+        },
+    ] {
+        case.check();
+    }
+}
+
+#[test]
+fn schema_constraints_are_applied_in_order() {
+    let schema = json!({
+        "$ref": "#/definitions/number",
+        "definitions": {"number": {"type": "integer"}},
+        "allOf": [{"type": "string"}],
+        "oneOf": [{"type": "integer"}],
+        "anyOf": [{"type": "string"}],
+        "enum": [42],
+        "const": "42",
+        "type": "integer",
+        "not": {"const": 0}
+    });
+    let mut value = json!("42");
+    ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+    assert_eq!(value, json!(42));
+
+    let mut forbidden = schema;
+    forbidden["not"]["const"] = json!(42);
+    assert!(
+        ValueCoercer::new(&forbidden)
+            .coerce(&mut json!("42"))
+            .is_err()
+    );
 }
 
 #[test]
@@ -474,58 +827,40 @@ fn tagged_union_preserves_specific_error_path() {
     assert!(matches!(error, Error::ExpectedInteger { ref path, .. } if path == "source.count"));
 }
 
-#[cfg(test)]
-mod union_tests {
-    use super::super::ValueCoercer;
-    use serde_json::json;
-
-    fn untagged_string_or_map_schema() -> serde_json::Value {
-        json!({
-            "anyOf": [
-                { "type": "string" },
-                { "$ref": "#/definitions/ConditionMap" }
-            ],
-            "definitions": {
-                "ConditionMap": {
-                    "oneOf": [{
-                        "type": "object",
-                        "properties": {
-                            "type": { "const": "vrl" },
-                            "source": { "type": "string" }
-                        }
-                    }]
-                }
+#[test]
+fn any_of_preserves_structurally_compatible_values() {
+    let schema = json!({
+        "anyOf": [
+            { "type": "string" },
+            { "$ref": "#/definitions/ConditionMap" }
+        ],
+        "definitions": {
+            "ConditionMap": {
+                "oneOf": [{
+                    "type": "object",
+                    "properties": {
+                        "type": { "const": "vrl" },
+                        "source": { "type": "string" }
+                    }
+                }]
             }
-        })
-    }
-
-    #[test]
-    fn any_of_prefers_a_structurally_compatible_object_variant() {
-        let schema = untagged_string_or_map_schema();
-        let mut input = json!({
-            "type": "vrl",
-            "source": ".status_code != 200"
-        });
-
-        ValueCoercer::new(&schema).coerce(&mut input).unwrap();
-
-        assert_eq!(
-            input,
-            json!({
-                "type": "vrl",
-                "source": ".status_code != 200"
-            })
-        );
-    }
-
-    #[test]
-    fn any_of_preserves_a_structurally_compatible_string_variant() {
-        let schema = untagged_string_or_map_schema();
-        let mut input = json!(".status_code != 200");
-
-        ValueCoercer::new(&schema).coerce(&mut input).unwrap();
-
-        assert_eq!(input, json!(".status_code != 200"));
+        }
+    });
+    for case in [
+        CoercionCase {
+            name: "object chooses the map branch, not the earlier string branch",
+            schema: schema.clone(),
+            input: json!({"type": "vrl", "source": ".status_code != 200"}),
+            expected: json!({"type": "vrl", "source": ".status_code != 200"}),
+        },
+        CoercionCase {
+            name: "string stays in the string branch",
+            schema,
+            input: json!(".status_code != 200"),
+            expected: json!(".status_code != 200"),
+        },
+    ] {
+        case.check();
     }
 }
 

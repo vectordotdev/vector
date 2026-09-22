@@ -155,52 +155,72 @@ impl<'a> ValueCoercer<'a> {
     }
 
     fn coerce_value(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        if self.is_unknown_component(value, schema) {
+            return Ok(());
+        }
+
+        match schema {
+            Value::Bool(true) => Ok(()),
+            Value::Bool(false) => DisallowedPropertySnafu {
+                path: self.path.join("."),
+            }
+            .fail(),
+            Value::Object(_) => self.coerce_object_schema(value, schema),
+            // Preserve the existing no-op behavior for non-schema values.
+            _ => Ok(()),
+        }
+    }
+
+    fn is_unknown_component(&self, value: &Value, schema: &Value) -> bool {
         // Unknown component kinds are diagnosed by serde. Restrict this escape
         // hatch to the outer component schema, never an arbitrary union branch.
         let at_component = (self.path.len() == 2
             && COMPONENT_MAPS.contains(&self.path[0].as_str()))
             || (self.path.len() == 1 && self.path[0] == PROVIDER);
-        if at_component
+        at_component
             && self
                 .component_schemas
                 .iter()
                 .any(|outer| std::ptr::eq(*outer, schema))
-            && let Some(kind) = value.get("type").and_then(Value::as_str)
-            && !self.schema_contains_type_discriminant(schema, kind)
-        {
-            return Ok(());
-        }
-        self.handle_bool(schema)?;
-        self.handle_ref(value, schema)?;
-        self.handle_all_of(value, schema)?;
-        self.handle_one_of(value, schema)?;
-        self.handle_any_of(value, schema)?;
-        self.handle_enum(value, schema)?;
-        self.handle_const(value, schema)?;
+            && value
+                .get("type")
+                .and_then(Value::as_str)
+                .is_some_and(|kind| !self.schema_contains_type_discriminant(schema, kind))
+    }
 
-        let result = if let Some(type_spec) = schema.get("type") {
-            if let Some(t) = type_spec.as_str() {
-                self.coerce_type(value, t, schema)
-            } else if let Some(types) = type_spec.as_array() {
-                let allowed: Vec<&str> = types.iter().filter_map(|t| t.as_str()).collect();
+    fn coerce_object_schema(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        // Keywords can coexist. Apply every constraint in this order.
+        self.apply_reference(value, schema)?;
+        self.apply_all_of(value, schema)?;
+        self.apply_one_of(value, schema)?;
+        self.apply_any_of(value, schema)?;
+        self.apply_enum(value, schema)?;
+        self.apply_const(value, schema)?;
+        self.coerce_schema_type(value, schema)?;
+
+        // Evaluate negation against the coerced value.
+        self.apply_not(value, schema)
+    }
+
+    fn coerce_schema_type(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        match schema.get("type") {
+            Some(Value::String(expected)) => self.coerce_type(value, expected, schema),
+            Some(Value::Array(types)) => {
+                let allowed: Vec<&str> = types.iter().filter_map(Value::as_str).collect();
                 self.coerce_multiple_types(value, &allowed, schema)
-            } else {
-                Ok(())
             }
-        } else {
-            match value {
+            Some(_) => Ok(()),
+            None => match value {
                 Value::Object(_) => self.coerce_object(value, schema),
                 Value::Array(_) => self.coerce_array(value, schema),
                 _ => Ok(()),
-            }
-        };
-        result?;
-        self.handle_not(value, schema)
+            },
+        }
     }
 
     // Vector emits these simple negations for absent tags, nonzero numbers,
     // and mutually exclusive optional fields. Do not coerce to test a negation.
-    fn handle_not(&self, value: &Value, schema: &Value) -> Result<(), Error> {
+    fn apply_not(&self, value: &Value, schema: &Value) -> Result<(), Error> {
         let Some(negated) = schema.get("not") else {
             return Ok(());
         };
@@ -266,7 +286,7 @@ impl<'a> ValueCoercer<'a> {
             .is_some_and(|aliases| aliases.iter().any(|alias| alias.as_str() == Some(value)))
     }
 
-    fn handle_ref(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+    fn apply_reference(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         let Some(ref_str) = schema.get("$ref").and_then(|r| r.as_str()) else {
             return Ok(());
         };
@@ -290,17 +310,7 @@ impl<'a> ValueCoercer<'a> {
         }
     }
 
-    fn handle_bool(&mut self, schema: &Value) -> Result<(), Error> {
-        match schema.as_bool() {
-            Some(true) | None => Ok(()),
-            Some(false) => DisallowedPropertySnafu {
-                path: self.path.join("."),
-            }
-            .fail(),
-        }
-    }
-
-    fn handle_all_of(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+    fn apply_all_of(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         let Some(all_of) = schema.get("allOf").and_then(|v| v.as_array()) else {
             return Ok(());
         };
@@ -314,7 +324,7 @@ impl<'a> ValueCoercer<'a> {
 
     /// Select a `oneOf` variant, treating untagged schemas like `anyOf`.
     /// Final validation, including ambiguous variants, is left to serde.
-    fn handle_one_of(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+    fn apply_one_of(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         let Some(variants) = schema.get("oneOf").and_then(|v| v.as_array()) else {
             return Ok(());
         };
@@ -334,25 +344,53 @@ impl<'a> ValueCoercer<'a> {
     }
 
     /// Try an `anyOf` variant, leaving final validation to serde.
-    fn handle_any_of(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+    fn apply_any_of(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         let Some(variants) = schema.get("anyOf").and_then(|v| v.as_array()) else {
             return Ok(());
         };
         self.coerce_any_of(value, variants)
     }
 
-    fn handle_enum(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+    fn apply_enum(&self, value: &mut Value, schema: &Value) -> Result<(), Error> {
         let Some(enum_vals) = schema.get("enum").and_then(|v| v.as_array()) else {
             return Ok(());
         };
 
+        if Self::coerce_allowed_value(value, schema, enum_vals) {
+            Ok(())
+        } else {
+            InvalidEnumValueSnafu {
+                path: self.path.join("."),
+            }
+            .fail()
+        }
+    }
+
+    fn apply_const(&self, value: &mut Value, schema: &Value) -> Result<(), Error> {
+        let Some(const_val) = schema.get("const") else {
+            return Ok(());
+        };
+
+        if Self::coerce_allowed_value(value, schema, std::slice::from_ref(const_val)) {
+            Ok(())
+        } else {
+            InvalidConstSnafu {
+                path: self.path.join("."),
+                expected: const_val.to_string(),
+            }
+            .fail()
+        }
+    }
+
+    /// Shared scalar conversions for `enum` and `const`, preserving exact matches first.
+    fn coerce_allowed_value(value: &mut Value, schema: &Value, allowed: &[Value]) -> bool {
         // Exact match
-        if enum_vals.iter().any(|opt| value == opt)
+        if allowed.iter().any(|opt| value == opt)
             || value
                 .as_str()
                 .is_some_and(|value| Self::matches_variant_alias(schema, value))
         {
-            return Ok(());
+            return true;
         }
 
         // Try coercions from string
@@ -361,122 +399,53 @@ impl<'a> ValueCoercer<'a> {
 
             // String → Bool
             if let Ok(b) = s_trimmed.parse::<bool>()
-                && enum_vals.iter().any(|opt| opt.as_bool() == Some(b))
+                && allowed.iter().any(|opt| opt.as_bool() == Some(b))
             {
                 *value = Value::Bool(b);
-                return Ok(());
+                return true;
             }
 
             // String → Number
             if let Some(n) = parse_number(s_trimmed)
-                && enum_vals.iter().any(|opt| opt.as_number() == Some(&n))
+                && allowed.iter().any(|opt| opt.as_number() == Some(&n))
             {
                 *value = Value::Number(n);
-                return Ok(());
+                return true;
             }
 
             // String → Null
-            if s_trimmed.eq_ignore_ascii_case("null") && enum_vals.iter().any(|opt| opt.is_null()) {
+            if s_trimmed.eq_ignore_ascii_case("null") && allowed.iter().any(|opt| opt.is_null()) {
                 *value = Value::Null;
-                return Ok(());
+                return true;
             }
         }
 
         // Number → String
         if let Value::Number(n) = value {
             let val_str = n.to_string();
-            if enum_vals
+            if allowed
                 .iter()
                 .any(|opt| opt.as_str() == Some(val_str.as_str()))
             {
                 *value = Value::String(val_str);
-                return Ok(());
+                return true;
             }
         }
 
         // Bool → String
         if let Value::Bool(b) = value {
             let val_str = b.to_string();
-            if enum_vals.iter().any(|opt| {
+            if allowed.iter().any(|opt| {
                 opt.as_str()
                     .map(|s| s.eq_ignore_ascii_case(val_str.as_str()))
                     == Some(true)
             }) {
                 *value = Value::String(val_str);
-                return Ok(());
+                return true;
             }
         }
 
-        InvalidEnumValueSnafu {
-            path: self.path.join("."),
-        }
-        .fail()
-    }
-
-    fn handle_const(&mut self, value: &mut Value, schema: &Value) -> Result<(), Error> {
-        let Some(const_val) = schema.get("const") else {
-            return Ok(());
-        };
-
-        // Exact match
-        if value == const_val
-            || value
-                .as_str()
-                .is_some_and(|value| Self::matches_variant_alias(schema, value))
-        {
-            return Ok(());
-        }
-
-        // String input → try coercion
-        if let Value::String(s) = value {
-            let s_trimmed = s.trim();
-
-            // String → Bool
-            if let Ok(b) = s_trimmed.parse::<bool>()
-                && const_val.as_bool() == Some(b)
-            {
-                *value = Value::Bool(b);
-                return Ok(());
-            }
-
-            // String → Number
-            if let Some(n) = parse_number(s_trimmed)
-                && const_val.as_number() == Some(&n)
-            {
-                *value = Value::Number(n);
-                return Ok(());
-            }
-
-            // String → Null
-            if s_trimmed.eq_ignore_ascii_case("null") && const_val.is_null() {
-                *value = Value::Null;
-                return Ok(());
-            }
-        }
-
-        // Number → String
-        if let Value::Number(n) = value {
-            let val_str = n.to_string();
-            if const_val.as_str() == Some(val_str.as_str()) {
-                *value = Value::String(val_str);
-                return Ok(());
-            }
-        }
-
-        // Bool → String
-        if let Value::Bool(b) = value {
-            let val_str = b.to_string();
-            if const_val.as_str().map(|s| s.eq_ignore_ascii_case(&val_str)) == Some(true) {
-                *value = Value::String(val_str);
-                return Ok(());
-            }
-        }
-
-        InvalidConstSnafu {
-            path: self.path.join("."),
-            expected: const_val.to_string(),
-        }
-        .fail()
+        false
     }
 
     /// Ensure `value` matches one of the allowed types in `allowed`.
@@ -496,7 +465,7 @@ impl<'a> ValueCoercer<'a> {
         for allowed_type in allowed_types {
             let mut new_value = value.clone();
 
-            let result = self.try_coerce_to_allowed_type(&mut new_value, allowed_type, schema);
+            let result = self.coerce_type(&mut new_value, allowed_type, schema);
 
             if result.is_ok() {
                 *value = new_value;
@@ -522,27 +491,13 @@ impl<'a> ValueCoercer<'a> {
         expected_type: &str,
         schema: &Value,
     ) -> Result<(), Error> {
-        self.try_coerce_to_allowed_type(value, expected_type, schema)
-    }
-
-    fn try_coerce_to_allowed_type(
-        &mut self,
-        value: &mut Value,
-        allowed_type: &str,
-        schema: &Value,
-    ) -> Result<(), Error> {
-        match allowed_type {
+        match expected_type {
             "null" => self.coerce_null(value),
             "boolean" => self.coerce_bool(value),
             "integer" => self.coerce_integer(value),
             "number" => self.coerce_number(value),
             "string" => self.coerce_string(value),
-            "object" => {
-                if !value.is_object() {
-                    return fail_expected!(Object, value, self.path);
-                }
-                self.coerce_object(value, schema)
-            }
+            "object" => self.coerce_object(value, schema),
             "array" => {
                 // Any type can be wrapped to an array. This is needed because  we have deserialization logic that accepts
                 // e.g. a single string and converts it to an array, set or some other collection.
@@ -626,19 +581,8 @@ impl<'a> ValueCoercer<'a> {
                             .find(|field| Self::field_aliases(field).any(|alias| alias == key_str))
                     })
                 })
-                .or_else(|| {
-                    additional_properties.and_then(|additional| {
-                        if let Some(b) = additional.as_bool() {
-                            if b {
-                                None // allowed, no specific schema
-                            } else {
-                                Some(&Value::Bool(false)) // trigger error below
-                            }
-                        } else {
-                            Some(additional) // schema for additional_properties
-                        }
-                    })
-                });
+                // `true` allows the property without imposing a schema.
+                .or_else(|| additional_properties.filter(|schema| **schema != Value::Bool(true)));
 
             if let Some(field_schema) = field_schema {
                 if field_schema == &Value::Bool(false) {
@@ -692,13 +636,7 @@ impl<'a> ValueCoercer<'a> {
                     let initial_len = self.path.len();
                     self.path.push(idx.to_string());
 
-                    let schema = tuple_schemas.get(idx).or({
-                        match additional_items {
-                            Some(Value::Bool(false)) => Some(&Value::Bool(false)), // disallowed
-                            Some(s) => Some(s), // additional schema
-                            None => None,       // no schema → allow
-                        }
-                    });
+                    let schema = tuple_schemas.get(idx).or(additional_items);
 
                     if let Some(item_schema) = schema {
                         if item_schema == &Value::Bool(false) {
