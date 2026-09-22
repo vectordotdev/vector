@@ -113,3 +113,60 @@ async fn rotation_copy_truncate_with_unchanged_fingerprint() -> vector::Result<(
     assert_eq!(run.stop(Signal::SIGTERM).await?.messages, appended);
     Ok(())
 }
+
+#[tokio::test]
+async fn rotation_discovers_replacement_while_draining_backlog() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    let backlog = records("old-backlog", 10_000);
+    let replacement = records("replacement", 3);
+    let late = records("old-handle-late", 2);
+    fixture.write("active.log", &backlog)?;
+    let mut writer = OpenOptions::new()
+        .append(true)
+        .open(fixture.input.join("active.log"))?;
+    let mut run = fixture.start(
+        "*.log",
+        json!({"max_read_bytes": 64, "oldest_first": false}),
+    )?;
+    run.wait_for("first backlog record", |seen| !seen.messages.is_empty())
+        .await?;
+    std::fs::rename(
+        fixture.input.join("active.log"),
+        fixture.input.join("active.log.1"),
+    )?;
+    fixture.write("active.log", &replacement)?;
+    writer.write_all(lines(&late).as_bytes())?;
+    writer.sync_all()?;
+    run.wait_count(backlog.len() + replacement.len() + late.len())
+        .await?;
+    let seen = run.stop(Signal::SIGTERM).await?;
+    let new_position = seen
+        .messages
+        .iter()
+        .position(|line| line == &replacement[0])
+        .unwrap();
+    let last_old_position = seen
+        .messages
+        .iter()
+        .position(|line| line == backlog.last().unwrap())
+        .unwrap();
+    assert!(
+        new_position < last_old_position,
+        "replacement was not discovered until the backlog drained"
+    );
+    // Preserve ordering within each physical file while allowing fair interleaving.
+    let old: Vec<_> = seen
+        .messages
+        .iter()
+        .filter(|line| !line.starts_with("replacement-"))
+        .cloned()
+        .collect();
+    let new: Vec<_> = seen
+        .messages
+        .into_iter()
+        .filter(|line| line.starts_with("replacement-"))
+        .collect();
+    assert_eq!(old, [backlog, late].concat());
+    assert_eq!(new, replacement);
+    Ok(())
+}
