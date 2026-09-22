@@ -47,7 +47,7 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
         run: >-
-          "$VDEV" release workflow website-preflight --tag "$TAG"
+          vdev release workflow website-preflight --tag "$TAG"
 
       - name: Create Vector bot token
         if: steps.preflight.outputs.skip != 'true'
@@ -85,18 +85,20 @@ jobs:
           existing=$(git ls-remote "$remote" refs/heads/website)
           existing=${existing%%$'\t'*}
 
+          # Validate the candidate even when the website branch is absent or unchanged.
+          # The lease guards concurrent pushes, not a retry of an older release.
+          check_args=(--tag "$TAG" --release-commit "$RELEASE_COMMIT")
+          if [[ -n "$existing" ]]; then
+            git fetch --no-tags --depth=1 "$remote" "$existing"
+            check_args+=(--website-commit "$existing")
+          fi
+          vdev release workflow website-check "${check_args[@]}"
+
           # If website already identifies the release commit there is nothing to do.
           # This keeps workflow re-runs idempotent.
           if [[ "$existing" == "$RELEASE_COMMIT" ]]; then
             echo "Website branch already points to $RELEASE_COMMIT; nothing to do."
             exit 0
-          fi
-
-          # The lease guards concurrent pushes, not a retry of an older release.
-          # Compare against the observed website commit before replacing it.
-          if [[ -n "$existing" ]]; then
-            git fetch --no-tags --depth=1 "$remote" "$existing"
-            vdev release workflow website-check --tag "$TAG" --website-commit "$existing"
           fi
 
           # The explicit lease prevents a concurrent website push from being overwritten.

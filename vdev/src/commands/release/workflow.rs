@@ -100,9 +100,12 @@ struct WebsiteCheck {
     /// Stable release tag, e.g. v0.50.0.
     #[arg(long)]
     tag: String,
-    /// Current tip of the website branch, already fetched by the workflow.
+    /// Candidate release commit, already fetched by the workflow.
     #[arg(long)]
-    website_commit: String,
+    release_commit: String,
+    /// Current website tip, if the branch exists, already fetched by the workflow.
+    #[arg(long)]
+    website_commit: Option<String>,
 }
 
 #[derive(clap::Args, Debug)]
@@ -339,8 +342,16 @@ impl WebsiteCheck {
                 .context("release tag must start with v")?,
             "release tag version",
         )?;
-        git::ensure_sha(&self.website_commit, "website commit")?;
-        let current = cargo_version_at(&self.website_commit)?;
+        git::ensure_sha(&self.release_commit, "release commit")?;
+        ensure!(
+            cargo_version_at(&self.release_commit)? == release,
+            "release tag does not match Cargo.toml at the release commit"
+        );
+        let Some(website_commit) = self.website_commit else {
+            return Ok(());
+        };
+        git::ensure_sha(&website_commit, "website commit")?;
+        let current = cargo_version_at(&website_commit)?;
         // Only the version core (major.minor.patch) participates in the comparison;
         // prerelease and build suffixes on the website version are ignored.
         let release_tuple = (release.major, release.minor, release.patch);

@@ -892,20 +892,21 @@ mod website_check {
         commit(repo)
     }
 
-    fn check_website(repo: &Path, tag: &str, website: &str, success: bool) {
-        let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
-            .args([
-                "release",
-                "workflow",
-                "website-check",
-                "--tag",
-                tag,
-                "--website-commit",
-                website,
-            ])
-            .current_dir(repo)
-            .output()
-            .unwrap();
+    fn check_website(repo: &Path, tag: &str, release: &str, website: Option<&str>, success: bool) {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_vdev"));
+        command.args([
+            "release",
+            "workflow",
+            "website-check",
+            "--tag",
+            tag,
+            "--release-commit",
+            release,
+        ]);
+        if let Some(website) = website {
+            command.args(["--website-commit", website]);
+        }
+        let output = command.current_dir(repo).output().unwrap();
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert_eq!(output.status.success(), success, "{stderr}");
     }
@@ -915,8 +916,9 @@ mod website_check {
         for website_version in ["0.60.0-dev", "0.59.1"] {
             let (temp, _) = preparation();
             let repo = temp.path();
+            let release = git(repo, &["rev-parse", "HEAD"]);
             let website = website(repo, website_version);
-            check_website(repo, "v0.59.0", &website, false);
+            check_website(repo, "v0.59.0", &release, Some(&website), false);
         }
     }
 
@@ -926,10 +928,10 @@ mod website_check {
         let (temp, _) = preparation();
         let repo = temp.path();
         let newer = website(repo, "0.10.0");
-        check_website(repo, "v0.9.0", &newer, false);
-
         let older = website(repo, "0.9.0");
-        check_website(repo, "v0.10.0", &older, true);
+        check_website(repo, "v0.9.0", &older, Some(&newer), false);
+
+        check_website(repo, "v0.10.0", &newer, Some(&older), true);
     }
 
     #[test]
@@ -937,8 +939,9 @@ mod website_check {
         for website_version in ["0.59.0-dev", "0.59.0+build.5"] {
             let (temp, _) = preparation();
             let repo = temp.path();
+            let release = git(repo, &["rev-parse", "HEAD"]);
             let website = website(repo, website_version);
-            check_website(repo, "v0.59.0", &website, true);
+            check_website(repo, "v0.59.0", &release, Some(&website), true);
         }
     }
 
@@ -946,26 +949,28 @@ mod website_check {
     fn reads_the_version_at_the_requested_commit_not_the_checkout() {
         let (temp, _) = preparation();
         let repo = temp.path();
+        let release = git(repo, &["rev-parse", "HEAD"]);
         let newer = website(repo, "0.60.0");
         version(repo, "0.58.0");
         let older = commit(repo);
         // The checkout looks older than the release, but the requested website
         // commit is newer and must still be refused.
-        check_website(repo, "v0.59.0", &newer, false);
+        check_website(repo, "v0.59.0", &release, Some(&newer), false);
 
         version(repo, "0.60.0");
         commit(repo);
         // The checkout looks newer, but the requested website commit is older.
-        check_website(repo, "v0.59.0", &older, true);
+        check_website(repo, "v0.59.0", &release, Some(&older), true);
     }
 
     #[test]
     fn rejects_invalid_tags() {
         let (temp, _) = preparation();
         let repo = temp.path();
+        let release = git(repo, &["rev-parse", "HEAD"]);
         let website = website(repo, "0.58.0");
         for tag in ["0.59.0", "v0.59.0-rc.1"] {
-            check_website(repo, tag, &website, false);
+            check_website(repo, tag, &release, Some(&website), false);
         }
     }
 
@@ -973,8 +978,9 @@ mod website_check {
     fn rejects_malformed_and_unknown_website_commits() {
         let (temp, _) = preparation();
         let repo = temp.path();
+        let release = git(repo, &["rev-parse", "HEAD"]);
         for commit in ["not-a-commit", "0000000000000000000000000000000000000000"] {
-            check_website(repo, "v0.59.0", commit, false);
+            check_website(repo, "v0.59.0", &release, Some(commit), false);
         }
     }
 
@@ -982,13 +988,49 @@ mod website_check {
     fn rejects_a_website_commit_without_a_manifest_version() {
         let (temp, _) = preparation();
         let repo = temp.path();
+        let release = git(repo, &["rev-parse", "HEAD"]);
         write(
             repo,
             "Cargo.toml",
             "[dependencies]\nvrl = { workspace = true }\n",
         );
         let website = commit(repo);
-        check_website(repo, "v0.59.0", &website, false);
+        check_website(repo, "v0.59.0", &release, Some(&website), false);
+    }
+
+    #[test]
+    fn rejects_mismatched_release_commits_even_without_a_website_branch() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let previous = git(repo, &["rev-parse", "HEAD"]);
+        for candidate_version in ["0.59.1-dev", "0.59.1+build", "0.58.0"] {
+            let candidate = website(repo, candidate_version);
+            // A matching checkout must not hide a mismatched candidate commit.
+            website(repo, "0.59.1");
+            for current in [None, Some(previous.as_str()), Some(candidate.as_str())] {
+                check_website(repo, "v0.59.1", &candidate, current, false);
+            }
+        }
+    }
+
+    #[test]
+    fn accepts_a_matching_patch_release_with_or_without_a_website_branch() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let previous = git(repo, &["rev-parse", "HEAD"]);
+        let release = website(repo, "0.59.1");
+        for current in [None, Some(previous.as_str()), Some(release.as_str())] {
+            check_website(repo, "v0.59.1", &release, current, true);
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_release_commits_without_a_website_branch() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        for release in ["not-a-commit", "0000000000000000000000000000000000000000"] {
+            check_website(repo, "v0.59.0", release, None, false);
+        }
     }
 }
 
