@@ -649,7 +649,7 @@ where
                         (
                             "interrupt",
                             ExpressionError::Interrupted,
-                            self.drop_on_abort,
+                            self.drop_on_error,
                         )
                     }
                 };
@@ -735,7 +735,7 @@ mod tests {
         )
     }
 
-    fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
+    fn remap_with_runner<Runner: VrlRunner>(config: RemapConfig) -> Result<Remap<Runner>> {
         let schema_definitions = HashMap::from([
             (
                 None,
@@ -747,8 +747,29 @@ mod tests {
             ),
         ]);
 
-        Remap::new_ast(config, &TransformContext::new_test(schema_definitions))
-            .map(|(remap, _)| remap)
+        Remap::new(config, &TransformContext::new_test(schema_definitions)).map(|(remap, _)| remap)
+    }
+
+    fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
+        remap_with_runner(config)
+    }
+
+    #[derive(Clone)]
+    struct InterruptingRunner;
+
+    impl VrlRunner for InterruptingRunner {
+        fn new() -> Self {
+            Self
+        }
+
+        fn run(
+            &mut self,
+            _: &mut VrlTarget,
+            _: &Program,
+            _: &TimeZone,
+        ) -> std::result::Result<Value, Terminate> {
+            Err(Terminate::Interrupted)
+        }
     }
 
     #[test]
@@ -784,6 +805,21 @@ mod tests {
             &err,
             "must provide exactly one of `source` or `file` or `files` configuration"
         )
+    }
+
+    #[test]
+    fn interrupted_execution_uses_error_drop_policy() {
+        let config = RemapConfig {
+            source: Some(".not_an_int = int!(.bar)".to_owned()),
+            drop_on_error: true,
+            drop_on_abort: false,
+            ..Default::default()
+        };
+        let mut transform = remap_with_runner::<InterruptingRunner>(config).unwrap();
+
+        let output = collect_outputs(&mut transform, Event::from(LogEvent::from("message")));
+
+        assert_eq!(output.primary.len(), 0);
     }
 
     fn get_field_string(event: &Event, field: &str) -> String {
