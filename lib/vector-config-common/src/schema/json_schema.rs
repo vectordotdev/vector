@@ -612,7 +612,7 @@ impl<T: PartialEq> SingleOrVec<T> {
     /// Returns `true` if `self` is either a `Single` equal to `x`, or a `Vec` containing `x`.
     pub fn contains(&self, x: &T) -> bool {
         match self {
-            SingleOrVec::Single(s) => &**s == x,
+            SingleOrVec::Single(s) => s.as_ref() == x,
             SingleOrVec::Vec(v) => v.contains(x),
         }
     }
