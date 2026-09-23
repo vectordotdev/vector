@@ -48,9 +48,8 @@ pub struct PostgresConfig {
     /// as table names as parameters in prepared statements are not allowed in PostgreSQL.
     pub table: String,
 
-    /// The columns to insert data into. If not specified, all columns matching from the input data will be used and inserted into the table.
+    /// The columns to insert data into. If not specified, all columns in the destination table are used.
     /// This allows you to exclude columns like serial/auto-increment columns that should be handled by PostgreSQL.
-    /// This parameter is vulnerable to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub columns: Vec<String>,
 
@@ -205,7 +204,7 @@ impl ValidatedSink for PostgresConfig {
         let healthcheck = healthcheck(connection_pool.clone()).boxed();
 
         // The endpoint label must not carry credentials or query parameters.
-        let endpoint = protocol_endpoint(endpoint_uri.uri.clone()).1;
+        let endpoint = protocol_endpoint(endpoint_uri.uri).1;
         let service = PostgresService::new(
             connection_pool,
             self.table.clone(),

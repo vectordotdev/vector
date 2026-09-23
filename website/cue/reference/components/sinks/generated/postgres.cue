@@ -30,9 +30,8 @@ generated: components: sinks: postgres: configuration: {
 	}
 	columns: {
 		description: """
-			The columns to insert data into. If not specified, all columns matching from the input data will be used and inserted into the table.
+			The columns to insert data into. If not specified, all columns in the destination table are used.
 			This allows you to exclude columns like serial/auto-increment columns that should be handled by PostgreSQL.
-			This parameter is vulnerable to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
 			"""
 		required: false
 		type: array: {

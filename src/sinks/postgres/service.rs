@@ -132,8 +132,15 @@ pub enum PostgresServiceError {
     #[snafu(display("Database error: {source}"))]
     Postgres { source: sqlx::Error },
 
+    #[snafu(display("JSON serialization error: {source}"))]
+    Json { source: serde_json::Error },
+
     #[snafu(display("Serialization error: {source}"))]
     VectorCommon { source: vector_common::Error },
+}
+
+fn quote_identifier(identifier: &str) -> String {
+    format!("\"{}\"", identifier.replace('"', "\"\""))
 }
 
 impl Service<PostgresRequest> for PostgresService {
@@ -150,7 +157,7 @@ impl Service<PostgresRequest> for PostgresService {
         let future = async move {
             let table = service.table;
             let columns = service.columns;
-            let metadata = request.metadata;
+            let mut metadata = request.metadata;
             let json_serializer = JsonSerializerConfig::default().build();
             let serialized_values = request
                 .events
@@ -161,7 +168,7 @@ impl Service<PostgresRequest> for PostgresService {
             let serialized_values = if columns.is_empty() {
                 serialized_values
             } else {
-                serialized_values
+                let serialized_values = serialized_values
                     .into_iter()
                     .map(|mut value| {
                         if let serde_json::Value::Object(object) = &mut value {
@@ -169,7 +176,18 @@ impl Service<PostgresRequest> for PostgresService {
                         }
                         value
                     })
-                    .collect()
+                    .collect::<Vec<_>>();
+                let request_encoded_size = serde_json::to_vec(&serialized_values)
+                    .context(JsonSnafu)?
+                    .len();
+                metadata = RequestMetadata::new(
+                    metadata.event_count(),
+                    metadata.events_byte_size(),
+                    request_encoded_size,
+                    request_encoded_size,
+                    metadata.events_estimated_json_encoded_byte_size().clone(),
+                );
+                serialized_values
             };
 
             let query = if columns.is_empty() {
@@ -177,10 +195,13 @@ impl Service<PostgresRequest> for PostgresService {
                     "INSERT INTO {table} SELECT * FROM jsonb_populate_recordset(NULL::{table}, $1)"
                 )
             } else {
-                let columns_str = columns.join(", ");
+                let columns_str = columns
+                    .iter()
+                    .map(|column| quote_identifier(column))
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 format!(
-                    "INSERT INTO {table} ({}) SELECT {} FROM jsonb_populate_recordset(NULL::{table}, $1)",
-                    columns_str, columns_str
+                    "INSERT INTO {table} ({columns_str}) SELECT {columns_str} FROM jsonb_populate_recordset(NULL::{table}, $1)"
                 )
             };
 
@@ -200,5 +221,18 @@ impl Service<PostgresRequest> for PostgresService {
         };
 
         Box::pin(future)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::quote_identifier;
+
+    #[test]
+    fn quotes_postgres_identifiers() {
+        assert_eq!(quote_identifier("host"), "\"host\"");
+        assert_eq!(quote_identifier("Host"), "\"Host\"");
+        assert_eq!(quote_identifier("select"), "\"select\"");
+        assert_eq!(quote_identifier("quoted\"name"), "\"quoted\"\"name\"");
     }
 }

@@ -28,3 +28,5 @@ sinks:
 This allows excluding columns like serial/auto-increment columns that should be handled by PostgreSQL, fixing the issue where NULL values were inserted into serial columns.
 
 Fixes #24461
+
+authors: farhan1032 chris-1o
