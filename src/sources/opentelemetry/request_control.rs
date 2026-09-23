@@ -2,7 +2,7 @@ use std::{
     convert::Infallible,
     future::Future,
     pin::Pin,
-    sync::{Arc, Mutex},
+    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -11,7 +11,7 @@ use http::{Request, Response, StatusCode};
 use hyper::Body;
 use metrics::{Counter, Gauge};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use tokio_util::sync::PollSemaphore;
+use tokio_util::sync::{CancellationToken, PollSemaphore};
 use tonic::body::BoxBody;
 use tower::{
     BoxError, Layer, Service, ServiceExt, buffer::BufferLayer, load_shed::error::Overloaded,
@@ -130,21 +130,13 @@ impl RequestControlMetrics {
 #[derive(Clone)]
 struct QueuedRequest(#[expect(dead_code)] LevelToken);
 
+/// Signals the middleware-owned processing permit to be released early.
 #[derive(Clone)]
-pub(crate) struct RequestProcessingPermit(Arc<Mutex<Option<OwnedSemaphorePermit>>>);
+pub(crate) struct RequestProcessingPermit(CancellationToken);
 
 impl RequestProcessingPermit {
-    fn new(permit: OwnedSemaphorePermit) -> Self {
-        Self(Arc::new(Mutex::new(Some(permit))))
-    }
-
     pub(crate) fn release(&self) {
-        drop(
-            self.0
-                .lock()
-                .expect("processing permit lock poisoned")
-                .take(),
-        );
+        self.0.cancel();
     }
 }
 
@@ -175,6 +167,8 @@ impl<S: Clone> Clone for ProcessingLimitService<S> {
 impl<S> Service<Request<Body>> for ProcessingLimitService<S>
 where
     S: Service<Request<Body>>,
+    S::Response: Send,
+    S::Error: Send,
     S::Future: Send + 'static,
 {
     type Response = S::Response;
@@ -198,12 +192,20 @@ where
             .take()
             .expect("processing limit must be ready before call");
         drop(request.extensions_mut().remove::<QueuedRequest>());
-        let processing = RequestProcessingPermit::new(permit);
-        request.extensions_mut().insert(processing.clone());
+        let release = CancellationToken::new();
+        request
+            .extensions_mut()
+            .insert(RequestProcessingPermit(release.clone()));
         let future = self.inner.call(request);
         Box::pin(async move {
-            let _processing = processing;
-            future.await
+            tokio::pin!(future);
+            tokio::select! {
+                result = &mut future => result,
+                () = release.cancelled() => {
+                    drop(permit);
+                    future.await
+                }
+            }
         })
     }
 }
@@ -382,6 +384,7 @@ impl ErrorResponse<Response<BoxBody>> for GrpcErrorResponse {
 #[cfg(test)]
 mod tests {
     use std::{
+        future::{Ready, ready},
         sync::{
             Arc,
             atomic::{AtomicUsize, Ordering},
@@ -420,6 +423,23 @@ mod tests {
                 response: Arc::clone(&self.response),
                 release_processing: self.release_processing,
             }
+        }
+    }
+
+    #[derive(Clone)]
+    struct FailingService;
+
+    impl Service<Request<Body>> for FailingService {
+        type Response = Response<Body>;
+        type Error = std::io::Error;
+        type Future = Ready<Result<Self::Response, Self::Error>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _request: Request<Body>) -> Self::Future {
+            ready(Err(std::io::Error::other("request failed")))
         }
     }
 
@@ -562,6 +582,18 @@ mod tests {
         first.await.unwrap().unwrap();
         second.await.unwrap().unwrap();
         assert_eq!(control.inner.available_permits(), 1);
+    }
+
+    #[tokio::test]
+    async fn inner_error_releases_capacity() {
+        let control = RequestControl::new(1, 1, Duration::from_secs(5));
+        let service = control.http_layer().layer(FailingService);
+
+        let response = service.oneshot(Request::new(Body::empty())).await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(control.outer.available_permits(), 1);
+        assert_eq!(control.inner.available_permits(), 1);
+        wait_for_level(&control.metrics.queued, 0).await;
     }
 
     #[tokio::test]
