@@ -38,7 +38,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		relevant_when: "version = \"1\""
 		required:      false
 		type: string: examples: [
-			"any"
+			"any",
 		]
 	}
 	database: {
@@ -82,7 +82,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		required:      false
 		required_when: "version = \"2\""
 		type: string: examples: [
-			"my-org"
+			"my-org",
 		]
 	}
 	password: {
@@ -166,7 +166,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		relevant_when: "version = \"1\""
 		required:      false
 		type: string: examples: [
-			"todd"
+			"todd",
 		]
 	}
 	version: {
