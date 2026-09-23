@@ -50,6 +50,9 @@ jobs:
       - name: Require active release freeze
         if: steps.validation.outputs.tag_required == 'true'
         uses: ./.github/actions/require-release-freeze
+        with: &release-bot
+          app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
 
   tag:
     name: Create release tag and branch
@@ -66,6 +69,7 @@ jobs:
 
       - name: Require active release freeze
         uses: ./.github/actions/require-release-freeze
+        with: *release-bot
 
       - name: Create Vector bot token
         id: app-token

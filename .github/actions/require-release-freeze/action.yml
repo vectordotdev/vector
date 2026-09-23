@@ -1,17 +1,41 @@
 name: Require active release freeze
-description: Fail unless the repository's Release freeze ruleset is active.
+description: Require an active master freeze, bot direct-push access, and force-push protection.
+inputs:
+  app-client-id:
+    description: Client ID of the vectordotdev-bot GitHub App.
+    required: true
+  app-private-key:
+    description: Private key of the vectordotdev-bot GitHub App.
+    required: true
 runs:
   using: composite
   steps:
-    # This is a best-effort guard and remains susceptible to TOCTOU changes after the check.
-    # Maintainers must respect the release freeze window until housekeeping has merged.
-    - name: Check release freeze ruleset
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+    # Query as the bot: GITHUB_TOKEN cannot prove the bot's bypass permissions,
+    # and reading bypass_actors requires ruleset write access.
+    - name: Create Vector bot token for freeze checks
+      id: bot-token
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
       with:
+        client-id: ${{ inputs.app-client-id }}
+        private-key: ${{ inputs.app-private-key }}
+        permission-contents: write
+
+    # This is a best-effort guard and remains susceptible to TOCTOU changes after the check.
+    # Keep the freeze and temporary bot bypasses until housekeeping and manifests finish.
+    - name: Check release freeze and bot permissions
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        BOT_APP_SLUG: ${{ steps.bot-token.outputs.app-slug }}
+      with:
+        github-token: ${{ steps.bot-token.outputs.token }}
         script: |
+          if (process.env.BOT_APP_SLUG !== "vectordotdev-bot") {
+            core.setFailed("Release freeze checks require the vectordotdev-bot GitHub App.");
+            return;
+          }
           const rulesets = await github.paginate(
             "GET /repos/{owner}/{repo}/rulesets",
-            context.repo,
+            { ...context.repo, includes_parents: true },
           );
           const matches = rulesets.filter(
             (ruleset) => ruleset.name === "Release freeze",
@@ -23,5 +47,53 @@ runs:
             return;
           }
           if (matches[0].enforcement !== "active") {
-            core.setFailed("The Release freeze ruleset must stay active until housekeeping merges.");
+            core.setFailed("The Release freeze ruleset must stay active until housekeeping and manifests finish.");
+            return;
+          }
+
+          // Let GitHub resolve branch patterns and inherited rulesets. An active
+          // freeze targeting a different branch does not protect master.
+          const rules = await github.paginate(
+            "GET /repos/{owner}/{repo}/rules/branches/{branch}",
+            { ...context.repo, branch: "master" },
+          );
+          if (!rules.some((rule) => rule.ruleset_id === matches[0].id && rule.type === "update")) {
+            core.setFailed("Release freeze must restrict updates to master.");
+            return;
+          }
+          const details = await Promise.all(
+            [...new Set(rules.map((rule) => rule.ruleset_id))].map(async (id) => {
+              const { data } = await github.request(
+                "GET /repos/{owner}/{repo}/rulesets/{ruleset_id}",
+                { ...context.repo, ruleset_id: id, includes_parents: true },
+              );
+              return data;
+            }),
+          );
+          const modes = new Set(["always", "exempt", "pull_requests_only", "never"]);
+          for (const ruleset of details) {
+            if (!modes.has(ruleset.current_user_can_bypass)) {
+              core.setFailed(`Cannot determine vectordotdev-bot bypass access for ${ruleset.name}.`);
+              return;
+            }
+          }
+          const canPush = (ruleset) => ["always", "exempt"].includes(ruleset.current_user_can_bypass);
+          const byId = new Map(details.map((ruleset) => [ruleset.id, ruleset]));
+
+          // These rules permit an ordinary, single-parent update. All other
+          // effective rules require a direct-push bypass, not a PR-only bypass.
+          const pushSafe = new Set(["creation", "deletion", "non_fast_forward", "required_linear_history"]);
+          for (const ruleset of details) {
+            const blocking = rules.filter((rule) => rule.ruleset_id === ruleset.id && !pushSafe.has(rule.type));
+            if (blocking.length > 0 && !canPush(ruleset)) {
+              core.setFailed(
+                `vectordotdev-bot needs an always bypass for ${ruleset.name} during the release freeze (${blocking.map((rule) => rule.type).join(", ")}). A pull-request-only bypass does not allow direct pushes.`,
+              );
+            }
+          }
+          // Bypassing PR/check rules must not also permit rewriting or deleting master.
+          for (const type of ["non_fast_forward", "deletion"]) {
+            if (!rules.some((rule) => rule.type === type && !canPush(byId.get(rule.ruleset_id)))) {
+              core.setFailed(`master must retain an active ${type} rule that vectordotdev-bot cannot bypass.`);
+            }
           }

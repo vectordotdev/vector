@@ -16,15 +16,27 @@ export RELEASE_BRANCH="v${NEW_VECTOR_VERSION%.*}"
 
 - [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed.
   - VRL release steps: https://github.com/vectordotdev/vrl/blob/main/release/README.md
-- [ ] Set the `Release freeze` ruleset to **Active** in [repository rulesets](https://github.com/vectordotdev/vector/settings/rules).
+- [ ] Set up the direct-push window in [repository rulesets](https://github.com/vectordotdev/vector/settings/rules).
+      GitHub rulesets are additive, so the `vectordotdev-bot` needs an explicit
+      **Always** bypass on the following rulesets for the duration of the release:
+  - [ ] Set the `Release freeze` ruleset to **Active**.
+  - [ ] In the `Release freeze` ruleset, change the `vectordotdev-bot` bypass from
+        **Pull request** to **Always**.
+  - [ ] Add a `vectordotdev-bot` **Always** bypass to the `master-write-permissions`
+        ruleset (active update rule; by default it blocks direct branch updates of `master`).
+  - [ ] Add a `vectordotdev-bot` **Always** bypass to the `master required checks + mq`
+        ruleset (active PR/checks/queue rules; by default they require a PR to update `master`).
+  - [ ] Leave the `master-push-rules` ruleset (deletion/non-fast-forward protections)
+        untouched; it does not block normal non-force pushes and must keep no bypasses.
 - [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml)
       workflow from `master` with `version` set to the stable Vector version and `vrl_version` to the exact released VRL version.
 - [ ] Review the bot-authored `prepare-v-<major>-<minor>-<patch>-website` PR: edit the release description,
       changelog, upgrade guidance, and release date as needed. Review deprecations with
       `cargo vdev deprecation show --version "${NEW_VECTOR_VERSION}"`.
 
-Keep the freeze active until housekeeping has merged. Maintainers with bypass access must also
-respect this window: do not merge unrelated PRs into `master`.
+Keep the freeze active until **both** the release workflow's housekeeping PR has
+merged **and** the Kubernetes manifests push below has completed. Maintainers with
+bypass access must also respect this window: do not merge unrelated PRs into `master`.
 
 # Publish the release
 
@@ -53,7 +65,17 @@ The tag starts the release workflow; do not create the tag or release branch man
 
 - [ ] Wait for the release workflow to merge its housekeeping PR after checks pass.
       It begins the next minor `-dev` version, restores VRL `main`, and refreshes licenses and documentation.
+- [ ] Wait for the Helm chart release to push the Kubernetes manifests directly to `master`.
+  - The chart release triggers [Refresh Kubernetes manifests](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml),
+    which runs `cargo vdev build manifests` and, when the generated manifests differ,
+    commits and pushes them to `master` itself as the `vectordotdev-bot` — no PR, no review,
+    no merge queue. If the run reports no changes, the manifests already match the chart.
+- [ ] Close out the direct-push window **before** disabling the freeze:
+  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
+        `master-write-permissions` ruleset.
+  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
+        `master required checks + mq` ruleset.
+  - [ ] In the `Release freeze` ruleset, restore the `vectordotdev-bot` bypass from
+        **Always** back to **Pull request**.
+  - [ ] Verify the `master-push-rules` ruleset still has no bypasses.
 - [ ] Set the `Release freeze` ruleset back to **Disabled**.
-- [ ] Approve the automated manifests PR the Helm chart release opens, letting auto-merge complete it.
-  - The Helm chart release triggers [Refresh Kubernetes manifests](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml)
-    which runs `cargo vdev build manifests` and opens the PR automatically.

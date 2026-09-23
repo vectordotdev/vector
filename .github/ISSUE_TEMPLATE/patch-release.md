@@ -38,6 +38,22 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
 - [ ] Open PR against the release branch (`"${RELEASE_BRANCH}"`) for review
 - [ ] PR approval
 
+Patch releases also need the release freeze and the temporary bot bypasses so the
+automated Kubernetes manifests push can reach `master`. Set this up in
+[repository rulesets](https://github.com/vectordotdev/vector/settings/rules) before the
+Helm release, and keep it in place until the manifests push has completed.
+
+- [ ] Set up the direct-push window before the Helm release:
+  - [ ] Set the `Release freeze` ruleset to **Active**.
+  - [ ] In the `Release freeze` ruleset, change the `vectordotdev-bot` bypass from
+        **Pull request** to **Always**.
+  - [ ] Add a `vectordotdev-bot` **Always** bypass to the `master-write-permissions`
+        ruleset (active update rule; by default it blocks direct branch updates of `master`).
+  - [ ] Add a `vectordotdev-bot` **Always** bypass to the `master required checks + mq`
+        ruleset (active PR/checks/queue rules; by default they require a PR to update `master`).
+  - [ ] Leave the `master-push-rules` ruleset (deletion/non-fast-forward protections)
+        untouched; it does not block normal non-force pushes and must keep no bypasses.
+
 # On the day of release
 
 - [ ] Ensure release date in cue matches current date.
@@ -61,9 +77,22 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
   - The Vector release workflow starts [Helm release preparation](https://github.com/vectordotdev/helm-charts/actions/workflows/release-prepare.yml)
     automatically for the latest stable Vector release.
   - See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md) for the review steps.
-- [ ] Once Helm chart is released, approve the automated manifests PR, letting auto-merge complete it
-  - The Helm chart release triggers [Refresh Kubernetes manifests](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml)
-    which runs `cargo vdev build manifests` and opens the PR automatically
+- [ ] Once the Helm chart is released, wait for the Kubernetes manifests push to `master`.
+  - The chart release triggers [Refresh Kubernetes manifests](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml),
+    which runs `cargo vdev build manifests` and, when the generated manifests differ,
+    commits and pushes them to `master` itself as the `vectordotdev-bot` — no PR, no review,
+    no merge queue. If the run reports no changes, the manifests already match the chart.
+- [ ] After the manifests push succeeds, close out the direct-push window **before**
+      disabling the freeze:
+  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
+        `master-write-permissions` ruleset.
+  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
+        `master required checks + mq` ruleset.
+  - [ ] In the `Release freeze` ruleset, restore the `vectordotdev-bot` bypass from
+        **Always** back to **Pull request**.
+  - [ ] Verify the `master-push-rules` ruleset still has no bypasses.
+  - [ ] Set the `Release freeze` ruleset back to **Disabled**.
+
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Wait for the release workflow to reset the `website` branch to the release commit
       (`refs/heads/website` is force-pushed to the release branch HEAD) to update

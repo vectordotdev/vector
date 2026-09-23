@@ -1,5 +1,7 @@
 # Regenerate distribution/kubernetes manifests from the published Helm chart and
-# open a PR that merges after checks pass, exactly like the housekeeping PR path.
+# push them directly to master as the vectordotdev-bot. The direct push is
+# authorized by the release freeze window and the temporary bot bypasses on the
+# master rulesets that the release checklists set up and later remove.
 # The Helm chart release workflow dispatches this after publishing a new chart.
 # This replaces the manual `cargo vdev build manifests` step from the release
 # checklists.
@@ -15,8 +17,6 @@ on:
         type: string
 permissions:
   contents: read # Restrictive default
-  pull-requests: read # Required to find the open manifests PR in the merge job
-  checks: read # Required to wait on PR checks in the merge job
 
 concurrency:
   # Serialize manifest refreshes; a queued run picks up the newest chart anyway.
@@ -25,13 +25,10 @@ concurrency:
 
 jobs:
   refresh-manifests:
-    name: Regenerate manifests and open checked PR
+    name: Regenerate manifests and push to master
     if: github.repository == 'vectordotdev/vector'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    outputs:
-      head_sha: ${{ steps.pr.outputs.head_sha }}
-      branch: ${{ steps.pr.outputs.branch }}
     steps:
       - name: Checkout master
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,6 +36,12 @@ jobs:
           ref: master
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Require active release freeze
+        uses: ./.github/actions/require-release-freeze
+        with: &release-bot
+          app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
 
       - name: Set up manifest generation
         uses: ./.github/actions/setup
@@ -102,15 +105,17 @@ jobs:
           client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
           permission-contents: write
-          permission-pull-requests: write
 
-      - name: Open manifests PR
+      - name: Require active release freeze
         if: steps.changes.outputs.changed == 'true'
-        id: pr
+        uses: ./.github/actions/require-release-freeze
+        with: *release-bot
+
+      - name: Push manifests to master
+        if: steps.changes.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           CHART_VERSION: ${{ steps.chart.outputs.version }}
-          BRANCH: release/manifests-${{ steps.chart.outputs.version }}
         run: |
           set -euo pipefail
           # All remote git operations go through the token-authenticated URL. The
@@ -126,90 +131,13 @@ jobs:
 
           git config user.name "vectordotdev-bot[bot]"
           git config user.email "vectordotdev-bot[bot]@users.noreply.github.com"
-          git switch -c "$BRANCH"
-          # Changes are already staged by the Check for changes step.
+          # Commit only the generated manifest changes staged by the Check for
+          # changes step; nothing else is committed.
           git commit -m "chore(kubernetes): refresh manifests for chart ${CHART_VERSION}"
 
-          # Re-running must update the existing branch rather than failing or
-          # force-pushing history someone may already be reviewing.
-          if existing=$(git ls-remote "$remote" "refs/heads/$BRANCH"); then
-            existing=${existing%%$'\t'*}
-            git push --force-with-lease="refs/heads/$BRANCH:$existing" \
-              "$remote" "HEAD:refs/heads/$BRANCH"
-          else
-            git push "$remote" "HEAD:refs/heads/$BRANCH"
-          fi
+          # Plain non-force push: if master raced ahead since the check above,
+          # the push is rejected rather than rewriting history. Re-run this
+          # workflow from the new master; never rebase, retry, or force-push.
+          git push "$remote" HEAD:refs/heads/master
 
-          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
-            --app vectordotdev-bot --state open --json url --jq '.[0].url // empty')
-          if [[ -z "$url" ]]; then
-            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
-              --title "chore(kubernetes): refresh manifests for chart ${CHART_VERSION}" \
-              --label no-changelog \
-              --body "Regenerate \`distribution/kubernetes\` from the published Helm chart \`vector-${CHART_VERSION}\` via \`cargo vdev build manifests\`. The workflow merges the checked commit after checks pass.")
-          fi
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "Manifests PR: $url" >> "$GITHUB_STEP_SUMMARY"
-
-  merge-pr:
-    name: Merge checked manifests commit
-    needs: refresh-manifests
-    # Also resume an already published branch when generation skipped on a retry.
-    # An up-to-date checkout has no changes and must not attempt another merge.
-    if: >-
-      !cancelled() && needs.refresh-manifests.result == 'success' &&
-      needs.refresh-manifests.outputs.branch != ''
-    runs-on: ubuntu-24.04
-    timeout-minutes: 95
-    steps:
-      - name: Select manifests commit
-        id: pr
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ needs.refresh-manifests.outputs.branch }}
-          EXPECTED_HEAD: ${{ needs.refresh-manifests.outputs.head_sha }}
-        run: |
-          set -euo pipefail
-          prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
-            --app vectordotdev-bot --state open --json number,headRefOid,isCrossRepository)
-          jq -e 'length == 1 and .[0].isCrossRepository == false' <<< "$prs" >/dev/null
-          number=$(jq -r '.[0].number' <<< "$prs")
-          head_sha=$(jq -r '.[0].headRefOid' <<< "$prs")
-          [[ -z "$EXPECTED_HEAD" || "$head_sha" == "$EXPECTED_HEAD" ]]
-          printf 'number=%s\nhead_sha=%s\n' "$number" "$head_sha" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for checks on the selected commit
-        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
-        with:
-          ref: ${{ steps.pr.outputs.head_sha }}
-          repo-token: ${{ github.token }}
-          running-workflow-name: Merge checked manifests commit
-          check-regexp: ".+"
-          allowed-conclusions: success,skipped,neutral
-          checks-discovery-timeout: 300
-          wait-interval: 15
-
-      - name: Create Vector bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
-      - name: Merge only the checked commit
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
-        run: |
-          set -euo pipefail
-          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --json state,baseRefName,headRefOid | \
-            jq -e --arg head "$HEAD_SHA" \
-              '.state == "OPEN" and .baseRefName == "master" and .headRefOid == $head' >/dev/null
-          gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --squash --admin --match-head-commit "$HEAD_SHA"
-          echo "Merged manifests PR #${PR_NUMBER} at ${HEAD_SHA}." >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed manifests commit $(git rev-parse HEAD) to master for chart ${CHART_VERSION}." >> "$GITHUB_STEP_SUMMARY"

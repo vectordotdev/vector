@@ -40,6 +40,9 @@ jobs:
 
       - name: Require active release freeze
         uses: ./.github/actions/require-release-freeze
+        with:
+          app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
 
       - name: Record frozen base
         id: base
