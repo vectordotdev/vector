@@ -24,7 +24,7 @@ use tonic::{
     server::NamedService,
     transport::server::{Connected, Routes, Server},
 };
-use tower::{Layer, Service};
+use tower::{Layer, Service, ServiceBuilder};
 use tower_http::{
     classify::{GrpcErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
@@ -34,6 +34,7 @@ use tracing::Span;
 use crate::{
     internal_events::{GrpcServerRequestReceived, GrpcServerResponseSent},
     shutdown::{ShutdownSignal, ShutdownSignalToken},
+    sources::util::request_limiter::RequestLimiter,
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsAcceptorReloader},
 };
 use vector_lib::configurable::configurable_component;
@@ -411,6 +412,51 @@ pub async fn run_grpc_server_with_routes(
     keepalive: GrpcKeepaliveConfig,
     shutdown: ShutdownSignal,
 ) -> crate::Result<()> {
+    run_grpc_server_with_routes_impl(
+        address,
+        tls_settings,
+        tls_reloader,
+        routes,
+        keepalive,
+        shutdown,
+        None,
+    )
+    .await
+}
+
+/// Runs a gRPC server whose requests must acquire a permit before decompression and decoding.
+#[allow(clippy::too_many_arguments)]
+pub async fn run_grpc_server_with_routes_and_request_limiter(
+    address: SocketAddr,
+    tls_settings: MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
+    routes: Routes,
+    keepalive: GrpcKeepaliveConfig,
+    shutdown: ShutdownSignal,
+    request_limiter: RequestLimiter,
+    request_timeout: Duration,
+) -> crate::Result<()> {
+    run_grpc_server_with_routes_impl(
+        address,
+        tls_settings,
+        tls_reloader,
+        routes,
+        keepalive,
+        shutdown,
+        Some((request_limiter, request_timeout)),
+    )
+    .await
+}
+
+async fn run_grpc_server_with_routes_impl(
+    address: SocketAddr,
+    tls_settings: MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
+    routes: Routes,
+    keepalive: GrpcKeepaliveConfig,
+    shutdown: ShutdownSignal,
+    request_limiter: Option<(RequestLimiter, Duration)>,
+) -> crate::Result<()> {
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
     let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
@@ -424,6 +470,9 @@ pub async fn run_grpc_server_with_routes(
     Server::builder()
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
+        .layer(ServiceBuilder::new().option_layer(
+            request_limiter.map(|(limiter, timeout)| RequestLimiterLayer::new(limiter, timeout)),
+        ))
         .layer(DecompressionAndMetricsLayer)
         .add_routes(routes)
         .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
@@ -432,6 +481,77 @@ pub async fn run_grpc_server_with_routes(
     drop(rx.await);
 
     Ok(())
+}
+
+#[derive(Clone)]
+struct RequestLimiterLayer {
+    request_limiter: RequestLimiter,
+    request_timeout: Duration,
+}
+
+impl RequestLimiterLayer {
+    const fn new(request_limiter: RequestLimiter, request_timeout: Duration) -> Self {
+        Self {
+            request_limiter,
+            request_timeout,
+        }
+    }
+}
+
+impl<S> Layer<S> for RequestLimiterLayer {
+    type Service = RequestLimiterService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        RequestLimiterService {
+            inner,
+            request_limiter: self.request_limiter.clone(),
+            request_timeout: self.request_timeout,
+        }
+    }
+}
+
+#[derive(Clone)]
+struct RequestLimiterService<S> {
+    inner: S,
+    request_limiter: RequestLimiter,
+    request_timeout: Duration,
+}
+
+impl<S> Service<Request<Body>> for RequestLimiterService<S>
+where
+    S: Service<Request<Body>, Response = Response<BoxBody>> + Clone + Send + 'static,
+    S::Future: Send + 'static,
+{
+    type Response = Response<BoxBody>;
+    type Error = S::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, mut request: Request<Body>) -> Self::Future {
+        match self.request_limiter.try_acquire() {
+            Some(permit) => {
+                request.extensions_mut().insert(permit);
+                let future = self.inner.call(request);
+                let request_timeout = self.request_timeout;
+                async move {
+                    match tokio::time::timeout(request_timeout, future).await {
+                        Ok(response) => response,
+                        Err(_) => Ok(
+                            tonic::Status::unavailable("request processing timed out").to_http()
+                        ),
+                    }
+                }
+                .boxed()
+            }
+            None => {
+                async { Ok(tonic::Status::unavailable("too many concurrent requests").to_http()) }
+                    .boxed()
+            }
+        }
+    }
 }
 
 /// Builds a [TraceLayer] configured for a gRPC server.
@@ -478,7 +598,10 @@ pub fn build_grpc_trace_layer(
 
 #[cfg(test)]
 mod tests {
-    use std::future::{Ready, ready};
+    use std::{
+        future::{Ready, pending, ready},
+        sync::atomic::AtomicUsize,
+    };
 
     use super::*;
 
@@ -497,6 +620,96 @@ mod tests {
         fn call(&mut self, _req: Request<Body>) -> Self::Future {
             ready(Ok(Response::new(Body::empty())))
         }
+    }
+
+    #[derive(Clone)]
+    struct PendingService {
+        calls: Arc<AtomicUsize>,
+    }
+
+    impl Service<Request<Body>> for PendingService {
+        type Response = Response<BoxBody>;
+        type Error = Infallible;
+        type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, request: Request<Body>) -> Self::Future {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            async move {
+                let _request = request;
+                pending().await
+            }
+            .boxed()
+        }
+    }
+
+    #[tokio::test]
+    async fn request_concurrency_limit_rejects_immediately_and_releases_on_cancellation() {
+        let request_limiter = RequestLimiter::new(100, 1);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut service =
+            RequestLimiterLayer::new(request_limiter.clone(), Duration::from_secs(30)).layer(
+                PendingService {
+                    calls: Arc::clone(&calls),
+                },
+            );
+
+        let pending_request = service.call(Request::new(Body::empty()));
+        assert!(request_limiter.try_acquire().is_none());
+
+        let response = tokio::time::timeout(
+            Duration::from_millis(100),
+            service.call(Request::new(Body::empty())),
+        )
+        .await
+        .expect("overloaded request should not wait for a permit")
+        .unwrap();
+        assert_eq!(response.headers()["grpc-status"], "14");
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
+
+        drop(pending_request);
+        assert!(request_limiter.try_acquire().is_some());
+    }
+
+    #[tokio::test]
+    async fn request_concurrency_limit_precedes_decompression() {
+        let request_limiter = RequestLimiter::new(100, 1);
+        let _permit = request_limiter.try_acquire().unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let inner = DecompressionAndMetricsLayer.layer(PendingService {
+            calls: Arc::clone(&calls),
+        });
+        let mut service =
+            RequestLimiterLayer::new(request_limiter, Duration::from_secs(30)).layer(inner);
+
+        let response = service
+            .call(Request::new(Body::from("not a gRPC frame")))
+            .await
+            .unwrap();
+
+        assert_eq!(response.headers()["grpc-status"], "14");
+        assert_eq!(calls.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn request_timeout_cancels_work_and_releases_permit() {
+        let request_limiter = RequestLimiter::new(100, 1);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut service =
+            RequestLimiterLayer::new(request_limiter.clone(), Duration::from_millis(10)).layer(
+                PendingService {
+                    calls: Arc::clone(&calls),
+                },
+            );
+
+        let response = service.call(Request::new(Body::empty())).await.unwrap();
+
+        assert_eq!(response.headers()["grpc-status"], "14");
+        assert!(request_limiter.try_acquire().is_some());
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
     }
 
     #[tokio::test]

@@ -25,7 +25,10 @@ use vector_lib::{
 use crate::{
     SourceSender,
     internal_events::{EventsReceived, StreamClosedError},
-    sources::opentelemetry::config::{LOGS, METRICS, TRACES},
+    sources::{
+        opentelemetry::config::{LOGS, METRICS, TRACES},
+        util::request_limiter::RequestLimiterPermit,
+    },
 };
 
 #[derive(Clone)]
@@ -41,8 +44,12 @@ pub(super) struct Service {
 impl TraceService for Service {
     async fn export(
         &self,
-        request: Request<ExportTraceServiceRequest>,
+        mut request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
+        let permit = request
+            .extensions_mut()
+            .remove::<RequestLimiterPermit>()
+            .expect("request limiter layer must attach a permit");
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
@@ -58,7 +65,7 @@ impl TraceService for Service {
                 .flat_map(|v| v.into_event_iter())
                 .collect()
         };
-        self.handle_events(events, TRACES).await?;
+        self.handle_events(events, TRACES, permit).await?;
 
         Ok(Response::new(ExportTraceServiceResponse {
             partial_success: None,
@@ -70,8 +77,12 @@ impl TraceService for Service {
 impl LogsService for Service {
     async fn export(
         &self,
-        request: Request<ExportLogsServiceRequest>,
+        mut request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
+        let permit = request
+            .extensions_mut()
+            .remove::<RequestLimiterPermit>()
+            .expect("request limiter layer must attach a permit");
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
@@ -87,7 +98,7 @@ impl LogsService for Service {
                 .flat_map(|v| v.into_event_iter(self.log_namespace))
                 .collect()
         };
-        self.handle_events(events, LOGS).await?;
+        self.handle_events(events, LOGS, permit).await?;
 
         Ok(Response::new(ExportLogsServiceResponse {
             partial_success: None,
@@ -99,8 +110,12 @@ impl LogsService for Service {
 impl MetricsService for Service {
     async fn export(
         &self,
-        request: Request<ExportMetricsServiceRequest>,
+        mut request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
+        let permit = request
+            .extensions_mut()
+            .remove::<RequestLimiterPermit>()
+            .expect("request limiter layer must attach a permit");
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             // Major caveat here, the output event will be logs.
@@ -118,7 +133,7 @@ impl MetricsService for Service {
                 .collect()
         };
 
-        self.handle_events(events, METRICS).await?;
+        self.handle_events(events, METRICS, permit).await?;
 
         Ok(Response::new(ExportMetricsServiceResponse {
             partial_success: None,
@@ -131,6 +146,7 @@ impl Service {
         &self,
         mut events: Vec<Event>,
         log_name: &'static str,
+        permit: RequestLimiterPermit,
     ) -> Result<(), Status> {
         // When using OTLP decoding, count individual items within the batch
         // to maintain consistency with other Vector sources
@@ -139,6 +155,7 @@ impl Service {
         } else {
             events.len()
         };
+        permit.decoding_finished(count);
         let byte_size = events.estimated_json_encoded_size_of();
         self.events_received.emit(CountByteSize(count, byte_size));
 

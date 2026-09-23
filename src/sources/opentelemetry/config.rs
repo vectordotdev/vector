@@ -1,4 +1,8 @@
-use std::net::SocketAddr;
+use std::{
+    net::SocketAddr,
+    num::{NonZeroU64, NonZeroUsize},
+    time::Duration,
+};
 
 use crate::{
     config::{
@@ -16,7 +20,8 @@ use crate::{
         },
         util::{
             decompression::max_decompressed_size_bytes,
-            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes_and_request_limiter},
+            request_limiter::{MAX_IN_FLIGHT_EVENTS_TARGET, RequestLimiter},
         },
     },
 };
@@ -117,6 +122,29 @@ pub struct OpentelemetryConfig {
     pub grpc: GrpcConfig,
 
     pub http: HttpConfig,
+
+    /// The maximum number of HTTP and gRPC requests that can be processed concurrently.
+    ///
+    /// The adaptive limit is shared across both protocols. It starts with up to two concurrent
+    /// requests, adapts based on observed request sizes, and never exceeds this maximum.
+    /// Requests above the current limit are rejected
+    /// immediately with an overload response.
+    ///
+    /// When unset, the maximum defaults to Vector's configured runtime worker count, falling back
+    /// to the detected available parallelism.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = 8))]
+    pub max_concurrent_requests: Option<NonZeroUsize>,
+
+    /// The maximum time to cooperatively wait for an admitted HTTP or gRPC request.
+    ///
+    /// The timeout covers receiving and decoding the request body, sending events to the pipeline,
+    /// and waiting for end-to-end acknowledgements. Timed-out requests receive a retryable response
+    /// and release their concurrency permit. Synchronous decompression and decoding cannot be
+    /// preempted, so a request can exceed this duration.
+    #[serde(default = "default_request_timeout_secs")]
+    #[configurable(metadata(docs::examples = 30, docs::type_unit = "seconds"))]
+    pub request_timeout_secs: NonZeroU64,
 
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
@@ -228,11 +256,23 @@ fn example_http_config() -> HttpConfig {
     }
 }
 
+pub(super) const fn default_request_timeout_secs() -> NonZeroU64 {
+    NonZeroU64::new(30).expect("30 is nonzero")
+}
+
+pub(super) fn default_max_concurrent_requests() -> usize {
+    crate::app::worker_threads()
+        .map(NonZeroUsize::get)
+        .unwrap_or_else(crate::num_threads)
+}
+
 impl GenerateConfig for OpentelemetryConfig {
     fn generate_config() -> serde_json::Value {
         serde_json::to_value(Self {
             grpc: example_grpc_config(),
             http: example_http_config(),
+            max_concurrent_requests: None,
+            request_timeout_secs: default_request_timeout_secs(),
             acknowledgements: Default::default(),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig::default(),
@@ -273,6 +313,13 @@ impl OpentelemetryConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
         let log_namespace = cx.log_namespace(self.log_namespace);
+        let max_concurrent_requests = self
+            .max_concurrent_requests
+            .map(NonZeroUsize::get)
+            .unwrap_or_else(default_max_concurrent_requests);
+        let request_timeout = Duration::from_secs(self.request_timeout_secs.get());
+        let request_limiter =
+            RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, max_concurrent_requests);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
@@ -326,13 +373,15 @@ impl OpentelemetryConfig {
             .add_service(metrics_service)
             .add_service(trace_service);
 
-        let grpc_source = run_grpc_server_with_routes(
+        let grpc_source = run_grpc_server_with_routes_and_request_limiter(
             self.grpc.address,
             grpc_tls_settings,
             grpc_tls_reloader,
             builder.routes(),
             self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
+            request_limiter.clone(),
+            request_timeout,
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source gRPC server failed.", %error);
@@ -363,6 +412,8 @@ impl OpentelemetryConfig {
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
+            request_limiter,
+            request_timeout,
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source HTTP server failed.", %error);

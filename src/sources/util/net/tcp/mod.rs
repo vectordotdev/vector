@@ -1,5 +1,3 @@
-pub mod request_limiter;
-
 use std::{io, mem::drop, net::SocketAddr, num::NonZeroU64, time::Duration};
 
 use bytes::Bytes;
@@ -33,7 +31,6 @@ use vector_lib::{
 };
 use vrl::value::ObjectMap;
 
-use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
 use crate::{
     config::SourceContext,
@@ -43,10 +40,11 @@ use crate::{
         TcpSocketTlsConnectionError, TcpSocketTlsHandshakeTimeout, TcpSourceConnectionClosed,
     },
     net::is_graceful_tls_shutdown,
-    sources::util::{AfterReadExt, LenientFramedRead},
+    sources::util::{
+        AfterReadExt, LenientFramedRead,
+        request_limiter::{MAX_IN_FLIGHT_EVENTS_TARGET, RequestLimiter},
+    },
 };
-
-pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
 
 pub async fn try_bind_tcp_listener(
     addr: SocketListenAddr,
@@ -168,8 +166,9 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
+            // The old limiter always started with at least two permits. Preserve that behavior.
             let request_limiter =
-                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads());
+                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads().max(2));
 
             listener
                 .accept_stream_limited(max_connections)

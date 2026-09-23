@@ -1,12 +1,13 @@
 use std::{
     net,
+    num::{NonZeroU64, NonZeroUsize},
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
     SourceSender,
-    config::{OutputId, SourceConfig, SourceContext},
+    config::{DataType, OutputId, SourceConfig, SourceContext, SourceOutput},
     event::{
         Event, EventStatus, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
         ObjectMap, Value, into_event_stream,
@@ -49,6 +50,8 @@ use vector_lib::{
         },
         resource::v1::{Resource, Resource as OtelResource},
     },
+    schema::Definition,
+    source_sender::SourceSenderItem,
 };
 use vrl::{event_path, value};
 
@@ -228,6 +231,186 @@ fn config_grpc_keepalive() {
         config.grpc.keepalive.max_connection_age_grace_secs,
         Some(30)
     );
+}
+
+#[test]
+fn config_max_concurrent_requests_is_nonzero() {
+    let default_config: OpentelemetryConfig = toml::from_str(
+        r#"
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(default_config.max_concurrent_requests, None);
+    assert_eq!(default_config.request_timeout_secs.get(), 30);
+    assert_eq!(
+        super::config::default_max_concurrent_requests(),
+        crate::app::worker_threads()
+            .map(NonZeroUsize::get)
+            .unwrap_or_else(crate::num_threads)
+    );
+
+    let config: OpentelemetryConfig = toml::from_str(
+        r#"
+            max_concurrent_requests = 7
+
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(config.max_concurrent_requests.unwrap().get(), 7);
+
+    let error = toml::from_str::<OpentelemetryConfig>(
+        r#"
+            max_concurrent_requests = 0
+
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+        "#,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("nonzero"));
+
+    let error = toml::from_str::<OpentelemetryConfig>(
+        r#"
+            request_timeout_secs = 0
+
+            [grpc]
+            address = "0.0.0.0:4317"
+
+            [http]
+            address = "0.0.0.0:4318"
+        "#,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("nonzero"));
+}
+
+#[tokio::test]
+async fn request_limit_is_shared_across_http_and_grpc() {
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+    let mut output = start_request_control_source(
+        request_control_config(
+            grpc_addr,
+            http_addr,
+            crate::sources::opentelemetry::config::default_request_timeout_secs(),
+        ),
+        grpc_addr,
+        Some(http_addr),
+    )
+    .await;
+
+    let mut grpc_client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
+        .await
+        .unwrap();
+    let grpc_request =
+        tokio::spawn(async move { grpc_client.export(create_test_logs_request()).await });
+    let mut grpc_item = next_request(&mut output, "gRPC request should reach the output").await;
+    assert!(!grpc_request.is_finished());
+
+    let http_client = reqwest::Client::new();
+    let response = tokio::time::timeout(
+        Duration::from_secs(1),
+        http_client
+            .post(format!("http://{http_addr}/v1/logs/?client=test"))
+            .header("content-type", "application/x-protobuf")
+            .body("not protobuf")
+            .send(),
+    )
+    .await
+    .expect("overloaded HTTP request should not wait for a permit")
+    .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
+    let status = super::status::Status::decode(response.bytes().await.unwrap()).unwrap();
+    assert_eq!(status.code, tonic::Code::Unavailable as i32);
+    assert_eq!(status.message, "too many concurrent requests");
+
+    acknowledge(&mut grpc_item);
+    drop(grpc_item);
+    grpc_request.await.unwrap().unwrap();
+
+    let request_body = create_test_logs_request().into_inner().encode_to_vec();
+    let pending_http_client = http_client.clone();
+    let http_request = tokio::spawn(async move {
+        pending_http_client
+            .post(format!("http://{http_addr}/v1/logs/?client=test"))
+            .header("content-type", "application/x-protobuf")
+            .body(request_body)
+            .send()
+            .await
+    });
+    let mut http_item = next_request(&mut output, "HTTP request should reach the output").await;
+    assert!(!http_request.is_finished());
+
+    let mut grpc_client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
+        .await
+        .unwrap();
+    let error = tokio::time::timeout(
+        Duration::from_secs(1),
+        grpc_client.export(create_test_logs_request()),
+    )
+    .await
+    .expect("overloaded gRPC request should not wait for a permit")
+    .unwrap_err();
+    assert_eq!(error.code(), tonic::Code::Unavailable);
+    assert_eq!(error.message(), "too many concurrent requests");
+
+    acknowledge(&mut http_item);
+    drop(http_item);
+    assert!(http_request.await.unwrap().unwrap().status().is_success());
+}
+
+#[tokio::test]
+async fn request_timeout_releases_permit_while_acknowledgement_is_stalled() {
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+    let mut output = start_request_control_source(
+        request_control_config(grpc_addr, http_addr, NonZeroU64::new(1).unwrap()),
+        grpc_addr,
+        None,
+    )
+    .await;
+
+    let mut grpc_client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
+        .await
+        .unwrap();
+    let first_request =
+        tokio::spawn(async move { grpc_client.export(create_test_logs_request()).await });
+    let first_item = next_request(&mut output, "first request should reach the output").await;
+    let error = tokio::time::timeout(Duration::from_secs(3), first_request)
+        .await
+        .expect("first request should time out")
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.code(), tonic::Code::Unavailable);
+    assert_eq!(error.message(), "request processing timed out");
+
+    let mut grpc_client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
+        .await
+        .unwrap();
+    let second_request =
+        tokio::spawn(async move { grpc_client.export(create_test_logs_request()).await });
+    let mut second_item = next_request(
+        &mut output,
+        "permit should be released for the second request",
+    )
+    .await;
+    acknowledge(&mut second_item);
+    drop(second_item);
+    second_request.await.unwrap().unwrap();
+    drop(first_item);
 }
 
 #[tokio::test]
@@ -1216,8 +1399,74 @@ fn get_source_config_with_headers(
         },
         acknowledgements: Default::default(),
         log_namespace: Default::default(),
+        max_concurrent_requests: None,
+        request_timeout_secs: crate::sources::opentelemetry::config::default_request_timeout_secs(),
         use_otlp_decoding: use_otlp_decoding.into(),
     }
+}
+
+fn request_control_config(
+    grpc_addr: net::SocketAddr,
+    http_addr: net::SocketAddr,
+    request_timeout_secs: NonZeroU64,
+) -> OpentelemetryConfig {
+    OpentelemetryConfig {
+        grpc: GrpcConfig {
+            address: grpc_addr,
+            tls: None,
+            keepalive: Default::default(),
+        },
+        http: HttpConfig {
+            address: http_addr,
+            tls: None,
+            keepalive: Default::default(),
+            headers: vec![],
+        },
+        acknowledgements: true.into(),
+        log_namespace: None,
+        max_concurrent_requests: NonZeroUsize::new(1),
+        request_timeout_secs,
+        use_otlp_decoding: false.into(),
+    }
+}
+
+async fn start_request_control_source(
+    config: OpentelemetryConfig,
+    grpc_addr: net::SocketAddr,
+    http_addr: Option<net::SocketAddr>,
+) -> impl Stream<Item = SourceSenderItem> + Unpin {
+    let mut sender_builder = SourceSender::builder();
+    let output = sender_builder.add_source_output(
+        SourceOutput::new_maybe_logs(DataType::Log, Definition::any()).with_port(LOGS),
+        "test".into(),
+    );
+    let sender = sender_builder.build();
+    let server = config
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(server);
+    test_util::wait_for_tcp(grpc_addr).await;
+    if let Some(http_addr) = http_addr {
+        test_util::wait_for_tcp(http_addr).await;
+    }
+    output.into_stream()
+}
+
+async fn next_request(
+    output: &mut (impl Stream<Item = SourceSenderItem> + Unpin),
+    expectation: &'static str,
+) -> SourceSenderItem {
+    tokio::time::timeout(Duration::from_secs(5), output.next())
+        .await
+        .expect(expectation)
+        .unwrap()
+}
+
+fn acknowledge(item: &mut SourceSenderItem) {
+    item.events.iter_events_mut().for_each(|mut event| {
+        event.metadata_mut().update_status(EventStatus::Delivered);
+    });
 }
 
 async fn send_and_collect_otel_event(
@@ -1548,6 +1797,8 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
+        max_concurrent_requests: None,
+        request_timeout_secs: crate::sources::opentelemetry::config::default_request_timeout_secs(),
         use_otlp_decoding: false.into(),
     };
 
@@ -1628,6 +1879,8 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         },
         acknowledgements: Default::default(),
         log_namespace: None,
+        max_concurrent_requests: None,
+        request_timeout_secs: crate::sources::opentelemetry::config::default_request_timeout_secs(),
         use_otlp_decoding: true.into(),
     };
 
@@ -1855,6 +2108,9 @@ mod otlp_decoding_config_tests {
             },
             acknowledgements: Default::default(),
             log_namespace: None,
+            max_concurrent_requests: None,
+            request_timeout_secs:
+                crate::sources::opentelemetry::config::default_request_timeout_secs(),
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: true,
                 metrics: true,
@@ -1896,6 +2152,9 @@ mod otlp_decoding_config_tests {
             },
             acknowledgements: Default::default(),
             log_namespace: None,
+            max_concurrent_requests: None,
+            request_timeout_secs:
+                crate::sources::opentelemetry::config::default_request_timeout_secs(),
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,
                 metrics: false,
@@ -1940,6 +2199,9 @@ mod otlp_decoding_config_tests {
             },
             acknowledgements: Default::default(),
             log_namespace: None,
+            max_concurrent_requests: None,
+            request_timeout_secs:
+                crate::sources::opentelemetry::config::default_request_timeout_secs(),
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,
                 metrics: true,

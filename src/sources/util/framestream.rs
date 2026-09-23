@@ -39,7 +39,10 @@ use vector_lib::{
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsSettings},
 };
 
-use super::net::{RequestLimiter, SocketListenAddr};
+use super::{
+    net::SocketListenAddr,
+    request_limiter::{MAX_IN_FLIGHT_EVENTS_TARGET, RequestLimiter},
+};
 use crate::{
     SourceSender,
     event::Event,
@@ -51,10 +54,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         Source,
-        util::{
-            AfterReadExt,
-            net::{MAX_IN_FLIGHT_EVENTS_TARGET, try_bind_tcp_listener},
-        },
+        util::{AfterReadExt, net::try_bind_tcp_listener},
     },
 };
 
@@ -449,9 +449,10 @@ pub fn build_framestream_tcp_source(
         let connection_gauge = OpenGauge::new();
         let shutdown_clone = shutdown.clone();
 
+        // The old limiter always started with at least two permits. Preserve that behavior.
         let request_limiter = RequestLimiter::new(
             MAX_IN_FLIGHT_EVENTS_TARGET,
-            frame_handler.max_frame_handling_tasks(),
+            frame_handler.max_frame_handling_tasks().max(2),
         );
 
         listener
