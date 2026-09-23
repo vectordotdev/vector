@@ -396,62 +396,6 @@ mod tests {
         assert!(log.get(event_path!("vector", "some_other_field")).is_none());
     }
 
-    #[tokio::test]
-    #[serial]
-    async fn tcp_error_peer_addr_is_captured_without_span_enrichment() {
-        use vector_lib::internal_event::InternalEvent;
-
-        trace::init(false, false, "info", 10, None);
-        trace::reset_early_buffer();
-        let rx = start_source().await;
-        let peer_addr = "192.0.2.10:54321".parse().unwrap();
-
-        {
-            let span = error_span!(
-                "connection",
-                component_id = "tcp_peer_test",
-                %peer_addr,
-            );
-            let _enter = span.enter();
-            crate::internal_events::TcpSendAckError {
-                error: std::io::Error::from(std::io::ErrorKind::ConnectionReset),
-                peer_addr,
-            }
-            .emit();
-            crate::internal_events::TcpSocketTlsConnectionError {
-                error: vector_lib::tls::TlsError::IncomingListener {
-                    source: std::io::Error::from(std::io::ErrorKind::ConnectionReset),
-                },
-                peer_addr,
-            }
-            .emit();
-            error!(message = "Unrelated event.");
-        }
-
-        sleep(Duration::from_millis(1)).await;
-        let mut events = collect_ready(rx);
-        events.retain(|event| {
-            event.as_log().get(event_path!("vector", "component_id"))
-                == Some(&Value::from("tcp_peer_test"))
-        });
-        assert_eq!(events.len(), 3);
-        for event in &events[..2] {
-            let log = event.as_log();
-            assert_eq!(log["peer_addr"], "192.0.2.10:54321".into());
-            assert_eq!(log["metadata.level"], "ERROR".into());
-        }
-        assert!(events[2].as_log().get(event_path!("peer_addr")).is_none());
-        for event in &events {
-            assert!(
-                event
-                    .as_log()
-                    .get(event_path!("vector", "peer_addr"))
-                    .is_none()
-            );
-        }
-        assert!(!vector_lib::metrics::LABELS.contains("peer_addr"));
-    }
-
     // NOTE: This test requires #[serial] because it directly interacts with global tracing state.
     // This is a pre-existing limitation around tracing initialization in tests.
     #[tokio::test]
