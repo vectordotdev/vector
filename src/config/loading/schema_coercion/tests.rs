@@ -74,6 +74,71 @@ fn generated_optional_sensitive_string_preserves_literal_null() {
     }
 }
 
+/// A unit variant whose spelling also represents an absent optional value.
+#[vector_config::configurable_component]
+#[derive(Debug, PartialEq)]
+enum NullSpelling {
+    /// A literal mode, not an absent value.
+    #[serde(rename = "null", alias = "NULL")]
+    Null,
+}
+
+#[test]
+fn generated_optional_enum_preserves_literal_null() {
+    let schema = serde_json::to_value(
+        vector_config::schema::generate_root_schema::<Option<NullSpelling>>().unwrap(),
+    )
+    .unwrap();
+    for mut value in [json!("null"), json!("NULL"), json!(null)] {
+        let expected = serde_json::from_value::<Option<NullSpelling>>(value.clone()).unwrap();
+        ValueCoercer::new(&schema).coerce(&mut value).unwrap();
+        assert_eq!(
+            serde_json::from_value::<Option<NullSpelling>>(value).unwrap(),
+            expected
+        );
+    }
+}
+
+#[test]
+fn unions_infer_value_shapes_from_const_and_enum() {
+    for keyword in ["anyOf", "oneOf"] {
+        for case in [
+            CoercionCase {
+                name: "string const wins over null coercion",
+                schema: json!({keyword: [{"type": "null"}, {"const": "null"}]}),
+                input: json!("null"),
+                expected: json!("null"),
+            },
+            CoercionCase {
+                name: "mixed enum preserves its string member",
+                schema: json!({keyword: [{"type": "boolean"}, {"enum": [42, "true"]}]}),
+                input: json!("true"),
+                expected: json!("true"),
+            },
+            CoercionCase {
+                name: "numeric const wins over string coercion",
+                schema: json!({keyword: [{"type": "string"}, {"const": 42}]}),
+                input: json!(42),
+                expected: json!(42),
+            },
+            CoercionCase {
+                name: "boolean enum wins over string coercion",
+                schema: json!({keyword: [{"type": "string"}, {"enum": [true, false]}]}),
+                input: json!(true),
+                expected: json!(true),
+            },
+            CoercionCase {
+                name: "same shape still requires an allowed value",
+                schema: json!({keyword: [{"type": "null"}, {"const": "other"}]}),
+                input: json!("null"),
+                expected: json!(null),
+            },
+        ] {
+            case.check();
+        }
+    }
+}
+
 /// Aliases for externally tagged enum variants.
 #[vector_config::configurable_component]
 #[derive(Debug, PartialEq)]

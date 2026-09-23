@@ -888,6 +888,17 @@ impl<'a> ValueCoercer<'a> {
             };
         }
 
+        // Generated unit variants can constrain values without an explicit `type`.
+        // Rank their shape here; coercion still checks the actual allowed value.
+        if let Some(constant) = schema.get("const") {
+            return get_json_type(constant) == get_json_type(value);
+        }
+        if let Some(allowed) = schema.get("enum").and_then(Value::as_array) {
+            return allowed
+                .iter()
+                .any(|allowed| get_json_type(allowed) == get_json_type(value));
+        }
+
         ["allOf", "anyOf", "oneOf"].iter().any(|keyword| {
             schema
                 .get(keyword)
