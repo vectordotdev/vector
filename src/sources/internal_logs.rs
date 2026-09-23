@@ -274,8 +274,10 @@ mod tests {
         error!(message = "After source started.", %test_id);
 
         {
+            let peer_addr: std::net::SocketAddr = "192.0.2.10:54321".parse().unwrap();
             let nested_span = error_span!(
-                "nested span",
+                "connection",
+                %peer_addr,
                 component_kind = "bar",
                 component_new_field = "baz",
                 component_numerical_field = 1,
@@ -295,6 +297,7 @@ mod tests {
         let end = chrono::Utc::now();
 
         assert_eq!(events.len(), 4);
+        assert!(!vector_lib::metrics::LABELS.contains("peer_addr"));
 
         assert_eq!(
             events[0].as_log()["message"],
@@ -319,6 +322,9 @@ mod tests {
             assert!(timestamp <= end);
             assert_eq!(log["metadata.kind"], "event".into());
             assert_eq!(log["metadata.level"], "ERROR".into());
+            if i < 3 {
+                assert!(log.get(event_path!("vector", "peer_addr")).is_none());
+            }
             // The first log event occurs outside our custom span
             if i == 0 {
                 assert!(log.get(event_path!("vector", "component_id")).is_none());
@@ -335,6 +341,7 @@ mod tests {
                 assert_eq!(log["vector.component_id"], "foo".into());
                 assert_eq!(log["vector.component_kind"], "bar".into());
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
+                assert_eq!(log["vector.peer_addr"], "192.0.2.10:54321".into());
                 assert_eq!(log["vector.component_new_field"], "baz".into());
                 assert_eq!(log["vector.component_numerical_field"], 1.into());
                 assert!(log.get(event_path!("vector", "ignored_field")).is_none());
