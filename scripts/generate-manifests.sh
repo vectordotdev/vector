@@ -13,8 +13,40 @@ fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+chart_version=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --chart-version)
+            chart_version="${2:?}"
+            shift 2
+            ;;
+        *)
+            echo "unknown argument: $1" >&2
+            exit 1
+            ;;
+    esac
+done
+
 helm repo add vector https://helm.vector.dev
 helm repo update
+
+# Pin every template/show invocation to one chart version so the generated
+# manifests and READMEs cannot diverge from it if the repo publishes a newer
+# chart between runs of this script. Default to the latest published chart.
+if [[ -z "$chart_version" ]]; then
+    chart_version=$(helm search repo vector/vector -o json | yq -p json '.[0].version')
+fi
+readonly chart_version
+echo "Generating manifests from chart version ${chart_version}"
+
+# Refuse to regenerate from a chart that is not strictly newer than the one
+# the checked-in manifests were generated from; that would silently downgrade
+# them. The README records the version it was generated with.
+current_version=$(sed -nE 's/^version ([0-9][^ ]*) with the following.*/\1/p' \
+    distribution/kubernetes/vector-agent/README.md)
+if [[ -n "$current_version" ]]; then
+    vdev version check-newer --what chart --new "$chart_version" --current "$current_version"
+fi
 
 TMPDIR=$(mktemp -d)
 trap 'rm -r $TMPDIR' EXIT
@@ -40,8 +72,7 @@ for values in "$TMPDIR"/values-*.yaml; do
 
     rm -rf "${type:?}"
     mkdir "${type:?}"
-
-    helm template --namespace default vector vector/vector --values "$values" --output-dir "$TMPDIR/generated_$type"
+    helm template --namespace default vector vector/vector --version "$chart_version" --values "$values" --output-dir "$TMPDIR/generated_$type"
     for file in "$TMPDIR/generated_$type"/vector/templates/*.yaml; do
         # Skip files containing only comments
         if [[ "$(yq eval '. | length' "$file")" == 0 ]]; then
@@ -56,8 +87,7 @@ for values in "$TMPDIR"/values-*.yaml; do
 
     cat > "distribution/kubernetes/$type/README.md" <<EOF
 The kubernetes manifests found in this directory have been automatically generated
-from the [helm chart \`vector/vector\`](https://github.com/vectordotdev/helm-charts/tree/master/charts/vector)
-version $(helm show chart vector/vector | yq e '.version' -) with the following \`values.yaml\`:
+version $(helm show chart vector/vector --version "$chart_version" | yq e '.version' -) with the following \`values.yaml\`:
 
 \`\`\`yaml
 $(<"$values")

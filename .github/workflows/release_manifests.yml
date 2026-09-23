@@ -80,7 +80,9 @@ jobs:
           echo "version=$published" >> "$GITHUB_OUTPUT"
 
       - name: Generate manifests
-        run: make generate-kubernetes-manifests
+        env:
+          CHART_VERSION: ${{ steps.chart.outputs.version }}
+        run: make generate-kubernetes-manifests CHART_VERSION="$CHART_VERSION"
 
       - name: Check for changes
         id: changes
