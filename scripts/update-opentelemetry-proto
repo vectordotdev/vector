@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [[ $# -gt 1 ]]; then
+  echo "usage: $0 [tag]" >&2
+  exit 1
+fi
+
+exec "$(dirname "$0")/vendor-released-tree.sh" \
+  https://github.com/open-telemetry/opentelemetry-proto \
+  lib/opentelemetry-proto/src/proto/opentelemetry-proto/opentelemetry/proto \
+  opentelemetry/proto \
+  '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+  'OpenTelemetry protobuf definitions' \
+  update-opentelemetry-proto \
+  "$@"

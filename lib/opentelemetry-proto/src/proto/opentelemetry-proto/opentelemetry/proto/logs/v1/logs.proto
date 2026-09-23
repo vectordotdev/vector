@@ -201,3 +201,4 @@ message LogRecord {
   //   - the field contains an invalid value.
   bytes span_id = 10;
 }
+

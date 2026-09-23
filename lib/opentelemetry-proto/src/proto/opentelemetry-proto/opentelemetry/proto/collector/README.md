@@ -8,3 +8,4 @@ This package describes the OpenTelemetry collector protocol.
 2. `trace` package contains the Trace Service protos.
 3. `metrics` package contains the Metrics Service protos.
 4. `logs` package contains the Logs Service protos.
+

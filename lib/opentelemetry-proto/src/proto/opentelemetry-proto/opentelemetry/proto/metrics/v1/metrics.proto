@@ -173,7 +173,7 @@ message Metric {
   string unit = 3;
 
   // Data determines the aggregation type (if any) of the metric, what is the
-  // reported value type for the data points, as well as the relationship to
+  // reported value type for the data points, as well as the relatationship to
   // the time interval over which they are reported.
   oneof data {
     Gauge gauge = 5;
@@ -496,7 +496,7 @@ message ExponentialHistogramDataPoint {
   // doing so.  This is specifically to enforce compatibility w/ OpenMetrics,
   // see: https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#histogram
   optional double sum = 5;
-
+  
   // scale describes the resolution of the histogram.  Boundaries are
   // located at powers of the base, where:
   //
@@ -534,7 +534,7 @@ message ExponentialHistogramDataPoint {
   // of counts.
   message Buckets {
     // Offset is the bucket index of the first entry in the bucket_counts array.
-    //
+    // 
     // Note: This uses a varint encoding as a simple form of compression.
     sint32 offset = 1;
 
@@ -548,7 +548,7 @@ message ExponentialHistogramDataPoint {
     // especially zeros, so uint64 has been selected to ensure
     // varint encoding.
     repeated uint64 bucket_counts = 2;
-  }
+  } 
 
   // Flags that apply to this specific data point.  See DataPointFlags
   // for the available flags and their meaning.
@@ -674,3 +674,4 @@ message Exemplar {
   // or if the trace is not sampled.
   bytes trace_id = 5;
 }
+

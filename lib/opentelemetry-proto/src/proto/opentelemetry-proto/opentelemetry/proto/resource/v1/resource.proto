@@ -35,3 +35,4 @@ message Resource {
   // no attributes were dropped.
   uint32 dropped_attributes_count = 2;
 }
+

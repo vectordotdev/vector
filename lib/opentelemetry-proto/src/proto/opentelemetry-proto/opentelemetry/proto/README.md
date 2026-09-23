@@ -1,7 +1,10 @@
-The following protobuf definitions are vendored from:
+# OpenTelemetry protobuf definitions
 
-* https://github.com/open-telemetry/opentelemetry-proto/tree/v1.0.0/opentelemetry/proto
+Vendored from [`open-telemetry/opentelemetry-proto`](https://github.com/open-telemetry/opentelemetry-proto)
+[`opentelemetry/proto`](https://github.com/open-telemetry/opentelemetry-proto/tree/v1.0.0/opentelemetry/proto)
+at release [`v1.0.0`](https://github.com/open-telemetry/opentelemetry-proto/releases/tag/v1.0.0).
 
-At the moment, these are manually updated based on community demand.
-Please [open an issue](https://github.com/vectordotdev/vector/issues/new?assignees=&labels=type%3A+feature&projects=&template=feature.yml)
-if you would like to see a newer version.
+Files already present in this directory are refreshed from that release.
+
+Refresh by running `scripts/update-opentelemetry-proto` for the latest release,
+or `scripts/update-opentelemetry-proto v1.0.0` to pin this tag again.
