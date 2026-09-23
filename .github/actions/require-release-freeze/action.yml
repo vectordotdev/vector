@@ -4,8 +4,11 @@ inputs:
   app-client-id:
     description: Client ID of the vectordotdev-bot GitHub App.
     required: true
-  app-private-key:
-    description: Private key of the vectordotdev-bot GitHub App.
+  freeze-ruleset-id:
+    description: Repository variable RELEASE_FREEZE_RULESET_ID (the vars context is unavailable in composite actions).
+    required: true
+  bot-bypass-ruleset-ids:
+    description: Repository variable RELEASE_FREEZE_BOT_BYPASS, comma-separated ruleset IDs (the vars context is unavailable in composite actions).
     required: true
 runs:
   using: composite
@@ -27,8 +30,8 @@ runs:
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         BOT_APP_SLUG: ${{ steps.bot-token.outputs.app-slug }}
-        RELEASE_FREEZE_RULESET_ID: ${{ vars.RELEASE_FREEZE_RULESET_ID }}
-        RELEASE_FREEZE_BOT_BYPASS: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}
+        RELEASE_FREEZE_RULESET_ID: ${{ inputs.freeze-ruleset-id }}
+        RELEASE_FREEZE_BOT_BYPASS: ${{ inputs.bot-bypass-ruleset-ids }}
       with:
         github-token: ${{ steps.bot-token.outputs.token }}
         script: |
