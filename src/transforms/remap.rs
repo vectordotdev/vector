@@ -620,6 +620,12 @@ where
                     events.for_each(|event| push_default(event, output))
                 }
             },
+            Err(Terminate::Interrupted) => {
+                emit!(RemapMappingError {
+                    error: ExpressionError::Interrupted.to_string(),
+                    event_dropped: true,
+                });
+            }
             Err(reason) => {
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
@@ -639,6 +645,7 @@ where
                         }
                         ("error", error, self.drop_on_error)
                     }
+                    Terminate::Interrupted => unreachable!("interruptions are handled above"),
                 };
 
                 if !drop {
@@ -722,7 +729,7 @@ mod tests {
         )
     }
 
-    fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
+    fn remap_with_runner<Runner: VrlRunner>(config: RemapConfig) -> Result<Remap<Runner>> {
         let schema_definitions = HashMap::from([
             (
                 None,
@@ -734,8 +741,29 @@ mod tests {
             ),
         ]);
 
-        Remap::new_ast(config, &TransformContext::new_test(schema_definitions))
-            .map(|(remap, _)| remap)
+        Remap::new(config, &TransformContext::new_test(schema_definitions)).map(|(remap, _)| remap)
+    }
+
+    fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
+        remap_with_runner(config)
+    }
+
+    #[derive(Clone)]
+    struct InterruptingRunner;
+
+    impl VrlRunner for InterruptingRunner {
+        fn new() -> Self {
+            Self
+        }
+
+        fn run(
+            &mut self,
+            _: &mut VrlTarget,
+            _: &Program,
+            _: &TimeZone,
+        ) -> std::result::Result<Value, Terminate> {
+            Err(Terminate::Interrupted)
+        }
     }
 
     #[test]
@@ -797,6 +825,27 @@ mod tests {
             &err,
             "must provide exactly one of `source` or `file` or `files` configuration"
         )
+    }
+
+    #[test]
+    fn interrupted_execution_is_dropped() {
+        for reroute_dropped in [false, true] {
+            let config = RemapConfig {
+                source: Some(".foo = 1".to_owned()),
+                drop_on_error: false,
+                reroute_dropped,
+                ..Default::default()
+            };
+            let mut transform = remap_with_runner::<InterruptingRunner>(config).unwrap();
+
+            let output = collect_outputs(&mut transform, Event::from(LogEvent::from("message")));
+
+            assert_eq!(output.primary.len(), 0);
+            assert_eq!(
+                output.named.values().map(OutputBuffer::len).sum::<usize>(),
+                0
+            );
+        }
     }
 
     fn get_field_string(event: &Event, field: &str) -> String {
