@@ -57,7 +57,10 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
   - [ ] Manually trigger the `trigger-package-release-pipeline-prod-stable` job.
 - [ ] Push the release branch to update the remote (This should close the preparation branch PR).
   - `git checkout "${RELEASE_BRANCH}" && git push`
-- [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
+- [ ] Review and squash-merge the Helm release PR, then wait for the chart release.
+  - The Vector release workflow starts [Helm release preparation](https://github.com/vectordotdev/helm-charts/actions/workflows/release-prepare.yml)
+    automatically for the latest stable Vector release.
+  - See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md) for the review steps.
 - [ ] Once Helm chart is released, updated Vector manifests
   - Run `cargo vdev build manifests` and open a PR with changes
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
