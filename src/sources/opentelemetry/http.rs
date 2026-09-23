@@ -7,7 +7,7 @@ use hyper::{Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
-use tower::ServiceBuilder;
+use tower::{Layer, ServiceBuilder};
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -40,7 +40,7 @@ use crate::{
         http_server::HttpConfigParamKind,
         opentelemetry::{
             config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
-            request_control::{HttpErrorResponse, RequestControlLayer},
+            request_control::{HttpErrorResponse, RequestControlLayer, RequestProcessingPermit},
         },
         util::{add_headers, decompress_body, http::capped_body},
     },
@@ -72,6 +72,9 @@ pub(crate) async fn run_http_server(
     info!(message = "Building HTTP server.", address = %address);
 
     let span = Span::current();
+    // Admission wraps the Warp service, so queued requests cannot reach `capped_body`.
+    // Build it once so all connections share the same buffer worker.
+    let admitted = request_control.layer(warp::service(routes));
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
         let svc = ServiceBuilder::new()
             .layer(build_http_trace_layer(span.clone()))
@@ -82,9 +85,7 @@ pub(crate) async fn run_http_server(
                     conn.peer_addr(),
                 )
             }))
-            // Admission wraps the Warp service, so queued requests cannot reach `capped_body`.
-            .layer(request_control.clone())
-            .service(warp::service(routes.clone()));
+            .service(admitted.clone());
         futures_util::future::ok::<_, Infallible>(svc)
     });
 
@@ -213,9 +214,13 @@ where
         ))
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::headers_cloned())
+        .and(warp::filters::ext::optional::<RequestProcessingPermit>())
         .and(body_filter)
         .and_then(
-            move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
+            move |encoding_header: Option<String>,
+                  headers: HeaderMap,
+                  processing: Option<RequestProcessingPermit>,
+                  body: Bytes| {
                 let events = make_events(encoding_header, headers, body);
                 handle_request(
                     events,
@@ -223,6 +228,7 @@ where
                     out.clone(),
                     telemetry_type,
                     Resp::default(),
+                    processing,
                 )
             },
         )
@@ -425,6 +431,7 @@ async fn handle_request(
     mut out: SourceSender,
     output: &str,
     resp: impl Message,
+    processing: Option<RequestProcessingPermit>,
 ) -> Result<Response, Rejection> {
     match events {
         Ok(mut events) => {
@@ -435,6 +442,9 @@ async fn handle_request(
                 emit!(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
+            if let Some(processing) = processing {
+                processing.release();
+            }
 
             match receiver {
                 None => Ok(protobuf(resp).into_response()),

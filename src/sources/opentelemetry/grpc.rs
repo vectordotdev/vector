@@ -25,7 +25,10 @@ use vector_lib::{
 use crate::{
     SourceSender,
     internal_events::{EventsReceived, StreamClosedError},
-    sources::opentelemetry::config::{LOGS, METRICS, TRACES},
+    sources::opentelemetry::{
+        config::{LOGS, METRICS, TRACES},
+        request_control::RequestProcessingPermit,
+    },
 };
 
 #[derive(Clone)]
@@ -43,6 +46,10 @@ impl TraceService for Service {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
+        let processing = request
+            .extensions()
+            .get::<RequestProcessingPermit>()
+            .cloned();
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
@@ -58,7 +65,7 @@ impl TraceService for Service {
                 .flat_map(|v| v.into_event_iter())
                 .collect()
         };
-        self.handle_events(events, TRACES).await?;
+        self.handle_events(events, TRACES, processing).await?;
 
         Ok(Response::new(ExportTraceServiceResponse {
             partial_success: None,
@@ -72,6 +79,10 @@ impl LogsService for Service {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
+        let processing = request
+            .extensions()
+            .get::<RequestProcessingPermit>()
+            .cloned();
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
@@ -87,7 +98,7 @@ impl LogsService for Service {
                 .flat_map(|v| v.into_event_iter(self.log_namespace))
                 .collect()
         };
-        self.handle_events(events, LOGS).await?;
+        self.handle_events(events, LOGS, processing).await?;
 
         Ok(Response::new(ExportLogsServiceResponse {
             partial_success: None,
@@ -101,6 +112,10 @@ impl MetricsService for Service {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
+        let processing = request
+            .extensions()
+            .get::<RequestProcessingPermit>()
+            .cloned();
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             // Major caveat here, the output event will be logs.
@@ -118,7 +133,7 @@ impl MetricsService for Service {
                 .collect()
         };
 
-        self.handle_events(events, METRICS).await?;
+        self.handle_events(events, METRICS, processing).await?;
 
         Ok(Response::new(ExportMetricsServiceResponse {
             partial_success: None,
@@ -131,6 +146,7 @@ impl Service {
         &self,
         mut events: Vec<Event>,
         log_name: &'static str,
+        processing: Option<RequestProcessingPermit>,
     ) -> Result<(), Status> {
         // When using OTLP decoding, count individual items within the batch
         // to maintain consistency with other Vector sources
@@ -152,9 +168,11 @@ impl Service {
                 emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
-            .and_then(|_| handle_batch_status(receiver))
             .await?;
-        Ok(())
+        if let Some(processing) = processing {
+            processing.release();
+        }
+        handle_batch_status(receiver).await
     }
 }
 

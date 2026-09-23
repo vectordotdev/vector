@@ -2,7 +2,7 @@ use std::{
     convert::Infallible,
     future::Future,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, Mutex},
     task::{Context, Poll},
     time::Duration,
 };
@@ -10,15 +10,12 @@ use std::{
 use http::{Request, Response, StatusCode};
 use hyper::Body;
 use metrics::{Counter, Gauge};
-use tokio::sync::Semaphore;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio_util::sync::PollSemaphore;
 use tonic::body::BoxBody;
 use tower::{
-    BoxError, Layer, Service, ServiceBuilder,
-    buffer::BufferLayer,
-    limit::GlobalConcurrencyLimitLayer,
-    load_shed::LoadShedLayer,
-    timeout::TimeoutLayer,
-    util::{BoxCloneService, MapRequestLayer},
+    BoxError, Layer, Service, ServiceExt, buffer::BufferLayer, load_shed::error::Overloaded,
+    timeout::TimeoutLayer, util::BoxCloneService,
 };
 use vector_lib::{
     counter, gauge,
@@ -85,7 +82,6 @@ enum Protocol {
     Grpc,
 }
 
-#[derive(Clone)]
 struct RequestControlMetrics {
     queued: OpenGauge,
     queued_level: Gauge,
@@ -134,50 +130,122 @@ impl RequestControlMetrics {
 #[derive(Clone)]
 struct QueuedRequest(#[expect(dead_code)] LevelToken);
 
-fn mark_dequeued(mut request: Request<Body>) -> Request<Body> {
-    drop(request.extensions_mut().remove::<QueuedRequest>());
-    request
-}
-
 #[derive(Clone)]
-struct QueueTrackingLayer {
-    metrics: Arc<RequestControlMetrics>,
+pub(crate) struct RequestProcessingPermit(Arc<Mutex<Option<OwnedSemaphorePermit>>>);
+
+impl RequestProcessingPermit {
+    fn new(permit: OwnedSemaphorePermit) -> Self {
+        Self(Arc::new(Mutex::new(Some(permit))))
+    }
+
+    pub(crate) fn release(&self) {
+        drop(
+            self.0
+                .lock()
+                .expect("processing permit lock poisoned")
+                .take(),
+        );
+    }
 }
 
-impl<S> Layer<S> for QueueTrackingLayer {
-    type Service = QueueTrackingService<S>;
+struct ProcessingLimitService<S> {
+    inner: S,
+    semaphore: Arc<Semaphore>,
+    acquire: PollSemaphore,
+    permit: Option<OwnedSemaphorePermit>,
+}
 
-    fn layer(&self, inner: S) -> Self::Service {
-        QueueTrackingService {
+impl<S> ProcessingLimitService<S> {
+    fn new(inner: S, semaphore: Arc<Semaphore>) -> Self {
+        Self {
             inner,
-            metrics: Arc::clone(&self.metrics),
+            acquire: PollSemaphore::new(Arc::clone(&semaphore)),
+            semaphore,
+            permit: None,
         }
     }
 }
 
-#[derive(Clone)]
-struct QueueTrackingService<S> {
-    inner: S,
-    metrics: Arc<RequestControlMetrics>,
+impl<S: Clone> Clone for ProcessingLimitService<S> {
+    fn clone(&self) -> Self {
+        Self::new(self.inner.clone(), Arc::clone(&self.semaphore))
+    }
 }
 
-impl<S> Service<Request<Body>> for QueueTrackingService<S>
+impl<S> Service<Request<Body>> for ProcessingLimitService<S>
 where
     S: Service<Request<Body>>,
+    S::Future: Send + 'static,
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = S::Future;
+    type Future = Pin<Box<dyn Future<Output = Result<S::Response, S::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.permit.is_none() {
+            match self.acquire.poll_acquire(cx) {
+                Poll::Ready(Some(permit)) => self.permit = Some(permit),
+                Poll::Ready(None) => unreachable!("processing semaphore is never closed"),
+                Poll::Pending => return Poll::Pending,
+            }
+        }
         self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, mut request: Request<Body>) -> Self::Future {
+        let permit = self
+            .permit
+            .take()
+            .expect("processing limit must be ready before call");
+        drop(request.extensions_mut().remove::<QueuedRequest>());
+        let processing = RequestProcessingPermit::new(permit);
+        request.extensions_mut().insert(processing.clone());
+        let future = self.inner.call(request);
+        Box::pin(async move {
+            let _processing = processing;
+            future.await
+        })
+    }
+}
+
+#[derive(Clone)]
+struct AdmissionService<S> {
+    inner: S,
+    outer: Arc<Semaphore>,
+    metrics: Arc<RequestControlMetrics>,
+}
+
+impl<S> Service<Request<Body>> for AdmissionService<S>
+where
+    S: Service<Request<Body>> + Clone + Send + 'static,
+    S::Response: Send + 'static,
+    S::Error: Into<BoxError>,
+    S::Future: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = BoxError;
+    type Future = Pin<Box<dyn Future<Output = Result<S::Response, BoxError>> + Send>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, mut request: Request<Body>) -> Self::Future {
+        let outer = match Arc::clone(&self.outer).try_acquire_owned() {
+            Ok(permit) => permit,
+            Err(_) => {
+                return Box::pin(async { Err(Box::new(Overloaded::new()) as BoxError) });
+            }
+        };
+
         request
             .extensions_mut()
             .insert(QueuedRequest(self.metrics.queued_token()));
-        self.inner.call(request)
+        let future = self.inner.clone().oneshot(request);
+        Box::pin(async move {
+            let _outer = outer;
+            future.await.map_err(Into::into)
+        })
     }
 }
 
@@ -202,27 +270,17 @@ where
     type Service = RequestControlService<S::Response, R>;
 
     fn layer(&self, service: S) -> Self::Service {
-        // Layer order is outer-to-inner. Load shedding observes readiness from the outer
-        // semaphore, while the buffer waits on the inner semaphore without polling bodies.
-        let service = ServiceBuilder::new()
-            .layer(TimeoutLayer::new(self.timeout))
-            .layer(LoadShedLayer::new())
-            .layer(GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(
-                &self.outer,
-            )))
-            .layer(QueueTrackingLayer {
-                metrics: Arc::clone(&self.metrics),
-            })
-            .layer(BufferLayer::new(self.outer_capacity))
-            .layer(GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(
-                &self.inner,
-            )))
-            .layer(MapRequestLayer::new(mark_dequeued))
-            .service(service);
+        let service = ProcessingLimitService::new(service, Arc::clone(&self.inner));
+        let service = BufferLayer::new(self.outer_capacity).layer(service);
+        let service = AdmissionService {
+            inner: service,
+            outer: Arc::clone(&self.outer),
+            metrics: Arc::clone(&self.metrics),
+        };
+        let service = TimeoutLayer::new(self.timeout).layer(service);
 
         RequestControlService {
             inner: BoxCloneService::new(service),
-            readiness_error: None,
             error_response: self.error_response.clone(),
         }
     }
@@ -234,7 +292,6 @@ pub(crate) trait ErrorResponse<R>: Clone + Send + 'static {
 
 pub(crate) struct RequestControlService<R, E> {
     inner: BoxCloneService<Request<Body>, R, BoxError>,
-    readiness_error: Option<BoxError>,
     error_response: E,
 }
 
@@ -245,8 +302,6 @@ where
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            // Readiness reservations are local to a service clone and must not be copied.
-            readiness_error: None,
             error_response: self.error_response.clone(),
         }
     }
@@ -261,23 +316,12 @@ where
     type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<R, Infallible>> + Send>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.inner.poll_ready(cx) {
-            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(error)) => {
-                self.readiness_error = Some(error);
-                Poll::Ready(Ok(()))
-            }
-            Poll::Pending => Poll::Pending,
-        }
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: Request<Body>) -> Self::Future {
         let error_response = self.error_response.clone();
-        if let Some(error) = self.readiness_error.take() {
-            return Box::pin(async move { Ok(error_response.make_response(error)) });
-        }
-
         let future = self.inner.call(request);
         Box::pin(async move {
             Ok(match future.await {
@@ -365,6 +409,7 @@ mod tests {
         observations: Arc<Observations>,
         gate: Arc<Semaphore>,
         response: Arc<dyn Fn() -> R + Send + Sync>,
+        release_processing: bool,
     }
 
     impl<R> Clone for GateService<R> {
@@ -373,6 +418,7 @@ mod tests {
                 observations: Arc::clone(&self.observations),
                 gate: Arc::clone(&self.gate),
                 response: Arc::clone(&self.response),
+                release_processing: self.release_processing,
             }
         }
     }
@@ -397,16 +443,26 @@ mod tests {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, _request: Request<Body>) -> Self::Future {
+        fn call(&mut self, request: Request<Body>) -> Self::Future {
             let observations = Arc::clone(&self.observations);
             let gate = Arc::clone(&self.gate);
             let response = Arc::clone(&self.response);
+            let processing = self.release_processing.then(|| {
+                request
+                    .extensions()
+                    .get::<RequestProcessingPermit>()
+                    .unwrap()
+                    .clone()
+            });
             Box::pin(async move {
                 observations.started.fetch_add(1, Ordering::AcqRel);
                 let active = observations.active.fetch_add(1, Ordering::AcqRel) + 1;
                 observations
                     .maximum_active
                     .fetch_max(active, Ordering::AcqRel);
+                if let Some(processing) = processing {
+                    processing.release();
+                }
                 let _guard = ActiveGuard(observations);
                 let _permit = gate.acquire().await.expect("test gate must remain open");
                 Ok(response())
@@ -422,7 +478,17 @@ mod tests {
             observations,
             gate,
             response: Arc::new(|| Response::new(Body::empty())),
+            release_processing: false,
         }
+    }
+
+    fn releasing_http_service(
+        observations: Arc<Observations>,
+        gate: Arc<Semaphore>,
+    ) -> GateService<Response<Body>> {
+        let mut service = http_service(observations, gate);
+        service.release_processing = true;
+        service
     }
 
     fn grpc_service(
@@ -433,6 +499,7 @@ mod tests {
             observations,
             gate,
             response: Arc::new(|| tonic::Status::new(tonic::Code::Ok, "").to_http()),
+            release_processing: false,
         }
     }
 
@@ -454,6 +521,47 @@ mod tests {
         })
         .await
         .expect("request control metric did not reach expected value");
+    }
+
+    #[tokio::test]
+    async fn readiness_does_not_reserve_outer_capacity() {
+        const OUTER: usize = 3;
+
+        let control = RequestControl::new(OUTER, 1, Duration::from_secs(5));
+        let observations = Arc::new(Observations::default());
+        let gate = Arc::new(Semaphore::new(1));
+        let service = control.http_layer().layer(http_service(observations, gate));
+        let mut idle_services = vec![service.clone(); OUTER];
+
+        for idle in &mut idle_services {
+            idle.ready().await.unwrap();
+        }
+
+        assert_eq!(control.outer.available_permits(), OUTER);
+        let response = service.oneshot(Request::new(Body::empty())).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn released_processing_permit_allows_ack_waits_to_overlap() {
+        let control = RequestControl::new(2, 1, Duration::from_secs(5));
+        let observations = Arc::new(Observations::default());
+        let gate = Arc::new(Semaphore::new(0));
+        let service = control.http_layer().layer(releasing_http_service(
+            Arc::clone(&observations),
+            Arc::clone(&gate),
+        ));
+
+        let first = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
+        wait_for(&observations.started, 1).await;
+        let second = tokio::spawn(service.oneshot(Request::new(Body::empty())));
+        wait_for(&observations.started, 2).await;
+        assert_eq!(observations.maximum_active.load(Ordering::Acquire), 2);
+
+        gate.add_permits(2);
+        first.await.unwrap().unwrap();
+        second.await.unwrap().unwrap();
+        assert_eq!(control.inner.available_permits(), 1);
     }
 
     #[tokio::test]
