@@ -19,6 +19,7 @@ runs:
         client-id: ${{ inputs.app-client-id }}
         private-key: ${{ inputs.app-private-key }}
         permission-contents: write
+        permission-administration: read
 
     # This is a best-effort guard and remains susceptible to TOCTOU changes after the check.
     # Keep the freeze and temporary bot bypasses until housekeeping and manifests finish.
