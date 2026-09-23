@@ -179,14 +179,7 @@ fn series_v3_service(
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
-        .and(
-            path!("api" / "intake" / "metrics" / "v3" / "series" / ..)
-                .or(path!(
-                    "api" / "intake" / "metrics" / "v3beta" / "series" / ..
-                ))
-                .unify()
-                .and(warp::path::full()),
-        )
+        .and(path!("api" / "intake" / "metrics" / "v3" / "series" / ..).and(warp::path::full()))
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
