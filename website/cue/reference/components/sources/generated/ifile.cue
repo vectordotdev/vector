@@ -222,7 +222,6 @@ generated: components: sources: ifile: configuration: {
 	max_read_bytes: {
 		description: """
 			Max amount of bytes to read from a single file before switching over to the next file.
-			**Note:** This does not apply when `oldest_first` is `true`.
 
 			This allows distributing the reads more or less evenly across
 			the files.
@@ -255,11 +254,6 @@ generated: components: sources: ifile: configuration: {
 			"offset"
 		]
 	}
-	oldest_first: {
-		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files."
-		required:    false
-		type: bool: default: false
-	}
 	read_from: {
 		description: "File position to use when reading a new file."
 		required:    false
@@ -273,7 +267,12 @@ generated: components: sources: ifile: configuration: {
 	}
 	remove_after_secs: {
 		description: """
-			After reaching EOF, the number of seconds to wait before removing the file, unless new data is written.
+			The minimum idle period in seconds before deleting a fully consumed file.
+
+			Deletion requires EOF with no partial record, unchanged file identity and size, and
+			delivery of all records. With acknowledgements enabled, delivery means acknowledged
+			by downstream components; otherwise it means handed to the source output.
+			Files too small to fingerprint are never deleted. Lower `fingerprint.bytes` if needed.
 
 			If not specified, files are not removed.
 			"""

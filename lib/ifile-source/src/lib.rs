@@ -9,7 +9,7 @@ pub mod paths_provider;
 pub use self::file_server::TestEvent;
 pub use self::{
     file_server::{calculate_ignore_before, FileServer, Line, Shutdown as FileServerShutdown},
-    file_watcher::FileWatcher,
+    file_watcher::{DeletionProgress, FileWatcher},
     paths_provider::notify::NotifyPathsProvider,
 };
 pub use file_source_common::{

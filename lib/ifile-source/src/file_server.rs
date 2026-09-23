@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     path::PathBuf,
+    sync::Arc,
     time::Instant,
     time::{self, Duration},
 };
@@ -21,7 +22,7 @@ use tokio_util::task::JoinMap;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    file_watcher::FileWatcher,
+    file_watcher::{DeletionProgress, FileWatcher},
     paths_provider::{PathUpdates, PathsProvider},
     Checkpointer, CheckpointsView, FilePosition, ReadFrom,
 };
@@ -36,6 +37,9 @@ pub enum TestEvent {
     Read(PathBuf, Box<[u8]>),
 }
 
+// Bound each output batch across all files, including batches of empty lines.
+const MAX_BATCH_BYTES: usize = 1024 * 1024;
+const MAX_BATCH_LINES: usize = 8192;
 /// `FileServer` is a Source which schedules reads over files,
 /// converting the lines of said files into `LogLine` structures.
 ///
@@ -53,7 +57,6 @@ where
     pub max_line_bytes: usize,
     pub line_delimiter: Bytes,
     pub fingerprinter: Fingerprinter,
-    pub oldest_first: bool,
     pub remove_after: Option<Duration>,
     pub emitter: E,
     pub rotate_wait: Duration,
@@ -83,6 +86,40 @@ where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
 {
+    async fn send_lines<C>(
+        &self,
+        chans: &mut C,
+        lines: &mut Vec<Line>,
+        stats: &mut TimingStats,
+    ) -> Result<(), C::Error>
+    where
+        C: Sink<Vec<Line>> + Unpin,
+        C::Error: std::error::Error,
+    {
+        if lines.is_empty() {
+            return Ok(());
+        }
+        #[cfg(any(test, feature = "test"))]
+        if let Some(sender) = self.test_sender.as_ref() {
+            for line in lines.iter() {
+                debug!("sending {}", String::from_utf8_lossy(line.text.chunk()));
+                sender
+                    .send(TestEvent::Read(
+                        PathBuf::from(line.filename.clone()),
+                        line.text.chunk().into(),
+                    ))
+                    .unwrap();
+            }
+        }
+        let start = time::Instant::now();
+        if let Err(error) = chans.send(std::mem::take(lines)).await {
+            error!(message = "Output channel closed.", %error);
+            return Err(error);
+        }
+        stats.record("sending", start.elapsed());
+        Ok(())
+    }
+
     // The first `shutdown_data` signal here is to stop this file
     // server from outputting new data; the second
     // `shutdown_checkpointer` is for finishing the background
@@ -309,36 +346,11 @@ where
             }
             stats.record("discovery", start.elapsed());
 
-            // Cleanup the known_small_files
-            if let Some(grace_period) = self.remove_after {
-                let mut set = JoinMap::new();
-
-                known_small_files
-                    .iter()
-                    .filter(|&(_path, last_time_open)| last_time_open.elapsed() >= grace_period)
-                    .map(|(path, _last_time_open)| path.clone())
-                    .for_each(|path| set.spawn(path.clone(), remove_file(path)));
-
-                while let Some((path, result)) = set.join_next().await {
-                    match result.map_err(std::io::Error::other).flatten() {
-                        Ok(()) => {
-                            let removed = known_small_files.remove(&path);
-
-                            if removed.is_some() {
-                                self.emitter.emit_file_deleted(&path);
-                            }
-                        }
-                        Err(err) => {
-                            self.emitter.emit_file_delete_error(&path, err);
-                        }
-                    }
-                }
-            }
-
             // Collect lines by polling files.
-            let mut maxed_out_reading_single_file = false;
+            let mut batch_bytes = 0;
+            let mut made_progress = false;
             for (&file_id, watcher) in &mut fp_map {
-                let start = time::Instant::now();
+                let mut start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 if watcher.check_for_truncation().await.is_ok() {
                     while let Ok(Some(line)) = watcher.read_line().await {
@@ -351,6 +363,8 @@ where
                         stats.record_bytes(sz);
 
                         bytes_read += sz;
+                        batch_bytes += sz;
+                        made_progress = true;
 
                         lines.push(Line {
                             text: line.bytes,
@@ -358,10 +372,19 @@ where
                             file_id,
                             start_offset: line.offset,
                             end_offset: watcher.get_file_position(),
+                            deletion_progress: watcher.deletion_progress.clone(),
                         });
 
+                        // Flush without restarting the file traversal or consuming
+                        // another per-file budget. A single line may exceed the cap.
+                        if batch_bytes >= MAX_BATCH_BYTES || lines.len() >= MAX_BATCH_LINES {
+                            stats.record("reading", start.elapsed());
+                            self.send_lines(&mut chans, &mut lines, &mut stats).await?;
+                            batch_bytes = 0;
+                            start = time::Instant::now();
+                        }
+
                         if bytes_read > self.max_read_bytes {
-                            maxed_out_reading_single_file = true;
                             break;
                         }
                     }
@@ -371,7 +394,7 @@ where
                 if bytes_read == 0 {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after {
-                        if watcher.last_read_success().elapsed() >= grace_period {
+                        if watcher.ready_to_delete(grace_period).await.unwrap_or(false) {
                             // Try to remove
                             match remove_file(&watcher.path).await {
                                 Ok(()) => {
@@ -385,11 +408,6 @@ where
                             }
                         }
                     }
-                }
-
-                // Do not move on to newer files if we are behind on an older file
-                if self.oldest_first && maxed_out_reading_single_file {
-                    break;
                 }
             }
 
@@ -410,27 +428,7 @@ where
             });
             self.emitter.emit_files_open(fp_map.len());
 
-            #[cfg(any(test, feature = "test"))]
-            if let Some(sender) = self.test_sender.as_ref() {
-                for line in &lines {
-                    debug!("sending {}", String::from_utf8_lossy(line.text.chunk()));
-                    sender
-                        .send(TestEvent::Read(
-                            PathBuf::from(line.filename.clone()),
-                            line.text.chunk().into(),
-                        ))
-                        .unwrap();
-                }
-            }
-            let start = time::Instant::now();
-            let made_progress = !lines.is_empty();
-            if made_progress {
-                if let Err(error) = chans.send(std::mem::take(&mut lines)).await {
-                    error!(message = "Output channel closed.", %error);
-                    return Err(error);
-                }
-            }
-            stats.record("sending", start.elapsed());
+            self.send_lines(&mut chans, &mut lines, &mut stats).await?;
 
             let shutdown_token = tokio::select! {
                 biased;
@@ -536,6 +534,12 @@ where
                     }
                 }
 
+                if self.remove_after.is_some() {
+                    watcher.enable_deletion(match read_from {
+                        ReadFrom::Checkpoint(offset) => Some(offset),
+                        _ => None,
+                    });
+                }
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);
             }
@@ -655,4 +659,5 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: FilePosition,
     pub end_offset: FilePosition,
+    pub deletion_progress: Option<Arc<DeletionProgress>>,
 }
