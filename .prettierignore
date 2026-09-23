@@ -25,6 +25,12 @@ website/cue/
 config/examples/docs_example.yaml
 config/examples/file_to_prometheus.yaml
 
+# Vendored upstream protocol definitions. Their YAML indentation is upstream's.
+# Paths passed to Prettier on the command line are still formatted, so `vdev`
+# also drops these prefixes before it invokes Prettier.
+lib/opentelemetry-proto/src/proto/opentelemetry-proto/
+lib/datadog-proto/proto/datadog/trace/
+
 # Lock files
 Cargo.lock
 website/yarn.lock
