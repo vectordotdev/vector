@@ -641,31 +641,19 @@ mod housekeeping {
     }
 
     #[test]
-    fn retries_reuse_the_published_branch_and_skip_open_or_completed_prs() {
+    fn skips_once_master_has_advanced_without_branch_or_resume_state() {
         let fixture = Fixture::new();
-        let output = fixture.state(true);
-        assert!(output.contains("branch=release/housekeeping-v0.59.0\n"));
-        assert!(output.contains("resume=false\nskip=false\n"));
         let repo = fixture.repo.path();
+        let output = fixture.state(true);
+        assert!(output.contains("version=0.59.0\n"));
+        assert!(output.contains("skip=false\n"));
+        // Housekeeping commits directly to master, so there is no branch or
+        // resume state, and once master begins the next development version a
+        // retry of the workflow is a no-op.
+        assert!(!output.contains("branch="));
+        assert!(!output.contains("resume="));
         fixture.prepare();
-        let housekeeping = commit(repo);
-        git(
-            repo,
-            &[
-                "push",
-                "origin",
-                "HEAD:refs/heads/release/housekeeping-v0.59.0",
-            ],
-        );
-        git(repo, &["switch", "--detach", &fixture.release]);
-        assert!(fixture.state(true).contains("resume=true\nskip=false\n"));
-        write(
-            repo,
-            ".git/pr-list.json",
-            r#"[{"isCrossRepository":false,"url":"https://example.invalid/pr/1"}]"#,
-        );
-        assert!(fixture.state(true).contains("skip=true\n"));
-        git(repo, &["switch", "--detach", &housekeeping]);
+        commit(repo);
         assert!(fixture.state(true).contains("skip=true\n"));
     }
 

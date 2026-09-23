@@ -32,11 +32,11 @@ pub struct Cli {
 enum WorkflowCommand {
     /// Validate a request before generating a release preparation PR.
     PrepareCheck(PrepareCheck),
-    /// Validate a generated release preparation or housekeeping PR.
+    /// Validate a generated release preparation PR or housekeeping commit.
     PrCheck(PrCheck),
     /// Validate an approved minor-release squash merge before creating its refs.
     AutotagCheck(AutotagCheck),
-    /// Check whether a published minor release needs a housekeeping PR.
+    /// Check whether a published minor release needs post-release housekeeping.
     HousekeepingCheck(HousekeepingCheck),
     /// Begin the next development version and restore VRL main locally.
     HousekeepingPrepare(HousekeepingPrepare),
@@ -306,15 +306,10 @@ impl HousekeepingCheck {
             &self.release_commit,
             &preparation_branch(&version),
         )?;
-        let branch = format!("release/housekeeping-v{version}");
+        // Housekeeping commits directly to master under the freeze, so there is
+        // no branch to resume and no PR to detect; the "master already advanced"
+        // check above makes re-runs idempotent.
         set_github_output("version", &version.to_string())?;
-        set_github_output("branch", &branch)?;
-        if let Some(url) = find_existing_pr(&self.repository, &branch, "vectordotdev-bot")? {
-            append_github_step_summary(&format!("Existing housekeeping PR: {url}"))?;
-            return set_github_output("skip", "true");
-        }
-        let resume = remote_ref_exists(&format!("refs/heads/{branch}"))?;
-        set_github_output("resume", if resume { "true" } else { "false" })?;
         set_github_output("skip", "false")
     }
 }

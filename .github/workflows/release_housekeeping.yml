@@ -11,9 +11,8 @@ on:
         type: string
 
 permissions:
-  contents: read
-  pull-requests: read
-  checks: read
+  contents: read # Restrictive default
+  pull-requests: read # List associated preparation PRs during state checks
 
 concurrency:
   group: release-housekeeping
@@ -27,7 +26,6 @@ jobs:
     timeout-minutes: 45
     outputs:
       base_sha: ${{ steps.base.outputs.sha }}
-      branch: ${{ steps.state.outputs.branch }}
       skip: ${{ steps.state.outputs.skip }}
       version: ${{ steps.state.outputs.version }}
     steps:
@@ -72,7 +70,7 @@ jobs:
           bot-bypass-ruleset-ids: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}
 
       - name: Generate housekeeping
-        if: steps.state.outputs.skip != 'true' && steps.state.outputs.resume != 'true'
+        if: steps.state.outputs.skip != 'true'
         env:
           VERSION: ${{ steps.state.outputs.version }}
           RELEASE_COMMIT: ${{ inputs.release_commit }}
@@ -81,23 +79,12 @@ jobs:
           --version "$VERSION" --release-commit "$RELEASE_COMMIT"
 
       - name: Install VRL documentation builder
-        if: steps.state.outputs.skip != 'true' && steps.state.outputs.resume != 'true'
+        if: steps.state.outputs.skip != 'true'
         uses: ./.github/actions/install-vrl-doc-builder
 
       - name: Refresh dependency files
-        if: steps.state.outputs.skip != 'true' && steps.state.outputs.resume != 'true'
+        if: steps.state.outputs.skip != 'true'
         run: make build-licenses generate-vector-vrl-docs
-
-      - name: Resume an already published branch
-        if: steps.state.outputs.skip != 'true' && steps.state.outputs.resume == 'true'
-        env:
-          BASE_SHA: ${{ steps.base.outputs.sha }}
-          BRANCH: ${{ steps.state.outputs.branch }}
-        run: |
-          git fetch --no-tags origin "refs/heads/$BRANCH"
-          git switch --detach FETCH_HEAD
-          "$VDEV" release workflow pr-check \
-            --base-sha "$BASE_SHA" --head-ref "$BRANCH"
 
       - name: Package housekeeping changes
         if: steps.state.outputs.skip != 'true'
@@ -117,17 +104,15 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  open-pr:
-    name: Open housekeeping PR
+  push-master:
+    name: Push housekeeping to master
     needs: generate
     if: needs.generate.outputs.skip != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    outputs:
-      head_sha: ${{ steps.pr.outputs.head_sha }}
     env:
       BASE_SHA: ${{ needs.generate.outputs.base_sha }}
-      BRANCH: ${{ needs.generate.outputs.branch }}
+      VERSION: ${{ needs.generate.outputs.version }}
     steps:
       - name: Checkout frozen master
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -157,26 +142,17 @@ jobs:
           name: release-housekeeping
           path: ${{ runner.temp }}/housekeeping
 
-      - name: Validate and commit housekeeping
-        env:
-          VERSION: ${{ needs.generate.outputs.version }}
+      - name: Validate housekeeping changes
         run: |
           git apply --index --binary "$RUNNER_TEMP/housekeeping/housekeeping.patch"
           git config user.name "vectordotdev-bot[bot]"
           git config user.email "vectordotdev-bot[bot]@users.noreply.github.com"
           git commit -m "chore(releasing): housekeeping after v${VERSION}"
-          "$VDEV" release workflow pr-check --base-sha "$BASE_SHA" --head-ref "$BRANCH"
-
-      - name: Reuse an identical published branch
-        run: |
-          if [[ -n "$(git ls-remote origin "refs/heads/$BRANCH")" ]]; then
-            git fetch --no-tags origin "refs/heads/$BRANCH"
-            git diff --exit-code HEAD FETCH_HEAD
-            git switch --detach FETCH_HEAD
-            "$VDEV" release workflow pr-check --base-sha "$BASE_SHA" --head-ref "$BRANCH"
-          fi
-          master=$(git ls-remote origin refs/heads/master)
-          [[ "${master%%$'\t'*}" == "$BASE_SHA" ]]
+          # Validate the checked housekeeping commit exactly as the release
+          # PR checklist would: only Cargo.toml/Cargo.lock dependency and
+          # documentation refreshes on the frozen base.
+          "$VDEV" release workflow pr-check \
+            --base-sha "$BASE_SHA" --head-ref "release/housekeeping-v${VERSION}"
 
       - name: Create Vector bot token
         id: app-token
@@ -185,109 +161,26 @@ jobs:
           client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
           private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
           permission-contents: write
-          permission-pull-requests: write
 
-      - name: Open housekeeping PR
-        id: pr
+      - name: Push housekeeping to master
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          VERSION: ${{ needs.generate.outputs.version }}
-        run: |
-          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
-            push origin "HEAD:refs/heads/$BRANCH"
-          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
-            --app vectordotdev-bot --state open --json url --jq '.[0].url // empty')
-          if [[ -z "$url" ]]; then
-            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
-              --title "chore(releasing): housekeeping after v${VERSION}" --label no-changelog \
-              --body "Begin the next minor development version, restore VRL main, and refresh dependency files after successful publication of v${VERSION}. The release workflow squash-merges the validated commit after checks pass, while the release freeze remains active.")
-          fi
-          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "Housekeeping PR: $url" >> "$GITHUB_STEP_SUMMARY"
-
-  merge-pr:
-    name: Merge checked housekeeping commit
-    needs: [generate, open-pr]
-    # Also resume an existing PR when generation skipped it on a workflow retry.
-    # A completed release has no branch output and must not attempt another merge.
-    if: >-
-      !cancelled() && needs.generate.result == 'success' &&
-      needs.generate.outputs.branch != '' &&
-      (needs.open-pr.result == 'success' || needs.open-pr.result == 'skipped')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 95
-    steps:
-      - name: Select housekeeping commit
-        id: pr
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ needs.generate.outputs.branch }}
-          EXPECTED_HEAD: ${{ needs.open-pr.outputs.head_sha }}
         run: |
           set -euo pipefail
-          prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
-            --app vectordotdev-bot --state open --json number,headRefOid,isCrossRepository)
-          jq -e 'length == 1 and .[0].isCrossRepository == false' <<< "$prs" >/dev/null
-          number=$(jq -r '.[0].number' <<< "$prs")
-          head_sha=$(jq -r '.[0].headRefOid' <<< "$prs")
-          [[ -z "$EXPECTED_HEAD" || "$head_sha" == "$EXPECTED_HEAD" ]]
-          printf 'number=%s\nhead_sha=%s\n' "$number" "$head_sha" >> "$GITHUB_OUTPUT"
+          # All remote git operations go through the token-authenticated URL. The
+          # checkout ran with persist-credentials: false, so origin has no credentials.
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
-      - name: Wait for release validation
-        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
-        with:
-          ref: ${{ steps.pr.outputs.head_sha }}
-          repo-token: ${{ github.token }}
-          check-name: Validate release state transition
-          allowed-conclusions: success
-          checks-discovery-timeout: 300
-          wait-interval: 15
+          master=$(git ls-remote "$remote" refs/heads/master)
+          master=${master%%$'\t'*}
+          [[ "$master" == "$BASE_SHA" ]] || {
+            echo "master moved since housekeeping was generated; re-run this workflow." >&2
+            exit 1
+          }
 
-      - name: Wait for checks on the selected commit
-        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
-        with:
-          ref: ${{ steps.pr.outputs.head_sha }}
-          repo-token: ${{ github.token }}
-          running-workflow-name: Merge checked housekeeping commit
-          check-regexp: ".+"
-          allowed-conclusions: success,skipped,neutral
-          checks-discovery-timeout: 300
-          wait-interval: 15
+          # Plain non-force push: if master raced ahead since the check above,
+          # the push is rejected rather than rewriting history. Re-run this
+          # workflow from the new master; never rebase, retry, or force-push.
+          git push "$remote" HEAD:refs/heads/master
 
-      - name: Checkout release automation
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: ${{ inputs.release_commit }}
-          sparse-checkout: .github/actions/require-release-freeze
-          persist-credentials: false
-
-      - name: Require active release freeze
-        uses: ./.github/actions/require-release-freeze
-        with: *release-bot
-
-      - name: Create Vector bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
-      - name: Merge only the checked commit
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          BASE_SHA: ${{ needs.generate.outputs.base_sha }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
-        run: |
-          set -euo pipefail
-          master=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/master" --jq .object.sha)
-          [[ "$master" == "$BASE_SHA" ]]
-          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --json state,baseRefName,headRefOid | \
-            jq -e --arg head "$HEAD_SHA" \
-              '.state == "OPEN" and .baseRefName == "master" and .headRefOid == $head' >/dev/null
-          gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --squash --admin --match-head-commit "$HEAD_SHA"
-          echo "Merged housekeeping PR #${PR_NUMBER} at ${HEAD_SHA}." >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed housekeeping commit $(git rev-parse HEAD) to master after v${VERSION}." >> "$GITHUB_STEP_SUMMARY"
