@@ -366,8 +366,6 @@ struct SpanFields(HashMap<&'static str, Value>);
 inventory::submit!(SpanField("component_id"));
 inventory::submit!(SpanField("component_type"));
 inventory::submit!(SpanField("component_kind"));
-// Preserve connection context in logs without adding high-cardinality metric labels.
-inventory::submit!(SpanField("peer_addr"));
 
 /// Snapshot of every registered [`SpanField`],
 /// materialized once on first access. `inventory` populates submissions before `main`, so the

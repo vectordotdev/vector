@@ -274,10 +274,8 @@ mod tests {
         error!(message = "After source started.", %test_id);
 
         {
-            let peer_addr: std::net::SocketAddr = "192.0.2.10:54321".parse().unwrap();
             let nested_span = error_span!(
-                "connection",
-                %peer_addr,
+                "nested span",
                 component_kind = "bar",
                 component_new_field = "baz",
                 component_numerical_field = 1,
@@ -297,7 +295,6 @@ mod tests {
         let end = chrono::Utc::now();
 
         assert_eq!(events.len(), 4);
-        assert!(!vector_lib::metrics::LABELS.contains("peer_addr"));
 
         assert_eq!(
             events[0].as_log()["message"],
@@ -322,9 +319,6 @@ mod tests {
             assert!(timestamp <= end);
             assert_eq!(log["metadata.kind"], "event".into());
             assert_eq!(log["metadata.level"], "ERROR".into());
-            if i < 3 {
-                assert!(log.get(event_path!("vector", "peer_addr")).is_none());
-            }
             // The first log event occurs outside our custom span
             if i == 0 {
                 assert!(log.get(event_path!("vector", "component_id")).is_none());
@@ -341,7 +335,6 @@ mod tests {
                 assert_eq!(log["vector.component_id"], "foo".into());
                 assert_eq!(log["vector.component_kind"], "bar".into());
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
-                assert_eq!(log["vector.peer_addr"], "192.0.2.10:54321".into());
                 assert_eq!(log["vector.component_new_field"], "baz".into());
                 assert_eq!(log["vector.component_numerical_field"], 1.into());
                 assert!(log.get(event_path!("vector", "ignored_field")).is_none());
@@ -401,6 +394,62 @@ mod tests {
         );
         // The unregistered span field is still filtered out.
         assert!(log.get(event_path!("vector", "some_other_field")).is_none());
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn tcp_error_peer_addr_is_captured_without_span_enrichment() {
+        use vector_lib::internal_event::InternalEvent;
+
+        trace::init(false, false, "info", 10, None);
+        trace::reset_early_buffer();
+        let rx = start_source().await;
+        let peer_addr = "192.0.2.10:54321".parse().unwrap();
+
+        {
+            let span = error_span!(
+                "connection",
+                component_id = "tcp_peer_test",
+                %peer_addr,
+            );
+            let _enter = span.enter();
+            crate::internal_events::TcpSendAckError {
+                error: std::io::Error::from(std::io::ErrorKind::ConnectionReset),
+                peer_addr,
+            }
+            .emit();
+            crate::internal_events::TcpSocketTlsConnectionError {
+                error: vector_lib::tls::TlsError::IncomingListener {
+                    source: std::io::Error::from(std::io::ErrorKind::ConnectionReset),
+                },
+                peer_addr,
+            }
+            .emit();
+            error!(message = "Unrelated event.");
+        }
+
+        sleep(Duration::from_millis(1)).await;
+        let mut events = collect_ready(rx);
+        events.retain(|event| {
+            event.as_log().get(event_path!("vector", "component_id"))
+                == Some(&Value::from("tcp_peer_test"))
+        });
+        assert_eq!(events.len(), 3);
+        for event in &events[..2] {
+            let log = event.as_log();
+            assert_eq!(log["peer_addr"], "192.0.2.10:54321".into());
+            assert_eq!(log["metadata.level"], "ERROR".into());
+        }
+        assert!(events[2].as_log().get(event_path!("peer_addr")).is_none());
+        for event in &events {
+            assert!(
+                event
+                    .as_log()
+                    .get(event_path!("vector", "peer_addr"))
+                    .is_none()
+            );
+        }
+        assert!(!vector_lib::metrics::LABELS.contains("peer_addr"));
     }
 
     // NOTE: This test requires #[serial] because it directly interacts with global tracing state.
