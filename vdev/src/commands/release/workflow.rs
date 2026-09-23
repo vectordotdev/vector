@@ -40,6 +40,10 @@ enum WorkflowCommand {
     HousekeepingCheck(HousekeepingCheck),
     /// Begin the next development version and restore VRL main locally.
     HousekeepingPrepare(HousekeepingPrepare),
+    /// Check that resetting the website branch to a release won't roll it back.
+    WebsiteCheck(WebsiteCheck),
+    /// Decide whether a release tag should reset the website branch.
+    WebsitePreflight(WebsitePreflight),
 }
 
 #[derive(clap::Args, Debug)]
@@ -91,6 +95,26 @@ struct PrCheck {
     expected_vrl_version: Option<Version>,
 }
 
+#[derive(clap::Args, Debug)]
+struct WebsiteCheck {
+    /// Stable release tag, e.g. v0.50.0.
+    #[arg(long)]
+    tag: String,
+    /// Candidate release commit, already fetched by the workflow.
+    #[arg(long)]
+    release_commit: String,
+    /// Current website tip, if the branch exists, already fetched by the workflow.
+    #[arg(long)]
+    website_commit: Option<String>,
+}
+
+#[derive(clap::Args, Debug)]
+struct WebsitePreflight {
+    /// Release tag to classify, e.g. v0.50.0 or v0.51.0-rc.1.
+    #[arg(long)]
+    tag: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct ExistingPullRequest {
     #[serde(rename = "isCrossRepository")]
@@ -133,6 +157,8 @@ impl Cli {
             WorkflowCommand::AutotagCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingPrepare(args) => args.exec(),
+            WorkflowCommand::WebsiteCheck(args) => args.exec(),
+            WorkflowCommand::WebsitePreflight(args) => args.exec(),
         }
     }
 }
@@ -305,6 +331,57 @@ impl HousekeepingPrepare {
         Command::new("cargo")
             .args(["update", "-p", "vrl"])
             .check_run()
+    }
+}
+
+impl WebsiteCheck {
+    fn exec(self) -> Result<()> {
+        let release = parse_stable_version(
+            self.tag
+                .strip_prefix('v')
+                .context("release tag must start with v")?,
+            "release tag version",
+        )?;
+        git::ensure_sha(&self.release_commit, "release commit")?;
+        ensure!(
+            cargo_version_at(&self.release_commit)? == release,
+            "release tag does not match Cargo.toml at the release commit"
+        );
+        let Some(website_commit) = self.website_commit else {
+            return Ok(());
+        };
+        git::ensure_sha(&website_commit, "website commit")?;
+        let current = cargo_version_at(&website_commit)?;
+        // Only the version core (major.minor.patch) participates in the comparison;
+        // prerelease and build suffixes on the website version are ignored.
+        let release_tuple = (release.major, release.minor, release.patch);
+        let current_tuple = (current.major, current.minor, current.patch);
+        ensure!(
+            current_tuple <= release_tuple,
+            "refusing to replace website version {current} with {release}"
+        );
+        Ok(())
+    }
+}
+
+impl WebsitePreflight {
+    fn exec(self) -> Result<()> {
+        let tag = self.tag;
+        let version = tag
+            .strip_prefix('v')
+            .context("release tag must start with v")?
+            .parse::<Version>()
+            .with_context(|| format!("invalid release tag: {tag}"))?;
+        // Only stable tags, including patch releases, reset the website branch.
+        // Prerelease and build-metadata tags complete successfully so the
+        // release workflow's housekeeping stage can still handle them.
+        let skip = !version.pre.is_empty() || !version.build.is_empty();
+        if skip {
+            append_github_step_summary(&format!(
+                "Skipping website reset for non-stable tag: {tag}"
+            ))?;
+        }
+        set_github_output("skip", if skip { "true" } else { "false" })
     }
 }
 
