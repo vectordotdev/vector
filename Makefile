@@ -510,7 +510,7 @@ clean: ## Clean everything
 
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from the latest (or CHART_VERSION) Helm chart
-	$(VDEV) build manifests $(if $(CHART_VERSION),--chart-version $(CHART_VERSION))
+	$(VDEV) build manifests -- $(if $(CHART_VERSION),--chart-version $(CHART_VERSION))
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
