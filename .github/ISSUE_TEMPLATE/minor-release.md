@@ -62,9 +62,6 @@ The tag starts the release workflow; do not create the tag or release branch man
     commits and pushes them to `master` itself as the `vectordotdev-bot` — no PR, no review,
     no merge queue. If the run reports no changes, the manifests already match the chart.
 - [ ] Close out the direct-push window **before** disabling the freeze:
-  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
-        `master-write-permissions` ruleset.
-  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
-        `master required checks + mq` ruleset.
-  - [ ] Verify the `master-push-rules` ruleset still has no bypasses.
-- [ ] Set the `Release freeze` ruleset back to **Disabled**.
+  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from every
+        ruleset in `RELEASE_FREEZE_BOT_BYPASS`.
+- [ ] Set the `RELEASE_FREEZE_RULESET_ID` ruleset back to **Disabled**.

@@ -68,12 +68,9 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
     no merge queue. If the run reports no changes, the manifests already match the chart.
 - [ ] After the manifests push succeeds, close out the direct-push window **before**
       disabling the freeze:
-  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
-        `master-write-permissions` ruleset.
-  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
-        `master required checks + mq` ruleset.
-  - [ ] Verify the `master-push-rules` ruleset still has no bypasses.
-  - [ ] Set the `Release freeze` ruleset back to **Disabled**.
+  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from every
+        ruleset in `RELEASE_FREEZE_BOT_BYPASS`.
+  - [ ] Set the `RELEASE_FREEZE_RULESET_ID` ruleset back to **Disabled**.
 
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Wait for the release workflow to reset the `website` branch to the release commit
