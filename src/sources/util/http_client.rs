@@ -14,7 +14,7 @@
 use std::{collections::HashMap, future::ready, time::Duration};
 
 use bytes::Bytes;
-use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
+use futures_util::{FutureExt, StreamExt, stream};
 use http::{Uri, response::Parts};
 use hyper::{Body, Request};
 use tokio_stream::wrappers::IntervalStream;
@@ -218,27 +218,35 @@ pub(crate) async fn call<
                 auth.apply(&mut request);
             }
 
-            tokio::time::timeout(inputs.timeout, client.send(request))
-                .then(move |result| async move {
-                    match result {
-                        Ok(Ok(response)) => Ok(response),
-                        Ok(Err(error)) => Err(error.into()),
-                        Err(_) => Err(format!(
-                            "Timeout error: request exceeded {}s",
-                            inputs.timeout.as_secs_f64()
-                        )
-                        .into()),
-                    }
-                })
-                .and_then(|response| async move {
-                    let (header, body) = response.into_parts();
-                    let body = http_body::Body::collect(body).await?.to_bytes();
-                    emit!(EndpointBytesReceived {
-                        byte_size: body.len(),
-                        protocol: "http",
-                        endpoint: endpoint.as_str(),
-                    });
-                    Ok((header, body))
+            // The timeout covers the WHOLE scrape, headers and body alike. It
+            // used to wrap `client.send` only, which resolves once the
+            // response headers arrive, leaving the body read unbounded. An
+            // endpoint that answered headers promptly and then stalled
+            // mid-body held a scrape open indefinitely, so scrapes of one
+            // endpoint overlapped and were emitted out of order by the
+            // `flatten_unordered` below. Downstream that is not merely late
+            // data: a sink converting absolute counters to incremental sees a
+            // total lower than the last one it saw, treats it as a counter
+            // reset, and the next reading is emitted as a delta reaching back
+            // to the stale one, counting that interval twice.
+            tokio::time::timeout(inputs.timeout, async move {
+                let response = client.send(request).await?;
+                let (header, body) = response.into_parts();
+                let body = http_body::Body::collect(body).await?.to_bytes();
+                emit!(EndpointBytesReceived {
+                    byte_size: body.len(),
+                    protocol: "http",
+                    endpoint: endpoint.as_str(),
+                });
+                Ok((header, body))
+            })
+                .map(move |result| match result {
+                    Ok(inner) => inner,
+                    Err(_) => Err(format!(
+                        "Timeout error: request exceeded {}s",
+                        inputs.timeout.as_secs_f64()
+                    )
+                    .into()),
                 })
                 .into_stream()
                 .filter_map(move |response| {
