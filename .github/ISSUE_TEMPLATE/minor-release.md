@@ -37,8 +37,8 @@ The tag starts the release workflow; do not create the tag or release branch man
 
 - [ ] Wait for release workflow to complete.
   - Discoverable via [release.yml](https://github.com/vectordotdev/vector/actions/workflows/release.yml)
-- [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git fetch origin && git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push --force-with-lease`
+- [ ] Wait for the release workflow to reset the `website` branch to the release commit,
+      publishing the release notes to https://vector.dev
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
     - Refer to the internal releasing doc to monitor the deployment.
 - [ ] Release Linux packages. Refer to the internal releasing doc.

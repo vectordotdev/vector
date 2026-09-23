@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![warn(clippy::pedantic)]
 
 // TODO: `darling` is currently strict about accepting only matching literal types for scalar fields i.e. a `f64` field
 // can only be parsed from a string or float literal, but not an integer literal... and float literals have to be in the

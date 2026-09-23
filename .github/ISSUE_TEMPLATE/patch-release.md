@@ -61,6 +61,7 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
 - [ ] Once Helm chart is released, updated Vector manifests
   - Run `cargo vdev build manifests` and open a PR with changes
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
-- [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
-  - [ ] `git fetch origin && git checkout website && git reset --hard origin/"${RELEASE_BRANCH}" && git push --force-with-lease`
+- [ ] Wait for the release workflow to reset the `website` branch to the release commit
+      (`refs/heads/website` is force-pushed to the release branch HEAD) to update
+      https://vector.dev with the patch release notes
 - [ ] Kick-off post-mortems for any regressions resolved by the release
