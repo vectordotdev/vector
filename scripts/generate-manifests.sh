@@ -92,6 +92,7 @@ for values in "$TMPDIR"/values-*.yaml; do
 
     cat > "distribution/kubernetes/$type/README.md" <<EOF
 The kubernetes manifests found in this directory have been automatically generated
+from the [helm chart \`vector/vector\`](https://github.com/vectordotdev/helm-charts/tree/master/charts/vector)
 version $(helm show chart vector/vector --version "$chart_version" | yq e '.version' -) with the following \`values.yaml\`:
 
 \`\`\`yaml
