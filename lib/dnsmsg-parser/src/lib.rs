@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![deny(warnings)]
 #![deny(clippy::unwrap_used)]
 #![warn(

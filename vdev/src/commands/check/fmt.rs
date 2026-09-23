@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::{
     app,
     commands::{fmt::PRETTIER_EXTENSIONS, style},
-    utils::git::git_ls_files,
+    utils::{git::git_ls_files, paths::prettier},
 };
 
 /// Check that all files are formatted properly
@@ -25,11 +25,10 @@ impl Cli {
                 continue;
             }
             info!("Checking prettier formatting for {ext} files...");
-            let args: Vec<&str> = ["--ignore-path", ".prettierignore", "--check"]
+            let args = ["--check"]
                 .into_iter()
-                .chain(files.iter().map(String::as_str))
-                .collect();
-            app::exec("prettier", &args, true)?;
+                .chain(files.iter().map(String::as_str));
+            prettier(args, true)?;
         }
 
         Ok(())

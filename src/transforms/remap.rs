@@ -695,7 +695,7 @@ mod tests {
     use crate::{
         config::{ConfigBuilder, build_unit_tests},
         event::{
-            LogEvent, Metric, Value,
+            LogEvent, Metric, TraceEvent, TraceLayout, Value,
             metric::{MetricKind, MetricValue},
         },
         metrics::Controller,
@@ -741,6 +741,32 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<RemapConfig>();
+    }
+
+    #[test]
+    fn remap_trace_scalar_root_drops_trace_layout() {
+        let event = {
+            let mut trace = TraceEvent::from(btreemap! {
+                "host" => "a_hostname",
+            });
+            trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+            Event::Trace(trace)
+        };
+        let conf = RemapConfig {
+            source: Some(r#". = "message""#.to_owned()),
+            drop_on_error: true,
+            drop_on_abort: false,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+        let result = transform_one(&mut tform, event).unwrap();
+        let log = result.as_log();
+        assert_eq!(log.namespace(), LogNamespace::Legacy);
+        assert_eq!(log.metadata().trace_layout(), None);
+        assert_eq!(
+            log.get(event_path!("message")),
+            Some(&Value::from("message"))
+        );
     }
 
     #[test]

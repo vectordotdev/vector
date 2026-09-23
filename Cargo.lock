@@ -4557,6 +4557,7 @@ dependencies = [
  "quickcheck",
  "tempfile",
  "tokio",
+ "tokio-util",
  "tracing 0.1.44",
  "vector-common",
 ]
@@ -12348,6 +12349,7 @@ dependencies = [
  "futures-io",
  "futures-sink",
  "futures-util",
+ "hashbrown 0.15.2",
  "pin-project-lite",
  "slab",
  "tokio",
@@ -13294,7 +13296,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.19"
+version = "0.3.21"
 dependencies = [
  "anyhow",
  "cfg-if",

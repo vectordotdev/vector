@@ -1,4 +1,5 @@
 mod config_builder;
+pub(crate) mod interpolation;
 mod loader;
 mod representation;
 mod secret;
@@ -14,6 +15,7 @@ use std::{
 
 pub use config_builder::ConfigBuilderLoader;
 use glob::glob;
+pub use interpolation::interpolate_config_map_with_env_vars;
 use loader::process::Process;
 pub use loader::*;
 pub use secret::*;
@@ -22,7 +24,6 @@ use vector_lib::configurable::NamedComponent;
 
 use super::{
     Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, validation,
-    vars,
 };
 use crate::signal;
 
@@ -341,7 +342,7 @@ pub fn prepare_input<R: std::io::Read>(
         {
             vars.insert("HOSTNAME".into(), hostname);
         }
-        vars::interpolate(&source_string, &vars)
+        interpolation::interpolate(&source_string, &vars)
     } else {
         Ok(source_string)
     }
