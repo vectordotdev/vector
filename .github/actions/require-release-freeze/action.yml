@@ -4,6 +4,9 @@ inputs:
   app-client-id:
     description: Client ID of the vectordotdev-bot GitHub App.
     required: true
+  app-private-key:
+    description: Private key of the vectordotdev-bot GitHub App.
+    required: true
   freeze-ruleset-id:
     description: Repository variable RELEASE_FREEZE_RULESET_ID (the vars context is unavailable in composite actions).
     required: true
