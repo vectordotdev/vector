@@ -7,7 +7,9 @@ use crate::utils::{git, semver};
 ///
 /// Accepts full semver, including prerelease versions (`0.59.0-rc.1`), which
 /// semver orders before their own stable release. Exits nonzero when the new
-/// version is not strictly newer, so workflows can use it as a gate.
+/// version is not strictly newer, so workflows can use it as a gate. Pass
+/// `--allow-equal` when generating from the same version again is legitimate,
+/// so only true downgrades are rejected.
 ///
 /// Examples:
 ///   vdev version check-newer --new 0.59.0 --current 0.58.0
@@ -28,6 +30,10 @@ pub(super) struct Cli {
     #[arg(long, default_value = "target")]
     what: String,
 
+    /// Permit the new version to equal the current one; reject only downgrades
+    #[arg(long)]
+    allow_equal: bool,
+
     /// Shorthand: `vdev version check-newer <NEW> [<CURRENT>]`
     #[arg(value_name = "NEW", conflicts_with_all = ["new", "current"])]
     new_positional: Option<String>,
@@ -43,6 +49,7 @@ impl Cli {
             new,
             current,
             what,
+            allow_equal,
             new_positional,
             current_positional,
         } = self;
@@ -61,8 +68,13 @@ impl Cli {
 
         let new = semver::parse(&new)?;
         let current = semver::parse(&current)?;
-        semver::ensure_newer(&new, &current, &what)?;
-        println!("{new} is newer than {current}");
+        if allow_equal {
+            semver::ensure_newer_or_equal(&new, &current, &what)?;
+            println!("{new} is not older than {current}");
+        } else {
+            semver::ensure_newer(&new, &current, &what)?;
+            println!("{new} is newer than {current}");
+        }
         Ok(())
     }
 }

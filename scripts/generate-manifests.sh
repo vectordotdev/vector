@@ -39,13 +39,15 @@ fi
 readonly chart_version
 echo "Generating manifests from chart version ${chart_version}"
 
-# Refuse to regenerate from a chart that is not strictly newer than the one
-# the checked-in manifests were generated from; that would silently downgrade
-# them. The README records the version it was generated with.
+# Refuse to regenerate from a chart older than the one the checked-in
+# manifests were generated from; that would silently downgrade them. The README
+# records the version it was generated with. Equal is allowed so retries and
+# idempotent re-runs from the same chart pass.
 current_version=$(sed -nE 's/^version ([0-9][^ ]*) with the following.*/\1/p' \
     distribution/kubernetes/vector-agent/README.md)
 if [[ -n "$current_version" ]]; then
-    vdev version check-newer --what chart --new "$chart_version" --current "$current_version"
+    vdev version check-newer --allow-equal --what chart \
+        --new "$chart_version" --current "$current_version"
 fi
 
 TMPDIR=$(mktemp -d)

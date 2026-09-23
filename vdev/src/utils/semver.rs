@@ -23,6 +23,17 @@ pub fn ensure_newer(candidate: &Version, current: &Version, what: &str) -> Resul
     Ok(())
 }
 
+/// Ensure `candidate` is not older than `current` (equal is allowed).
+///
+/// Like [`ensure_newer`], but permits regenerating from the same version so
+/// retries and idempotent re-runs do not fail; only rejects true downgrades.
+pub fn ensure_newer_or_equal(candidate: &Version, current: &Version, what: &str) -> Result<()> {
+    if candidate < current {
+        bail!("{what} version {candidate} is OLDER than {current}; refusing to continue");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -65,5 +76,13 @@ mod tests {
         let pre = v("0.59.0-rc.1");
         assert!(ensure_newer(&v("0.59.0"), &pre, "chart").is_ok());
         assert!(ensure_newer(&v("0.59.0-rc.1"), &pre, "chart").is_err());
+    }
+
+    #[test]
+    fn ensure_newer_or_equal_allows_equal_but_rejects_downgrades() {
+        let current = v("0.58.0");
+        assert!(ensure_newer_or_equal(&v("0.59.0"), &current, "chart").is_ok());
+        assert!(ensure_newer_or_equal(&v("0.58.0"), &current, "chart").is_ok());
+        assert!(ensure_newer_or_equal(&v("0.57.9"), &current, "chart").is_err());
     }
 }
