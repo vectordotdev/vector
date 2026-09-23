@@ -56,7 +56,6 @@ impl<T: SinkConfig + 'static> From<T> for BoxedSink {
 
 /// Fully resolved sink component.
 #[configurable_component]
-#[configurable(metadata(docs::component_base_type = "sink"))]
 #[derive(Clone, derive_more::Debug)]
 pub struct SinkOuter<T>
 where

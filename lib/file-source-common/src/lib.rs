@@ -1,5 +1,6 @@
 #![deny(warnings)]
 #![deny(clippy::all)]
+#![warn(clippy::pedantic)]
 
 pub mod buffer;
 pub mod checkpointer;

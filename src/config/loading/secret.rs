@@ -132,6 +132,34 @@ impl Loader<SecretBackendLoader> for SecretBackendLoader {
     }
 }
 
+/// Collects secret references from string leaves in a parsed configuration.
+/// Keys are excluded, matching tree-based interpolation.
+pub fn collect_secret_keys_from_map(map: &ConfigMap, keys: &mut HashMap<String, HashSet<String>>) {
+    fn visit(value: &serde_json::Value, keys: &mut HashMap<String, HashSet<String>>) {
+        match value {
+            serde_json::Value::String(string) => collect_secret_keys(string, keys),
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    visit(value, keys);
+                }
+            }
+            serde_json::Value::Object(map) => collect_secret_keys_from_map(map, keys),
+            _ => {}
+        }
+    }
+    for value in map.values() {
+        visit(value, keys);
+    }
+}
+
+/// Replaces secret references in string leaves, preserving keys and value types.
+pub fn interpolate_config_map_with_secrets(
+    map: &ConfigMap,
+    secrets: &HashMap<String, String>,
+) -> Result<ConfigMap, Vec<String>> {
+    super::interpolation::interpolate_config_map(map, secrets, interpolate)
+}
+
 fn collect_secret_keys(input: &str, keys: &mut HashMap<String, HashSet<String>>) {
     COLLECTOR.captures_iter(input).for_each(|cap| {
         if let (Some(backend), Some(key)) = (cap.get(1), cap.get(2)) {
@@ -177,7 +205,40 @@ mod tests {
 
     use indoc::indoc;
 
-    use super::{collect_secret_keys, interpolate};
+    use super::{
+        collect_secret_keys, collect_secret_keys_from_map, interpolate,
+        interpolate_config_map_with_secrets,
+    };
+
+    #[test]
+    fn tree_secret_collection_and_interpolation_agree() {
+        let input = serde_json::json!({
+            "SECRET[unused.key]": ["SECRET[backend.key]", {"nested": "SECRET[backend.key]"}],
+            "typed": [42, true, null]
+        });
+        let map = input.as_object().unwrap();
+        let mut keys = HashMap::new();
+        collect_secret_keys_from_map(map, &mut keys);
+        assert_eq!(
+            keys,
+            HashMap::from([(
+                "backend".into(),
+                std::collections::HashSet::from(["key".into()])
+            )])
+        );
+        let secrets = HashMap::from([("backend.key".into(), "42\n\"quoted\"".into())]);
+        let result = interpolate_config_map_with_secrets(map, &secrets).unwrap();
+        assert_eq!(
+            serde_json::Value::Object(result),
+            serde_json::json!({
+                "SECRET[unused.key]": ["42\n\"quoted\"", {"nested": "42\n\"quoted\""}],
+                "typed": [42, true, null]
+            })
+        );
+        assert_eq!(input["SECRET[unused.key]"][0], "SECRET[backend.key]");
+        let errors = interpolate_config_map_with_secrets(map, &HashMap::new()).unwrap_err();
+        assert_eq!(errors.len(), 2);
+    }
 
     #[test]
     fn replacement() {
