@@ -1,0 +1,215 @@
+# Regenerate distribution/kubernetes manifests from the published Helm chart and
+# open a PR that merges after checks pass, exactly like the housekeeping PR path.
+# The Helm chart release workflow dispatches this after publishing a new chart.
+# This replaces the manual `cargo vdev build manifests` step from the release
+# checklists.
+name: Refresh Kubernetes manifests
+
+on:
+  workflow_dispatch:
+    inputs:
+      chart_version:
+        description: "Chart version published by the Helm release, e.g. 0.62.0. Empty picks the latest published chart."
+        required: false
+        default: ""
+        type: string
+permissions:
+  contents: read # Restrictive default
+  pull-requests: read # Required to find the open manifests PR in the merge job
+  checks: read # Required to wait on PR checks in the merge job
+
+concurrency:
+  # Serialize manifest refreshes; a queued run picks up the newest chart anyway.
+  group: refresh-kubernetes-manifests
+  cancel-in-progress: false
+
+jobs:
+  refresh-manifests:
+    name: Regenerate manifests and open checked PR
+    if: github.repository == 'vectordotdev/vector'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+      branch: ${{ steps.pr.outputs.branch }}
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up manifest generation
+        uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+
+      - name: Install helm
+        uses: azure/setup-helm@1c3f40cff0c8a2b8c2d1925957f6dcc5356d5c07 # v4.3.1
+        with:
+          token: ${{ github.token }}
+
+      - name: Install yq
+        run: |
+          set -euo pipefail
+          sudo curl -sSL -o /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      # helm.vector.dev is the published index; the generation script reads the
+      # chart from there, so the refreshed manifests always match production.
+      - name: Verify published chart version
+        id: chart
+        env:
+          EXPECTED_VERSION: ${{ inputs.chart_version }}
+        run: |
+          set -euo pipefail
+          published=$(curl -sSL https://helm.vector.dev/index.yaml \
+            | yq e '.entries.vector[0].version' -)
+          if [[ -n "$EXPECTED_VERSION" && "$published" != "$EXPECTED_VERSION" ]]; then
+            echo "helm.vector.dev latest chart is $published, expected $EXPECTED_VERSION." >&2
+            echo "The chart index may still be propagating; re-run this workflow shortly." >&2
+            exit 1
+          fi
+          echo "version=$published" >> "$GITHUB_OUTPUT"
+
+      - name: Generate manifests
+        run: make generate-kubernetes-manifests
+
+      - name: Check for changes
+        id: changes
+        env:
+          CHART_VERSION: ${{ steps.chart.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Stage everything the generation script touched so both modified and
+          # newly created manifest files are detected; git diff alone ignores
+          # untracked files.
+          git add -A -- distribution/kubernetes
+          if git diff --cached --quiet -- distribution/kubernetes; then
+            echo "Manifests already match chart $CHART_VERSION; nothing to do."
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create Vector bot token
+        if: steps.changes.outputs.changed == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Open manifests PR
+        if: steps.changes.outputs.changed == 'true'
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CHART_VERSION: ${{ steps.chart.outputs.version }}
+          BRANCH: release/manifests-${{ steps.chart.outputs.version }}
+        run: |
+          set -euo pipefail
+          # All remote git operations go through the token-authenticated URL. The
+          # checkout ran with persist-credentials: false, so origin has no credentials.
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          master=$(git ls-remote "$remote" refs/heads/master)
+          master=${master%%$'\t'*}
+          [[ "$(git rev-parse origin/master)" == "$master" ]] || {
+            echo "master moved since checkout; re-run this workflow." >&2
+            exit 1
+          }
+
+          git config user.name "vectordotdev-bot[bot]"
+          git config user.email "vectordotdev-bot[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          # Changes are already staged by the Check for changes step.
+          git commit -m "chore(kubernetes): refresh manifests for chart ${CHART_VERSION}"
+
+          # Re-running must update the existing branch rather than failing or
+          # force-pushing history someone may already be reviewing.
+          if existing=$(git ls-remote "$remote" "refs/heads/$BRANCH"); then
+            existing=${existing%%$'\t'*}
+            git push --force-with-lease="refs/heads/$BRANCH:$existing" \
+              "$remote" "HEAD:refs/heads/$BRANCH"
+          else
+            git push "$remote" "HEAD:refs/heads/$BRANCH"
+          fi
+
+          url=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
+            --app vectordotdev-bot --state open --json url --jq '.[0].url // empty')
+          if [[ -z "$url" ]]; then
+            url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
+              --title "chore(kubernetes): refresh manifests for chart ${CHART_VERSION}" \
+              --label no-changelog \
+              --body "Regenerate \`distribution/kubernetes\` from the published Helm chart \`vector-${CHART_VERSION}\` via \`cargo vdev build manifests\`. The workflow merges the checked commit after checks pass.")
+          fi
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Manifests PR: $url" >> "$GITHUB_STEP_SUMMARY"
+
+  merge-pr:
+    name: Merge checked manifests commit
+    needs: refresh-manifests
+    # Also resume an already published branch when generation skipped on a retry.
+    # An up-to-date checkout has no changes and must not attempt another merge.
+    if: >-
+      !cancelled() && needs.refresh-manifests.result == 'success' &&
+      needs.refresh-manifests.outputs.branch != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Select manifests commit
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.refresh-manifests.outputs.branch }}
+          EXPECTED_HEAD: ${{ needs.refresh-manifests.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --head "$BRANCH" \
+            --app vectordotdev-bot --state open --json number,headRefOid,isCrossRepository)
+          jq -e 'length == 1 and .[0].isCrossRepository == false' <<< "$prs" >/dev/null
+          number=$(jq -r '.[0].number' <<< "$prs")
+          head_sha=$(jq -r '.[0].headRefOid' <<< "$prs")
+          [[ -z "$EXPECTED_HEAD" || "$head_sha" == "$EXPECTED_HEAD" ]]
+          printf 'number=%s\nhead_sha=%s\n' "$number" "$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for checks on the selected commit
+        uses: lewagon/wait-on-check-action@369769072fe522a3a8a85c03c96af1e5242a1994 # v1.9.1
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          repo-token: ${{ github.token }}
+          running-workflow-name: Merge checked manifests commit
+          check-regexp: ".+"
+          allowed-conclusions: success,skipped,neutral
+          checks-discovery-timeout: 300
+          wait-interval: 15
+
+      - name: Create Vector bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Merge only the checked commit
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --json state,baseRefName,headRefOid | \
+            jq -e --arg head "$HEAD_SHA" \
+              '.state == "OPEN" and .baseRefName == "master" and .headRefOid == $head' >/dev/null
+          gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --squash --admin --match-head-commit "$HEAD_SHA"
+          echo "Merged manifests PR #${PR_NUMBER} at ${HEAD_SHA}." >> "$GITHUB_STEP_SUMMARY"

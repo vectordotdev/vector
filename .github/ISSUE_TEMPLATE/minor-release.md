@@ -54,4 +54,6 @@ The tag starts the release workflow; do not create the tag or release branch man
 - [ ] Wait for the release workflow to merge its housekeeping PR after checks pass.
       It begins the next minor `-dev` version, restores VRL `main`, and refreshes licenses and documentation.
 - [ ] Set the `Release freeze` ruleset back to **Disabled**.
-- [ ] Run `cargo vdev build manifests` after the Helm chart release and open a separate PR with the changes.
+- [ ] Approve the automated manifests PR the Helm chart release opens, letting auto-merge complete it.
+  - The Helm chart release triggers [Refresh Kubernetes manifests](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml)
+    which runs `cargo vdev build manifests` and opens the PR automatically.

@@ -61,8 +61,9 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
   - The Vector release workflow starts [Helm release preparation](https://github.com/vectordotdev/helm-charts/actions/workflows/release-prepare.yml)
     automatically for the latest stable Vector release.
   - See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md) for the review steps.
-- [ ] Once Helm chart is released, updated Vector manifests
-  - Run `cargo vdev build manifests` and open a PR with changes
+- [ ] Once Helm chart is released, approve the automated manifests PR, letting auto-merge complete it
+  - The Helm chart release triggers [Refresh Kubernetes manifests](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml)
+    which runs `cargo vdev build manifests` and opens the PR automatically
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Wait for the release workflow to reset the `website` branch to the release commit
       (`refs/heads/website` is force-pushed to the release branch HEAD) to update
