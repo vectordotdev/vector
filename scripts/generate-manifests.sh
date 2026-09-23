@@ -4,9 +4,7 @@
 
 set -euo pipefail
 
-vdev_cmd=(${VDEV:-cargo vdev})
-
-IFS=$'\n\t'
+vdev_cmd="${VDEV:-cargo vdev}"
 
 if sed --version 2>/dev/null | grep -q "GNU sed"; then
     SED="sed"
@@ -49,7 +47,7 @@ echo "Generating manifests from chart version ${chart_version}"
 current_version=$(sed -nE 's/^version ([0-9][^ ]*) with the following.*/\1/p' \
     distribution/kubernetes/vector-agent/README.md)
 if [[ -n "$current_version" ]]; then
-    "${vdev_cmd[@]}" version check-newer --allow-equal --what chart \
+    $vdev_cmd version check-newer --allow-equal --what chart \
         --new "$chart_version" --current "$current_version"
 fi
 
