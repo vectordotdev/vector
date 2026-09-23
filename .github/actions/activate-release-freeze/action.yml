@@ -1,0 +1,124 @@
+name: Activate release freeze
+description: Freeze master and grant the release bot temporary direct-push bypasses.
+inputs:
+  app-client-id:
+    description: Client ID of the vectordotdev-bot GitHub App, which requires Administration write permission.
+    required: true
+  app-private-key:
+    description: Private key of the vectordotdev-bot GitHub App.
+    required: true
+runs:
+  using: composite
+  steps:
+    # Keep ruleset administration separate from tokens used to push release commits.
+    - name: Create Vector bot token for ruleset updates
+      id: bot-token
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      with:
+        client-id: ${{ inputs.app-client-id }}
+        private-key: ${{ inputs.app-private-key }}
+        permission-administration: write
+        permission-contents: read
+
+    - name: Activate freeze and configure bot bypasses
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        BOT_APP_SLUG: ${{ steps.bot-token.outputs.app-slug }}
+        RELEASE_FREEZE_RULESET_ID: ${{ vars.RELEASE_FREEZE_RULESET_ID }}
+        RELEASE_FREEZE_BOT_BYPASS: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}
+      with:
+        github-token: ${{ steps.bot-token.outputs.token }}
+        script: |
+          if (process.env.BOT_APP_SLUG !== "vectordotdev-bot") {
+            throw new Error("Release freeze activation requires the vectordotdev-bot GitHub App.");
+          }
+          const { readRulesetIds, isBotActor, hasBotBypass, restrictsMasterUpdates, canManageReleaseBypass } =
+            require("./.github/actions/require-release-freeze/rulesets.js");
+          const { freezeId, bypassIds } = readRulesetIds(process.env);
+          const { data: app } = await github.request("GET /apps/{app_slug}", {
+            app_slug: process.env.BOT_APP_SLUG,
+          });
+          const { data: repository } = await github.request("GET /repos/{owner}/{repo}", context.repo);
+          const branchRules = () => github.paginate(
+            "GET /repos/{owner}/{repo}/rules/branches/{branch}",
+            { ...context.repo, branch: "master" },
+          );
+          const rules = await branchRules();
+          // Include configured IDs even when disabled or not effective on master,
+          // so invalid configuration fails instead of silently skipping a ruleset.
+          const ids = new Set([freezeId, ...bypassIds, ...rules.map((rule) => rule.ruleset_id)]);
+          const details = await Promise.all([...ids].map(async (id) => {
+            const { data } = await github.request(
+              "GET /repos/{owner}/{repo}/rulesets/{ruleset_id}",
+              { ...context.repo, ruleset_id: id, includes_parents: true },
+            );
+            return data;
+          }));
+          const byId = new Map(details.map((ruleset) => [ruleset.id, ruleset]));
+          const freeze = byId.get(freezeId);
+          if (!["active", "disabled"].includes(freeze.enforcement) ||
+              !restrictsMasterUpdates(freeze, repository.default_branch) || !hasBotBypass(freeze, app.id)) {
+            throw new Error(`Ruleset ${freezeId} must restrict master updates and already permit direct bot pushes.`);
+          }
+          for (const type of ["non_fast_forward", "deletion"]) {
+            if (!rules.some((rule) => rule.type === type && byId.get(rule.ruleset_id)?.bypass_actors?.length === 0)) {
+              throw new Error(`master must retain an active ${type} rule without bypass actors.`);
+            }
+          }
+
+          const pushSafe = new Set(["creation", "deletion", "non_fast_forward", "required_linear_history"]);
+          const updates = [];
+          for (const id of bypassIds) {
+            const ruleset = byId.get(id);
+            // A ruleset bypass applies to every rule and branch in that ruleset.
+            // Do not broaden it to other branches, inherited policy, or safety rules.
+            if (!canManageReleaseBypass(ruleset, repository.default_branch) || !rules.some((rule) => rule.ruleset_id === id)) {
+              throw new Error(`Cannot safely grant a release bypass to configured ruleset ${id} (${ruleset.name}). It must be active and contain only master release policy.`);
+            }
+            if (!Array.isArray(ruleset.bypass_actors)) {
+              throw new Error(`Cannot read bypass actors for ruleset ${id} (${ruleset.name}).`);
+            }
+            if (!hasBotBypass(ruleset, app.id)) {
+              updates.push(ruleset);
+            }
+          }
+          for (const rule of rules) {
+            if (!pushSafe.has(rule.type) && rule.ruleset_id !== freezeId &&
+                !bypassIds.includes(rule.ruleset_id) && !hasBotBypass(byId.get(rule.ruleset_id), app.id)) {
+              throw new Error(`Ruleset ${rule.ruleset_id} blocks direct pushes but is missing from RELEASE_FREEZE_BOT_BYPASS.`);
+            }
+          }
+
+          // Freeze first. If a later update fails, leave master frozen; a retry
+          // completes the remaining bypasses without duplicating existing actors.
+          // Only toggle enforcement: Release freeze keeps its existing bypass actors.
+          if (freeze.enforcement !== "active") {
+            await github.request("PUT /repos/{owner}/{repo}/rulesets/{ruleset_id}", {
+              ...context.repo,
+              ruleset_id: freeze.id,
+              enforcement: "active",
+            });
+          }
+          if (!(await branchRules()).some((rule) => rule.ruleset_id === freeze.id && rule.type === "update")) {
+            throw new Error("Release freeze must restrict updates to master before granting bot bypasses.");
+          }
+          for (const ruleset of updates) {
+            // Update only the bot's bypass, never the freeze or safety policies.
+            await github.request("PUT /repos/{owner}/{repo}/rulesets/{ruleset_id}", {
+              ...context.repo,
+              ruleset_id: ruleset.id,
+              bypass_actors: [
+                ...ruleset.bypass_actors.filter((actor) => !isBotActor(actor, app.id)),
+                { actor_id: app.id, actor_type: "Integration", bypass_mode: "always" },
+              ],
+            });
+            core.info(`Granted release bypass on ruleset ${ruleset.id} (${ruleset.name}).`);
+          }
+
+    # Check effective permissions with a contents-only token, not the privileged
+    # administration token used above. This also checks inherited rulesets.
+    - name: Verify active release freeze
+      uses: ./.github/actions/require-release-freeze
+      with:
+        app-client-id: ${{ inputs.app-client-id }}
+        app-private-key: ${{ inputs.app-private-key }}

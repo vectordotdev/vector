@@ -38,15 +38,19 @@ jobs:
           ref: master
           fetch-depth: 0
 
-      - name: Require active release freeze
-        uses: ./.github/actions/require-release-freeze
+      - name: Activate release freeze
+        uses: ./.github/actions/activate-release-freeze
         with:
           app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
           app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
 
       - name: Record frozen base
         id: base
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          # master may have advanced between checkout and freeze activation.
+          git fetch origin refs/heads/master:refs/remotes/origin/master
+          git switch --detach origin/master
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up release tooling
         uses: ./.github/actions/setup

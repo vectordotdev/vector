@@ -38,22 +38,6 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
 - [ ] Open PR against the release branch (`"${RELEASE_BRANCH}"`) for review
 - [ ] PR approval
 
-Patch releases also need the release freeze and the temporary bot bypasses so the
-automated Kubernetes manifests push can reach `master`. Set this up in
-[repository rulesets](https://github.com/vectordotdev/vector/settings/rules) before the
-Helm release, and keep it in place until the manifests push has completed.
-
-- [ ] Set up the direct-push window before the Helm release:
-  - [ ] Set the `Release freeze` ruleset to **Active**.
-  - [ ] In the `Release freeze` ruleset, change the `vectordotdev-bot` bypass from
-        **Pull request** to **Always**.
-  - [ ] Add a `vectordotdev-bot` **Always** bypass to the `master-write-permissions`
-        ruleset (active update rule; by default it blocks direct branch updates of `master`).
-  - [ ] Add a `vectordotdev-bot` **Always** bypass to the `master required checks + mq`
-        ruleset (active PR/checks/queue rules; by default they require a PR to update `master`).
-  - [ ] Leave the `master-push-rules` ruleset (deletion/non-fast-forward protections)
-        untouched; it does not block normal non-force pushes and must keep no bypasses.
-
 # On the day of release
 
 - [ ] Ensure release date in cue matches current date.
@@ -88,8 +72,6 @@ Helm release, and keep it in place until the manifests push has completed.
         `master-write-permissions` ruleset.
   - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
         `master required checks + mq` ruleset.
-  - [ ] In the `Release freeze` ruleset, restore the `vectordotdev-bot` bypass from
-        **Always** back to **Pull request**.
   - [ ] Verify the `master-push-rules` ruleset still has no bypasses.
   - [ ] Set the `Release freeze` ruleset back to **Disabled**.
 

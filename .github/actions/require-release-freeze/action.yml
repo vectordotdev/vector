@@ -26,6 +26,8 @@ runs:
       uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         BOT_APP_SLUG: ${{ steps.bot-token.outputs.app-slug }}
+        RELEASE_FREEZE_RULESET_ID: ${{ vars.RELEASE_FREEZE_RULESET_ID }}
+        RELEASE_FREEZE_BOT_BYPASS: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}
       with:
         github-token: ${{ steps.bot-token.outputs.token }}
         script: |
@@ -33,23 +35,10 @@ runs:
             core.setFailed("Release freeze checks require the vectordotdev-bot GitHub App.");
             return;
           }
-          const rulesets = await github.paginate(
-            "GET /repos/{owner}/{repo}/rulesets",
-            { ...context.repo, includes_parents: true },
-          );
-          const matches = rulesets.filter(
-            (ruleset) => ruleset.name === "Release freeze",
-          );
-          if (matches.length !== 1) {
-            core.setFailed(
-              `Expected exactly one Release freeze ruleset, found ${matches.length}.`,
-            );
-            return;
-          }
-          if (matches[0].enforcement !== "active") {
-            core.setFailed("The Release freeze ruleset must stay active until housekeeping and manifests finish.");
-            return;
-          }
+          const { readRulesetIds, restrictsMasterUpdates, canManageReleaseBypass } =
+            require("./.github/actions/require-release-freeze/rulesets.js");
+          const { freezeId, bypassIds } = readRulesetIds(process.env);
+          const { data: repository } = await github.request("GET /repos/{owner}/{repo}", context.repo);
 
           // Let GitHub resolve branch patterns and inherited rulesets. An active
           // freeze targeting a different branch does not protect master.
@@ -57,12 +46,8 @@ runs:
             "GET /repos/{owner}/{repo}/rules/branches/{branch}",
             { ...context.repo, branch: "master" },
           );
-          if (!rules.some((rule) => rule.ruleset_id === matches[0].id && rule.type === "update")) {
-            core.setFailed("Release freeze must restrict updates to master.");
-            return;
-          }
           const details = await Promise.all(
-            [...new Set(rules.map((rule) => rule.ruleset_id))].map(async (id) => {
+            [...new Set([freezeId, ...bypassIds, ...rules.map((rule) => rule.ruleset_id)])].map(async (id) => {
               const { data } = await github.request(
                 "GET /repos/{owner}/{repo}/rulesets/{ruleset_id}",
                 { ...context.repo, ruleset_id: id, includes_parents: true },
@@ -70,6 +55,13 @@ runs:
               return data;
             }),
           );
+          const byId = new Map(details.map((ruleset) => [ruleset.id, ruleset]));
+          const freeze = byId.get(freezeId);
+          if (freeze.enforcement !== "active" || !restrictsMasterUpdates(freeze, repository.default_branch) ||
+              !rules.some((rule) => rule.ruleset_id === freezeId && rule.type === "update")) {
+            core.setFailed(`Configured freeze ruleset ${freezeId} must actively restrict master updates.`);
+            return;
+          }
           const modes = new Set(["always", "exempt", "pull_requests_only", "never"]);
           for (const ruleset of details) {
             if (!modes.has(ruleset.current_user_can_bypass)) {
@@ -78,7 +70,20 @@ runs:
             }
           }
           const canPush = (ruleset) => ["always", "exempt"].includes(ruleset.current_user_can_bypass);
-          const byId = new Map(details.map((ruleset) => [ruleset.id, ruleset]));
+          for (const id of [freezeId, ...bypassIds]) {
+            const ruleset = byId.get(id);
+            if (!canPush(ruleset)) {
+              core.setFailed(`Configured ruleset ${id} must permit direct pushes by vectordotdev-bot.`);
+              return;
+            }
+          }
+          for (const id of bypassIds) {
+            if (!canManageReleaseBypass(byId.get(id), repository.default_branch) ||
+                !rules.some((rule) => rule.ruleset_id === id)) {
+              core.setFailed(`Configured bypass ruleset ${id} must be active and contain only master release policy.`);
+              return;
+            }
+          }
 
           // These rules permit an ordinary, single-parent update. All other
           // effective rules require a direct-push bypass, not a PR-only bypass.

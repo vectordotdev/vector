@@ -16,20 +16,11 @@ export RELEASE_BRANCH="v${NEW_VECTOR_VERSION%.*}"
 
 - [ ] Cut a new release of [VRL](https://github.com/vectordotdev/vrl) if needed.
   - VRL release steps: https://github.com/vectordotdev/vrl/blob/main/release/README.md
-- [ ] Set up the direct-push window in [repository rulesets](https://github.com/vectordotdev/vector/settings/rules).
-      GitHub rulesets are additive, so the `vectordotdev-bot` needs an explicit
-      **Always** bypass on the following rulesets for the duration of the release:
-  - [ ] Set the `Release freeze` ruleset to **Active**.
-  - [ ] In the `Release freeze` ruleset, change the `vectordotdev-bot` bypass from
-        **Pull request** to **Always**.
-  - [ ] Add a `vectordotdev-bot` **Always** bypass to the `master-write-permissions`
-        ruleset (active update rule; by default it blocks direct branch updates of `master`).
-  - [ ] Add a `vectordotdev-bot` **Always** bypass to the `master required checks + mq`
-        ruleset (active PR/checks/queue rules; by default they require a PR to update `master`).
-  - [ ] Leave the `master-push-rules` ruleset (deletion/non-fast-forward protections)
-        untouched; it does not block normal non-force pushes and must keep no bypasses.
 - [ ] Run the [Prepare release](https://github.com/vectordotdev/vector/actions/workflows/release_prepare.yml)
       workflow from `master` with `version` set to the stable Vector version and `vrl_version` to the exact released VRL version.
+  - The workflow activates the `RELEASE_FREEZE_RULESET_ID` ruleset and grants `vectordotdev-bot` an **Always** bypass
+    to some of `master`'s rulesets (`RELEASE_FREEZE_BOT_BYPASS`).
+  - If preparation fails after activation, the freeze remains active. Retry or use the closeout steps below to unfreeze the repository.
 - [ ] Review the bot-authored `prepare-v-<major>-<minor>-<patch>-website` PR: edit the release description,
       changelog, upgrade guidance, and release date as needed. Review deprecations with
       `cargo vdev deprecation show --version "${NEW_VECTOR_VERSION}"`.
@@ -75,7 +66,5 @@ The tag starts the release workflow; do not create the tag or release branch man
         `master-write-permissions` ruleset.
   - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from the
         `master required checks + mq` ruleset.
-  - [ ] In the `Release freeze` ruleset, restore the `vectordotdev-bot` bypass from
-        **Always** back to **Pull request**.
   - [ ] Verify the `master-push-rules` ruleset still has no bypasses.
 - [ ] Set the `Release freeze` ruleset back to **Disabled**.
