@@ -58,7 +58,9 @@ components: sources: ifile: {
 	configuration: generated.components.sources.ifile.configuration & {
 		remove_after_secs: warnings: [
 			"""
-				Vector’s process must have permission to delete files.
+				Vector’s process must have permission to delete files. Avoid replacing or moving
+				files concurrently with automatic deletion: the final identity check and deletion
+				are separate filesystem operations.
 				""",
 		]
 	}
@@ -158,39 +160,15 @@ components: sources: ifile: {
 		file_read_order: {
 			title: "File Read Order"
 			body: """
-				By default, Vector attempts to allocate its read bandwidth fairly
-				across all of the files it's currently watching. This prevents a
-				single very busy file from starving other independent files from
-				being read. In certain situations, however, this can lead to
-				interleaved reads from files that should be read one after the
-				other.
+				Vector allocates read bandwidth across watched files in bounded turns.
+				The `max_read_bytes` option controls how many bytes are read from one
+				file before moving on to another. This prevents a busy file from
+				monopolizing reading while other files have unread data.
 
-				For example, consider a service that logs to a timestamped file,
-				creating a new one at an interval and leaving the old one as is.
-				Under normal operation, Vector follows writes as they happen to
-				each file and there would be no interleaving. In an overload
-				situation, however, Vector may pick up and begin tailing newer files
-				before catching up to the latest writes from older files. This would
-				cause writes from a single logical log stream to be interleaved in
-				time and potentially slow down ingestion as a whole, since the fixed
-				total read bandwidth is allocated across an increasing number of
-				files.
-
-				To address this type of situation, Vector provides the
-				`oldest_first` option. When set, Vector does not read from any file
-				younger than the oldest file that it hasn't yet caught up to. In
-				other words, Vector continues reading from older files as long
-				as there is more data to read. After it hits the end, it then moves
-				on to read from younger files.
-
-				Whether or not to use the oldest_first flag depends on the organization
-				of the logs you're configuring Vector to tail. If your
-				`include` option contains multiple independent logical log streams
-				(for example, Nginx's access.log and error.log, or logs from multiple
-				services), you are likely better off with the default behavior. If
-				you're dealing with a single logical log stream or if you value
-				per-stream ordering over fairness across streams, consider setting
-				the `oldest_first` option to true.
+				Records are read in order within each file. There is no ordering
+				guarantee across files, including files belonging to the same
+				rotated log stream. Unlike the `file` source, `ifile` does not
+				support the `oldest_first` option.
 				"""
 		}
 
@@ -226,7 +204,10 @@ components: sources: ifile: {
 				with [`fingerprint.ignored_header_bytes`](#fingerprint.ignored_header_bytes).
 				For gzip files, both settings refer to uncompressed content.
 
-				Files are not read until the entire configured prefix is available. Identical prefixes
+				Files are not read until the entire configured prefix is available, and unread files
+				are not deleted by `remove_after_secs`. For completed files smaller than the default
+				1024-byte prefix, lower `fingerprint.bytes` to a size those files can reach.
+				Smaller prefixes increase the chance that different files share an identity. Identical prefixes
 				produce the same identity even at different paths, so choose a prefix that includes
 				distinctive content. Changing the size or skipped header changes file identities and can
 				cause data to be read again. Checkpoints from the earlier line-based fingerprint are not reused.

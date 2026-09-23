@@ -124,10 +124,7 @@ async fn rotation_discovers_replacement_while_draining_backlog() -> vector::Resu
     let mut writer = OpenOptions::new()
         .append(true)
         .open(fixture.input.join("active.log"))?;
-    let mut run = fixture.start(
-        "*.log",
-        json!({"max_read_bytes": 64, "oldest_first": false}),
-    )?;
+    let mut run = fixture.start("*.log", json!({"max_read_bytes": 64}))?;
     run.wait_for("first backlog record", |seen| !seen.messages.is_empty())
         .await?;
     std::fs::rename(

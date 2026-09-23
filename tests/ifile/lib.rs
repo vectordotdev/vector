@@ -6,6 +6,7 @@
 #![cfg(unix)]
 
 mod common;
+mod deletion;
 mod discovery;
 mod fairness;
 mod gzip;

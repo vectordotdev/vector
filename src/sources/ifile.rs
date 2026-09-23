@@ -4,9 +4,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use itertools::Itertools;
-use regex::bytes::Regex;
 use serde_with::serde_as;
-use snafu::{ResultExt, Snafu};
 #[cfg(test)]
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -18,8 +16,11 @@ use vector_lib::finalizer::OrderedFinalizer;
 #[cfg(test)]
 use vector_lib::ifile_source::TestEvent;
 use vector_lib::ifile_source::{
-    Checkpointer, FileServer, Line, NotifyPathsProvider, ReadFrom, ReadFromConfig,
-    calculate_ignore_before, paths_provider::GlobMatchOptions,
+    Checkpointer, FileServer, Line, NotifyPathsProvider, ReadFromConfig, calculate_ignore_before,
+    paths_provider::GlobMatchOptions,
+};
+use vector_lib::internal_event::{
+    ByteSize, CountByteSize, InternalEventHandle, RegisterInternalEvent,
 };
 use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
@@ -49,19 +50,6 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display(
-        "message_start_indicator {:?} is not a valid regex: {}",
-        indicator,
-        source
-    ))]
-    InvalidMessageStartIndicator {
-        indicator: String,
-        source: regex::Error,
-    },
-}
-
 /// Configuration for the `ifile` source.
 #[serde_as]
 #[configurable_component(source("ifile", "Collect logs from files with improved implementation."))]
@@ -90,14 +78,6 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = "path"))]
     pub file_key: OptionalValuePath,
 
-    /// Whether or not to start reading from the beginning of a new file.
-    #[configurable(
-        deprecated = "This option has been deprecated, use `ignore_checkpoints`/`read_from` instead."
-    )]
-    #[configurable(metadata(docs::hidden))]
-    #[serde(default)]
-    pub start_at_beginning: Option<bool>,
-
     /// Whether or not to ignore existing checkpoints when determining where to start reading a file.
     ///
     /// Checkpoints are still written normally.
@@ -108,7 +88,7 @@ pub struct FileConfig {
     pub read_from: ReadFromConfig,
 
     /// Ignore files with a data modification date older than the specified number of seconds.
-    #[serde(alias = "ignore_older", default)]
+    #[serde(default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 600))]
     #[configurable(metadata(docs::human_name = "Ignore Older Files"))]
@@ -173,7 +153,7 @@ pub struct FileConfig {
     pub checkpoint_interval: Duration,
 
     // Note: We now use filesystem notifications by default for file discovery
-    #[serde(alias = "fingerprinting", default)]
+    #[serde(default)]
     fingerprint: FingerprintConfig,
 
     /// Ignore missing files when fingerprinting.
@@ -182,18 +162,6 @@ pub struct FileConfig {
     #[serde(default)]
     pub ignore_not_found: bool,
 
-    /// String value used to identify the start of a multi-line message.
-    #[configurable(deprecated = "This option has been deprecated, use `multiline` instead.")]
-    #[configurable(metadata(docs::hidden))]
-    #[serde(default)]
-    pub message_start_indicator: Option<String>,
-
-    /// How long to wait for more data when aggregating a multi-line message, in milliseconds.
-    #[configurable(deprecated = "This option has been deprecated, use `multiline` instead.")]
-    #[configurable(metadata(docs::hidden))]
-    #[serde(default = "default_multi_line_timeout")]
-    pub multi_line_timeout: u64,
-
     /// Multiline aggregation configuration.
     ///
     /// If not specified, multiline aggregation is disabled.
@@ -201,7 +169,6 @@ pub struct FileConfig {
     pub multiline: Option<MultilineConfig>,
 
     /// Max amount of bytes to read from a single file before switching over to the next file.
-    /// **Note:** This does not apply when `oldest_first` is `true`.
     ///
     /// This allows distributing the reads more or less evenly across
     /// the files.
@@ -209,14 +176,15 @@ pub struct FileConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_read_bytes: usize,
 
-    /// Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files.
-    #[serde(default)]
-    pub oldest_first: bool,
-
-    /// After reaching EOF, the number of seconds to wait before removing the file, unless new data is written.
+    /// The minimum idle period in seconds before deleting a fully consumed file.
+    ///
+    /// Deletion requires EOF with no partial record, unchanged file identity and size, and
+    /// delivery of all records. With acknowledgements enabled, delivery means acknowledged
+    /// by downstream components; otherwise it means handed to the source output.
+    /// Files too small to fingerprint are never deleted. Lower `fingerprint.bytes` if needed.
     ///
     /// If not specified, files are not removed.
-    #[serde(alias = "remove_after", default)]
+    #[serde(default)]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 0))]
     #[configurable(metadata(docs::examples = 5))]
@@ -266,10 +234,6 @@ const fn default_read_from() -> ReadFromConfig {
 const fn default_checkpoint_interval() -> Duration {
     Duration::from_millis(500)
 }
-
-const fn default_multi_line_timeout() -> u64 {
-    1000
-} // deprecated
 
 const fn default_max_read_bytes() -> usize {
     64 * 1024
@@ -358,6 +322,8 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 pub(crate) struct FinalizerEntry {
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
+    pub(crate) deletion_progress:
+        Option<std::sync::Arc<vector_lib::ifile_source::DeletionProgress>>,
 }
 
 impl Default for FileConfig {
@@ -366,7 +332,6 @@ impl Default for FileConfig {
             include: vec![PathBuf::from("/var/log/**/*.log")],
             exclude: vec![],
             file_key: default_file_key(),
-            start_at_beginning: None,
             ignore_checkpoints: None,
             read_from: default_read_from(),
             ignore_older_secs: None,
@@ -377,11 +342,8 @@ impl Default for FileConfig {
             offset_key: None,
             data_dir: None,
             checkpoint_interval: default_checkpoint_interval(),
-            message_start_indicator: None,
-            multi_line_timeout: default_multi_line_timeout(), // millis
             multiline: None,
             max_read_bytes: default_max_read_bytes(),
-            oldest_first: false,
             remove_after_secs: None,
             line_delimiter: default_line_delimiter(),
             encoding: None,
@@ -408,17 +370,8 @@ impl SourceConfig for FileConfig {
             // source are only global, name can be used for subdir
             .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
-        // Clippy rule, because async_trait?
-        #[allow(clippy::suspicious_else_formatting)]
-        {
-            if let Some(ref config) = self.multiline {
-                let _: line_agg::Config = config.try_into()?;
-            }
-
-            if let Some(ref indicator) = self.message_start_indicator {
-                Regex::new(indicator)
-                    .with_context(|_| InvalidMessageStartIndicatorSnafu { indicator })?;
-            }
+        if let Some(ref config) = self.multiline {
+            let _: line_agg::Config = config.try_into()?;
         }
 
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
@@ -572,11 +525,8 @@ pub fn ifile_source(
         .collect::<Vec<PathBuf>>();
     let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let checkpoint_interval = config.checkpoint_interval;
-    let (ignore_checkpoints, read_from) = reconcile_position_options(
-        config.start_at_beginning,
-        config.ignore_checkpoints,
-        Some(config.read_from),
-    );
+    let ignore_checkpoints = config.ignore_checkpoints.unwrap_or(false);
+    let read_from = config.read_from.into();
 
     let emitter = FileSourceInternalEventsEmitter {
         include_file_metric_tag: config.internal_metrics.include_file_tag,
@@ -626,7 +576,6 @@ pub fn ifile_source(
             config.max_line_bytes,
             config.ignore_not_found,
         ),
-        oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,
         rotate_wait: config.rotate_wait,
@@ -650,8 +599,6 @@ pub fn ifile_source(
 
     let exclude = exclude_patterns;
     let multiline_config = config.multiline.clone();
-    let message_start_indicator = config.message_start_indicator.clone();
-    let multi_line_timeout = config.multi_line_timeout;
 
     let (finalizer, shutdown_checkpointer) = if acknowledgements {
         // The shutdown sent in to the finalizer is the global
@@ -668,7 +615,16 @@ pub fn ifile_source(
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
-                    checkpoints.update(entry.file_id, entry.offset);
+                    if entry
+                        .deletion_progress
+                        .as_ref()
+                        .is_none_or(|progress| progress.delivered(entry.offset))
+                    {
+                        checkpoints.update(entry.file_id, entry.offset);
+                    }
+                } else if let Some(progress) = entry.deletion_progress {
+                    // A later successful record must not authorize deleting a failed one.
+                    progress.failed();
                 }
             }
             send_shutdown.send(())
@@ -682,10 +638,14 @@ pub fn ifile_source(
 
     let checkpoints = checkpointer.view();
     let include_file_metric_tag = config.internal_metrics.include_file_tag;
+    let track_handoff = config.remove_after_secs.is_some() && !acknowledgements;
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
+        let mut bytes_received = FileMetricCache::<FileBytesReceived>::new(include_file_metric_tag);
+        let mut events_received =
+            FileMetricCache::<FileEventsReceived>::new(include_file_metric_tag);
 
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
@@ -693,11 +653,10 @@ pub fn ifile_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
-                emit!(FileBytesReceived {
-                    byte_size: line.text.len(),
-                    file: &line.filename,
-                    include_file_metric_tag,
-                });
+                trace!(message = "Bytes received.", byte_size = %line.text.len(), protocol = "ifile", file = %line.filename);
+                bytes_received
+                    .get(&line.filename, |file| FileBytesReceived { file })
+                    .emit(ByteSize(line.text.len()));
                 // transcode each line from the file's encoding charset to utf8
                 line.text = match encoding_decoder.as_mut() {
                     Some(d) => d.decode_to_utf8(line.text),
@@ -712,14 +671,6 @@ pub fn ifile_source(
                     rx,
                     multiline_config.try_into().unwrap(), // validated in build
                 )
-            } else if let Some(msi) = message_start_indicator {
-                wrap_with_line_agg(
-                    rx,
-                    line_agg::Config::for_legacy(
-                        Regex::new(&msi).unwrap(), // validated in build
-                        multi_line_timeout,
-                    ),
-                )
             } else {
                 Box::new(rx)
             };
@@ -727,15 +678,20 @@ pub fn ifile_source(
         // Once file server ends this will run until it has finished processing remaining
         // logs in the queue.
         let span = Span::current();
-        let mut messages = messages.map(move |line| {
+        let handoff_checkpoints = std::sync::Arc::clone(&checkpoints);
+        let messages = messages.map(move |line| {
             let mut event = create_event(
                 line.text,
                 line.start_offset,
                 &line.filename,
                 &event_metadata,
                 log_namespace,
-                include_file_metric_tag,
             );
+            let byte_size = event.estimated_json_encoded_size_of();
+            trace!(message = "Events received.", count = 1, %byte_size, file = %line.filename);
+            events_received
+                .get(&line.filename, |file| FileEventsReceived { file })
+                .emit(CountByteSize(1, byte_size));
 
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -743,28 +699,58 @@ pub fn ifile_source(
                 let entry = FinalizerEntry {
                     file_id: line.file_id,
                     offset: line.end_offset,
+                    deletion_progress: line.deletion_progress.clone(),
                 };
                 finalizer.add(entry, receiver);
-            } else {
+            } else if !track_handoff {
                 checkpoints.update(line.file_id, line.end_offset);
             }
-            event
+            (event, line.file_id, line.deletion_progress, line.end_offset)
         });
 
         let mut out_source_sender = out.source_sender;
         tokio::spawn(async move {
-            match out_source_sender
-                .send_event_stream(&mut messages)
+            let mut failed_count = 0;
+            let result = if track_handoff {
+                async {
+                    let mut batches = messages.ready_chunks(1000);
+                    while let Some(batch) = batches.next().await {
+                        let (events, progress): (Vec<_>, Vec<_>) = batch
+                            .into_iter()
+                            .map(|(event, file_id, progress, offset)| {
+                                (event, (file_id, progress, offset))
+                            })
+                            .unzip();
+                        let count = events.len();
+                        if let Err(error) = out_source_sender.send_batch(events).await {
+                            failed_count = count;
+                            return Err(error);
+                        }
+                        for (file_id, progress, offset) in progress {
+                            handoff_checkpoints.update(file_id, offset);
+                            if let Some(progress) = progress {
+                                progress.delivered(offset);
+                            }
+                        }
+                    }
+                    Ok(())
+                }
                 .instrument(span.or_current())
                 .await
-            {
-                Ok(()) => {
-                    debug!("Finished sending.");
-                }
-                Err(_) => {
-                    let (count, _) = messages.size_hint();
-                    emit!(StreamClosedError { count });
-                }
+            } else {
+                let mut events = messages.map(|(event, _, _, _)| event);
+                let result = out_source_sender
+                    .send_event_stream(&mut events)
+                    .instrument(span.or_current())
+                    .await;
+                failed_count = events.size_hint().0;
+                result
+            };
+            match result {
+                Ok(()) => debug!("Finished sending."),
+                Err(_) => emit!(StreamClosedError {
+                    count: failed_count
+                }),
             }
         });
 
@@ -784,31 +770,6 @@ pub fn ifile_source(
     })
 }
 
-/// Emit deprecation warning if the old option is used, and take it into account when determining
-/// defaults. Any of the newer options will override it when set directly.
-fn reconcile_position_options(
-    start_at_beginning: Option<bool>,
-    ignore_checkpoints: Option<bool>,
-    read_from: Option<ReadFromConfig>,
-) -> (bool, ReadFrom) {
-    if start_at_beginning.is_some() {
-        warn!(
-            message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead."
-        )
-    }
-
-    match start_at_beginning {
-        Some(true) => (
-            ignore_checkpoints.unwrap_or(true),
-            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
-        ),
-        _ => (
-            ignore_checkpoints.unwrap_or(false),
-            read_from.map(Into::into).unwrap_or_default(),
-        ),
-    }
-}
-
 fn wrap_with_line_agg(
     rx: impl Stream<Item = Line> + Send + Unpin + 'static,
     config: line_agg::Config,
@@ -820,23 +781,58 @@ fn wrap_with_line_agg(
                 (
                     line.filename,
                     line.text,
-                    (line.file_id, line.start_offset, line.end_offset),
+                    (
+                        line.file_id,
+                        line.start_offset,
+                        line.end_offset,
+                        line.deletion_progress,
+                    ),
                 )
             }),
             logic,
         )
         .map(
-            |(filename, text, (file_id, start_offset, initial_end), lastline_context)| Line {
-                text,
-                filename,
-                file_id,
-                start_offset,
-                end_offset: lastline_context.map_or(initial_end, |(_, _, lastline_end_offset)| {
-                    lastline_end_offset
-                }),
+            |(filename, text, (file_id, start_offset, initial_end, progress), lastline_context)| {
+                let (_, _, end_offset, deletion_progress) =
+                    lastline_context.unwrap_or((file_id, start_offset, initial_end, progress));
+                Line {
+                    text,
+                    filename,
+                    file_id,
+                    start_offset,
+                    end_offset,
+                    deletion_progress,
+                }
             },
         ),
     )
+}
+
+// Register in the processing task's component span. Keep only the latest path
+// when file tags are enabled: batches usually contain consecutive lines from a
+// file, and renames or interleaved multiline output must use their current path.
+struct FileMetricCache<E: RegisterInternalEvent> {
+    include_file_tag: bool,
+    file: Option<String>,
+    handle: Option<E::Handle>,
+}
+
+impl<E: RegisterInternalEvent> FileMetricCache<E> {
+    const fn new(include_file_tag: bool) -> Self {
+        Self {
+            include_file_tag,
+            file: None,
+            handle: None,
+        }
+    }
+
+    fn get(&mut self, file: &str, event: impl FnOnce(Option<String>) -> E) -> &E::Handle {
+        if self.handle.is_none() || (self.include_file_tag && self.file.as_deref() != Some(file)) {
+            self.file = self.include_file_tag.then(|| file.to_owned());
+            self.handle = Some(register!(event(self.file.clone())));
+        }
+        self.handle.as_ref().expect("metric handle was registered")
+    }
 }
 
 struct EventMetadata {
@@ -852,7 +848,6 @@ fn create_event(
     file: &str,
     meta: &EventMetadata,
     log_namespace: LogNamespace,
-    include_file_metric_tag: bool,
 ) -> LogEvent {
     let deserializer = BytesDeserializer;
     let mut event = deserializer.parse_single(line, log_namespace);
@@ -899,13 +894,6 @@ fn create_event(
         path!("path"),
         file,
     );
-
-    emit!(FileEventsReceived {
-        count: 1,
-        file,
-        byte_size: event.estimated_json_encoded_size_of(),
-        include_file_metric_tag,
-    });
 
     event
 }
@@ -980,6 +968,195 @@ mod tests {
                     }
                 }
             } => {}
+        }
+    }
+
+    #[test]
+    fn cached_file_metrics_preserve_labels_totals_and_component_isolation() {
+        use vector_lib::{event::MetricValue, json_size::JsonSize, metrics::Controller};
+
+        crate::test_util::trace_init();
+        let controller = Controller::get().unwrap();
+        controller.reset();
+        for tagged in [false, true] {
+            for component in ["first", "second"] {
+                let id = format!("{component}-{tagged}");
+                let span = info_span!("source", component_id = %id, component_kind = "source", component_type = "ifile");
+                span.in_scope(|| {
+                    let mut raw = FileMetricCache::<FileBytesReceived>::new(tagged);
+                    let mut events = FileMetricCache::<FileEventsReceived>::new(tagged);
+                    let mut raw_registrations = 0;
+                    let mut event_registrations = 0;
+                    // Includes consecutive lines, a renamed path, and delayed
+                    // output using the earlier path (e.g. multiline aggregation).
+                    for (path, bytes) in [
+                        ("a.log", 2),
+                        ("a.log", 3),
+                        ("b.log", 5),
+                        ("b.log", 7),
+                        ("a.log", 11),
+                    ] {
+                        raw.get(path, |file| {
+                            raw_registrations += 1;
+                            FileBytesReceived { file }
+                        })
+                        .emit(ByteSize(bytes));
+                        events
+                            .get(path, |file| {
+                                event_registrations += 1;
+                                FileEventsReceived { file }
+                            })
+                            .emit(CountByteSize(1, JsonSize::new(10)));
+                    }
+                    let expected_registrations = if tagged { 3 } else { 1 };
+                    assert_eq!(raw_registrations, expected_registrations);
+                    assert_eq!(event_registrations, expected_registrations);
+                });
+            }
+        }
+        let metrics = controller.capture_metrics();
+        for tagged in [false, true] {
+            for component in ["first", "second"] {
+                let id = format!("{component}-{tagged}");
+                let metrics: Vec<_> = metrics
+                    .iter()
+                    .filter(|m| {
+                        m.tags()
+                            .is_some_and(|t| t.get("component_id") == Some(id.as_str()))
+                    })
+                    .collect();
+                assert_eq!(metrics.len(), if tagged { 6 } else { 3 });
+                for metric in metrics {
+                    let tags = metric.tags().unwrap();
+                    assert_eq!(tags.get("component_kind"), Some("source"));
+                    assert_eq!(tags.get("component_type"), Some("ifile"));
+                    let raw = metric.name() == "component_received_bytes_total";
+                    let path = tags.get(if raw { "ifile" } else { "file" });
+                    assert_eq!(tags.get("protocol"), raw.then_some("ifile"));
+                    assert_eq!(tags.get(if raw { "file" } else { "ifile" }), None);
+                    let (bytes, events) = if tagged {
+                        match path {
+                            Some("a.log") => (16, 3),
+                            Some("b.log") => (12, 2),
+                            other => panic!("unexpected file tag: {other:?}"),
+                        }
+                    } else {
+                        assert_eq!(path, None);
+                        (28, 5)
+                    };
+                    let expected = match metric.name() {
+                        "component_received_bytes_total" => bytes,
+                        "component_received_events_total" => events,
+                        "component_received_event_bytes_total" => events * 10,
+                        other => panic!("unexpected metric: {other}"),
+                    };
+                    assert_eq!(
+                        metric.value(),
+                        &MetricValue::Counter {
+                            value: f64::from(expected)
+                        }
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn global_output_batches_preserve_records_and_file_turns() {
+        // Exercise aggregate bytes, a single file whose budget exceeds the cap,
+        // and empty lines which must be bounded by the event limit instead.
+        for (files, records, line_bytes, read_budget) in [
+            (32, 100, 1024, 65536),
+            (1, 2200, 1024, 4 * 1024 * 1024),
+            (1, 10000, 0, 65536),
+        ] {
+            let root = tempdir().unwrap();
+            let data = tempdir().unwrap();
+            for file in 0..files {
+                let mut contents = String::new();
+                for record in 0..records {
+                    if line_bytes > 0 {
+                        let prefix = format!("{file}:{record}:");
+                        contents.push_str(&prefix);
+                        contents.extend(std::iter::repeat_n('x', line_bytes - prefix.len()));
+                    }
+                    contents.push('\n');
+                }
+                fs::write(root.path().join(format!("{file}.log")), contents)
+                    .await
+                    .unwrap();
+            }
+            let emitter = FileSourceInternalEventsEmitter {
+                include_file_metric_tag: false,
+            };
+            let server = FileServer {
+                paths_provider: NotifyPathsProvider::new(
+                    &[root.path().join("*.log")],
+                    &[],
+                    GlobMatchOptions::default(),
+                    emitter.clone(),
+                ),
+                max_read_bytes: read_budget,
+                ignore_checkpoints: false,
+                read_from: vector_lib::ifile_source::ReadFrom::Beginning,
+                ignore_before: None,
+                max_line_bytes: 4096,
+                line_delimiter: Bytes::from_static(b"\n"),
+                fingerprinter: Fingerprinter::new(FingerprintStrategy::DevInode, 4096, false),
+                remove_after: None,
+                emitter,
+                rotate_wait: Duration::from_secs(60),
+                checkpoint_interval: Duration::from_secs(60),
+                test_sender: None,
+            };
+            let (tx, mut rx) = futures::channel::mpsc::channel(1);
+            let (stop_tx, stop_rx) = oneshot::channel::<()>();
+            let stop = stop_rx.shared();
+            let task =
+                tokio::spawn(server.run(tx, stop.clone(), stop, Checkpointer::new(data.path())));
+            let mut counts = std::collections::HashMap::new();
+            let mut total = 0;
+            let mut batch_sizes = Vec::new();
+            timeout(Duration::from_secs(20), async {
+                while total < files * records {
+                    let batch = rx.next().await.unwrap();
+                    assert!(!batch.is_empty());
+                    assert!(batch.len() <= 8192);
+                    let bytes: usize = batch.iter().map(|line| line.text.len()).sum();
+                    assert!(bytes <= 1024 * 1024);
+                    batch_sizes.push(batch.len());
+                    for line in batch {
+                        let count = counts.entry(line.filename.clone()).or_insert(0);
+                        assert_eq!(line.start_offset, (*count * (line_bytes + 1)) as u64);
+                        assert_eq!(line.end_offset, ((*count + 1) * (line_bytes + 1)) as u64);
+                        if line_bytes > 0 {
+                            let file = PathBuf::from(&line.filename);
+                            let prefix =
+                                format!("{}:{count}:", file.file_stem().unwrap().to_str().unwrap());
+                            assert!(line.text.starts_with(prefix.as_bytes()));
+                        }
+                        *count += 1;
+                        total += 1;
+                        // Every file gets its first turn before any gets a second.
+                        if files > 1 && *count > 65 {
+                            assert_eq!(counts.len(), files);
+                        }
+                    }
+                }
+            })
+            .await
+            .unwrap();
+            assert_eq!(counts.len(), files);
+            assert!(counts.values().all(|count| *count == records));
+            assert!(batch_sizes.len() > 1);
+            assert!(batch_sizes.last().unwrap() < batch_sizes.first().unwrap());
+            stop_tx.send(()).unwrap();
+            timeout(Duration::from_secs(5), task)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+            assert!(rx.next().await.is_none());
         }
     }
 
@@ -1114,7 +1291,6 @@ mod tests {
             r#"
             include = [ "/var/log/**/*.log" ]
             file_key = "file"
-            multi_line_timeout = 1000
             max_read_bytes = 65536
             line_delimiter = "\n"
         "#,
@@ -1291,7 +1467,7 @@ mod tests {
             file_key: Some(owned_value_path!("file")),
             offset_key: Some(owned_value_path!("offset")),
         };
-        let log = create_event(line, offset, file, &meta, LogNamespace::Legacy, false);
+        let log = create_event(line, offset, file, &meta, LogNamespace::Legacy);
 
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
@@ -1313,7 +1489,7 @@ mod tests {
             file_key: Some(owned_value_path!("file_path")),
             offset_key: Some(owned_value_path!("off")),
         };
-        let log = create_event(line, offset, file, &meta, LogNamespace::Legacy, false);
+        let log = create_event(line, offset, file, &meta, LogNamespace::Legacy);
 
         assert_eq!(log["file_path"], "some_file.rs".into());
         assert_eq!(log["hostname"], "Some.Machine".into());
@@ -1335,7 +1511,7 @@ mod tests {
             file_key: Some(owned_value_path!("ignored")),
             offset_key: Some(owned_value_path!("ignored")),
         };
-        let log = create_event(line, offset, file, &meta, LogNamespace::Vector, false);
+        let log = create_event(line, offset, file, &meta, LogNamespace::Vector);
 
         assert_eq!(log.value(), &value!("hello world"));
 
@@ -2305,75 +2481,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_multi_line_aggregation_legacy() {
-        let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
-            include: vec![dir.path().join("*")],
-            message_start_indicator: Some("INFO".into()),
-            multi_line_timeout: 25, // less than 50 in sleep()
-            ..test_default_file_config(&dir)
-        };
-
-        let path = dir.path().join("file");
-
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
-            &config,
-            false,
-            NoAcks,
-            LogNamespace::Legacy,
-            Some(tx),
-            async {
-                let mut file = File::create(&path).await.unwrap();
-                file.write_line("leftover foo").await.unwrap();
-                file.flush().await.unwrap();
-                // Wait for the source to be initialized before writing lines and testing time
-                // based aggregation
-                wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000).await;
-
-                file.write_line("INFO hello").await.unwrap();
-                file.write_line("INFO goodbye").await.unwrap();
-                file.write_line("part of goodbye").await.unwrap();
-                file.flush().await.unwrap();
-
-                sleep_500_millis().await;
-
-                file.write_line("INFO hi again").await.unwrap();
-                file.write_line("and some more").await.unwrap();
-                file.write_line("INFO hello").await.unwrap();
-                file.flush().await.unwrap();
-
-                sleep_500_millis().await;
-
-                file.write_line("too slow").await.unwrap();
-                file.write_line("INFO doesn't have").await.unwrap();
-                file.write_line("to be INFO in").await.unwrap();
-                file.write_line("the middle").await.unwrap();
-                file.flush().await.unwrap();
-
-                wait_for_n_reads(&mut rx, 10, 5000).await;
-            },
-        )
-        .await;
-
-        let received = extract_messages_value(received);
-
-        assert_eq!(
-            received,
-            vec![
-                "leftover foo".into(),
-                "INFO hello".into(),
-                "INFO goodbye\npart of goodbye".into(),
-                "INFO hi again\nand some more".into(),
-                "INFO hello".into(),
-                "too slow".into(),
-                "INFO doesn't have".into(),
-                "to be INFO in\nthe middle".into(),
-            ]
-        );
-    }
-
-    #[tokio::test]
     async fn test_multi_line_aggregation() {
         let dir = tempdir().unwrap();
         let config = ifile::FileConfig {
@@ -2457,10 +2564,11 @@ mod tests {
         file.write_line("INFO hello").await.unwrap();
         file.write_line("part of hello").await.unwrap();
 
+        // Finish shutdown and its checkpoint write before restarting the source.
         // Read and aggregate existing lines
         let received = run_ifile_source(
             &config,
-            false,
+            true,
             Acks,
             LogNamespace::Legacy,
             None,
@@ -2475,7 +2583,7 @@ mod tests {
 
         // After restart, we should not see any part of the previously aggregated lines
         let received_after_restart =
-            run_ifile_source(&config, false, Acks, LogNamespace::Legacy, None, async {
+            run_ifile_source(&config, true, Acks, LogNamespace::Legacy, None, async {
                 file.write_line("INFO goodbye").await.unwrap();
             })
             .await;
@@ -2497,7 +2605,6 @@ mod tests {
         let config = ifile::FileConfig {
             include: vec![dir.path().join("*")],
             max_read_bytes: 1,
-            oldest_first: false,
             ..test_default_file_config(&dir)
         };
 
@@ -2560,72 +2667,6 @@ mod tests {
             .collect();
 
         assert_eq!(received_strings, expected_lines);
-    }
-
-    #[tokio::test]
-    async fn test_oldest_first() {
-        let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
-            include: vec![dir.path().join("*")],
-            max_read_bytes: 1,
-            oldest_first: true,
-            ..test_default_file_config(&dir)
-        };
-
-        let older_path = dir.path().join("z_older_file");
-        let mut older = File::create(&older_path).await.unwrap();
-
-        older.write_line("hello i am the old file").await.unwrap();
-        older
-            .write_line("i have been around a while")
-            .await
-            .unwrap();
-        older
-            .write_line("you should definitely read all of me first")
-            .await
-            .unwrap();
-
-        older.sync_all().await.unwrap();
-
-        let newer_path = dir.path().join("a_newer_file");
-        let mut newer = File::create(&newer_path).await.unwrap();
-
-        newer.write_line("i'm new").await.unwrap();
-        newer
-            .write_line("hopefully you read all the old stuff first")
-            .await
-            .unwrap();
-        newer
-            .write_line("because otherwise i'm not going to make sense")
-            .await
-            .unwrap();
-
-        newer.sync_all().await.unwrap();
-
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
-            &config,
-            false,
-            NoAcks,
-            LogNamespace::Legacy,
-            Some(tx),
-            wait_checkpoint_and_n_reads(&mut rx, vec![&older_path, &newer_path], 6, 5000),
-        )
-        .await;
-
-        let received = extract_messages_value(received);
-
-        assert_eq!(
-            received,
-            vec![
-                "hello i am the old file".into(),
-                "i have been around a while".into(),
-                "you should definitely read all of me first".into(),
-                "i'm new".into(),
-                "hopefully you read all the old stuff first".into(),
-                "because otherwise i'm not going to make sense".into(),
-            ]
-        );
     }
 
     #[tokio::test]
@@ -2802,45 +2843,138 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remove_file() {
-        let n = 5;
-        let remove_after_secs = 1;
+    async fn remove_file_waits_for_delivery() {
+        use vector_lib::event::Finalizable;
 
-        let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
-            include: vec![dir.path().join("*")],
-            remove_after_secs: Some(remove_after_secs),
-            ..test_default_file_config(&dir)
-        };
-
-        let path = dir.path().join("file");
-        let received = run_ifile_source(&config, false, Acks, LogNamespace::Legacy, None, async {
-            let mut file = File::create(&path).await.unwrap();
-
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
-            for i in 0..n {
-                file.write_line(format!("{i}")).await.unwrap();
+        for (acknowledgements, fail_first) in [(true, false), (false, false), (true, true)] {
+            let dir = tempdir().unwrap();
+            let config = ifile::FileConfig {
+                include: vec![dir.path().join("file")],
+                remove_after_secs: Some(1),
+                ..test_default_file_config(&dir)
+            };
+            let path = dir.path().join("file");
+            fs::write(&path, "one\ntwo\n").await.unwrap();
+            let (tx, mut rx) = SourceSender::new_test();
+            let (stop, shutdown, _) = ShutdownSignal::new_wired();
+            let task = tokio::spawn(ifile::ifile_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                shutdown,
+                Senders {
+                    source_sender: tx,
+                    test_sender: None,
+                },
+                acknowledgements,
+                LogNamespace::Legacy,
+            ));
+            let mut events = Vec::new();
+            for _ in 0..2 {
+                events.push(
+                    timeout(Duration::from_secs(5), rx.next())
+                        .await
+                        .unwrap()
+                        .unwrap(),
+                );
             }
-            drop(file);
-
-            for _ in 0..10 {
-                // Wait for remove grace period to end.
-                sleep(Duration::from_secs(remove_after_secs + 1)).await;
-
-                if File::open(&path).await.is_err() {
-                    break;
+            if acknowledgements {
+                sleep(Duration::from_secs(2)).await;
+                assert!(path.exists(), "deleted before acknowledgement");
+                for (index, event) in events.iter_mut().enumerate() {
+                    let finalizers = event.take_finalizers();
+                    finalizers.update_status(if fail_first && index == 0 {
+                        EventStatus::Errored
+                    } else {
+                        EventStatus::Delivered
+                    });
+                    drop(finalizers);
                 }
             }
-        })
-        .await;
-
-        assert_eq!(received.len(), n);
-
-        match File::open(&path).await {
-            Ok(_) => panic!("File wasn't removed"),
-            Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
+            if fail_first {
+                sleep(Duration::from_secs(2)).await;
+                assert!(
+                    path.exists(),
+                    "later success deleted an earlier failed record"
+                );
+            } else {
+                timeout(Duration::from_secs(5), async {
+                    while path.exists() {
+                        sleep(Duration::from_millis(20)).await;
+                    }
+                })
+                .await
+                .expect("file was not deleted after delivery");
+            }
+            drop(stop);
+            timeout(Duration::from_secs(5), task)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+            if fail_first {
+                let checkpoint: serde_json::Value = serde_json::from_slice(
+                    &fs::read(config.data_dir.as_ref().unwrap().join("checkpoints.json"))
+                        .await
+                        .unwrap(),
+                )
+                .unwrap();
+                assert!(
+                    checkpoint["checkpoints"].as_array().unwrap().is_empty(),
+                    "checkpoint advanced past failed delivery"
+                );
+            }
         }
+    }
+
+    #[tokio::test]
+    async fn remove_file_waits_for_handoff_without_acknowledgements() {
+        let dir = tempdir().unwrap();
+        let config = ifile::FileConfig {
+            include: vec![dir.path().join("file")],
+            remove_after_secs: Some(1),
+            ..test_default_file_config(&dir)
+        };
+        let path = dir.path().join("file");
+        fs::write(&path, "record\n".repeat(2000)).await.unwrap();
+        let (tx, rx) = SourceSender::new_test_sender_with_options(1, None);
+        let mut rx = rx
+            .into_stream()
+            .flat_map(vector_lib::event::into_event_stream);
+        let (test_tx, mut test_rx) = mpsc::unbounded_channel();
+        let (stop, shutdown, _) = ShutdownSignal::new_wired();
+        let task = tokio::spawn(ifile::ifile_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            shutdown,
+            Senders {
+                source_sender: tx,
+                test_sender: Some(test_tx),
+            },
+            false,
+            LogNamespace::Legacy,
+        ));
+        wait_checkpoint_and_n_reads(&mut test_rx, vec![&path], 2000, 5000).await;
+        sleep(Duration::from_secs(2)).await;
+        assert!(path.exists(), "deleted while output was blocked");
+        for _ in 0..2000 {
+            timeout(Duration::from_secs(5), rx.next())
+                .await
+                .unwrap()
+                .unwrap();
+        }
+        timeout(Duration::from_secs(5), async {
+            while path.exists() {
+                sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("file was not deleted after output drained");
+        drop(stop);
+        timeout(Duration::from_secs(5), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
     }
 
     #[derive(Clone, Copy, Eq, PartialEq)]
