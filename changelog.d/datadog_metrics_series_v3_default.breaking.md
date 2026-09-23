@@ -12,9 +12,15 @@ Sketch metrics (distributions and histograms) are unaffected and continue to be 
 
 ## Migration
 
-No configuration change is required for Datadog's managed intake. To keep submitting series to
-the previous endpoint — for example when sending to a proxy or agent that doesn't accept the V3
-intake route — set `series_api_version` explicitly:
+No configuration change is required when sending directly to Datadog's managed intake.
+
+If your `datadog_metrics` sink forwards to another Vector instance's `datadog_agent`
+source, the receiving instance must support V3 before the sender switches to the new
+default. Upgrading the sender first causes series metric requests to fail.
+
+Upgrade receiving instances first, or explicitly configure sending sinks to continue
+using V2 until all receivers support V3. The same workaround applies to proxies or
+other endpoints that do not accept the V3 intake route:
 
 ```yaml
 sinks:
