@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
+use std::{collections::HashMap, net::SocketAddr};
 
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
@@ -24,7 +24,7 @@ use crate::{
     serde::{bool_or_struct, default_decoding},
     sources::util::{
         HttpSource,
-        http::{HttpMethod, add_headers, add_query_parameters},
+        http::{HttpMethod, UnixSocketConfig, add_headers, add_query_parameters},
     },
     tls::TlsEnableableConfig,
 };
@@ -35,37 +35,17 @@ use crate::{
 pub struct SimpleHttpConfig {
     /// The TCP socket address to listen for connections on.
     ///
-    /// It _must_ include a port. This is mutually exclusive with `socket_path`.
+    /// It _must_ include a port. This is mutually exclusive with `socket`.
     #[configurable(metadata(docs::examples = "0.0.0.0:80"))]
     #[configurable(metadata(docs::examples = "localhost:80"))]
     #[serde(default)]
     address: Option<SocketAddr>,
 
-    /// The Unix domain socket path to listen for connections on.
+    /// Unix domain socket to listen for connections on.
     ///
     /// This is mutually exclusive with `address`.
-    #[configurable(metadata(docs::examples = "/var/run/vector-http.sock"))]
     #[serde(default)]
-    socket_path: Option<PathBuf>,
-
-    /// Unix file mode bits to apply to the Unix socket file.
-    ///
-    /// Note: The file mode value can be specified in any numeric format supported by your configuration
-    /// language, but it is most intuitive to use an octal number.
-    #[configurable(metadata(docs::examples = 0o660))]
-    #[configurable(metadata(docs::examples = 0o666))]
-    #[serde(default)]
-    socket_file_mode: Option<u32>,
-
-    /// User ID to own the Unix socket file.
-    #[configurable(metadata(docs::examples = 1000))]
-    #[serde(default)]
-    socket_file_uid: Option<u32>,
-
-    /// Group ID to own the Unix socket file.
-    #[configurable(metadata(docs::examples = 1000))]
-    #[serde(default)]
-    socket_file_gid: Option<u32>,
+    socket: Option<UnixSocketConfig>,
 
     /// A list of HTTP headers to include in the log event.
     ///
@@ -162,31 +142,20 @@ pub struct SimpleHttpConfig {
 
 impl SimpleHttpConfig {
     fn validate_address(&self) -> crate::Result<()> {
-        if self.socket_path.is_none()
-            && (self.socket_file_mode.is_some()
-                || self.socket_file_uid.is_some()
-                || self.socket_file_gid.is_some())
-        {
-            return Err(
-                "`socket_file_mode`, `socket_file_uid`, and `socket_file_gid` require `socket_path`."
-                    .into(),
-            );
-        }
-
-        if self.socket_path.is_some() && self.keepalive != KeepaliveConfig::default() {
+        if self.socket.is_some() && self.keepalive != KeepaliveConfig::default() {
             return Err("`keepalive` configuration is not supported for Unix sockets.".into());
         }
 
-        match (&self.address, &self.socket_path) {
-            (Some(_), Some(_)) => Err("`address` and `socket_path` are mutually exclusive.".into()),
+        match (&self.address, &self.socket) {
+            (Some(_), Some(_)) => Err("`address` and `socket` are mutually exclusive.".into()),
             (None, Some(_)) => {
                 #[cfg(not(unix))]
-                return Err("`socket_path` is only supported on Unix platforms.".into());
+                return Err("`socket` is only supported on Unix platforms.".into());
                 #[cfg(unix)]
                 Ok(())
             }
             (Some(_), None) => Ok(()),
-            (None, None) => Err("Must specify either `address` or `socket_path`.".into()),
+            (None, None) => Err("Must specify either `address` or `socket`.".into()),
         }
     }
 
@@ -263,10 +232,7 @@ impl Default for SimpleHttpConfig {
     fn default() -> Self {
         Self {
             address: Some(default_address()),
-            socket_path: None,
-            socket_file_mode: None,
-            socket_file_uid: None,
-            socket_file_gid: None,
+            socket: None,
             headers: Vec::new(),
             query_parameters: Vec::new(),
             tls: None,
@@ -378,13 +344,7 @@ impl SourceConfig for SimpleHttpConfig {
         source.run(
             self.address,
             #[cfg(unix)]
-            self.socket_path.clone(),
-            #[cfg(unix)]
-            self.socket_file_mode,
-            #[cfg(unix)]
-            self.socket_file_uid,
-            #[cfg(unix)]
-            self.socket_file_gid,
+            self.socket.as_ref(),
             self.path.as_str(),
             self.method,
             self.response_code,
@@ -414,9 +374,9 @@ impl SourceConfig for SimpleHttpConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        match (&self.address, &self.socket_path) {
+        match (&self.address, &self.socket) {
             (Some(address), None) => vec![Resource::tcp(*address)],
-            (None, Some(path)) => vec![Resource::unix_socket(path.clone())],
+            (None, Some(socket)) => vec![Resource::unix_socket(socket.path.clone())],
             (None, None) => vec![Resource::tcp(default_address())],
             _ => vec![],
         }
@@ -579,6 +539,8 @@ mod tests {
     };
 
     use super::{SimpleHttpConfig, remove_duplicates};
+    #[cfg(unix)]
+    use crate::sources::util::http::UnixSocketConfig;
     use crate::{
         SourceSender,
         common::http::server_auth::HttpServerAuthConfig,
@@ -629,10 +591,7 @@ mod tests {
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address: Some(address),
-                socket_path: None,
-                socket_file_mode: None,
-                socket_file_uid: None,
-                socket_file_gid: None,
+                socket: None,
                 headers,
                 query_parameters,
                 response_code,
@@ -764,25 +723,40 @@ mod tests {
     fn unix_socket_config_validation() {
         // Valid config
         let config: SimpleHttpConfig = serde_yaml::from_str(
-            "socket_path: /tmp/vector-http.sock\nsocket_file_mode: 432\nsocket_file_uid: 1000\nsocket_file_gid: 1001",
-        ).unwrap();
-        assert_eq!(config.socket_path, Some("/tmp/vector-http.sock".into()));
-        assert_eq!(config.socket_file_mode, Some(0o660));
+            "socket:\n  path: /tmp/vector-http.sock\n  file_mode: 432\n  file_uid: 1000\n  file_gid: 1001",
+        )
+        .unwrap();
+        assert_eq!(
+            config.socket,
+            Some(UnixSocketConfig {
+                path: "/tmp/vector-http.sock".into(),
+                file_mode: Some(0o660),
+                file_uid: Some(1000),
+                file_gid: Some(1001),
+            })
+        );
         assert!(config.validate_address().is_ok());
 
-        // Invalid: Both address and socket_path provided
+        // Invalid: Both address and socket provided
         let config: SimpleHttpConfig =
-            serde_yaml::from_str("address: 127.0.0.1:8080\nsocket_path: /tmp/vector-http.sock")
+            serde_yaml::from_str("address: 127.0.0.1:8080\nsocket:\n  path: /tmp/vector-http.sock")
                 .unwrap();
         assert!(config.validate_address().is_err());
 
-        // Invalid: Permissions set without a socket_path
-        let config: SimpleHttpConfig = serde_yaml::from_str("socket_file_mode: 432").unwrap();
-        assert!(config.validate_address().is_err());
+        // Invalid: socket without a path
+        assert!(serde_yaml::from_str::<SimpleHttpConfig>("socket:\n  file_mode: 432").is_err());
 
-        // Invalid: keepalive configured with socket_path
+        // Invalid: unknown option inside socket
+        assert!(
+            serde_yaml::from_str::<SimpleHttpConfig>(
+                "socket:\n  path: /tmp/vector-http.sock\n  mode: 432"
+            )
+            .is_err()
+        );
+
+        // Invalid: keepalive configured with socket
         let config: SimpleHttpConfig = serde_yaml::from_str(
-            "socket_path: /tmp/vector-http.sock\nkeepalive:\n  max_connection_age_secs: 100",
+            "socket:\n  path: /tmp/vector-http.sock\nkeepalive:\n  max_connection_age_secs: 100",
         )
         .unwrap();
         assert!(config.validate_address().is_err());
@@ -800,8 +774,12 @@ mod tests {
 
         let source = SimpleHttpConfig {
             address: None,
-            socket_path: Some(socket_path.clone()),
-            socket_file_mode: Some(0o660),
+            socket: Some(UnixSocketConfig {
+                path: socket_path.clone(),
+                file_mode: Some(0o660),
+                file_uid: None,
+                file_gid: None,
+            }),
             ..Default::default()
         }
         .build(context)

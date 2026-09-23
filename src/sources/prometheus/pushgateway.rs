@@ -92,12 +92,6 @@ impl SourceConfig for PrometheusPushgatewayConfig {
             Some(self.address),
             #[cfg(unix)]
             None,
-            #[cfg(unix)]
-            None,
-            #[cfg(unix)]
-            None,
-            #[cfg(unix)]
-            None,
             "",
             HttpMethod::Post,
             http::StatusCode::OK,

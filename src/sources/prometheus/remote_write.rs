@@ -127,12 +127,6 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             Some(self.address),
             #[cfg(unix)]
             None,
-            #[cfg(unix)]
-            None,
-            #[cfg(unix)]
-            None,
-            #[cfg(unix)]
-            None,
             self.path.as_str(),
             HttpMethod::Post,
             StatusCode::OK,

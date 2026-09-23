@@ -1,20 +1,30 @@
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
+use std::fs::remove_file;
 use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
-#[cfg(unix)]
-use std::{fs::remove_file, path::PathBuf};
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use hyper::{Server, service::make_service_fn};
 use tokio::net::TcpStream;
-#[cfg(unix)]
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
 use tokio::net::UnixListener;
-#[cfg(unix)]
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
 use tokio_stream::wrappers::UnixListenerStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LogNamespace, SourceAcknowledgementsConfig},
+    configurable::configurable_component,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
 };
 use vrl::{path::PathPrefix, path::ValuePath as _, value::ObjectMap};
@@ -29,7 +39,10 @@ use warp::{
 };
 
 use super::encoding::{capped_body, decompress_body};
-#[cfg(unix)]
+#[cfg(all(
+    unix,
+    any(feature = "sources-socket", feature = "sources-utils-net-unix")
+))]
 use crate::internal_events::UnixSocketFileDeleteError;
 use crate::{
     SourceSender,
@@ -48,6 +61,35 @@ use crate::{
     any(feature = "sources-socket", feature = "sources-utils-net-unix")
 ))]
 use crate::sources::util::{change_socket_ownership, change_socket_permissions};
+
+/// Configuration for listening on a Unix domain socket.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct UnixSocketConfig {
+    /// The Unix domain socket path to listen for connections on.
+    #[configurable(metadata(docs::examples = "/var/run/vector-http.sock"))]
+    pub path: std::path::PathBuf,
+
+    /// Unix file mode bits to apply to the Unix socket file.
+    ///
+    /// Note: The file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
+    #[configurable(metadata(docs::examples = 0o660))]
+    #[configurable(metadata(docs::examples = 0o666))]
+    #[serde(default)]
+    pub file_mode: Option<u32>,
+
+    /// User ID to own the Unix socket file.
+    #[configurable(metadata(docs::examples = 1000))]
+    #[serde(default)]
+    pub file_uid: Option<u32>,
+
+    /// Group ID to own the Unix socket file.
+    #[configurable(metadata(docs::examples = 1000))]
+    #[serde(default)]
+    pub file_gid: Option<u32>,
+}
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
     // This function can be defined to enrich events with additional HTTP
@@ -129,10 +171,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     fn run(
         self,
         address: Option<SocketAddr>,
-        #[cfg(unix)] socket_path: Option<PathBuf>,
-        #[cfg(unix)] socket_file_mode: Option<u32>,
-        #[cfg(unix)] socket_file_uid: Option<u32>,
-        #[cfg(unix)] socket_file_gid: Option<u32>,
+        #[cfg(unix)] socket: Option<&UnixSocketConfig>,
         path: &str,
         method: HttpMethod,
         response_code: StatusCode,
@@ -144,9 +183,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         keepalive_settings: KeepaliveConfig,
     ) -> crate::Result<crate::sources::Source> {
         #[cfg(unix)]
-        if socket_path.is_some() && tls.and_then(|config| config.enabled).unwrap_or(false) {
-            return Err("`tls` cannot be used when `socket_path` is configured.".into());
+        if socket.is_some() && tls.and_then(|config| config.enabled).unwrap_or(false) {
+            return Err("`tls` cannot be used when `socket` is configured.".into());
         }
+        #[cfg(all(
+            unix,
+            any(feature = "sources-socket", feature = "sources-utils-net-unix")
+        ))]
+        let socket = socket.cloned();
 
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
@@ -313,19 +357,23 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                     unix,
                     any(feature = "sources-socket", feature = "sources-utils-net-unix")
                 ))]
-                if let Some(path) = socket_path {
+                if let Some(UnixSocketConfig {
+                    path,
+                    file_mode,
+                    file_uid,
+                    file_gid,
+                }) = socket
+                {
                     let listener = UnixListener::bind(&path).map_err(|err| {
                         error!(message = "Failed to bind Unix socket.", ?path, %err);
                     })?;
 
-                    if let Err(error) =
-                        change_socket_ownership(&path, socket_file_uid, socket_file_gid)
-                    {
+                    if let Err(error) = change_socket_ownership(&path, file_uid, file_gid) {
                         error!(message = "Failed to set socket ownership.", ?path, %error);
                         return Err(());
                     }
 
-                    if let Err(error) = change_socket_permissions(&path, socket_file_mode) {
+                    if let Err(error) = change_socket_permissions(&path, file_mode) {
                         error!(message = "Failed to set socket permissions.", ?path, %error);
                         return Err(());
                     }
