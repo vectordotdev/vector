@@ -113,76 +113,45 @@ mod source {
 
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;
-    use vector_lib::{
-        internal_event::{error_stage, error_type},
-        json_size::JsonSize,
-    };
+    use vector_lib::internal_event::{error_stage, error_type};
 
-    #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileBytesReceived<'a> {
-        pub byte_size: usize,
-        pub file: &'a str,
-        pub include_file_metric_tag: bool,
-    }
+    use metrics::Counter;
+    use vector_lib::internal_event::{ByteSize, CountByteSize};
 
-    impl InternalEvent for FileBytesReceived<'_> {
-        fn emit(self) {
-            trace!(
-                message = "Bytes received.",
-                byte_size = %self.byte_size,
-                protocol = "ifile",
-                file = %self.file,
-            );
-            if self.include_file_metric_tag {
-                counter!(
-                    CounterName::ComponentReceivedBytesTotal,
-                    "protocol" => "ifile",
-                    "ifile" => self.file.to_owned()
-                )
-            } else {
-                counter!(
-                    CounterName::ComponentReceivedBytesTotal,
-                    "protocol" => "ifile",
-                )
-            }
-            .increment(self.byte_size as u64);
+    vector_lib::registered_event!(
+        FileBytesReceived {
+            file: Option<String>,
+        } => {
+            bytes: Counter = match self.file {
+                Some(file) => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "ifile", "ifile" => file),
+                None => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "ifile"),
+            },
         }
-    }
 
-    #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileEventsReceived<'a> {
-        pub count: usize,
-        pub file: &'a str,
-        pub byte_size: JsonSize,
-        pub include_file_metric_tag: bool,
-    }
-
-    impl InternalEvent for FileEventsReceived<'_> {
-        fn emit(self) {
-            trace!(
-                message = "Events received.",
-                count = %self.count,
-                byte_size = %self.byte_size,
-                file = %self.file
-            );
-            if self.include_file_metric_tag {
-                counter!(
-                    CounterName::ComponentReceivedEventsTotal,
-                    "file" => self.file.to_owned(),
-                )
-                .increment(self.count as u64);
-                counter!(
-                    CounterName::ComponentReceivedEventBytesTotal,
-                    "file" => self.file.to_owned(),
-                )
-                .increment(self.byte_size.get() as u64);
-            } else {
-                counter!(CounterName::ComponentReceivedEventsTotal).increment(self.count as u64);
-                counter!(CounterName::ComponentReceivedEventBytesTotal)
-                    .increment(self.byte_size.get() as u64);
-            }
+        fn emit(&self, data: ByteSize) {
+            self.bytes.increment(data.0 as u64);
         }
-    }
+    );
+
+    vector_lib::registered_event!(
+        FileEventsReceived {
+            file: Option<String>,
+        } => {
+            events: Counter = match self.file.as_ref() {
+                Some(file) => counter!(CounterName::ComponentReceivedEventsTotal, "file" => file.clone()),
+                None => counter!(CounterName::ComponentReceivedEventsTotal),
+            },
+            event_bytes: Counter = match self.file {
+                Some(file) => counter!(CounterName::ComponentReceivedEventBytesTotal, "file" => file),
+                None => counter!(CounterName::ComponentReceivedEventBytesTotal),
+            },
+        }
+
+        fn emit(&self, data: CountByteSize) {
+            self.events.increment(data.0 as u64);
+            self.event_bytes.increment(data.1.get() as u64);
+        }
+    );
 
     #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileChecksumFailed<'a> {
