@@ -19,7 +19,6 @@ matrix:
   # leg once v3 series support lands
   # (see https://github.com/vectordotdev/vector/issues/25790).
   agent_version: ["7.80.4", "6"]
-  # validate every series API version, including the default (`v3`)
   series_api_version: ["v1", "v2", "v3"]
 
 # changes to these files/paths will invoke the integration test in CI
