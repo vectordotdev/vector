@@ -1,4 +1,3 @@
-TCP source acknowledgement and TLS connection error logs now include the remote `peer_addr`,
-including when collected through the `internal_logs` source.
+TCP source acknowledgement and TLS connection error logs now include the remote `peer_addr`.
 
 authors: pront
