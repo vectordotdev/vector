@@ -361,6 +361,10 @@ impl_generate_config_from_default!(FileConfig);
 #[typetag::serde(name = "ifile")]
 impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        if self.line_delimiter.is_empty() {
+            return Err("`line_delimiter` must not be empty".into());
+        }
+
         // add the source name as a subdir, so that multiple sources can
         // operate within the same given data_dir (e.g. the global one)
         // without the file servers' checkpointers interfering with each
@@ -1280,6 +1284,22 @@ mod tests {
 
     async fn sleep_millis(millis: u64) {
         sleep(Duration::from_millis(millis)).await;
+    }
+
+    #[tokio::test]
+    async fn rejects_empty_line_delimiter() {
+        let dir = tempdir().unwrap();
+        let config = FileConfig {
+            line_delimiter: String::new(),
+            ..test_default_file_config(&dir)
+        };
+        let (sender, _receiver) = SourceSender::new_test();
+        let result = config.build(SourceContext::new_test(sender, None)).await;
+        assert!(
+            result.is_err(),
+            "empty delimiters must fail source construction"
+        );
+        assert!(result.err().unwrap().to_string().contains("line_delimiter"));
     }
 
     #[test]

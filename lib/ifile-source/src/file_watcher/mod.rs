@@ -344,7 +344,6 @@ impl FileWatcher {
             }
         };
         let file_position = &mut self.file_position;
-        let initial_position = *file_position;
         match read_until_with_max_size(
             reader,
             file_position,
@@ -362,16 +361,17 @@ impl FileWatcher {
                 self.reached_eof = false;
                 self.track_read_success();
                 let bytes = self.buf.split().freeze();
+                // The call may finish a previously buffered record or skip
+                // oversized records. Derive the start from the completed record.
+                let offset =
+                    self.file_position - bytes.len() as u64 - self.line_delimiter.len() as u64;
 
                 debug!(
                     "read_line {}",
                     String::from_utf8_lossy(bytes::Buf::chunk(&bytes))
                 );
                 // Return all lines, including empty ones
-                Ok(Some(RawLine {
-                    offset: initial_position,
-                    bytes,
-                }))
+                Ok(Some(RawLine { offset, bytes }))
             }
             Ok(ReadResult {
                 successfully_read: None,
@@ -421,6 +421,44 @@ async fn is_gzipped(r: &mut BufReader<File>) -> io::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn offsets_follow_partial_and_discarded_records() {
+        use tokio::io::AsyncWriteExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        for delimiter in ["\n", "\r\n"] {
+            fs::write(&path, "abc").await.unwrap();
+            let mut watcher = FileWatcher::new(
+                path.clone(),
+                ReadFrom::Beginning,
+                None,
+                6,
+                Bytes::from(delimiter),
+            )
+            .await
+            .unwrap();
+            assert!(watcher.read_line().await.unwrap().is_none());
+            let mut file = fs::OpenOptions::new()
+                .append(true)
+                .open(&path)
+                .await
+                .unwrap();
+            file.write_all(format!("def{delimiter}oversized{delimiter}ok{delimiter}").as_bytes())
+                .await
+                .unwrap();
+            file.sync_all().await.unwrap();
+            let first = watcher.read_line().await.unwrap().unwrap();
+            assert_eq!(first.bytes, "abcdef");
+            assert_eq!(first.offset, 0);
+            let second = watcher.read_line().await.unwrap().unwrap();
+            assert_eq!(second.bytes, "ok");
+            assert_eq!(
+                second.offset,
+                (6 + delimiter.len() + 9 + delimiter.len()) as u64
+            );
+        }
+    }
 
     #[tokio::test]
     async fn deletion_requires_delivery_and_rechecks_file() {
