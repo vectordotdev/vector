@@ -127,16 +127,19 @@ components: sources: windows_event_log: {
 		query_complexity: {
 			title: "Query complexity limit"
 			body: """
-				Windows limits how many expressions a structured XPath query may contain. A query
-				that exceeds the limit is rejected when the subscription is created, with
-				`ERROR_EVT_INVALID_QUERY` (`0x80073A99`), and the source does not start. Every
-				comparison such as `EventID=4624` or `Level=2` counts as one expression. In
-				practice the limit is about 20; a query with 26 `EventID=` comparisons was
-				rejected.
+				Windows rejects structured XPath queries whose boolean operators are nested too
+				deeply. Such a query fails when the subscription is created, with
+				`ERROR_EVT_INVALID_QUERY` (`0x80073A99`), the channel is skipped, and the source
+				does not start. A flat `or` chain nests one level per operand: on Windows 11, a
+				chain of 23 terms is accepted and a chain of 24 is rejected. A term may itself be
+				a parenthesized group: a range such as `(EventID>=4720 and EventID<=4733)` adds
+				one term to the chain plus one level for its `and`, so 22 ranges fit where 23
+				single IDs do. Grouping only helps while the total nesting stays shallow; four
+				groups of 20 IDs are accepted, five are not.
 
-				`only_event_ids` is translated into one `EventID=` comparison per listed ID, so a
-				longer list runs into the same limit. Use `event_query` with ranges instead, where
-				a range costs two expressions regardless of its width:
+				`only_event_ids` is currently translated into a flat chain with one `EventID=`
+				comparison per listed ID, so a list of more than 23 IDs runs into this limit even
+				though the configuration validates. Use `event_query` with ranges instead:
 
 				```toml
 				event_query = "*[System[(EventID=4624 or EventID=4625 or (EventID>=4720 and EventID<=4733))]]"
