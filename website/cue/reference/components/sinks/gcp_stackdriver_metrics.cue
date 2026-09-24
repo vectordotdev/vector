@@ -60,7 +60,6 @@ components: sinks: gcp_stackdriver_metrics: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.gcp_stackdriver_metrics.configuration & {

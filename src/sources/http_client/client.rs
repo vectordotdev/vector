@@ -88,12 +88,10 @@ pub struct HttpClientConfig {
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: QueryParameters,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 
     /// Framing to use in the decoding.
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     pub framing: FramingConfig,
 
@@ -121,11 +119,9 @@ pub struct HttpClientConfig {
     pub body: Option<ParameterValue>,
 
     /// TLS configuration.
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// HTTP Authentication.
-    #[configurable(derived)]
     pub auth: Option<Auth>,
 
     /// The namespace to use for logs. This overrides the global setting.
@@ -203,7 +199,7 @@ fn compile_parameter_vrl(
         Err(diagnostics) => {
             let error = format_vrl_diagnostics(param.value(), diagnostics);
             Err(sources::BuildError::VrlCompilationError {
-                message: format!("VRL compilation failed: {}", error),
+                message: format!("VRL compilation failed: {error}"),
             })
         }
     }

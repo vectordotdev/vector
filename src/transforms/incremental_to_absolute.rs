@@ -24,7 +24,6 @@ pub struct IncrementalToAbsoluteConfig {
     ///
     /// By default, incremental metrics are evicted after 5 minutes of not being updated. The next
     /// incremental value will be reset.
-    #[configurable(derived)]
     #[serde(default)]
     pub cache: NormalizerConfig<IncrementalToAbsoluteDefaultNormalizerSettings>,
 }

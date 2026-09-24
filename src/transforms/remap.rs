@@ -1,6 +1,3 @@
-// Derivative's Debug impl generates `let _ = field.fmt(f)` which triggers this lint.
-#![allow(clippy::let_underscore_must_use)]
-
 use std::{
     collections::{BTreeMap, HashMap},
     fs::File,
@@ -56,9 +53,8 @@ type CacheValue = (Program, String, MeaningList);
     "remap",
     "Modify your observability data as it passes through your topology using Vector Remap Language (VRL)."
 ))]
-#[derive(Derivative)]
+#[derive(Default, derive_more::Debug)]
 #[serde(deny_unknown_fields)]
-#[derivative(Default, Debug)]
 pub struct RemapConfig {
     /// The [Vector Remap Language][vrl] (VRL) program to execute for each event.
     ///
@@ -154,13 +150,13 @@ pub struct RemapConfig {
     #[configurable(metadata(docs::human_name = "Reroute Dropped Events"))]
     pub reroute_dropped: bool,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub runtime: VrlRuntime,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(skip)]
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     /// Cache can't be `BTreeMap` or `HashMap` because of `TableRegistry`, which doesn't allow us to inspect tables inside it.
     /// And even if we allowed the inspection, the tables can be huge, resulting in a long comparison or hash computation
     /// while using `Vec` allows us to use just a shallow comparison
@@ -624,6 +620,12 @@ where
                     events.for_each(|event| push_default(event, output))
                 }
             },
+            Err(Terminate::Interrupted) => {
+                emit!(RemapMappingError {
+                    error: ExpressionError::Interrupted.to_string(),
+                    event_dropped: true,
+                });
+            }
             Err(reason) => {
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
@@ -643,6 +645,7 @@ where
                         }
                         ("error", error, self.drop_on_error)
                     }
+                    Terminate::Interrupted => unreachable!("interruptions are handled above"),
                 };
 
                 if !drop {
@@ -699,7 +702,7 @@ mod tests {
     use crate::{
         config::{ConfigBuilder, build_unit_tests},
         event::{
-            LogEvent, Metric, Value,
+            LogEvent, Metric, TraceEvent, TraceLayout, Value,
             metric::{MetricKind, MetricValue},
         },
         metrics::Controller,
@@ -726,7 +729,7 @@ mod tests {
         )
     }
 
-    fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
+    fn remap_with_runner<Runner: VrlRunner>(config: RemapConfig) -> Result<Remap<Runner>> {
         let schema_definitions = HashMap::from([
             (
                 None,
@@ -738,13 +741,60 @@ mod tests {
             ),
         ]);
 
-        Remap::new_ast(config, &TransformContext::new_test(schema_definitions))
-            .map(|(remap, _)| remap)
+        Remap::new(config, &TransformContext::new_test(schema_definitions)).map(|(remap, _)| remap)
+    }
+
+    fn remap(config: RemapConfig) -> Result<Remap<AstRunner>> {
+        remap_with_runner(config)
+    }
+
+    #[derive(Clone)]
+    struct InterruptingRunner;
+
+    impl VrlRunner for InterruptingRunner {
+        fn new() -> Self {
+            Self
+        }
+
+        fn run(
+            &mut self,
+            _: &mut VrlTarget,
+            _: &Program,
+            _: &TimeZone,
+        ) -> std::result::Result<Value, Terminate> {
+            Err(Terminate::Interrupted)
+        }
     }
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<RemapConfig>();
+    }
+
+    #[test]
+    fn remap_trace_scalar_root_drops_trace_layout() {
+        let event = {
+            let mut trace = TraceEvent::from(btreemap! {
+                "host" => "a_hostname",
+            });
+            trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+            Event::Trace(trace)
+        };
+        let conf = RemapConfig {
+            source: Some(r#". = "message""#.to_owned()),
+            drop_on_error: true,
+            drop_on_abort: false,
+            ..Default::default()
+        };
+        let mut tform = remap(conf).unwrap();
+        let result = transform_one(&mut tform, event).unwrap();
+        let log = result.as_log();
+        assert_eq!(log.namespace(), LogNamespace::Legacy);
+        assert_eq!(log.metadata().trace_layout(), None);
+        assert_eq!(
+            log.get(event_path!("message")),
+            Some(&Value::from("message"))
+        );
     }
 
     #[test]
@@ -775,6 +825,27 @@ mod tests {
             &err,
             "must provide exactly one of `source` or `file` or `files` configuration"
         )
+    }
+
+    #[test]
+    fn interrupted_execution_is_dropped() {
+        for reroute_dropped in [false, true] {
+            let config = RemapConfig {
+                source: Some(".foo = 1".to_owned()),
+                drop_on_error: false,
+                reroute_dropped,
+                ..Default::default()
+            };
+            let mut transform = remap_with_runner::<InterruptingRunner>(config).unwrap();
+
+            let output = collect_outputs(&mut transform, Event::from(LogEvent::from("message")));
+
+            assert_eq!(output.primary.len(), 0);
+            assert_eq!(
+                output.named.values().map(OutputBuffer::len).sum::<usize>(),
+                0
+            );
+        }
     }
 
     fn get_field_string(event: &Event, field: &str) -> String {

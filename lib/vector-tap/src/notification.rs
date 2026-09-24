@@ -7,6 +7,7 @@ pub struct Matched {
 }
 
 impl Matched {
+    #[must_use]
     pub fn new(pattern: String) -> Self {
         Self {
             message: format!("[tap] Pattern '{pattern}' successfully matched."),
@@ -24,6 +25,7 @@ pub struct NotMatched {
 }
 
 impl NotMatched {
+    #[must_use]
     pub fn new(pattern: String) -> Self {
         Self {
             message: format!(
@@ -46,6 +48,7 @@ pub struct InvalidMatch {
 }
 
 impl InvalidMatch {
+    #[must_use]
     pub fn new(message: String, pattern: String, invalid_matches: Vec<String>) -> Self {
         Self {
             message,
@@ -64,6 +67,7 @@ pub enum Notification {
 }
 
 impl Notification {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             Notification::Matched(n) => n.message.as_ref(),

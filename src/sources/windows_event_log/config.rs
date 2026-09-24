@@ -190,7 +190,6 @@ pub struct WindowsEventLogConfig {
     /// When disabled (default), checkpoints are updated immediately after reading
     /// events, which may result in data loss if Vector crashes before events are
     /// delivered to sinks.
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
@@ -305,10 +304,9 @@ impl WindowsEventLogConfig {
         // One handle is reserved for the shutdown event, leaving 63 for channels.
         if self.channels.len() > MAX_CHANNELS {
             return Err(format!(
-                "Too many channels: {} specified, maximum is {} \
+                "Too many channels: {} specified, maximum is {MAX_CHANNELS} \
                  (limited by WaitForMultipleObjects)",
-                self.channels.len(),
-                MAX_CHANNELS
+                self.channels.len()
             )
             .into());
         }
@@ -318,8 +316,7 @@ impl WindowsEventLogConfig {
             || self.connection_timeout_secs > MAX_CONNECTION_TIMEOUT_SECS
         {
             return Err(format!(
-                "Connection timeout must be between 1 and {} seconds",
-                MAX_CONNECTION_TIMEOUT_SECS
+                "Connection timeout must be between 1 and {MAX_CONNECTION_TIMEOUT_SECS} seconds"
             )
             .into());
         }
@@ -327,8 +324,7 @@ impl WindowsEventLogConfig {
         // Validate event timeout
         if self.event_timeout_ms == 0 || self.event_timeout_ms > MAX_EVENT_TIMEOUT_MS {
             return Err(format!(
-                "Event timeout must be between 1 and {} milliseconds",
-                MAX_EVENT_TIMEOUT_MS
+                "Event timeout must be between 1 and {MAX_EVENT_TIMEOUT_MS} milliseconds"
             )
             .into());
         }
@@ -340,7 +336,7 @@ impl WindowsEventLogConfig {
 
         // Prevent resource exhaustion via excessive batch sizes
         if self.batch_size == 0 || self.batch_size > MAX_BATCH_SIZE {
-            return Err(format!("Batch size must be between 1 and {}", MAX_BATCH_SIZE).into());
+            return Err(format!("Batch size must be between 1 and {MAX_BATCH_SIZE}").into());
         }
 
         // Enhanced channel name validation with security checks
@@ -352,18 +348,15 @@ impl WindowsEventLogConfig {
             // Prevent excessively long channel names
             if channel.len() > MAX_CHANNEL_NAME_LENGTH {
                 return Err(format!(
-                    "Channel name '{}' exceeds maximum length of {} characters",
-                    channel, MAX_CHANNEL_NAME_LENGTH
-                )
+                    "Channel name '{channel}' exceeds maximum length of {MAX_CHANNEL_NAME_LENGTH} characters")
                 .into());
             }
 
             // Reject wildcard patterns - they cause heap corruption issues with many channels
             if is_channel_pattern(channel) {
                 return Err(format!(
-                    "Channel name '{}' contains wildcard characters (*, ?, [). \
-                     Wildcard patterns are not supported. Please specify exact channel names.",
-                    channel
+                    "Channel name '{channel}' contains wildcard characters (*, ?, [). \
+                     Wildcard patterns are not supported. Please specify exact channel names."
                 )
                 .into());
             }
@@ -372,9 +365,7 @@ impl WindowsEventLogConfig {
             // validation is handled by EvtOpenChannelConfig at subscription time,
             // so we only block characters that could cause issues before that check.
             if channel.chars().any(|c| c.is_control()) {
-                return Err(
-                    format!("Channel name '{}' contains control characters", channel).into(),
-                );
+                return Err(format!("Channel name '{channel}' contains control characters").into());
             }
         }
 
@@ -387,8 +378,7 @@ impl WindowsEventLogConfig {
             // Prevent excessively long XPath queries
             if query.len() > MAX_XPATH_QUERY_LENGTH {
                 return Err(format!(
-                    "Event query exceeds maximum length of {} characters",
-                    MAX_XPATH_QUERY_LENGTH
+                    "Event query exceeds maximum length of {MAX_XPATH_QUERY_LENGTH} characters"
                 )
                 .into());
             }
@@ -432,8 +422,7 @@ impl WindowsEventLogConfig {
             for pattern in &dangerous_patterns {
                 if query_lower.contains(pattern) {
                     return Err(format!(
-                        "Event query contains potentially unsafe pattern: '{}'",
-                        pattern
+                        "Event query contains potentially unsafe pattern: '{pattern}'"
                     )
                     .into());
                 }
@@ -448,8 +437,7 @@ impl WindowsEventLogConfig {
 
             if event_ids.len() > MAX_EVENT_ID_LIST_SIZE {
                 return Err(format!(
-                    "Only event IDs list cannot contain more than {} entries",
-                    MAX_EVENT_ID_LIST_SIZE
+                    "Only event IDs list cannot contain more than {MAX_EVENT_ID_LIST_SIZE} entries"
                 )
                 .into());
             }
@@ -457,8 +445,7 @@ impl WindowsEventLogConfig {
 
         if self.ignore_event_ids.len() > MAX_EVENT_ID_LIST_SIZE {
             return Err(format!(
-                "Ignore event IDs list cannot contain more than {} entries",
-                MAX_EVENT_ID_LIST_SIZE
+                "Ignore event IDs list cannot contain more than {MAX_EVENT_ID_LIST_SIZE} entries"
             )
             .into());
         }
@@ -471,15 +458,14 @@ impl WindowsEventLogConfig {
 
             if include_fields.len() > MAX_FIELD_COUNT {
                 return Err(format!(
-                    "Include fields list cannot contain more than {} entries",
-                    MAX_FIELD_COUNT
+                    "Include fields list cannot contain more than {MAX_FIELD_COUNT} entries"
                 )
                 .into());
             }
 
             for field in include_fields {
                 if field.trim().is_empty() || field.len() > MAX_FIELD_NAME_LENGTH {
-                    return Err(format!("Invalid field name: '{}'", field).into());
+                    return Err(format!("Invalid field name: '{field}'").into());
                 }
 
                 // Enhanced security validation for field names
@@ -490,8 +476,7 @@ impl WindowsEventLogConfig {
                     || field.contains('>')
                 {
                     return Err(format!(
-                        "Invalid field name contains dangerous characters: '{}'",
-                        field
+                        "Invalid field name contains dangerous characters: '{field}'"
                     )
                     .into());
                 }
@@ -505,15 +490,14 @@ impl WindowsEventLogConfig {
 
             if exclude_fields.len() > MAX_FIELD_COUNT {
                 return Err(format!(
-                    "Exclude fields list cannot contain more than {} entries",
-                    MAX_FIELD_COUNT
+                    "Exclude fields list cannot contain more than {MAX_FIELD_COUNT} entries"
                 )
                 .into());
             }
 
             for field in exclude_fields {
                 if field.trim().is_empty() || field.len() > MAX_FIELD_NAME_LENGTH {
-                    return Err(format!("Invalid field name: '{}'", field).into());
+                    return Err(format!("Invalid field name: '{field}'").into());
                 }
 
                 // Enhanced security validation for field names
@@ -524,8 +508,7 @@ impl WindowsEventLogConfig {
                     || field.contains('>')
                 {
                     return Err(format!(
-                        "Invalid field name contains dangerous characters: '{}'",
-                        field
+                        "Invalid field name contains dangerous characters: '{field}'"
                     )
                     .into());
                 }

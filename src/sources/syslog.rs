@@ -80,16 +80,12 @@ pub struct SyslogConfig {
 pub enum Mode {
     /// Listen on TCP.
     Tcp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
-        #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
 
-        #[configurable(derived)]
         permit_origin: Option<IpAllowlistConfig>,
 
-        #[configurable(derived)]
         tls: Option<TlsSourceConfig>,
 
         /// The size of the receive buffer used for each connection.
@@ -112,7 +108,6 @@ pub enum Mode {
 
     /// Listen on UDP.
     Udp {
-        #[configurable(derived)]
         address: SocketListenAddr,
 
         /// The size of the receive buffer used for the listening socket.
@@ -831,10 +826,9 @@ mod test {
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
         let msg = "i am foobar";
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {}{} {}"#,
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {}{} {msg}"#,
             r#"[meta sequenceId="1" sysUpTime="37" language="EN"]"#,
-            r#"[origin ip="192.168.0.1" software="test"]"#,
-            msg
+            r#"[origin ip="192.168.0.1" software="test"]"#
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
@@ -884,8 +878,8 @@ mod test {
     fn handles_incorrect_sd_element() {
         let msg = "qwerty";
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r"[incorrect x]", msg
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}"#,
+            r"[incorrect x]"
         );
 
         let mut expected = Event::Log(LogEvent::from(msg));
@@ -924,8 +918,8 @@ mod test {
         assert_event_data_eq!(event, expected);
 
         let raw = format!(
-            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
-            r"[incorrect x=]", msg
+            r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {msg}"#,
+            r"[incorrect x=]"
         );
 
         let event = event_from_bytes(
@@ -1406,7 +1400,7 @@ mod test {
                 .iter()
                 .map(|msg| {
                     let s = msg.to_string();
-                    format!("{} {}", s.len(), s).into()
+                    format!("{} {s}", s.len()).into()
                 })
                 .collect();
 
