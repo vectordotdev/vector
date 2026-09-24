@@ -20,7 +20,9 @@ export RELEASE_BRANCH="v${NEW_VECTOR_VERSION%.*}"
       workflow from `master` with `version` set to the stable Vector version and `vrl_version` to the exact released VRL version.
   - The workflow activates the `RELEASE_FREEZE_RULESET_ID` ruleset and grants `vectordotdev-bot` an **Always** bypass
     to some of `master`'s rulesets (`RELEASE_FREEZE_BOT_BYPASS`).
-  - If preparation fails after activation, the freeze remains active. Retry or use the closeout steps below to unfreeze the repository.
+  - If preparation fails after activation, the freeze remains active. Retry, or run
+    [Unfreeze master](https://github.com/vectordotdev/vector/actions/workflows/release_unfreeze.yml)
+    with `workflow_dispatch` to unfreeze the repository.
 - [ ] Review the bot-authored `prepare-v-<major>-<minor>-<patch>-website` PR: edit the release description,
       changelog, upgrade guidance, and release date as needed. Review deprecations with
       `cargo vdev deprecation show --version "${NEW_VECTOR_VERSION}"`.
@@ -28,6 +30,8 @@ export RELEASE_BRANCH="v${NEW_VECTOR_VERSION%.*}"
 Keep the freeze active until **both** the release workflow's housekeeping PR has
 merged **and** the Kubernetes manifests push below has completed. Maintainers with
 bypass access must also respect this window: do not merge unrelated PRs into `master`.
+[Unfreeze master](https://github.com/vectordotdev/vector/actions/workflows/release_unfreeze.yml)
+closes the window automatically once both are done.
 
 # Publish the release
 
@@ -61,7 +65,11 @@ The tag starts the release workflow; do not create the tag or release branch man
     which runs `cargo vdev build manifests` and, when the generated manifests differ,
     commits and pushes them to `master` itself as the `vectordotdev-bot` — no PR, no review,
     no merge queue. If the run reports no changes, the manifests already match the chart.
-- [ ] Close out the direct-push window **before** disabling the freeze:
-  - [ ] Remove the temporary `vectordotdev-bot` **Always** bypass from every
-        ruleset in `RELEASE_FREEZE_BOT_BYPASS`.
-- [ ] Set the `RELEASE_FREEZE_RULESET_ID` ruleset back to **Disabled**.
+- [ ] Wait for the [Unfreeze master](https://github.com/vectordotdev/vector/actions/workflows/release_unfreeze.yml)
+      workflow to close the direct-push window after the manifests run succeeds.
+  - It removes the temporary `vectordotdev-bot` **Always** bypass from every ruleset in
+    `RELEASE_FREEZE_BOT_BYPASS`, then sets the `RELEASE_FREEZE_RULESET_ID` ruleset back to **Disabled**.
+    It waits for the housekeeping PR to merge and for any pending release or manifests run first,
+    and gives up after ten minutes, leaving the freeze active.
+  - Run it manually with `workflow_dispatch` if the release never starts the manifests workflow, or to retry a failed run.
+    A manual run skips the wait and revokes the bypasses immediately.

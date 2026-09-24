@@ -1,0 +1,87 @@
+# Close the release freeze window opened by "Prepare release". The window stays
+# open until the release workflow has merged its housekeeping PR and the
+# Kubernetes manifests push has landed, so this runs when "Refresh Kubernetes
+# manifests" completes, and waits for the other stages that may still be
+# pending. It revokes the temporary vectordotdev-bot direct-push bypasses before
+# disabling the freeze, matching the order in the release checklists: disabling
+# the freeze first would leave master writable directly by the bot.
+# Dispatch this manually when a release never starts the manifests workflow, or
+# to retry a failed run.
+name: Unfreeze master
+
+on:
+  workflow_run:
+    workflows: ["Refresh Kubernetes manifests"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read # Restrictive default
+
+# One group for both freeze transitions: a closeout that overlaps an activation
+# could end with a disabled freeze and a restored bypass.
+concurrency:
+  group: release-freeze
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  unfreeze:
+    name: Close the release freeze window
+    if: >-
+      github.repository == 'vectordotdev/vector' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Wait for the release to finish
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # The freeze outlives the manifests push: the release workflow also
+          # merges its housekeeping PR during the window, and that PR appears only
+          # after the release workflow finishes. Failing on a transient state
+          # would leave the closeout to a manual dispatch, so wait instead.
+          DEADLINE_SECONDS: 600
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + DEADLINE_SECONDS))
+          while :; do
+            waiting=$(gh run list --repo "$GITHUB_REPOSITORY" --limit 100 \
+              --json workflowName,status,url --jq '.[] | select(.status != "completed")
+                | select(.workflowName == "Release Suite"
+                  or .workflowName == "Prepare post-release housekeeping"
+                  or .workflowName == "Refresh Kubernetes manifests")
+                | "\(.workflowName) \(.url)"')
+            open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --app vectordotdev-bot \
+              --state open --limit 100 --json number,title --jq '.[] | "PR #\(.number): \(.title)"')
+            if [[ -z "$waiting" && -z "$open" ]]; then
+              echo "No release workflow is pending and no vectordotdev-bot PR is open." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if (( SECONDS >= deadline )); then
+              printf '%s\n' "$waiting" "$open" >&2
+              echo "Still waiting after ${DEADLINE_SECONDS}s; the freeze stays active." >&2
+              exit 1
+            fi
+            printf '%s\n' "$waiting" "$open"
+            sleep 30
+          done
+
+      - name: Revoke bypasses and unfreeze master
+        uses: ./.github/actions/unfreeze-release
+        with:
+          app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          freeze-ruleset-id: ${{ vars.RELEASE_FREEZE_RULESET_ID }}
+          bot-bypass-ruleset-ids: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}
