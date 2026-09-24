@@ -252,7 +252,7 @@ fn config_grpc_keepalive() {
 }
 
 #[tokio::test]
-async fn http_and_grpc_share_admission_and_return_retryable_errors() {
+async fn http_and_grpc_acknowledgement_waits_do_not_hold_admission() {
     let (_guard_0, grpc_addr) = next_addr();
     let (_guard_1, http_addr) = next_addr();
     let mut config = get_source_config_with_headers(grpc_addr, http_addr, false);
@@ -271,7 +271,7 @@ async fn http_and_grpc_share_admission_and_return_retryable_errors() {
 
     let body = create_test_logs_request().into_inner().encode_to_vec();
     let client = reqwest::Client::new();
-    let mut first = tokio::spawn({
+    let first = tokio::spawn({
         let client = client.clone();
         let body = body.clone();
         async move {
@@ -290,41 +290,46 @@ async fn http_and_grpc_share_admission_and_return_retryable_errors() {
         .expect("first HTTP request was not admitted")
         .expect("source output closed before admission");
 
-    let overloaded_http = client
-        .post(format!("http://{http_addr}/v1/logs"))
-        .header("Content-Type", "application/x-protobuf")
-        .body(body)
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(
-        overloaded_http.status(),
-        reqwest::StatusCode::TOO_MANY_REQUESTS
-    );
-    let status = super::status::Status::decode(overloaded_http.bytes().await.unwrap()).unwrap();
-    assert_eq!(status.code, tonic::Code::Unavailable as i32);
+    let second = tokio::spawn({
+        let client = client.clone();
+        async move {
+            client
+                .post(format!("http://{http_addr}/v1/logs"))
+                .header("Content-Type", "application/x-protobuf")
+                .body(body)
+                .send()
+                .await
+                .unwrap()
+        }
+    });
+    let second_pending_event =
+        tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
+            .await
+            .expect("second HTTP request was not admitted")
+            .expect("source output closed before admission");
 
-    // A second stream on a gRPC connection consumes another logical request slot and is rejected
-    // by the same outer semaphore currently held by HTTP.
     let mut grpc_client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
         .await
         .unwrap();
-    let grpc_error = grpc_client
-        .export(create_test_logs_request())
-        .await
-        .unwrap_err();
-    assert_eq!(grpc_error.code(), tonic::Code::Unavailable);
-    assert_eq!(grpc_error.message(), "OTLP request limit exceeded");
-
-    assert!(
-        tokio::time::timeout(std::time::Duration::from_millis(1100), &mut first)
+    let third = tokio::spawn(async move { grpc_client.export(create_test_logs_request()).await });
+    let third_pending_event =
+        tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
             .await
-            .is_err(),
-        "acknowledgement waiting must not use the request processing timeout"
-    );
+            .expect("gRPC request was not admitted")
+            .expect("source output closed before admission");
+
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    assert!(!first.is_finished());
+    assert!(!second.is_finished());
+    assert!(!third.is_finished());
+
     first.abort();
+    second.abort();
+    third.abort();
     assert!(first.await.unwrap_err().is_cancelled());
-    drop(pending_event);
+    assert!(second.await.unwrap_err().is_cancelled());
+    assert!(third.await.unwrap_err().is_cancelled());
+    drop((pending_event, second_pending_event, third_pending_event));
 }
 
 #[tokio::test]
@@ -347,7 +352,7 @@ async fn grpc_acknowledgement_wait_does_not_use_request_timeout() {
     let mut client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
         .await
         .unwrap();
-    let mut first = tokio::spawn({
+    let first = tokio::spawn({
         let mut client = client.clone();
         async move { client.export(create_test_logs_request()).await }
     });
@@ -357,20 +362,24 @@ async fn grpc_acknowledgement_wait_does_not_use_request_timeout() {
         .expect("first gRPC request was not admitted")
         .expect("source output closed before admission");
 
-    // Both exports are multiplexed over one HTTP/2 connection, but consume independent slots.
-    let overloaded = client.export(create_test_logs_request()).await.unwrap_err();
-    assert_eq!(overloaded.code(), tonic::Code::Unavailable);
-    assert_eq!(overloaded.message(), "OTLP request limit exceeded");
-
-    assert!(
-        tokio::time::timeout(std::time::Duration::from_millis(1100), &mut first)
+    // Both exports are multiplexed over one HTTP/2 connection, but acknowledgement waiting from
+    // the first no longer occupies the shared request slot.
+    let second = tokio::spawn(async move { client.export(create_test_logs_request()).await });
+    let second_pending_event =
+        tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
             .await
-            .is_err(),
-        "acknowledgement waiting must not use the request processing timeout"
-    );
+            .expect("second gRPC request was not admitted")
+            .expect("source output closed before admission");
+
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    assert!(!first.is_finished());
+    assert!(!second.is_finished());
+
     first.abort();
+    second.abort();
     assert!(first.await.unwrap_err().is_cancelled());
-    drop(pending_event);
+    assert!(second.await.unwrap_err().is_cancelled());
+    drop((pending_event, second_pending_event));
 }
 
 #[tokio::test]

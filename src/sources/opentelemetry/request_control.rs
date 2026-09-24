@@ -1,13 +1,13 @@
 use std::{convert::Infallible, sync::Arc, time::Duration};
 
-use http::{Request, Response, StatusCode};
+use crate::internal_events::{OpenGauge, OpenToken};
+use http::{Request, Response};
 use hyper::Body;
 use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
-use tonic::body::BoxBody;
 use tower::{
     BoxError, Layer, Service, ServiceExt, limit::GlobalConcurrencyLimitLayer,
-    load_shed::error::Overloaded, service_fn, util::BoxCloneService,
+    load_shed::error::Overloaded, service_fn, timeout::TimeoutLayer, util::BoxCloneService,
 };
 use vector_lib::{
     counter,
@@ -15,10 +15,6 @@ use vector_lib::{
     gauge,
     internal_event::{CounterName, GaugeName},
 };
-use warp::Reply;
-
-use super::{reply::protobuf, status::Status};
-use crate::internal_events::{OpenGauge, OpenToken};
 
 /// Admission limits shared by all HTTP and gRPC requests handled by one OTLP source.
 #[derive(Clone)]
@@ -39,24 +35,21 @@ impl RequestControl {
         }
     }
 
-    pub(crate) fn http_layer(&self) -> RequestControlLayer<HttpErrorResponse> {
-        self.layer(HttpErrorResponse {
-            metrics: Arc::clone(&self.metrics),
-        })
+    pub(crate) fn http_layer<R>(&self, error_response: R) -> RequestControlLayer<R> {
+        self.layer(error_response, Protocol::Http)
     }
 
-    pub(crate) fn grpc_layer(&self) -> RequestControlLayer<GrpcErrorResponse> {
-        self.layer(GrpcErrorResponse {
-            metrics: Arc::clone(&self.metrics),
-        })
+    pub(crate) fn grpc_layer<R>(&self, error_response: R) -> RequestControlLayer<R> {
+        self.layer(error_response, Protocol::Grpc)
     }
 
-    fn layer<R>(&self, error_response: R) -> RequestControlLayer<R> {
+    fn layer<R>(&self, error_response: R, protocol: Protocol) -> RequestControlLayer<R> {
         RequestControlLayer {
             outer: Arc::clone(&self.outer),
             inner: Arc::clone(&self.inner),
             timeout: self.timeout,
             metrics: Arc::clone(&self.metrics),
+            protocol,
             error_response,
         }
     }
@@ -66,6 +59,23 @@ impl RequestControl {
 enum Protocol {
     Http,
     Grpc,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum MiddlewareError {
+    Overloaded,
+    TimedOut,
+    Unavailable,
+}
+
+impl MiddlewareError {
+    pub(crate) const fn message(self) -> &'static str {
+        match self {
+            Self::Overloaded => "OTLP request limit exceeded",
+            Self::TimedOut => "OTLP request timed out",
+            Self::Unavailable => "OTLP request unavailable",
+        }
+    }
 }
 
 struct RequestControlMetrics {
@@ -117,7 +127,38 @@ impl RequestControlMetrics {
     }
 }
 
-pub(crate) struct PendingAcknowledgement(pub(crate) BatchStatusReceiver);
+fn classify_error(
+    error: BoxError,
+    metrics: &RequestControlMetrics,
+    protocol: Protocol,
+) -> MiddlewareError {
+    if error.is::<tower::load_shed::error::Overloaded>() {
+        MiddlewareError::Overloaded
+    } else if error.is::<tower::timeout::error::Elapsed>() {
+        metrics.time_out(protocol);
+        MiddlewareError::TimedOut
+    } else {
+        error!(message = "OTLP request middleware failed.", %error);
+        MiddlewareError::Unavailable
+    }
+}
+
+pub(crate) struct PendingAcknowledgement<B> {
+    receiver: BatchStatusReceiver,
+    failure_response: fn(AcknowledgementFailure) -> Response<B>,
+}
+
+impl<B> PendingAcknowledgement<B> {
+    pub(crate) const fn new(
+        receiver: BatchStatusReceiver,
+        failure_response: fn(AcknowledgementFailure) -> Response<B>,
+    ) -> Self {
+        Self {
+            receiver,
+            failure_response,
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(crate) enum AcknowledgementFailure {
@@ -135,12 +176,28 @@ impl AcknowledgementFailure {
     }
 }
 
+async fn finalize_acknowledgement<B>(mut response: Response<B>) -> Result<Response<B>, Infallible>
+where
+    B: 'static,
+{
+    if let Some(pending) = response
+        .extensions_mut()
+        .remove::<PendingAcknowledgement<B>>()
+        && let Some(status) = AcknowledgementFailure::from_status(pending.receiver.await)
+    {
+        response = (pending.failure_response)(status);
+    }
+
+    Ok(response)
+}
+
 #[derive(Clone)]
 pub(crate) struct RequestControlLayer<R> {
     outer: Arc<Semaphore>,
     inner: Arc<Semaphore>,
     timeout: Duration,
     metrics: Arc<RequestControlMetrics>,
+    protocol: Protocol,
     error_response: R,
 }
 
@@ -150,152 +207,68 @@ where
     B: Send + 'static,
     S::Error: Into<BoxError> + Send + Sync + 'static,
     S::Future: Send + 'static,
-    R: ErrorResponse<Response<B>>,
+    R: MiddlewareErrorResponse<Response<B>>,
 {
     type Service = BoxCloneService<Request<Body>, Response<B>, Infallible>;
 
     fn layer(&self, service: S) -> Self::Service {
+        // Bound queueing and processing with both permits and a timeout, then release that
+        // admission capacity before finalizing the acknowledgement without a timeout.
         let processing =
             GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(&self.inner)).layer(service);
+        let metrics = Arc::clone(&self.metrics);
+        let processing = service_fn(move |request: Request<Body>| {
+            let queued = metrics.queued_token();
+            let mut processing = processing.clone();
+
+            async move {
+                processing.ready().await?;
+                drop(queued);
+                processing.call(request).await
+            }
+        });
+        let processing = TimeoutLayer::new(self.timeout).layer(processing);
 
         let outer = Arc::clone(&self.outer);
         let metrics = Arc::clone(&self.metrics);
-        let timeout = self.timeout;
+        let protocol = self.protocol;
         let error_response = self.error_response.clone();
         let service = service_fn(move |request: Request<Body>| {
-            let deadline = tokio::time::Instant::now().checked_add(timeout);
-            let outer = deadline.map(|_| Arc::clone(&outer).try_acquire_owned());
-            let queued = outer
-                .as_ref()
-                .and_then(|outer| outer.as_ref().ok())
-                .map(|_| metrics.queued_token());
-            let processing = outer
-                .as_ref()
-                .and_then(|outer| outer.as_ref().ok())
-                .map(|_| processing.clone());
+            let outer = Arc::clone(&outer).try_acquire_owned();
+            let processing = outer.as_ref().ok().map(|_| processing.clone());
+            let metrics = Arc::clone(&metrics);
             let error_response = error_response.clone();
 
             async move {
-                let result = match (deadline, outer) {
-                    (None, None) => {
-                        Err(Box::new(tower::timeout::error::Elapsed::new()) as BoxError)
-                    }
-                    (Some(deadline), Some(Ok(outer))) => {
+                let result = match outer {
+                    Ok(outer) => {
                         let _outer = outer;
-                        let mut processing =
-                            processing.expect("admitted request has a processing service");
-                        let admitted = async move {
-                            processing.ready().await.map_err(Into::into)?;
-                            drop(queued);
-                            processing.call(request).await.map_err(Into::into)
-                        };
-
-                        match tokio::time::timeout_at(deadline, admitted).await {
-                            Ok(Ok(mut response)) => {
-                                if let Some(PendingAcknowledgement(receiver)) =
-                                    response.extensions_mut().remove()
-                                    && let Some(status) =
-                                        AcknowledgementFailure::from_status(receiver.await)
-                                {
-                                    response = error_response.make_acknowledgement_response(status);
-                                }
-
-                                Ok(response)
-                            }
-                            Ok(Err(error)) => Err(error),
-                            Err(_) => {
-                                Err(Box::new(tower::timeout::error::Elapsed::new()) as BoxError)
-                            }
-                        }
+                        processing
+                            .expect("admitted request has a processing service")
+                            .oneshot(request)
+                            .await
                     }
                     // Reuse Tower's standard overload marker without its readiness-based
                     // layer, which would allow idle service clones to reserve capacity.
-                    (Some(_), Some(Err(_))) => Err(Box::new(Overloaded::new()) as BoxError),
-                    _ => unreachable!("outer admission is attempted only with a valid deadline"),
+                    Err(_) => Err(Box::new(Overloaded::new()) as BoxError),
                 };
 
                 Ok::<_, Infallible>(match result {
                     Ok(response) => response,
-                    Err(error) => error_response.make_response(error),
+                    Err(error) => {
+                        error_response.make_response(classify_error(error, &metrics, protocol))
+                    }
                 })
             }
         });
+        let service = service.and_then(finalize_acknowledgement);
 
         BoxCloneService::new(service)
     }
 }
 
-pub(crate) trait ErrorResponse<R>: Clone + Send + 'static {
-    fn make_response(&self, error: BoxError) -> R;
-    fn make_acknowledgement_response(&self, status: AcknowledgementFailure) -> R;
-}
-
-#[derive(Clone)]
-pub(crate) struct HttpErrorResponse {
-    metrics: Arc<RequestControlMetrics>,
-}
-
-impl ErrorResponse<Response<Body>> for HttpErrorResponse {
-    fn make_response(&self, error: BoxError) -> Response<Body> {
-        let (status, message) = if error.is::<tower::load_shed::error::Overloaded>() {
-            (StatusCode::TOO_MANY_REQUESTS, "OTLP request limit exceeded")
-        } else if error.is::<tower::timeout::error::Elapsed>() {
-            self.metrics.time_out(Protocol::Http);
-            (StatusCode::SERVICE_UNAVAILABLE, "OTLP request timed out")
-        } else {
-            error!(message = "OTLP HTTP request middleware failed.", %error);
-            (StatusCode::SERVICE_UNAVAILABLE, "OTLP request unavailable")
-        };
-
-        let response = protobuf(Status {
-            code: tonic::Code::Unavailable as i32,
-            message: message.to_owned(),
-            ..Default::default()
-        });
-        warp::reply::with_status(response, status).into_response()
-    }
-
-    fn make_acknowledgement_response(&self, status: AcknowledgementFailure) -> Response<Body> {
-        let message = match status {
-            AcknowledgementFailure::Errored => "Error delivering contents to sink",
-            AcknowledgementFailure::Rejected => "Contents failed to deliver to sink",
-        };
-        let response = protobuf(Status {
-            code: tonic::Code::Unknown as i32,
-            message: message.to_owned(),
-            ..Default::default()
-        });
-        warp::reply::with_status(response, StatusCode::INTERNAL_SERVER_ERROR).into_response()
-    }
-}
-
-#[derive(Clone)]
-pub(crate) struct GrpcErrorResponse {
-    metrics: Arc<RequestControlMetrics>,
-}
-
-impl ErrorResponse<Response<BoxBody>> for GrpcErrorResponse {
-    fn make_response(&self, error: BoxError) -> Response<BoxBody> {
-        let message = if error.is::<tower::load_shed::error::Overloaded>() {
-            "OTLP request limit exceeded".to_owned()
-        } else if error.is::<tower::timeout::error::Elapsed>() {
-            self.metrics.time_out(Protocol::Grpc);
-            "OTLP request timed out".to_owned()
-        } else {
-            error!(message = "OTLP gRPC request middleware failed.", %error);
-            "OTLP request unavailable".to_owned()
-        };
-
-        tonic::Status::unavailable(message).to_http()
-    }
-
-    fn make_acknowledgement_response(&self, status: AcknowledgementFailure) -> Response<BoxBody> {
-        match status {
-            AcknowledgementFailure::Errored => tonic::Status::internal("Delivery error"),
-            AcknowledgementFailure::Rejected => tonic::Status::data_loss("Delivery failed"),
-        }
-        .to_http()
-    }
+pub(crate) trait MiddlewareErrorResponse<R>: Clone + Send + 'static {
+    fn make_response(&self, error: MiddlewareError) -> R;
 }
 
 #[cfg(test)]
@@ -312,13 +285,18 @@ mod tests {
 
     use bytes::BytesMut;
     use futures_util::future::BoxFuture;
+    use http::StatusCode;
     use hyper::body::HttpBody;
     use prost::Message;
     use tokio::sync::Semaphore;
+    use tonic::body::BoxBody;
     use tower::{Layer, ServiceExt};
     use vector_lib::event::BatchNotifier;
 
     use super::*;
+    use crate::sources::opentelemetry::{
+        grpc::GrpcErrorResponse, http::HttpErrorResponse, status::Status,
+    };
 
     #[derive(Default)]
     struct Observations {
@@ -432,7 +410,9 @@ mod tests {
                 let mut response = Response::new(Body::empty());
                 response
                     .extensions_mut()
-                    .insert(PendingAcknowledgement(receiver));
+                    .insert(PendingAcknowledgement::new(receiver, |_| {
+                        Response::new(Body::empty())
+                    }));
                 Ok(response)
             })
         }
@@ -494,7 +474,9 @@ mod tests {
         let control = RequestControl::new(OUTER, 1, Duration::from_secs(5));
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(1));
-        let service = control.http_layer().layer(http_service(observations, gate));
+        let service = control
+            .http_layer(HttpErrorResponse)
+            .layer(http_service(observations, gate));
         let mut idle_services = vec![service.clone(); OUTER];
 
         for idle in &mut idle_services {
@@ -507,20 +489,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn released_processing_permit_allows_ack_waits_to_overlap() {
-        let control = RequestControl::new(2, 1, Duration::from_secs(5));
+    async fn released_request_permits_allow_ack_waits_to_overlap() {
+        let control = RequestControl::new(1, 1, Duration::from_secs(5));
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
-        let service = control.http_layer().layer(acknowledging_http_service(
-            Arc::clone(&observations),
-            Arc::clone(&gate),
-        ));
+        let service = control
+            .http_layer(HttpErrorResponse)
+            .layer(acknowledging_http_service(
+                Arc::clone(&observations),
+                Arc::clone(&gate),
+            ));
 
         let first = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
         wait_for(&observations.started, 1).await;
         let second = tokio::spawn(service.oneshot(Request::new(Body::empty())));
         wait_for(&observations.started, 2).await;
         assert_eq!(observations.maximum_active.load(Ordering::Acquire), 2);
+        assert_eq!(control.outer.available_permits(), 1);
+        assert_eq!(control.inner.available_permits(), 1);
 
         gate.add_permits(2);
         first.await.unwrap().unwrap();
@@ -531,7 +517,7 @@ mod tests {
     #[tokio::test]
     async fn inner_error_releases_capacity() {
         let control = RequestControl::new(1, 1, Duration::from_secs(5));
-        let service = control.http_layer().layer(FailingService);
+        let service = control.http_layer(HttpErrorResponse).layer(FailingService);
 
         let response = service.oneshot(Request::new(Body::empty())).await.unwrap();
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
@@ -546,7 +532,7 @@ mod tests {
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
         let service = control
-            .http_layer()
+            .http_layer(HttpErrorResponse)
             .layer(http_service(Arc::clone(&observations), Arc::clone(&gate)));
 
         let first = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
@@ -584,7 +570,7 @@ mod tests {
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
         let service = control
-            .http_layer()
+            .http_layer(HttpErrorResponse)
             .layer(http_service(Arc::clone(&observations), Arc::clone(&gate)));
 
         let mut admitted = Vec::with_capacity(OUTER);
@@ -623,7 +609,7 @@ mod tests {
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
         let service = control
-            .http_layer()
+            .http_layer(HttpErrorResponse)
             .layer(http_service(Arc::clone(&observations), Arc::clone(&gate)));
 
         let timed_out = service
@@ -659,7 +645,7 @@ mod tests {
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
         let service = control
-            .http_layer()
+            .http_layer(HttpErrorResponse)
             .layer(http_service(Arc::clone(&observations), Arc::clone(&gate)));
 
         let active = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
@@ -691,11 +677,11 @@ mod tests {
         let http_observations = Arc::new(Observations::default());
         let grpc_observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
-        let http = control.http_layer().layer(http_service(
+        let http = control.http_layer(HttpErrorResponse).layer(http_service(
             Arc::clone(&http_observations),
             Arc::clone(&gate),
         ));
-        let grpc = control.grpc_layer().layer(grpc_service(
+        let grpc = control.grpc_layer(GrpcErrorResponse).layer(grpc_service(
             Arc::clone(&grpc_observations),
             Arc::clone(&gate),
         ));

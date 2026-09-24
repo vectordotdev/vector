@@ -15,8 +15,8 @@ use crate::{
         Source,
         http_server::{build_param_matcher, remove_duplicates},
         opentelemetry::{
-            grpc::Service,
-            http::{build_warp_filter, run_http_server},
+            grpc::{GrpcErrorResponse, Service},
+            http::{HttpErrorResponse, build_warp_filter, run_http_server},
             request_control::RequestControl,
         },
         util::{
@@ -370,7 +370,7 @@ impl OpentelemetryConfig {
             builder.routes(),
             self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
-            request_control.grpc_layer(),
+            request_control.grpc_layer(GrpcErrorResponse),
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source gRPC server failed.", %error);
@@ -401,7 +401,7 @@ impl OpentelemetryConfig {
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
-            request_control.http_layer(),
+            request_control.http_layer(HttpErrorResponse),
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source HTTP server failed.", %error);

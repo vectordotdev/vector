@@ -1,6 +1,6 @@
 use futures::TryFutureExt;
 use prost::Message;
-use tonic::{Request, Response, Status};
+use tonic::{Request, Response, Status, body::BoxBody};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
@@ -27,9 +27,21 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     sources::opentelemetry::{
         config::{LOGS, METRICS, TRACES},
-        request_control::PendingAcknowledgement,
+        request_control::{
+            AcknowledgementFailure, MiddlewareError, MiddlewareErrorResponse,
+            PendingAcknowledgement,
+        },
     },
 };
+
+#[derive(Clone, Copy)]
+pub(crate) struct GrpcErrorResponse;
+
+impl MiddlewareErrorResponse<http::Response<BoxBody>> for GrpcErrorResponse {
+    fn make_response(&self, error: MiddlewareError) -> http::Response<BoxBody> {
+        Status::unavailable(error.message()).to_http()
+    }
+}
 
 #[derive(Clone)]
 pub(super) struct Service {
@@ -177,7 +189,18 @@ fn response_with_acknowledgement<T>(
     if let Some(receiver) = receiver {
         response
             .extensions_mut()
-            .insert(PendingAcknowledgement(receiver));
+            .insert(PendingAcknowledgement::<BoxBody>::new(
+                receiver,
+                acknowledgement_failure_response,
+            ));
     }
     response
+}
+
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http::Response<BoxBody> {
+    match status {
+        AcknowledgementFailure::Errored => Status::internal("Delivery error"),
+        AcknowledgementFailure::Rejected => Status::data_loss("Delivery failed"),
+    }
+    .to_http()
 }

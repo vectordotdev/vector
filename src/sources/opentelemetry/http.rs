@@ -40,7 +40,10 @@ use crate::{
         http_server::HttpConfigParamKind,
         opentelemetry::{
             config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
-            request_control::{HttpErrorResponse, PendingAcknowledgement, RequestControlLayer},
+            request_control::{
+                AcknowledgementFailure, MiddlewareError, MiddlewareErrorResponse,
+                PendingAcknowledgement, RequestControlLayer,
+            },
         },
         util::{add_headers, decompress_body, http::capped_body},
     },
@@ -53,6 +56,27 @@ pub(crate) enum ApiError {
 }
 
 impl warp::reject::Reject for ApiError {}
+
+#[derive(Clone, Copy)]
+pub(crate) struct HttpErrorResponse;
+
+impl MiddlewareErrorResponse<Response> for HttpErrorResponse {
+    fn make_response(&self, error: MiddlewareError) -> Response {
+        let status = match error {
+            MiddlewareError::Overloaded => StatusCode::TOO_MANY_REQUESTS,
+            MiddlewareError::TimedOut | MiddlewareError::Unavailable => {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
+        };
+
+        let response = protobuf(Status {
+            code: tonic::Code::Unavailable as i32,
+            message: error.message().to_owned(),
+            ..Default::default()
+        });
+        warp::reply::with_status(response, status).into_response()
+    }
+}
 
 pub(crate) async fn run_http_server(
     address: SocketAddr,
@@ -439,12 +463,28 @@ async fn handle_request(
             if let Some(receiver) = receiver {
                 response
                     .extensions_mut()
-                    .insert(PendingAcknowledgement(receiver));
+                    .insert(PendingAcknowledgement::new(
+                        receiver,
+                        acknowledgement_failure_response,
+                    ));
             }
             Ok(response)
         }
         Err(err) => Err(warp::reject::custom(err)),
     }
+}
+
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> Response {
+    let message = match status {
+        AcknowledgementFailure::Errored => "Error delivering contents to sink",
+        AcknowledgementFailure::Rejected => "Contents failed to deliver to sink",
+    };
+    let response = protobuf(Status {
+        code: tonic::Code::Unknown as i32,
+        message: message.to_owned(),
+        ..Default::default()
+    });
+    warp::reply::with_status(response, StatusCode::INTERNAL_SERVER_ERROR).into_response()
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {
