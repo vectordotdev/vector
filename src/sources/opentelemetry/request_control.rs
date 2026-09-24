@@ -6,7 +6,7 @@ use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tonic::body::BoxBody;
 use tower::{
-    BoxError, Layer, Service, ServiceBuilder, ServiceExt, limit::GlobalConcurrencyLimitLayer,
+    BoxError, Layer, Service, ServiceExt, limit::GlobalConcurrencyLimitLayer,
     load_shed::error::Overloaded, service_fn, util::BoxCloneService,
 };
 use vector_lib::{
@@ -62,10 +62,6 @@ impl RequestControl {
     }
 }
 
-type LevelEmitter = Box<dyn Fn(usize) + Send + Sync>;
-
-struct LevelToken(#[expect(dead_code)] Arc<OpenToken<LevelEmitter>>);
-
 #[derive(Clone, Copy)]
 enum Protocol {
     Http,
@@ -102,10 +98,11 @@ impl RequestControlMetrics {
         }
     }
 
-    fn queued_token(&self) -> LevelToken {
+    fn queued_token(&self) -> OpenToken<impl Fn(usize) + use<>> {
         let gauge = self.queued_level.clone();
-        let emitter: LevelEmitter = Box::new(move |count| gauge.set(count as f64));
-        LevelToken(Arc::new(self.queued.clone().open(emitter)))
+        self.queued
+            .clone()
+            .open(move |count| gauge.set(count as f64))
     }
 
     fn time_out(&self, protocol: Protocol) {
@@ -116,8 +113,6 @@ impl RequestControlMetrics {
         .increment(1);
     }
 }
-
-struct QueuedRequest(#[expect(dead_code)] LevelToken);
 
 pub(crate) struct PendingAcknowledgement(pub(crate) BatchStatusReceiver);
 
@@ -141,28 +136,17 @@ where
     type Service = BoxCloneService<Request<Body>, Response<B>, Infallible>;
 
     fn layer(&self, service: S) -> Self::Service {
-        let processing = ServiceBuilder::new()
-            .layer(GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(
-                &self.inner,
-            )))
-            .map_request(|mut request: Request<Body>| {
-                drop(request.extensions_mut().remove::<QueuedRequest>());
-                request
-            })
-            .service(service);
+        let processing =
+            GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(&self.inner)).layer(service);
 
         let outer = Arc::clone(&self.outer);
         let metrics = Arc::clone(&self.metrics);
         let timeout = self.timeout;
         let error_response = self.error_response.clone();
-        let service = service_fn(move |mut request: Request<Body>| {
+        let service = service_fn(move |request: Request<Body>| {
             let outer = Arc::clone(&outer).try_acquire_owned();
-            if outer.is_ok() {
-                request
-                    .extensions_mut()
-                    .insert(QueuedRequest(metrics.queued_token()));
-            }
-            let processing = processing.clone();
+            let queued = outer.as_ref().ok().map(|_| metrics.queued_token());
+            let processing = outer.as_ref().ok().map(|_| processing.clone());
             let error_response = error_response.clone();
             let deadline = tokio::time::Instant::now() + timeout;
 
@@ -172,8 +156,13 @@ where
                         let acknowledgement_error = error_response.clone();
                         let admitted = async move {
                             let _outer = outer;
+                            let mut processing =
+                                processing.expect("admitted request has a processing service");
+
+                            processing.ready().await.map_err(Into::into)?;
+                            drop(queued);
                             let mut response =
-                                processing.oneshot(request).await.map_err(Into::into)?;
+                                processing.call(request).await.map_err(Into::into)?;
 
                             if let Some(PendingAcknowledgement(receiver)) =
                                 response.extensions_mut().remove()

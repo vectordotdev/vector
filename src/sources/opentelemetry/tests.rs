@@ -260,8 +260,7 @@ async fn http_and_grpc_share_admission_and_return_retryable_errors() {
     config.max_concurrent_requests = Some(1.try_into().unwrap());
     config.request_timeout_secs = 1.try_into().unwrap();
 
-    // Keep the output stream unpolled so E2E acknowledgement holds the admitted request open.
-    let (sender, _output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
+    let (sender, mut output) = new_unacknowledged_logs_source(&config);
     let server = config
         .build(SourceContext::new_test(sender, None))
         .await
@@ -285,7 +284,11 @@ async fn http_and_grpc_share_admission_and_return_retryable_errors() {
                 .unwrap()
         }
     });
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    // Receiving the event proves admission. Retain its finalizer so the request waits for ack.
+    let pending_event = tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
+        .await
+        .expect("first HTTP request was not admitted")
+        .expect("source output closed before admission");
 
     let overloaded_http = client
         .post(format!("http://{http_addr}/v1/logs"))
@@ -321,6 +324,7 @@ async fn http_and_grpc_share_admission_and_return_retryable_errors() {
     let status = super::status::Status::decode(timed_out_http.bytes().await.unwrap()).unwrap();
     assert_eq!(status.code, tonic::Code::Unavailable as i32);
     assert_eq!(status.message, "OTLP request timed out");
+    drop(pending_event);
 }
 
 #[tokio::test]
@@ -332,7 +336,7 @@ async fn grpc_timeout_is_retryable_unavailable() {
     config.max_concurrent_requests = Some(1.try_into().unwrap());
     config.request_timeout_secs = 1.try_into().unwrap();
 
-    let (sender, _output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
+    let (sender, mut output) = new_unacknowledged_logs_source(&config);
     let server = config
         .build(SourceContext::new_test(sender, None))
         .await
@@ -347,7 +351,11 @@ async fn grpc_timeout_is_retryable_unavailable() {
         let mut client = client.clone();
         async move { client.export(create_test_logs_request()).await }
     });
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    // Receiving the event proves admission. Retain its finalizer so the request waits for ack.
+    let pending_event = tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
+        .await
+        .expect("first gRPC request was not admitted")
+        .expect("source output closed before admission");
 
     // Both exports are multiplexed over one HTTP/2 connection, but consume independent slots.
     let overloaded = client.export(create_test_logs_request()).await.unwrap_err();
@@ -357,6 +365,7 @@ async fn grpc_timeout_is_retryable_unavailable() {
     let timed_out = first.await.unwrap().unwrap_err();
     assert_eq!(timed_out.code(), tonic::Code::Unavailable);
     assert_eq!(timed_out.message(), "OTLP request timed out");
+    drop(pending_event);
 }
 
 #[tokio::test]
@@ -1699,6 +1708,23 @@ pub async fn build_otlp_test_env(
         config,
         output: Box::new(output),
     }
+}
+
+// Unlike `new_source`, receiving an event does not automatically finalize its acknowledgement.
+fn new_unacknowledged_logs_source(
+    config: &OpentelemetryConfig,
+) -> (SourceSender, impl Stream<Item = Event> + Unpin) {
+    let mut builder = SourceSender::builder();
+    let logs_output = config
+        .outputs(LogNamespace::Legacy)
+        .into_iter()
+        .find(|output| output.port.as_deref() == Some(LOGS))
+        .unwrap();
+    let output = builder
+        .add_source_output(logs_output, "test".into())
+        .into_stream()
+        .flat_map(into_event_stream);
+    (builder.build(), output)
 }
 
 pub(super) fn new_source(
