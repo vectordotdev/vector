@@ -2,7 +2,7 @@
 //!
 //! This is a preparation pass, not a general JSON Schema validator. Serde remains
 //! authoritative for final component validation.
-//! The loader does not invoke this pass yet.
+//! The loader invokes this pass after environment-variable and secret substitution.
 
 use serde_json::{Number, Value};
 use snafu::{OptionExt, Snafu};

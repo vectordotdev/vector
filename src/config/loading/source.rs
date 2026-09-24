@@ -1,5 +1,3 @@
-use std::io::Read;
-
 use super::{
     ComponentHint, Loader, Process,
     representation::{ConfigMap, merge_into_map},
@@ -24,15 +22,12 @@ impl Default for SourceLoader {
 }
 
 impl Process for SourceLoader {
-    /// Prepares input by simply reading bytes to a string. Unlike other loaders, there's no
-    /// interpolation of environment variables. This is on purpose to preserve the original config.
-    fn prepare<R: Read>(&mut self, mut input: R) -> Result<String, Vec<String>> {
-        let mut source_string = String::new();
-        input
-            .read_to_string(&mut source_string)
-            .map_err(|e| vec![e.to_string()])?;
+    fn should_interpolate_env(&self) -> bool {
+        false
+    }
 
-        Ok(source_string)
+    fn postprocess(&mut self, map: ConfigMap) -> Result<ConfigMap, Vec<String>> {
+        Ok(map)
     }
 
     /// Merge values by combining with the internal configuration map.

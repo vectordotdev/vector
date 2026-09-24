@@ -84,17 +84,9 @@ pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String
                 .or_else(|| caps.get(2))
                 .map(|m| m.as_str())
                 .map(|name| {
-                    // Get the value and check for newlines (LF or CR)
-                    let val = vars.get(name).and_then(|v| {
-                        if v.contains(['\n', '\r']) {
-                            errors.push(format!(
-                                "Environment variable contains newline character. name = {name:?}",
-                            ));
-                            None
-                        } else {
-                            Some(v.as_str())
-                        }
-                    });
+                    // Parsing has already fixed the configuration's structure. Newlines and
+                    // other syntax characters remain part of this string value.
+                    let val = vars.get(name).map(String::as_str);
 
                     match flags {
                         ":-" => match val {
@@ -225,8 +217,8 @@ mod test {
     }
 
     #[test]
-    fn test_multiline_expansion_prevented() {
-        let vars = vec![
+    fn multiline_values_cannot_change_the_parsed_structure() {
+        let vars: HashMap<String, String> = vec![
             ("SAFE_VAR".into(), "single line value".into()),
             ("MULTILINE_VAR".into(), "line1\nline2\nline3".into()),
             ("WITH_NEWLINE".into(), "before\nafter".into()),
@@ -236,30 +228,14 @@ mod test {
         .into_iter()
         .collect();
 
-        // Test that multiline values are treated as missing
-        let result = interpolate("$MULTILINE_VAR", &vars);
-        assert!(result.is_err(), "Multiline var should be rejected");
-
-        let result = interpolate("$WITH_NEWLINE", &vars);
-        assert!(result.is_err(), "Newline var should be rejected");
-
-        let result = interpolate("$WITH_CR", &vars);
-        assert!(result.is_err(), "CR var should be rejected");
-
-        let result = interpolate("$WITH_CRLF", &vars);
-        assert!(result.is_err(), "CRLF var should be rejected");
-
-        // Test that safe values still work
-        let result = interpolate("$SAFE_VAR", &vars).unwrap();
-        assert_eq!("single line value", result);
-
-        // Test with default values - multiline vars should still error
-        let result = interpolate("${MULTILINE_VAR:-safe default}", &vars);
-        assert!(result.is_err(), "Should error even with default");
-
-        // Verify error messages are helpful
-        let err = interpolate("$MULTILINE_VAR", &vars).unwrap_err();
-        assert!(err.iter().any(|e| e.contains("newline character")));
-        assert!(err.iter().any(|e| e.contains("MULTILINE_VAR")));
+        for (name, value) in &vars {
+            let input = serde_json::json!({"key": format!("${{{name}:-default}}")});
+            let result =
+                interpolate_config_map_with_env_vars(input.as_object().unwrap(), &vars).unwrap();
+            assert_eq!(
+                serde_json::Value::Object(result),
+                serde_json::json!({"key": value})
+            );
+        }
     }
 }

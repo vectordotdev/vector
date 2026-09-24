@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    io::Read,
     sync::LazyLock,
 };
 
@@ -14,7 +13,7 @@ use crate::{
     config::{
         SecretBackend,
         loading::{
-            ComponentHint, Loader, deserialize_config_map, prepare_input, process::Process,
+            ComponentHint, Loader, deserialize_config_map, process::Process,
             representation::ConfigMap,
         },
     },
@@ -110,16 +109,25 @@ impl Default for SecretBackendLoader {
 }
 
 impl Process for SecretBackendLoader {
-    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let config_string = prepare_input(input, self.interpolate_env)?;
-        // Collect secret placeholders just after env var processing
-        collect_secret_keys(&config_string, &mut self.secret_keys);
-        Ok(config_string)
+    fn should_interpolate_env(&self) -> bool {
+        self.interpolate_env
     }
 
-    fn merge(&mut self, map: ConfigMap, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
-        if map.contains_key("secret") {
-            let additional = deserialize_config_map::<SecretBackendOuter>(map)?;
+    fn postprocess(&mut self, map: ConfigMap) -> Result<ConfigMap, Vec<String>> {
+        collect_secret_keys_from_map(&map, &mut self.secret_keys);
+        Ok(map)
+    }
+
+    fn merge(&mut self, mut map: ConfigMap, _: Option<ComponentHint>) -> Result<(), Vec<String>> {
+        // Other components can still contain unresolved secrets, including their type tags.
+        // Only coerce the backend configurations needed to retrieve those secrets.
+        const SECRET_KEY: &str = "secret";
+        if let Some(backends) = map.remove(SECRET_KEY) {
+            let additional =
+                deserialize_config_map::<SecretBackendOuter>(ConfigMap::from_iter([(
+                    SECRET_KEY.to_owned(),
+                    backends,
+                )]))?;
             self.backends.extend(additional.secret);
         }
         Ok(())

@@ -10,7 +10,7 @@ use vector_lib::configurable::configurable_component;
 
 use super::BuildResult;
 use crate::{
-    config::{self, Format, ProxyConfig, interpolate, provider::ProviderConfig},
+    config::{Format, ProxyConfig, loading::ConfigBuilderLoader, provider::ProviderConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
@@ -143,25 +143,9 @@ async fn http_request_to_config_builder(
         .await
         .map_err(|e| vec![e.to_owned()])?;
 
-    if !interpolate_env {
-        return config::load(config_str.chunk(), *config_format);
-    }
-
-    let env_vars = std::env::vars_os()
-        .map(|(k, v)| {
-            (
-                k.as_os_str().to_string_lossy().to_string(),
-                v.as_os_str().to_string_lossy().to_string(),
-            )
-        })
-        .collect::<std::collections::HashMap<String, String>>();
-
-    let config_str = interpolate(
-        std::str::from_utf8(&config_str).map_err(|e| vec![e.to_string()])?,
-        &env_vars,
-    )?;
-
-    config::load(config_str.as_bytes().chunk(), *config_format)
+    ConfigBuilderLoader::default()
+        .interpolate_env(interpolate_env)
+        .load_from_input(config_str.chunk(), *config_format)
 }
 
 /// Polls the HTTP endpoint after/every `poll_interval_secs`, returning a stream of `ConfigBuilder`.
@@ -233,3 +217,49 @@ impl ProviderConfig for HttpConfig {
 }
 
 impl_generate_config_from_default!(HttpConfig);
+
+#[cfg(all(test, feature = "sources-demo_logs"))]
+mod tests {
+    use std::{convert::Infallible, future::ready};
+
+    use hyper::{Body, Response};
+
+    use super::{Format, IndexMap, ProxyConfig, Url, http_request_to_config_builder};
+    use crate::test_util::http::spawn_blackhole_http_server;
+
+    #[tokio::test]
+    async fn remote_configuration_is_parsed_before_optional_interpolation() {
+        let input = indoc::indoc! {"
+            # ${VECTOR_TEST_HTTP_UNSET:?comments are not interpolated}
+            sources:
+              demo:
+                type: demo_logs
+                format: shuffle
+                lines: ['${VECTOR_TEST_HTTP_LINE:-a: b}']
+                count: '42'
+        "};
+        let uri = spawn_blackhole_http_server(move |_| {
+            ready(Ok::<_, Infallible>(Response::new(Body::from(input))))
+        })
+        .await;
+
+        for (interpolate, expected) in [(true, "a: b"), (false, "${VECTOR_TEST_HTTP_LINE:-a: b}")] {
+            let config = http_request_to_config_builder(
+                &Url::parse(&uri.to_string()).unwrap(),
+                None,
+                &IndexMap::new(),
+                &ProxyConfig::default(),
+                &Format::Yaml,
+                interpolate,
+            )
+            .await
+            .unwrap();
+            let value = serde_json::to_value(config).unwrap();
+            assert_eq!(
+                value["sources"]["demo"]["lines"],
+                serde_json::json!([expected])
+            );
+            assert_eq!(value["sources"]["demo"]["count"], 42);
+        }
+    }
+}
