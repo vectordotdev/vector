@@ -4,14 +4,15 @@ use http::{Request, Response, StatusCode};
 use hyper::Body;
 use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
-use tokio_util::sync::CancellationToken;
 use tonic::body::BoxBody;
 use tower::{
-    BoxError, Layer, Service, ServiceExt, load_shed::error::Overloaded, service_fn,
-    util::BoxCloneService,
+    BoxError, Layer, Service, ServiceExt, limit::GlobalConcurrencyLimitLayer,
+    load_shed::error::Overloaded, service_fn, util::BoxCloneService,
 };
 use vector_lib::{
-    counter, gauge,
+    counter,
+    event::{BatchStatus, BatchStatusReceiver},
+    gauge,
     internal_event::{CounterName, GaugeName},
 };
 use warp::Reply;
@@ -118,15 +119,7 @@ impl RequestControlMetrics {
 
 struct QueuedRequest(#[expect(dead_code)] LevelToken);
 
-/// Signals the middleware-owned processing permit to be released early.
-#[derive(Clone)]
-pub(crate) struct RequestProcessingPermit(CancellationToken);
-
-impl RequestProcessingPermit {
-    pub(crate) fn release(&self) {
-        self.0.cancel();
-    }
-}
+pub(crate) struct PendingAcknowledgement(pub(crate) BatchStatusReceiver);
 
 #[derive(Clone)]
 pub(crate) struct RequestControlLayer<R> {
@@ -137,19 +130,25 @@ pub(crate) struct RequestControlLayer<R> {
     error_response: R,
 }
 
-impl<S, R> Layer<S> for RequestControlLayer<R>
+impl<S, R, B> Layer<S> for RequestControlLayer<R>
 where
-    S: Service<Request<Body>> + Clone + Send + 'static,
-    S::Response: Send + 'static,
+    S: Service<Request<Body>, Response = Response<B>> + Clone + Send + 'static,
+    B: Send + 'static,
     S::Error: Into<BoxError> + Send + Sync + 'static,
     S::Future: Send + 'static,
-    R: ErrorResponse<S::Response>,
+    R: ErrorResponse<Response<B>>,
 {
-    type Service = BoxCloneService<Request<Body>, S::Response, Infallible>;
+    type Service = BoxCloneService<Request<Body>, Response<B>, Infallible>;
 
     fn layer(&self, service: S) -> Self::Service {
+        let processing = service_fn(move |mut request: Request<Body>| {
+            drop(request.extensions_mut().remove::<QueuedRequest>());
+            service.clone().oneshot(request)
+        });
+        let processing =
+            GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(&self.inner)).layer(processing);
+
         let outer = Arc::clone(&self.outer);
-        let processing = Arc::clone(&self.inner);
         let metrics = Arc::clone(&self.metrics);
         let timeout = self.timeout;
         let error_response = self.error_response.clone();
@@ -160,35 +159,32 @@ where
                     .extensions_mut()
                     .insert(QueuedRequest(metrics.queued_token()));
             }
-            let processing = Arc::clone(&processing);
-            let inner = service.clone();
+            let processing = processing.clone();
             let error_response = error_response.clone();
             let deadline = tokio::time::Instant::now() + timeout;
 
             async move {
                 let result = match outer {
                     Ok(outer) => {
+                        let acknowledgement_error = error_response.clone();
                         let admitted = async move {
                             let _outer = outer;
-                            let permit = processing
-                                .acquire_owned()
-                                .await
-                                .expect("processing semaphore is never closed");
-                            drop(request.extensions_mut().remove::<QueuedRequest>());
+                            let mut response =
+                                processing.oneshot(request).await.map_err(Into::into)?;
 
-                            let release = CancellationToken::new();
-                            request
-                                .extensions_mut()
-                                .insert(RequestProcessingPermit(release.clone()));
-                            let future = inner.oneshot(request);
-                            tokio::pin!(future);
-                            tokio::select! {
-                                result = &mut future => result.map_err(Into::into),
-                                () = release.cancelled() => {
-                                    drop(permit);
-                                    future.await.map_err(Into::into)
+                            if let Some(PendingAcknowledgement(receiver)) =
+                                response.extensions_mut().remove()
+                            {
+                                match receiver.await {
+                                    BatchStatus::Delivered => {}
+                                    status => {
+                                        response = acknowledgement_error
+                                            .make_acknowledgement_response(status);
+                                    }
                                 }
                             }
+
+                            Ok(response)
                         };
 
                         match tokio::time::timeout_at(deadline, admitted).await {
@@ -216,6 +212,7 @@ where
 
 pub(crate) trait ErrorResponse<R>: Clone + Send + 'static {
     fn make_response(&self, error: BoxError) -> R;
+    fn make_acknowledgement_response(&self, status: BatchStatus) -> R;
 }
 
 #[derive(Clone)]
@@ -242,6 +239,20 @@ impl ErrorResponse<Response<Body>> for HttpErrorResponse {
         });
         warp::reply::with_status(response, status).into_response()
     }
+
+    fn make_acknowledgement_response(&self, status: BatchStatus) -> Response<Body> {
+        let message = match status {
+            BatchStatus::Errored => "Error delivering contents to sink",
+            BatchStatus::Rejected => "Contents failed to deliver to sink",
+            BatchStatus::Delivered => unreachable!("delivered acknowledgements are successful"),
+        };
+        let response = protobuf(Status {
+            code: tonic::Code::Unknown as i32,
+            message: message.to_owned(),
+            ..Default::default()
+        });
+        warp::reply::with_status(response, StatusCode::INTERNAL_SERVER_ERROR).into_response()
+    }
 }
 
 #[derive(Clone)]
@@ -263,6 +274,15 @@ impl ErrorResponse<Response<BoxBody>> for GrpcErrorResponse {
 
         tonic::Status::unavailable(message).to_http()
     }
+
+    fn make_acknowledgement_response(&self, status: BatchStatus) -> Response<BoxBody> {
+        match status {
+            BatchStatus::Errored => tonic::Status::internal("Delivery error"),
+            BatchStatus::Rejected => tonic::Status::data_loss("Delivery failed"),
+            BatchStatus::Delivered => unreachable!("delivered acknowledgements are successful"),
+        }
+        .to_http()
+    }
 }
 
 #[cfg(test)]
@@ -283,6 +303,7 @@ mod tests {
     use prost::Message;
     use tokio::sync::Semaphore;
     use tower::{Layer, ServiceExt};
+    use vector_lib::event::BatchNotifier;
 
     use super::*;
 
@@ -297,7 +318,12 @@ mod tests {
         observations: Arc<Observations>,
         gate: Arc<Semaphore>,
         response: Arc<dyn Fn() -> R + Send + Sync>,
-        release_processing: bool,
+    }
+
+    #[derive(Clone)]
+    struct AcknowledgingGateService {
+        observations: Arc<Observations>,
+        gate: Arc<Semaphore>,
     }
 
     impl<R> Clone for GateService<R> {
@@ -306,7 +332,6 @@ mod tests {
                 observations: Arc::clone(&self.observations),
                 gate: Arc::clone(&self.gate),
                 response: Arc::clone(&self.response),
-                release_processing: self.release_processing,
             }
         }
     }
@@ -348,29 +373,54 @@ mod tests {
             Poll::Ready(Ok(()))
         }
 
-        fn call(&mut self, request: Request<Body>) -> Self::Future {
+        fn call(&mut self, _request: Request<Body>) -> Self::Future {
             let observations = Arc::clone(&self.observations);
             let gate = Arc::clone(&self.gate);
             let response = Arc::clone(&self.response);
-            let processing = self.release_processing.then(|| {
-                request
-                    .extensions()
-                    .get::<RequestProcessingPermit>()
-                    .unwrap()
-                    .clone()
-            });
             Box::pin(async move {
                 observations.started.fetch_add(1, Ordering::AcqRel);
                 let active = observations.active.fetch_add(1, Ordering::AcqRel) + 1;
                 observations
                     .maximum_active
                     .fetch_max(active, Ordering::AcqRel);
-                if let Some(processing) = processing {
-                    processing.release();
-                }
                 let _guard = ActiveGuard(observations);
                 let _permit = gate.acquire().await.expect("test gate must remain open");
                 Ok(response())
+            })
+        }
+    }
+
+    impl Service<Request<Body>> for AcknowledgingGateService {
+        type Response = Response<Body>;
+        type Error = Infallible;
+        type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _request: Request<Body>) -> Self::Future {
+            let observations = Arc::clone(&self.observations);
+            let gate = Arc::clone(&self.gate);
+            Box::pin(async move {
+                observations.started.fetch_add(1, Ordering::AcqRel);
+                let active = observations.active.fetch_add(1, Ordering::AcqRel) + 1;
+                observations
+                    .maximum_active
+                    .fetch_max(active, Ordering::AcqRel);
+
+                let (notifier, receiver) = BatchNotifier::new_with_receiver();
+                tokio::spawn(async move {
+                    let _guard = ActiveGuard(observations);
+                    let _permit = gate.acquire().await.expect("test gate must remain open");
+                    drop(notifier);
+                });
+
+                let mut response = Response::new(Body::empty());
+                response
+                    .extensions_mut()
+                    .insert(PendingAcknowledgement(receiver));
+                Ok(response)
             })
         }
     }
@@ -383,17 +433,14 @@ mod tests {
             observations,
             gate,
             response: Arc::new(|| Response::new(Body::empty())),
-            release_processing: false,
         }
     }
 
-    fn releasing_http_service(
+    fn acknowledging_http_service(
         observations: Arc<Observations>,
         gate: Arc<Semaphore>,
-    ) -> GateService<Response<Body>> {
-        let mut service = http_service(observations, gate);
-        service.release_processing = true;
-        service
+    ) -> AcknowledgingGateService {
+        AcknowledgingGateService { observations, gate }
     }
 
     fn grpc_service(
@@ -404,7 +451,6 @@ mod tests {
             observations,
             gate,
             response: Arc::new(|| tonic::Status::new(tonic::Code::Ok, "").to_http()),
-            release_processing: false,
         }
     }
 
@@ -452,7 +498,7 @@ mod tests {
         let control = RequestControl::new(2, 1, Duration::from_secs(5));
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
-        let service = control.http_layer().layer(releasing_http_service(
+        let service = control.http_layer().layer(acknowledging_http_service(
             Arc::clone(&observations),
             Arc::clone(&gate),
         ));

@@ -5,7 +5,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    event::{BatchNotifier, BatchStatusReceiver, Event},
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     opentelemetry::proto::collector::{
         logs::v1::{
@@ -27,7 +27,7 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     sources::opentelemetry::{
         config::{LOGS, METRICS, TRACES},
-        request_control::RequestProcessingPermit,
+        request_control::PendingAcknowledgement,
     },
 };
 
@@ -46,10 +46,6 @@ impl TraceService for Service {
         &self,
         request: Request<ExportTraceServiceRequest>,
     ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        let processing = request
-            .extensions()
-            .get::<RequestProcessingPermit>()
-            .cloned();
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
@@ -65,11 +61,14 @@ impl TraceService for Service {
                 .flat_map(|v| v.into_event_iter())
                 .collect()
         };
-        self.handle_events(events, TRACES, processing).await?;
+        let receiver = self.handle_events(events, TRACES).await?;
 
-        Ok(Response::new(ExportTraceServiceResponse {
-            partial_success: None,
-        }))
+        Ok(response_with_acknowledgement(
+            ExportTraceServiceResponse {
+                partial_success: None,
+            },
+            receiver,
+        ))
     }
 }
 
@@ -79,10 +78,6 @@ impl LogsService for Service {
         &self,
         request: Request<ExportLogsServiceRequest>,
     ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        let processing = request
-            .extensions()
-            .get::<RequestProcessingPermit>()
-            .cloned();
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
@@ -98,11 +93,14 @@ impl LogsService for Service {
                 .flat_map(|v| v.into_event_iter(self.log_namespace))
                 .collect()
         };
-        self.handle_events(events, LOGS, processing).await?;
+        let receiver = self.handle_events(events, LOGS).await?;
 
-        Ok(Response::new(ExportLogsServiceResponse {
-            partial_success: None,
-        }))
+        Ok(response_with_acknowledgement(
+            ExportLogsServiceResponse {
+                partial_success: None,
+            },
+            receiver,
+        ))
     }
 }
 
@@ -112,10 +110,6 @@ impl MetricsService for Service {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
-        let processing = request
-            .extensions()
-            .get::<RequestProcessingPermit>()
-            .cloned();
         let events = if let Some(deserializer) = self.deserializer.as_ref() {
             let raw_bytes = request.get_ref().encode_to_vec();
             // Major caveat here, the output event will be logs.
@@ -133,11 +127,14 @@ impl MetricsService for Service {
                 .collect()
         };
 
-        self.handle_events(events, METRICS, processing).await?;
+        let receiver = self.handle_events(events, METRICS).await?;
 
-        Ok(Response::new(ExportMetricsServiceResponse {
-            partial_success: None,
-        }))
+        Ok(response_with_acknowledgement(
+            ExportMetricsServiceResponse {
+                partial_success: None,
+            },
+            receiver,
+        ))
     }
 }
 
@@ -146,8 +143,7 @@ impl Service {
         &self,
         mut events: Vec<Event>,
         log_name: &'static str,
-        processing: Option<RequestProcessingPermit>,
-    ) -> Result<(), Status> {
+    ) -> Result<Option<BatchStatusReceiver>, Status> {
         // When using OTLP decoding, count individual items within the batch
         // to maintain consistency with other Vector sources
         let count = if self.deserializer.is_some() {
@@ -169,22 +165,19 @@ impl Service {
                 Status::unavailable(message)
             })
             .await?;
-        if let Some(processing) = processing {
-            processing.release();
-        }
-        handle_batch_status(receiver).await
+        Ok(receiver)
     }
 }
 
-async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<(), Status> {
-    let status = match receiver {
-        Some(receiver) => receiver.await,
-        None => BatchStatus::Delivered,
-    };
-
-    match status {
-        BatchStatus::Errored => Err(Status::internal("Delivery error")),
-        BatchStatus::Rejected => Err(Status::data_loss("Delivery failed")),
-        BatchStatus::Delivered => Ok(()),
+fn response_with_acknowledgement<T>(
+    message: T,
+    receiver: Option<BatchStatusReceiver>,
+) -> Response<T> {
+    let mut response = Response::new(message);
+    if let Some(receiver) = receiver {
+        response
+            .extensions_mut()
+            .insert(PendingAcknowledgement(receiver));
     }
+    response
 }

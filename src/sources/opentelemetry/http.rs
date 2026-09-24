@@ -13,7 +13,7 @@ use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
-    event::{BatchNotifier, BatchStatus},
+    event::BatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
@@ -40,7 +40,7 @@ use crate::{
         http_server::HttpConfigParamKind,
         opentelemetry::{
             config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
-            request_control::{HttpErrorResponse, RequestControlLayer, RequestProcessingPermit},
+            request_control::{HttpErrorResponse, PendingAcknowledgement, RequestControlLayer},
         },
         util::{add_headers, decompress_body, http::capped_body},
     },
@@ -214,13 +214,9 @@ where
         ))
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::headers_cloned())
-        .and(warp::filters::ext::optional::<RequestProcessingPermit>())
         .and(body_filter)
         .and_then(
-            move |encoding_header: Option<String>,
-                  headers: HeaderMap,
-                  processing: Option<RequestProcessingPermit>,
-                  body: Bytes| {
+            move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
                 let events = make_events(encoding_header, headers, body);
                 handle_request(
                     events,
@@ -228,7 +224,6 @@ where
                     out.clone(),
                     telemetry_type,
                     Resp::default(),
-                    processing,
                 )
             },
         )
@@ -431,7 +426,6 @@ async fn handle_request(
     mut out: SourceSender,
     output: &str,
     resp: impl Message,
-    processing: Option<RequestProcessingPermit>,
 ) -> Result<Response, Rejection> {
     match events {
         Ok(mut events) => {
@@ -442,26 +436,13 @@ async fn handle_request(
                 emit!(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
-            if let Some(processing) = processing {
-                processing.release();
+            let mut response = protobuf(resp).into_response();
+            if let Some(receiver) = receiver {
+                response
+                    .extensions_mut()
+                    .insert(PendingAcknowledgement(receiver));
             }
-
-            match receiver {
-                None => Ok(protobuf(resp).into_response()),
-                Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(protobuf(resp).into_response()),
-                    BatchStatus::Errored => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Error delivering contents to sink".into(),
-                        ..Default::default()
-                    })),
-                    BatchStatus::Rejected => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Contents failed to deliver to sink".into(),
-                        ..Default::default()
-                    })),
-                },
-            }
+            Ok(response)
         }
         Err(err) => Err(warp::reject::custom(err)),
     }
