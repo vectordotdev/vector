@@ -112,6 +112,8 @@ pub mod splunk_hec;
 pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
+#[cfg(feature = "sinks-victoriametrics")]
+pub mod victoriametrics;
 #[cfg(feature = "sinks-webhdfs")]
 pub mod webhdfs;
 #[cfg(feature = "sinks-websocket")]
