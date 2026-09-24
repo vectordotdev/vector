@@ -71,5 +71,6 @@ The tag starts the release workflow; do not create the tag or release branch man
     `RELEASE_FREEZE_BOT_BYPASS`, then sets the `RELEASE_FREEZE_RULESET_ID` ruleset back to **Disabled**.
     It waits for the housekeeping PR to merge and for any pending release or manifests run first,
     and gives up after ten minutes, leaving the freeze active.
-  - Run it manually with `workflow_dispatch` if the release never starts the manifests workflow, or to retry a failed run.
-    A manual run skips the wait and revokes the bypasses immediately.
+  - Run it manually with `workflow_dispatch` if the release never starts the manifests workflow, if that
+    run fails, or to retry a failed closeout.
+    A manual run makes the same checks unless you set `force`, which closes the window anyway.

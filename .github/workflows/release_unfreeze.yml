@@ -6,7 +6,8 @@
 # disabling the freeze, matching the order in the release checklists: disabling
 # the freeze first would leave master writable directly by the bot.
 # Dispatch this manually when a release never starts the manifests workflow, or
-# to retry a failed run.
+# to retry a failed run. A manual run still checks the release state unless the
+# force input is set, which is the way out when a release stage cannot finish.
 name: Unfreeze master
 
 on:
@@ -14,6 +15,11 @@ on:
     workflows: ["Refresh Kubernetes manifests"]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      force:
+        description: Close the window even if a release stage still looks pending
+        type: boolean
+        default: false
 
 permissions:
   contents: read # Restrictive default
@@ -45,7 +51,10 @@ jobs:
           persist-credentials: false
 
       - name: Wait for the release to finish
-        if: github.event_name == 'workflow_run'
+        # A manual run is the escape hatch, but it still checks the release state
+        # unless force is set: closing the window under a release that still needs
+        # it breaks the next stage's freeze check.
+        if: github.event_name == 'workflow_run' || !inputs.force
         env:
           GH_TOKEN: ${{ github.token }}
           # The freeze outlives the manifests push: the release workflow also
@@ -57,28 +66,49 @@ jobs:
           set -euo pipefail
           deadline=$((SECONDS + DEADLINE_SECONDS))
           while :; do
+            pending=''
+            latest=''
+            open=''
+            failed=0
             # Query each release workflow server-side: --limit applies before any
             # client-side filter, and this repository creates about a hundred runs
             # an hour, so one repository-wide list can hide an older run that is
             # still active. "Prepare post-release housekeeping" and the website
             # reset have no runs of their own; they execute inside "Release Suite".
-            waiting=$(for workflow in release.yml release_manifests.yml; do
-              gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 20 \
-                --json status,workflowName,url --jq '.[] | select(.status != "completed")
-                  | "\(.workflowName) \(.url)"'
-            done)
-            open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --app vectordotdev-bot \
-              --state open --limit 100 --json number,title --jq '.[] | "PR #\(.number): \(.title)"')
-            if [[ -z "$waiting" && -z "$open" ]]; then
+            # "Tag approved release" bridges the merged preparation PR to the tagged
+            # release, and "Prepare release" opens the next window.
+            for workflow in release.yml release_manifests.yml release_prepare.yml release_autotag.yml; do
+              if ! runs=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 100 \
+                  --json status,workflowName,url --jq '.[] | select(.status != "completed")
+                    | "\(.workflowName) \(.url)"'); then
+                echo "Could not query ${workflow} runs; the freeze stays active." >&2
+                failed=1
+                break
+              fi
+              pending+="$runs"
+            done
+            if (( failed == 0 )); then
+              # A finished "Release Suite" that failed means the housekeeping PR
+              # never merged, and its retry needs the freeze. Wait for a human
+              # instead of closing the window under an incomplete release.
+              latest=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --limit 1 \
+                --json conclusion,url --jq '.[] | select(.conclusion != "success")
+                  | "\(.conclusion) \(.url)"') || failed=1
+            fi
+            if (( failed == 0 )); then
+              open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --app vectordotdev-bot \
+                --state open --limit 100 --json number,title --jq '.[] | "PR #\(.number): \(.title)"') || failed=1
+            fi
+            if (( failed == 0 )) && [[ -z "$pending" && -z "$latest" && -z "$open" ]]; then
               echo "No release workflow is pending and no vectordotdev-bot PR is open." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             if (( SECONDS >= deadline )); then
-              printf '%s\n' "$waiting" "$open" >&2
+              printf '%s\n' "$pending" "$latest" "$open" >&2
               echo "Still waiting after ${DEADLINE_SECONDS}s; the freeze stays active." >&2
               exit 1
             fi
-            printf '%s\n' "$waiting" "$open"
+            printf '%s\n' "$pending" "$latest" "$open"
             sleep 30
           done
 

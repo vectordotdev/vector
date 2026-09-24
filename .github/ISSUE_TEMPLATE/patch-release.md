@@ -72,7 +72,9 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
     `RELEASE_FREEZE_BOT_BYPASS`, then sets the `RELEASE_FREEZE_RULESET_ID` ruleset back to **Disabled**.
     It waits for any pending release or manifests run and for open `vectordotdev-bot` PRs first,
     and gives up after ten minutes, leaving the freeze active.
-  - Run it manually with `workflow_dispatch` if the release never starts the manifests workflow, or to retry a failed run.
+  - Run it manually with `workflow_dispatch` if the release never starts the manifests workflow, if that
+    run fails, or to retry a failed closeout.
+    A manual run makes the same checks unless you set `force`, which closes the window anyway.
 
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
 - [ ] Wait for the release workflow to reset the `website` branch to the release commit
