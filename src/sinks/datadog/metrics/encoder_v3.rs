@@ -62,6 +62,26 @@ impl DatadogMetricsV3Encoder {
         }
     }
 
+    /// Creates an encoder with specific payload limits.
+    ///
+    /// Only available in tests; production code always uses the API-defined limits via `new`.
+    /// Mirrors `DatadogMetricsEncoder::with_payload_limits`.
+    #[cfg(test)]
+    pub fn with_payload_limits(
+        default_namespace: Option<String>,
+        uncompressed_limit: usize,
+        compressed_limit: usize,
+    ) -> Self {
+        Self {
+            uncompressed_limit,
+            compressed_limit,
+            ..Self::new(
+                DatadogMetricsEndpoint::Series(super::config::SeriesApiVersion::V3),
+                default_namespace,
+            )
+        }
+    }
+
     /// Encode one metric into the writer.
     ///
     /// Always returns `Ok(None)` — the V3 encoder cannot detect payload overflow
@@ -130,14 +150,22 @@ impl DatadogMetricsV3Encoder {
             .map_err(|source| FinishError::CompressionFailed { source })?
             .freeze();
 
-        let compressed_splits = compressed.len() / self.compressed_limit;
-        let uncompressed_splits = uncompressed_size / self.uncompressed_limit;
-        let recommended_splits = std::cmp::max(compressed_splits, uncompressed_splits) + 1;
+        // Both limits are inclusive: the intake accepts a payload whose encoded size is exactly
+        // the maximum, and the Agent agrees -- saluki's `V3PayloadLimits::request_fits` compares
+        // both dimensions with `<=`. Only a strictly larger payload has overflowed.
+        //
+        // Deriving this from `len / limit + 1` instead classified an exactly-at-the-limit payload
+        // as needing a split, and for a batch of one metric `split_and_encode` then has nothing
+        // left to halve and drops it as unsplittable -- discarding a payload that was valid.
+        if compressed.len() > self.compressed_limit || uncompressed_size > self.uncompressed_limit {
+            // Only used for logging now that splitting bisects, but keep it meaningful: round up
+            // so a payload 1.5x over the limit reports 2 rather than 1.
+            let compressed_splits = compressed.len().div_ceil(self.compressed_limit.max(1));
+            let uncompressed_splits = uncompressed_size.div_ceil(self.uncompressed_limit.max(1));
 
-        if recommended_splits > 1 {
             return Err(FinishError::TooLarge {
                 metrics,
-                recommended_splits,
+                recommended_splits: std::cmp::max(compressed_splits, uncompressed_splits).max(2),
             });
         }
 
@@ -342,6 +370,75 @@ mod tests {
         let (result, metrics) = enc.finish().unwrap();
         assert!(result.into_payload().is_empty());
         assert!(metrics.is_empty());
+    }
+
+    /// Encodes one gauge and reports `(uncompressed_size, compressed_size)` for it.
+    fn measure_single_gauge() -> (usize, usize) {
+        let mut enc = DatadogMetricsV3Encoder::new(
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3),
+            None,
+        );
+        enc.try_encode(gauge("limit.probe", 1.0)).unwrap();
+        let (result, _) = enc.finish().expect("probe payload should encode");
+
+        let uncompressed = result.uncompressed_byte_size;
+        let compressed = result.into_payload().len();
+        (uncompressed, compressed)
+    }
+
+    /// The payload size limits are inclusive: the intake accepts a payload whose encoded size is
+    /// exactly the maximum, and saluki's `request_fits` compares both dimensions with `<=`. A
+    /// payload sitting exactly on a limit must therefore be sent, not reported as too large.
+    ///
+    /// Deriving that from `len / limit + 1` made the exact-limit case look like it needed two
+    /// splits, and `split_and_encode` has nothing left to halve for a single-metric batch, so it
+    /// dropped a payload the intake would have accepted. Sizes are measured first, then fed back
+    /// as the limits under test, since they can't be predicted.
+    #[test]
+    fn v3_payload_exactly_at_the_limits_is_not_too_large() {
+        let (uncompressed, compressed) = measure_single_gauge();
+
+        let mut enc = DatadogMetricsV3Encoder::with_payload_limits(None, uncompressed, compressed);
+        enc.try_encode(gauge("limit.probe", 1.0)).unwrap();
+
+        let (result, metrics) = enc
+            .finish()
+            .expect("a payload exactly at both limits must be accepted, not split");
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(result.into_payload().len(), compressed);
+    }
+
+    /// One byte over either limit is still an overflow.
+    #[test]
+    fn v3_payload_one_byte_over_a_limit_is_too_large() {
+        let (uncompressed, compressed) = measure_single_gauge();
+
+        for (uncompressed_limit, compressed_limit) in [
+            (uncompressed - 1, compressed),
+            (uncompressed, compressed - 1),
+        ] {
+            let mut enc = DatadogMetricsV3Encoder::with_payload_limits(
+                None,
+                uncompressed_limit,
+                compressed_limit,
+            );
+            enc.try_encode(gauge("limit.probe", 1.0)).unwrap();
+
+            match enc.finish() {
+                Err(FinishError::TooLarge {
+                    metrics,
+                    recommended_splits,
+                }) => {
+                    assert_eq!(metrics.len(), 1, "the metric must come back for splitting");
+                    assert!(
+                        recommended_splits >= 2,
+                        "an overflowing payload must recommend at least two splits, got \
+                         {recommended_splits}"
+                    );
+                }
+                other => panic!("expected TooLarge, got {:?}", other.map(|(_, m)| m.len())),
+            }
+        }
     }
 
     // The `datadog_agent` source flattens an upstream V2 payload's structured resources back
