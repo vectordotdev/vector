@@ -1,9 +1,15 @@
+# Flatten OpenTelemetry sink configuration
+
+## Summary
+
 Changed the `opentelemetry` sink config fields to remove `protocol.*`. `protocol.type` was replaced
 by `protocol` and all fields previously nested under `protocol` now can be placed in the top level
 configuration.
 
 The legacy nested `protocol.*` format is still accepted temporarily but is deprecated and logs a
 warning on startup. Migrate to the flat format before the fallback is removed in a future release.
+
+## Migration
 
 Before:
 
@@ -12,6 +18,7 @@ sinks:
   otel_sink:
     inputs:
       - in
+    type: opentelemetry
     protocol:
       type: http
       uri: http://otel-collector-sink:5318/v1/logs

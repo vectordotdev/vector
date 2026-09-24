@@ -1,6 +1,6 @@
 ---
 what: "Nested `protocol.*` configuration format for the `opentelemetry` sink"
-deprecated_since: "0.57.0"
+deprecated_since: "0.59.0"
 ---
 
 The nested `protocol.*` configuration format for the `opentelemetry` sink is deprecated. The legacy

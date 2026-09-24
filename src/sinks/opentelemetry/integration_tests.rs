@@ -27,7 +27,7 @@ fn sink_grpc_address() -> String {
 fn otlp_log_event_with_host(host: &str) -> vector_lib::event::Event {
     let mut event = otlp_log_event();
     if let vector_lib::event::Event::Log(ref mut log) = event {
-        log.insert("host", host.to_owned());
+        log.insert(vrl::event_path!("host"), host.to_owned());
     }
     event
 }
@@ -96,6 +96,7 @@ async fn delivers_logs_via_grpc_template_uri() {
         r#"
         protocol = "grpc"
         uri = "http://{{ host }}:4317"
+        dangerously_allow_unconfined_template_resolution = true
     "#,
     )
     .unwrap();

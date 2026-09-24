@@ -36,6 +36,7 @@ use vector_lib::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::{BatcherSettings, DriverResponse},
 };
+use vrl::event_path;
 
 use crate::{
     config::{AcknowledgementsConfig, SinkContext, SinkHealthcheckOptions},
@@ -50,7 +51,7 @@ use crate::{
             StreamSink, http::RequestConfig, metadata::RequestMetadataBuilder, retries::RetryLogic,
         },
     },
-    template::Template,
+    template::{ConfinedTemplate, ConfinedUriTemplate, ConfinementConfig, Template, UriTemplate},
     tls::{MaybeTlsSettings, TlsConfig},
 };
 
@@ -101,35 +102,54 @@ pub(super) struct GrpcSinkConfig {
     #[configurable(metadata(
         docs::warnings = "When using template syntax, the rendered URI is taken from event data. Only use dynamic URIs with trusted event sources to avoid directing Vector to unintended internal network destinations."
     ))]
-    pub uri: Template,
+    pub uri: UriTemplate,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub compression: GrpcCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[serde(flatten)]
+    pub confinement: ConfinementConfig,
+}
+
+pub(super) struct ValidatedGrpc {
+    static_uri: Option<Uri>,
+    static_headers: Vec<(
+        tonic::metadata::AsciiMetadataKey,
+        tonic::metadata::AsciiMetadataValue,
+    )>,
+    dynamic_headers: Vec<(tonic::metadata::AsciiMetadataKey, Template)>,
+    batch_settings: BatcherSettings,
 }
 
 impl GrpcSinkConfig {
-    pub(super) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    pub(super) fn validate(&self) -> crate::Result<ValidatedGrpc> {
+        if self.uri.is_empty() {
+            return Err("gRPC URI must not be empty".into());
+        }
+        if !self
+            .confinement
+            .dangerously_allow_unconfined_template_resolution
+        {
+            self.uri
+                .clone()
+                .confine(&self.confinement, "opentelemetry", "uri")?;
+        }
         // For static URIs, parse at build time for the healthcheck.
         // Dynamic URIs are rendered per-event during sink execution.
         let static_uri = if self.uri.is_dynamic() {
@@ -143,15 +163,6 @@ impl GrpcSinkConfig {
                 self.tls.is_some(),
             )?)
         };
-
-        // The connector is always TLS-capable so it can handle both http:// and https://
-        // URIs per-request, matching the behaviour of the HTTP sink. Whether the scheme
-        // defaults to http or https when the URI has no explicit scheme is controlled by
-        // whether a `tls:` block is configured.
-        let tls_configured = self.tls.is_some();
-        let tls = MaybeTlsSettings::tls_client(self.tls.as_ref())?;
-
-        let compression = self.compression.as_tonic_encoding();
 
         // Split headers into static (literal values) and dynamic (template values).
         // Static headers are pre-parsed once and used for the healthcheck and every export.
@@ -183,8 +194,57 @@ impl GrpcSinkConfig {
             let k_lower = k.to_lowercase();
             let key = tonic::metadata::AsciiMetadataKey::from_bytes(k_lower.as_bytes())
                 .map_err(|e| format!("invalid gRPC metadata key {k:?}: {e}"))?;
+            if !self
+                .confinement
+                .dangerously_allow_unconfined_template_resolution
+            {
+                t.clone()
+                    .confine(&self.confinement, "opentelemetry", "request.headers")?;
+            }
             dynamic_grpc_header_templates.push((key, t));
         }
+
+        Ok(ValidatedGrpc {
+            static_uri,
+            static_headers: static_grpc_headers,
+            dynamic_headers: dynamic_grpc_header_templates,
+            batch_settings: self.batch.validate()?.into_batcher_settings()?,
+        })
+    }
+
+    pub(super) fn build(
+        &self,
+        validated: &ValidatedGrpc,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let static_uri = &validated.static_uri;
+        let static_grpc_headers = validated.static_headers.clone();
+        let dynamic_grpc_header_templates = validated
+            .dynamic_headers
+            .iter()
+            .map(|(key, template)| {
+                Ok((
+                    key.clone(),
+                    template.clone().confine(
+                        &self.confinement,
+                        "opentelemetry",
+                        "request.headers",
+                    )?,
+                ))
+            })
+            .collect::<crate::Result<Vec<_>>>()?;
+        let uri_template = self
+            .uri
+            .clone()
+            .confine(&self.confinement, "opentelemetry", "uri")?;
+        // The connector is always TLS-capable so it can handle both http:// and https://
+        // URIs per-request, matching the behaviour of the HTTP sink. Whether the scheme
+        // defaults to http or https when the URI has no explicit scheme is controlled by
+        // whether a `tls:` block is configured.
+        let tls_configured = self.tls.is_some();
+        let tls = MaybeTlsSettings::tls_client(self.tls.as_ref())?;
+
+        let compression = self.compression.as_tonic_encoding();
 
         let client = new_grpc_client(&tls, cx.proxy())?;
         // Dynamic headers cannot be rendered without a live event, so the healthcheck cannot
@@ -229,7 +289,7 @@ impl GrpcSinkConfig {
         let service = OtlpGrpcService::new(client, compression, static_grpc_headers);
 
         let request_settings = self.request.tower.into_settings();
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let batch_settings = validated.batch_settings;
 
         let service = ServiceBuilder::new()
             .settings(request_settings, OtlpGrpcRetryLogic)
@@ -239,7 +299,7 @@ impl GrpcSinkConfig {
             batch_settings,
             service,
             dynamic_header_templates: dynamic_grpc_header_templates,
-            uri_template: self.uri.clone(),
+            uri_template,
             tls_configured,
         };
 
@@ -428,10 +488,10 @@ struct OtlpGrpcService {
     hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
     compression: Option<tonic::codec::CompressionEncoding>,
     headers: std::sync::Arc<
-        Vec<(
+        [(
             tonic::metadata::AsciiMetadataKey,
             tonic::metadata::AsciiMetadataValue,
-        )>,
+        )],
     >,
 }
 
@@ -448,7 +508,7 @@ impl OtlpGrpcService {
             clients: None,
             hyper_client,
             compression,
-            headers: std::sync::Arc::new(headers),
+            headers: headers.into(),
         }
     }
 
@@ -772,11 +832,11 @@ impl OtlpBatch {
 struct OtlpGrpcSink<S> {
     batch_settings: BatcherSettings,
     service: S,
-    uri_template: Template,
+    uri_template: ConfinedUriTemplate,
     /// Used only to pick the default scheme (`http` vs `https`) when the rendered URI
     /// has no explicit scheme. The connector itself handles both schemes.
     tls_configured: bool,
-    dynamic_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, Template)>,
+    dynamic_header_templates: Vec<(tonic::metadata::AsciiMetadataKey, ConfinedTemplate)>,
 }
 
 impl<S> OtlpGrpcSink<S>
@@ -907,7 +967,7 @@ where
                     requests.push(signal_into_request(data, OtlpSignal::Metrics, &uri, dynamic_headers.clone()));
                 }
                 if let Some(data) = batch.traces {
-                    requests.push(signal_into_request(data, OtlpSignal::Traces, &uri, dynamic_headers.clone()));
+                    requests.push(signal_into_request(data, OtlpSignal::Traces, &uri, dynamic_headers));
                 }
 
                 futures::stream::iter(requests)
@@ -945,13 +1005,13 @@ fn encode_event(
     // Clone the event to pass ownership to the encoder while keeping the original
     // for metadata extraction in the caller. The clone is shallow for logs/traces.
     match event {
-        Event::Log(log) if log.contains(RESOURCE_LOGS_JSON_FIELD) => {
+        Event::Log(log) if log.contains(event_path!(RESOURCE_LOGS_JSON_FIELD)) => {
             serializer.encode(event.clone(), &mut buf)?;
             Ok(Some(OtlpSignal::Logs(ExportLogsServiceRequest::decode(
                 buf.freeze(),
             )?)))
         }
-        Event::Log(log) if log.contains(RESOURCE_METRICS_JSON_FIELD) => {
+        Event::Log(log) if log.contains(event_path!(RESOURCE_METRICS_JSON_FIELD)) => {
             serializer.encode(event.clone(), &mut buf)?;
             Ok(Some(OtlpSignal::Metrics(
                 ExportMetricsServiceRequest::decode(buf.freeze())?,
@@ -959,13 +1019,13 @@ fn encode_event(
         }
         // OTLP spans can arrive as Log events when the source does not use
         // use_otlp_decoding.traces = true.
-        Event::Log(log) if log.contains(RESOURCE_SPANS_JSON_FIELD) => {
+        Event::Log(log) if log.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) => {
             serializer.encode(event.clone(), &mut buf)?;
             Ok(Some(OtlpSignal::Traces(ExportTraceServiceRequest::decode(
                 buf.freeze(),
             )?)))
         }
-        Event::Trace(trace) if trace.contains(RESOURCE_SPANS_JSON_FIELD) => {
+        Event::Trace(trace) if trace.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) => {
             serializer.encode(event.clone(), &mut buf)?;
             Ok(Some(OtlpSignal::Traces(ExportTraceServiceRequest::decode(
                 buf.freeze(),
