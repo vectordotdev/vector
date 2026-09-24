@@ -351,8 +351,9 @@ where
             let mut made_progress = false;
             for (&file_id, watcher) in &mut fp_map {
                 let mut start = time::Instant::now();
-                let mut bytes_read: usize = 0;
+                let mut bytes_read = 0;
                 if watcher.check_for_truncation().await.is_ok() {
+                    let turn_start = watcher.get_file_position();
                     while let Ok(Some(line)) = watcher.read_line().await {
                         let sz = line.bytes.len();
                         trace!(
@@ -362,7 +363,9 @@ where
                         );
                         stats.record_bytes(sz);
 
-                        bytes_read += sz;
+                        // Include delimiters and discarded bytes in the file's
+                        // turn budget so empty records cannot monopolize reads.
+                        bytes_read = watcher.get_file_position() - turn_start;
                         batch_bytes += sz;
                         made_progress = true;
 
@@ -384,7 +387,7 @@ where
                             start = time::Instant::now();
                         }
 
-                        if bytes_read > self.max_read_bytes {
+                        if bytes_read > self.max_read_bytes as u64 {
                             break;
                         }
                     }
