@@ -73,7 +73,7 @@ pub(crate) async fn run_http_server(
 
     let span = Span::current();
     // Admission wraps the Warp service, so queued requests cannot reach `capped_body`.
-    // Build it once so all connections share the same buffer worker.
+    // Build it once and clone the admitted service for each connection.
     let admitted = request_control.layer(warp::service(routes));
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
         let svc = ServiceBuilder::new()

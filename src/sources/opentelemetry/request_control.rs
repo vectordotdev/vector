@@ -1,21 +1,14 @@
-use std::{
-    convert::Infallible,
-    future::Future,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::{convert::Infallible, sync::Arc, time::Duration};
 
 use http::{Request, Response, StatusCode};
 use hyper::Body;
 use metrics::{Counter, Gauge};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
-use tokio_util::sync::{CancellationToken, PollSemaphore};
+use tokio::sync::Semaphore;
+use tokio_util::sync::CancellationToken;
 use tonic::body::BoxBody;
 use tower::{
-    BoxError, Layer, Service, ServiceExt, buffer::BufferLayer, load_shed::error::Overloaded,
-    timeout::TimeoutLayer, util::BoxCloneService,
+    BoxError, Layer, Service, ServiceExt, load_shed::error::Overloaded, service_fn,
+    util::BoxCloneService,
 };
 use vector_lib::{
     counter, gauge,
@@ -31,7 +24,6 @@ use crate::internal_events::{OpenGauge, OpenToken};
 pub(crate) struct RequestControl {
     outer: Arc<Semaphore>,
     inner: Arc<Semaphore>,
-    outer_capacity: usize,
     timeout: Duration,
     metrics: Arc<RequestControlMetrics>,
 }
@@ -41,7 +33,6 @@ impl RequestControl {
         Self {
             outer: Arc::new(Semaphore::new(outer_capacity)),
             inner: Arc::new(Semaphore::new(inner_capacity)),
-            outer_capacity,
             timeout,
             metrics: Arc::new(RequestControlMetrics::new(outer_capacity)),
         }
@@ -63,7 +54,6 @@ impl RequestControl {
         RequestControlLayer {
             outer: Arc::clone(&self.outer),
             inner: Arc::clone(&self.inner),
-            outer_capacity: self.outer_capacity,
             timeout: self.timeout,
             metrics: Arc::clone(&self.metrics),
             error_response,
@@ -73,7 +63,6 @@ impl RequestControl {
 
 type LevelEmitter = Box<dyn Fn(usize) + Send + Sync>;
 
-#[derive(Clone)]
 struct LevelToken(#[expect(dead_code)] Arc<OpenToken<LevelEmitter>>);
 
 #[derive(Clone, Copy)]
@@ -127,7 +116,6 @@ impl RequestControlMetrics {
     }
 }
 
-#[derive(Clone)]
 struct QueuedRequest(#[expect(dead_code)] LevelToken);
 
 /// Signals the middleware-owned processing permit to be released early.
@@ -140,122 +128,10 @@ impl RequestProcessingPermit {
     }
 }
 
-struct ProcessingLimitService<S> {
-    inner: S,
-    semaphore: Arc<Semaphore>,
-    acquire: PollSemaphore,
-    permit: Option<OwnedSemaphorePermit>,
-}
-
-impl<S> ProcessingLimitService<S> {
-    fn new(inner: S, semaphore: Arc<Semaphore>) -> Self {
-        Self {
-            inner,
-            acquire: PollSemaphore::new(Arc::clone(&semaphore)),
-            semaphore,
-            permit: None,
-        }
-    }
-}
-
-impl<S: Clone> Clone for ProcessingLimitService<S> {
-    fn clone(&self) -> Self {
-        Self::new(self.inner.clone(), Arc::clone(&self.semaphore))
-    }
-}
-
-impl<S> Service<Request<Body>> for ProcessingLimitService<S>
-where
-    S: Service<Request<Body>>,
-    S::Response: Send,
-    S::Error: Send,
-    S::Future: Send + 'static,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<S::Response, S::Error>> + Send>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.permit.is_none() {
-            match self.acquire.poll_acquire(cx) {
-                Poll::Ready(Some(permit)) => self.permit = Some(permit),
-                Poll::Ready(None) => unreachable!("processing semaphore is never closed"),
-                Poll::Pending => return Poll::Pending,
-            }
-        }
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, mut request: Request<Body>) -> Self::Future {
-        let permit = self
-            .permit
-            .take()
-            .expect("processing limit must be ready before call");
-        drop(request.extensions_mut().remove::<QueuedRequest>());
-        let release = CancellationToken::new();
-        request
-            .extensions_mut()
-            .insert(RequestProcessingPermit(release.clone()));
-        let future = self.inner.call(request);
-        Box::pin(async move {
-            tokio::pin!(future);
-            tokio::select! {
-                result = &mut future => result,
-                () = release.cancelled() => {
-                    drop(permit);
-                    future.await
-                }
-            }
-        })
-    }
-}
-
-#[derive(Clone)]
-struct AdmissionService<S> {
-    inner: S,
-    outer: Arc<Semaphore>,
-    metrics: Arc<RequestControlMetrics>,
-}
-
-impl<S> Service<Request<Body>> for AdmissionService<S>
-where
-    S: Service<Request<Body>> + Clone + Send + 'static,
-    S::Response: Send + 'static,
-    S::Error: Into<BoxError>,
-    S::Future: Send + 'static,
-{
-    type Response = S::Response;
-    type Error = BoxError;
-    type Future = Pin<Box<dyn Future<Output = Result<S::Response, BoxError>> + Send>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, mut request: Request<Body>) -> Self::Future {
-        let outer = match Arc::clone(&self.outer).try_acquire_owned() {
-            Ok(permit) => permit,
-            Err(_) => {
-                return Box::pin(async { Err(Box::new(Overloaded::new()) as BoxError) });
-            }
-        };
-
-        request
-            .extensions_mut()
-            .insert(QueuedRequest(self.metrics.queued_token()));
-        let future = self.inner.clone().oneshot(request);
-        Box::pin(async move {
-            let _outer = outer;
-            future.await.map_err(Into::into)
-        })
-    }
-}
-
 #[derive(Clone)]
 pub(crate) struct RequestControlLayer<R> {
     outer: Arc<Semaphore>,
     inner: Arc<Semaphore>,
-    outer_capacity: usize,
     timeout: Duration,
     metrics: Arc<RequestControlMetrics>,
     error_response: R,
@@ -265,73 +141,81 @@ impl<S, R> Layer<S> for RequestControlLayer<R>
 where
     S: Service<Request<Body>> + Clone + Send + 'static,
     S::Response: Send + 'static,
-    S::Error: Into<BoxError> + Send + Sync,
+    S::Error: Into<BoxError> + Send + Sync + 'static,
     S::Future: Send + 'static,
     R: ErrorResponse<S::Response>,
 {
-    type Service = RequestControlService<S::Response, R>;
+    type Service = BoxCloneService<Request<Body>, S::Response, Infallible>;
 
     fn layer(&self, service: S) -> Self::Service {
-        let service = ProcessingLimitService::new(service, Arc::clone(&self.inner));
-        let service = BufferLayer::new(self.outer_capacity).layer(service);
-        let service = AdmissionService {
-            inner: service,
-            outer: Arc::clone(&self.outer),
-            metrics: Arc::clone(&self.metrics),
-        };
-        let service = TimeoutLayer::new(self.timeout).layer(service);
+        let outer = Arc::clone(&self.outer);
+        let processing = Arc::clone(&self.inner);
+        let metrics = Arc::clone(&self.metrics);
+        let timeout = self.timeout;
+        let error_response = self.error_response.clone();
+        let service = service_fn(move |mut request: Request<Body>| {
+            let outer = Arc::clone(&outer).try_acquire_owned();
+            if outer.is_ok() {
+                request
+                    .extensions_mut()
+                    .insert(QueuedRequest(metrics.queued_token()));
+            }
+            let processing = Arc::clone(&processing);
+            let inner = service.clone();
+            let error_response = error_response.clone();
+            let deadline = tokio::time::Instant::now() + timeout;
 
-        RequestControlService {
-            inner: BoxCloneService::new(service),
-            error_response: self.error_response.clone(),
-        }
+            async move {
+                let result = match outer {
+                    Ok(outer) => {
+                        let admitted = async move {
+                            let _outer = outer;
+                            let permit = processing
+                                .acquire_owned()
+                                .await
+                                .expect("processing semaphore is never closed");
+                            drop(request.extensions_mut().remove::<QueuedRequest>());
+
+                            let release = CancellationToken::new();
+                            request
+                                .extensions_mut()
+                                .insert(RequestProcessingPermit(release.clone()));
+                            let future = inner.oneshot(request);
+                            tokio::pin!(future);
+                            tokio::select! {
+                                result = &mut future => result.map_err(Into::into),
+                                () = release.cancelled() => {
+                                    drop(permit);
+                                    future.await.map_err(Into::into)
+                                }
+                            }
+                        };
+
+                        match tokio::time::timeout_at(deadline, admitted).await {
+                            Ok(result) => result,
+                            Err(_) => {
+                                Err(Box::new(tower::timeout::error::Elapsed::new()) as BoxError)
+                            }
+                        }
+                    }
+                    // Reuse Tower's standard overload marker without its readiness-based
+                    // layer, which would allow idle service clones to reserve capacity.
+                    Err(_) => Err(Box::new(Overloaded::new()) as BoxError),
+                };
+
+                Ok::<_, Infallible>(match result {
+                    Ok(response) => response,
+                    Err(error) => error_response.make_response(error),
+                })
+            }
+        });
+
+        BoxCloneService::new(service)
     }
 }
 
 pub(crate) trait ErrorResponse<R>: Clone + Send + 'static {
     fn make_response(&self, error: BoxError) -> R;
-}
-
-pub(crate) struct RequestControlService<R, E> {
-    inner: BoxCloneService<Request<Body>, R, BoxError>,
-    error_response: E,
-}
-
-impl<R, E> Clone for RequestControlService<R, E>
-where
-    E: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            error_response: self.error_response.clone(),
-        }
-    }
-}
-
-impl<R, E> Service<Request<Body>> for RequestControlService<R, E>
-where
-    R: Send + 'static,
-    E: ErrorResponse<R>,
-{
-    type Response = R;
-    type Error = Infallible;
-    type Future = Pin<Box<dyn Future<Output = Result<R, Infallible>> + Send>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, request: Request<Body>) -> Self::Future {
-        let error_response = self.error_response.clone();
-        let future = self.inner.call(request);
-        Box::pin(async move {
-            Ok(match future.await {
-                Ok(response) => response,
-                Err(error) => error_response.make_response(error),
-            })
-        })
-    }
 }
 
 #[derive(Clone)]
@@ -389,6 +273,7 @@ mod tests {
             Arc,
             atomic::{AtomicUsize, Ordering},
         },
+        task::{Context, Poll},
         time::Duration,
     };
 
@@ -396,7 +281,7 @@ mod tests {
     use futures_util::future::BoxFuture;
     use hyper::body::HttpBody;
     use prost::Message;
-    use tokio::{sync::Semaphore, time::sleep};
+    use tokio::sync::Semaphore;
     use tower::{Layer, ServiceExt};
 
     use super::*;
@@ -710,7 +595,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn canceled_buffered_request_never_reaches_inner_service() {
+    async fn canceled_queued_request_never_reaches_inner_service() {
         let control = RequestControl::new(2, 1, Duration::from_secs(5));
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
@@ -720,23 +605,21 @@ mod tests {
 
         let active = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
         wait_for(&observations.started, 1).await;
-        let buffered = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
+        let queued = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
         while control.outer.available_permits() != 0 {
             tokio::task::yield_now().await;
         }
         wait_for_level(&control.metrics.queued, 1).await;
-        buffered.abort();
-        assert!(buffered.await.unwrap_err().is_cancelled());
+        queued.abort();
+        assert!(queued.await.unwrap_err().is_cancelled());
 
         gate.add_permits(1);
         active.await.unwrap().unwrap();
         wait_for_level(&control.metrics.queued, 0).await;
-        sleep(Duration::from_millis(20)).await;
         assert_eq!(observations.started.load(Ordering::Acquire), 1);
         assert_eq!(control.outer.available_permits(), 2);
+        assert_eq!(control.inner.available_permits(), 1);
 
-        // The inner concurrency service may retain a readiness reservation for the next call;
-        // prove that it remains usable rather than inspecting its semaphore directly.
         gate.add_permits(1);
         service.oneshot(Request::new(Body::empty())).await.unwrap();
         assert_eq!(observations.started.load(Ordering::Acquire), 2);
