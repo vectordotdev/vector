@@ -647,14 +647,15 @@ mod subscription_tests {
     fn max_flat_or_chain(query: &str) -> usize {
         let mut chains = vec![0usize];
         let mut max = 0;
+        let bytes = query.as_bytes();
         let mut i = 0;
-        while i < query.len() {
-            let rest = &query[i..];
-            if rest.starts_with('(') {
+        while i < bytes.len() {
+            let rest = &bytes[i..];
+            if rest.starts_with(b"(") {
                 chains.push(0);
-            } else if rest.starts_with(')') {
+            } else if rest.starts_with(b")") {
                 chains.pop();
-            } else if rest.starts_with(" or ") {
+            } else if rest.starts_with(b" or ") {
                 let top = chains.last_mut().expect("unbalanced parentheses");
                 *top += 1;
                 max = max.max(*top);
