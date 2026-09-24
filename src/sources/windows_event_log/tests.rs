@@ -688,7 +688,10 @@ mod subscription_tests {
 
             let query = build_xpath_query(&config).unwrap();
             assert!(query.starts_with("*[System[("), "n={n}: {query}");
-            assert!(query.len() <= 4096, "n={n}: query should fit within XPath limit");
+            assert!(
+                query.len() <= 4096,
+                "n={n}: query should fit within XPath limit"
+            );
             assert_eq!(query.matches("EventID=").count(), ids.len(), "n={n}");
             for id in &ids {
                 assert!(
