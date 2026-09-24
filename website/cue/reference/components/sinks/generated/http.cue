@@ -134,7 +134,7 @@ generated: components: sinks: http: configuration: {
 		type: string: {
 			default: ""
 			examples: [
-				"}",
+				"}"
 			]
 		}
 	}

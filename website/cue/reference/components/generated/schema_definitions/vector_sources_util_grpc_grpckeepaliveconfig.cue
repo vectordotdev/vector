@@ -10,7 +10,7 @@ _schemaDefinitions: "vector::sources::util::grpc::GrpcKeepaliveConfig": object: 
 		required: false
 		type: uint: {
 			examples: [
-				30,
+				30
 			]
 			unit: "seconds"
 		}
@@ -24,7 +24,7 @@ _schemaDefinitions: "vector::sources::util::grpc::GrpcKeepaliveConfig": object: 
 		required: false
 		type: uint: {
 			examples: [
-				300,
+				300
 			]
 			unit: "seconds"
 		}

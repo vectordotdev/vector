@@ -103,7 +103,7 @@ generated: components: sinks: statsd: configuration: {
 		required: false
 		type: uint: {
 			examples: [
-				65536,
+				65536
 			]
 			unit: "bytes"
 		}
