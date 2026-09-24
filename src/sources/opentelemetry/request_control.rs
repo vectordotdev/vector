@@ -71,7 +71,10 @@ enum Protocol {
 struct RequestControlMetrics {
     queued: OpenGauge,
     queued_level: Gauge,
-    #[expect(dead_code)]
+    #[expect(
+        dead_code,
+        reason = "retain the queue capacity gauge handle for the controller lifetime"
+    )]
     queue_capacity: Gauge,
     http_timed_out: Counter,
     grpc_timed_out: Counter,
