@@ -587,11 +587,11 @@ mod housekeeping {
         fn validate(&self, success: bool) -> String {
             let output = self.run(
                 &[
-                    "pr-check",
+                    "housekeeping-validate",
+                    "--version",
+                    "0.59.0",
                     "--base-sha",
                     &self.release,
-                    "--head-ref",
-                    "release/housekeeping-v0.59.0",
                 ],
                 success,
             );

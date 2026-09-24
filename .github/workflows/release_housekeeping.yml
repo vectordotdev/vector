@@ -20,14 +20,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  generate:
-    name: Generate housekeeping changes
+  housekeeping:
+    name: Begin the next development version and push to master
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    outputs:
-      base_sha: ${{ steps.base.outputs.sha }}
-      skip: ${{ steps.state.outputs.skip }}
-      version: ${{ steps.state.outputs.version }}
+    timeout-minutes: 60
+    env:
+      RELEASE_COMMIT: ${{ inputs.release_commit }}
     steps:
       - name: Checkout master
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -54,7 +52,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
-          RELEASE_COMMIT: ${{ inputs.release_commit }}
         run: >-
           "$VDEV" release workflow housekeeping-check
           --tag "$RELEASE_TAG" --release-commit "$RELEASE_COMMIT"
@@ -73,7 +70,6 @@ jobs:
         if: steps.state.outputs.skip != 'true'
         env:
           VERSION: ${{ steps.state.outputs.version }}
-          RELEASE_COMMIT: ${{ inputs.release_commit }}
         run: >-
           "$VDEV" release workflow housekeeping-prepare
           --version "$VERSION" --release-commit "$RELEASE_COMMIT"
@@ -86,75 +82,23 @@ jobs:
         if: steps.state.outputs.skip != 'true'
         run: make build-licenses generate-vector-vrl-docs
 
-      - name: Package housekeeping changes
-        if: steps.state.outputs.skip != 'true'
-        env:
-          BASE_SHA: ${{ steps.base.outputs.sha }}
+      - name: Check for changes
+        id: changes
         run: |
-          git add --all
-          git diff --cached --binary "$BASE_SHA" > "$RUNNER_TEMP/housekeeping.patch"
-          test -s "$RUNNER_TEMP/housekeeping.patch"
-
-      - name: Upload housekeeping changes
-        if: steps.state.outputs.skip != 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: release-housekeeping
-          path: ${{ runner.temp }}/housekeeping.patch
-          if-no-files-found: error
-          retention-days: 1
-
-  push-master:
-    name: Push housekeeping to master
-    needs: generate
-    if: needs.generate.outputs.skip != 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      BASE_SHA: ${{ needs.generate.outputs.base_sha }}
-      VERSION: ${{ needs.generate.outputs.version }}
-    steps:
-      - name: Checkout frozen master
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: master
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Require active release freeze
-        uses: ./.github/actions/require-release-freeze
-        with: *release-bot
-
-      - name: Set up trusted validator
-        uses: ./.github/actions/setup
-        with:
-          rust: true
-          cargo-cache: true
-          vdev: true
-
-      - name: Verify frozen base
-        run: |
-          [[ "$(git rev-parse HEAD)" == "$BASE_SHA" ]]
-
-      - name: Download housekeeping changes
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: release-housekeeping
-          path: ${{ runner.temp }}/housekeeping
-
-      - name: Validate housekeeping changes
-        run: |
-          git apply --index --binary "$RUNNER_TEMP/housekeeping/housekeeping.patch"
-          git config user.name "vectordotdev-bot[bot]"
-          git config user.email "vectordotdev-bot[bot]@users.noreply.github.com"
-          git commit -m "chore(releasing): housekeeping after v${VERSION}"
-          # Validate the checked housekeeping commit exactly as the release
-          # PR checklist would: only Cargo.toml/Cargo.lock dependency and
-          # documentation refreshes on the frozen base.
-          "$VDEV" release workflow pr-check \
-            --base-sha "$BASE_SHA" --head-ref "release/housekeeping-v${VERSION}"
+          set -euo pipefail
+          # Stage exactly the files housekeeping owns so both modified and newly
+          # created documentation files are detected; git diff alone ignores
+          # untracked files. Anything else the tooling touched is left unstaged
+          # and fails the validation below.
+          git add -A -- Cargo.toml Cargo.lock LICENSE-3rdparty.csv docs/generated
+          if git diff --cached --quiet; then
+            echo "Master already begins the next development version; nothing to do."
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Create Vector bot token
+        if: steps.changes.outputs.changed == 'true'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -162,9 +106,17 @@ jobs:
           private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
           permission-contents: write
 
+      - name: Require active release freeze
+        if: steps.changes.outputs.changed == 'true'
+        uses: ./.github/actions/require-release-freeze
+        with: *release-bot
+
       - name: Push housekeeping to master
+        if: steps.changes.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          VERSION: ${{ steps.state.outputs.version }}
         run: |
           set -euo pipefail
           # All remote git operations go through the token-authenticated URL. The
@@ -177,6 +129,18 @@ jobs:
             echo "master moved since housekeeping was generated; re-run this workflow." >&2
             exit 1
           }
+
+          git config user.name "vectordotdev-bot[bot]"
+          git config user.email "vectordotdev-bot[bot]@users.noreply.github.com"
+          # Commit only the generated changes staged by the Check for changes
+          # step; nothing else is committed.
+          git commit -m "chore(releasing): housekeeping after v${VERSION}"
+
+          # Validate the checked housekeeping commit exactly as the release PR
+          # checklist would: only the version bump, the VRL main restoration, and
+          # dependency and documentation refreshes on the frozen base.
+          "$VDEV" release workflow housekeeping-validate \
+            --version "$VERSION" --base-sha "$BASE_SHA"
 
           # Plain non-force push: if master raced ahead since the check above,
           # the push is rejected rather than rewriting history. Re-run this

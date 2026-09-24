@@ -32,7 +32,7 @@ pub struct Cli {
 enum WorkflowCommand {
     /// Validate a request before generating a release preparation PR.
     PrepareCheck(PrepareCheck),
-    /// Validate a generated release preparation PR or housekeeping commit.
+    /// Validate a generated release preparation PR.
     PrCheck(PrCheck),
     /// Validate an approved minor-release squash merge before creating its refs.
     AutotagCheck(AutotagCheck),
@@ -40,6 +40,8 @@ enum WorkflowCommand {
     HousekeepingCheck(HousekeepingCheck),
     /// Begin the next development version and restore VRL main locally.
     HousekeepingPrepare(HousekeepingPrepare),
+    /// Validate a generated housekeeping commit before it is pushed to master.
+    HousekeepingValidate(HousekeepingValidate),
     /// Check that resetting the website branch to a release won't roll it back.
     WebsiteCheck(WebsiteCheck),
     /// Decide whether a release tag should reset the website branch.
@@ -62,6 +64,16 @@ struct HousekeepingPrepare {
     version: Version,
     #[arg(long)]
     release_commit: String,
+}
+
+#[derive(clap::Args, Debug)]
+struct HousekeepingValidate {
+    /// Released stable version whose housekeeping commit is being validated, e.g. 0.59.0.
+    #[arg(long)]
+    version: Version,
+    /// Frozen master commit the housekeeping commit is based on.
+    #[arg(long)]
+    base_sha: String,
 }
 
 #[derive(clap::Args, Debug)]
@@ -157,6 +169,7 @@ impl Cli {
             WorkflowCommand::AutotagCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingPrepare(args) => args.exec(),
+            WorkflowCommand::HousekeepingValidate(args) => args.exec(),
             WorkflowCommand::WebsiteCheck(args) => args.exec(),
             WorkflowCommand::WebsitePreflight(args) => args.exec(),
         }
@@ -329,6 +342,14 @@ impl HousekeepingPrepare {
     }
 }
 
+impl HousekeepingValidate {
+    fn exec(self) -> Result<()> {
+        git::ensure_sha(&self.base_sha, "base SHA")?;
+        git::ensure_worktree_clean()?;
+        validate_housekeeping(&self.base_sha, &self.version)
+    }
+}
+
 impl WebsiteCheck {
     fn exec(self) -> Result<()> {
         let release = parse_stable_version(
@@ -466,10 +487,6 @@ impl PrCheck {
     fn exec(self) -> Result<()> {
         git::ensure_sha(&self.base_sha, "base SHA")?;
         git::ensure_worktree_clean()?;
-        if let Some(version) = self.head_ref.strip_prefix("release/housekeeping-v") {
-            let version = parse_stable_version(version, "housekeeping branch version")?;
-            return validate_housekeeping(&self.base_sha, &version);
-        }
         let version = parse_preparation_branch(&self.head_ref)?;
         ensure!(
             version.patch == 0,
