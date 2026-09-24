@@ -116,6 +116,22 @@ impl RequestControlMetrics {
 
 pub(crate) struct PendingAcknowledgement(pub(crate) BatchStatusReceiver);
 
+#[derive(Clone, Copy)]
+pub(crate) enum AcknowledgementFailure {
+    Errored,
+    Rejected,
+}
+
+impl AcknowledgementFailure {
+    const fn from_status(status: BatchStatus) -> Option<Self> {
+        match status {
+            BatchStatus::Delivered => None,
+            BatchStatus::Errored => Some(Self::Errored),
+            BatchStatus::Rejected => Some(Self::Rejected),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct RequestControlLayer<R> {
     outer: Arc<Semaphore>,
@@ -175,14 +191,11 @@ where
 
                             if let Some(PendingAcknowledgement(receiver)) =
                                 response.extensions_mut().remove()
+                                && let Some(status) =
+                                    AcknowledgementFailure::from_status(receiver.await)
                             {
-                                match receiver.await {
-                                    BatchStatus::Delivered => {}
-                                    status => {
-                                        response = acknowledgement_error
-                                            .make_acknowledgement_response(status);
-                                    }
-                                }
+                                response =
+                                    acknowledgement_error.make_acknowledgement_response(status);
                             }
 
                             Ok(response)
@@ -214,7 +227,7 @@ where
 
 pub(crate) trait ErrorResponse<R>: Clone + Send + 'static {
     fn make_response(&self, error: BoxError) -> R;
-    fn make_acknowledgement_response(&self, status: BatchStatus) -> R;
+    fn make_acknowledgement_response(&self, status: AcknowledgementFailure) -> R;
 }
 
 #[derive(Clone)]
@@ -242,11 +255,10 @@ impl ErrorResponse<Response<Body>> for HttpErrorResponse {
         warp::reply::with_status(response, status).into_response()
     }
 
-    fn make_acknowledgement_response(&self, status: BatchStatus) -> Response<Body> {
+    fn make_acknowledgement_response(&self, status: AcknowledgementFailure) -> Response<Body> {
         let message = match status {
-            BatchStatus::Errored => "Error delivering contents to sink",
-            BatchStatus::Rejected => "Contents failed to deliver to sink",
-            BatchStatus::Delivered => unreachable!("delivered acknowledgements are successful"),
+            AcknowledgementFailure::Errored => "Error delivering contents to sink",
+            AcknowledgementFailure::Rejected => "Contents failed to deliver to sink",
         };
         let response = protobuf(Status {
             code: tonic::Code::Unknown as i32,
@@ -277,11 +289,10 @@ impl ErrorResponse<Response<BoxBody>> for GrpcErrorResponse {
         tonic::Status::unavailable(message).to_http()
     }
 
-    fn make_acknowledgement_response(&self, status: BatchStatus) -> Response<BoxBody> {
+    fn make_acknowledgement_response(&self, status: AcknowledgementFailure) -> Response<BoxBody> {
         match status {
-            BatchStatus::Errored => tonic::Status::internal("Delivery error"),
-            BatchStatus::Rejected => tonic::Status::data_loss("Delivery failed"),
-            BatchStatus::Delivered => unreachable!("delivered acknowledgements are successful"),
+            AcknowledgementFailure::Errored => tonic::Status::internal("Delivery error"),
+            AcknowledgementFailure::Rejected => tonic::Status::data_loss("Delivery failed"),
         }
         .to_http()
     }
