@@ -72,7 +72,7 @@ jobs:
           VERSION: ${{ steps.state.outputs.version }}
         run: >-
           "$VDEV" release workflow housekeeping-prepare
-          --version "$VERSION" --release-commit "$RELEASE_COMMIT"
+          --version "$VERSION"
 
       - name: Install VRL documentation builder
         if: steps.state.outputs.skip != 'true'

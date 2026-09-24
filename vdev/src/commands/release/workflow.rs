@@ -62,8 +62,6 @@ struct HousekeepingCheck {
 struct HousekeepingPrepare {
     #[arg(long)]
     version: Version,
-    #[arg(long)]
-    release_commit: String,
 }
 
 #[derive(clap::Args, Debug)]
@@ -313,7 +311,15 @@ impl HousekeepingCheck {
             println!("Master has advanced beyond {version}; no housekeeping needed.");
             return set_github_output("skip", "true");
         }
-        ensure_release_checkout(&version, &self.release_commit)?;
+        // Authorized release-time pushes (e.g. the Kubernetes manifests refresh)
+        // may have landed on top of the release commit; housekeeping generates
+        // from the current frozen master, so HEAD need only contain the release
+        // commit (checked above via merge-base) and still carry the released
+        // version.
+        ensure!(
+            current_cargo_version()? == version,
+            "master must still contain release version {version}"
+        );
         validate_associated_preparation_pr(
             &self.repository,
             &self.release_commit,
@@ -330,7 +336,15 @@ impl HousekeepingCheck {
 impl HousekeepingPrepare {
     fn exec(self) -> Result<()> {
         git::ensure_worktree_clean()?;
-        ensure_release_checkout(&self.version, &self.release_commit)?;
+        // Authorized release-time pushes (e.g. the Kubernetes manifests
+        // refresh) may have advanced master past the release commit; generate
+        // from the current frozen master, which the check step verified still
+        // contains the release commit at the released version.
+        ensure!(
+            current_cargo_version()? == self.version,
+            "master must still contain release version {}",
+            self.version
+        );
         let manifest = housekeeping_manifest(&fs::read_to_string("Cargo.toml")?, &self.version)?;
         fs::write("Cargo.toml", manifest)?;
         Command::new("cargo")
@@ -399,20 +413,6 @@ impl WebsitePreflight {
         }
         set_github_output("skip", if skip { "true" } else { "false" })
     }
-}
-
-fn ensure_release_checkout(version: &Version, sha: &str) -> Result<()> {
-    next_minor_development_version(version)?;
-    git::ensure_sha(sha, "release commit")?;
-    ensure!(
-        current_cargo_version()? == *version,
-        "master must still contain release version {version}"
-    );
-    ensure!(
-        git::run_and_check_output(&["rev-parse", "HEAD"])?.trim() == sha,
-        "master must still match the published release commit"
-    );
-    Ok(())
 }
 
 fn next_minor_development_version(version: &Version) -> Result<Version> {
