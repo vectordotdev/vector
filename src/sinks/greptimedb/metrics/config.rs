@@ -1,7 +1,7 @@
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::{
-    config::{DynValidatedSink, ValidatedSink},
+    config::ValidatedSink,
     sinks::{
         greptimedb::{
             GreptimeDBDefaultBatchSettings, GrpcCompression, default_dbname,
@@ -59,15 +59,12 @@ pub struct GreptimeDBMetricsConfig {
     #[serde(default)]
     pub grpc_compression: GrpcCompression,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub(crate) batch: BatchConfig<GreptimeDBDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -75,7 +72,6 @@ pub struct GreptimeDBMetricsConfig {
     )]
     pub acknowledgements: AcknowledgementsConfig,
 
-    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     /// Use Greptime's prefixed naming for time index and value columns.
@@ -109,10 +105,6 @@ impl SinkConfig for GreptimeDBMetricsConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
-    }
-
-    fn as_dyn_validated(&self) -> Option<&dyn DynValidatedSink> {
-        Some(self)
     }
 }
 

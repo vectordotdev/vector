@@ -9,11 +9,11 @@ use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
 use vrl::event_path;
 
-use crate::event::event_exceeds_max_nesting_cost;
 use crate::event::ser::{
     ARRAY_FRAME_COST, MAX_VALUE_NESTING_FRAMES, OBJECT_FRAME_COST, TIMESTAMP_FRAME_COST,
     check_value_nesting_cost,
 };
+use crate::event::{TraceLayout, event_exceeds_max_nesting_cost};
 use vector_buffers::Bufferable;
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
@@ -67,6 +67,46 @@ fn back_and_forth_through_bytes() {
         .tests(1_000)
         .max_tests(10_000)
         .quickcheck(inner as fn(EventArray) -> TestResult);
+}
+
+#[test]
+fn disk_buffer_preserves_trace_layout_metadata() {
+    let mut trace = TraceEvent::default();
+    trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+    let expected = EventArray::from(Event::Trace(trace));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Traces(traces) = actual else {
+        panic!("expected a traces array");
+    };
+    assert_eq!(
+        traces[0].metadata().trace_layout(),
+        Some(TraceLayout::Datadog)
+    );
+}
+
+#[test]
+fn disk_buffer_preserves_unrecognized_trace_layout() {
+    let mut trace = TraceEvent::default();
+    trace
+        .metadata_mut()
+        .set_trace_layout(TraceLayout::Unrecognized(99));
+    let expected = EventArray::from(Event::Trace(trace));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Traces(traces) = actual else {
+        panic!("expected a traces array");
+    };
+    assert_eq!(
+        traces[0].metadata().trace_layout(),
+        Some(TraceLayout::Unrecognized(99))
+    );
 }
 
 #[test]
@@ -777,4 +817,61 @@ fn check_value_nesting_cost_with_mixed_variants() {
 
     assert!(check_value_nesting_cost(&value, 0, 7).is_ok());
     assert!(check_value_nesting_cost(&value, 0, 6).is_err());
+}
+
+#[test]
+fn truncated_protobuf_is_invalid_payload() {
+    let array = EventArray::Logs(vec![LogEvent::from("hello")]);
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(array, &mut buffer);
+    assert!(buffer.len() > 1);
+    buffer.truncate(buffer.len() - 1);
+
+    let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            crate::event::DecodeError::InvalidProtobufPayload { .. }
+        ),
+        "truncated protobuf should be InvalidProtobufPayload, got {error:?}"
+    );
+    let message = error.to_string();
+    assert!(
+        message.contains("EventArray") && message.contains("EventWrapper"),
+        "invalid payload should report both decode attempts, got {message}"
+    );
+}
+
+#[test]
+fn unknown_event_array_variant_is_not_invalid_protobuf() {
+    // Field 4 is not a member of `EventArray.events`. Prost keeps it as an unknown
+    // field and leaves the oneof unset, which must not be reported as corrupt protobuf.
+    let buffer = bytes::Bytes::from_static(&[34, 0]);
+    let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
+    assert!(
+        matches!(error, crate::event::DecodeError::UnrecognizedEventVariant),
+        "unknown oneof tag should be UnrecognizedEventVariant, got {error:?}"
+    );
+}
+
+#[test]
+fn nan_float_is_rejected_by_encodable_decode() {
+    let proto_array = proto::EventArray {
+        events: Some(proto::event_array::Events::Logs(proto::LogArray {
+            logs: vec![proto::Log {
+                value: Some(proto::Value {
+                    kind: Some(proto::value::Kind::Float(f64::NAN)),
+                }),
+                ..proto::Log::default()
+            }],
+        })),
+    };
+    let mut buffer = BytesMut::with_capacity(64);
+    proto_array.encode(&mut buffer).unwrap();
+
+    let error = EventArray::decode(EventArray::get_metadata(), buffer).unwrap_err();
+    assert!(
+        matches!(error, crate::event::DecodeError::NanFloat),
+        "NaN float should be NanFloat, got {error:?}"
+    );
 }

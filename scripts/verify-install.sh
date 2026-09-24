@@ -7,7 +7,11 @@ set -euo pipefail
 #
 #   Verifies vector packages have been built and installed correctly
 
-package="${1:?must pass package as argument}"
+package="${1:-}"
+if [[ $# -ne 1 || ! -f "$package" ]]; then
+  echo "Expected exactly one package file" >&2
+  exit 1
+fi
 
 install_package () {
   case "$1" in

@@ -53,14 +53,14 @@ services:
   # Receives metric data from the `datadog-agent` directly. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-agent:
-    # TODO: temporarily pegging the image as latest results in failures
-    image: docker.io/datadog/fakeintake:v77a06f2b
+    image: docker.io/datadog/fakeintake@sha256:bd5f58f1fdd7b45f25fd4b8c522b6705b0f805c1d0651e43cc3bcfdb1354334c
 
   # Receives metric data from the `vector` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.
   fakeintake-vector:
-    # TODO: temporarily pegging the image as latest results in failures
-    image: docker.io/datadog/fakeintake:v77a06f2b
+    # Must stay in lockstep with `fakeintake-agent` above: the test compares the payloads
+    # both services received, so they have to decode them identically.
+    image: docker.io/datadog/fakeintake@sha256:bd5f58f1fdd7b45f25fd4b8c522b6705b0f805c1d0651e43cc3bcfdb1354334c
 
 networks:
   default:

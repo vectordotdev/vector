@@ -98,7 +98,7 @@ fn route(c: &mut Criterion) {
         // into named filters. A mixture of match and not match happens.
         Param {
             slug: "vrl_field_match_many",
-            input: event.clone(),
+            input: event,
             route_config: toml::from_str::<RouteConfig>(
                 r#"
             route.a.type = "vrl"
@@ -148,7 +148,7 @@ fn route(c: &mut Criterion) {
         "#,
             )
             .unwrap(),
-            output_buffer: output_buffer.clone(),
+            output_buffer,
         },
     ] {
         group.throughput(Throughput::Elements(param.input.len() as u64));

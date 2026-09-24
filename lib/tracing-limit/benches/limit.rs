@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 #[macro_use]
 extern crate criterion;
 #[macro_use]
@@ -24,7 +26,7 @@ fn bench(c: &mut Criterion) {
             input,
             |b, n| {
                 let sub = tracing_subscriber::registry::Registry::default().with(
-                    RateLimitedLayer::new(VisitingLayer::new(Mutex::new(String::from("")))),
+                    RateLimitedLayer::new(VisitingLayer::new(Mutex::new(String::new()))),
                 );
                 let n = black_box(n);
                 tracing::subscriber::with_default(sub, || {
@@ -36,9 +38,9 @@ fn bench(c: &mut Criterion) {
                                 bar = "bar",
                                 baz = 3,
                                 quuux = ?0.99,
-                            )
+                            );
                         }
-                    })
+                    });
                 });
             },
         );
@@ -47,7 +49,7 @@ fn bench(c: &mut Criterion) {
     for input in INPUTS {
         group.bench_with_input(BenchmarkId::new("5s", input.to_string()), input, |b, n| {
             let sub = tracing_subscriber::registry::Registry::default().with(
-                RateLimitedLayer::new(VisitingLayer::new(Mutex::new(String::from("")))),
+                RateLimitedLayer::new(VisitingLayer::new(Mutex::new(String::new()))),
             );
             let n = black_box(n);
             tracing::subscriber::with_default(sub, || {
@@ -59,9 +61,9 @@ fn bench(c: &mut Criterion) {
                             bar = "bar",
                             baz = 3,
                             quuux = ?0.99
-                        )
+                        );
                     }
-                })
+                });
             });
         });
     }

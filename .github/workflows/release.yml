@@ -20,3 +20,72 @@ jobs:
       git_ref: ${{ github.ref }}
       channel: release
     secrets: inherit
+  reset-website:
+    name: Reset website branch to the release
+    needs: Release
+    permissions:
+      contents: write # Required to force-update the website branch
+    uses: ./.github/workflows/release_website.yml
+    with:
+      tag: ${{ github.ref_name }}
+      release_commit: ${{ github.sha }}
+    secrets: inherit
+
+  prepare-helm-release:
+    name: Prepare Helm chart release
+    needs: Release
+    if: github.repository == 'vectordotdev/vector'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check latest stable release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Skipping Helm release preparation for non-stable tag $TAG."
+            exit 0
+          fi
+
+          # Helm preparation reads releases/latest and does not accept a version input.
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          if [[ "$latest" != "$TAG" ]]; then
+            echo "Skipping Helm release preparation: $TAG is not the latest release ($latest)."
+            exit 0
+          fi
+          echo "dispatch=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create Helm charts bot token
+        if: steps.release.outputs.dispatch == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          owner: vectordotdev
+          repositories: helm-charts
+          # The App installation on helm-charts must grant Actions: write.
+          permission-actions: write
+
+      - name: Start Helm release preparation
+        if: steps.release.outputs.dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api --method POST repos/vectordotdev/helm-charts/actions/workflows/release-prepare.yml/dispatches \
+            -f ref=develop
+
+  housekeeping:
+    needs: [Release, reset-website]
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    uses: ./.github/workflows/release_housekeeping.yml
+    with:
+      tag: ${{ github.ref_name }}
+      release_commit: ${{ github.sha }}
+    secrets: inherit
