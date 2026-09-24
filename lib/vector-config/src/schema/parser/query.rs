@@ -56,6 +56,24 @@ impl SchemaQuerier {
     pub fn query(&self) -> SchemaQueryBuilder<'_> {
         SchemaQueryBuilder::from_schema(&self.schema)
     }
+
+    /// Gets the schema for values in a map at the configuration root.
+    pub fn root_map_value_schema(&self, property: &str) -> Result<SimpleSchema<'_>, QueryError> {
+        let value = self
+            .schema
+            .root_map_value_schema(property)
+            .ok_or(QueryError::NoMatches)?;
+        let schema = value.as_object().ok_or(QueryError::NoMatches)?;
+        let schema = match schema.reference.as_deref() {
+            Some(reference) => reference
+                .strip_prefix("#/definitions/")
+                .and_then(|name| self.schema.definitions.get(name))
+                .and_then(Schema::as_object)
+                .ok_or(QueryError::NoMatches)?,
+            None => schema,
+        };
+        Ok(schema.into())
+    }
 }
 
 /// A query builder for querying against a root schema.
@@ -428,5 +446,39 @@ fn schema_to_simple_schema(schema: &Schema) -> SimpleSchema<'_> {
 
     SimpleSchema {
         schema: schema_object,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn queries_component_base_through_the_root_map() {
+        let querier = SchemaQuerier {
+            schema: serde_json::from_value(json!({
+                "allOf": [{"properties": {"sources": {
+                    "additionalProperties": {"$ref": "#/definitions/outer"}
+                }}}],
+                "definitions": {"outer": {"type": "object", "properties": {
+                    "shared": {"type": "boolean"}
+                }}}
+            }))
+            .unwrap(),
+        };
+        let base = querier.root_map_value_schema("sources").unwrap();
+        assert!(
+            base.into_inner()
+                .object
+                .as_ref()
+                .unwrap()
+                .properties
+                .contains_key("shared")
+        );
+        assert!(matches!(
+            querier.root_map_value_schema("sinks"),
+            Err(QueryError::NoMatches)
+        ));
     }
 }

@@ -33,6 +33,11 @@ pub struct ReadResult {
 /// Benchmarks indicate that this function processes in the high single-digit
 /// GiB/s range for buffers of length 1KiB. For buffers any smaller than this
 /// the overhead of setup dominates our benchmarks.
+///
+/// # Errors
+///
+/// Returns an error if reading from `reader` fails, except interrupted reads,
+/// which are retried.
 pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
     reader: &'a mut R,
     position: &'a mut FilePosition,
@@ -84,88 +89,84 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
                     successfully_read: Some(total_read),
                     discarded_for_size_and_truncated,
                 });
-            } else {
-                // Not a complete delimiter after all.
-                // Add partial_delim to output buffer as it is actual data.
-                if !discarding {
-                    buf.extend_from_slice(&partial_delim);
-                }
-                partial_delim.clear();
-                // Continue processing current available buffer
             }
+            // Not a complete delimiter after all.
+            // Add partial_delim to output buffer as it is actual data.
+            if !discarding {
+                buf.extend_from_slice(&partial_delim);
+            }
+            partial_delim.clear();
+            // Continue processing current available buffer
         }
 
         let (done, used) = {
-            match delim_finder.find(available) {
-                Some(i) => {
-                    if !discarding {
-                        buf.extend_from_slice(&available[..i]);
-                    }
-                    (true, i + delim_len)
+            if let Some(i) = delim_finder.find(available) {
+                if !discarding {
+                    buf.extend_from_slice(&available[..i]);
                 }
-                None => {
-                    // No delimiter found in current buffer. But there could be a partial delimiter
-                    // at the end of this buffer. For multi-byte delimiters like \r\n, we need
-                    // to handle the case where the delimiter is split across buffer boundaries
-                    // (e.g. \r in the "old" buffer, then we read new data and find \n in the new
-                    // buffer).
-                    let mut partial_match_len = 0;
+                (true, i + delim_len)
+            } else {
+                // No delimiter found in current buffer. But there could be a partial delimiter
+                // at the end of this buffer. For multi-byte delimiters like \r\n, we need
+                // to handle the case where the delimiter is split across buffer boundaries
+                // (e.g. \r in the "old" buffer, then we read new data and find \n in the new
+                // buffer).
+                let mut partial_match_len = 0;
 
-                    // We only need to check if we're not already at the end of the buffer and if we
-                    // have a delimiter that has more than one byte.
-                    if !available.is_empty() && delim_len > 1 {
-                        // Check if the end of the current buffer matches a prefix of the delimiter
-                        // by testing from longest to shortest possible prefix.
-                        //
-                        // This loop runs at most (delim_len - 1) iterations:
-                        //   - 2-byte delimiter (\r\n): 1 iteration max
-                        //   - 5-byte delimiter: 4 iterations max
-                        //
-                        // This part of the code is only called if all of these are true:
-                        //
-                        // - We have a new buffer (e.g. every 8kB, i.e. only called once per buffer)
-                        // - We have a multi-byte delimiter
-                        // - This delimiter could not be found in the current buffer
-                        //
-                        // Even for longer delimiters the performance impact is negligible.
-                        //
-                        // Example 1:
-                        //   Delimiter: \r\n
-                        //   Iteration 1: It checks if the current buffer ends with "\r",
-                        //     if it does we have a potential partial delimiter.
-                        //   The next chunk will confirm whether this is truly part of a delimiter.
+                // We only need to check if we're not already at the end of the buffer and if we
+                // have a delimiter that has more than one byte.
+                if !available.is_empty() && delim_len > 1 {
+                    // Check if the end of the current buffer matches a prefix of the delimiter
+                    // by testing from longest to shortest possible prefix.
+                    //
+                    // This loop runs at most (delim_len - 1) iterations:
+                    //   - 2-byte delimiter (\r\n): 1 iteration max
+                    //   - 5-byte delimiter: 4 iterations max
+                    //
+                    // This part of the code is only called if all of these are true:
+                    //
+                    // - We have a new buffer (e.g. every 8kB, i.e. only called once per buffer)
+                    // - We have a multi-byte delimiter
+                    // - This delimiter could not be found in the current buffer
+                    //
+                    // Even for longer delimiters the performance impact is negligible.
+                    //
+                    // Example 1:
+                    //   Delimiter: \r\n
+                    //   Iteration 1: It checks if the current buffer ends with "\r",
+                    //     if it does we have a potential partial delimiter.
+                    //   The next chunk will confirm whether this is truly part of a delimiter.
 
-                        // Example 2:
-                        //   Delimiter: ABCDE
-                        //   Iteration 1: It checks if the current buffer ends with "ABCD" (we don't
-                        //     need to check "ABCDE" because that would have been caught by
-                        //     `delim_finder.find` earlier)
-                        //   Iteration 2: It checks if the current buffer ends with "ABC"
-                        //   Iterations 3-4: Same for "AB" and "A"
-                        for prefix_len in (1..delim_len).rev() {
-                            if available.len() >= prefix_len
-                                && available.ends_with(&delim[..prefix_len])
-                            {
-                                partial_match_len = prefix_len;
-                                break;
-                            }
+                    // Example 2:
+                    //   Delimiter: ABCDE
+                    //   Iteration 1: It checks if the current buffer ends with "ABCD" (we don't
+                    //     need to check "ABCDE" because that would have been caught by
+                    //     `delim_finder.find` earlier)
+                    //   Iteration 2: It checks if the current buffer ends with "ABC"
+                    //   Iterations 3-4: Same for "AB" and "A"
+                    for prefix_len in (1..delim_len).rev() {
+                        if available.len() >= prefix_len
+                            && available.ends_with(&delim[..prefix_len])
+                        {
+                            partial_match_len = prefix_len;
+                            break;
                         }
                     }
-
-                    let bytes_to_copy = available.len() - partial_match_len;
-
-                    if !discarding && bytes_to_copy > 0 {
-                        buf.extend_from_slice(&available[..bytes_to_copy]);
-                    }
-
-                    // If we found a potential partial delimiter, save it for the next iteration
-                    if partial_match_len > 0 {
-                        partial_delim.clear();
-                        partial_delim.extend_from_slice(&available[bytes_to_copy..]);
-                    }
-
-                    (false, available.len())
                 }
+
+                let bytes_to_copy = available.len() - partial_match_len;
+
+                if !discarding && bytes_to_copy > 0 {
+                    buf.extend_from_slice(&available[..bytes_to_copy]);
+                }
+
+                // If we found a potential partial delimiter, save it for the next iteration
+                if partial_match_len > 0 {
+                    partial_delim.clear();
+                    partial_delim.extend_from_slice(&available[bytes_to_copy..]);
+                }
+
+                (false, available.len())
             }
         };
 
@@ -187,14 +188,14 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
         }
 
         if done {
-            if !discarding {
+            if discarding {
+                discarding = false;
+                buf.clear();
+            } else {
                 return Ok(ReadResult {
                     successfully_read: Some(total_read),
                     discarded_for_size_and_truncated,
                 });
-            } else {
-                discarding = false;
-                buf.clear();
             }
         } else if used == 0 && at_eof {
             // We've hit EOF but haven't seen a delimiter. This can happen when:
@@ -222,12 +223,6 @@ mod test {
     use crate::buffer::ReadResult;
 
     async fn qc_inner(chunks: Vec<Vec<u8>>, delim: u8, max_size: NonZeroU8) -> TestResult {
-        // The `global_data` is the view of `chunks` as a single contiguous
-        // block of memory. Where `chunks` simulates what happens when bytes are
-        // fitfully available `global_data` is the view of all chunks assembled
-        // after every byte is available.
-        let mut global_data = BytesMut::new();
-
         // `DelimDetails` describes the nature of each delimiter found in the
         // `chunks`.
         #[derive(Clone)]
@@ -245,6 +240,12 @@ mod test {
             /// peer
             byte_range: Range<usize>,
         }
+
+        // The `global_data` is the view of `chunks` as a single contiguous
+        // block of memory. Where `chunks` simulates what happens when bytes are
+        // fitfully available `global_data` is the view of all chunks assembled
+        // after every byte is available.
+        let mut global_data = BytesMut::new();
 
         // Move through the `chunks` and discover at what positions an instance
         // of `delim` exists in the chunk stream and whether that `delim` is
@@ -312,7 +313,7 @@ mod test {
                     let has_valid_delimiter = facts
                         .iter()
                         .any(|details| (details.chunk_index == idx) && details.within_max_size);
-                    assert!(chunk.is_empty() || !has_valid_delimiter)
+                    assert!(chunk.is_empty() || !has_valid_delimiter);
                 }
                 ReadResult {
                     successfully_read: Some(total_read),
@@ -324,7 +325,7 @@ mod test {
                     assert!(first_delim.is_some());
                     assert_eq!(
                         first_delim.clone().unwrap().global_index + 1,
-                        position as usize
+                        usize::try_from(position).expect("position fits in the input buffer")
                     );
                     assert_eq!(first_delim.clone().unwrap().interior_index + 1, total_read);
                     assert_eq!(
@@ -365,7 +366,7 @@ mod test {
                 .quickcheck(inner as fn(Vec<Vec<u8>>, u8, NonZeroU8) -> TestResult);
         })
         .await
-        .unwrap()
+        .unwrap();
     }
 
     /// Generic test helper that tests delimiter splits across buffer boundaries

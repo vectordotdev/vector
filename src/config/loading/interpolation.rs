@@ -1,6 +1,59 @@
 use std::{collections::HashMap, sync::LazyLock};
 
 use regex::{Captures, Regex};
+use serde_json::Value;
+
+use super::representation::ConfigMap;
+
+/// Interpolates environment variables in string leaves without changing keys or value types.
+pub fn interpolate_config_map_with_env_vars(
+    map: &ConfigMap,
+    vars: &HashMap<String, String>,
+) -> Result<ConfigMap, Vec<String>> {
+    interpolate_config_map(map, vars, interpolate)
+}
+
+/// Applies a string interpolator recursively, collecting errors from all string leaves.
+pub(super) fn interpolate_config_map(
+    map: &ConfigMap,
+    vars: &HashMap<String, String>,
+    interpolate_fn: impl Fn(&str, &HashMap<String, String>) -> Result<String, Vec<String>>,
+) -> Result<ConfigMap, Vec<String>> {
+    fn visit(
+        value: &mut Value,
+        interpolate: &impl Fn(&str) -> Result<String, Vec<String>>,
+        errors: &mut Vec<String>,
+    ) {
+        match value {
+            Value::String(string) => match interpolate(string) {
+                Ok(interpolated) => *string = interpolated,
+                Err(mut failures) => errors.append(&mut failures),
+            },
+            Value::Array(values) => {
+                for value in values {
+                    visit(value, interpolate, errors);
+                }
+            }
+            Value::Object(values) => {
+                for value in values.values_mut() {
+                    visit(value, interpolate, errors);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut result = map.clone();
+    let mut errors = Vec::new();
+    for value in result.values_mut() {
+        visit(value, &|string| interpolate_fn(string, vars), &mut errors);
+    }
+    if errors.is_empty() {
+        Ok(result)
+    } else {
+        Err(errors)
+    }
+}
 
 // Environment variable names can have any characters from the Portable Character Set other
 // than NUL.  However, for Vector's interpolation, we are closer to what a shell supports which
@@ -86,7 +139,48 @@ pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String
 
 #[cfg(test)]
 mod test {
-    use super::interpolate;
+    use std::collections::HashMap;
+
+    use super::{interpolate, interpolate_config_map_with_env_vars};
+
+    #[test]
+    fn tree_interpolation_preserves_keys_and_types() {
+        let input = serde_json::json!({
+            "${UNSET}": ["${VALUE}", {"${UNSET}": "${NUMBER}"}],
+            "typed": [42, true, null],
+            "boolean": "${BOOLEAN}"
+        });
+        let vars = HashMap::from([
+            ("VALUE".into(), "\"quoted\": [value] # comment".into()),
+            ("NUMBER".into(), "42".into()),
+            ("BOOLEAN".into(), "true".into()),
+        ]);
+        let result =
+            interpolate_config_map_with_env_vars(input.as_object().unwrap(), &vars).unwrap();
+        assert_eq!(
+            serde_json::Value::Object(result),
+            serde_json::json!({
+                "${UNSET}": ["\"quoted\": [value] # comment", {"${UNSET}": "42"}],
+                "typed": [42, true, null],
+                "boolean": "true"
+            })
+        );
+        assert_eq!(input["boolean"], "${BOOLEAN}");
+    }
+
+    #[test]
+    fn tree_interpolation_collects_errors_without_mutating_input() {
+        let input = serde_json::json!({"values": ["${FIRST}", {"nested": "${SECOND}"}]});
+        let original = input.clone();
+        let errors =
+            interpolate_config_map_with_env_vars(input.as_object().unwrap(), &HashMap::new())
+                .unwrap_err();
+        assert_eq!(errors.len(), 2);
+        assert!(errors.iter().any(|error| error.contains("FIRST")));
+        assert!(errors.iter().any(|error| error.contains("SECOND")));
+        assert_eq!(input, original);
+    }
+
     #[test]
     fn interpolation() {
         let vars = vec![

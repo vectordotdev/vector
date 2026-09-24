@@ -119,6 +119,7 @@ pub enum Format {
 }
 
 impl Format {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Format::Date => "date",
@@ -318,9 +319,10 @@ impl ToTokens for Validation {
 }
 
 fn option_as_token<T: ToTokens>(optional: Option<T>) -> proc_macro2::TokenStream {
-    match optional {
-        Some(value) => quote! { Some(#value) },
-        None => quote! { None },
+    if let Some(value) = optional {
+        quote! { Some(#value) }
+    } else {
+        quote! { None }
     }
 }
 
@@ -328,8 +330,7 @@ fn contains_instance_type(schema: &SchemaObject, instance_type: InstanceType) ->
     schema
         .instance_type
         .as_ref()
-        .map(|sov| sov.contains(&instance_type))
-        .unwrap_or(false)
+        .is_some_and(|sov| sov.contains(&instance_type))
 }
 
 fn maybe_float_or_int(meta: &Meta) -> darling::Result<Option<f64>> {
@@ -354,10 +355,10 @@ fn maybe_float_or_int(meta: &Meta) -> darling::Result<Option<f64>> {
 
     // Now make sure it's actually within our shrunken bounds.
     result.and_then(|n| {
-        if !(NUMERIC_ENFORCED_LOWER_BOUND..=NUMERIC_ENFORCED_UPPER_BOUND).contains(&n) {
-            Err(darling::Error::custom(ERR_NUMERIC_OUT_OF_RANGE))
-        } else {
+        if (NUMERIC_ENFORCED_LOWER_BOUND..=NUMERIC_ENFORCED_UPPER_BOUND).contains(&n) {
             Ok(Some(n))
+        } else {
+            Err(darling::Error::custom(ERR_NUMERIC_OUT_OF_RANGE))
         }
     })
 }
