@@ -271,7 +271,7 @@ async fn http_and_grpc_share_admission_and_return_retryable_errors() {
 
     let body = create_test_logs_request().into_inner().encode_to_vec();
     let client = reqwest::Client::new();
-    let first = tokio::spawn({
+    let mut first = tokio::spawn({
         let client = client.clone();
         let body = body.clone();
         async move {
@@ -316,19 +316,19 @@ async fn http_and_grpc_share_admission_and_return_retryable_errors() {
     assert_eq!(grpc_error.code(), tonic::Code::Unavailable);
     assert_eq!(grpc_error.message(), "OTLP request limit exceeded");
 
-    let timed_out_http = first.await.unwrap();
-    assert_eq!(
-        timed_out_http.status(),
-        reqwest::StatusCode::SERVICE_UNAVAILABLE
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(1100), &mut first)
+            .await
+            .is_err(),
+        "acknowledgement waiting must not use the request processing timeout"
     );
-    let status = super::status::Status::decode(timed_out_http.bytes().await.unwrap()).unwrap();
-    assert_eq!(status.code, tonic::Code::Unavailable as i32);
-    assert_eq!(status.message, "OTLP request timed out");
+    first.abort();
+    assert!(first.await.unwrap_err().is_cancelled());
     drop(pending_event);
 }
 
 #[tokio::test]
-async fn grpc_timeout_is_retryable_unavailable() {
+async fn grpc_acknowledgement_wait_does_not_use_request_timeout() {
     let (_guard_0, grpc_addr) = next_addr();
     let (_guard_1, http_addr) = next_addr();
     let mut config = get_source_config_with_headers(grpc_addr, http_addr, false);
@@ -347,7 +347,7 @@ async fn grpc_timeout_is_retryable_unavailable() {
     let mut client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
         .await
         .unwrap();
-    let first = tokio::spawn({
+    let mut first = tokio::spawn({
         let mut client = client.clone();
         async move { client.export(create_test_logs_request()).await }
     });
@@ -362,9 +362,14 @@ async fn grpc_timeout_is_retryable_unavailable() {
     assert_eq!(overloaded.code(), tonic::Code::Unavailable);
     assert_eq!(overloaded.message(), "OTLP request limit exceeded");
 
-    let timed_out = first.await.unwrap().unwrap_err();
-    assert_eq!(timed_out.code(), tonic::Code::Unavailable);
-    assert_eq!(timed_out.message(), "OTLP request timed out");
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(1100), &mut first)
+            .await
+            .is_err(),
+        "acknowledgement waiting must not use the request processing timeout"
+    );
+    first.abort();
+    assert!(first.await.unwrap_err().is_cancelled());
     drop(pending_event);
 }
 

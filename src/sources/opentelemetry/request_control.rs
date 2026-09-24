@@ -178,31 +178,28 @@ where
                         Err(Box::new(tower::timeout::error::Elapsed::new()) as BoxError)
                     }
                     (Some(deadline), Some(Ok(outer))) => {
-                        let acknowledgement_error = error_response.clone();
+                        let _outer = outer;
+                        let mut processing =
+                            processing.expect("admitted request has a processing service");
                         let admitted = async move {
-                            let _outer = outer;
-                            let mut processing =
-                                processing.expect("admitted request has a processing service");
-
                             processing.ready().await.map_err(Into::into)?;
                             drop(queued);
-                            let mut response =
-                                processing.call(request).await.map_err(Into::into)?;
-
-                            if let Some(PendingAcknowledgement(receiver)) =
-                                response.extensions_mut().remove()
-                                && let Some(status) =
-                                    AcknowledgementFailure::from_status(receiver.await)
-                            {
-                                response =
-                                    acknowledgement_error.make_acknowledgement_response(status);
-                            }
-
-                            Ok(response)
+                            processing.call(request).await.map_err(Into::into)
                         };
 
                         match tokio::time::timeout_at(deadline, admitted).await {
-                            Ok(result) => result,
+                            Ok(Ok(mut response)) => {
+                                if let Some(PendingAcknowledgement(receiver)) =
+                                    response.extensions_mut().remove()
+                                    && let Some(status) =
+                                        AcknowledgementFailure::from_status(receiver.await)
+                                {
+                                    response = error_response.make_acknowledgement_response(status);
+                                }
+
+                                Ok(response)
+                            }
+                            Ok(Err(error)) => Err(error),
                             Err(_) => {
                                 Err(Box::new(tower::timeout::error::Elapsed::new()) as BoxError)
                             }

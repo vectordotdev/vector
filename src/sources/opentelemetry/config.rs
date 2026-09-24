@@ -131,7 +131,7 @@ pub struct OpentelemetryConfig {
     /// Defaults to ten times the number of Vector runtime worker threads.
     pub max_concurrent_requests: Option<NonZeroUsize>,
 
-    /// Maximum time spent queueing and processing a request, including acknowledgement handling.
+    /// Maximum time spent queueing and processing a request through submission to the source output.
     #[serde(default = "default_request_timeout_secs")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     pub request_timeout_secs: NonZeroU64,
