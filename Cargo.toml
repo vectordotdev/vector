@@ -952,6 +952,7 @@ sinks-metrics = [
   "sinks-sematext",
   "sinks-statsd",
   "sinks-vector",
+  "sinks-victoriametrics",
   "sinks-splunk_hec"
 ]
 
@@ -1008,6 +1009,7 @@ sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
+sinks-victoriametrics = ["dep:prost", "vector-lib/prometheus"]
 sinks-websocket = ["dep:tokio-tungstenite"]
 sinks-websocket_server = ["dep:tokio-tungstenite", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
 sinks-webhdfs = ["dep:opendal", "dep:opendal-http-transport-reqwest"]
@@ -1056,6 +1058,7 @@ all-integration-tests = [
   "redis-integration-tests",
   "splunk-integration-tests",
   "vector-api-tests",
+  "victoriametrics-integration-tests",
   "webhdfs-integration-tests",
   "windows-event-log-integration-tests",
 ]
@@ -1125,6 +1128,7 @@ pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
+victoriametrics-integration-tests = ["sinks-victoriametrics"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
 windows-event-log-integration-tests = ["sources-windows_event_log-integration-tests"]
 disable-resolv-conf = []
