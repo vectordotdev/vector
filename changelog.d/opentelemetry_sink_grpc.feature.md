@@ -1,3 +1,5 @@
-Added gRPC transport support for the `opentelemetry` sink. Configure with `protocol = "grpc"` and set `uri` to your OTLP/gRPC endpoint (e.g. `http://localhost:4317`). Supports TLS and gzip compression.
+Added gRPC transport support for the `opentelemetry` sink, including TLS and gzip or zstd
+compression for requests and responses. Set `protocol: grpc` and `uri` to your OTLP/gRPC
+endpoint, such as `http://localhost:4317`.
 
-authors: thomasqueirozb
+authors: thomasqueirozb sakateka
