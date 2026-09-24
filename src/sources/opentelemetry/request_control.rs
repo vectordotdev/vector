@@ -144,15 +144,24 @@ where
         let timeout = self.timeout;
         let error_response = self.error_response.clone();
         let service = service_fn(move |request: Request<Body>| {
-            let outer = Arc::clone(&outer).try_acquire_owned();
-            let queued = outer.as_ref().ok().map(|_| metrics.queued_token());
-            let processing = outer.as_ref().ok().map(|_| processing.clone());
+            let deadline = tokio::time::Instant::now().checked_add(timeout);
+            let outer = deadline.map(|_| Arc::clone(&outer).try_acquire_owned());
+            let queued = outer
+                .as_ref()
+                .and_then(|outer| outer.as_ref().ok())
+                .map(|_| metrics.queued_token());
+            let processing = outer
+                .as_ref()
+                .and_then(|outer| outer.as_ref().ok())
+                .map(|_| processing.clone());
             let error_response = error_response.clone();
-            let deadline = tokio::time::Instant::now() + timeout;
 
             async move {
-                let result = match outer {
-                    Ok(outer) => {
+                let result = match (deadline, outer) {
+                    (None, None) => {
+                        Err(Box::new(tower::timeout::error::Elapsed::new()) as BoxError)
+                    }
+                    (Some(deadline), Some(Ok(outer))) => {
                         let acknowledgement_error = error_response.clone();
                         let admitted = async move {
                             let _outer = outer;
@@ -188,7 +197,8 @@ where
                     }
                     // Reuse Tower's standard overload marker without its readiness-based
                     // layer, which would allow idle service clones to reserve capacity.
-                    Err(_) => Err(Box::new(Overloaded::new()) as BoxError),
+                    (Some(_), Some(Err(_))) => Err(Box::new(Overloaded::new()) as BoxError),
+                    _ => unreachable!("outer admission is attempted only with a valid deadline"),
                 };
 
                 Ok::<_, Infallible>(match result {
