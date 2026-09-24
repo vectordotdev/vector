@@ -151,15 +151,8 @@ impl DatadogMetricsV3Encoder {
             .freeze();
 
         // Both limits are inclusive: the intake accepts a payload whose encoded size is exactly
-        // the maximum, and the Agent agrees -- saluki's `V3PayloadLimits::request_fits` compares
-        // both dimensions with `<=`. Only a strictly larger payload has overflowed.
-        //
-        // Deriving this from `len / limit + 1` instead classified an exactly-at-the-limit payload
-        // as needing a split, and for a batch of one metric `split_and_encode` then has nothing
-        // left to halve and drops it as unsplittable -- discarding a payload that was valid.
+        // the maximum. Only a strictly larger payload has overflowed.
         if compressed.len() > self.compressed_limit || uncompressed_size > self.uncompressed_limit {
-            // Only used for logging now that splitting bisects, but keep it meaningful: round up
-            // so a payload 1.5x over the limit reports 2 rather than 1.
             let compressed_splits = compressed.len().div_ceil(self.compressed_limit.max(1));
             let uncompressed_splits = uncompressed_size.div_ceil(self.uncompressed_limit.max(1));
 
