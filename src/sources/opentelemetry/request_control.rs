@@ -6,7 +6,7 @@ use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tonic::body::BoxBody;
 use tower::{
-    BoxError, Layer, Service, ServiceExt, limit::GlobalConcurrencyLimitLayer,
+    BoxError, Layer, Service, ServiceBuilder, ServiceExt, limit::GlobalConcurrencyLimitLayer,
     load_shed::error::Overloaded, service_fn, util::BoxCloneService,
 };
 use vector_lib::{
@@ -141,12 +141,15 @@ where
     type Service = BoxCloneService<Request<Body>, Response<B>, Infallible>;
 
     fn layer(&self, service: S) -> Self::Service {
-        let processing = service_fn(move |mut request: Request<Body>| {
-            drop(request.extensions_mut().remove::<QueuedRequest>());
-            service.clone().oneshot(request)
-        });
-        let processing =
-            GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(&self.inner)).layer(processing);
+        let processing = ServiceBuilder::new()
+            .layer(GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(
+                &self.inner,
+            )))
+            .map_request(|mut request: Request<Body>| {
+                drop(request.extensions_mut().remove::<QueuedRequest>());
+                request
+            })
+            .service(service);
 
         let outer = Arc::clone(&self.outer);
         let metrics = Arc::clone(&self.metrics);
