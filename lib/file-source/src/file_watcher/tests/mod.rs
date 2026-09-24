@@ -220,6 +220,34 @@ async fn gzip_multi_stream_reads_all_members() {
     assert_eq!(lines, vec!["first", "second"]);
 }
 
+#[tokio::test]
+async fn strips_utf8_bom_and_cr_from_default_delimited_lines() {
+    let dir = tempfile::TempDir::new().expect("could not create tempdir");
+    let path = dir.path().join("bom-crlf.log");
+    std::fs::write(&path, b"\xEF\xBB\xBFfirst\r\nsecond\r\n").unwrap();
+
+    let mut fw = FileWatcher::new(
+        path,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        100_000,
+        Bytes::from_static(b"\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let mut lines = Vec::new();
+    for _ in 0..2 {
+        let result = fw.read_line().await.expect("read_line error");
+        lines.push(result.raw_line.expect("expected a line").bytes);
+    }
+
+    assert_eq!(
+        lines,
+        vec![Bytes::from_static(b"first"), Bytes::from_static(b"second")]
+    );
+}
+
 fn watcher_for_timing() -> FileWatcher {
     let now = Instant::now();
 

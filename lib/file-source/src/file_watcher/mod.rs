@@ -21,6 +21,7 @@ use vector_common::compression::gzip_multiple_decoder;
 
 const EOF_READ_BACKOFF_MIN: Duration = Duration::from_millis(1);
 const EOF_READ_BACKOFF_MAX: Duration = Duration::from_millis(250);
+const UTF8_BOM: &[u8] = b"\xEF\xBB\xBF";
 
 #[cfg(test)]
 mod tests;
@@ -40,6 +41,25 @@ pub struct RawLine {
 pub struct RawLineResult {
     pub raw_line: Option<RawLine>,
     pub discarded_for_size_and_truncated: Vec<BytesMut>,
+}
+
+fn normalize_line(bytes: Bytes, offset: FilePosition, line_delimiter: &[u8]) -> Bytes {
+    let mut start = 0;
+    let mut end = bytes.len();
+
+    if offset == 0 && bytes.as_ref().starts_with(UTF8_BOM) {
+        start = UTF8_BOM.len();
+    }
+
+    if line_delimiter == b"\n" && bytes.as_ref().ends_with(b"\r") {
+        end -= 1;
+    }
+
+    if start == 0 && end == bytes.len() {
+        bytes
+    } else {
+        bytes.slice(start..end)
+    }
 }
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
@@ -258,7 +278,11 @@ impl FileWatcher {
                 Ok(RawLineResult {
                     raw_line: Some(RawLine {
                         offset: initial_position,
-                        bytes: self.buf.split().freeze(),
+                        bytes: normalize_line(
+                            self.buf.split().freeze(),
+                            initial_position,
+                            &self.line_delimiter,
+                        ),
                     }),
                     discarded_for_size_and_truncated,
                 })
@@ -272,7 +296,11 @@ impl FileWatcher {
                     // File has been deleted, so return what we have in the buffer, even though it
                     // didn't end with a newline. This is not a perfect signal for when we should
                     // give up waiting for a newline, but it's decent.
-                    let buf = self.buf.split().freeze();
+                    let buf = normalize_line(
+                        self.buf.split().freeze(),
+                        initial_position,
+                        &self.line_delimiter,
+                    );
                     if buf.is_empty() {
                         // EOF
                         self.reached_eof = true;
