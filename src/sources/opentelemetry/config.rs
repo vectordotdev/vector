@@ -27,6 +27,8 @@ use crate::{
 };
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
+use serde::{Deserialize, Deserializer, de};
+use tokio::sync::Semaphore;
 use tonic::transport::server::RoutesBuilder;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
@@ -129,6 +131,7 @@ pub struct OpentelemetryConfig {
     /// Maximum number of queued and processing requests across the HTTP and gRPC servers.
     ///
     /// Defaults to ten times the number of Vector runtime worker threads.
+    #[serde(default, deserialize_with = "deserialize_max_concurrent_requests")]
     pub max_concurrent_requests: Option<NonZeroUsize>,
 
     /// Maximum time spent queueing and processing a request through submission to the source output.
@@ -175,6 +178,22 @@ pub struct OpentelemetryConfig {
 
 const fn default_request_timeout_secs() -> NonZeroU64 {
     NonZeroU64::new(30).unwrap()
+}
+
+fn deserialize_max_concurrent_requests<'de, D>(
+    deserializer: D,
+) -> Result<Option<NonZeroUsize>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<NonZeroUsize>::deserialize(deserializer)?;
+    if value.is_some_and(|value| value.get() > Semaphore::MAX_PERMITS) {
+        return Err(de::Error::custom(format!(
+            "max_concurrent_requests must not exceed {}",
+            Semaphore::MAX_PERMITS
+        )));
+    }
+    Ok(value)
 }
 
 fn runtime_worker_threads() -> NonZeroUsize {

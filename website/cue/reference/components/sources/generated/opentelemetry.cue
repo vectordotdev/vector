@@ -115,7 +115,7 @@ generated: components: sources: opentelemetry: configuration: {
 		type: uint: {}
 	}
 	request_timeout_secs: {
-		description: "Maximum time spent queueing and processing a request, including acknowledgement handling."
+		description: "Maximum time spent queueing and processing a request through submission to the source output."
 		required:    false
 		type: uint: {
 			default: 30

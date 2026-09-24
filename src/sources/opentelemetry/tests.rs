@@ -26,6 +26,7 @@ use futures::Stream;
 use futures_util::StreamExt;
 use prost::Message;
 use similar_asserts::assert_eq;
+use tokio::sync::Semaphore;
 use tonic::Request;
 use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 use vector_lib::opentelemetry::proto::trace::v1::{ResourceSpans, ScopeSpans, Span};
@@ -207,7 +208,7 @@ fn generate_config() {
 }
 
 #[test]
-fn admission_config_defaults_and_rejects_zero() {
+fn admission_config_defaults_and_rejects_invalid_values() {
     let config: OpentelemetryConfig = serde_yaml::from_str(
         r#"
         grpc:
@@ -225,6 +226,17 @@ fn admission_config_defaults_and_rejects_zero() {
             format!("grpc:\n  address: 0.0.0.0:4317\nhttp:\n  address: 0.0.0.0:4318\n{invalid}\n");
         assert!(serde_yaml::from_str::<OpentelemetryConfig>(&yaml).is_err());
     }
+
+    let yaml = format!(
+        "grpc:\n  address: 0.0.0.0:4317\nhttp:\n  address: 0.0.0.0:4318\nmax_concurrent_requests: {}\n",
+        Semaphore::MAX_PERMITS + 1
+    );
+    let error = serde_yaml::from_str::<OpentelemetryConfig>(&yaml).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("max_concurrent_requests must not exceed")
+    );
 }
 
 #[test]
