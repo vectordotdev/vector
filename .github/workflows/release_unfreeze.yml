@@ -57,12 +57,16 @@ jobs:
           set -euo pipefail
           deadline=$((SECONDS + DEADLINE_SECONDS))
           while :; do
-            waiting=$(gh run list --repo "$GITHUB_REPOSITORY" --limit 100 \
-              --json workflowName,status,url --jq '.[] | select(.status != "completed")
-                | select(.workflowName == "Release Suite"
-                  or .workflowName == "Prepare post-release housekeeping"
-                  or .workflowName == "Refresh Kubernetes manifests")
-                | "\(.workflowName) \(.url)"')
+            # Query each release workflow server-side: --limit applies before any
+            # client-side filter, and this repository creates about a hundred runs
+            # an hour, so one repository-wide list can hide an older run that is
+            # still active. "Prepare post-release housekeeping" and the website
+            # reset have no runs of their own; they execute inside "Release Suite".
+            waiting=$(for workflow in release.yml release_manifests.yml; do
+              gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --limit 20 \
+                --json status,workflowName,url --jq '.[] | select(.status != "completed")
+                  | "\(.workflowName) \(.url)"'
+            done)
             open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --app vectordotdev-bot \
               --state open --limit 100 --json number,title --jq '.[] | "PR #\(.number): \(.title)"')
             if [[ -z "$waiting" && -z "$open" ]]; then

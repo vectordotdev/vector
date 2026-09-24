@@ -70,7 +70,8 @@ export PREP_BRANCH=prepare-v-0-"${CURRENT_MINOR_VERSION}"-"${NEW_PATCH_VERSION}"
       workflow to close the direct-push window after the manifests run succeeds.
   - It removes the temporary `vectordotdev-bot` **Always** bypass from every ruleset in
     `RELEASE_FREEZE_BOT_BYPASS`, then sets the `RELEASE_FREEZE_RULESET_ID` ruleset back to **Disabled**.
-    It refuses to close the window while a `vectordotdev-bot` PR is still open.
+    It waits for any pending release or manifests run and for open `vectordotdev-bot` PRs first,
+    and gives up after ten minutes, leaving the freeze active.
   - Run it manually with `workflow_dispatch` if the release never starts the manifests workflow, or to retry a failed run.
 
 - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
