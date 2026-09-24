@@ -1,0 +1,148 @@
+# Regenerate distribution/kubernetes manifests from the published Helm chart and
+# push them directly to master as the vectordotdev-bot. The direct push is
+# authorized by the release freeze window and the temporary bot bypasses on the
+# master rulesets. Release preparation opens this window; the release checklists
+# describe how to close it.
+# The Helm chart release workflow dispatches this after publishing a new chart.
+# This replaces the manual `cargo vdev build manifests` step from the release
+# checklists.
+name: Refresh Kubernetes manifests
+
+on:
+  workflow_dispatch:
+    inputs:
+      chart_version:
+        description: "Chart version published by the Helm release, e.g. 0.62.0. Empty picks the latest published chart."
+        required: false
+        default: ""
+        type: string
+permissions:
+  contents: read # Restrictive default
+
+concurrency:
+  # Serialize manifest refreshes; a queued run picks up the newest chart anyway.
+  group: refresh-kubernetes-manifests
+  cancel-in-progress: false
+
+jobs:
+  refresh-manifests:
+    name: Regenerate manifests and push to master
+    if: github.repository == 'vectordotdev/vector'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require active release freeze
+        uses: ./.github/actions/require-release-freeze
+        with: &release-bot
+          app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          freeze-ruleset-id: ${{ vars.RELEASE_FREEZE_RULESET_ID }}
+          bot-bypass-ruleset-ids: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}
+
+      - name: Set up manifest generation
+        uses: ./.github/actions/setup
+        with:
+          vdev: true
+          mold: false
+
+      - name: Install helm
+        uses: azure/setup-helm@1c3f40cff0c8a2b8c2d1925957f6dcc5356d5c07 # v4.3.1
+        with:
+          token: ${{ github.token }}
+
+      - name: Install yq
+        run: |
+          set -euo pipefail
+          sudo curl -sSL -o /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      # helm.vector.dev is the published index; the generation script reads the
+      # chart from there, so the refreshed manifests always match production.
+      - name: Verify published chart version
+        id: chart
+        env:
+          EXPECTED_VERSION: ${{ inputs.chart_version }}
+        run: |
+          set -euo pipefail
+          published=$(curl -sSL https://helm.vector.dev/index.yaml \
+            | yq e '.entries.vector[0].version' -)
+          if [[ -n "$EXPECTED_VERSION" && "$published" != "$EXPECTED_VERSION" ]]; then
+            echo "helm.vector.dev latest chart is $published, expected $EXPECTED_VERSION." >&2
+            echo "The chart index may still be propagating; re-run this workflow shortly." >&2
+            exit 1
+          fi
+          echo "version=$published" >> "$GITHUB_OUTPUT"
+
+      - name: Generate manifests
+        env:
+          CHART_VERSION: ${{ steps.chart.outputs.version }}
+        run: make generate-kubernetes-manifests CHART_VERSION="$CHART_VERSION"
+
+      - name: Check for changes
+        id: changes
+        env:
+          CHART_VERSION: ${{ steps.chart.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Stage everything the generation script touched so both modified and
+          # newly created manifest files are detected; git diff alone ignores
+          # untracked files.
+          git add -A -- distribution/kubernetes
+          if git diff --cached --quiet -- distribution/kubernetes; then
+            echo "Manifests already match chart $CHART_VERSION; nothing to do."
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create Vector bot token
+        if: steps.changes.outputs.changed == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Require active release freeze
+        if: steps.changes.outputs.changed == 'true'
+        uses: ./.github/actions/require-release-freeze
+        with: *release-bot
+
+      - name: Push manifests to master
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CHART_VERSION: ${{ steps.chart.outputs.version }}
+        run: |
+          set -euo pipefail
+          # All remote git operations go through the token-authenticated URL. The
+          # checkout ran with persist-credentials: false, so origin has no credentials.
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          master=$(git ls-remote "$remote" refs/heads/master)
+          master=${master%%$'\t'*}
+          [[ "$(git rev-parse origin/master)" == "$master" ]] || {
+            echo "master moved since checkout; re-run this workflow." >&2
+            exit 1
+          }
+
+          git config user.name "vectordotdev-bot[bot]"
+          git config user.email "vectordotdev-bot[bot]@users.noreply.github.com"
+          # Commit only the generated manifest changes staged by the Check for
+          # changes step; nothing else is committed.
+          git commit -m "chore(kubernetes): refresh manifests for chart ${CHART_VERSION}"
+
+          # Plain non-force push: if master raced ahead since the check above,
+          # the push is rejected rather than rewriting history. Re-run this
+          # workflow from the new master; never rebase, retry, or force-push.
+          git push "$remote" HEAD:refs/heads/master
+
+          echo "Pushed manifests commit $(git rev-parse HEAD) to master for chart ${CHART_VERSION}." >> "$GITHUB_STEP_SUMMARY"

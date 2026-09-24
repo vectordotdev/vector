@@ -65,6 +65,11 @@ jobs:
       - name: Require active release freeze
         if: steps.state.outputs.skip != 'true'
         uses: ./.github/actions/require-release-freeze
+        with: &release-bot
+          app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          freeze-ruleset-id: ${{ vars.RELEASE_FREEZE_RULESET_ID }}
+          bot-bypass-ruleset-ids: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}
 
       - name: Generate housekeeping
         if: steps.state.outputs.skip != 'true' && steps.state.outputs.resume != 'true'
@@ -133,6 +138,7 @@ jobs:
 
       - name: Require active release freeze
         uses: ./.github/actions/require-release-freeze
+        with: *release-bot
 
       - name: Set up trusted validator
         uses: ./.github/actions/setup
@@ -257,6 +263,7 @@ jobs:
 
       - name: Require active release freeze
         uses: ./.github/actions/require-release-freeze
+        with: *release-bot
 
       - name: Create Vector bot token
         id: app-token
