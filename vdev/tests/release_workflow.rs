@@ -445,6 +445,289 @@ fn release_preparation_rejects_a_merge_commit() {
 }
 
 #[cfg(unix)]
+mod housekeeping {
+    use super::*;
+    use serde_json::json;
+    use std::{env, os::unix::fs::PermissionsExt as _, process::Output};
+
+    struct Fixture {
+        repo: TempDir,
+        _remote: TempDir,
+        release: String,
+    }
+
+    impl Fixture {
+        fn new() -> Self {
+            let (repo, _) = preparation();
+            let release = git(repo.path(), &["rev-parse", "HEAD"]);
+            git(repo.path(), &["tag", "v0.59.0"]);
+            let remote = tempdir().unwrap();
+            git(remote.path(), &["init", "--bare"]);
+            git(
+                repo.path(),
+                &["remote", "add", "origin", remote.path().to_str().unwrap()],
+            );
+            git(repo.path(), &["push", "origin", "HEAD:refs/heads/master"]);
+
+            // Real Cargo git resolution, redirected to a tiny local VRL repository.
+            let vrl = repo.path().join(".git/vrl-source");
+            write(
+                &vrl,
+                "Cargo.toml",
+                "[package]\nname = \"vrl\"\nversion = \"0.28.0\"\nedition = \"2021\"\n",
+            );
+            write(&vrl, "src/lib.rs", "");
+            git(&vrl, &["init", "-b", "main"]);
+            for (key, value) in [
+                ("commit.gpgsign", "false"),
+                ("core.hooksPath", "/dev/null"),
+                ("user.name", "Release test"),
+                ("user.email", "release@example.invalid"),
+            ] {
+                git(&vrl, &["config", key, value]);
+            }
+            commit(&vrl);
+            git(
+                repo.path(),
+                &[
+                    "config",
+                    "--file",
+                    ".git/test-gitconfig",
+                    &format!("url.file://{}.insteadOf", vrl.display()),
+                    "https://github.com/vectordotdev/vrl.git",
+                ],
+            );
+            write(repo.path(), ".git/associated-prs.json", &json!([[{
+                "merged_at": "2026-09-21T12:00:00Z",
+                "merge_commit_sha": release,
+                "user": {"login": "vectordotdev-bot[bot]"},
+                "base": {"ref": "master", "repo": {"full_name": "vectordotdev/vector"}},
+                "head": {"ref": "prepare-v-0-59-0-website", "repo": {"full_name": "vectordotdev/vector"}}
+            }]]).to_string());
+            write(repo.path(), ".git/pr-list.json", "[]");
+            write(
+                repo.path(),
+                ".git/test-bin/gh",
+                "#!/bin/sh\ncase \"$1\" in\napi) cat .git/associated-prs.json ;;\npr) cat .git/pr-list.json ;;\n*) exit 1 ;;\nesac\n",
+            );
+            fs::set_permissions(
+                repo.path().join(".git/test-bin/gh"),
+                fs::Permissions::from_mode(0o755),
+            )
+            .unwrap();
+            Self {
+                repo,
+                _remote: remote,
+                release,
+            }
+        }
+
+        fn run(&self, args: &[&str], success: bool) -> Output {
+            let repo = self.repo.path();
+            let path = env::join_paths(
+                std::iter::once(repo.join(".git/test-bin"))
+                    .chain(env::split_paths(&env::var_os("PATH").unwrap())),
+            )
+            .unwrap();
+            let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
+                .args(["release", "workflow"])
+                .args(args)
+                .env("PATH", path)
+                .env("GIT_CONFIG_GLOBAL", repo.join(".git/test-gitconfig"))
+                .env("CARGO_NET_GIT_FETCH_WITH_CLI", "true")
+                // Do not cache the redirected VRL repository in the developer's Cargo home.
+                .env("CARGO_HOME", repo.join(".git/cargo-home"))
+                .env_remove("GITHUB_OUTPUT")
+                .env_remove("GITHUB_STEP_SUMMARY")
+                .current_dir(repo)
+                .output()
+                .unwrap();
+            assert_eq!(
+                output.status.success(),
+                success,
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            output
+        }
+
+        fn state(&self, success: bool) -> String {
+            let output = self.run(
+                &[
+                    "housekeeping-check",
+                    "--tag",
+                    "v0.59.0",
+                    "--release-commit",
+                    &self.release,
+                    "--repository",
+                    "vectordotdev/vector",
+                ],
+                success,
+            );
+            if success {
+                String::from_utf8(output.stdout).unwrap()
+            } else {
+                String::from_utf8(output.stderr).unwrap()
+            }
+        }
+
+        fn prepare(&self) {
+            self.run(
+                &[
+                    "housekeeping-prepare",
+                    "--version",
+                    "0.59.0",
+                    "--release-commit",
+                    &self.release,
+                ],
+                true,
+            );
+        }
+
+        fn validate(&self, success: bool) -> String {
+            let output = self.run(
+                &[
+                    "pr-check",
+                    "--base-sha",
+                    &self.release,
+                    "--head-ref",
+                    "release/housekeeping-v0.59.0",
+                ],
+                success,
+            );
+            String::from_utf8(output.stderr).unwrap()
+        }
+    }
+
+    #[test]
+    fn generates_and_validates_the_next_development_version() {
+        let fixture = Fixture::new();
+        fixture.prepare();
+        let repo = fixture.repo.path();
+        let manifest = fs::read_to_string(repo.join("Cargo.toml")).unwrap();
+        assert!(manifest.contains("version = \"0.60.0-dev\""));
+        assert!(manifest.contains("git = \"https://github.com/vectordotdev/vrl.git\""));
+        assert!(manifest.contains("branch = \"main\""));
+        let lock = fs::read_to_string(repo.join("Cargo.lock")).unwrap();
+        assert!(lock.contains("git+https://github.com/vectordotdev/vrl.git?branch=main#"));
+        write(repo, "LICENSE-3rdparty.csv", "Refreshed licenses\n");
+        write(repo, "docs/generated/vrl.json", "{}\n");
+        commit(repo);
+        fixture.validate(true);
+        assert!(git(repo, &["status", "--porcelain"]).is_empty());
+    }
+
+    #[test]
+    fn rejects_unrelated_changes_and_stale_lockfiles() {
+        for (path, contents, error) in [
+            (
+                "src/lib.rs",
+                "pub fn unrelated() {}\n",
+                "unexpected housekeeping file",
+            ),
+            ("Cargo.lock", "version = 4\n", "lock file"),
+            (
+                "Cargo.toml",
+                "[package]\nname = \"vector\"\nversion = \"0.60.0-dev\"\nedition = \"2024\"\n",
+                "housekeeping may only bump",
+            ),
+        ] {
+            let fixture = Fixture::new();
+            fixture.prepare();
+            write(fixture.repo.path(), path, contents);
+            commit(fixture.repo.path());
+            assert!(fixture.validate(false).contains(error), "{path}");
+        }
+    }
+
+    #[test]
+    fn retries_reuse_the_published_branch_and_skip_open_or_completed_prs() {
+        let fixture = Fixture::new();
+        let output = fixture.state(true);
+        assert!(output.contains("branch=release/housekeeping-v0.59.0\n"));
+        assert!(output.contains("resume=false\nskip=false\n"));
+        let repo = fixture.repo.path();
+        fixture.prepare();
+        let housekeeping = commit(repo);
+        git(
+            repo,
+            &[
+                "push",
+                "origin",
+                "HEAD:refs/heads/release/housekeeping-v0.59.0",
+            ],
+        );
+        git(repo, &["switch", "--detach", &fixture.release]);
+        assert!(fixture.state(true).contains("resume=true\nskip=false\n"));
+        write(
+            repo,
+            ".git/pr-list.json",
+            r#"[{"isCrossRepository":false,"url":"https://example.invalid/pr/1"}]"#,
+        );
+        assert!(fixture.state(true).contains("skip=true\n"));
+        git(repo, &["switch", "--detach", &housekeeping]);
+        assert!(fixture.state(true).contains("skip=true\n"));
+    }
+
+    #[test]
+    fn requires_the_published_tag_and_frozen_release_commit() {
+        let fixture = Fixture::new();
+        let repo = fixture.repo.path();
+        write(repo, ".git/associated-prs.json", "[[]]");
+        assert!(
+            fixture
+                .state(false)
+                .contains("expected one merged bot preparation PR")
+        );
+        write(repo, "README.md", "A commit during the freeze\n");
+        commit(repo);
+        assert!(
+            fixture
+                .state(false)
+                .contains("master must still match the published release commit")
+        );
+        git(repo, &["-c", "tag.gpgsign=false", "tag", "-f", "v0.59.0"]);
+        assert!(
+            fixture
+                .state(false)
+                .contains("release tag does not match the published commit")
+        );
+    }
+
+    #[test]
+    fn skips_non_minor_releases_and_rejects_generation_from_the_wrong_commit() {
+        let fixture = Fixture::new();
+        for tag in ["v0.59.1", "v0.60.0-rc.1", "v0.59.0+build"] {
+            let output = fixture.run(
+                &[
+                    "housekeeping-check",
+                    "--tag",
+                    tag,
+                    "--release-commit",
+                    &fixture.release,
+                    "--repository",
+                    "vectordotdev/vector",
+                ],
+                true,
+            );
+            assert_eq!(String::from_utf8(output.stdout).unwrap(), "skip=true\n");
+        }
+        let before = git(fixture.repo.path(), &["rev-parse", "HEAD^"]);
+        fixture.run(
+            &[
+                "housekeeping-prepare",
+                "--version",
+                "0.59.0",
+                "--release-commit",
+                &before,
+            ],
+            false,
+        );
+        assert!(git(fixture.repo.path(), &["status", "--porcelain"]).is_empty());
+    }
+}
+
+#[cfg(unix)]
 mod autotag {
     use super::*;
     use serde_json::{Value, json};
@@ -598,5 +881,199 @@ mod autotag {
         assert!(
             String::from_utf8_lossy(&result.stderr).contains("checkout must match the release SHA")
         );
+    }
+}
+
+mod website_check {
+    use super::*;
+
+    fn website(repo: &Path, website_version: &str) -> String {
+        version(repo, website_version);
+        commit(repo)
+    }
+
+    fn check_website(repo: &Path, tag: &str, release: &str, website: Option<&str>, success: bool) {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_vdev"));
+        command.args([
+            "release",
+            "workflow",
+            "website-check",
+            "--tag",
+            tag,
+            "--release-commit",
+            release,
+        ]);
+        if let Some(website) = website {
+            command.args(["--website-commit", website]);
+        }
+        let output = command.current_dir(repo).output().unwrap();
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.success(), success, "{stderr}");
+    }
+
+    #[test]
+    fn rejects_versions_newer_than_the_release() {
+        for website_version in ["0.60.0-dev", "0.59.1"] {
+            let (temp, _) = preparation();
+            let repo = temp.path();
+            let release = git(repo, &["rev-parse", "HEAD"]);
+            let website = website(repo, website_version);
+            check_website(repo, "v0.59.0", &release, Some(&website), false);
+        }
+    }
+
+    #[test]
+    fn compares_versions_numerically_not_lexically() {
+        // "0.10.0" sorts before "0.9.0" lexically, but is numerically newer.
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let newer = website(repo, "0.10.0");
+        let older = website(repo, "0.9.0");
+        check_website(repo, "v0.9.0", &older, Some(&newer), false);
+
+        check_website(repo, "v0.10.0", &newer, Some(&older), true);
+    }
+
+    #[test]
+    fn accepts_equal_core_versions_with_website_development_suffixes() {
+        for website_version in ["0.59.0-dev", "0.59.0+build.5"] {
+            let (temp, _) = preparation();
+            let repo = temp.path();
+            let release = git(repo, &["rev-parse", "HEAD"]);
+            let website = website(repo, website_version);
+            check_website(repo, "v0.59.0", &release, Some(&website), true);
+        }
+    }
+
+    #[test]
+    fn reads_the_version_at_the_requested_commit_not_the_checkout() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let release = git(repo, &["rev-parse", "HEAD"]);
+        let newer = website(repo, "0.60.0");
+        version(repo, "0.58.0");
+        let older = commit(repo);
+        // The checkout looks older than the release, but the requested website
+        // commit is newer and must still be refused.
+        check_website(repo, "v0.59.0", &release, Some(&newer), false);
+
+        version(repo, "0.60.0");
+        commit(repo);
+        // The checkout looks newer, but the requested website commit is older.
+        check_website(repo, "v0.59.0", &release, Some(&older), true);
+    }
+
+    #[test]
+    fn rejects_invalid_tags() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let release = git(repo, &["rev-parse", "HEAD"]);
+        let website = website(repo, "0.58.0");
+        for tag in ["0.59.0", "v0.59.0-rc.1"] {
+            check_website(repo, tag, &release, Some(&website), false);
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_and_unknown_website_commits() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let release = git(repo, &["rev-parse", "HEAD"]);
+        for commit in ["not-a-commit", "0000000000000000000000000000000000000000"] {
+            check_website(repo, "v0.59.0", &release, Some(commit), false);
+        }
+    }
+
+    #[test]
+    fn rejects_a_website_commit_without_a_manifest_version() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let release = git(repo, &["rev-parse", "HEAD"]);
+        write(
+            repo,
+            "Cargo.toml",
+            "[dependencies]\nvrl = { workspace = true }\n",
+        );
+        let website = commit(repo);
+        check_website(repo, "v0.59.0", &release, Some(&website), false);
+    }
+
+    #[test]
+    fn rejects_mismatched_release_commits_even_without_a_website_branch() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let previous = git(repo, &["rev-parse", "HEAD"]);
+        for candidate_version in ["0.59.1-dev", "0.59.1+build", "0.58.0"] {
+            let candidate = website(repo, candidate_version);
+            // A matching checkout must not hide a mismatched candidate commit.
+            website(repo, "0.59.1");
+            for current in [None, Some(previous.as_str()), Some(candidate.as_str())] {
+                check_website(repo, "v0.59.1", &candidate, current, false);
+            }
+        }
+    }
+
+    #[test]
+    fn accepts_a_matching_patch_release_with_or_without_a_website_branch() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        let previous = git(repo, &["rev-parse", "HEAD"]);
+        let release = website(repo, "0.59.1");
+        for current in [None, Some(previous.as_str()), Some(release.as_str())] {
+            check_website(repo, "v0.59.1", &release, current, true);
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_release_commits_without_a_website_branch() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        for release in ["not-a-commit", "0000000000000000000000000000000000000000"] {
+            check_website(repo, "v0.59.0", release, None, false);
+        }
+    }
+}
+
+mod website_preflight {
+    use super::*;
+
+    fn preflight(repo: &Path, tag: &str, success: bool) -> String {
+        let output = Command::new(env!("CARGO_BIN_EXE_vdev"))
+            .args(["release", "workflow", "website-preflight", "--tag", tag])
+            .env_remove("GITHUB_OUTPUT")
+            .env_remove("GITHUB_STEP_SUMMARY")
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.success(), success, "{stderr}");
+        String::from_utf8(output.stdout).unwrap()
+    }
+
+    #[test]
+    fn resets_stable_tags_including_patch_releases() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        for tag in ["v0.59.0", "v0.59.1"] {
+            assert_eq!(preflight(repo, tag, true), "skip=false\n");
+        }
+    }
+
+    #[test]
+    fn skips_prerelease_and_build_metadata_tags() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        for tag in ["v0.60.0-rc.1", "v0.59.0+build"] {
+            assert_eq!(preflight(repo, tag, true), "skip=true\n");
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_tags() {
+        let (temp, _) = preparation();
+        let repo = temp.path();
+        for tag in ["0.59.0", "v0.59", "v0.59.0.1", "release-v0.59.0"] {
+            preflight(repo, tag, false);
+        }
     }
 }

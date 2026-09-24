@@ -33,17 +33,26 @@ jobs:
       skip: ${{ steps.preflight.outputs.skip }}
     steps:
       - name: Checkout master
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: master
           fetch-depth: 0
 
-      - name: Require active release freeze
-        uses: ./.github/actions/require-release-freeze
+      - name: Activate release freeze
+        uses: ./.github/actions/activate-release-freeze
+        with:
+          app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          freeze-ruleset-id: ${{ vars.RELEASE_FREEZE_RULESET_ID }}
+          bot-bypass-ruleset-ids: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}
 
       - name: Record frozen base
         id: base
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          # master may have advanced between checkout and freeze activation.
+          git fetch origin refs/heads/master:refs/remotes/origin/master
+          git switch --detach origin/master
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up release tooling
         uses: ./.github/actions/setup
@@ -53,7 +62,7 @@ jobs:
           rust: true
           protoc: true
           dd-rust-license-tool: true
-          vdev: false
+          vdev: true
 
       - name: Validate requested release
         id: preflight
@@ -61,7 +70,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: >-
-          cargo vdev release workflow prepare-check
+          "$VDEV" release workflow prepare-check
           --version "$VERSION"
           --bot-app vectordotdev-bot
           --repository "$GITHUB_REPOSITORY"
@@ -73,7 +82,7 @@ jobs:
           VERSION: ${{ inputs.version }}
           VRL_VERSION: ${{ inputs.vrl_version }}
         run: >-
-          cargo vdev release prepare
+          "$VDEV" release prepare
           --version "$VERSION"
           --vrl-version "$VRL_VERSION"
           --dry-run
@@ -85,11 +94,9 @@ jobs:
           PREP_BRANCH: ${{ steps.preflight.outputs.branch }}
           VRL_VERSION: ${{ inputs.vrl_version }}
         run: |
-          # The preflight built this binary from the frozen master checkout.
-          cp target/debug/vdev "$RUNNER_TEMP/release-vdev"
           git fetch --no-tags origin "refs/heads/${PREP_BRANCH}"
           git switch --detach FETCH_HEAD
-          "$RUNNER_TEMP/release-vdev" release workflow pr-check \
+          "$VDEV" release workflow pr-check \
             --base-sha "$BASE_SHA" --head-ref "$PREP_BRANCH" \
             --expected-vrl-version "$VRL_VERSION"
 
@@ -126,7 +133,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout frozen master
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: master
           fetch-depth: 0
