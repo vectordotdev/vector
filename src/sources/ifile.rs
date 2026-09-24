@@ -600,7 +600,7 @@ pub fn ifile_source(
     let exclude = exclude_patterns;
     let multiline_config = config.multiline.clone();
 
-    let (finalizer, shutdown_checkpointer) = if acknowledgements {
+    let (finalizer, shutdown_checkpointer, shutdown_output) = if acknowledgements {
         // The shutdown sent in to the finalizer is the global
         // shutdown handle used to tell it to stop accepting new batch
         // statuses and just wait for the remaining acks to come in.
@@ -629,11 +629,12 @@ pub fn ifile_source(
             }
             send_shutdown.send(())
         });
-        (Some(finalizer), shutdown2.map(|_| ()).boxed())
+        (Some(finalizer), shutdown2.map(|_| ()).boxed(), None)
     } else {
-        // When not dealing with end-to-end acknowledgements, just
-        // clone the global shutdown to stop the checkpoint writer.
-        (None, shutdown.clone().map(|_| ()).boxed())
+        // Keep checkpointing until queued records and multiline buffers have
+        // reached the source output, even without downstream acknowledgements.
+        let (send_shutdown, shutdown2) = oneshot::channel::<()>();
+        (None, shutdown2.map(|_| ()).boxed(), Some(send_shutdown))
     };
 
     let checkpoints = checkpointer.view();
@@ -751,6 +752,9 @@ pub fn ifile_source(
                 Err(_) => emit!(StreamClosedError {
                     count: failed_count
                 }),
+            }
+            if let Some(shutdown_output) = shutdown_output {
+                shutdown_output.send(()).unwrap_or_default();
             }
         });
 
@@ -1069,6 +1073,7 @@ mod tests {
             (32, 100, 1024, 65536),
             (1, 2200, 1024, 4 * 1024 * 1024),
             (1, 10000, 0, 65536),
+            (2, 10000, 0, 64),
         ] {
             let root = tempdir().unwrap();
             let data = tempdir().unwrap();
@@ -1138,7 +1143,7 @@ mod tests {
                         *count += 1;
                         total += 1;
                         // Every file gets its first turn before any gets a second.
-                        if files > 1 && *count > 65 {
+                        if files > 1 && *count > read_budget / (line_bytes + 1) + 1 {
                             assert_eq!(counts.len(), files);
                         }
                     }
@@ -2975,6 +2980,64 @@ mod tests {
             .unwrap()
             .unwrap()
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn shutdown_waits_for_handoff_before_final_checkpoint() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("file");
+        let contents = "record\n".repeat(2000);
+        fs::write(&path, &contents).await.unwrap();
+        let config = ifile::FileConfig {
+            include: vec![path.clone()],
+            remove_after_secs: Some(3600),
+            checkpoint_interval: Duration::from_secs(3600),
+            ..test_default_file_config(&dir)
+        };
+        let (tx, rx) = SourceSender::new_test_sender_with_options(1, None);
+        let rx = rx
+            .into_stream()
+            .flat_map(vector_lib::event::into_event_stream);
+        let (test_tx, mut test_rx) = mpsc::unbounded_channel();
+        let (stop, shutdown, _) = ShutdownSignal::new_wired();
+        let mut task = tokio::spawn(ifile::ifile_source(
+            &config,
+            config.data_dir.clone().unwrap(),
+            shutdown,
+            Senders {
+                source_sender: tx,
+                test_sender: Some(test_tx),
+            },
+            false,
+            LogNamespace::Legacy,
+        ));
+        wait_checkpoint_and_n_reads(&mut test_rx, vec![&path], 2000, 5000).await;
+        drop(stop);
+        assert!(
+            timeout(Duration::from_millis(200), &mut task)
+                .await
+                .is_err(),
+            "source completed shutdown while output was still blocked"
+        );
+        let events = timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+            .await
+            .unwrap();
+        assert_eq!(events.len(), 2000);
+        timeout(Duration::from_secs(5), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let checkpoint: serde_json::Value = serde_json::from_slice(
+            &fs::read(config.data_dir.unwrap().join("checkpoints.json"))
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            checkpoint["checkpoints"][0]["position"],
+            contents.len() as u64
+        );
     }
 
     #[derive(Clone, Copy, Eq, PartialEq)]
