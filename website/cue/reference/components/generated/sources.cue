@@ -25,8 +25,11 @@ generated: components: sources: configuration: {
 						}
 					}]
 					options: "*": {
-						description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-						required:    true
+						description: """
+															A collection of graph edge attributes in graphviz DOT language, related to a single input
+															component.
+															"""
+						required: true
 						type: object: {
 							examples: [{
 								color: "red"

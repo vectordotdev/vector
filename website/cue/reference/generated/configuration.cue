@@ -46,8 +46,11 @@ generated: configuration: {
 												width: "5.0"
 											}]
 										}
-										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-										required:    true
+										description: """
+																						A collection of graph edge attributes in graphviz DOT language, related to a single input
+																						component.
+																						"""
+										required: true
 									}
 									examples: [{
 										example_input: {
@@ -1136,8 +1139,11 @@ generated: configuration: {
 												width: "5.0"
 											}]
 										}
-										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-										required:    true
+										description: """
+																						A collection of graph edge attributes in graphviz DOT language, related to a single input
+																						component.
+																						"""
+										required: true
 									}
 									examples: [{
 										example_input: {
@@ -1312,8 +1318,11 @@ generated: configuration: {
 												width: "5.0"
 											}]
 										}
-										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-										required:    true
+										description: """
+																						A collection of graph edge attributes in graphviz DOT language, related to a single input
+																						component.
+																						"""
+										required: true
 									}
 									examples: [{
 										example_input: {
@@ -1444,8 +1453,11 @@ generated: configuration: {
 												width: "5.0"
 											}]
 										}
-										description: "A collection of graph edge attributes in graphviz DOT language, related to a single input component."
-										required:    true
+										description: """
+																						A collection of graph edge attributes in graphviz DOT language, related to a single input
+																						component.
+																						"""
+										required: true
 									}
 									examples: [{
 										example_input: {

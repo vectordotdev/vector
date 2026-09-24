@@ -234,7 +234,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 				"match[]": ["{job=\"somejob\"}", "{__name__=~\"job:.*\"}"]
 			}]
 			options: "*": {
-				description: "A query string parameter."
+				description: "Configuration of the query parameter value for HTTP requests."
 				required:    true
 				type: {
 					object: options: {

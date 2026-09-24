@@ -87,7 +87,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 		description: "Tag cardinality limits configuration per metric name."
 		required:    false
 		type: object: options: "*": {
-			description: "An individual metric configuration."
+			description: "Per-metric name tag cardinality limit configuration."
 			required:    true
 			type: object: options: {
 				cache_size_per_key: {
@@ -160,8 +160,26 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 						"""
 					required: false
 					type: object: options: "*": {
-						description: "An individual tag configuration."
-						required:    true
+						description: """
+																				Per-tag cardinality configuration.
+
+																				Specify `mode` to control how this tag is handled:
+
+																				Example:
+																				```yaml
+																				per_tag_limits:
+																				  environment:
+																				    mode: limit_override  # track with a per-tag cap
+																				    value_limit: 3
+																				  high_cardinality_tag:
+																				    mode: limit_override
+																				    value_limit: 1000
+																				    cache_size_per_key: 102400  # larger bloom filter for this tag
+																				  trace_id:
+																				    mode: excluded        # opt out of tracking entirely
+																				```
+																				"""
+						required: true
 						type: object: options: {
 							cache_size_per_key: {
 								description: """
@@ -215,8 +233,26 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: "An individual tag configuration."
-			required:    true
+			description: """
+				Per-tag cardinality configuration.
+
+				Specify `mode` to control how this tag is handled:
+
+				Example:
+				```yaml
+				per_tag_limits:
+				  environment:
+				    mode: limit_override  # track with a per-tag cap
+				    value_limit: 3
+				  high_cardinality_tag:
+				    mode: limit_override
+				    value_limit: 1000
+				    cache_size_per_key: 102400  # larger bloom filter for this tag
+				  trace_id:
+				    mode: excluded        # opt out of tracking entirely
+				```
+				"""
+			required: true
 			type: object: options: {
 				cache_size_per_key: {
 					description: """
