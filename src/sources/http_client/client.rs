@@ -370,6 +370,8 @@ impl SourceConfig for HttpClientConfig {
         let inputs = GenericHttpClientInputs {
             urls,
             interval: self.interval,
+            initial_delay: Duration::ZERO,
+            jitter_seed: None,
             timeout: self.timeout,
             headers: self.headers.clone(),
             content_type,
