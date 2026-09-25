@@ -21,19 +21,19 @@ use vector_common::constants::GZIP_MAGIC;
 use crate::{FilePosition, ReadFrom};
 use file_source_common::PortableFileExt;
 use file_source_common::{
-    buffer::{read_until_with_max_size, ReadResult},
+    buffer::bounded::{BoundedLineReader, ReadOutcome},
     AsyncFileInfo,
 };
 
-/// Delivery progress used only when automatic file deletion is enabled.
+/// Contiguous delivery progress for acknowledgements and automatic file deletion.
 /// A new instance after truncation isolates acknowledgements for old contents.
 #[derive(Debug)]
-pub struct DeletionProgress {
+pub struct DeliveryProgress {
     offset: AtomicU64,
     failed: AtomicBool,
 }
 
-impl DeletionProgress {
+impl DeliveryProgress {
     fn new(offset: FilePosition) -> Self {
         Self {
             offset: AtomicU64::new(offset),
@@ -88,12 +88,13 @@ pub struct FileWatcher {
     is_dead: bool,
     reached_eof: bool,
     last_read_success: Instant,
-    last_seen: Instant,
+    idle_since: Option<Instant>,
+    line_reader: BoundedLineReader,
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
     reader: FileReader,
-    pub(super) deletion_progress: Option<Arc<DeletionProgress>>,
+    pub(super) delivery_progress: Option<Arc<DeliveryProgress>>,
     compressed: bool,
     deletion_allowed: bool,
     opened_length: u64,
@@ -207,22 +208,23 @@ impl FileWatcher {
             is_dead: false,
             reached_eof: false,
             last_read_success: ts,
-            last_seen: ts,
+            idle_since: None,
+            line_reader: BoundedLineReader::new(line_delimiter.clone(), max_line_bytes),
             max_line_bytes,
             line_delimiter,
             buf: BytesMut::new(),
             deletion_allowed: !matches!(reader, FileReader::Empty),
             reader,
-            deletion_progress: None,
+            delivery_progress: None,
             compressed: gzipped,
             opened_length: metadata.len(),
             opened_modified: metadata.modified().ok(),
         })
     }
 
-    pub(super) fn enable_deletion(&mut self, checkpoint: Option<FilePosition>) {
-        if self.deletion_progress.is_none() {
-            self.deletion_progress = Some(Arc::new(DeletionProgress::new(checkpoint.unwrap_or(0))));
+    pub(super) fn enable_delivery_tracking(&mut self, checkpoint: Option<FilePosition>) {
+        if self.delivery_progress.is_none() {
+            self.delivery_progress = Some(Arc::new(DeliveryProgress::new(checkpoint.unwrap_or(0))));
         }
     }
 
@@ -232,7 +234,7 @@ impl FileWatcher {
             || !self.buf.is_empty()
             || self.last_read_success.elapsed() < grace
             || !self
-                .deletion_progress
+                .delivery_progress
                 .as_ref()
                 .is_some_and(|p| p.covers(self.file_position))
         {
@@ -284,7 +286,7 @@ impl FileWatcher {
     pub fn set_file_findable(&mut self, f: bool) {
         self.findable = f;
         if f {
-            self.last_seen = Instant::now();
+            self.idle_since = None;
         }
     }
 
@@ -317,8 +319,11 @@ impl FileWatcher {
                 reader.seek(SeekFrom::Start(0)).await?;
                 self.file_position = 0;
                 self.buf.clear();
-                if self.deletion_progress.is_some() {
-                    self.deletion_progress = Some(Arc::new(DeletionProgress::new(0)));
+                self.line_reader.reset();
+                if let Some(progress) = &self.delivery_progress {
+                    // Reject late acknowledgements for the previous contents.
+                    progress.failed();
+                    self.delivery_progress = Some(Arc::new(DeliveryProgress::new(0)));
                 }
             }
         }
@@ -329,7 +334,12 @@ impl FileWatcher {
     ///
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time.
-    pub(super) async fn read_line(&mut self) -> io::Result<Option<RawLine>> {
+    #[cfg(test)]
+    async fn read_line(&mut self) -> io::Result<Option<RawLine>> {
+        self.read_line_bounded(usize::MAX).await
+    }
+
+    pub(super) async fn read_line_bounded(&mut self, budget: usize) -> io::Result<Option<RawLine>> {
         self.reached_eof = false;
         if self.is_dead {
             return Ok(None);
@@ -343,21 +353,24 @@ impl FileWatcher {
                 return Ok(None);
             }
         };
-        let file_position = &mut self.file_position;
-        match read_until_with_max_size(
-            reader,
-            file_position,
-            self.line_delimiter.as_ref(),
-            &mut self.buf,
-            self.max_line_bytes,
-        )
-        .await
-        {
-            Ok(ReadResult {
-                successfully_read: Some(_), // TODO check if discarded_for_size_and_truncated is
-                                            // empty
-                ..
-            }) => {
+        // Preserve whole-record reads for valid lines even with a tiny turn
+        // budget. Skipping malformed input remains bounded by one maximum-size
+        // record or the remaining turn budget, whichever is larger.
+        let budget = budget.max(
+            self.max_line_bytes
+                .saturating_add(self.line_delimiter.len()),
+        );
+        let initial_position = self.file_position;
+        let result = self
+            .line_reader
+            .read(reader, &mut self.file_position, &mut self.buf, budget)
+            .await;
+        if self.file_position != initial_position {
+            // Partial and discarded records are activity too.
+            self.idle_since = None;
+        }
+        match result {
+            Ok(ReadOutcome::Line) => {
                 self.reached_eof = false;
                 self.track_read_success();
                 let bytes = self.buf.split().freeze();
@@ -373,15 +386,13 @@ impl FileWatcher {
                 // Return all lines, including empty ones
                 Ok(Some(RawLine { offset, bytes }))
             }
-            Ok(ReadResult {
-                successfully_read: None,
-                ..
-            }) => {
+            Ok(ReadOutcome::Yield) => Ok(None),
+            Ok(ReadOutcome::Eof) => {
                 if matches!(self.reader, FileReader::Gzip(_)) {
                     self.reader = FileReader::Empty;
                 }
                 // A renamed file can still receive writes through an open handle.
-                // FileServer retires it after rotate_wait, not at the first EOF.
+                // FileServer retires missing readers after an idle timeout at EOF.
                 self.reached_eof = true;
                 Ok(None)
             }
@@ -406,8 +417,12 @@ impl FileWatcher {
     }
 
     #[inline]
-    pub fn last_seen(&self) -> Instant {
-        self.last_seen
+    pub(super) fn should_retire(&mut self, timeout: Duration) -> bool {
+        if self.findable || !self.reached_eof {
+            self.idle_since = None;
+            return false;
+        }
+        self.idle_since.get_or_insert_with(Instant::now).elapsed() >= timeout
     }
 }
 
@@ -421,6 +436,56 @@ async fn is_gzipped(r: &mut BufReader<File>) -> io::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn idle_retirement_requires_missing_eof_and_resets_on_partial_bytes() {
+        use tokio::io::AsyncWriteExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        fs::write(&path, "first\n").await.unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        assert!(watcher.read_line().await.unwrap().is_some());
+        watcher.set_file_findable(false);
+        assert!(
+            !watcher.should_retire(Duration::ZERO),
+            "must establish EOF first"
+        );
+        assert!(watcher.read_line().await.unwrap().is_none());
+        let timeout = Duration::from_secs(1);
+        assert!(!watcher.should_retire(timeout));
+        watcher.idle_since = Some(Instant::now() - Duration::from_secs(2));
+        assert!(watcher.should_retire(timeout));
+
+        // An unterminated append is activity even though it produces no event.
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .await
+            .unwrap();
+        file.write_all(b"partial").await.unwrap();
+        file.sync_all().await.unwrap();
+        assert!(watcher.read_line().await.unwrap().is_none());
+        assert!(!watcher.should_retire(timeout));
+        watcher.idle_since = Some(Instant::now() - Duration::from_secs(2));
+        watcher.set_file_findable(true);
+        assert!(
+            !watcher.should_retire(Duration::ZERO),
+            "discoverable files stay open"
+        );
+        watcher.set_file_findable(false);
+        assert!(
+            !watcher.should_retire(timeout),
+            "rediscovery resets retirement"
+        );
+    }
 
     #[tokio::test]
     async fn offsets_follow_partial_and_discarded_records() {
@@ -474,10 +539,10 @@ mod tests {
         )
         .await
         .unwrap();
-        watcher.enable_deletion(None);
+        watcher.enable_delivery_tracking(None);
         while watcher.read_line().await.unwrap().is_some() {}
         assert!(!watcher.ready_to_delete(Duration::ZERO).await.unwrap());
-        let progress = watcher.deletion_progress.as_ref().unwrap().clone();
+        let progress = watcher.delivery_progress.as_ref().unwrap().clone();
         progress.delivered(8);
         assert!(watcher.ready_to_delete(Duration::ZERO).await.unwrap());
         assert!(!watcher
@@ -520,7 +585,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn truncation_isolates_deletion_acknowledgements() {
+    async fn truncation_isolates_delivery_acknowledgements() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("input.log");
         fs::write(&path, "old contents\n").await.unwrap();
@@ -533,15 +598,15 @@ mod tests {
         )
         .await
         .unwrap();
-        watcher.enable_deletion(None);
+        watcher.enable_delivery_tracking(None);
         while watcher.read_line().await.unwrap().is_some() {}
-        let old_progress = watcher.deletion_progress.as_ref().unwrap().clone();
+        let old_progress = watcher.delivery_progress.as_ref().unwrap().clone();
         fs::write(&path, "new\n").await.unwrap();
         watcher.check_for_truncation().await.unwrap();
         while watcher.read_line().await.unwrap().is_some() {}
-        old_progress.delivered(4);
+        assert!(!old_progress.delivered(4));
         assert!(!watcher.ready_to_delete(Duration::ZERO).await.unwrap());
-        watcher.deletion_progress.as_ref().unwrap().delivered(4);
+        watcher.delivery_progress.as_ref().unwrap().delivered(4);
         assert!(watcher.ready_to_delete(Duration::ZERO).await.unwrap());
     }
 
@@ -576,6 +641,29 @@ mod tests {
         assert_eq!(line.offset, 0);
         assert_eq!(line.bytes, "new");
         assert!(watcher.read_line().await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn truncation_resets_oversized_record_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        fs::write(&path, "x".repeat(128)).await.unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            8,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        assert!(watcher.read_line_bounded(64).await.unwrap().is_none());
+        assert!(!watcher.reached_eof());
+        fs::write(&path, "new\n").await.unwrap();
+        watcher.check_for_truncation().await.unwrap();
+        let line = watcher.read_line_bounded(64).await.unwrap().unwrap();
+        assert_eq!(line.bytes, "new");
+        assert_eq!(line.offset, 0);
     }
 
     #[tokio::test]

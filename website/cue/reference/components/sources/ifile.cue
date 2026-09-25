@@ -150,10 +150,13 @@ components: sources: ifile: {
 		file_deletion: {
 			title: "File Deletion"
 			body: """
-				When a watched file is deleted, Vector maintains its open file
-				handle and continues reading until it reaches `EOF`. When a file is
-				no longer findable in the `includes` option and the reader has
-				reached `EOF`, that file's reader is discarded.
+				When a watched file is deleted or moved outside the `include` patterns,
+				Vector keeps its open reader while draining unread data. At `EOF`, the
+				`reader_idle_timeout_secs` timer starts (30 seconds by default). Reading
+				new bytes resets the timer, including bytes of an incomplete record.
+				After the idle period, Vector releases the reader and its file handle.
+				Files that remain discoverable are kept open regardless of inactivity.
+				Writes after a reader closes cannot be collected unless the file is discovered again.
 				"""
 		}
 
@@ -420,7 +423,8 @@ components: sources: ifile: {
 				notifications, with periodic glob scans to discover files if notifications are missed.
 
 				Plain files retain their open handles so Vector can continue reading writes after
-				a rename. The `rotate_wait_secs` option controls how long rotated files remain open.
+				a rename. The `reader_idle_timeout_secs` option controls retirement at EOF when
+				a file is no longer discoverable.
 				Compressed files retain their decoder and handle until the end of the stream.
 				"""
 		}

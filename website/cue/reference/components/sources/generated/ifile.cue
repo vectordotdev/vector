@@ -265,6 +265,21 @@ generated: components: sources: ifile: configuration: {
 			}
 		}
 	}
+	reader_idle_timeout_secs: {
+		description: """
+			How long to retain an idle reader for a file no longer matched by `include`.
+
+			The timeout starts at EOF after the file becomes undiscoverable. Reading new
+			bytes resets it, including bytes of an incomplete record. Readers still
+			draining data and files that remain discoverable are not retired by this timeout.
+			Writes made after the reader closes cannot be collected unless the file is discovered again.
+			"""
+		required: false
+		type: uint: {
+			default: 30
+			unit:    "seconds"
+		}
+	}
 	remove_after_secs: {
 		description: """
 			The minimum idle period in seconds before deleting a fully consumed file.
@@ -280,17 +295,6 @@ generated: components: sources: ifile: configuration: {
 		type: uint: {
 			examples: [0, 5, 60]
 			unit: "seconds"
-		}
-	}
-	rotate_wait_secs: {
-		description: """
-			How long to keep an open handle to a rotated log file.
-			The default value represents "no limit"
-			"""
-		required: false
-		type: uint: {
-			default: 9223372036854775807
-			unit:    "seconds"
 		}
 	}
 }

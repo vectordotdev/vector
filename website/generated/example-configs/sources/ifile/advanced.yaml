@@ -17,3 +17,4 @@ sources:
     max_read_bytes: 65536
     offset_key: offset
     read_from: beginning
+    reader_idle_timeout_secs: 30
