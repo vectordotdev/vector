@@ -1,4 +1,6 @@
+#![warn(clippy::pedantic)]
 #![deny(warnings)]
+#![deny(clippy::unwrap_used)]
 #![warn(
     missing_debug_implementations,
     rust_2018_idioms,

@@ -29,7 +29,6 @@ pub enum NormalizerError {
 /// Defines behavior for creating the MetricNormalizer
 #[serde_as]
 #[configurable_component]
-#[configurable(metadata(docs::advanced))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NormalizerConfig<D: NormalizerSettings + Clone> {
     /// The maximum size in bytes of the events in the metrics normalizer cache, excluding cache overhead.
@@ -156,6 +155,14 @@ impl<N> MetricNormalizer<N> {
             .into_settings();
         Self {
             state: MetricSet::new(settings),
+            normalizer,
+        }
+    }
+
+    /// Creates a new normalizer with a time-to-live policy.
+    pub fn with_ttl(normalizer: N, ttl: Duration) -> Self {
+        Self {
+            state: MetricSet::with_policies(None, Some(TtlPolicy::new(ttl))),
             normalizer,
         }
     }
@@ -683,20 +690,19 @@ impl MetricSet {
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
         let timestamp = self.create_timestamp();
         // We always call insert() to track memory usage
-        match self.inner.get_mut(metric.series()) {
-            Some(existing) => {
-                let mut new_value = existing.data.value().clone();
-                if new_value.add(metric.value()) {
-                    // Update the stored value
-                    metric = metric.with_value(new_value);
-                }
-                // Insert the updated stored value, or as store a new reference value (if the Metric changed type)
-                self.insert(metric.clone(), timestamp);
-            }
-            None => {
-                self.insert(metric.clone(), timestamp);
+        if let Some(existing) = self.inner.get_mut(metric.series()) {
+            let mut new_value = existing.data.value().clone();
+            if new_value.add(metric.value()) {
+                // Update the stored value
+                metric = metric.with_value(new_value);
             }
         }
+        // Strip finalizers from the clone before caching. The normalization cache must not
+        // hold Arc<EventFinalizer> references, as that prevents the disk buffer from
+        // acknowledging events — leading to a deadlock once the buffer fills.
+        let mut cache_metric = metric.clone();
+        cache_metric.metadata_mut().take_finalizers();
+        self.insert(cache_metric, timestamp);
         metric.into_absolute()
     }
 
@@ -724,30 +730,25 @@ impl MetricSet {
         // incremental updates.
         let timestamp = self.create_timestamp();
         // We always call insert() to track memory usage
-        match self.inner.get_mut(metric.series()) {
-            Some(reference) => {
-                let new_value = metric.value().clone();
-                // Create a copy of the reference so we can insert and
-                // replace the existing entry, tracking memory usage
-                let mut new_reference = reference.clone();
-                // From the stored reference value, emit an increment
-                if metric.subtract(&reference.data) {
-                    new_reference.data.value = new_value;
-                    new_reference.timestamp = timestamp;
-                    self.insert_with_tracking(metric.series().clone(), new_reference);
-                    Some(metric.into_incremental())
-                } else {
-                    // Metric changed type, store this and emit nothing
-                    self.insert(metric, timestamp);
-                    None
-                }
+        if let Some(reference) = self.inner.get_mut(metric.series()) {
+            let new_value = metric.value().clone();
+            // Create a copy of the reference so we can insert and
+            // replace the existing entry, tracking memory usage
+            let mut new_reference = reference.clone();
+            // From the stored reference value, emit an increment
+            if metric.subtract(&reference.data) {
+                new_reference.data.value = new_value;
+                new_reference.timestamp = timestamp;
+                self.insert_with_tracking(metric.series().clone(), new_reference);
+                return Some(metric.into_incremental());
             }
-            None => {
-                // No reference so store this and emit nothing
-                self.insert(metric, timestamp);
-                None
-            }
+            // Metric changed type — fall through to store as new baseline
         }
+        // No reference, or metric changed type: cache as baseline and emit nothing.
+        // Strip finalizers before caching (see incremental_to_absolute).
+        metric.metadata_mut().take_finalizers();
+        self.insert(metric, timestamp);
+        None
     }
 
     fn insert(&mut self, metric: Metric, timestamp: Option<Instant>) {

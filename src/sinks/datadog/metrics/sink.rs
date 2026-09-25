@@ -217,7 +217,7 @@ fn sort_and_collapse_counters_by_series_and_timestamp(mut metrics: Vec<Metric>) 
             a.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
         )
             .cmp(&(
-                a.value().as_name(),
+                b.value().as_name(),
                 b.series(),
                 b.timestamp().map(|dt| dt.timestamp()).unwrap_or(now_ts),
             ))
@@ -279,7 +279,7 @@ mod tests {
             values
                 .into_iter()
                 .map(|(id, value)| {
-                    let name = format!("{}-{}", value.as_name(), id);
+                    let name = format!("{}-{id}", value.as_name());
                     Metric::new(name, MetricKind::Incremental, value).with_timestamp(Some(ts))
                 })
                 // Filter out duplicates other than counters. We do this to prevent false positives. False positives would occur
@@ -390,6 +390,24 @@ mod tests {
         ];
         let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
 
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn sort_metric_type_is_primary_sort_key() {
+        // The sort key is (type_name, series, timestamp). "counter" < "gauge" alphabetically,
+        // so a counter must always precede a gauge regardless of series name.
+        let input = vec![
+            create_gauge("aaa", 1.0),
+            create_counter("zzz", 1.0),
+            create_counter("aaa", 1.0),
+        ];
+        let expected = vec![
+            create_counter("aaa", 1.0),
+            create_counter("zzz", 1.0),
+            create_gauge("aaa", 1.0),
+        ];
+        let actual = sort_and_collapse_counters_by_series_and_timestamp(input);
         assert_eq!(expected, actual);
     }
 

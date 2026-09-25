@@ -420,12 +420,15 @@ impl<'de> Deserialize<'de> for TagValueSet {
         enum Variants {
             // Backwards compatibility for existing data
             String(String),
+            // A single bare tag is serialized as null.
+            Null(()),
             // This is the new form of tag values
             Array(Vec<TagValue>),
         }
 
         Variants::deserialize(de).map(|v| match v {
             Variants::String(s) => Self::from([s]),
+            Variants::Null(()) => Self::from([TagValue::Bare]),
             Variants::Array(a) => Self::from(a),
         })
     }
@@ -468,6 +471,11 @@ impl MetricTags {
     /// Iterates over all the tag value sets
     pub fn iter_sets(&self) -> impl Iterator<Item = (&str, &TagValueSet)> {
         self.0.iter().map(|(key, value)| (key.as_str(), value))
+    }
+
+    /// Iterates over all the tag value sets, consuming the tags.
+    pub fn into_iter_sets(self) -> impl Iterator<Item = (String, TagValueSet)> {
+        self.0.into_iter()
     }
 
     /// Iterate over references to all values of each tag.
@@ -609,7 +617,7 @@ impl ByteSizeOf for MetricTags {
     }
 }
 
-#[cfg(any(test, feature = "generate-fixtures"))]
+#[cfg(test)]
 mod test_support {
     use std::collections::HashSet;
 
@@ -671,6 +679,17 @@ mod tests {
         let mut tags = make_tags(&[("a", "1")]);
         assert!(tags.remove_set("missing").is_none());
         assert!(tags.contains_key("a"));
+    }
+
+    #[test]
+    fn single_bare_tag_value_set_json_roundtrip() {
+        let value = TagValueSet::from([TagValue::Bare]);
+
+        let encoded = serde_json::to_string(&value).unwrap();
+        let decoded: TagValueSet = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(encoded, "null");
+        assert_eq!(decoded, value);
     }
 
     proptest! {

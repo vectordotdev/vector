@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.20.0": {
-	date:     "2022-02-08"
-	codename: ""
+	date: "2022-02-08"
 
 	known_issues: [
 		"When unit testing targets that have multiple outputs, Vector logs a warning for untested outputs. Will be fixed in `0.20.1`.",

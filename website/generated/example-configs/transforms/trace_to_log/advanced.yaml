@@ -1,0 +1,6 @@
+transforms:
+  my_transform_id:
+    type: trace_to_log
+    inputs:
+      - my-source-or-transform-id
+    measure_cpu_usage: false

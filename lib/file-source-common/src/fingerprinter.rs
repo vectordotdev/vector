@@ -5,13 +5,13 @@ use std::{
     time,
 };
 
-use async_compression::tokio::bufread::GzipDecoder;
 use crc::Crc;
 use serde::{Deserialize, Serialize};
 use tokio::{
     fs::{self, File},
     io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeekExt, BufReader},
 };
+use vector_common::compression::gzip_multiple_decoder;
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{
@@ -71,7 +71,7 @@ impl SupportedCompressionAlgorithms {
         vec![SupportedCompressionAlgorithms::Gzip]
     }
 
-    fn magic_header_bytes(&self) -> &'static [u8] {
+    fn magic_header_bytes(self) -> &'static [u8] {
         match self {
             SupportedCompressionAlgorithms::Gzip => GZIP_MAGIC,
         }
@@ -128,7 +128,7 @@ impl UncompressedReader for UncompressedReaderImpl {
         // To support new compression algorithms, add them below
         match Self::check(fp).await? {
             Some(SupportedCompressionAlgorithms::Gzip) => Ok(Box::new(BufReader::new(
-                GzipDecoder::new(BufReader::new(fp)),
+                gzip_multiple_decoder(BufReader::new(fp)),
             ))),
             // No compression, or read the raw bytes
             None => Ok(Box::new(BufReader::new(fp))),
@@ -153,6 +153,7 @@ async fn skip_first_n_bytes<R: AsyncBufRead + Unpin + Send>(
 }
 
 impl Fingerprinter {
+    #[must_use]
     pub fn new(
         strategy: FingerprintStrategy,
         max_line_length: usize,
@@ -170,7 +171,7 @@ impl Fingerprinter {
 
     /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
     pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
-        use FileFingerprint::*;
+        use FileFingerprint::{DevInode, FirstLinesChecksum};
 
         match self.strategy {
             FingerprintStrategy::DevInode => {
@@ -204,10 +205,10 @@ impl Fingerprinter {
     ) -> Option<FileFingerprint> {
         let metadata = match fs::metadata(path).await {
             Ok(metadata) => {
-                if !metadata.is_dir() {
-                    self.fingerprint(path).await.map(Some)
-                } else {
+                if metadata.is_dir() {
                     Ok(None)
+                } else {
+                    self.fingerprint(path).await.map(Some)
                 }
             }
             Err(e) => Err(e),
@@ -235,7 +236,7 @@ impl Fingerprinter {
                     _ => {
                         emitter.emit_file_fingerprint_read_error(path, error);
                     }
-                };
+                }
                 // For scenarios other than UnexpectedEOF, remove the path from the small files map.
                 known_small_files.remove(&path.to_path_buf());
             })
@@ -264,9 +265,8 @@ async fn fingerprinter_read_until(
                 if count <= 1 {
                     total_read += pos + 1;
                     break 'main;
-                } else {
-                    count -= 1;
                 }
+                count -= 1;
             }
         }
         total_read += read;
@@ -365,7 +365,7 @@ mod test {
                 file,
                 b"hello world "
                     .iter()
-                    .cloned()
+                    .copied()
                     .cycle()
                     .clone()
                     .take(amount)

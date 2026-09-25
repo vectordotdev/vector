@@ -23,7 +23,7 @@ use crate::{
         self, UriParseSnafu,
         util::{SinkBatchSettings, http::HttpBatchService},
     },
-    template::Template,
+    template::ConfinedTemplate,
     tls::{TlsConfig, TlsSettings},
 };
 
@@ -112,7 +112,7 @@ pub fn build_uri(
     path: &str,
     query: impl IntoIterator<Item = (&'static str, String)>,
 ) -> Result<Uri, http::uri::InvalidUri> {
-    let mut uri = format!("{}{}", host.trim_end_matches('/'), path);
+    let mut uri = format!("{}{path}", host.trim_end_matches('/'));
 
     let mut first = true;
 
@@ -152,7 +152,7 @@ pub fn config_timestamp_key_target_path() -> OptionalTargetPath {
 }
 
 pub fn render_template_string<'a>(
-    template: &Template,
+    template: &ConfinedTemplate,
     event: impl Into<EventRef<'a>>,
     field_name: &str,
 ) -> Option<String> {
@@ -495,7 +495,7 @@ pub mod integration_test_helpers {
                     .send()
             },
             Duration::from_millis(500),
-            Duration::from_secs(30),
+            Duration::from_secs(60),
         )
         .await;
 

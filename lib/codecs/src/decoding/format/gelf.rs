@@ -302,11 +302,11 @@ mod tests {
         let log = events[0].as_log();
 
         assert_eq!(
-            log.get(VERSION),
+            log.get(event_path!(VERSION)),
             Some(&Value::Bytes(Bytes::from_static(b"1.1")))
         );
         assert_eq!(
-            log.get(HOST),
+            log.get(event_path!(HOST)),
             Some(&Value::Bytes(Bytes::from_static(b"example.org")))
         );
         assert_eq!(
@@ -316,24 +316,24 @@ mod tests {
             )))
         );
         assert_eq!(
-            log.get(FULL_MESSAGE),
+            log.get(event_path!(FULL_MESSAGE)),
             Some(&Value::Bytes(Bytes::from_static(
                 b"Backtrace here\n\nmore stuff"
             )))
         );
         let dt = DateTime::from_timestamp(1385053862, 307_200_000).expect("invalid timestamp");
-        assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(dt)));
-        assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
+        assert_eq!(log.get(event_path!(TIMESTAMP)), Some(&Value::Timestamp(dt)));
+        assert_eq!(log.get(event_path!(LEVEL)), Some(&Value::Integer(1)));
         assert_eq!(
-            log.get(FACILITY),
+            log.get(event_path!(FACILITY)),
             Some(&Value::Bytes(Bytes::from_static(b"foo")))
         );
         assert_eq!(
-            log.get(LINE),
+            log.get(event_path!(LINE)),
             Some(&Value::Float(ordered_float::NotNan::new(42.0).unwrap()))
         );
         assert_eq!(
-            log.get(FILE),
+            log.get(event_path!(FILE)),
             Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
         );
         assert_eq!(
@@ -472,7 +472,7 @@ mod tests {
         let log = events[0].as_log();
 
         assert_eq!(
-            log.get(VERSION),
+            log.get(event_path!(VERSION)),
             Some(&Value::Bytes(Bytes::from_static(b"1.0")))
         );
 

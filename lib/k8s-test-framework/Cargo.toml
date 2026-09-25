@@ -7,6 +7,9 @@ description = "Kubernetes Test Framework used to test Vector in Kubernetes"
 publish = false
 license = "MPL-2.0"
 
+[lints]
+workspace = true
+
 [dependencies]
 k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31"] }
 serde_json.workspace = true

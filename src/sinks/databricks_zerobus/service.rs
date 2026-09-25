@@ -47,7 +47,7 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
     // Validate the proxy URL once up-front so a malformed value surfaces at
     // sink startup rather than per-connection.
     ProxyConnector::new(&proxy_url).map_err(|e| ZerobusSinkError::ConfigError {
-        message: format!("Invalid proxy URL '{}': {}", proxy_url, e),
+        message: format!("Invalid proxy URL '{proxy_url}': {e}"),
     })?;
     let no_proxy = proxy.no_proxy.clone();
     Ok(Arc::new(move |host: &str| {
@@ -67,6 +67,7 @@ fn build_connector_factory(proxy: &ProxyConfig) -> Result<ConnectorFactory, Zero
 /// would be wasteful.
 #[derive(Clone)]
 pub struct ZerobusRequest {
+    #[allow(clippy::rc_buffer)]
     pub events: Arc<Vec<Event>>,
     pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
@@ -312,22 +313,24 @@ pub struct ZerobusService {
 }
 
 impl ZerobusService {
-    pub async fn new(
-        config: ZerobusSinkConfig,
-        proxy: &ProxyConfig,
-    ) -> Result<Self, ZerobusSinkError> {
+    pub fn new(config: ZerobusSinkConfig, proxy: &ProxyConfig) -> Result<Self, ZerobusSinkError> {
         let mut builder = ZerobusSdk::builder()
-            .endpoint(&config.ingestion_endpoint)
-            .unity_catalog_url(&config.unity_catalog_endpoint)
+            .endpoint(config.ingestion_endpoint.to_string())
+            .unity_catalog_url(
+                config
+                    .unity_catalog_endpoint
+                    .to_string()
+                    .trim_end_matches('/'),
+            )
             .application_name(config.user_agent_suffix());
         builder = builder.connector_factory(build_connector_factory(proxy)?);
         let sdk = builder.build().map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Failed to create Zerobus SDK: {}", e),
+            message: format!("Failed to create Zerobus SDK: {e}"),
         })?;
 
         let http_client = HttpClient::new(TlsSettings::default(), proxy).map_err(|e| {
             ZerobusSinkError::ConfigError {
-                message: format!("Failed to create HTTP client: {}", e),
+                message: format!("Failed to create HTTP client: {e}"),
             }
         })?;
 
@@ -352,7 +355,7 @@ impl ZerobusService {
         let (client_id, client_secret) = config.auth.credentials();
 
         let table_schema = unity_catalog_schema::fetch_table_schema(
-            &config.unity_catalog_endpoint,
+            &config.unity_catalog_endpoint.to_string(),
             &config.table_name,
             client_id,
             client_secret,
@@ -375,7 +378,7 @@ impl ZerobusService {
                 )
                 .build_batch_serializer()
                 .map_err(|e| ZerobusSinkError::ConfigError {
-                    message: format!("Failed to build batch serializer: {}", e),
+                    message: format!("Failed to build batch serializer: {e}"),
                 })?;
 
                 Ok(ResolvedSchema {
@@ -404,7 +407,7 @@ impl ZerobusService {
                 .encoder
                 .encode_batch(events)
                 .map_err(|e| ZerobusSinkError::EncodingError {
-                    message: format!("Failed to encode batch: {}", e),
+                    message: format!("Failed to encode batch: {e}"),
                 })?;
         Ok(batch)
     }
@@ -579,23 +582,28 @@ pub struct ZerobusRetryLogic;
 #[cfg(test)]
 impl ZerobusService {
     /// Create a service with a mock stream already installed for testing.
-    pub async fn new_with_mock(
+    pub fn new_with_mock(
         config: ZerobusSinkConfig,
         mock: MockStream,
     ) -> Result<Self, ZerobusSinkError> {
         config.validate()?;
 
         let sdk = ZerobusSdk::builder()
-            .endpoint(&config.ingestion_endpoint)
-            .unity_catalog_url(&config.unity_catalog_endpoint)
+            .endpoint(config.ingestion_endpoint.to_string())
+            .unity_catalog_url(
+                config
+                    .unity_catalog_endpoint
+                    .to_string()
+                    .trim_end_matches('/'),
+            )
             .build()
             .map_err(|e| ZerobusSinkError::ConfigError {
-                message: format!("Failed to create Zerobus SDK: {}", e),
+                message: format!("Failed to create Zerobus SDK: {e}"),
             })?;
 
         let http_client = HttpClient::new(TlsSettings::default(), &ProxyConfig::default())
             .map_err(|e| ZerobusSinkError::ConfigError {
-                message: format!("Failed to create HTTP client: {}", e),
+                message: format!("Failed to create HTTP client: {e}"),
             })?;
 
         Ok(Self {
@@ -703,14 +711,15 @@ mod tests {
     use crate::sinks::databricks_zerobus::config::{
         DatabricksAuthentication, ZerobusStreamOptions,
     };
+    use crate::sinks::util::HttpEndpoint;
     use databricks_zerobus_ingest_sdk::ZerobusError;
     use vector_lib::sensitive_string::SensitiveString;
 
     fn test_config() -> ZerobusSinkConfig {
         ZerobusSinkConfig {
-            ingestion_endpoint: "https://127.0.0.1:1".to_string(),
+            ingestion_endpoint: HttpEndpoint::parse("https://127.0.0.1:1").unwrap(),
             table_name: "test.default.logs".to_string(),
-            unity_catalog_endpoint: "https://127.0.0.1:1".to_string(),
+            unity_catalog_endpoint: HttpEndpoint::parse("https://127.0.0.1:1").unwrap(),
             auth: DatabricksAuthentication::OAuth {
                 client_id: SensitiveString::from("id".to_string()),
                 client_secret: SensitiveString::from("secret".to_string()),
@@ -735,9 +744,8 @@ mod tests {
 
     #[tokio::test]
     async fn ingest_succeeds_with_mock_stream() {
-        let service = ZerobusService::new_with_mock(test_config(), MockStream::succeeding())
-            .await
-            .unwrap();
+        let service =
+            ZerobusService::new_with_mock(test_config(), MockStream::succeeding()).unwrap();
 
         let stream = current_stream(&service).await;
         let result = service
@@ -753,9 +761,7 @@ mod tests {
         let mock = MockStream::failing(ZerobusError::ChannelCreationError(
             "connection reset".to_string(),
         ));
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         assert!(service.has_active_stream().await);
 
@@ -774,9 +780,7 @@ mod tests {
     #[tokio::test]
     async fn non_retryable_error_keeps_stream() {
         let mock = MockStream::failing(ZerobusError::InvalidArgument("bad field".to_string()));
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         assert!(service.has_active_stream().await);
 
@@ -796,9 +800,7 @@ mod tests {
     async fn stream_recovers_after_retryable_failure() {
         // Simulate: success → retryable failure → success again.
         let mock = MockStream::succeeding();
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         // First ingest succeeds.
         let stream = current_stream(&service).await;
@@ -849,9 +851,7 @@ mod tests {
         let mock = MockStream::succeeding();
         let closed = mock.closed_flag();
 
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         assert!(service.has_active_stream().await);
         assert!(!closed.load(std::sync::atomic::Ordering::Relaxed));
@@ -876,9 +876,7 @@ mod tests {
         .with_gate();
         let closed = mock.closed_flag();
 
-        let service = ZerobusService::new_with_mock(test_config(), mock)
-            .await
-            .unwrap();
+        let service = ZerobusService::new_with_mock(test_config(), mock).unwrap();
 
         // Spawn two concurrent ingests. Each clones the same stream `Arc`,
         // then blocks in the gate.
@@ -1043,12 +1041,12 @@ mod tests {
         let resolved = ResolvedSchema::for_test(schema);
 
         let mut e1 = LogEvent::default();
-        e1.insert("id", 1i64);
-        e1.insert("body", "hello");
-        e1.insert("ts", Utc::now());
+        e1.insert(vrl::event_path!("id"), 1i64);
+        e1.insert(vrl::event_path!("body"), "hello");
+        e1.insert(vrl::event_path!("ts"), Utc::now());
 
         let mut e2 = LogEvent::default();
-        e2.insert("id", 2i64);
+        e2.insert(vrl::event_path!("id"), 2i64);
         // `body` and `ts` omitted — both nullable, so they encode as null.
 
         let batch =
@@ -1086,7 +1084,7 @@ mod tests {
         let resolved = ResolvedSchema::for_test(schema);
 
         let mut e = LogEvent::default();
-        e.insert("body", "no id here"); // `id` omitted
+        e.insert(vrl::event_path!("body"), "no id here"); // `id` omitted
 
         let err = ZerobusService::encode_batch(&resolved, &[Event::Log(e)]).unwrap_err();
         assert!(matches!(err, ZerobusSinkError::EncodingError { .. }));

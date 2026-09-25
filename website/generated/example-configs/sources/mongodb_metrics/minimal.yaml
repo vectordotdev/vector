@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: mongodb_metrics
+    endpoints:
+      - mongodb://localhost:27017

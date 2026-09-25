@@ -34,6 +34,8 @@ on:
         value: ${{ jobs.source.outputs.dependencies }}
       deny:
         value: ${{ jobs.source.outputs.deny }}
+      deprecations:
+        value: ${{ jobs.source.outputs.deprecations }}
       internal_events:
         value: ${{ jobs.source.outputs.internal_events }}
       cue:
@@ -124,6 +126,8 @@ on:
         value: ${{ jobs.int_tests.outputs.nats }}
       nginx:
         value: ${{ jobs.int_tests.outputs.nginx }}
+      opensearch:
+        value: ${{ jobs.int_tests.outputs.opensearch }}
       opentelemetry:
         value: ${{ jobs.int_tests.outputs.opentelemetry }}
       postgres:
@@ -149,6 +153,8 @@ on:
         value: ${{ jobs.e2e_tests.outputs.opentelemetry-logs }}
       e2e-opentelemetry-metrics:
         value: ${{ jobs.e2e_tests.outputs.opentelemetry-metrics }}
+      e2e-opentelemetry-traces:
+        value: ${{ jobs.e2e_tests.outputs.opentelemetry-traces }}
       int-tests-any:
         value: ${{ jobs.int_tests.outputs.any }}
       e2e-tests-any:
@@ -172,6 +178,7 @@ jobs:
       source: ${{ steps.filter.outputs.source }}
       dependencies: ${{ steps.filter.outputs.dependencies }}
       deny: ${{ steps.filter.outputs.deny }}
+      deprecations: ${{ steps.filter.outputs.deprecations }}
       internal_events: ${{ steps.filter.outputs.internal_events }}
       cue: ${{ steps.filter.outputs.cue }}
       component_docs: ${{ steps.filter.outputs.component_docs }}
@@ -189,9 +196,9 @@ jobs:
       unit_mac-yml: ${{ steps.filter.outputs.unit_mac-yml }}
       unit_windows-yml: ${{ steps.filter.outputs.unit_windows-yml }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
@@ -219,18 +226,34 @@ jobs:
               - 'rust-toolchain.toml'
               - 'Makefile'
               - 'scripts/cross/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             deny:
               - '**/Cargo.toml'
               - 'Cargo.lock'
               - ".github/workflows/deny.yml"
+            deprecations:
+              - 'deprecation.d/**'
+              - 'website/data/deprecations.json'
+              - "vdev/Cargo.toml"
+              - ".github/workflows/deprecation.yaml"
+              - ".github/workflows/changes.yml"
             cue:
               - 'website/cue/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
+              - 'vdev/src/commands/build/docs_json.rs'
               - ".github/workflows/changes.yml"
             component_docs:
-              - "vdev/**"
+              - 'Makefile'
+              - "vdev/Cargo.toml"
+              - 'website/Makefile'
+              - 'website/package.json'
+              - 'website/yarn.lock'
+              - 'website/generated/example-configs/**'
+              - 'vdev/src/commands/build/component_docs/**'
+              - 'vdev/src/commands/build/component_examples.rs'
+              - 'vdev/src/commands/build/docs_json.rs'
+              - 'vdev/src/commands/check/component_examples.rs'
               - 'website/cue/**/*.cue'
               - 'docs/generated/**'
               # If changes to the VRL sha is made the combined generated cue file will change which
@@ -239,18 +262,18 @@ jobs:
               - ".github/workflows/changes.yml"
             markdown:
               - '**/**.md'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             scripts:
               - '**/**.sh'
               - ".github/workflows/changes.yml"
             internal_events:
               - 'src/internal_events/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             docker:
               - 'distribution/docker/**'
-              - "vdev/**"
+              - "vdev/Cargo.toml"
               - ".github/workflows/changes.yml"
             install:
               - ".github/workflows/install-sh.yml"
@@ -283,21 +306,29 @@ jobs:
               - ".github/workflows/test.yml"
               - ".github/workflows/unit-tests.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             integration-yml:
               - ".github/workflows/integration.yml"
               - ".github/workflows/changes.yml"
             test-make-command-yml:
               - ".github/workflows/test-make-command.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             msrv-yml:
               - ".github/workflows/msrv.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             cross-yml:
               - ".github/workflows/cross.yml"
               - ".github/workflows/changes.yml"
             unit_mac-yml:
               - ".github/workflows/unit_mac.yml"
               - ".github/workflows/changes.yml"
+              - ".github/workflows/warm-cache.yml"
+              - ".github/actions/setup/**"
             unit_windows-yml:
               - ".github/workflows/unit_windows.yml"
               - ".github/workflows/changes.yml"
@@ -339,6 +370,7 @@ jobs:
       mqtt: ${{ steps.filter.outputs.mqtt }}
       nats: ${{ steps.filter.outputs.nats }}
       nginx: ${{ steps.filter.outputs.nginx }}
+      opensearch: ${{ steps.filter.outputs.opensearch }}
       opentelemetry: ${{ steps.filter.outputs.opentelemetry }}
       postgres: ${{ steps.filter.outputs.postgres }}
       prometheus: ${{ steps.filter.outputs.prometheus }}
@@ -349,13 +381,12 @@ jobs:
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup
         with:
           vdev: true
           mold: false
-          cargo-cache: false
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
@@ -363,7 +394,7 @@ jobs:
       - name: Create filter rules for integrations
         run: vdev int ci-paths > int_test_filters.yaml
 
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
@@ -406,6 +437,7 @@ jobs:
             "mqtt": ${{ steps.filter.outputs.mqtt }},
             "nats": ${{ steps.filter.outputs.nats }},
             "nginx": ${{ steps.filter.outputs.nginx }},
+            "opensearch": ${{ steps.filter.outputs.opensearch }},
             "opentelemetry": ${{ steps.filter.outputs.opentelemetry }},
             "postgres": ${{ steps.filter.outputs.postgres }},
             "prometheus": ${{ steps.filter.outputs.prometheus }},
@@ -442,15 +474,16 @@ jobs:
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
       opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
+      opentelemetry-traces: ${{ steps.filter.outputs.opentelemetry-traces }}
+      opentelemetry-metrics-native: ${{ steps.filter.outputs.opentelemetry-metrics-native }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup
         with:
           vdev: true
           mold: false
-          cargo-cache: false
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which
@@ -458,7 +491,7 @@ jobs:
       - name: Create filter rules for e2e tests
         run: vdev e2e ci-paths > int_test_filters.yaml
 
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
@@ -475,7 +508,9 @@ jobs:
             "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
             "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
             "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }},
-            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }}
+            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }},
+            "opentelemetry-traces": ${{ steps.filter.outputs.opentelemetry-traces }},
+            "opentelemetry-metrics-native": ${{ steps.filter.outputs.opentelemetry-metrics-native }}
           }
           EOF
           )

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=../../proto/vector/observability.proto");
     println!("cargo:rerun-if-changed=../../proto");

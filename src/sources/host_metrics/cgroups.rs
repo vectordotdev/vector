@@ -11,7 +11,10 @@ use tokio::{
     fs::{self, File},
     io::AsyncReadExt,
 };
-use vector_lib::metric_tags;
+use vector_lib::{
+    internal_event::{CounterName, GaugeName},
+    metric_tags,
+};
 
 use super::{CGroupsConfig, HostMetrics, MetricsBuffer, filter_result_sync};
 use crate::event::MetricTags;
@@ -147,17 +150,17 @@ impl<'a> CGroupRecurser<'a> {
             "Failed to load cgroups CPU statistics.",
         ) {
             self.output.counter(
-                "cgroup_cpu_usage_seconds_total",
+                CounterName::CgroupCpuUsageSecondsTotal,
                 cpu.usage_usec as f64 * MICROSECONDS,
                 tags.clone(),
             );
             self.output.counter(
-                "cgroup_cpu_user_seconds_total",
+                CounterName::CgroupCpuUserSecondsTotal,
                 cpu.user_usec as f64 * MICROSECONDS,
                 tags.clone(),
             );
             self.output.counter(
-                "cgroup_cpu_system_seconds_total",
+                CounterName::CgroupCpuSystemSecondsTotal,
                 cpu.system_usec as f64 * MICROSECONDS,
                 tags.clone(),
             );
@@ -170,35 +173,44 @@ impl<'a> CGroupRecurser<'a> {
             cgroup.load_memory_current(&mut self.buffer).await,
             "Failed to load cgroups current memory.",
         ) {
-            self.output
-                .gauge("cgroup_memory_current_bytes", current as f64, tags.clone());
+            self.output.gauge(
+                GaugeName::CgroupMemoryCurrentBytes,
+                current as f64,
+                tags.clone(),
+            );
         }
 
         if let Some(Some(stat)) = filter_result_sync(
             cgroup.load_memory_stat(&mut self.buffer).await,
             "Failed to load cgroups memory statistics.",
         ) {
-            self.output
-                .gauge("cgroup_memory_anon_bytes", stat.anon as f64, tags.clone());
-            self.output
-                .gauge("cgroup_memory_file_bytes", stat.file as f64, tags.clone());
             self.output.gauge(
-                "cgroup_memory_anon_active_bytes",
+                GaugeName::CgroupMemoryAnonBytes,
+                stat.anon as f64,
+                tags.clone(),
+            );
+            self.output.gauge(
+                GaugeName::CgroupMemoryFileBytes,
+                stat.file as f64,
+                tags.clone(),
+            );
+            self.output.gauge(
+                GaugeName::CgroupMemoryAnonActiveBytes,
                 stat.active_anon as f64,
                 tags.clone(),
             );
             self.output.gauge(
-                "cgroup_memory_anon_inactive_bytes",
+                GaugeName::CgroupMemoryAnonInactiveBytes,
                 stat.inactive_anon as f64,
                 tags.clone(),
             );
             self.output.gauge(
-                "cgroup_memory_file_active_bytes",
+                GaugeName::CgroupMemoryFileActiveBytes,
                 stat.active_file as f64,
                 tags.clone(),
             );
             self.output.gauge(
-                "cgroup_memory_file_inactive_bytes",
+                GaugeName::CgroupMemoryFileInactiveBytes,
                 stat.inactive_file as f64,
                 tags.clone(),
             );
@@ -389,8 +401,8 @@ macro_rules! define_stat_struct {
                 for line in text.lines(){
                     if false {}
                     $(
-                        else if line.starts_with(concat!(stringify!($field), ' ')) {
-                            result.$field = line[stringify!($field).len()+1..].parse()?;
+                        else if let Some(rest) = line.strip_prefix(concat!(stringify!($field), ' ')) {
+                            result.$field = rest.parse()?;
                         }
                     )*
                 }
@@ -462,7 +474,7 @@ mod tests {
         path::{Path, PathBuf},
     };
 
-    use rand::{Rng, rngs::ThreadRng};
+    use rand::{RngExt, rngs::ThreadRng};
     use similar_asserts::assert_eq;
     use tempfile::TempDir;
     use vector_lib::event::Metric;
@@ -487,10 +499,14 @@ mod tests {
 
     #[tokio::test]
     async fn generates_cgroups_metrics() {
-        let config: HostMetricsConfig = toml::from_str(r#"collectors = ["cgroups"]"#).unwrap();
+        let config: HostMetricsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            collectors:
+              - cgroups
+        "#})
+        .unwrap();
         let mut buffer = MetricsBuffer::new(None);
         HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
-        let metrics = buffer.metrics;
+        let metrics = buffer.into_metrics();
 
         assert!(!metrics.is_empty());
         assert_eq!(count_tag(&metrics, "cgroup"), metrics.len());
@@ -600,16 +616,16 @@ mod tests {
 
         async fn test(&self) {
             let path = self.0.path();
-            let config: HostMetricsConfig = toml::from_str(&format!(
-                r#"
-                collectors = ["cgroups"]
-                cgroups.base_dir = {path:?}
-                "#
-            ))
+            let config: HostMetricsConfig = serde_yaml::from_str(&indoc::formatdoc! {r#"
+                collectors:
+                  - cgroups
+                cgroups:
+                  base_dir: {path:?}
+            "#})
             .unwrap();
             let mut buffer = MetricsBuffer::new(None);
             HostMetrics::new(config).cgroups_metrics(&mut buffer).await;
-            let metrics = buffer.metrics;
+            let metrics = buffer.into_metrics();
 
             assert_ne!(metrics.len(), 0);
 

@@ -98,11 +98,11 @@ impl From<udp::UdpConfig> for SocketConfig {
 }
 
 impl GenerateConfig for SocketConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"mode = "tcp"
-            address = "0.0.0.0:9000""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"mode: tcp
+            address: "0.0.0.0:9000""#,
+        })
         .unwrap()
     }
 }
@@ -139,9 +139,11 @@ impl SourceConfig for SocketConfig {
                     config.keepalive(),
                     config.shutdown_timeout_secs(),
                     tls,
+                    None, // tls_reloader: not wired for this source
                     tls_client_metadata_key,
                     config.receive_buffer_bytes(),
                     config.max_connection_duration_secs(),
+                    config.tls_handshake_timeout_secs(),
                     cx,
                     false.into(),
                     config.connection_limit,
@@ -321,6 +323,7 @@ mod test {
     use std::{
         collections::HashMap,
         net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
+        num::NonZeroU64,
         sync::{
             Arc,
             atomic::{AtomicBool, Ordering},
@@ -397,10 +400,16 @@ mod test {
             .expect("Failed to bind UDP socket to OS-assigned port")
     }
 
-    pub fn bind_unused_udp_any() -> UdpSocket {
-        // Bind to port 0 to let the OS assign an available port
-        UdpSocket::bind((IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0))
-            .expect("Failed to bind UDP socket to OS-assigned port")
+    /// Bind a UDP socket suitable for sending multicast packets through the loopback interface.
+    /// Sets `IP_MULTICAST_IF` to loopback so packets route through `lo` regardless of the
+    /// system's default multicast route, necessary for reliable local testing on macOS.
+    pub fn bind_unused_udp_multicast() -> UdpSocket {
+        let socket = UdpSocket::bind((IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0))
+            .expect("Failed to bind UDP socket to OS-assigned port");
+        socket2::SockRef::from(&socket)
+            .set_multicast_if_v4(&Ipv4Addr::LOCALHOST)
+            .expect("Failed to set multicast interface to loopback");
+        socket
     }
 
     fn get_gelf_payload(message: &str) -> String {
@@ -923,8 +932,45 @@ mod test {
         }
     }
 
+    #[tokio::test]
+    async fn tcp_tls_handshake_timeout() {
+        let (tx, _) = SourceSender::new_test();
+        let (guard, addr) = next_addr();
+
+        let mut config = TcpConfig::from_address(addr.into());
+        config.set_tls(Some(TlsSourceConfig {
+            tls_config: TlsEnableableConfig::test_config(),
+            client_metadata_key: None,
+        }));
+        config.set_tls_handshake_timeout_secs(Some(NonZeroU64::new(1).unwrap()));
+
+        let source_task = SocketConfig::from(config)
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+
+        // Spawn the source task and wait until we're sure it's listening:
+        drop(tokio::spawn(source_task));
+        wait_for_tcp_and_release(guard, addr).await;
+
+        // Open a plain TCP connection but deliberately never send a TLS
+        // ClientHello, so the server's handshake never completes on its own.
+        let mut stream: TcpStream = TcpStream::connect(addr)
+            .await
+            .expect("stream should be able to connect");
+        let start = Instant::now();
+
+        let bytes_read = timeout(Duration::from_secs(2), stream.read(&mut [0]))
+            .await
+            .expect("timed out waiting for stream to close")
+            .expect("failed to read from stream");
+
+        assert_eq!(bytes_read, 0, "unexpectedly read data from stream");
+        assert_relative_eq!(start.elapsed().as_secs_f64(), 1.0, epsilon = 0.5);
+    }
+
     //////// UDP TESTS ////////
-    async fn send_lines_udp(to: SocketAddr, lines: impl IntoIterator<Item = String>) -> UdpSocket {
+    fn send_lines_udp(to: SocketAddr, lines: impl IntoIterator<Item = String>) -> UdpSocket {
         send_lines_udp_from(bind_unused_udp(), to, lines)
     }
 
@@ -936,10 +982,7 @@ mod test {
         send_packets_udp_from(from, to, lines.into_iter().map(|line| line.into()))
     }
 
-    async fn send_packets_udp(
-        to: SocketAddr,
-        packets: impl IntoIterator<Item = Bytes>,
-    ) -> UdpSocket {
+    fn send_packets_udp(to: SocketAddr, packets: impl IntoIterator<Item = Bytes>) -> UdpSocket {
         send_packets_udp_from(bind_unused_udp(), to, packets)
     }
 
@@ -1063,7 +1106,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            send_lines_udp(address, vec!["test".to_string()]).await;
+            send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1080,7 +1123,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            send_lines_udp(address, vec!["foo\nbar".to_string()]).await;
+            send_lines_udp(address, vec!["foo\nbar".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1097,7 +1140,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]).await;
+            send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]);
             let events = collect_n(rx, 2).await;
 
             assert_eq!(
@@ -1128,8 +1171,7 @@ mod test {
                     "test with a long line".to_string(),
                     "a short un".to_string(),
                 ],
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
@@ -1167,8 +1209,7 @@ mod test {
             send_lines_udp(
                 address,
                 vec!["test with, long line".to_string(), "short one".to_string()],
-            )
-            .await;
+            );
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
@@ -1202,7 +1243,7 @@ mod test {
             chunks.append(&mut another_chunks);
             chunks.shuffle(&mut rng);
 
-            send_packets_udp(address, chunks).await;
+            send_packets_udp(address, chunks);
 
             let events = collect_n(rx, 2).await;
             assert_eq!(
@@ -1223,7 +1264,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            let from = send_lines_udp(address, vec!["test".to_string()]).await;
+            let from = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1244,7 +1285,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, true).await;
 
-            let from = send_lines_udp(address, vec!["test".to_string()]).await;
+            let from = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
             let log = events[0].as_log();
             let event_meta = log.metadata().value();
@@ -1272,7 +1313,7 @@ mod test {
             let (tx, rx) = SourceSender::new_test();
             let address = init_udp(tx, false).await;
 
-            _ = send_lines_udp(address, vec!["test".to_string()]).await;
+            _ = send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1293,7 +1334,7 @@ mod test {
             let (address, source_handle) =
                 init_udp_with_shutdown(tx, &source_id, &mut shutdown).await;
 
-            send_lines_udp(address, vec!["test".to_string()]).await;
+            send_lines_udp(address, vec!["test".to_string()]);
             let events = collect_n(rx, 1).await;
 
             assert_eq!(
@@ -1327,12 +1368,11 @@ mod test {
             let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
             let run_pump_atomic_receiver = Arc::clone(&run_pump_atomic_sender);
             let pump_handle = tokio::task::spawn_blocking(move || {
-                let handle = tokio::runtime::Handle::current();
-                handle.block_on(send_lines_udp(
+                send_lines_udp(
                     address,
                     std::iter::repeat("test".to_string())
                         .take_while(move |_| run_pump_atomic_receiver.load(Ordering::Relaxed)),
-                ));
+                );
             });
 
             // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
@@ -1371,13 +1411,16 @@ mod test {
                 SocketAddr::new(IpAddr::V4(multicast_ip_address), socket_address.port());
             let mut config = UdpConfig::from_address(socket_address.into());
             config.multicast_groups = vec![multicast_ip_address];
+            // Use loopback as the multicast interface so local test packets are delivered
+            // on all platforms. Without this, macOS joins on the default network interface
+            // (e.g. en0) instead of loopback, and the sender's packets never arrive.
+            config.multicast_interface = Some(Ipv4Addr::LOCALHOST);
             init_udp_with_config(tx, config).await;
 
-            // We must send packets to the same interface the `socket_address` is bound to
-            // in order to receive the multicast packets the `from` socket sends.
-            // To do so, we use the `IPADDR_ANY` address
+            // Bind sender with loopback as the outgoing multicast interface so packets
+            // route through lo, matching the interface the receiver joined on.
             send_lines_udp_from(
-                bind_unused_udp_any(),
+                bind_unused_udp_multicast(),
                 multicast_socket_address,
                 ["test".to_string()],
             );
@@ -1405,9 +1448,10 @@ mod test {
                 .collect::<Vec<SocketAddr>>();
             let mut config = UdpConfig::from_address(socket_address.into());
             config.multicast_groups = multicast_ip_addresses;
+            config.multicast_interface = Some(Ipv4Addr::LOCALHOST);
             init_udp_with_config(tx, config).await;
 
-            let mut from = bind_unused_udp_any();
+            let mut from = bind_unused_udp_multicast();
             for multicast_ip_socket_address in multicast_ip_socket_addresses {
                 from = send_lines_udp_from(
                     from,
@@ -1435,11 +1479,13 @@ mod test {
                 SocketAddr::new(IpAddr::V4(multicast_ip_address), socket_address.port());
             let mut config = UdpConfig::from_address(socket_address.into());
             config.multicast_groups = vec![multicast_ip_address];
+            config.multicast_interface = Some(Ipv4Addr::LOCALHOST);
             init_udp_with_config(tx, config).await;
 
-            // Send packet to multicast address
+            // Send packet to multicast address using loopback as the outgoing interface
+            // so it routes through lo, matching the interface the receiver joined on.
             let _ = send_lines_udp_from(
-                bind_unused_udp_any(),
+                bind_unused_udp_multicast(),
                 multicast_socket_address,
                 ["test".to_string()],
             );
@@ -1581,23 +1627,16 @@ mod test {
 
     #[cfg(unix)]
     fn parses_unix_config(mode: &str) -> SocketConfig {
-        toml::from_str::<SocketConfig>(&format!(
-            r#"
-               mode = "{mode}"
-               path = "/does/not/exist"
-            "#
+        serde_yaml::from_str::<SocketConfig>(&format!(
+            "mode: \"{mode}\"\npath: \"/does/not/exist\""
         ))
         .unwrap()
     }
 
     #[cfg(unix)]
     fn parses_unix_config_file_mode(mode: &str) -> SocketConfig {
-        toml::from_str::<SocketConfig>(&format!(
-            r#"
-               mode = "{mode}"
-               path = "/does/not/exist"
-               socket_file_mode = 0o777
-            "#
+        serde_yaml::from_str::<SocketConfig>(&format!(
+            "mode: \"{mode}\"\npath: \"/does/not/exist\"\nsocket_file_mode: 511"
         ))
         .unwrap()
     }

@@ -18,7 +18,6 @@ components: sinks: azure_blob: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       true
 				max_bytes:    10_000_000
 				timeout_secs: 300.0
 			}
@@ -64,7 +63,6 @@ components: sinks: azure_blob: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.azure_blob.configuration

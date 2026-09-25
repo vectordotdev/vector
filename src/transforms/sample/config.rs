@@ -14,7 +14,7 @@ use crate::{
         TransformOutput,
     },
     schema,
-    template::Template,
+    template::UnconfinedTemplate,
     transforms::Transform,
 };
 
@@ -60,17 +60,16 @@ pub struct SampleConfig {
     ///
     /// For example, `rate = 1500` means 1 out of every 1500 events are forwarded and the rest are
     /// dropped. This differs from `ratio` which allows more precise control over the number of events
-    /// retained and values greater than 1/2. It is an error to provide a value for both `rate` and `ratio`.
-    #[configurable(metadata(docs::examples = 1500))]
+    /// retained and values greater than 1/2.
+    #[configurable(required_one_of = "sampling_strategy")]
     pub rate: Option<u64>,
 
-    /// The rate at which events are forwarded, expressed as a percentage
+    /// The rate at which events are forwarded, expressed as a percentage.
     ///
     /// For example, `ratio = .13` means that 13% out of all events on the stream are forwarded and
     /// the rest are dropped. This differs from `rate` allowing the configuration of a higher
-    /// precision value and also the ability to retain values of greater than 50% of all events. It is
-    /// an error to provide a value for both `rate` and `ratio`.
-    #[configurable(metadata(docs::examples = 0.13))]
+    /// precision value and also the ability to retain values of greater than 50% of all events.
+    #[configurable(required_one_of = "sampling_strategy", metadata(docs::examples = 0.13))]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub ratio: Option<f64>,
 
@@ -80,7 +79,6 @@ pub struct SampleConfig {
     /// in `(0, 1]` to be considered valid (for example, `0.25` keeps 25%). If the field is missing
     /// or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
     /// This option cannot be used together with `rate_field`.
-    #[configurable(metadata(docs::examples = "sample_rate"))]
     pub ratio_field: Option<String>,
 
     /// The event field whose integer value is used as the sampling rate on a per-event basis, expressed as `1/N`.
@@ -89,7 +87,6 @@ pub struct SampleConfig {
     /// are rejected. The value must be a positive integer to be considered valid. If the field is
     /// missing or invalid, static sampling settings (`rate` or `ratio`) are used as a fallback.
     /// This option cannot be used together with `ratio_field`.
-    #[configurable(metadata(docs::examples = "sample_rate_n"))]
     pub rate_field: Option<String>,
 
     /// The name of the field whose value is hashed to determine if the event should be
@@ -124,7 +121,7 @@ pub struct SampleConfig {
         docs::examples = "{{ service }}",
         docs::examples = "{{ hostname }}-{{ service }}"
     ))]
-    pub group_by: Option<Template>,
+    pub group_by: Option<UnconfinedTemplate>,
 
     /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
@@ -166,8 +163,8 @@ impl SampleConfig {
 }
 
 impl GenerateConfig for SampleConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             rate: None,
             ratio: Some(0.1),
             ratio_field: None,
@@ -222,10 +219,22 @@ impl TransformConfig for SampleConfig {
         Input::new(DataType::Log | DataType::Trace)
     }
 
-    fn validate(&self, _: &schema::Definition) -> Result<(), Vec<String>> {
+    fn validate_structure(&self) -> Result<(), Vec<String>> {
         self.sample_rate()
             .map(|_| ())
             .map_err(|e| vec![e.to_string()])
+    }
+
+    fn validate_with_context(&self, context: &TransformContext) -> Result<(), Vec<String>> {
+        if let Some(Err(e)) = self
+            .exclude
+            .as_ref()
+            .map(|c| c.validate(&context.enrichment_tables, &context.metrics_storage))
+        {
+            Err(vec![format!("exclude: {e}")])
+        } else {
+            Ok(())
+        }
     }
 
     fn outputs(
@@ -317,7 +326,7 @@ mod tests {
             exclude: None,
         };
 
-        assert!(config.validate(&crate::schema::Definition::any()).is_ok());
+        assert!(config.validate_structure().is_ok());
     }
 
     #[test]

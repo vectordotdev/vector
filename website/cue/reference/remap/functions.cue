@@ -7,6 +7,7 @@ remap: {
 		required:    bool
 		default?: bool | string | int | [string, ...string]
 		type: [remap.#Type, ...remap.#Type]
+		element_type?: [remap.#Type, ...remap.#Type]
 		enum?: #Enum
 	}
 

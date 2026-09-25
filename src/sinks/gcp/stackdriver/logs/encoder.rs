@@ -7,18 +7,28 @@ use serde_json::{Map, json, to_vec};
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::{event_path, path::PathPrefix};
 
-use super::config::{
-    StackdriverLabelConfig, StackdriverLogName, StackdriverResource, default_labels_key,
-};
+use super::config::{StackdriverLogName, default_labels_key};
 use crate::{
     sinks::{prelude::*, util::encoding::Encoder as SinkEncoder},
     template::TemplateRenderingError,
 };
 
 #[derive(Clone, Debug)]
+pub(super) struct StackdriverLabelConfig {
+    pub(super) labels_key: Option<String>,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct StackdriverResource {
+    pub(super) type_: String,
+    pub(super) labels: HashMap<String, UnconfinedTemplate>,
+}
+
+#[derive(Clone, Debug)]
 pub(super) struct StackdriverLogsEncoder {
     transformer: Transformer,
-    log_id: Template,
+    log_id: ConfinedTemplate,
     log_name: StackdriverLogName,
     label_config: StackdriverLabelConfig,
     resource: StackdriverResource,
@@ -29,7 +39,7 @@ impl StackdriverLogsEncoder {
     /// Creates a new `StackdriverLogsEncoder`.
     pub(super) const fn new(
         transformer: Transformer,
-        log_id: Template,
+        log_id: ConfinedTemplate,
         log_name: StackdriverLogName,
         label_config: StackdriverLabelConfig,
         resource: StackdriverResource,

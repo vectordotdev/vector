@@ -2,6 +2,10 @@ package metadata
 
 components: sinks: aws_cloudwatch_metrics: components._aws & {
 	title: "AWS Cloudwatch Metrics"
+	description: """
+		CloudWatch supports two metric storage representations: statistic sets and data points.
+		Vector uses data points so CloudWatch can calculate statistics without loss.
+		"""
 
 	classes: {
 		delivery:      "at_least_once"
@@ -18,7 +22,6 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_events:   20
 				timeout_secs: 1.0
 			}
@@ -66,18 +69,6 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 				or by delta increments/decrements. Delta gauges are considered an
 				advanced feature useful in a distributed setting, however they
 				should be used with care.
-				""",
-		]
-		notices: [
-			"""
-				CloudWatch Metrics types are organized not by their semantics, but
-				by storage properties:
-
-				* Statistic Sets
-				* Data Points
-
-				In Vector only the latter is used to allow lossless statistics
-				calculations on CloudWatch side.
 				""",
 		]
 	}

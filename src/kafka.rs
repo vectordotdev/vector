@@ -43,11 +43,8 @@ pub enum KafkaCompression {
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct KafkaAuthConfig {
-    #[configurable(derived)]
     pub(crate) sasl: Option<KafkaSaslConfig>,
 
-    #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     pub(crate) tls: Option<TlsEnableableConfig>,
 }
 
