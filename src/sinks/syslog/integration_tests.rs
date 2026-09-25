@@ -7,6 +7,7 @@ use std::{
 use futures::stream;
 use tokio::time::sleep;
 use vector_lib::event::{Event, LogEvent, ObjectMap, Value};
+use vrl::event_path;
 
 use super::SyslogSinkConfig;
 use crate::{
@@ -60,10 +61,10 @@ fn syslog_log_dir() -> PathBuf {
 fn log_event(message: &str, facility: &str, severity: &str) -> Event {
     let mut event = Event::Log(LogEvent::from(message.to_owned()));
     let log = event.as_mut_log();
-    log.insert("host", "vector-integration-host");
-    log.insert("app", "vector-integration-app");
-    log.insert("facility", facility);
-    log.insert("severity", severity);
+    log.insert(event_path!("host"), "vector-integration-host");
+    log.insert(event_path!("app"), "vector-integration-app");
+    log.insert(event_path!("facility"), facility);
+    log.insert(event_path!("severity"), severity);
     event
 }
 
@@ -73,7 +74,9 @@ async fn run_sink(config: SyslogSinkConfig, event: Event) {
     // after `init_test` clears the event recorder.
     assert_sink_compliance(&SINK_TAGS, async move {
         let context = SinkContext::default();
-        let (sink, healthcheck) = config.build(context).await.expect("sink should build");
+        let (sink, healthcheck) = SinkConfig::build(&config, context)
+            .await
+            .expect("sink should build");
         healthcheck.await.expect("healthcheck should pass");
         sink.run(stream::once(ready(event.into())))
             .await
@@ -297,13 +300,13 @@ async fn tcp_octet_counting_rfc5424_with_proc_id_msg_id_structured_data_reaches_
 
     let mut event = log_event(&message, "local2", "info");
     let log = event.as_mut_log();
-    log.insert("pid", proc_id.as_str());
-    log.insert("mid", msg_id.as_str());
+    log.insert(event_path!("pid"), proc_id.as_str());
+    log.insert(event_path!("mid"), msg_id.as_str());
     let mut sd_params = ObjectMap::new();
     sd_params.insert("retry".into(), Value::from(sd_param_value.as_str()));
     let mut sd_root = ObjectMap::new();
     sd_root.insert("metrics@1234".into(), Value::from(sd_params));
-    log.insert("structured_data", Value::from(sd_root));
+    log.insert(event_path!("structured_data"), Value::from(sd_root));
 
     run_sink(config, event).await;
 

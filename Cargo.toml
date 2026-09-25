@@ -932,8 +932,8 @@ sinks-logs = [
   "sinks-redis",
   "sinks-sematext",
   "sinks-socket",
-  "sinks-syslog",
   "sinks-splunk_hec",
+  "sinks-syslog",
   "sinks-vector",
   "sinks-webhdfs",
   "sinks-websocket",
@@ -1005,9 +1005,9 @@ sinks-pulsar = ["dep:pulsar"]
 sinks-redis = ["dep:redis"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = ["sinks-utils-udp"]
-sinks-syslog = ["codecs-syslog", "sinks-utils-udp"]
 sinks-splunk_hec = []
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
+sinks-syslog = ["codecs-syslog", "sinks-utils-udp"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
 sinks-websocket = ["dep:tokio-tungstenite"]

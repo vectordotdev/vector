@@ -17,12 +17,7 @@ components: sinks: syslog: {
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
-			encoding: {
-				enabled: true
-				codec: {
-					enabled: false
-				}
-			}
+			encoding: enabled:    false
 			send_buffer_bytes: {
 				enabled:       true
 				relevant_when: "mode = `tcp` or mode = `udp`"
@@ -56,8 +51,7 @@ components: sinks: syslog: {
 
 	support: {
 		requirements: []
-		warnings: []
-		notices: [
+		warnings: [
 			"""
 				For RFC 5425 syslog over TLS compliance, configure `mode = "tcp"`,
 				`tls.enabled = true`, `syslog.rfc = "rfc5424"`, and

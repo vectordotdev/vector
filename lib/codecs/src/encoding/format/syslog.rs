@@ -361,68 +361,90 @@ fn insert_structured_param(result: &mut BTreeMap<String, String>, key: String, v
     result.insert(key, value);
 }
 
-fn parse_numeric_code<T>(value: &Value, from_repr: fn(usize) -> Option<T>) -> Option<T> {
-    match value {
-        Value::Integer(n) => usize::try_from(*n).ok().and_then(from_repr),
-        other => other
-            .to_string_lossy()
-            .trim()
-            .parse::<usize>()
-            .ok()
-            .and_then(from_repr),
+/// Resolves a facility or severity from an event value.
+///
+/// Accepts integers, numeric strings, and case-insensitive names, converting the
+/// value to a string at most once and without allocating for valid UTF-8 bytes.
+fn parse_syslog_code<T: Copy>(
+    value: &Value,
+    from_repr: fn(usize) -> Option<T>,
+    names: &[(&str, T)],
+) -> Option<T> {
+    if let Value::Integer(n) = value {
+        return usize::try_from(*n).ok().and_then(from_repr);
     }
+
+    let raw = value.to_string_lossy();
+    let name = raw.trim();
+    if let Ok(n) = name.parse::<usize>() {
+        return from_repr(n);
+    }
+
+    names
+        .iter()
+        .find(|(candidate, _)| candidate.eq_ignore_ascii_case(name))
+        .map(|(_, code)| *code)
 }
 
-fn parse_facility(value: &Value) -> Option<Facility> {
-    if let Some(facility) = parse_numeric_code(value, Facility::from_repr) {
-        return Some(facility);
-    }
+const FACILITY_NAMES: &[(&str, Facility)] = &[
+    ("kern", Facility::Kern),
+    ("kernel", Facility::Kern),
+    ("user", Facility::User),
+    ("mail", Facility::Mail),
+    ("daemon", Facility::Daemon),
+    ("auth", Facility::Auth),
+    ("syslog", Facility::Syslog),
+    ("lpr", Facility::Lpr),
+    ("news", Facility::News),
+    ("uucp", Facility::Uucp),
+    ("cron", Facility::Cron),
+    ("authpriv", Facility::Authpriv),
+    ("auth-priv", Facility::Authpriv),
+    ("auth_priv", Facility::Authpriv),
+    ("ftp", Facility::Ftp),
+    ("ntp", Facility::Ntp),
+    ("security", Facility::Security),
+    ("audit", Facility::Security),
+    ("log-alert", Facility::LogAlert),
+    ("log_alert", Facility::LogAlert),
+    ("alert", Facility::LogAlert),
+    ("console", Facility::LogAlert),
+    ("solaris-cron", Facility::SolarisCron),
+    ("solaris_cron", Facility::SolarisCron),
+    ("clockd", Facility::SolarisCron),
+    ("local0", Facility::Local0),
+    ("local1", Facility::Local1),
+    ("local2", Facility::Local2),
+    ("local3", Facility::Local3),
+    ("local4", Facility::Local4),
+    ("local5", Facility::Local5),
+    ("local6", Facility::Local6),
+    ("local7", Facility::Local7),
+];
 
-    match value.to_string_lossy().trim().to_ascii_lowercase().as_str() {
-        "kern" | "kernel" => Some(Facility::Kern),
-        "user" => Some(Facility::User),
-        "mail" => Some(Facility::Mail),
-        "daemon" => Some(Facility::Daemon),
-        "auth" => Some(Facility::Auth),
-        "syslog" => Some(Facility::Syslog),
-        "lpr" => Some(Facility::Lpr),
-        "news" => Some(Facility::News),
-        "uucp" => Some(Facility::Uucp),
-        "cron" => Some(Facility::Cron),
-        "authpriv" | "auth-priv" | "auth_priv" => Some(Facility::Authpriv),
-        "ftp" => Some(Facility::Ftp),
-        "ntp" => Some(Facility::Ntp),
-        "security" | "audit" => Some(Facility::Security),
-        "log-alert" | "log_alert" | "alert" | "console" => Some(Facility::LogAlert),
-        "solaris-cron" | "solaris_cron" | "clockd" => Some(Facility::SolarisCron),
-        "local0" => Some(Facility::Local0),
-        "local1" => Some(Facility::Local1),
-        "local2" => Some(Facility::Local2),
-        "local3" => Some(Facility::Local3),
-        "local4" => Some(Facility::Local4),
-        "local5" => Some(Facility::Local5),
-        "local6" => Some(Facility::Local6),
-        "local7" => Some(Facility::Local7),
-        _ => None,
-    }
+const SEVERITY_NAMES: &[(&str, Severity)] = &[
+    ("emergency", Severity::Emergency),
+    ("emerg", Severity::Emergency),
+    ("panic", Severity::Emergency),
+    ("alert", Severity::Alert),
+    ("critical", Severity::Critical),
+    ("crit", Severity::Critical),
+    ("error", Severity::Error),
+    ("err", Severity::Error),
+    ("warning", Severity::Warning),
+    ("warn", Severity::Warning),
+    ("notice", Severity::Notice),
+    ("informational", Severity::Informational),
+    ("info", Severity::Informational),
+    ("debug", Severity::Debug),
+];
+
+fn parse_facility(value: &Value) -> Option<Facility> {
+    parse_syslog_code(value, Facility::from_repr, FACILITY_NAMES)
 }
 
 fn parse_severity(value: &Value) -> Option<Severity> {
-    if let Some(severity) = parse_numeric_code(value, Severity::from_repr) {
-        return Some(severity);
-    }
-
-    match value.to_string_lossy().trim().to_ascii_lowercase().as_str() {
-        "emergency" | "emerg" | "panic" => Some(Severity::Emergency),
-        "alert" => Some(Severity::Alert),
-        "critical" | "crit" => Some(Severity::Critical),
-        "error" | "err" => Some(Severity::Error),
-        "warning" | "warn" => Some(Severity::Warning),
-        "notice" => Some(Severity::Notice),
-        "informational" | "info" => Some(Severity::Informational),
-        "debug" => Some(Severity::Debug),
-        _ => None,
-    }
+    parse_syslog_code(value, Severity::from_repr, SEVERITY_NAMES)
 }
 
 /// The syslog RFC standard to use for formatting.

@@ -11,7 +11,10 @@ use vrl::value::Kind;
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::{Encoder, Transformer, encoding::BoxedFramingError},
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        ValidatedSink,
+    },
     schema,
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
 };
@@ -33,11 +36,9 @@ pub struct SyslogSinkConfig {
     /// Syslog encoding options.
     ///
     /// Controls the RFC format, facility, severity, and field mappings for the syslog output.
-    #[configurable(derived)]
     #[serde(default)]
     pub syslog: SyslogSerializerOptions,
 
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -70,7 +71,6 @@ pub struct TcpMode {
     #[serde(flatten)]
     pub config: TcpSinkConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub framing: SyslogFramingConfig,
 }
@@ -90,7 +90,6 @@ pub struct UnixMode {
     #[serde(flatten)]
     pub config: UnixSinkConfig,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub framing: SyslogFramingConfig,
 }
@@ -174,57 +173,29 @@ pub struct UnixSinkConfig {
 }
 
 impl GenerateConfig for SyslogSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"address = "127.0.0.1:514"
-            mode = "tcp"
-            syslog.rfc = "rfc5424""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"address: "127.0.0.1:514"
+            mode: tcp
+            syslog:
+              rfc: rfc5424"#,
+        })
         .unwrap()
+    }
+}
+
+impl SyslogSinkConfig {
+    fn build_serializer(&self) -> vector_lib::codecs::SyslogSerializer {
+        SyslogSerializerConfig {
+            syslog: self.syslog.clone(),
+        }
+        .build()
     }
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "syslog")]
 impl SinkConfig for SyslogSinkConfig {
-    async fn build(
-        &self,
-        _cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let syslog_config = SyslogSerializerConfig {
-            syslog: self.syslog.clone(),
-        };
-        let serializer = syslog_config.build();
-        // No user-configurable transformer: the syslog serializer handles all
-        // field extraction internally. Users who need field filtering should
-        // use the `socket` sink with `encoding.codec = "syslog"` instead.
-        let transformer = Transformer::default();
-
-        match &self.mode {
-            Mode::Tcp(TcpMode { config, framing }) => {
-                let encoder = Encoder::<Framer>::new(framing.build(), serializer.into());
-                config.build(transformer, encoder)
-            }
-            Mode::Udp(UdpMode { config }) => {
-                let encoder = Encoder::<()>::new(serializer.into());
-                config.build(transformer, encoder, None)
-            }
-            #[cfg(unix)]
-            Mode::UnixStream(UnixMode { config, framing }) => {
-                let encoder = Encoder::<Framer>::new(framing.build(), serializer.into());
-                config.build(
-                    transformer,
-                    encoder,
-                    super::util::service::net::UnixMode::Stream,
-                )
-            }
-            #[cfg(not(unix))]
-            Mode::UnixStream(_) => {
-                Err("Unix stream mode is supported only on Unix platforms.".into())
-            }
-        }
-    }
-
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
             .optional_meaning("host", Kind::bytes())
@@ -238,12 +209,83 @@ impl SinkConfig for SyslogSinkConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum ValidatedSyslog {
+    Tcp {
+        host: String,
+        port: u16,
+    },
+    Udp,
+    #[cfg(unix)]
+    UnixStream,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for SyslogSinkConfig {
+    type Validated = ValidatedSyslog;
+
+    fn validate(&self) -> crate::Result<ValidatedSyslog> {
+        match &self.mode {
+            Mode::Tcp(TcpMode { config, .. }) => {
+                let (host, port) = config.parse_address()?;
+                Ok(ValidatedSyslog::Tcp { host, port })
+            }
+            Mode::Udp(UdpMode { config }) => {
+                config.parse_address()?;
+                Ok(ValidatedSyslog::Udp)
+            }
+            #[cfg(unix)]
+            Mode::UnixStream(_) => Ok(ValidatedSyslog::UnixStream),
+            #[cfg(not(unix))]
+            Mode::UnixStream(_) => {
+                Err("Unix stream mode is supported only on Unix platforms.".into())
+            }
+        }
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedSyslog,
+        _cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let serializer = self.build_serializer();
+        // No user-configurable transformer: the syslog serializer handles all
+        // field extraction internally. Users who need field filtering should
+        // use the `socket` sink with `encoding.codec = "syslog"` instead.
+        let transformer = Transformer::default();
+
+        match (validated, &self.mode) {
+            (ValidatedSyslog::Tcp { host, port }, Mode::Tcp(TcpMode { config, framing })) => {
+                let encoder = Encoder::<Framer>::new(framing.build(), serializer.into());
+                config.build_with_address(host.clone(), *port, transformer, encoder)
+            }
+            (ValidatedSyslog::Udp, Mode::Udp(UdpMode { config })) => {
+                let encoder = Encoder::<()>::new(serializer.into());
+                config.build(transformer, encoder, None)
+            }
+            #[cfg(unix)]
+            (ValidatedSyslog::UnixStream, Mode::UnixStream(UnixMode { config, framing })) => {
+                let encoder = Encoder::<Framer>::new(framing.build(), serializer.into());
+                config.build(
+                    transformer,
+                    encoder,
+                    super::util::service::net::UnixMode::Stream,
+                )
+            }
+            #[cfg(not(unix))]
+            (_, Mode::UnixStream(_)) => {
+                Err("Unix stream mode is supported only on Unix platforms.".into())
+            }
+            _ => unreachable!("validated state does not match config mode"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{future::ready, net::SocketAddr, time::Duration};
 
     use futures::{StreamExt, stream};
-    use serde::Deserialize;
     use tokio::{
         io::AsyncReadExt,
         net::TcpListener,
@@ -253,6 +295,7 @@ mod tests {
     use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
     use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -271,6 +314,24 @@ mod tests {
         crate::test_util::test_generate_config::<SyslogSinkConfig>();
     }
 
+    #[test]
+    fn validate_rejects_invalid_addresses() {
+        for mode in ["tcp", "udp"] {
+            let config: SyslogSinkConfig = toml::from_str(&format!(
+                r#"
+                mode = "{mode}"
+                address = "missing-port"
+                "#,
+            ))
+            .expect("config should parse");
+
+            assert!(
+                config.validate().is_err(),
+                "{mode} address without a port should fail validation"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn component_spec_compliance() {
         trace_init();
@@ -278,11 +339,9 @@ mod tests {
         let (_guard, addr) = next_addr();
         let _receiver = CountReceiver::receive_lines(addr);
 
-        let config = SyslogSinkConfig::generate_config().to_string();
-        let mut config = SyslogSinkConfig::deserialize(
-            toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
-        )
-        .expect("config should be valid");
+        let mut config: SyslogSinkConfig =
+            serde_json::from_value(SyslogSinkConfig::generate_config())
+                .expect("config should be valid");
         // Point to our local test listener instead of the default address.
         config.mode = Mode::Tcp(TcpMode {
             config: TcpSinkConfig::from_address(addr.to_string()),
@@ -290,7 +349,7 @@ mod tests {
         });
 
         let context = SinkContext::default();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
+        let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
 
         let event = Event::Log(LogEvent::from("spec compliance"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
@@ -313,11 +372,11 @@ mod tests {
         };
 
         let mut event = Event::Log(LogEvent::from("test syslog message"));
-        event.as_mut_log().insert("host", "test-host");
+        event.as_mut_log().insert(event_path!("host"), "test-host");
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             sink.run(stream::once(ready(event.into()))).await
         })
         .await
@@ -361,11 +420,11 @@ mod tests {
         .expect("config should parse");
 
         let mut event = Event::Log(LogEvent::from("rfc3164 test message"));
-        event.as_mut_log().insert("host", "myhost");
+        event.as_mut_log().insert(event_path!("host"), "myhost");
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             sink.run(stream::once(ready(event.into()))).await
         })
         .await
@@ -411,13 +470,19 @@ mod tests {
         .expect("config should parse");
 
         let mut event = Event::Log(LogEvent::from("custom fields test"));
-        event.as_mut_log().insert("my_app", "myservice");
-        event.as_mut_log().insert("syslog_facility", "local0");
-        event.as_mut_log().insert("syslog_severity", "error");
+        event
+            .as_mut_log()
+            .insert(event_path!("my_app"), "myservice");
+        event
+            .as_mut_log()
+            .insert(event_path!("syslog_facility"), "local0");
+        event
+            .as_mut_log()
+            .insert(event_path!("syslog_severity"), "error");
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             sink.run(stream::once(ready(event.into()))).await
         })
         .await
@@ -463,7 +528,7 @@ mod tests {
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             sink.run(events).await
         })
         .await
@@ -511,7 +576,7 @@ mod tests {
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             sink.run(stream::once(ready(event.into()))).await
         })
         .await
@@ -567,7 +632,7 @@ mod tests {
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             sink.run(stream::once(ready(event.into()))).await
         })
         .await
@@ -609,7 +674,7 @@ mod tests {
 
         let context = SinkContext::default();
         assert_sink_compliance(&SINK_TAGS, async move {
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             let event = Event::Log(LogEvent::from("udp syslog test"));
             sink.run(stream::once(ready(event.into()))).await
         })
@@ -662,7 +727,7 @@ mod tests {
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             sink.run(stream::once(ready(event.into()))).await
         })
         .await
@@ -707,7 +772,7 @@ mod tests {
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let context = SinkContext::default();
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             sink.run(stream::once(ready(event.into()))).await
         })
         .await
@@ -748,7 +813,7 @@ mod tests {
 
         let context = SinkContext::default();
         assert_sink_compliance(&SINK_TAGS, async move {
-            let (sink, _healthcheck) = config.build(context).await.unwrap();
+            let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
             sink.run(stream::once(ready(event.into()))).await
         })
         .await
@@ -785,7 +850,7 @@ mod tests {
         };
 
         let context = SinkContext::default();
-        let (sink, _healthcheck) = config.build(context).await.unwrap();
+        let (sink, _healthcheck) = SinkConfig::build(&config, context).await.unwrap();
 
         let (_, events) = random_lines_with_stream(1000, 10000, None);
         let sink_handle = tokio::spawn(run_and_assert_sink_compliance(sink, events, &SINK_TAGS));
