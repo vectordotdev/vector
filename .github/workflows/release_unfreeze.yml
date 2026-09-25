@@ -63,8 +63,8 @@ jobs:
           # would leave the closeout to a manual dispatch, so wait instead.
           DEADLINE_SECONDS: 600
         run: |
-          set -euo pipefail
           deadline=$((SECONDS + DEADLINE_SECONDS))
+          idle=0
           while :; do
             pending=''
             latest=''
@@ -89,19 +89,35 @@ jobs:
             done
             if (( failed == 0 )); then
               # A finished "Release Suite" that failed means the housekeeping PR
-              # never merged, and its retry needs the freeze. Wait for a human
-              # instead of closing the window under an incomplete release.
+              # never merged, and its retry needs the freeze. The same holds for
+              # a failed manifests run: its retry needs the freeze. Wait for a
+              # human instead of closing the window under an incomplete release.
               latest=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --limit 1 \
                 --json conclusion,url --jq '.[] | select(.conclusion != "success")
                   | "\(.conclusion) \(.url)"') || failed=1
+            fi
+            if (( failed == 0 )); then
+              latest+="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release_manifests.yml --limit 1 \
+                --json conclusion,url --jq '.[] | select(.conclusion != "success")
+                  | "\(.conclusion) \(.url)"')" || failed=1
             fi
             if (( failed == 0 )); then
               open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --app vectordotdev-bot \
                 --state open --limit 100 --json number,title --jq '.[] | "PR #\(.number): \(.title)"') || failed=1
             fi
             if (( failed == 0 )) && [[ -z "$pending" && -z "$latest" && -z "$open" ]]; then
-              echo "No release workflow is pending and no vectordotdev-bot PR is open." >> "$GITHUB_STEP_SUMMARY"
-              exit 0
+              # Require a stable idle state: a poll can land between the tag
+              # workflow completing and GitHub listing the release run it
+              # triggered, and that handoff race would otherwise close the
+              # window the new release needs. A second idle poll after a full
+              # sleep interval confirms the release is really finished.
+              idle=$((idle + 1))
+              if (( idle >= 2 )); then
+                echo "No release workflow is pending and no vectordotdev-bot PR is open." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+            else
+              idle=0
             fi
             if (( SECONDS >= deadline )); then
               printf '%s\n' "$pending" "$latest" "$open" >&2
