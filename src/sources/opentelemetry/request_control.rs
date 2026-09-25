@@ -6,8 +6,7 @@ use hyper::Body;
 use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tower::{
-    BoxError, Layer, Service, ServiceExt, load_shed::error::Overloaded, service_fn,
-    timeout::TimeoutLayer, util::BoxCloneService,
+    BoxError, Layer, Service, ServiceExt, service_fn, timeout::TimeoutLayer, util::BoxCloneService,
 };
 use vector_lib::{
     counter,
@@ -129,9 +128,7 @@ fn classify_error(
     metrics: &RequestControlMetrics,
     protocol: Protocol,
 ) -> MiddlewareError {
-    if error.is::<tower::load_shed::error::Overloaded>() {
-        MiddlewareError::Overloaded
-    } else if error.is::<tower::timeout::error::Elapsed>() {
+    if error.is::<tower::timeout::error::Elapsed>() {
         metrics.time_out(protocol);
         MiddlewareError::TimedOut
     } else {
@@ -216,30 +213,25 @@ where
         let protocol = self.protocol;
         let error_response = self.error_response.clone();
         let service = service_fn(move |request: Request<Body>| {
-            let permit = Arc::clone(&semaphore).try_acquire_owned();
-            let processing = permit.as_ref().ok().map(|_| processing.clone());
+            let admitted = Arc::clone(&semaphore).try_acquire_owned().map(|permit| {
+                let active = metrics.active_token();
+                (permit, active, processing.clone())
+            });
             let metrics = Arc::clone(&metrics);
             let error_response = error_response.clone();
 
             async move {
-                let result = match permit {
-                    Ok(permit) => {
-                        let _permit = permit;
-                        let _active = metrics.active_token();
-                        processing
-                            .expect("admitted request has a processing service")
-                            .oneshot(request)
-                            .await
-                    }
-                    Err(_) => Err(Box::new(Overloaded::new()) as BoxError),
+                let response = match admitted {
+                    Ok((_permit, _active, processing)) => match processing.oneshot(request).await {
+                        Ok(response) => response,
+                        Err(error) => {
+                            error_response.make_response(classify_error(error, &metrics, protocol))
+                        }
+                    },
+                    Err(_) => error_response.make_response(MiddlewareError::Overloaded),
                 };
 
-                Ok::<_, Infallible>(match result {
-                    Ok(response) => response,
-                    Err(error) => {
-                        error_response.make_response(classify_error(error, &metrics, protocol))
-                    }
-                })
+                Ok::<_, Infallible>(response)
             }
         });
         let service = service.and_then(finalize_acknowledgement);

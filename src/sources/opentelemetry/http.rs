@@ -96,7 +96,7 @@ pub(crate) async fn run_http_server(
     info!(message = "Building HTTP server.", address = %address);
 
     let span = Span::current();
-    // Admission wraps the Warp service, so queued requests cannot reach `capped_body`.
+    // Admission wraps the Warp service, so rejected requests cannot reach `capped_body`.
     let admitted = request_control.layer(warp::service(routes));
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
         let svc = ServiceBuilder::new()
