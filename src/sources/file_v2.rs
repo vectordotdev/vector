@@ -591,7 +591,6 @@ pub fn file_v2_source(
             config.ignore_not_found,
         ),
         remove_after: config.remove_after_secs.map(Duration::from_secs),
-        acknowledgements,
         emitter,
         reader_idle_timeout: config.reader_idle_timeout,
         checkpoint_interval,
@@ -630,11 +629,9 @@ pub fn file_v2_source(
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
-                    if entry
-                        .delivery_progress
-                        .as_ref()
-                        .is_none_or(|progress| progress.delivered(entry.offset))
-                    {
+                    if let Some(progress) = entry.delivery_progress {
+                        progress.checkpoint(&checkpoints, entry.file_id, entry.offset);
+                    } else {
                         checkpoints.update(entry.file_id, entry.offset);
                     }
                 } else if let Some(progress) = entry.delivery_progress {
@@ -719,7 +716,11 @@ pub fn file_v2_source(
                 };
                 finalizer.add(entry, receiver);
             } else if !track_handoff {
-                checkpoints.update(line.file_id, line.end_offset);
+                if let Some(progress) = &line.delivery_progress {
+                    progress.checkpoint(&checkpoints, line.file_id, line.end_offset);
+                } else {
+                    checkpoints.update(line.file_id, line.end_offset);
+                }
             }
             (event, line.file_id, line.delivery_progress, line.end_offset)
         });
@@ -743,9 +744,10 @@ pub fn file_v2_source(
                             return Err(error);
                         }
                         for (file_id, progress, offset) in progress {
-                            handoff_checkpoints.update(file_id, offset);
                             if let Some(progress) = progress {
-                                progress.delivered(offset);
+                                progress.checkpoint(&handoff_checkpoints, file_id, offset);
+                            } else {
+                                handoff_checkpoints.update(file_id, offset);
                             }
                         }
                     }
@@ -1124,7 +1126,6 @@ mod tests {
                 line_delimiter: Bytes::from_static(b"\n"),
                 fingerprinter: Fingerprinter::new(FingerprintStrategy::DevInode, 4096, false),
                 remove_after: None,
-                acknowledgements: false,
                 emitter,
                 reader_idle_timeout: Duration::from_secs(60),
                 checkpoint_interval: Duration::from_secs(60),

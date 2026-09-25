@@ -181,6 +181,18 @@ impl Fingerprinter {
         }
     }
 
+    /// Bytes that establish a byte-checksum identity, including its skipped header.
+    #[must_use]
+    pub fn checksum_prefix_length(&self) -> Option<usize> {
+        match self.strategy {
+            FingerprintStrategy::FirstBytesChecksum {
+                ignored_header_bytes,
+                bytes,
+            } => Some(ignored_header_bytes.saturating_add(bytes.get())),
+            _ => None,
+        }
+    }
+
     /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
     pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
         use FileFingerprint::{DevInode, FirstBytesChecksum, FirstLinesChecksum};

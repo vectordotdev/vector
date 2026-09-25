@@ -22,7 +22,7 @@ use tokio_util::task::JoinMap;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    file_watcher::{DeliveryProgress, FileWatcher},
+    file_watcher::{DeliveryProgress, FileIdentity, FileWatcher},
     paths_provider::{PathUpdates, PathsProvider},
     Checkpointer, CheckpointsView, FilePosition, ReadFrom,
 };
@@ -58,7 +58,6 @@ where
     pub line_delimiter: Bytes,
     pub fingerprinter: Fingerprinter,
     pub remove_after: Option<Duration>,
-    pub acknowledgements: bool,
     pub emitter: E,
     pub reader_idle_timeout: Duration,
     /// Duration after which to checkpoint files
@@ -343,6 +342,21 @@ where
 
                         self.emitter.emit_files_open(fp_map.len());
                     }
+                } else {
+                    // Fingerprinting can temporarily fail after a tracked file
+                    // shrinks below the configured prefix. Presence and content
+                    // identity are separate: retain only the matching inode.
+                    if let Ok(identity) = FileIdentity::at_path(&path).await {
+                        if let Some(watcher) = fp_map
+                            .values_mut()
+                            .find(|watcher| watcher.matches_identity(&identity))
+                        {
+                            watcher.set_file_findable(true);
+                            if watcher.path != path {
+                                watcher.update_path(path.clone()).await.ok();
+                            }
+                        }
+                    }
                 }
             }
             stats.record("discovery", start.elapsed());
@@ -353,14 +367,24 @@ where
             for (&file_id, watcher) in &mut fp_map {
                 let mut start = time::Instant::now();
                 let mut bytes_read = 0;
+                let previous_position = watcher.get_file_position();
                 if watcher.check_for_truncation().await.is_ok() {
+                    if previous_position > 0 && watcher.get_file_position() == 0 {
+                        checkpoints.update(file_id, 0);
+                    }
                     let turn_start = watcher.get_file_position();
                     // A zero budget still permits progress on the next record.
                     let budget = self.max_read_bytes.max(1) as u64;
                     while watcher.get_file_position() - turn_start < budget {
                         let remaining = budget - (watcher.get_file_position() - turn_start);
-                        let Ok(Some(line)) = watcher.read_line_bounded(remaining as usize).await
-                        else {
+                        let result = watcher.read_line_bounded(remaining as usize).await;
+                        if let Some((start, end)) = watcher.discarded.take() {
+                            if let Some(progress) = &watcher.delivery_progress {
+                                progress.discard(start, end, file_id, &checkpoints);
+                            }
+                            continue;
+                        }
+                        let Ok(Some(line)) = result else {
                             break;
                         };
                         let sz = line.bytes.len();
@@ -397,6 +421,29 @@ where
                     // without waiting for another filesystem notification.
                     made_progress |= bytes_read > 0;
                 }
+                if watcher.should_retire(self.reader_idle_timeout) {
+                    if let Some(line) = watcher.finish_partial() {
+                        batch_bytes += line.bytes.len();
+                        lines.push(Line {
+                            text: line.bytes,
+                            filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                            file_id,
+                            start_offset: line.offset,
+                            end_offset: watcher.get_file_position(),
+                            delivery_progress: watcher.delivery_progress.clone(),
+                        });
+                    }
+                    if let Some((start, end)) = watcher.discarded.take() {
+                        if let Some(progress) = &watcher.delivery_progress {
+                            progress.discard(start, end, file_id, &checkpoints);
+                        }
+                    }
+                    watcher.set_dead();
+                    if batch_bytes >= MAX_BATCH_BYTES || lines.len() >= MAX_BATCH_LINES {
+                        self.send_lines(&mut chans, &mut lines, &mut stats).await?;
+                        batch_bytes = 0;
+                    }
+                }
                 stats.record("reading", start.elapsed());
 
                 if bytes_read == 0 {
@@ -422,9 +469,6 @@ where
             // Retire missing files only after draining them and waiting for
             // further writes. Discoverable files remain watched while idle.
             fp_map.retain(|file_id, watcher| {
-                if watcher.should_retire(self.reader_idle_timeout) {
-                    watcher.set_dead();
-                }
                 if watcher.dead() {
                     self.emitter
                         .emit_file_unwatched(&watcher.path, watcher.reached_eof());
@@ -519,16 +563,37 @@ where
         .await
         {
             Ok(mut watcher) => {
-                // A rewrite can change the checksum without changing the inode.
-                // Keep the existing reader: it may already have observed the
-                // truncation and read some of the replacement contents between
-                // discovery passes. Starting another reader would replay them.
+                if let Err(error) = watcher
+                    .capture_generation_prefix(self.fingerprinter.checksum_prefix_length())
+                    .await
+                {
+                    self.emitter.emit_file_watch_error(&path, error);
+                    return;
+                }
                 let previous_index = fp_map.values().position(|old| old.same_file(&watcher));
                 if let Some(index) = previous_index {
                     let (old_id, previous) = fp_map.shift_remove_index(index).unwrap();
-                    checkpoints.set_dead(old_id);
-                    watcher = previous;
-                    watcher.update_path(path.clone()).await.ok();
+                    if previous.same_generation(&watcher) {
+                        // A shrink was already observed and its new prefix has
+                        // only grown. Preserve reads and redirect late acknowledgements.
+                        if let Some(progress) = &previous.delivery_progress {
+                            progress.rekey(old_id, file_id, checkpoints);
+                        }
+                        watcher = previous;
+                        watcher.update_path(path.clone()).await.ok();
+                    } else {
+                        // A changed prefix without an observed rewind is a new
+                        // generation, even if the file regrew beyond our offset.
+                        if let Some(progress) = &previous.delivery_progress {
+                            progress.failed();
+                        }
+                        if let Err(error) = watcher.rewind().await {
+                            self.emitter.emit_file_watch_error(&path, error);
+                            return;
+                        }
+                        checkpoints.set_dead(old_id);
+                        checkpoints.update(file_id, 0);
+                    }
                 }
                 if let ReadFrom::Checkpoint(file_position) = read_from {
                     self.emitter.emit_file_resumed(&path, file_position);
@@ -542,12 +607,9 @@ where
                     }
                 }
 
-                if self.acknowledgements || self.remove_after.is_some() {
-                    watcher.enable_delivery_tracking(match read_from {
-                        ReadFrom::Checkpoint(offset) => Some(offset),
-                        _ => None,
-                    });
-                }
+                // Tracking is also needed without acknowledgements: buffered
+                // lines can outlive a fingerprint rekey or a truncation.
+                watcher.enable_delivery_tracking();
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);
             }
