@@ -373,7 +373,7 @@ mod source {
                 )
                 .increment(1);
                 counter!(
-                    "files_unwatched_bytes_unread_total",
+                    CounterName::FilesUnwatchedBytesUnreadTotal,
                     "file" => file_tag,
                     "reached_eof" => reached_eof,
                 )
@@ -385,7 +385,7 @@ mod source {
                 )
                 .increment(1);
                 counter!(
-                    "files_unwatched_bytes_unread_total",
+                    CounterName::FilesUnwatchedBytesUnreadTotal,
                     "reached_eof" => reached_eof,
                 )
                 .increment(self.bytes_unread);
