@@ -387,6 +387,9 @@ impl_generate_config_from_default!(FileConfig);
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        warn!(
+            "DEPRECATED: The `file` source is deprecated in favor of `file_v2`. Review migration guidance at https://vector.dev/deprecations/ before switching."
+        );
         // add the source name as a subdir, so that multiple sources can
         // operate within the same given data_dir (e.g. the global one)
         // without the file servers' checkpointers interfering with each

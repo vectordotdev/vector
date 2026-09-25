@@ -1,9 +1,9 @@
 package metadata
 
-components: sources: ifile: {
+components: sources: file_v2: {
 	_directory: "/var/log"
 
-	title: "IFile"
+	title: "File v2"
 
 	classes: {
 		delivery: "best_effort"
@@ -41,7 +41,7 @@ components: sources: ifile: {
 			"""
 				The `vector` process must run on the system where the block
 				device (that stores the files in `include`) is locally connected.
-				Unlike the `file` source, the `ifile` source will not work for
+				Unlike the `file` source, the `file_v2` source will not work for
 				network file systems like NFS and SMB if Vector runs on the
 				client rather than the server, as the kernel of the Operating
 				System is then not aware of changes happening at the block
@@ -55,7 +55,7 @@ components: sources: ifile: {
 		platform_name: null
 	}
 
-	configuration: generated.components.sources.ifile.configuration & {
+	configuration: generated.components.sources.file_v2.configuration & {
 		remove_after_secs: warnings: [
 			"""
 				Vector’s process must have permission to delete files. Avoid replacing or moving
@@ -87,7 +87,7 @@ components: sources: ifile: {
 				description: "The name of the source type."
 				required:    true
 				type: string: {
-					examples: ["ifile"]
+					examples: ["file_v2"]
 				}
 			}
 			timestamp: fields._current_timestamp
@@ -108,7 +108,7 @@ components: sources: ifile: {
 				file:        _file
 				host:        _values.local_host
 				message:     _line
-				source_type: "ifile"
+				source_type: "file_v2"
 				timestamp:   _values.current_timestamp
 			}
 		},
@@ -170,7 +170,7 @@ components: sources: ifile: {
 
 				Records are read in order within each file. There is no ordering
 				guarantee across files, including files belonging to the same
-				rotated log stream. Unlike the `file` source, `ifile` does not
+				rotated log stream. Unlike the `file` source, `file_v2` does not
 				support the `oldest_first` option.
 				"""
 		}
@@ -263,7 +263,7 @@ components: sources: ifile: {
 
 						```toml
 						[sources.my_file_source]
-							type = "ifile"
+							type = "file_v2"
 							# ...
 
 							[sources.my_file_source.multiline]
@@ -300,7 +300,7 @@ components: sources: ifile: {
 
 						```toml
 						[sources.my_file_source]
-							type = "ifile"
+							type = "file_v2"
 							# ...
 
 							[sources.my_file_source.multiline]
@@ -336,7 +336,7 @@ components: sources: ifile: {
 
 						```toml
 						[sources.my_file_source]
-						type = "ifile"
+						type = "file_v2"
 						# ...
 
 						[sources.my_file_source.multiline]
@@ -416,7 +416,7 @@ components: sources: ifile: {
 		async_implementation: {
 			title: "Async Implementation"
 			body: """
-				The `ifile` source is an async implementation intended as a modern replacement
+				The `file_v2` source is an async implementation intended as a modern replacement
 				for the existing `file` source.
 
 				It uses the [notify-rs](https://github.com/notify-rs/notify) library for OS-level
@@ -432,7 +432,7 @@ components: sources: ifile: {
 		checkpointing: {
 			title: "Checkpointing"
 			body: """
-				The `ifile` source introduces a new `checkpoint_interval` configuration option that
+				The `file_v2` source introduces a new `checkpoint_interval` configuration option that
 				controls how frequently the current read position is saved to disk during normal operation.
 
 				Vector always saves the current read position before a proper shutdown (for example, when

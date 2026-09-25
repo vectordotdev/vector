@@ -32,6 +32,8 @@ pub mod file;
     all(unix, feature = "sources-file_descriptor")
 ))]
 pub mod file_descriptors;
+#[cfg(feature = "sources-file_v2")]
+pub mod file_v2;
 #[cfg(feature = "sources-fluent")]
 pub mod fluent;
 #[cfg(feature = "sources-gcp_pubsub")]
@@ -44,8 +46,6 @@ pub mod host_metrics;
 pub mod http_client;
 #[cfg(feature = "sources-http_server")]
 pub mod http_server;
-#[cfg(feature = "sources-ifile")]
-pub mod ifile;
 #[cfg(feature = "sources-internal_logs")]
 pub mod internal_logs;
 #[cfg(feature = "sources-internal_metrics")]

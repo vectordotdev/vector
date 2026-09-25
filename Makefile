@@ -316,9 +316,9 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests
 test-cli: ## Runs cli tests
 	${TEST_RUNNER} --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
 
-.PHONY: test-ifile
-test-ifile: ## Runs real-binary ifile source tests
-	${TEST_RUNNER} --no-fail-fast --no-default-features --features ifile-tests --test ifile
+.PHONY: test-file_v2
+test-file_v2: ## Runs real-binary file_v2 source tests
+	${TEST_RUNNER} --no-fail-fast --no-default-features --features file_v2-tests --test file_v2
 
 .PHONY: test-vector-api
 test-vector-api: ## Runs vector API tests (top and tap)

@@ -55,7 +55,7 @@ mod eventstoredb_metrics;
 mod exec;
 #[cfg(any(
     feature = "sources-file",
-    feature = "sources-ifile",
+    feature = "sources-file_v2",
     feature = "sources-kubernetes_logs",
     feature = "sinks-file",
     feature = "sinks-aws_s3",
@@ -158,8 +158,8 @@ mod window;
 #[cfg(all(windows, feature = "sources-windows_event_log"))]
 mod windows_event_log;
 
-#[cfg(feature = "sources-ifile")]
-pub mod ifile;
+#[cfg(feature = "sources-file_v2")]
+pub mod file_v2;
 #[cfg(windows)]
 mod windows;
 
@@ -219,7 +219,7 @@ pub(crate) use self::exec::*;
 pub use self::expansion::*;
 #[cfg(any(
     feature = "sources-file",
-    feature = "sources-ifile",
+    feature = "sources-file_v2",
     feature = "sources-kubernetes_logs",
     feature = "sinks-file",
 ))]

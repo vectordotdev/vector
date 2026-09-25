@@ -68,12 +68,12 @@ jobs:
     needs: changes
     secrets: inherit
 
-  test-ifile:
+  test-file_v2:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
     uses: ./.github/workflows/test-make-command.yml
     with:
-      command: test-ifile
-      job_name: make test-ifile
+      command: test-file_v2
+      job_name: make test-file_v2
       cargo_nextest: true
       upload_test_results: true
     needs: changes
@@ -150,7 +150,7 @@ jobs:
       - changes
       - test-cli
       - test-vector-api
-      - test-ifile
+      - test-file_v2
       - make-test-behavior
       - make-check-examples
       - make-test-docs

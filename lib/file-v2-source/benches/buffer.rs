@@ -2,7 +2,7 @@ use std::{fmt, io::Cursor};
 
 use bytes::BytesMut;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use ifile_source::buffer::read_until_with_max_size;
+use file_v2_source::buffer::read_until_with_max_size;
 
 struct Parameters {
     bytes: Vec<u8>,
@@ -26,7 +26,7 @@ fn read_until_bench(c: &mut Criterion) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
-    let mut group = c.benchmark_group("ifile-source");
+    let mut group = c.benchmark_group("file-v2-source");
 
     let mut parameters = vec![
         Parameters {

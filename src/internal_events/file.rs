@@ -16,7 +16,7 @@ use crate::sinks::util::path_confinement::ConfineError;
 
 #[cfg(any(
     feature = "sources-file",
-    feature = "sources-ifile",
+    feature = "sources-file_v2",
     feature = "sources-kubernetes_logs"
 ))]
 pub use self::source::*;
@@ -144,7 +144,7 @@ impl InternalEvent for FilePathOutsideBaseDirError<'_> {
 
 #[cfg(any(
     feature = "sources-file",
-    feature = "sources-ifile",
+    feature = "sources-file_v2",
     feature = "sources-kubernetes_logs"
 ))]
 mod source {
