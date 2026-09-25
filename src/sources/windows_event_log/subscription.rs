@@ -1035,6 +1035,41 @@ impl EventLogSubscription {
 /// Queries exceeding this limit fall back to `"*"` (all events).
 const XPATH_MAX_LENGTH: usize = 4096;
 
+/// Longest `EventID=a or EventID=b or ...` chain that is emitted flat.
+///
+/// Windows rejects a structured XPath query whose boolean operators are nested
+/// too deeply with `ERROR_EVT_INVALID_QUERY`, and a flat `or` chain nests one
+/// level per operand: on Windows 11 a chain of 23 comparisons is accepted and
+/// one of 24 is rejected, so the subscription fails and the source does not
+/// start. Parentheses alone do not help: four groups of 20 are accepted, five
+/// are not. Lists up to this length keep the flat form; longer lists are
+/// emitted as a balanced tree whose depth grows with `log2` of the list length
+/// (10 levels for 1000 IDs).
+const XPATH_FLAT_OR_MAX: usize = 20;
+
+/// Build the `EventID` predicate for `only_event_ids`, flat for short lists and
+/// as a balanced `or` tree for long ones. See [`XPATH_FLAT_OR_MAX`].
+fn event_id_predicate(ids: &[u32]) -> String {
+    if ids.len() <= XPATH_FLAT_OR_MAX {
+        return ids
+            .iter()
+            .map(|id| format!("EventID={id}"))
+            .collect::<Vec<_>>()
+            .join(" or ");
+    }
+    balanced_or(ids)
+}
+
+fn balanced_or(ids: &[u32]) -> String {
+    match ids {
+        [id] => format!("EventID={id}"),
+        _ => {
+            let (left, right) = ids.split_at(ids.len() / 2);
+            format!("({} or {})", balanced_or(left), balanced_or(right))
+        }
+    }
+}
+
 /// Build an XPath query from config, incorporating `only_event_ids` when no
 /// explicit `event_query` is set.
 ///
@@ -1057,12 +1092,7 @@ pub(super) fn build_xpath_query(
     if let Some(ref ids) = config.only_event_ids
         && !ids.is_empty()
     {
-        let query = if ids.len() == 1 {
-            format!("*[System[EventID={}]]", ids[0])
-        } else {
-            let predicates: Vec<String> = ids.iter().map(|id| format!("EventID={id}")).collect();
-            format!("*[System[{}]]", predicates.join(" or "))
-        };
+        let query = format!("*[System[{}]]", event_id_predicate(ids));
 
         if query.len() <= XPATH_MAX_LENGTH {
             return Ok(query);

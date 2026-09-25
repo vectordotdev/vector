@@ -627,6 +627,106 @@ mod subscription_tests {
         assert!(query.len() <= 4096, "Query should fit within XPath limit");
     }
 
+    /// Deepest parenthesis nesting in a query.
+    fn max_paren_depth(query: &str) -> usize {
+        let (mut depth, mut max) = (0usize, 0usize);
+        for c in query.chars() {
+            match c {
+                '(' => {
+                    depth += 1;
+                    max = max.max(depth);
+                }
+                ')' => depth -= 1,
+                _ => {}
+            }
+        }
+        max
+    }
+
+    /// Longest run of ` or ` operators at a single parenthesis level.
+    fn max_flat_or_chain(query: &str) -> usize {
+        let mut chains = vec![0usize];
+        let mut max = 0;
+        let bytes = query.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            let rest = &bytes[i..];
+            if rest.starts_with(b"(") {
+                chains.push(0);
+            } else if rest.starts_with(b")") {
+                chains.pop();
+            } else if rest.starts_with(b" or ") {
+                let top = chains.last_mut().expect("unbalanced parentheses");
+                *top += 1;
+                max = max.max(*top);
+                i += 3;
+            }
+            i += 1;
+        }
+        max
+    }
+
+    #[test]
+    fn test_build_xpath_query_twenty_ids_stay_flat() {
+        let mut config = create_test_config();
+        let ids: Vec<u32> = (1000..1020).collect();
+        config.only_event_ids = Some(ids.clone());
+
+        let query = build_xpath_query(&config).unwrap();
+        let expected: Vec<String> = ids.iter().map(|id| format!("EventID={id}")).collect();
+        assert_eq!(query, format!("*[System[{}]]", expected.join(" or ")));
+    }
+
+    /// Windows rejects a flat chain of 24 `EventID=` comparisons with
+    /// `ERROR_EVT_INVALID_QUERY`, so the source failed at startup for
+    /// `only_event_ids` lists longer than 23 entries.
+    #[test]
+    fn test_build_xpath_query_long_list_is_shallow() {
+        for n in [21u32, 24, 50, 100, 200] {
+            let mut config = create_test_config();
+            let ids: Vec<u32> = (1000..1000 + n).collect();
+            config.only_event_ids = Some(ids.clone());
+
+            let query = build_xpath_query(&config).unwrap();
+            assert!(query.starts_with("*[System[("), "n={n}: {query}");
+            assert!(
+                query.len() <= 4096,
+                "n={n}: query should fit within XPath limit"
+            );
+            assert_eq!(query.matches("EventID=").count(), ids.len(), "n={n}");
+            for id in &ids {
+                assert!(
+                    query.contains(&format!("EventID={id})"))
+                        || query.contains(&format!("EventID={id} ")),
+                    "n={n}: EventID={id} missing"
+                );
+            }
+            assert_eq!(
+                max_flat_or_chain(&query),
+                1,
+                "n={n}: expected a binary tree of `or` operators"
+            );
+            // ceil(log2(n)) for n >= 2
+            let bound = ((n - 1).ilog2() + 1) as usize;
+            assert!(
+                max_paren_depth(&query) <= bound,
+                "n={n}: nesting depth {} exceeds log2 bound {bound}",
+                max_paren_depth(&query)
+            );
+        }
+    }
+
+    #[test]
+    fn test_query_shape_helpers() {
+        let flat = (1..=24)
+            .map(|id| format!("EventID={id}"))
+            .collect::<Vec<_>>()
+            .join(" or ");
+        assert_eq!(max_flat_or_chain(&format!("*[System[{flat}]]")), 23);
+        assert_eq!(max_flat_or_chain("((a or b) or (c or d))"), 1);
+        assert_eq!(max_paren_depth("((a or b) or (c or d))"), 2);
+    }
+
     #[test]
     fn test_event_filtering_by_id() {
         let mut config = create_test_config();
