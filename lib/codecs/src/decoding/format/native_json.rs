@@ -8,7 +8,7 @@ use vector_core::{
     event::Event,
     schema,
 };
-use vrl::value::{Kind, kind::Collection, value::simdutf_bytes_utf8_lossy};
+use vrl::value::{Kind, value::simdutf_bytes_utf8_lossy};
 
 use super::{Deserializer, default_lossy};
 use crate::native_json::{descriptor, from_dynamic_message};
@@ -44,15 +44,9 @@ impl NativeJsonDeserializerConfig {
 
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
-        match log_namespace {
-            LogNamespace::Vector => {
-                schema::Definition::new_with_default_metadata(Kind::json(), [log_namespace])
-            }
-            LogNamespace::Legacy => schema::Definition::new_with_default_metadata(
-                Kind::object(Collection::json()),
-                [log_namespace],
-            ),
-        }
+        // Native JSON preserves arbitrary event values, including scalar roots and timestamps,
+        // regardless of the configured namespace.
+        schema::Definition::new_with_default_metadata(Kind::any(), [log_namespace])
     }
 }
 
@@ -151,6 +145,37 @@ mod test {
     use vector_core::event::{MetricValue, metric::MetricSketch};
 
     use super::*;
+
+    #[test]
+    fn schema_includes_decoded_native_values() {
+        let config = NativeJsonDeserializerConfig::default();
+        let deserializer = config.build();
+        let values = [
+            json!({"rawBytes": "c2NhbGFy"}),
+            json!({"timestamp": "2026-09-25T12:00:00Z"}),
+            json!({"array": {"items": [{"timestamp": "2026-09-25T12:00:00Z"}]}}),
+            json!({"map": {"fields": {"nested": {"timestamp": "2026-09-25T12:00:00Z"}}}}),
+        ];
+
+        for log_namespace in [LogNamespace::Legacy, LogNamespace::Vector] {
+            let schema = config.schema_definition(log_namespace);
+            for value in &values {
+                let input = Bytes::from(
+                    serde_json::to_vec(&json!({"event": {"log": {"value": value}}})).unwrap(),
+                );
+                let events = deserializer.parse(input, log_namespace).unwrap();
+
+                assert_eq!(events.len(), 1);
+                assert!(
+                    schema
+                        .event_kind()
+                        .is_superset(&Kind::from(events[0].as_log().value()))
+                        .is_ok(),
+                    "decoded value does not fit {log_namespace:?} schema: {value}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn parses_top_level_arrays() {
@@ -324,6 +349,80 @@ mod test {
                 "malformed native JSON unexpectedly decoded: {value}"
             );
         }
+    }
+
+    #[test]
+    fn rejects_malformed_forwarded_datadog_api_keys() {
+        let deserializer = NativeJsonDeserializerConfig::default().build();
+        for (kind, event) in [
+            ("log", json!({"value": {"map": {}}})),
+            ("metric", json!({"name": "test", "counter": {}})),
+            ("trace", json!({"fields": {}})),
+        ] {
+            for api_key in ["bad\nkey", "bad\rkey", "bad\0key"] {
+                let mut event = event.clone();
+                event["metadataFull"] = json!({
+                    "secrets": {"entries": {"datadog_api_key": api_key}}
+                });
+                let mut wrapper = json!({"event": {}});
+                wrapper["event"][kind] = event;
+                let input = Bytes::from(serde_json::to_vec(&wrapper).unwrap());
+
+                let error = deserializer.parse(input, LogNamespace::Legacy).unwrap_err();
+
+                assert_eq!(
+                    error.to_string(),
+                    "Error decoding native JSON event: metadata has invalid Datadog API key"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn preserves_valid_forwarded_datadog_api_key_and_arbitrary_secrets() {
+        let deserializer = NativeJsonDeserializerConfig::default().build();
+        let api_key = "0123456789abcdef0123456789abcdef";
+        let other_secret = "arbitrary\nsecret\0value";
+        let input = Bytes::from(
+            serde_json::to_vec(&json!({
+                "event": {
+                    "log": {
+                        "value": {"map": {}},
+                        "metadataFull": {
+                            "secrets": {
+                                "entries": {
+                                    "datadog_api_key": api_key,
+                                    "custom_secret": other_secret
+                                }
+                            }
+                        }
+                    }
+                }
+            }))
+            .unwrap(),
+        );
+        let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
+        assert_eq!(
+            events[0].metadata().datadog_api_key().as_deref(),
+            Some(api_key)
+        );
+        assert_eq!(
+            events[0]
+                .metadata()
+                .secrets()
+                .get("custom_secret")
+                .map(AsRef::as_ref),
+            Some(other_secret)
+        );
+
+        let encoded = crate::native_json::to_json_value(events[0].clone()).unwrap();
+        let decoded = deserializer
+            .parse(
+                Bytes::from(serde_json::to_vec(&encoded).unwrap()),
+                LogNamespace::Legacy,
+            )
+            .unwrap();
+        assert_eq!(decoded[0].metadata(), events[0].metadata());
     }
 
     #[test]
