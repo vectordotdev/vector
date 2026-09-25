@@ -25,7 +25,7 @@ use crate::api;
 use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
-    config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
+    config::{self, Component, ComponentConfig, ComponentKind, Config, ConfigPath},
     extra_context::ExtraContext,
     heartbeat,
     internal_events::{
@@ -637,39 +637,27 @@ pub async fn load_configs(
     let mut watched_component_paths = Vec::new();
 
     if let Some(watcher_conf) = watcher_conf {
-        for (name, transform) in config.transforms() {
-            let files = transform.inner.files_to_watch();
+        for (name, component) in config.components() {
+            let files = match &component {
+                Component::Source(_) => continue,
+                Component::Transform(transform) => transform.inner.files_to_watch(),
+                Component::Sink(sink) => sink.inner.files_to_watch(),
+                Component::EnrichmentTable(table) => table.inner.files_to_watch(),
+            };
             let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
+                files.iter().map(|path| (*path).clone()).collect(),
                 name.clone(),
-                ComponentType::Transform,
+                component.kind(),
             );
             watched_component_paths.push(component_config);
-        }
 
-        for (name, sink) in config.sinks() {
-            let files = sink.inner.files_to_watch();
-            let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
-                name.clone(),
-                ComponentType::Sink,
-            );
-            watched_component_paths.push(component_config);
-        }
-
-        for (name, table) in config.enrichment_tables() {
-            let files = table.inner.files_to_watch();
-            let component_config = ComponentConfig::new(
-                files.clone().into_iter().cloned().collect(),
-                name.clone(),
-                ComponentType::EnrichmentTable,
-            );
-            watched_component_paths.push(component_config);
-            if table.as_sink(name).is_some() {
+            if let Component::EnrichmentTable(table) = &component
+                && table.as_sink(name).is_some()
+            {
                 let sink_component_config = ComponentConfig::new(
                     files.into_iter().cloned().collect(),
                     name.clone(),
-                    ComponentType::Sink,
+                    ComponentKind::Sink,
                 );
                 watched_component_paths.push(sink_component_config);
             }
