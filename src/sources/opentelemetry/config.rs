@@ -131,8 +131,11 @@ pub struct OpentelemetryConfig {
     /// Maximum number of requests processed concurrently across the HTTP and gRPC servers.
     ///
     /// Requests beyond this limit are rejected. Defaults to `100`.
-    #[serde(default, deserialize_with = "deserialize_max_concurrent_requests")]
-    pub max_concurrent_requests: Option<NonZeroUsize>,
+    #[serde(
+        default = "default_max_concurrent_requests",
+        deserialize_with = "deserialize_max_concurrent_requests"
+    )]
+    pub max_concurrent_requests: NonZeroUsize,
 
     /// Maximum time spent processing a request through submission to the source output.
     #[serde(default = "default_request_timeout_secs")]
@@ -180,14 +183,12 @@ const fn default_request_timeout_secs() -> NonZeroU64 {
     NonZeroU64::new(30).unwrap()
 }
 
-fn deserialize_max_concurrent_requests<'de, D>(
-    deserializer: D,
-) -> Result<Option<NonZeroUsize>, D::Error>
+fn deserialize_max_concurrent_requests<'de, D>(deserializer: D) -> Result<NonZeroUsize, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let value = Option::<NonZeroUsize>::deserialize(deserializer)?;
-    if value.is_some_and(|value| value.get() > Semaphore::MAX_PERMITS) {
+    let value = NonZeroUsize::deserialize(deserializer)?;
+    if value.get() > Semaphore::MAX_PERMITS {
         return Err(de::Error::custom(format!(
             "max_concurrent_requests must not exceed {}",
             Semaphore::MAX_PERMITS
@@ -276,7 +277,7 @@ impl GenerateConfig for OpentelemetryConfig {
             grpc: example_grpc_config(),
             http: example_http_config(),
             acknowledgements: Default::default(),
-            max_concurrent_requests: None,
+            max_concurrent_requests: default_max_concurrent_requests(),
             request_timeout_secs: default_request_timeout_secs(),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig::default(),
@@ -316,12 +317,8 @@ impl OpentelemetryConfig {
     ) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
-        let concurrency_limit = self
-            .max_concurrent_requests
-            .unwrap_or_else(default_max_concurrent_requests)
-            .get();
         let request_control = RequestControl::new(
-            concurrency_limit,
+            self.max_concurrent_requests.get(),
             Duration::from_secs(self.request_timeout_secs.get()),
         );
         let log_namespace = cx.log_namespace(self.log_namespace);

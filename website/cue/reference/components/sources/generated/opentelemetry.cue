@@ -112,7 +112,9 @@ generated: components: sources: opentelemetry: configuration: {
 			Requests beyond this limit are rejected. Defaults to `100`.
 			"""
 		required: false
-		type: uint: {}
+		type: uint: {
+			default: 100
+		}
 	}
 	request_timeout_secs: {
 		description: "Maximum time spent processing a request through submission to the source output."
