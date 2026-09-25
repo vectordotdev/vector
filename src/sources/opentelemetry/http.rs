@@ -7,13 +7,13 @@ use hyper::{Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
-use tower::ServiceBuilder;
+use tower::{Layer, ServiceBuilder};
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
-    event::{BatchNotifier, BatchStatus},
+    event::BatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
@@ -38,7 +38,13 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         http_server::HttpConfigParamKind,
-        opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
+        opentelemetry::{
+            config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
+            request_control::{
+                AcknowledgementFailure, MiddlewareError, MiddlewareErrorResponse,
+                PendingAcknowledgement, RequestControlLayer,
+            },
+        },
         util::{add_headers, decompress_body, http::capped_body},
     },
     tls::{MaybeTlsSettings, TlsAcceptorReloader},
@@ -51,6 +57,27 @@ pub(crate) enum ApiError {
 
 impl warp::reject::Reject for ApiError {}
 
+#[derive(Clone, Copy)]
+pub(crate) struct HttpErrorResponse;
+
+impl MiddlewareErrorResponse<Response> for HttpErrorResponse {
+    fn make_response(&self, error: MiddlewareError) -> Response {
+        let status = match error {
+            MiddlewareError::Overloaded => StatusCode::TOO_MANY_REQUESTS,
+            MiddlewareError::TimedOut | MiddlewareError::Unavailable => {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
+        };
+
+        let response = protobuf(Status {
+            code: tonic::Code::Unavailable as i32,
+            message: error.message().to_owned(),
+            ..Default::default()
+        });
+        warp::reply::with_status(response, status).into_response()
+    }
+}
+
 pub(crate) async fn run_http_server(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -58,6 +85,7 @@ pub(crate) async fn run_http_server(
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
+    request_control: RequestControlLayer<HttpErrorResponse>,
 ) -> crate::Result<()> {
     let listener = tls_settings
         .bind_reloadable(&address, tls_reloader)
@@ -68,6 +96,8 @@ pub(crate) async fn run_http_server(
     info!(message = "Building HTTP server.", address = %address);
 
     let span = Span::current();
+    // Admission wraps the Warp service, so rejected requests cannot reach `capped_body`.
+    let admitted = request_control.layer(warp::service(routes));
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
         let svc = ServiceBuilder::new()
             .layer(build_http_trace_layer(span.clone()))
@@ -78,7 +108,7 @@ pub(crate) async fn run_http_server(
                     conn.peer_addr(),
                 )
             }))
-            .service(warp::service(routes.clone()));
+            .service(admitted.clone());
         futures_util::future::ok::<_, Infallible>(svc)
     });
 
@@ -429,26 +459,32 @@ async fn handle_request(
                 emit!(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
-
-            match receiver {
-                None => Ok(protobuf(resp).into_response()),
-                Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(protobuf(resp).into_response()),
-                    BatchStatus::Errored => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Error delivering contents to sink".into(),
-                        ..Default::default()
-                    })),
-                    BatchStatus::Rejected => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Contents failed to deliver to sink".into(),
-                        ..Default::default()
-                    })),
-                },
+            let mut response = protobuf(resp).into_response();
+            if let Some(receiver) = receiver {
+                response
+                    .extensions_mut()
+                    .insert(PendingAcknowledgement::new(
+                        receiver,
+                        acknowledgement_failure_response,
+                    ));
             }
+            Ok(response)
         }
         Err(err) => Err(warp::reject::custom(err)),
     }
+}
+
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> Response {
+    let message = match status {
+        AcknowledgementFailure::Errored => "Error delivering contents to sink",
+        AcknowledgementFailure::Rejected => "Contents failed to deliver to sink",
+    };
+    let response = protobuf(Status {
+        code: tonic::Code::Unknown as i32,
+        message: message.to_owned(),
+        ..Default::default()
+    });
+    warp::reply::with_status(response, StatusCode::INTERNAL_SERVER_ERROR).into_response()
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {

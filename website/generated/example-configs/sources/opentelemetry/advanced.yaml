@@ -9,3 +9,5 @@ sources:
       keepalive:
         max_connection_age_jitter_factor: 0.1
         max_connection_age_secs: 300
+    max_concurrent_requests: 100
+    request_timeout_secs: 30

@@ -401,8 +401,47 @@ where
     Ok(())
 }
 
-// This is a bit of a ugly hack to allow us to run two services on the same port.
-// I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
+// TODO: Unify the gRPC server helpers using `Routes` and an identity layer.
+pub async fn run_grpc_server_with_routes_and_layer<L>(
+    address: SocketAddr,
+    tls_settings: MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
+    routes: Routes,
+    keepalive: GrpcKeepaliveConfig,
+    shutdown: ShutdownSignal,
+    request_layer: L,
+) -> crate::Result<()>
+where
+    L: Layer<DecompressionAndMetrics<Routes>> + Clone + Send + 'static,
+    L::Service: Service<Request<Body>, Response = Response<BoxBody>> + Clone + Send + 'static,
+    <L::Service as Service<Request<Body>>>::Future: Send + 'static,
+    <L::Service as Service<Request<Body>>>::Error: Into<tower::BoxError> + std::fmt::Display + Send,
+{
+    let span = Span::current();
+    let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
+    let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
+    let max_connection_lifetime = keepalive.max_connection_lifetime();
+    let stream = listener
+        .accept_stream()
+        .map(move |stream| stream.map(|io| MaxConnectionAgeIo::new(io, max_connection_lifetime)));
+
+    info!(%address, "Building gRPC server.");
+
+    Server::builder()
+        .layer(MaxConnectionAgeLayer::new())
+        .layer(build_grpc_trace_layer(span.clone()))
+        // Request admission must see each HTTP/2 stream before its body is decompressed.
+        .layer(request_layer)
+        .layer(DecompressionAndMetricsLayer)
+        .add_routes(routes)
+        .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
+        .await?;
+
+    drop(rx.await);
+
+    Ok(())
+}
+
 pub async fn run_grpc_server_with_routes(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,

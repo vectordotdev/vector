@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, num::NonZeroUsize, time::Duration};
 
 use crate::{
     config::{
@@ -11,17 +11,21 @@ use crate::{
         Source,
         http_server::{build_param_matcher, remove_duplicates},
         opentelemetry::{
-            grpc::Service,
-            http::{build_warp_filter, run_http_server},
+            grpc::{GrpcErrorResponse, Service},
+            http::{HttpErrorResponse, build_warp_filter, run_http_server},
+            request_control::RequestControl,
         },
         util::{
             decompression::max_decompressed_size_bytes,
-            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes_and_layer},
         },
     },
 };
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
+use serde::{Deserialize, Deserializer, de};
+use serde_with::serde_as;
+use tokio::sync::Semaphore;
 use tonic::transport::server::RoutesBuilder;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
@@ -110,6 +114,7 @@ impl OtlpDecodingConfig {
 }
 
 /// Configuration for the `opentelemetry` source.
+#[serde_as]
 #[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -120,6 +125,21 @@ pub struct OpentelemetryConfig {
 
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
+
+    /// Maximum number of requests processed concurrently across the HTTP and gRPC servers.
+    ///
+    /// Requests beyond this limit are rejected. Defaults to `100`.
+    #[serde(
+        default = "default_max_concurrent_requests",
+        deserialize_with = "deserialize_max_concurrent_requests"
+    )]
+    pub max_concurrent_requests: NonZeroUsize,
+
+    /// Maximum time spent processing a request through submission to the source output.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[serde(default = "default_request_timeout_secs")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    pub request_timeout_secs: Duration,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -156,6 +176,28 @@ pub struct OpentelemetryConfig {
     /// - The events can be forwarded directly (passthrough) to a downstream OTLP collector
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub use_otlp_decoding: OtlpDecodingConfig,
+}
+
+const fn default_request_timeout_secs() -> Duration {
+    Duration::from_secs(30)
+}
+
+fn deserialize_max_concurrent_requests<'de, D>(deserializer: D) -> Result<NonZeroUsize, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = NonZeroUsize::deserialize(deserializer)?;
+    if value.get() > Semaphore::MAX_PERMITS {
+        return Err(de::Error::custom(format!(
+            "max_concurrent_requests must not exceed {}",
+            Semaphore::MAX_PERMITS
+        )));
+    }
+    Ok(value)
+}
+
+const fn default_max_concurrent_requests() -> NonZeroUsize {
+    NonZeroUsize::new(100).unwrap()
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
@@ -234,6 +276,8 @@ impl GenerateConfig for OpentelemetryConfig {
             grpc: example_grpc_config(),
             http: example_http_config(),
             acknowledgements: Default::default(),
+            max_concurrent_requests: default_max_concurrent_requests(),
+            request_timeout_secs: default_request_timeout_secs(),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig::default(),
         })
@@ -272,6 +316,10 @@ impl OpentelemetryConfig {
     ) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
+        let request_control = RequestControl::new(
+            self.max_concurrent_requests.get(),
+            self.request_timeout_secs,
+        );
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
@@ -326,13 +374,14 @@ impl OpentelemetryConfig {
             .add_service(metrics_service)
             .add_service(trace_service);
 
-        let grpc_source = run_grpc_server_with_routes(
+        let grpc_source = run_grpc_server_with_routes_and_layer(
             self.grpc.address,
             grpc_tls_settings,
             grpc_tls_reloader,
             builder.routes(),
             self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
+            request_control.grpc_layer(GrpcErrorResponse),
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source gRPC server failed.", %error);
@@ -363,6 +412,7 @@ impl OpentelemetryConfig {
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
+            request_control.http_layer(HttpErrorResponse),
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source HTTP server failed.", %error);

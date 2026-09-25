@@ -26,6 +26,7 @@ use futures::Stream;
 use futures_util::StreamExt;
 use prost::Message;
 use similar_asserts::assert_eq;
+use tokio::sync::Semaphore;
 use tonic::Request;
 use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 use vector_lib::opentelemetry::proto::trace::v1::{ResourceSpans, ScopeSpans, Span};
@@ -208,6 +209,55 @@ fn generate_config() {
 }
 
 #[test]
+fn admission_config_defaults_and_rejects_invalid_values() {
+    let config: OpentelemetryConfig = serde_yaml::from_str(
+        r#"
+        grpc:
+          address: "0.0.0.0:4317"
+        http:
+          address: "0.0.0.0:4318"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(config.max_concurrent_requests.get(), 100);
+    assert_eq!(config.request_timeout_secs.as_secs(), 30);
+
+    let configured: OpentelemetryConfig = serde_yaml::from_str(
+        r#"
+        grpc:
+          address: "0.0.0.0:4317"
+        http:
+          address: "0.0.0.0:4318"
+        max_concurrent_requests: 7
+        request_timeout_secs: 11
+        "#,
+    )
+    .unwrap();
+    assert_eq!(configured.max_concurrent_requests.get(), 7);
+    assert_eq!(configured.request_timeout_secs.as_secs(), 11);
+
+    for invalid in [
+        "max_concurrent_requests: 0",
+        "max_concurrent_requests: null",
+    ] {
+        let yaml =
+            format!("grpc:\n  address: 0.0.0.0:4317\nhttp:\n  address: 0.0.0.0:4318\n{invalid}\n");
+        assert!(serde_yaml::from_str::<OpentelemetryConfig>(&yaml).is_err());
+    }
+
+    let yaml = format!(
+        "grpc:\n  address: 0.0.0.0:4317\nhttp:\n  address: 0.0.0.0:4318\nmax_concurrent_requests: {}\n",
+        Semaphore::MAX_PERMITS + 1
+    );
+    let error = serde_yaml::from_str::<OpentelemetryConfig>(&yaml).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("max_concurrent_requests must not exceed")
+    );
+}
+
+#[test]
 fn config_grpc_keepalive() {
     let config: OpentelemetryConfig = toml::from_str(
         r#"
@@ -229,6 +279,137 @@ fn config_grpc_keepalive() {
         config.grpc.keepalive.max_connection_age_grace_secs,
         Some(30)
     );
+}
+
+#[tokio::test]
+async fn http_and_grpc_acknowledgement_waits_do_not_hold_admission() {
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+    let mut config = get_source_config_with_headers(grpc_addr, http_addr, false);
+    config.acknowledgements = true.into();
+    config.max_concurrent_requests = 1.try_into().unwrap();
+    config.request_timeout_secs = std::time::Duration::from_secs(1);
+
+    let (sender, mut output) = new_unacknowledged_logs_source(&config);
+    let server = config
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(server);
+    test_util::wait_for_tcp(http_addr).await;
+    test_util::wait_for_tcp(grpc_addr).await;
+
+    let body = create_test_logs_request().into_inner().encode_to_vec();
+    let client = reqwest::Client::new();
+    let first = tokio::spawn({
+        let client = client.clone();
+        let body = body.clone();
+        async move {
+            client
+                .post(format!("http://{http_addr}/v1/logs"))
+                .header("Content-Type", "application/x-protobuf")
+                .body(body)
+                .send()
+                .await
+                .unwrap()
+        }
+    });
+    // Receiving the event proves admission. Retain its finalizer so the request waits for ack.
+    let pending_event = tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
+        .await
+        .expect("first HTTP request was not admitted")
+        .expect("source output closed before admission");
+
+    let second = tokio::spawn({
+        let client = client.clone();
+        async move {
+            client
+                .post(format!("http://{http_addr}/v1/logs"))
+                .header("Content-Type", "application/x-protobuf")
+                .body(body)
+                .send()
+                .await
+                .unwrap()
+        }
+    });
+    let second_pending_event =
+        tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
+            .await
+            .expect("second HTTP request was not admitted")
+            .expect("source output closed before admission");
+
+    let mut grpc_client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
+        .await
+        .unwrap();
+    let third = tokio::spawn(async move { grpc_client.export(create_test_logs_request()).await });
+    let third_pending_event =
+        tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
+            .await
+            .expect("gRPC request was not admitted")
+            .expect("source output closed before admission");
+
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    assert!(!first.is_finished());
+    assert!(!second.is_finished());
+    assert!(!third.is_finished());
+
+    first.abort();
+    second.abort();
+    third.abort();
+    assert!(first.await.unwrap_err().is_cancelled());
+    assert!(second.await.unwrap_err().is_cancelled());
+    assert!(third.await.unwrap_err().is_cancelled());
+    drop((pending_event, second_pending_event, third_pending_event));
+}
+
+#[tokio::test]
+async fn grpc_acknowledgement_wait_does_not_use_request_timeout() {
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+    let mut config = get_source_config_with_headers(grpc_addr, http_addr, false);
+    config.acknowledgements = true.into();
+    config.max_concurrent_requests = 1.try_into().unwrap();
+    config.request_timeout_secs = std::time::Duration::from_secs(1);
+
+    let (sender, mut output) = new_unacknowledged_logs_source(&config);
+    let server = config
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(server);
+    test_util::wait_for_tcp(grpc_addr).await;
+
+    let mut client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
+        .await
+        .unwrap();
+    let first = tokio::spawn({
+        let mut client = client.clone();
+        async move { client.export(create_test_logs_request()).await }
+    });
+    // Receiving the event proves admission. Retain its finalizer so the request waits for ack.
+    let pending_event = tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
+        .await
+        .expect("first gRPC request was not admitted")
+        .expect("source output closed before admission");
+
+    // Both exports are multiplexed over one HTTP/2 connection, but acknowledgement waiting from
+    // the first no longer occupies the shared request slot.
+    let second = tokio::spawn(async move { client.export(create_test_logs_request()).await });
+    let second_pending_event =
+        tokio::time::timeout(std::time::Duration::from_secs(5), output.next())
+            .await
+            .expect("second gRPC request was not admitted")
+            .expect("source output closed before admission");
+
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    assert!(!first.is_finished());
+    assert!(!second.is_finished());
+
+    first.abort();
+    second.abort();
+    assert!(first.await.unwrap_err().is_cancelled());
+    assert!(second.await.unwrap_err().is_cancelled());
+    drop((pending_event, second_pending_event));
 }
 
 #[tokio::test]
@@ -1216,6 +1397,8 @@ fn get_source_config_with_headers(
             ],
         },
         acknowledgements: Default::default(),
+        max_concurrent_requests: 100.try_into().unwrap(),
+        request_timeout_secs: std::time::Duration::from_secs(30),
         log_namespace: Default::default(),
         use_otlp_decoding: use_otlp_decoding.into(),
     }
@@ -1598,6 +1781,8 @@ async fn build_otlp_test_env_with(
             headers: Default::default(),
         },
         acknowledgements: Default::default(),
+        max_concurrent_requests: 100.try_into().unwrap(),
+        request_timeout_secs: std::time::Duration::from_secs(30),
         log_namespace,
         use_otlp_decoding: use_otlp_decoding.into(),
     };
@@ -1617,6 +1802,23 @@ async fn build_otlp_test_env_with(
         config,
         output: Box::new(output),
     }
+}
+
+// Unlike `new_source`, receiving an event does not automatically finalize its acknowledgement.
+fn new_unacknowledged_logs_source(
+    config: &OpentelemetryConfig,
+) -> (SourceSender, impl Stream<Item = Event> + Unpin) {
+    let mut builder = SourceSender::builder();
+    let logs_output = config
+        .outputs(LogNamespace::Legacy)
+        .into_iter()
+        .find(|output| output.port.as_deref() == Some(LOGS))
+        .unwrap();
+    let output = builder
+        .add_source_output(logs_output, "test".into())
+        .into_stream()
+        .flat_map(into_event_stream);
+    (builder.build(), output)
 }
 
 pub(super) fn new_source(
@@ -1678,6 +1880,8 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
             headers: Default::default(),
         },
         acknowledgements: Default::default(),
+        max_concurrent_requests: 100.try_into().unwrap(),
+        request_timeout_secs: std::time::Duration::from_secs(30),
         log_namespace: None,
         use_otlp_decoding: true.into(),
     };
@@ -1905,6 +2109,8 @@ mod otlp_decoding_config_tests {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: 100.try_into().unwrap(),
+            request_timeout_secs: std::time::Duration::from_secs(30),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: true,
@@ -1946,6 +2152,8 @@ mod otlp_decoding_config_tests {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: 100.try_into().unwrap(),
+            request_timeout_secs: std::time::Duration::from_secs(30),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,
@@ -1990,6 +2198,8 @@ mod otlp_decoding_config_tests {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: 100.try_into().unwrap(),
+            request_timeout_secs: std::time::Duration::from_secs(30),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,

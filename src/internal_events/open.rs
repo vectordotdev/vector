@@ -55,6 +55,11 @@ impl OpenGauge {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn current(&self) -> usize {
+        self.gauge.load(Ordering::Acquire)
+    }
+
     #[cfg(all(feature = "sources-utils-net-unix", unix))]
     pub fn any_open(&self) -> bool {
         self.gauge.load(Ordering::Acquire) != 0

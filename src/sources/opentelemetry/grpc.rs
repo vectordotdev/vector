@@ -1,11 +1,11 @@
 use futures::TryFutureExt;
 use prost::Message;
-use tonic::{Request, Response, Status};
+use tonic::{Request, Response, Status, body::BoxBody};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    event::{BatchNotifier, BatchStatusReceiver, Event},
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
     opentelemetry::proto::collector::{
         logs::v1::{
@@ -25,8 +25,23 @@ use vector_lib::{
 use crate::{
     SourceSender,
     internal_events::{EventsReceived, StreamClosedError},
-    sources::opentelemetry::config::{LOGS, METRICS, TRACES},
+    sources::opentelemetry::{
+        config::{LOGS, METRICS, TRACES},
+        request_control::{
+            AcknowledgementFailure, MiddlewareError, MiddlewareErrorResponse,
+            PendingAcknowledgement,
+        },
+    },
 };
+
+#[derive(Clone, Copy)]
+pub(crate) struct GrpcErrorResponse;
+
+impl MiddlewareErrorResponse<http::Response<BoxBody>> for GrpcErrorResponse {
+    fn make_response(&self, error: MiddlewareError) -> http::Response<BoxBody> {
+        Status::unavailable(error.message()).to_http()
+    }
+}
 
 #[derive(Clone)]
 pub(super) struct Service {
@@ -58,11 +73,14 @@ impl TraceService for Service {
                 .flat_map(|v| v.into_event_iter())
                 .collect()
         };
-        self.handle_events(events, TRACES).await?;
+        let receiver = self.handle_events(events, TRACES).await?;
 
-        Ok(Response::new(ExportTraceServiceResponse {
-            partial_success: None,
-        }))
+        Ok(response_with_acknowledgement(
+            ExportTraceServiceResponse {
+                partial_success: None,
+            },
+            receiver,
+        ))
     }
 }
 
@@ -87,11 +105,14 @@ impl LogsService for Service {
                 .flat_map(|v| v.into_event_iter(self.log_namespace))
                 .collect()
         };
-        self.handle_events(events, LOGS).await?;
+        let receiver = self.handle_events(events, LOGS).await?;
 
-        Ok(Response::new(ExportLogsServiceResponse {
-            partial_success: None,
-        }))
+        Ok(response_with_acknowledgement(
+            ExportLogsServiceResponse {
+                partial_success: None,
+            },
+            receiver,
+        ))
     }
 }
 
@@ -118,11 +139,14 @@ impl MetricsService for Service {
                 .collect()
         };
 
-        self.handle_events(events, METRICS).await?;
+        let receiver = self.handle_events(events, METRICS).await?;
 
-        Ok(Response::new(ExportMetricsServiceResponse {
-            partial_success: None,
-        }))
+        Ok(response_with_acknowledgement(
+            ExportMetricsServiceResponse {
+                partial_success: None,
+            },
+            receiver,
+        ))
     }
 }
 
@@ -131,7 +155,7 @@ impl Service {
         &self,
         mut events: Vec<Event>,
         log_name: &'static str,
-    ) -> Result<(), Status> {
+    ) -> Result<Option<BatchStatusReceiver>, Status> {
         // When using OTLP decoding, count individual items within the batch
         // to maintain consistency with other Vector sources
         let count = if self.deserializer.is_some() {
@@ -152,21 +176,31 @@ impl Service {
                 emit!(StreamClosedError { count });
                 Status::unavailable(message)
             })
-            .and_then(|_| handle_batch_status(receiver))
             .await?;
-        Ok(())
+        Ok(receiver)
     }
 }
 
-async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<(), Status> {
-    let status = match receiver {
-        Some(receiver) => receiver.await,
-        None => BatchStatus::Delivered,
-    };
-
-    match status {
-        BatchStatus::Errored => Err(Status::internal("Delivery error")),
-        BatchStatus::Rejected => Err(Status::data_loss("Delivery failed")),
-        BatchStatus::Delivered => Ok(()),
+fn response_with_acknowledgement<T>(
+    message: T,
+    receiver: Option<BatchStatusReceiver>,
+) -> Response<T> {
+    let mut response = Response::new(message);
+    if let Some(receiver) = receiver {
+        response
+            .extensions_mut()
+            .insert(PendingAcknowledgement::<BoxBody>::new(
+                receiver,
+                acknowledgement_failure_response,
+            ));
     }
+    response
+}
+
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> http::Response<BoxBody> {
+    match status {
+        AcknowledgementFailure::Errored => Status::internal("Delivery error"),
+        AcknowledgementFailure::Rejected => Status::data_loss("Delivery failed"),
+    }
+    .to_http()
 }
