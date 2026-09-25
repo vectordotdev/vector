@@ -491,13 +491,11 @@ fn dynamic_ratio_honors_group_by_key() {
 
     assert!(
         (60..140).contains(&sampled_service_a),
-        "service-a sampled {} out of {events_per_service}",
-        sampled_service_a
+        "service-a sampled {sampled_service_a} out of {events_per_service}"
     );
     assert!(
         (60..140).contains(&sampled_service_b),
-        "service-b sampled {} out of {events_per_service}",
-        sampled_service_b
+        "service-b sampled {sampled_service_b} out of {events_per_service}"
     );
 }
 
@@ -538,13 +536,11 @@ fn dynamic_rate_honors_group_by_key() {
 
     assert!(
         (60..140).contains(&sampled_service_a),
-        "service-a sampled {} out of {events_per_service}",
-        sampled_service_a
+        "service-a sampled {sampled_service_a} out of {events_per_service}"
     );
     assert!(
         (60..140).contains(&sampled_service_b),
-        "service-b sampled {} out of {events_per_service}",
-        sampled_service_b
+        "service-b sampled {sampled_service_b} out of {events_per_service}"
     );
 }
 
@@ -584,13 +580,11 @@ fn dynamic_ratio_group_by_samples_mixed_ratios_at_expected_rates() {
 
     assert!(
         (80..220).contains(&sampled_low_ratio),
-        "ratio=0.25 sampled {} out of {events_per_ratio}",
-        sampled_low_ratio
+        "ratio=0.25 sampled {sampled_low_ratio} out of {events_per_ratio}"
     );
     assert!(
         (300..450).contains(&sampled_high_ratio),
-        "ratio=0.75 sampled {} out of {events_per_ratio}",
-        sampled_high_ratio
+        "ratio=0.75 sampled {sampled_high_ratio} out of {events_per_ratio}"
     );
     assert!(
         sampled_high_ratio > sampled_low_ratio,
@@ -634,13 +628,11 @@ fn dynamic_rate_group_by_samples_mixed_rates_at_expected_rates() {
 
     assert!(
         (220..380).contains(&sampled_rate_2),
-        "rate=2 sampled {} out of {events_per_rate}",
-        sampled_rate_2
+        "rate=2 sampled {sampled_rate_2} out of {events_per_rate}"
     );
     assert!(
         (120..280).contains(&sampled_rate_3),
-        "rate=3 sampled {} out of {events_per_rate}",
-        sampled_rate_3
+        "rate=3 sampled {sampled_rate_3} out of {events_per_rate}"
     );
     assert!(
         sampled_rate_2 > sampled_rate_3,

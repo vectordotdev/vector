@@ -1,4 +1,4 @@
-use std::{iter, ops::Deref};
+use std::iter;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -25,6 +25,7 @@ impl Schema {
     ///
     /// The given reference string should be a URI reference. This will usually be a JSON Pointer
     /// in [URI Fragment representation](https://tools.ietf.org/html/rfc6901#section-6).
+    #[must_use]
     pub fn new_ref(reference: String) -> Self {
         SchemaObject::new_ref(reference).into()
     }
@@ -34,20 +35,22 @@ impl Schema {
     /// If `self` is a [`SchemaObject`] with `Some`
     /// [`reference`](struct.SchemaObject.html#structfield.reference) set, this returns `true`.
     /// Otherwise, returns `false`.
+    #[must_use]
     pub fn is_ref(&self) -> bool {
         match self {
             Schema::Object(o) => o.is_ref(),
-            _ => false,
+            Schema::Bool(_) => false,
         }
     }
 
     /// Gets a reference to the inner schema object if this schema is a JSON Schema object.
     ///
     /// Otherwise, `None` is returned.
+    #[must_use]
     pub fn as_object(&self) -> Option<&SchemaObject> {
         match self {
             Schema::Object(schema) => Some(schema),
-            _ => None,
+            Schema::Bool(_) => None,
         }
     }
 
@@ -57,20 +60,21 @@ impl Schema {
     pub fn as_object_mut(&mut self) -> Option<&mut SchemaObject> {
         match self {
             Schema::Object(schema) => Some(schema),
-            _ => None,
+            Schema::Bool(_) => None,
         }
     }
 
     /// Converts the given schema (if it is a boolean schema) into an equivalent schema object.
     ///
     /// If the given schema is already a schema object, this has no effect.
+    #[must_use]
     pub fn into_object(self) -> SchemaObject {
         match self {
             Schema::Object(o) => o,
             Schema::Bool(true) => SchemaObject::default(),
             Schema::Bool(false) => SchemaObject {
                 subschemas: Some(Box::new(SubschemaValidation {
-                    not: Some(Schema::Object(Default::default()).into()),
+                    not: Some(Schema::Object(SchemaObject::default()).into()),
                     ..Default::default()
                 })),
                 ..Default::default()
@@ -229,6 +233,7 @@ impl SchemaObject {
     ///
     /// The given reference string should be a URI reference. This will usually be a JSON Pointer
     /// in [URI Fragment representation](https://tools.ietf.org/html/rfc6901#section-6).
+    #[must_use]
     pub fn new_ref(reference: String) -> Self {
         SchemaObject {
             reference: Some(reference),
@@ -240,6 +245,7 @@ impl SchemaObject {
     ///
     /// If `self` has `Some` [`reference`](struct.SchemaObject.html#structfield.reference) set, this returns `true`.
     /// Otherwise, returns `false`.
+    #[must_use]
     pub fn is_ref(&self) -> bool {
         self.reference.is_some()
     }
@@ -249,6 +255,7 @@ impl SchemaObject {
     /// This is a basic check that always returns `true` if no `instance_type` is specified on the schema,
     /// and does not check any subschemas. Because of this, both `{}` and  `{"not": {}}` accept any type according
     /// to this method.
+    #[must_use]
     pub fn has_type(&self, ty: InstanceType) -> bool {
         self.instance_type.as_ref().is_none_or(|x| x.contains(&ty))
     }
@@ -558,6 +565,13 @@ pub enum SingleOrVec<T> {
     Vec(Vec<T>),
 }
 
+impl<T> SingleOrVec<T> {
+    /// Returns an iterator over the single item or the items in the vector.
+    pub fn iter(&self) -> std::slice::Iter<'_, T> {
+        self.into_iter()
+    }
+}
+
 impl<T: Clone> Extend<T> for SingleOrVec<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         match self {
@@ -598,12 +612,17 @@ impl<T: PartialEq> SingleOrVec<T> {
     /// Returns `true` if `self` is either a `Single` equal to `x`, or a `Vec` containing `x`.
     pub fn contains(&self, x: &T) -> bool {
         match self {
-            SingleOrVec::Single(s) => s.deref() == x,
+            SingleOrVec::Single(s) => s.as_ref() == x,
             SingleOrVec::Vec(v) => v.contains(x),
         }
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::ref_option,
+    reason = "Serde skip_serializing_if requires a reference to the field"
+)]
 fn is_none_or_default_true(field: &Option<Box<Schema>>) -> bool {
     match field {
         None => true,
@@ -611,6 +630,10 @@ fn is_none_or_default_true(field: &Option<Box<Schema>>) -> bool {
     }
 }
 
+/// # Panics
+///
+/// Panics if the reference does not start with `#/definitions/`.
+#[must_use]
 pub fn get_cleaned_schema_reference(schema_ref: &str) -> &str {
     if let Some(cleaned) = schema_ref.strip_prefix(DEFINITIONS_PREFIX) {
         cleaned

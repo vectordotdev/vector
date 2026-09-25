@@ -23,7 +23,7 @@ pub struct VrlConfig {
     /// The VRL boolean expression.
     pub(crate) source: String,
 
-    #[configurable(derived, metadata(docs::hidden))]
+    #[configurable(metadata(docs::hidden))]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub(crate) runtime: VrlRuntime,
 }
@@ -145,6 +145,7 @@ impl Conditional for Vrl {
                 );
                 format!("source execution failed: {err}")
             }
+            Terminate::Interrupted => "source execution interrupted".to_owned(),
         });
 
         let value = match value_result {

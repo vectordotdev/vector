@@ -188,7 +188,7 @@ impl VrlTarget {
                     LogNamespace::Legacy => TargetEvents::One(create_log_event(v, metadata).into()),
                 },
             },
-            VrlTarget::Trace(value, metadata) => match value {
+            VrlTarget::Trace(value, mut metadata) => match value {
                 value @ Value::Object(_) => {
                     let log = LogEvent::from_parts(value, metadata);
                     TargetEvents::One(TraceEvent::from(log).into())
@@ -201,7 +201,10 @@ impl VrlTarget {
                     log_namespace,
                 }),
 
-                v => TargetEvents::One(create_log_event(v, metadata).into()),
+                v => {
+                    metadata.clear_trace_layout();
+                    TargetEvents::One(create_log_event(v, metadata).into())
+                }
             },
             VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
         }
@@ -414,7 +417,6 @@ impl Target for VrlTarget {
         }
     }
 
-    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, target_path: &OwnedTargetPath) -> Result<Option<&Value>, String> {
         match target_path.prefix {
             PathPrefix::Event => match self {
@@ -761,7 +763,7 @@ mod test {
     use chrono::{Utc, offset::TimeZone};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vrl::{btreemap, value::kind::Index};
+    use vrl::{btreemap, event_path, value::kind::Index};
 
     use super::{super::MetricValue, *};
     use crate::metric_tags;
@@ -1190,6 +1192,40 @@ mod test {
                     .map(|v| Event::Log(LogEvent::from_map(v, metadata.clone())))
                     .collect::<Vec<_>>()
             );
+        }
+    }
+
+    #[test]
+    fn trace_scalar_root_into_log_drops_trace_layout() {
+        let mut trace = TraceEvent::from(btreemap! {"foo" => "bar"});
+        trace
+            .metadata_mut()
+            .set_trace_layout(super::super::TraceLayout::Datadog);
+
+        let info = ProgramInfo {
+            fallible: false,
+            abortable: false,
+            target_queries: vec![],
+            target_assignments: vec![],
+        };
+        let mut target = VrlTarget::new(Event::Trace(trace), &info, MetricTagMode::Single);
+        Target::target_insert(
+            &mut target,
+            &OwnedTargetPath::event_root(),
+            Value::from("message"),
+        )
+        .unwrap();
+
+        match target.into_events(LogNamespace::Legacy) {
+            TargetEvents::One(Event::Log(log)) => {
+                assert_eq!(log.namespace(), LogNamespace::Legacy);
+                assert_eq!(log.metadata().trace_layout(), None);
+                assert_eq!(
+                    log.get(event_path!("message")),
+                    Some(&Value::from("message"))
+                );
+            }
+            _ => panic!("expected one log event"),
         }
     }
 

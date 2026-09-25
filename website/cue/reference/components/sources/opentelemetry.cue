@@ -39,7 +39,6 @@ components: sources: opentelemetry: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

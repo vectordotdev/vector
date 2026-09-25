@@ -27,7 +27,7 @@ fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, 
                 LOGS_REQUEST_MESSAGE_TYPE,
                 line,
             )
-            .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+            .map_err(|e| format!("Line {}: {e}", line_num + 1))?
             .resource_logs,
         );
     }

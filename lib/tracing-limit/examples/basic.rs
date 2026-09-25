@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use tracing::{Dispatch, info, trace};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::SubscriberExt;
@@ -15,7 +17,7 @@ fn main() {
         for i in 0..40usize {
             trace!("This field is not rate limited!");
             info!(message = "This message is rate limited", count = &i);
-            std::thread::sleep(std::time::Duration::from_millis(1000));
+            std::thread::sleep(std::time::Duration::from_secs(1));
         }
-    })
+    });
 }

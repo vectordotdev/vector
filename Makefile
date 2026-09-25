@@ -19,7 +19,8 @@ else
     export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
     export DNSTAP_BENCHES := dnstap-benches
 endif
-export FEATURES ?=
+FEATURES ?=
+VDEV_FEATURE_ARGS = $(if $(strip $(FEATURES)),--features "$(FEATURES)")
 
 # When COVERAGE=true, swap cargo-nextest for cargo-llvm-cov so test targets collect
 # coverage data. Run `make coverage-report` afterwards to emit the lcov file.
@@ -370,7 +371,7 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	$(VDEV) check rust
+	$(VDEV) check rust $(VDEV_FEATURE_ARGS)
 
 .PHONY: check-all
 check-all: ## Check everything
@@ -387,8 +388,8 @@ check-component-features: ## Check that all component features are setup properl
 	$(VDEV) check component-features
 
 .PHONY: check-clippy
-check-clippy: ## Check code with Clippy
-	$(VDEV) check rust
+check-clippy: ## Check code with Clippy; when set, FEATURES is the exact feature set
+	$(VDEV) check rust $(VDEV_FEATURE_ARGS)
 
 .PHONY: check-docs
 check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
@@ -453,11 +454,6 @@ check-generated-docs: generate-docs ## Checks that machine-generated component d
 	$(VDEV) check generated-docs
 	$(VDEV) check component-examples
 
-##@ Rustdoc
-build-rustdoc: ## Build Vector's Rustdocs
-	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
-	cargo doc --no-deps --workspace
-
 ##@ Packaging (forwarded to Makefile.packaging)
 
 # Packaging targets that depend on VERSION live in Makefile.packaging to avoid
@@ -513,8 +509,8 @@ clean: ## Clean everything
 	cargo clean
 
 .PHONY: generate-kubernetes-manifests
-generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
-	$(VDEV) build manifests
+generate-kubernetes-manifests: ## Generate Kubernetes manifests from the latest (or CHART_VERSION) Helm chart
+	$(VDEV) build manifests -- $(if $(CHART_VERSION),--chart-version $(CHART_VERSION))
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
@@ -555,10 +551,6 @@ signoff: ## Signsoff all previous commits since branch creation
 version: ## Get the current Vector version
 	@$(VDEV) version
 
-.PHONY: git-hooks
-git-hooks: ## Add Vector-local git hooks for commit sign-off
-	@scripts/install-git-hooks.sh
-
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
@@ -570,7 +562,7 @@ ci-generate-publish-metadata: ## Generates the necessary metadata required for b
 
 .PHONY: clippy-fix
 clippy-fix:
-	$(VDEV) check rust --fix
+	$(VDEV) check rust $(VDEV_FEATURE_ARGS) --fix
 
 .PHONY: fmt
 fmt:

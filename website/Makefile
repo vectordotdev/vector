@@ -47,20 +47,27 @@ generate-deprecations-json:
 structured-data: generate-vrl-docs generate-deprecations-json component-examples
 
 serve: clean setup cargo-data structured-data
-	hugo server \
-	--bind $(SERVER_BIND) \
-	--port $(SERVER_PORT) \
+	$(MAKE) serve-development
+
+.PHONY: serve-development
+serve-development:
+	hugo \
 	--buildDrafts \
 	--buildFuture \
 	--environment "development"
+	$(MAKE) pagefind
+	yarn concurrently --kill-others --success first --names hugo,pagefind \
+		"hugo server --bind $(SERVER_BIND) --port $(SERVER_PORT) --buildDrafts --buildFuture --environment development" \
+		"yarn pagefind:watch"
 
 # Live site
 production-build:
 	hugo \
 	--environment "production" \
 	--minify
+	$(MAKE) pagefind
 
-ci-production-build: setup cargo-data structured-data production-build typesense-production
+ci-production-build: setup cargo-data structured-data production-build
 
 # Preview site
 preview-build:
@@ -70,8 +77,9 @@ preview-build:
 	--environment "preview" \
 	--minify
 	cp ./custom-headers/_preview ./public/_headers
+	$(MAKE) pagefind
 
-ci-preview-build: setup cargo-data structured-data preview-build typesense-preview
+ci-preview-build: setup cargo-data structured-data preview-build
 
 run-link-checker:
 	htmltest
@@ -83,13 +91,8 @@ run-external-link-checker:
 check-links: production-build run-link-checker
 
 # Search
-typesense-preview:
-	yarn typesense-index
-	yarn typesense-sync:preview
-
-typesense-production:
-	yarn typesense-index
-	yarn typesense-sync:production
+pagefind:
+	yarn pagefind --site public
 
 # Useful for locally debugging issues that arise only on the deployed production site
 run-production-site-locally:

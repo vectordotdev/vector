@@ -1,1 +1,0 @@
-{"metric":{"name":"g","tags":{"b":"l","q":"h"},"interval_ms":3801288120,"kind":"absolute","distribution":{"samples":[{"value":119360.0,"rate":436775407},{"value":258624.0,"rate":1918885929}],"statistic":"summary"}}}
