@@ -64,14 +64,14 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		component_request_queue_capacity: {
-			description:       "The maximum number of requests that can be admitted for queueing and processing by this component."
+		component_request_active: {
+			description:       "The number of requests currently being processed by this component."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		component_request_queue_size: {
-			description:       "The number of admitted requests waiting to be processed by this component."
+		component_request_concurrency_limit: {
+			description:       "The maximum number of requests that can be processed concurrently by this component."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags

@@ -128,13 +128,13 @@ pub struct OpentelemetryConfig {
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 
-    /// Maximum number of queued and processing requests across the HTTP and gRPC servers.
+    /// Maximum number of requests processed concurrently across the HTTP and gRPC servers.
     ///
-    /// Defaults to ten times the number of Vector runtime worker threads.
+    /// Requests beyond this limit are rejected. Defaults to `100`.
     #[serde(default, deserialize_with = "deserialize_max_concurrent_requests")]
     pub max_concurrent_requests: Option<NonZeroUsize>,
 
-    /// Maximum time spent queueing and processing a request through submission to the source output.
+    /// Maximum time spent processing a request through submission to the source output.
     #[serde(default = "default_request_timeout_secs")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
     pub request_timeout_secs: NonZeroU64,
@@ -196,10 +196,8 @@ where
     Ok(value)
 }
 
-fn runtime_worker_threads() -> NonZeroUsize {
-    crate::app::worker_threads()
-        .or_else(|| NonZeroUsize::new(crate::num_threads()))
-        .expect("available parallelism is nonzero")
+const fn default_max_concurrent_requests() -> NonZeroUsize {
+    NonZeroUsize::new(100).unwrap()
 }
 
 /// Configuration for the `opentelemetry` gRPC server.
@@ -318,14 +316,12 @@ impl OpentelemetryConfig {
     ) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
-        let worker_threads = runtime_worker_threads().get();
-        let outer_capacity = self
+        let concurrency_limit = self
             .max_concurrent_requests
-            .map(NonZeroUsize::get)
-            .unwrap_or_else(|| worker_threads.saturating_mul(10));
+            .unwrap_or_else(default_max_concurrent_requests)
+            .get();
         let request_control = RequestControl::new(
-            outer_capacity,
-            worker_threads,
+            concurrency_limit,
             Duration::from_secs(self.request_timeout_secs.get()),
         );
         let log_namespace = cx.log_namespace(self.log_namespace);

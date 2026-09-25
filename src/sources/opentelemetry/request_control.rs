@@ -6,8 +6,8 @@ use hyper::Body;
 use metrics::{Counter, Gauge};
 use tokio::sync::Semaphore;
 use tower::{
-    BoxError, Layer, Service, ServiceExt, limit::GlobalConcurrencyLimitLayer,
-    load_shed::error::Overloaded, service_fn, timeout::TimeoutLayer, util::BoxCloneService,
+    BoxError, Layer, Service, ServiceExt, load_shed::error::Overloaded, service_fn,
+    timeout::TimeoutLayer, util::BoxCloneService,
 };
 use vector_lib::{
     counter,
@@ -16,22 +16,20 @@ use vector_lib::{
     internal_event::{CounterName, GaugeName},
 };
 
-/// Admission limits shared by all HTTP and gRPC requests handled by one OTLP source.
+/// Concurrency limit shared by all HTTP and gRPC requests handled by one OTLP source.
 #[derive(Clone)]
 pub(crate) struct RequestControl {
-    outer: Arc<Semaphore>,
-    inner: Arc<Semaphore>,
+    semaphore: Arc<Semaphore>,
     timeout: Duration,
     metrics: Arc<RequestControlMetrics>,
 }
 
 impl RequestControl {
-    pub(crate) fn new(outer_capacity: usize, inner_capacity: usize, timeout: Duration) -> Self {
+    pub(crate) fn new(concurrency_limit: usize, timeout: Duration) -> Self {
         Self {
-            outer: Arc::new(Semaphore::new(outer_capacity)),
-            inner: Arc::new(Semaphore::new(inner_capacity)),
+            semaphore: Arc::new(Semaphore::new(concurrency_limit)),
             timeout,
-            metrics: Arc::new(RequestControlMetrics::new(outer_capacity)),
+            metrics: Arc::new(RequestControlMetrics::new(concurrency_limit)),
         }
     }
 
@@ -45,8 +43,7 @@ impl RequestControl {
 
     fn layer<R>(&self, error_response: R, protocol: Protocol) -> RequestControlLayer<R> {
         RequestControlLayer {
-            outer: Arc::clone(&self.outer),
-            inner: Arc::clone(&self.inner),
+            semaphore: Arc::clone(&self.semaphore),
             timeout: self.timeout,
             metrics: Arc::clone(&self.metrics),
             protocol,
@@ -79,27 +76,27 @@ impl MiddlewareError {
 }
 
 struct RequestControlMetrics {
-    queued: OpenGauge,
-    queued_level: Gauge,
+    active: OpenGauge,
+    active_level: Gauge,
     #[expect(
         dead_code,
-        reason = "retain the queue capacity gauge handle for the controller lifetime"
+        reason = "retain the concurrency limit gauge handle for the controller lifetime"
     )]
-    queue_capacity: Gauge,
+    concurrency_limit: Gauge,
     http_timed_out: Counter,
     grpc_timed_out: Counter,
 }
 
 impl RequestControlMetrics {
     #[expect(clippy::cast_precision_loss)]
-    fn new(queue_capacity: usize) -> Self {
-        let queue_capacity_gauge = gauge!(GaugeName::ComponentRequestQueueCapacity);
-        queue_capacity_gauge.set(queue_capacity as f64);
+    fn new(concurrency_limit: usize) -> Self {
+        let concurrency_limit_gauge = gauge!(GaugeName::ComponentRequestConcurrencyLimit);
+        concurrency_limit_gauge.set(concurrency_limit as f64);
 
         Self {
-            queued: OpenGauge::new(),
-            queued_level: gauge!(GaugeName::ComponentRequestQueueSize),
-            queue_capacity: queue_capacity_gauge,
+            active: OpenGauge::new(),
+            active_level: gauge!(GaugeName::ComponentRequestActive),
+            concurrency_limit: concurrency_limit_gauge,
             http_timed_out: counter!(
                 CounterName::ComponentTimedOutRequestsTotal,
                 "protocol" => "http"
@@ -111,9 +108,9 @@ impl RequestControlMetrics {
         }
     }
 
-    fn queued_token(&self) -> OpenToken<impl Fn(usize) + use<>> {
-        let gauge = self.queued_level.clone();
-        self.queued
+    fn active_token(&self) -> OpenToken<impl Fn(usize) + use<>> {
+        let gauge = self.active_level.clone();
+        self.active
             .clone()
             .open(move |count| gauge.set(count as f64))
     }
@@ -193,8 +190,7 @@ where
 
 #[derive(Clone)]
 pub(crate) struct RequestControlLayer<R> {
-    outer: Arc<Semaphore>,
-    inner: Arc<Semaphore>,
+    semaphore: Arc<Semaphore>,
     timeout: Duration,
     metrics: Arc<RequestControlMetrics>,
     protocol: Protocol,
@@ -212,44 +208,29 @@ where
     type Service = BoxCloneService<Request<Body>, Response<B>, Infallible>;
 
     fn layer(&self, service: S) -> Self::Service {
-        // Bound queueing and processing with both permits and a timeout, then release that
-        // admission capacity before finalizing the acknowledgement without a timeout.
-        let processing =
-            GlobalConcurrencyLimitLayer::with_semaphore(Arc::clone(&self.inner)).layer(service);
-        let metrics = Arc::clone(&self.metrics);
-        let processing = service_fn(move |request: Request<Body>| {
-            let queued = metrics.queued_token();
-            let mut processing = processing.clone();
-
-            async move {
-                processing.ready().await?;
-                drop(queued);
-                processing.call(request).await
-            }
-        });
-        let processing = TimeoutLayer::new(self.timeout).layer(processing);
-
-        let outer = Arc::clone(&self.outer);
+        // Acquire shared capacity immediately, reject requests when none is available, and release
+        // the permit before finalizing the acknowledgement without a timeout.
+        let processing = TimeoutLayer::new(self.timeout).layer(service);
+        let semaphore = Arc::clone(&self.semaphore);
         let metrics = Arc::clone(&self.metrics);
         let protocol = self.protocol;
         let error_response = self.error_response.clone();
         let service = service_fn(move |request: Request<Body>| {
-            let outer = Arc::clone(&outer).try_acquire_owned();
-            let processing = outer.as_ref().ok().map(|_| processing.clone());
+            let permit = Arc::clone(&semaphore).try_acquire_owned();
+            let processing = permit.as_ref().ok().map(|_| processing.clone());
             let metrics = Arc::clone(&metrics);
             let error_response = error_response.clone();
 
             async move {
-                let result = match outer {
-                    Ok(outer) => {
-                        let _outer = outer;
+                let result = match permit {
+                    Ok(permit) => {
+                        let _permit = permit;
+                        let _active = metrics.active_token();
                         processing
                             .expect("admitted request has a processing service")
                             .oneshot(request)
                             .await
                     }
-                    // Reuse Tower's standard overload marker without its readiness-based
-                    // layer, which would allow idle service clones to reserve capacity.
                     Err(_) => Err(Box::new(Overloaded::new()) as BoxError),
                 };
 
@@ -468,29 +449,29 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn readiness_does_not_reserve_outer_capacity() {
-        const OUTER: usize = 3;
+    async fn readiness_does_not_reserve_capacity() {
+        const LIMIT: usize = 3;
 
-        let control = RequestControl::new(OUTER, 1, Duration::from_secs(5));
+        let control = RequestControl::new(LIMIT, Duration::from_secs(5));
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(1));
         let service = control
             .http_layer(HttpErrorResponse)
             .layer(http_service(observations, gate));
-        let mut idle_services = vec![service.clone(); OUTER];
+        let mut idle_services = vec![service.clone(); LIMIT];
 
         for idle in &mut idle_services {
             idle.ready().await.unwrap();
         }
 
-        assert_eq!(control.outer.available_permits(), OUTER);
+        assert_eq!(control.semaphore.available_permits(), LIMIT);
         let response = service.oneshot(Request::new(Body::empty())).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]
     async fn released_request_permits_allow_ack_waits_to_overlap() {
-        let control = RequestControl::new(1, 1, Duration::from_secs(5));
+        let control = RequestControl::new(1, Duration::from_secs(5));
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
         let service = control
@@ -505,107 +486,95 @@ mod tests {
         let second = tokio::spawn(service.oneshot(Request::new(Body::empty())));
         wait_for(&observations.started, 2).await;
         assert_eq!(observations.maximum_active.load(Ordering::Acquire), 2);
-        assert_eq!(control.outer.available_permits(), 1);
-        assert_eq!(control.inner.available_permits(), 1);
+        assert_eq!(control.semaphore.available_permits(), 1);
 
         gate.add_permits(2);
         first.await.unwrap().unwrap();
         second.await.unwrap().unwrap();
-        assert_eq!(control.inner.available_permits(), 1);
+        assert_eq!(control.semaphore.available_permits(), 1);
     }
 
     #[tokio::test]
-    async fn inner_error_releases_capacity() {
-        let control = RequestControl::new(1, 1, Duration::from_secs(5));
+    async fn processing_error_releases_capacity() {
+        let control = RequestControl::new(1, Duration::from_secs(5));
         let service = control.http_layer(HttpErrorResponse).layer(FailingService);
 
         let response = service.oneshot(Request::new(Body::empty())).await.unwrap();
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        assert_eq!(control.outer.available_permits(), 1);
-        assert_eq!(control.inner.available_permits(), 1);
-        wait_for_level(&control.metrics.queued, 0).await;
+        assert_eq!(control.semaphore.available_permits(), 1);
+        wait_for_level(&control.metrics.active, 0).await;
     }
 
     #[tokio::test]
-    async fn queues_to_outer_limit_and_respects_inner_limit() {
-        let control = RequestControl::new(3, 1, Duration::from_secs(5));
+    async fn rejects_requests_above_concurrency_limit() {
+        let control = RequestControl::new(1, Duration::from_secs(5));
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
         let service = control
             .http_layer(HttpErrorResponse)
             .layer(http_service(Arc::clone(&observations), Arc::clone(&gate)));
 
-        let first = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
+        let admitted = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
         wait_for(&observations.started, 1).await;
-        let second = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
-        let third = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
-        while control.outer.available_permits() != 0 {
-            tokio::task::yield_now().await;
-        }
-        wait_for_level(&control.metrics.queued, 2).await;
+        assert_eq!(control.metrics.active.current(), 1);
 
-        let overloaded = service
+        let rejected = service
             .clone()
             .oneshot(Request::new(Body::empty()))
             .await
             .unwrap();
-        assert_eq!(overloaded.status(), StatusCode::TOO_MANY_REQUESTS);
-        assert_eq!(observations.maximum_active.load(Ordering::Acquire), 1);
+        assert_eq!(rejected.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(observations.started.load(Ordering::Acquire), 1);
 
-        gate.add_permits(3);
-        for request in [first, second, third] {
-            assert_eq!(request.await.unwrap().unwrap().status(), StatusCode::OK);
-        }
-        assert_eq!(observations.started.load(Ordering::Acquire), 3);
-        assert_eq!(observations.maximum_active.load(Ordering::Acquire), 1);
-        wait_for_level(&control.metrics.queued, 0).await;
+        gate.add_permits(1);
+        assert_eq!(admitted.await.unwrap().unwrap().status(), StatusCode::OK);
+        wait_for_level(&control.metrics.active, 0).await;
+        assert_eq!(control.semaphore.available_permits(), 1);
     }
 
     #[tokio::test]
-    async fn synchronized_burst_is_bounded_by_both_stages() {
-        const INNER: usize = 16;
-        const OUTER: usize = 160;
+    async fn synchronized_burst_is_bounded_by_concurrency_limit() {
+        const LIMIT: usize = 16;
+        const REQUESTS: usize = 160;
 
-        let control = RequestControl::new(OUTER, INNER, Duration::from_secs(5));
+        let control = RequestControl::new(LIMIT, Duration::from_secs(5));
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
         let service = control
             .http_layer(HttpErrorResponse)
             .layer(http_service(Arc::clone(&observations), Arc::clone(&gate)));
 
-        let mut admitted = Vec::with_capacity(OUTER);
-        for _ in 0..OUTER {
+        let mut admitted = Vec::with_capacity(LIMIT);
+        for _ in 0..LIMIT {
             admitted.push(tokio::spawn(
                 service.clone().oneshot(Request::new(Body::empty())),
             ));
         }
-        while control.outer.available_permits() != 0
-            || observations.started.load(Ordering::Acquire) != INNER
-        {
-            tokio::task::yield_now().await;
+        wait_for(&observations.started, LIMIT).await;
+        assert_eq!(control.metrics.active.current(), LIMIT);
+
+        for _ in LIMIT..REQUESTS {
+            let response = service
+                .clone()
+                .oneshot(Request::new(Body::empty()))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
         }
-        wait_for_level(&control.metrics.queued, OUTER - INNER).await;
+        assert_eq!(observations.started.load(Ordering::Acquire), LIMIT);
+        assert_eq!(observations.maximum_active.load(Ordering::Acquire), LIMIT);
 
-        let overloaded = service
-            .clone()
-            .oneshot(Request::new(Body::empty()))
-            .await
-            .unwrap();
-        assert_eq!(overloaded.status(), StatusCode::TOO_MANY_REQUESTS);
-        assert_eq!(observations.maximum_active.load(Ordering::Acquire), INNER);
-
-        gate.add_permits(OUTER);
+        gate.add_permits(LIMIT);
         for request in admitted {
             assert_eq!(request.await.unwrap().unwrap().status(), StatusCode::OK);
         }
-        assert_eq!(observations.started.load(Ordering::Acquire), OUTER);
-        assert_eq!(observations.maximum_active.load(Ordering::Acquire), INNER);
-        wait_for_level(&control.metrics.queued, 0).await;
+        wait_for_level(&control.metrics.active, 0).await;
+        assert_eq!(control.semaphore.available_permits(), LIMIT);
     }
 
     #[tokio::test]
     async fn timeout_and_cancellation_release_capacity() {
-        let control = RequestControl::new(1, 1, Duration::from_millis(20));
+        let control = RequestControl::new(1, Duration::from_millis(20));
         let observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
         let service = control
@@ -625,55 +594,21 @@ mod tests {
         }
         let status = Status::decode(bytes.freeze()).unwrap();
         assert_eq!(status.code, tonic::Code::Unavailable as i32);
-        assert_eq!(control.outer.available_permits(), 1);
-        assert_eq!(control.inner.available_permits(), 1);
-        wait_for_level(&control.metrics.queued, 0).await;
+        assert_eq!(control.semaphore.available_permits(), 1);
+        wait_for_level(&control.metrics.active, 0).await;
 
         let pending = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
         wait_for(&observations.started, 2).await;
         pending.abort();
         assert!(pending.await.unwrap_err().is_cancelled());
         wait_for(&observations.active, 0).await;
-        assert_eq!(control.outer.available_permits(), 1);
-        assert_eq!(control.inner.available_permits(), 1);
-        wait_for_level(&control.metrics.queued, 0).await;
+        assert_eq!(control.semaphore.available_permits(), 1);
+        wait_for_level(&control.metrics.active, 0).await;
     }
 
     #[tokio::test]
-    async fn canceled_queued_request_never_reaches_inner_service() {
-        let control = RequestControl::new(2, 1, Duration::from_secs(5));
-        let observations = Arc::new(Observations::default());
-        let gate = Arc::new(Semaphore::new(0));
-        let service = control
-            .http_layer(HttpErrorResponse)
-            .layer(http_service(Arc::clone(&observations), Arc::clone(&gate)));
-
-        let active = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
-        wait_for(&observations.started, 1).await;
-        let queued = tokio::spawn(service.clone().oneshot(Request::new(Body::empty())));
-        while control.outer.available_permits() != 0 {
-            tokio::task::yield_now().await;
-        }
-        wait_for_level(&control.metrics.queued, 1).await;
-        queued.abort();
-        assert!(queued.await.unwrap_err().is_cancelled());
-
-        gate.add_permits(1);
-        active.await.unwrap().unwrap();
-        wait_for_level(&control.metrics.queued, 0).await;
-        assert_eq!(observations.started.load(Ordering::Acquire), 1);
-        assert_eq!(control.outer.available_permits(), 2);
-        assert_eq!(control.inner.available_permits(), 1);
-
-        gate.add_permits(1);
-        service.oneshot(Request::new(Body::empty())).await.unwrap();
-        assert_eq!(observations.started.load(Ordering::Acquire), 2);
-        assert_eq!(control.inner.available_permits(), 1);
-    }
-
-    #[tokio::test]
-    async fn http_and_grpc_share_outer_and_inner_capacity() {
-        let control = RequestControl::new(2, 1, Duration::from_secs(5));
+    async fn http_and_grpc_share_capacity() {
+        let control = RequestControl::new(1, Duration::from_secs(5));
         let http_observations = Arc::new(Observations::default());
         let grpc_observations = Arc::new(Observations::default());
         let gate = Arc::new(Semaphore::new(0));
@@ -688,24 +623,17 @@ mod tests {
 
         let processing = tokio::spawn(http.clone().oneshot(Request::new(Body::empty())));
         wait_for(&http_observations.started, 1).await;
-        let queued = tokio::spawn(grpc.clone().oneshot(Request::new(Body::empty())));
-        while control.outer.available_permits() != 0 {
-            tokio::task::yield_now().await;
-        }
-        wait_for_level(&control.metrics.queued, 1).await;
-        assert_eq!(grpc_observations.started.load(Ordering::Acquire), 0);
-
-        let overloaded = grpc
+        let rejected = grpc
             .clone()
             .oneshot(Request::new(Body::empty()))
             .await
             .unwrap();
-        assert_eq!(overloaded.headers()["grpc-status"], "14");
+        assert_eq!(rejected.headers()["grpc-status"], "14");
+        assert_eq!(grpc_observations.started.load(Ordering::Acquire), 0);
 
-        gate.add_permits(2);
+        gate.add_permits(1);
         processing.await.unwrap().unwrap();
-        queued.await.unwrap().unwrap();
-        assert_eq!(grpc_observations.started.load(Ordering::Acquire), 1);
-        wait_for_level(&control.metrics.queued, 0).await;
+        wait_for_level(&control.metrics.active, 0).await;
+        assert_eq!(control.semaphore.available_permits(), 1);
     }
 }

@@ -221,6 +221,20 @@ fn admission_config_defaults_and_rejects_invalid_values() {
     assert_eq!(config.max_concurrent_requests, None);
     assert_eq!(config.request_timeout_secs.get(), 30);
 
+    let configured: OpentelemetryConfig = serde_yaml::from_str(
+        r#"
+        grpc:
+          address: "0.0.0.0:4317"
+        http:
+          address: "0.0.0.0:4318"
+        max_concurrent_requests: 7
+        request_timeout_secs: 11
+        "#,
+    )
+    .unwrap();
+    assert_eq!(configured.max_concurrent_requests.unwrap().get(), 7);
+    assert_eq!(configured.request_timeout_secs.get(), 11);
+
     for invalid in ["max_concurrent_requests: 0", "request_timeout_secs: 0"] {
         let yaml =
             format!("grpc:\n  address: 0.0.0.0:4317\nhttp:\n  address: 0.0.0.0:4318\n{invalid}\n");
