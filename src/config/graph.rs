@@ -220,9 +220,8 @@ impl Graph {
             });
             Ok(())
         } else {
-            let output_type = match self.nodes.get(to) {
-                Some(node) if node.kind == ComponentKind::Transform => "transform",
-                Some(node) if node.kind == ComponentKind::Sink => "sink",
+            let component_kind = match self.nodes.get(to).map(|node| node.kind) {
+                Some(kind @ (ComponentKind::Transform | ComponentKind::Sink)) => kind,
                 _ => panic!("only transforms and sinks have inputs"),
             };
             // allow empty result if relaxed wildcard matching is enabled
@@ -232,7 +231,7 @@ impl Graph {
                     // TODO: replace with proper check when https://github.com/rust-lang/glob/issues/72 is resolved
                     if from != glob::Pattern::escape(from) {
                         info!(
-                            "Input \"{from}\" for {output_type} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled."
+                            "Input \"{from}\" for {component_kind} \"{to}\" didn’t match any components, but this was ignored because `relaxed_wildcard_matching` is enabled."
                         );
                         return Ok(());
                     }
@@ -248,7 +247,7 @@ impl Graph {
                     .join("\n")
             );
             Err(format!(
-                "Input \"{from}\" for {output_type} \"{to}\" doesn't match any components.",
+                "Input \"{from}\" for {component_kind} \"{to}\" doesn't match any components.",
             ))
         }
     }

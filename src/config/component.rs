@@ -12,7 +12,8 @@ use super::{EnrichmentTableOuter, OutputId, SinkOuter, SourceOuter, TransformOut
 /// a separate list of component categories.
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(name(ComponentKind))]
-#[strum_discriminants(derive(Ord, PartialOrd))]
+#[strum_discriminants(derive(Ord, PartialOrd, strum::Display))]
+#[strum_discriminants(strum(serialize_all = "snake_case"))]
 pub enum Component<'a, T = OutputId>
 where
     T: Configurable + Serialize + ToValue + Clone + 'static,
