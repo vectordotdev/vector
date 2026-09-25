@@ -35,6 +35,12 @@ fn my_function() {
 
 - Group imports: `std` → external crates → internal (`crate::`)
 
+## Unit tests
+
+Unit tests for a type live in the same source file as that type (`#[cfg(test)] mod tests` at
+the bottom of the file) unless they exercise behavior that spans multiple modules. Cross-module
+tests belong with the composing type, not in a catch-all tests file for the crate.
+
 ## Logging Style
 
 Always use the [Tracing crate](https://tracing.rs/tracing/)'s key/value style:
