@@ -170,10 +170,7 @@ cargo vdev int test <name>    # Integration tests
 cargo vdev fmt                # Format code
 ```
 
-For new tooling that will be used by future developers, add a `vdev` subcommand instead of a shell
-or Python script. Shared behavior belongs in a Rust helper next to those subcommands. Use `scripts/`
-only for one-shot migrations and for packaging or CI automation for which `vdev` is unsuitable. Do
-not introduce new top-level subcommands unless none of the existing ones are appropriate.
+For new tooling that will be used by future developers, add a `vdev` subcommand instead of a shell or Python script. Do not introduce new top-level subcommands unless none of the existing ones are appropriate.
 
 ### Pre-Push Hook (Optional but Recommended)
 

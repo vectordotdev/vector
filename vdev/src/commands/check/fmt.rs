@@ -2,11 +2,8 @@ use anyhow::Result;
 
 use crate::{
     app,
-    commands::{
-        fmt::{PRETTIER_EXTENSIONS, files_for_prettier},
-        style,
-    },
-    utils::paths::prettier,
+    commands::{fmt::PRETTIER_EXTENSIONS, style},
+    utils::paths::{files_for_prettier, prettier},
 };
 
 /// Check that all files are formatted properly

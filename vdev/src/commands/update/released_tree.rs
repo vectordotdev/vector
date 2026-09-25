@@ -169,24 +169,25 @@ fn readme(spec: &VendorSpec, tag: &str) -> String {
         .repo_url
         .strip_prefix("https://github.com/")
         .unwrap_or(spec.repo_url);
-    format!(
-        "\
-# {title}
+    let VendorSpec {
+        title,
+        repo_url: repo,
+        src_rel,
+        command,
+        ..
+    } = spec;
+    indoc::formatdoc! {"
+        # {title}
 
-Vendored from [`{slug}`]({repo})
-[`{src_rel}`]({repo}/tree/{tag}/{src_rel})
-at release [`{tag}`]({repo}/releases/tag/{tag}).
+        Vendored from [`{slug}`]({repo})
+        [`{src_rel}`]({repo}/tree/{tag}/{src_rel})
+        at release [`{tag}`]({repo}/releases/tag/{tag}).
 
-Files already present in this directory are refreshed from that release.
+        Files already present in this directory are refreshed from that release.
 
-Refresh by running `cargo vdev {command}` for the latest release,
-or `cargo vdev {command} {tag}` to pin this tag again.
-",
-        title = spec.title,
-        repo = spec.repo_url,
-        src_rel = spec.src_rel,
-        command = spec.command,
-    )
+        Refresh by running `cargo vdev {command}` for the latest release,
+        or `cargo vdev {command} {tag}` to pin this tag again.
+    "}
 }
 
 #[cfg(test)]
