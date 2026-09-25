@@ -194,17 +194,72 @@ impl Service<ElasticsearchRequest> for ElasticsearchService {
         let mut http_service = self.batch_service.clone();
         Box::pin(async move {
             http_service.ready().await?;
+            let original_events = std::mem::take(&mut req.original_events);
             let events_byte_size =
                 std::mem::take(req.metadata_mut()).into_events_estimated_json_encoded_byte_size();
             let http_response = http_service.call(req).await?;
 
             let event_status = get_event_status(&http_response);
+            if event_status == EventStatus::Rejected {
+                log_failed_events(&http_response, &original_events);
+            }
             Ok(ElasticsearchResponse {
                 event_status,
                 http_response,
                 events_byte_size,
             })
         })
+    }
+}
+
+/// When log level is set to debug, logs each event that was individually rejected by Elasticsearch,
+/// along with the ES error type, reason, and per-item status code. Parses the bulk API response
+/// items array and correlates each failed item back to the corresponding original event by index.
+fn log_failed_events(response: &Response<Bytes>, original_events: &[ProcessedEvent]) {
+    if !tracing::enabled!(tracing::Level::DEBUG) {
+        return;
+    }
+    let body = String::from_utf8_lossy(response.body());
+    let parsed = match serde_json::from_str::<serde_json::Value>(&body) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let items = match parsed.get("items").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => return,
+    };
+    for (i, item) in items.iter().enumerate() {
+        let result = item
+            .get("index")
+            .or_else(|| item.get("create"))
+            .or_else(|| item.get("update"));
+        let result = match result {
+            Some(r) => r,
+            None => continue,
+        };
+        let error = match result.get("error") {
+            Some(e) => e,
+            None => continue,
+        };
+        let error_type = error
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let error_reason = error
+            .get("reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+        let es_status = result.get("status").and_then(|v| v.as_u64()).unwrap_or(0);
+
+        if let Some(event) = original_events.get(i) {
+            debug!(
+                message = "Elasticsearch rejected event.",
+                error_type = error_type,
+                error_reason = error_reason,
+                es_status = es_status,
+                event = ?event.log,
+            );
+        }
     }
 }
 
