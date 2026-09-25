@@ -792,13 +792,15 @@ fn wrap_with_line_agg(
     Box::new(
         LineAgg::new(
             rx.map(|line| {
-                // Buffered contexts retain the Arc, so this address cannot be
-                // reused while an aggregate for that reader generation exists.
+                // A rename must not split one reader's ordered records into
+                // separate aggregates. Buffered contexts retain the Arc, so its
+                // address cannot be reused while this generation has an aggregate.
                 let generation = std::sync::Arc::as_ptr(&line.delivery_progress) as usize;
                 (
-                    (line.filename, generation),
+                    generation,
                     line.text,
                     (
+                        line.filename,
                         line.file_id,
                         line.start_offset,
                         line.end_offset,
@@ -810,13 +812,14 @@ fn wrap_with_line_agg(
         )
         .map(
             |(
-                (filename, _),
+                _,
                 text,
-                (file_id, start_offset, initial_end, progress),
+                (filename, file_id, start_offset, initial_end, progress),
                 lastline_context,
             )| {
-                let (_, _, end_offset, delivery_progress) =
-                    lastline_context.unwrap_or((file_id, start_offset, initial_end, progress));
+                let (end_offset, delivery_progress) = lastline_context
+                    .map(|(_, _, _, end, progress)| (end, progress))
+                    .unwrap_or((initial_end, progress));
                 Line {
                     text,
                     filename,
@@ -2640,6 +2643,50 @@ mod tests {
     #[tokio::test]
     async fn multiline_truncation_keeps_generations_with_the_same_fingerprint_separate() {
         assert_multiline_generations(true).await;
+    }
+
+    #[tokio::test]
+    async fn multiline_rename_preserves_record_order_and_origin_path() {
+        use std::sync::Arc;
+        use vector_lib::file_v2_source::DeliveryProgress;
+        let progress = Arc::new(DeliveryProgress::new(0));
+        let line = |filename: &str, text: &'static str, start_offset| Line {
+            text: Bytes::from_static(text.as_bytes()),
+            filename: filename.into(),
+            file_id: FileFingerprint::FirstBytesChecksum(1),
+            start_offset,
+            end_offset: start_offset + text.len() as u64 + 1,
+            delivery_progress: Arc::clone(&progress),
+        };
+        let input = futures::stream::iter([
+            line("before.log", "INFO old", 0),
+            line("after.log", " old tail", 9),
+            line("after.log", "INFO new", 19),
+            line("after.log", "INFO next", 28),
+        ])
+        .chain(futures::stream::pending());
+        let config = line_agg::Config {
+            start_pattern: regex::bytes::Regex::new("^INFO").unwrap(),
+            condition_pattern: regex::bytes::Regex::new("^INFO").unwrap(),
+            mode: line_agg::Mode::HaltBefore,
+            timeout: Duration::from_secs(60),
+        };
+        let mut output = wrap_with_line_agg(input, config);
+        // Require read order before the old-path timeout or stream shutdown can
+        // flush it. Otherwise a later acknowledgement could checkpoint past it.
+        for (filename, text, start, end) in [
+            ("before.log", "INFO old\n old tail", 0, 19),
+            ("after.log", "INFO new", 19, 28),
+        ] {
+            let line = timeout(Duration::from_secs(1), output.next())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(line.text, text);
+            assert_eq!(line.filename, filename);
+            assert_eq!((line.start_offset, line.end_offset), (start, end));
+            assert!(Arc::ptr_eq(&line.delivery_progress, &progress));
+        }
     }
 
     #[tokio::test]
