@@ -88,16 +88,25 @@ jobs:
               pending+="$runs"
             done
             if (( failed == 0 )); then
-              # A finished "Release Suite" that failed means the housekeeping PR
-              # never merged, and its retry needs the freeze. The same holds for
-              # a failed manifests run: its retry needs the freeze. Wait for a
-              # human instead of closing the window under an incomplete release.
+              # A finished release stage that failed must keep the freeze
+              # active: its retry needs the freeze, so wait for a human
+              # instead of closing the window under an incomplete release.
               latest=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --limit 1 \
                 --json conclusion,url --jq '.[] | select(.conclusion != "success")
                   | "\(.conclusion) \(.url)"') || failed=1
             fi
             if (( failed == 0 )); then
+              # The same holds for a failed manifests run: its retry needs the
+              # freeze to republish the chart manifests.
               latest+="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release_manifests.yml --limit 1 \
+                --json conclusion,url --jq '.[] | select(.conclusion != "success")
+                  | "\(.conclusion) \(.url)"')" || failed=1
+            fi
+            if (( failed == 0 )); then
+              # The same holds for a failed "Tag approved release": its retry
+              # needs the freeze to recreate the release tag, and until it
+              # succeeds no Release Suite run exists to check instead.
+              latest+="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release_autotag.yml --limit 1 \
                 --json conclusion,url --jq '.[] | select(.conclusion != "success")
                   | "\(.conclusion) \(.url)"')" || failed=1
             fi
