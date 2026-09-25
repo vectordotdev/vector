@@ -1,9 +1,9 @@
 package metadata
 
-components: sources: file: {
+components: sources: file_v2: {
 	_directory: "/var/log"
 
-	title: "File"
+	title: "File v2"
 
 	classes: {
 		delivery: "best_effort"
@@ -17,7 +17,7 @@ components: sources: file: {
 		auto_generated:   true
 		acknowledgements: true
 		collect: {
-			checkpoint: enabled: true
+			checkpoint: enabled: false
 			from: {
 				service: services.files
 
@@ -38,18 +38,29 @@ components: sources: file: {
 				for these files. Please see [File
 				permissions](#file-permissions) for more details.
 				""",
+			"""
+				The `vector` process must run on the system where the block
+				device (that stores the files in `include`) is locally connected.
+				Unlike the `file` source, the `file_v2` source will not work for
+				network file systems like NFS and SMB if Vector runs on the
+				client rather than the server, as the kernel of the Operating
+				System is then not aware of changes happening at the block
+				device level at the remote end.
+				""",
 		]
-		warnings: ["The `file` source is deprecated in favor of `file_v2`. See [migration guidance](https://vector.dev/deprecations/) before switching."]
+		warnings: []
 	}
 
 	installation: {
 		platform_name: null
 	}
 
-	configuration: generated.components.sources.file.configuration & {
+	configuration: generated.components.sources.file_v2.configuration & {
 		remove_after_secs: warnings: [
 			"""
-				Vector’s process must have permission to delete files.
+				Vector’s process must have permission to delete files. Avoid replacing or moving
+				files concurrently with automatic deletion: the final identity check and deletion
+				are separate filesystem operations.
 				""",
 		]
 	}
@@ -76,7 +87,7 @@ components: sources: file: {
 				description: "The name of the source type."
 				required:    true
 				type: string: {
-					examples: ["file"]
+					examples: ["file_v2"]
 				}
 			}
 			timestamp: fields._current_timestamp
@@ -97,7 +108,7 @@ components: sources: file: {
 				file:        _file
 				host:        _values.local_host
 				message:     _line
-				source_type: "file"
+				source_type: "file_v2"
 				timestamp:   _values.current_timestamp
 			}
 		},
@@ -107,29 +118,28 @@ components: sources: file: {
 		autodiscovery: {
 			title: "Autodiscovery"
 			body: """
-				Vector will continually look for new files matching any of your
-				include patterns. The frequency is controlled via the
-				`glob_minimum_cooldown` option. If a new file is added that matches
-				any of the supplied patterns, Vector will begin tailing it. Vector
-				maintains a unique list of files and will not tail a file more than
-				once, even if it matches multiple patterns. You can read more about
-				how we identify files in the Identification section.
+				Vector continually looks for new files matching any of your include
+				patterns using filesystem notifications. If a new file is added that
+				matches any of the supplied patterns, Vector begins tailing it.
+				Vector maintains a unique list of files and does not tail a file more
+				than once, even if it matches multiple patterns. You can read more
+				about how Vector identifies files in the Identification section.
 				"""
 		}
 
 		compressed_files: {
 			title: "Compressed Files"
 			body: """
-				Vector will transparently detect files which have been compressed
-				using Gzip and decompress them for reading. This detection process
-				looks for the unique sequence of bytes in the Gzip header and does
+				Vector transparently detects files that have been compressed
+				using gzip and decompresses them for reading. This detection process
+				looks for the unique sequence of bytes in the gzip header and does
 				not rely on the compressed files adhering to any kind of naming
 				convention.
 
-				One caveat with reading compressed files is that Vector is not able
+				One caveat with reading compressed files is that Vector is unable
 				to efficiently seek into them. Rather than implement a
 				potentially-expensive full scan as a seek mechanism, Vector
-				currently will not attempt to make further reads from a file for
+				does not attempt to make further reads from a file for
 				which it has already stored a checkpoint in a previous run. For
 				this reason, users should take care to allow Vector to fully
 				process any compressed files before shutting the process down or moving the
@@ -140,49 +150,28 @@ components: sources: file: {
 		file_deletion: {
 			title: "File Deletion"
 			body: """
-				When a watched file is deleted, Vector will maintain its open file
-				handle and continue reading until it reaches `EOF`. When a file is
-				no longer findable in the `includes` option and the reader has
-				reached `EOF`, that file's reader is discarded.
+				When a watched file is deleted or moved outside the `include` patterns,
+				Vector keeps its open reader while draining unread data. At `EOF`, the
+				`reader_idle_timeout_secs` timer starts (30 seconds by default). Reading
+				new bytes resets the timer, including bytes of an incomplete record.
+				After the idle period, Vector releases the reader and its file handle.
+				Files that remain discoverable are kept open regardless of inactivity.
+				Writes after a reader closes cannot be collected unless the file is discovered again.
 				"""
 		}
 
 		file_read_order: {
 			title: "File Read Order"
 			body: """
-				By default, Vector attempts to allocate its read bandwidth fairly
-				across all of the files it's currently watching. This prevents a
-				single very busy file from starving other independent files from
-				being read. In certain situations, however, this can lead to
-				interleaved reads from files that should be read one after the
-				other.
+				Vector allocates read bandwidth across watched files in bounded turns.
+				The `max_read_bytes` option controls how many bytes are read from one
+				file before moving on to another. This prevents a busy file from
+				monopolizing reading while other files have unread data.
 
-				For example, consider a service that logs to timestamped file,
-				creating a new one at an interval and leaving the old one as-is.
-				Under normal operation, Vector would follow writes as they happen to
-				each file and there would be no interleaving. In an overload
-				situation, however, Vector may pick up and begin tailing newer files
-				before catching up to the latest writes from older files. This would
-				cause writes from a single logical log stream to be interleaved in
-				time and potentially slow down ingestion as a whole, since the fixed
-				total read bandwidth is allocated across an increasing number of
-				files.
-
-				To address this type of situation, Vector provides the
-				`oldest_first` option. When set, Vector will not read from any file
-				younger than the oldest file that it hasn't yet caught up to. In
-				other words, Vector will continue reading from older files as long
-				as there is more data to read. Only once it hits the end will it
-				then move on to read from younger files.
-
-				Whether or not to use the oldest_first flag depends on the
-				organization of the logs you're configuring Vector to tail. If your
-				`include` option contains multiple independent logical log streams
-				(e.g. Nginx's access.log and error.log, or logs from multiple
-				services), you are likely better off with the default behavior. If
-				you're dealing with a single logical log stream or if you value
-				per-stream ordering over fairness across streams, consider setting
-				the `oldest_first` option to true.
+				Records are read in order within each file. There is no ordering
+				guarantee across files, including files belonging to the same
+				rotated log stream. Unlike the `file` source, `file_v2` does not
+				support the `oldest_first` option.
 				"""
 		}
 
@@ -192,14 +181,14 @@ components: sources: file: {
 				Vector supports tailing across a number of file rotation strategies.
 				The default behavior of `logrotate` is simply to move the old log
 				file and create a new one. This requires no special configuration of
-				Vector, as it will maintain its open file handle to the rotated log
-				until it has finished reading and it will find the newly created
+				Vector, as it maintains its open file handle to the rotated log
+				until it has finished reading. Vector finds the newly created
 				file normally.
 
 				A popular alternative strategy is `copytruncate`, in which
-				`logrotate` will copy the old log file to a new location before
-				truncating the original. Vector will also handle this well out of
-				the box, but there are a couple configuration options that will help
+				`logrotate` copies the old log file to a new location before
+				truncating the original. Vector also handles this well out of
+				the box, but there are a couple configuration options that help
 				reduce the very small chance of missed data in some edge cases. We
 				recommend a combination of `delaycompress` (if applicable) on the
 				`logrotate` side and including the first rotated file in Vector's
@@ -212,17 +201,22 @@ components: sources: file: {
 
 		fingerprint: {
 			title: "Fingerprinting"
-			body:  """
-				By default, Vector identifies files by running a [cyclic redundancy
-				check](\(urls.crc)) (CRC) on the first N lines of the file. This serves as a
-				*fingerprint* that uniquely identifies the file. The number of lines, N, that are
-				read can be set using the [`fingerprint.lines`](#fingerprint.lines) and
-				[`fingerprint.ignored_header_bytes`](#fingerprint.ignored_header_bytes) options. Note
-				that for compressed files, these lines and header bytes refer to the uncompressed content.
+			body: """
+				By default, Vector identifies files by computing a CRC checksum of the first 1024 bytes.
+				Configure the prefix size with [`fingerprint.bytes`](#fingerprint.bytes) and skip a fixed header
+				with [`fingerprint.ignored_header_bytes`](#fingerprint.ignored_header_bytes).
+				For gzip files, both settings refer to uncompressed content.
 
-				This strategy avoids the common pitfalls associated with using device and inode
-				names since inode names can be reused across files. This enables Vector to properly
-				tail files across various rotation strategies.
+				Files are not read until the entire configured prefix is available, and unread files
+				are not deleted by `remove_after_secs`. For completed files smaller than the default
+				1024-byte prefix, lower `fingerprint.bytes` to a size those files can reach.
+				Smaller prefixes increase the chance that different files share an identity. Identical prefixes
+				produce the same identity even at different paths, so choose a prefix that includes
+				distinctive content. Changing the size or skipped header changes file identities and can
+				cause data to be read again. Checkpoints from the earlier line-based fingerprint are not reused.
+
+				This identity remains stable when a file is renamed or appended to. It does not verify
+				that previously consumed content has not been edited.
 				"""
 		}
 
@@ -230,32 +224,25 @@ components: sources: file: {
 			title: "Globbing"
 			body:  """
 				[Globbing](\(urls.globbing)) is supported in all provided file paths,
-				files will be autodiscovered continually at a rate defined by the
-				`glob_minimum_cooldown` option.
-
-				Vector uses the Rust [`glob` crate](\(urls.glob_crate)) for pattern matching.
-				Basic glob functionality should work as expected, including multiple wildcards in a
-				single path (e.g., `/opt/nomad/data/alloc/*/alloc/logs/monitor.std*.*`) and
-				recursive directory matching with `**` (e.g., `/var/lib/kubelet/pods/**/logs/*.log`).
-				See the [glob crate documentation](\(urls.glob_crate_pattern)) for complete syntax details.
+				and files are autodiscovered continually using filesystem notifications.
 				"""
 		}
 
 		line_delimiters: {
 			title: "Line Delimiters"
 			body: """
-				Each line is read until a new line delimiter (by default, `\n` i.e.
+				Each line is read until a new line delimiter (by default, `\n`, which is
 				the `0xA` byte) or `EOF` is found. If needed, the default line
-				delimiter can be overridden via the `line_delimiter` option.
+				delimiter can be overridden with the `line_delimiter` option.
 				"""
 		}
 
 		multiline_messages: {
 			title: "Multiline Messages"
 			body: """
-				Sometimes a single log event will appear as multiple log lines. To
+				Sometimes a single log event appears as multiple log lines. To
 				handle this, Vector provides a set of `multiline` options. These
-				options were carefully thought through and will allow you to solve the
+				options were carefully thought through and allow you to solve the
 				simplest and most complex cases. Let's look at a few examples:
 				"""
 			sub_sections: [
@@ -276,7 +263,7 @@ components: sources: file: {
 
 						```toml
 						[sources.my_file_source]
-							type = "file"
+							type = "file_v2"
 							# ...
 
 							[sources.my_file_source.multiline]
@@ -287,12 +274,12 @@ components: sources: file: {
 						```
 
 						* `start_pattern`, set to `^[^\s]`, tells Vector that new
-							multi-line events should _not_ start  with white-space.
+							multiline events should _not_ start  with white space.
 						* `mode`, set to `continue_through`, tells Vector continue
 							aggregating lines until the `condition_pattern` is no longer
 							valid (excluding the invalid line).
 						* `condition_pattern`, set to `^[\s]+from`, tells Vector to
-							continue aggregating lines if they start with white-space
+							continue aggregating lines if they start with white space
 							followed by `from`.
 						"""#
 				},
@@ -313,7 +300,7 @@ components: sources: file: {
 
 						```toml
 						[sources.my_file_source]
-							type = "file"
+							type = "file_v2"
 							# ...
 
 							[sources.my_file_source.multiline]
@@ -323,7 +310,7 @@ components: sources: file: {
 								timeout_ms = 1000
 						```
 
-						* `start_pattern`, set to `\\$`, tells Vector that new multi-line
+						* `start_pattern`, set to `\\$`, tells Vector that new multiline
 							events start with lines that end in `\`.
 						* `mode`, set to `continue_past`, tells Vector continue
 							aggregating lines, plus one additional line, until
@@ -349,7 +336,7 @@ components: sources: file: {
 
 						```toml
 						[sources.my_file_source]
-						type = "file"
+						type = "file_v2"
 						# ...
 
 						[sources.my_file_source.multiline]
@@ -360,7 +347,7 @@ components: sources: file: {
 						```
 
 						* `start_pattern`, set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells
-							Vector that new multi-line events start with a timestamp
+							Vector that new multiline events start with a timestamp
 							sequence.
 						* `mode`, set to `halt_before`, tells Vector to continue
 							aggregating lines as long as the `condition_pattern` does not
@@ -384,7 +371,7 @@ components: sources: file: {
 				user. You should ensure this user has read access to the desired
 				files used as `include`. Strategies for this include:
 
-				* Create a new unix group, make it the group owner of the
+				* Create a new Unix group, make it the group owner of the
 				  target files, with read access, and  add `vector` to that
 				  group
 				* Use [POSIX ACLs](\(urls.posix_acls)) to grant access to the
@@ -395,7 +382,7 @@ components: sources: file: {
 				  Vector to read any file. This is not recommended as it gives
 				  Vector more permissions than it requires, but it is
 				  recommended over running Vector as `root` which would grant it
-				  even broader permissions. This can be granted via SystemD by
+				  even broader permissions. This can be granted through SystemD by
 				  creating an override file using `systemctl edit vector` and
 				  adding:
 
@@ -414,15 +401,49 @@ components: sources: file: {
 		read_position: {
 			title: "Read Position"
 			body: """
-				By default, Vector will read from the beginning of newly discovered
+				By default, Vector reads from the beginning of newly discovered
 				files. You can change this behavior by setting the `read_from` option to
 				`"end"`.
 
-				Previously discovered files will be [checkpointed](#checkpointing), and
-				the read position will resume from the last checkpoint. To disable this
+				Previously discovered files are [checkpointed](#checkpointing), and
+				the read position resumes from the last checkpoint. To disable this
 				behavior, you can set the `ignore_checkpoints` option to `true`.  This
 				will cause Vector to disregard existing checkpoints when determining the
 				starting read position of a file.
+				"""
+		}
+
+		async_implementation: {
+			title: "Async Implementation"
+			body: """
+				The `file_v2` source is an async implementation intended as a modern replacement
+				for the existing `file` source.
+
+				It uses the [notify-rs](https://github.com/notify-rs/notify) library for OS-level
+				notifications, with periodic glob scans to discover files if notifications are missed.
+
+				Plain files retain their open handles so Vector can continue reading writes after
+				a rename. The `reader_idle_timeout_secs` option controls retirement at EOF when
+				a file is no longer discoverable.
+				Compressed files retain their decoder and handle until the end of the stream.
+				"""
+		}
+
+		checkpointing: {
+			title: "Checkpointing"
+			body: """
+				The `file_v2` source introduces a new `checkpoint_interval` configuration option that
+				controls how frequently the current read position is saved to disk during normal operation.
+
+				Vector always saves the current read position before a proper shutdown (for example, when
+				receiving SIGINT), so data will not be reprocessed when Vector is gracefully restarted.
+
+				The `checkpoint_interval` setting only affects recovery after an abrupt termination
+				(such as SIGKILL or power loss). In such cases, Vector may reprocess up to `checkpoint_interval`
+				milliseconds worth of data from each file.
+
+				A lower value results in less data being reprocessed if Vector is terminated abruptly,
+				but increases the performance impact of checkpointing during normal operation.
 				"""
 		}
 	}

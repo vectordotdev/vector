@@ -1,0 +1,649 @@
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::Arc,
+    time::{self, Duration},
+};
+
+#[cfg(any(test, feature = "test"))]
+use bytes::Buf;
+use bytes::{Bytes, BytesMut};
+use chrono::{DateTime, Utc};
+use futures::{Future, Sink, SinkExt};
+use indexmap::IndexMap;
+#[cfg(any(test, feature = "test"))]
+use tokio::sync::mpsc;
+use tokio::{
+    fs::{self, remove_file},
+    time::timeout,
+};
+use tokio_util::task::JoinMap;
+use tracing::{debug, error, info, trace};
+
+use crate::{
+    file_watcher::{DeliveryProgress, FileIdentity, FileWatcher, RawLine, ReadResult},
+    paths_provider::{PathUpdates, PathsProvider},
+    Checkpointer, CheckpointsView, FilePosition, ReadFrom,
+};
+use file_source_common::{
+    internal_events::FileSourceInternalEvents, FileFingerprint, Fingerprinter,
+};
+
+#[cfg(any(test, feature = "test"))]
+#[derive(Debug, Clone)]
+pub enum TestEvent {
+    Checkpointed(PathBuf),
+    Read(PathBuf, Box<[u8]>),
+}
+
+// Bound each output batch across all files, including batches of empty lines.
+const MAX_BATCH_BYTES: usize = 1024 * 1024;
+const MAX_BATCH_LINES: usize = 8192;
+/// `FileServer` is a Source which schedules reads over files,
+/// converting the lines of said files into `LogLine` structures.
+///
+/// Readers retain open file handles across renames. A source-level notification
+/// watcher wakes idle reads, while periodic scans reconcile missed notifications.
+pub struct FileServer<PP, E: FileSourceInternalEvents>
+where
+    PP: PathsProvider,
+{
+    pub paths_provider: PP,
+    pub max_read_bytes: usize,
+    pub ignore_checkpoints: bool,
+    pub read_from: ReadFrom,
+    pub ignore_before: Option<DateTime<Utc>>,
+    pub max_line_bytes: usize,
+    pub line_delimiter: Bytes,
+    pub fingerprinter: Fingerprinter,
+    pub remove_after: Option<Duration>,
+    pub emitter: E,
+    pub reader_idle_timeout: Duration,
+    /// Duration after which to checkpoint files
+    pub checkpoint_interval: Duration,
+    #[cfg(not(any(test, feature = "test")))]
+    pub test_sender: Option<()>,
+    #[cfg(any(test, feature = "test"))]
+    pub test_sender: Option<mpsc::UnboundedSender<TestEvent>>,
+}
+
+/// `FileServer` as Source
+///
+/// The 'run' of `FileServer` performs the cooperative scheduling of reads over
+/// `FileServer`'s configured files. Much care has been taking to make this
+/// scheduling 'fair', meaning busy files do not drown out quiet files or vice
+/// versa but there's no one perfect approach. Very fast files _will_ be lost if
+/// your system aggressively rolls log files. `FileServer` will keep a file
+/// handler open but should your system move so quickly that a file disappears
+/// before `FileServer` is able to open it the contents will be lost. This should be a
+/// rare occurrence.
+///
+/// Specific operating systems support evented interfaces that correct this
+/// problem but your intrepid authors know of no generic solution.
+impl<PP, E> FileServer<PP, E>
+where
+    PP: PathsProvider,
+    E: FileSourceInternalEvents,
+{
+    async fn send_lines<C>(&self, chans: &mut C, lines: &mut Vec<Line>) -> Result<(), C::Error>
+    where
+        C: Sink<Vec<Line>> + Unpin,
+        C::Error: std::error::Error,
+    {
+        if lines.is_empty() {
+            return Ok(());
+        }
+        #[cfg(any(test, feature = "test"))]
+        if let Some(sender) = self.test_sender.as_ref() {
+            for line in lines.iter() {
+                debug!("sending {}", String::from_utf8_lossy(line.text.chunk()));
+                sender
+                    .send(TestEvent::Read(
+                        PathBuf::from(line.filename.clone()),
+                        line.text.chunk().into(),
+                    ))
+                    .unwrap();
+            }
+        }
+        if let Err(error) = chans.send(std::mem::take(lines)).await {
+            error!(message = "Output channel closed.", %error);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    // The first `shutdown_data` signal here is to stop this file
+    // server from outputting new data; the second
+    // `shutdown_checkpointer` is for finishing the background
+    // checkpoint writer task, which has to wait for all
+    // acknowledgements to be completed.
+    pub async fn run<C, S1, S2>(
+        mut self,
+        mut chans: C,
+        mut shutdown_data: S1,
+        shutdown_checkpointer: S2,
+        mut checkpointer: Checkpointer,
+    ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
+    where
+        C: Sink<Vec<Line>> + Unpin,
+        <C as Sink<Vec<Line>>>::Error: std::error::Error,
+        S1: Future + Unpin + Send + 'static,
+        S2: Future + Unpin + Send + 'static,
+    {
+        // Notifications provide prompt discovery; periodic glob scans reconcile
+        // files whose notifications were lost or coalesced.
+        debug!(message = "Using notify-based watching for all files");
+
+        let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
+
+        let mut lines = Vec::new();
+
+        checkpointer.read_checkpoints(self.ignore_before).await;
+
+        let mut known_small_files = HashMap::new();
+
+        let mut existing_files = Vec::new();
+
+        let paths = self.paths_provider.paths(true).await.into_paths();
+        for path in paths.into_iter() {
+            debug!(?path, "fingerprinting on startup");
+            if let Some(file_id) = self
+                .fingerprinter
+                .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
+                .await
+            {
+                existing_files.push((path, file_id));
+            }
+        }
+
+        let mut metadata_set = JoinMap::new();
+        existing_files.iter().for_each(|(path, _file_id)| {
+            metadata_set.spawn(path.clone(), fs::metadata(path.clone()))
+        });
+
+        let mut created_map: HashMap<PathBuf, DateTime<Utc>> = Default::default();
+        let now = Utc::now(); // This could be a local OnceCell
+
+        while let Some((path, result)) = metadata_set.join_next().await {
+            match result.map_err(std::io::Error::other).flatten() {
+                Ok(metadata) => {
+                    created_map.insert(
+                        path,
+                        metadata.created().map(DateTime::<Utc>::from).unwrap_or(now),
+                    );
+                }
+                Err(_err) => {
+                    // TODO: log error
+                    created_map.insert(path, now);
+                }
+            }
+        }
+
+        existing_files.sort_by(|(path_a, _), (path_b, _)| {
+            let a = created_map.get(path_a).unwrap_or(&now);
+            let b = created_map.get(path_b).unwrap_or(&now);
+            a.cmp(b)
+        });
+
+        let checkpoints = checkpointer.view();
+
+        debug!(?existing_files);
+        for (path, file_id) in existing_files {
+            // TODO parallelize?
+            self.watch_new_file(path.clone(), file_id, &mut fp_map, &checkpoints, true)
+                .await;
+
+            #[cfg(any(test, feature = "test"))]
+            if let Some(sender) = self.test_sender.as_ref() {
+                sender.send(TestEvent::Checkpointed(path.clone())).unwrap();
+            }
+        }
+        self.emitter.emit_files_open(fp_map.len());
+
+        // Spawn the checkpoint writer task with the configured interval
+        // This ensures that checkpoints are written periodically to disk
+        let checkpoint_interval = self.checkpoint_interval;
+
+        let checkpoint_task_handle = tokio::spawn(checkpoint_writer(
+            checkpointer,
+            checkpoint_interval,
+            shutdown_checkpointer,
+            self.emitter.clone(),
+        ));
+
+        let mut next_glob_time = time::Instant::now() + Duration::from_secs(1);
+        loop {
+            // Reconcile periodically even while draining a backlog. Notifications
+            // supply only affected paths between these full scans.
+            let now_time = time::Instant::now();
+            let should_discover_glob = next_glob_time <= now_time;
+
+            if should_discover_glob {
+                // Schedule the next glob time - use a fixed interval of 1 second
+                next_glob_time = now_time.checked_add(Duration::from_secs(1)).unwrap();
+            }
+
+            // Search for files to detect major file changes.
+            let updates = self.paths_provider.paths(should_discover_glob).await;
+            match &updates {
+                PathUpdates::Snapshot(paths) => {
+                    known_small_files.retain(|path, _| paths.contains(path));
+                    for watcher in fp_map.values_mut() {
+                        watcher.set_file_findable(false);
+                    }
+                }
+                PathUpdates::Changed { updated, removed }
+                    if !updated.is_empty() || !removed.is_empty() =>
+                {
+                    for watcher in fp_map.values_mut() {
+                        if updated.contains(&watcher.path) || removed.contains(&watcher.path) {
+                            watcher.set_file_findable(false);
+                        }
+                    }
+                    for path in removed {
+                        known_small_files.remove(path);
+                    }
+                }
+                PathUpdates::Changed { .. } => {}
+            }
+            let paths = updates.into_paths();
+            for path in paths.into_iter() {
+                if let Some(file_id) = self
+                    .fingerprinter
+                    .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
+                    .await
+                {
+                    if let Some(watcher) = fp_map.get_mut(&file_id) {
+                        // file fingerprint matches a watched file
+                        let was_found_this_cycle = watcher.file_findable();
+                        watcher.set_file_findable(true);
+                        if watcher.path == path {
+                            trace!(
+                                message = "Continue watching file.",
+                                path = ?path,
+                            );
+                        } else if !was_found_this_cycle {
+                            // matches a file with a different path
+                            info!(
+                                message = "Watched file has been renamed.",
+                                path = ?path,
+                                old_path = ?watcher.path
+                            );
+                            watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                        } else {
+                            info!(
+                                message = "More than one file has the same fingerprint.",
+                                path = ?path,
+                                old_path = ?watcher.path
+                            );
+                            let (old_path, new_path) = (&watcher.path, &path);
+                            if let (Ok(old_modified_time), Ok(new_modified_time)) = (
+                                fs::metadata(old_path).await.and_then(|m| m.modified()),
+                                fs::metadata(new_path).await.and_then(|m| m.modified()),
+                            ) {
+                                if old_modified_time < new_modified_time {
+                                    info!(
+                                        message = "Switching to watch most recently modified file.",
+                                        new_modified_time = ?new_modified_time,
+                                        old_modified_time = ?old_modified_time,
+                                    );
+                                    watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                }
+                            }
+                        }
+                    } else {
+                        // untracked file fingerprint
+                        // Register new files for the bounded read loop below.
+                        debug!(message = "Discovered new file during runtime", ?path);
+                        self.watch_new_file(
+                            path.clone(),
+                            file_id,
+                            &mut fp_map,
+                            &checkpoints,
+                            false,
+                        )
+                        .await;
+
+                        self.emitter.emit_files_open(fp_map.len());
+                    }
+                } else {
+                    // Fingerprinting can temporarily fail after a tracked file
+                    // shrinks below the configured prefix. Presence and content
+                    // identity are separate: retain only the matching inode.
+                    if let Ok(identity) = FileIdentity::at_path(&path).await {
+                        if let Some(watcher) = fp_map
+                            .values_mut()
+                            .find(|watcher| watcher.matches_identity(&identity))
+                        {
+                            watcher.set_file_findable(true);
+                            if watcher.path != path {
+                                watcher.update_path(path.clone()).await.ok();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Collect lines by polling files.
+            let mut batch_bytes = 0;
+            let mut made_progress = false;
+            for (&file_id, watcher) in &mut fp_map {
+                let mut bytes_read = 0;
+                let previous_position = watcher.get_file_position();
+                if watcher.check_for_truncation().await.is_ok() {
+                    if previous_position > 0 && watcher.get_file_position() == 0 {
+                        checkpoints.update(file_id, 0);
+                    }
+                    let turn_start = watcher.get_file_position();
+                    // A zero budget still permits progress on the next record.
+                    let budget = self.max_read_bytes.max(1) as u64;
+                    while watcher.get_file_position() - turn_start < budget {
+                        let remaining = budget - (watcher.get_file_position() - turn_start);
+                        let result = watcher.read_line_bounded(remaining as usize).await;
+                        if let Some(size) = watcher.take_oversized() {
+                            self.emitter.emit_file_line_too_long(
+                                &BytesMut::new(),
+                                self.max_line_bytes,
+                                size,
+                            );
+                        }
+                        let line = match result {
+                            Ok(ReadResult::Line(line)) => line,
+                            Ok(ReadResult::Discarded { start, end }) => {
+                                watcher.delivery_progress.discard(
+                                    start,
+                                    end,
+                                    file_id,
+                                    &checkpoints,
+                                );
+                                continue;
+                            }
+                            Ok(ReadResult::Yield | ReadResult::Eof) | Err(_) => break,
+                        };
+                        let sz = line.bytes.len();
+                        trace!(
+                            message = "Read bytes.",
+                            path = ?watcher.path,
+                            bytes = ?sz
+                        );
+
+                        batch_bytes += sz;
+                        made_progress = true;
+
+                        lines.push(Line::from_watcher(line, file_id, watcher));
+
+                        // Flush without restarting the file traversal or consuming
+                        // another per-file budget. A single line may exceed the cap.
+                        if batch_bytes >= MAX_BATCH_BYTES || lines.len() >= MAX_BATCH_LINES {
+                            self.send_lines(&mut chans, &mut lines).await?;
+                            batch_bytes = 0;
+                        }
+                    }
+                    bytes_read = watcher.get_file_position() - turn_start;
+                    // Partial and discarded records must keep backlog draining
+                    // without waiting for another filesystem notification.
+                    made_progress |= bytes_read > 0;
+                }
+                if watcher.should_retire(self.reader_idle_timeout) {
+                    let result = watcher.finish_partial();
+                    if let Some(size) = watcher.take_oversized() {
+                        self.emitter.emit_file_line_too_long(
+                            &BytesMut::new(),
+                            self.max_line_bytes,
+                            size,
+                        );
+                    }
+                    match result {
+                        ReadResult::Line(line) => {
+                            batch_bytes += line.bytes.len();
+                            lines.push(Line::from_watcher(line, file_id, watcher));
+                        }
+                        ReadResult::Discarded { start, end } => {
+                            watcher
+                                .delivery_progress
+                                .discard(start, end, file_id, &checkpoints);
+                        }
+                        ReadResult::Yield | ReadResult::Eof => {}
+                    }
+                    watcher.set_dead();
+                    if batch_bytes >= MAX_BATCH_BYTES || lines.len() >= MAX_BATCH_LINES {
+                        self.send_lines(&mut chans, &mut lines).await?;
+                        batch_bytes = 0;
+                    }
+                }
+
+                if bytes_read == 0 {
+                    // Should the file be removed
+                    if let Some(grace_period) = self.remove_after {
+                        if watcher.ready_to_delete(grace_period).await.unwrap_or(false) {
+                            // Try to remove
+                            match remove_file(&watcher.path).await {
+                                Ok(()) => {
+                                    self.emitter.emit_file_deleted(&watcher.path);
+                                    watcher.set_dead();
+                                }
+                                Err(error) => {
+                                    // We will try again after some time.
+                                    self.emitter.emit_file_delete_error(&watcher.path, error);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Retire missing files only after draining them and waiting for
+            // further writes. Discoverable files remain watched while idle.
+            fp_map.retain(|file_id, watcher| {
+                if watcher.dead() {
+                    self.emitter
+                        .emit_file_unwatched(&watcher.path, watcher.reached_eof());
+                    checkpoints.set_dead(*file_id);
+                    false
+                } else {
+                    true
+                }
+            });
+            self.emitter.emit_files_open(fp_map.len());
+
+            self.send_lines(&mut chans, &mut lines).await?;
+
+            let shutdown_token = tokio::select! {
+                biased;
+                token = &mut shutdown_data => Some(token),
+                _ = async {
+                    if made_progress {
+                        // Keep draining backlogs, but let other source tasks run.
+                        tokio::task::yield_now().await;
+                    } else {
+                        tokio::select! {
+                            _ = self.paths_provider.wait_for_changes() => {},
+                            _ = tokio::time::sleep_until(next_glob_time.into()) => {},
+                        }
+                    }
+                } => None,
+            };
+            if let Some(_shutdown_token) = shutdown_token {
+                // Keep the shutdown token alive until acknowledgements and the
+                // final checkpoint write have completed.
+                // Shut down all file watchers to prevent further events
+                debug!(
+                    message = "Shutting down all file watchers",
+                    count = fp_map.len()
+                );
+                fp_map.clear();
+
+                chans
+                    .close()
+                    .await
+                    .expect("error closing file_server data channel");
+                checkpoint_task_handle
+                    .await
+                    .expect("checkpoint task has was cancelled or panicked");
+                return Ok(Shutdown);
+            }
+        }
+    }
+
+    async fn watch_new_file(
+        &self,
+        path: PathBuf,
+        file_id: FileFingerprint,
+        fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
+        checkpoints: &CheckpointsView,
+        startup: bool,
+    ) {
+        // Determine the initial _requested_ starting point in the file. This can be overridden
+        // once the file is actually opened and we determine it is compressed, older than we're
+        // configured to read, etc.
+        let fallback = if startup {
+            self.read_from
+        } else {
+            // Always read new files that show up while we're running from the beginning. There's
+            // not a good way to determine if they were moved or just created and written very
+            // quickly, so just make sure we're not missing any data.
+            ReadFrom::Beginning
+        };
+
+        // Always prefer the stored checkpoint unless the user has opted out.  Previously, the
+        // checkpoint was only loaded for new files when Vector was started up, but the
+        // `kubernetes_logs` source returns the files well after start-up, once it has populated
+        // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
+        // https://github.com/vectordotdev/vector/issues/7139
+        let read_from = if !self.ignore_checkpoints {
+            checkpoints
+                .get(file_id)
+                .map(ReadFrom::Checkpoint)
+                .unwrap_or(fallback)
+        } else {
+            fallback
+        };
+
+        match FileWatcher::new(
+            path.clone(),
+            read_from,
+            self.ignore_before,
+            self.max_line_bytes,
+            self.line_delimiter.clone(),
+        )
+        .await
+        {
+            Ok(mut watcher) => {
+                if let Err(error) = watcher
+                    .capture_generation_prefix(self.fingerprinter.checksum_prefix_length())
+                    .await
+                {
+                    self.emitter.emit_file_watch_error(&path, error);
+                    return;
+                }
+                let previous_index = fp_map.values().position(|old| old.same_file(&watcher));
+                if let Some(index) = previous_index {
+                    let (old_id, previous) = fp_map.shift_remove_index(index).unwrap();
+                    if previous.same_generation(&watcher) {
+                        // A shrink was already observed and its new prefix has
+                        // only grown. Preserve reads and redirect late acknowledgements.
+                        previous
+                            .delivery_progress
+                            .rekey(old_id, file_id, checkpoints);
+                        watcher = previous;
+                        watcher.update_path(path.clone()).await.ok();
+                    } else {
+                        // A changed prefix without an observed rewind is a new
+                        // generation, even if the file regrew beyond our offset.
+                        previous.delivery_progress.failed();
+                        if let Err(error) = watcher.rewind().await {
+                            self.emitter.emit_file_watch_error(&path, error);
+                            return;
+                        }
+                        checkpoints.set_dead(old_id);
+                        checkpoints.update(file_id, 0);
+                    }
+                }
+                if let ReadFrom::Checkpoint(file_position) = read_from {
+                    self.emitter.emit_file_resumed(&path, file_position);
+                } else {
+                    self.emitter.emit_file_added(&path);
+
+                    #[cfg(any(test, feature = "test"))]
+                    if let Some(sender) = self.test_sender.as_ref() {
+                        debug!("watching {path:?}");
+                        sender.send(TestEvent::Checkpointed(path.clone())).unwrap();
+                    }
+                }
+
+                watcher.set_file_findable(true);
+                checkpoints.set_live(file_id);
+                fp_map.insert(file_id, watcher);
+            }
+            Err(error) => self.emitter.emit_file_watch_error(&path, error),
+        };
+    }
+}
+
+/// Write checkpoints to file, sleeping `sleep_duration` in between writes
+async fn checkpoint_writer(
+    checkpointer: Checkpointer,
+    sleep_duration: Duration,
+    mut shutdown: impl Future + Unpin,
+    emitter: impl FileSourceInternalEvents,
+) -> Checkpointer {
+    let mut should_shutdown = false;
+    while !should_shutdown {
+        should_shutdown = timeout(sleep_duration, &mut shutdown).await.is_ok();
+        if should_shutdown {
+            debug!("Writing checkpoints before shutdown");
+        }
+
+        let emitter = emitter.clone();
+        let start = time::Instant::now();
+        match checkpointer.write_checkpoints().await {
+            Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
+            Err(error) => {
+                if should_shutdown {
+                    error!(?error, "Error writing checkpoints before shutdown");
+                }
+                emitter.emit_file_checkpoint_write_error(error);
+            }
+        }
+    }
+
+    checkpointer
+}
+
+pub fn calculate_ignore_before(ignore_older_secs: Option<u64>) -> Option<DateTime<Utc>> {
+    ignore_older_secs.map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64))
+}
+
+/// A sentinel type to signal that file server was gracefully shut down.
+///
+/// The purpose of this type is to clarify the semantics of the result values
+/// returned from the [`FileServer::run`] for both the users of the file server,
+/// and the implementors.
+#[derive(Debug)]
+pub struct Shutdown;
+
+#[derive(Debug)]
+pub struct Line {
+    pub text: Bytes,
+    pub filename: String,
+    pub file_id: FileFingerprint,
+    pub start_offset: FilePosition,
+    pub end_offset: FilePosition,
+    pub delivery_progress: Arc<DeliveryProgress>,
+}
+
+#[cfg(test)]
+mod tests;
+
+impl Line {
+    fn from_watcher(line: RawLine, file_id: FileFingerprint, watcher: &FileWatcher) -> Self {
+        Self {
+            text: line.bytes,
+            filename: watcher.path.to_string_lossy().into_owned(),
+            file_id,
+            start_offset: line.offset,
+            end_offset: watcher.get_file_position(),
+            delivery_progress: watcher.delivery_progress.clone(),
+        }
+    }
+}

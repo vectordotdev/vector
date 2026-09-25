@@ -1,6 +1,6 @@
 package metadata
 
-generated: components: sources: file: configuration: {
+generated: components: sources: file_v2: configuration: {
 	acknowledgements: {
 		deprecated: true
 		description: """
@@ -17,6 +17,25 @@ generated: components: sources: file: configuration: {
 			"""
 		required: false
 		type:     _schemaDefinitions["vector_core::config::SourceAcknowledgementsConfig"]
+	}
+	checkpoint_interval: {
+		description: """
+			The interval between writing the current read position to disk during normal operation.
+
+			This controls how frequently the current read position is saved to disk during normal operation.
+			Vector always saves the current read position before a proper shutdown (for example, when receiving
+			SIGINT), so data will not be reprocessed when Vector is gracefully restarted.
+			This setting only affects recovery after an abrupt termination (such as SIGKILL or power loss).
+			In such cases, Vector may reprocess up to `checkpoint_interval` seconds worth of data from each file.
+			A lower value results in less data being reprocessed if Vector is terminated abruptly,
+			but increases the performance impact of checkpointing during normal operation.
+			"""
+		required: false
+		type: uint: {
+			default: 500
+			examples: [500, 1000, 2000, 5000]
+			unit: "milliseconds"
+		}
 	}
 	data_dir: {
 		description: """
@@ -55,7 +74,7 @@ generated: components: sources: file: configuration: {
 		description: """
 			Overrides the name of the log field used to add the file path to each event.
 
-			The value is the full path to the file where the event was read message.
+			The value is the full path to the file where the event was a read message.
 
 			Set to `""` to suppress this key.
 			"""
@@ -75,6 +94,22 @@ generated: components: sources: file: configuration: {
 			"""
 		required: false
 		type: object: options: {
+			bytes: {
+				description: """
+					The number of bytes used to generate the checksum after skipping `ignored_header_bytes`.
+
+					Defaults to 1024. Must be greater than zero. Files are not read until this many bytes
+					are available. For gzip files, this refers to the uncompressed content.
+					Files with identical prefixes have the same identity even when their paths differ.
+					Changing this value changes file identities and can cause previously read data to be replayed.
+					"""
+				relevant_when: "strategy = \"checksum\""
+				required:      false
+				type: uint: {
+					default: 1024
+					unit:    "bytes"
+				}
+			}
 			ignored_header_bytes: {
 				description: """
 					The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
@@ -90,22 +125,6 @@ generated: components: sources: file: configuration: {
 					unit:    "bytes"
 				}
 			}
-			lines: {
-				description: """
-					The number of lines to read for generating the checksum.
-
-					The number of lines are determined from the uncompressed content if the file is compressed. Only
-					gzip is supported at this time.
-
-					If the file has less than this amount of lines, it won’t be read at all.
-					"""
-				relevant_when: "strategy = \"checksum\""
-				required:      false
-				type: uint: {
-					default: 1
-					unit:    "lines"
-				}
-			}
 			strategy: {
 				description: """
 					The strategy used to uniquely identify files.
@@ -116,7 +135,7 @@ generated: components: sources: file: configuration: {
 				type: string: {
 					default: "checksum"
 					enum: {
-						checksum: "Read lines from the beginning of the file and compute a checksum over them."
+						checksum: "Read a fixed number of bytes from the beginning of the file and compute a checksum over them."
 						device_and_inode: """
 															Use the [device and inode][inode] as the identifier.
 
@@ -125,20 +144,6 @@ generated: components: sources: file: configuration: {
 					}
 				}
 			}
-		}
-	}
-	glob_minimum_cooldown_ms: {
-		description: """
-			The delay between file discovery calls.
-
-			This controls the interval at which files are searched. A higher value results in greater
-			chances of some short-lived files being missed between searches, but a lower value increases
-			the performance impact of file discovery.
-			"""
-		required: false
-		type: uint: {
-			default: 1000
-			unit:    "milliseconds"
 		}
 	}
 	host_key: {
@@ -217,14 +222,13 @@ generated: components: sources: file: configuration: {
 	max_read_bytes: {
 		description: """
 			Max amount of bytes to read from a single file before switching over to the next file.
-			**Note:** This does not apply when `oldest_first` is `true`.
 
 			This allows distributing the reads more or less evenly across
 			the files.
 			"""
 		required: false
 		type: uint: {
-			default: 2048
+			default: 65536
 			unit:    "bytes"
 		}
 	}
@@ -250,11 +254,6 @@ generated: components: sources: file: configuration: {
 			"offset"
 		]
 	}
-	oldest_first: {
-		description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from more recent files."
-		required:    false
-		type: bool: default: false
-	}
 	read_from: {
 		description: "File position to use when reading a new file."
 		required:    false
@@ -266,9 +265,29 @@ generated: components: sources: file: configuration: {
 			}
 		}
 	}
+	reader_idle_timeout_secs: {
+		description: """
+			How long to retain an idle reader for a file no longer matched by `include`.
+
+			The timeout starts at EOF after the file becomes undiscoverable. Reading new
+			bytes resets it, including bytes of an incomplete record. Readers still
+			draining data and files that remain discoverable are not retired by this timeout.
+			Writes made after the reader closes cannot be collected unless the file is discovered again.
+			"""
+		required: false
+		type: uint: {
+			default: 30
+			unit:    "seconds"
+		}
+	}
 	remove_after_secs: {
 		description: """
-			After reaching EOF, the number of seconds to wait before removing the file, unless new data is written.
+			The minimum idle period in seconds before deleting a fully consumed file.
+
+			Deletion requires EOF with no partial record, unchanged file identity and size, and
+			delivery of all records. With acknowledgements enabled, delivery means acknowledged
+			by downstream components; otherwise it means handed to the source output.
+			Files too small to fingerprint are never deleted. Lower `fingerprint.bytes` if needed.
 
 			If not specified, files are not removed.
 			"""
@@ -276,17 +295,6 @@ generated: components: sources: file: configuration: {
 		type: uint: {
 			examples: [0, 5, 60]
 			unit: "seconds"
-		}
-	}
-	rotate_wait_secs: {
-		description: """
-			How long to keep an open handle to a rotated log file.
-			The default value represents "no limit"
-			"""
-		required: false
-		type: uint: {
-			default: 9223372036854775807
-			unit:    "seconds"
 		}
 	}
 }

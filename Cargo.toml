@@ -39,6 +39,11 @@ name = "vector_api"
 path = "tests/vector_api/lib.rs"
 required-features = ["vector-api-tests"]
 
+[[test]]
+name = "file_v2"
+path = "tests/file_v2/lib.rs"
+required-features = ["file_v2-tests"]
+
 [profile.release]
 debug = false # Do not include debug symbols in the executable.
 codegen-units = 1
@@ -105,6 +110,7 @@ members = [
   "lib/fakedata",
   "lib/file-source",
   "lib/file-source-common",
+  "lib/file-v2-source",
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
   "lib/loki-logproto",
@@ -714,6 +720,7 @@ sources-logs = [
   "sources-docker_logs",
   "sources-exec",
   "sources-file",
+  "sources-file_v2",
   "sources-fluent",
   "sources-gcp_pubsub",
   "sources-heroku_logs",
@@ -768,7 +775,8 @@ sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:dnsmsg-parser", "d
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
-sources-file = ["vector-lib/file-source"]
+sources-file = ["vector-lib/file-source", "vector-lib/file-source-common"]
+sources-file_v2 = ["vector-lib/file-v2-source", "vector-lib/file-source-common"]
 sources-file_descriptor = ["tokio-util/io"]
 sources-fluent = ["dep:base64", "sources-utils-net-tcp", "sources-utils-net-unix", "tokio-util/net", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sources-gcp_pubsub = ["gcp", "dep:h2", "dep:prost", "dep:prost-types", "protobuf-build", "dep:tonic"]
@@ -781,7 +789,7 @@ sources-internal_metrics = []
 sources-static_metrics = []
 sources-journald = []
 sources-kafka = ["dep:rdkafka"]
-sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
+sources-kubernetes_logs = ["vector-lib/file-source", "vector-lib/file-source-common", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-mqtt = ["dep:rumqttc"]
@@ -1040,6 +1048,7 @@ all-integration-tests = [
   "greptimedb-integration-tests",
   "http-client-integration-tests",
   "humio-integration-tests",
+  "file_v2-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
   "logstash-integration-tests",
@@ -1154,6 +1163,13 @@ e2e-tests-opentelemetry = [
   "sinks-file",
   "codecs-opentelemetry",
   "dep:prost-reflect"
+]
+
+file_v2-tests = [
+  "sources-file_v2",
+  "sources-internal_metrics",
+  "transforms-filter",
+  "sinks-console"
 ]
 
 vector-api-tests = [

@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io::{ErrorKind, Result, SeekFrom},
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     time,
 };
@@ -18,7 +19,7 @@ use crate::{
     AsyncFileInfo, internal_events::FileSourceInternalEvents, metadata_ext::PortableFileExt,
 };
 
-const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
+pub const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 
 #[derive(Debug, Clone)]
 pub struct Fingerprinter {
@@ -45,6 +46,10 @@ impl ResizeSlice<u8> for Vec<u8> {
 
 #[derive(Debug, Clone)]
 pub enum FingerprintStrategy {
+    FirstBytesChecksum {
+        ignored_header_bytes: usize,
+        bytes: NonZeroUsize,
+    },
     FirstLinesChecksum {
         ignored_header_bytes: usize,
         lines: usize,
@@ -57,6 +62,7 @@ pub enum FingerprintStrategy {
 pub enum FileFingerprint {
     #[serde(alias = "first_line_checksum")]
     FirstLinesChecksum(u64),
+    FirstBytesChecksum(u64),
     DevInode(u64, u64),
 }
 
@@ -175,11 +181,34 @@ impl Fingerprinter {
         }
     }
 
+    /// Bytes that establish a byte-checksum identity, including its skipped header.
+    #[must_use]
+    pub fn checksum_prefix_length(&self) -> Option<usize> {
+        match self.strategy {
+            FingerprintStrategy::FirstBytesChecksum {
+                ignored_header_bytes,
+                bytes,
+            } => Some(ignored_header_bytes.saturating_add(bytes.get())),
+            _ => None,
+        }
+    }
+
     /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
     pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
-        use FileFingerprint::{DevInode, FirstLinesChecksum};
+        use FileFingerprint::{DevInode, FirstBytesChecksum, FirstLinesChecksum};
 
         match self.strategy {
+            FingerprintStrategy::FirstBytesChecksum {
+                ignored_header_bytes,
+                bytes,
+            } => {
+                let buffer = self.buffer.resize_slice_mut(bytes.get());
+                let mut fp = File::open(path).await?;
+                let mut reader = UncompressedReaderImpl::reader(&mut fp).await?;
+                skip_first_n_bytes(&mut reader, ignored_header_bytes).await?;
+                reader.read_exact(buffer).await?;
+                Ok(FirstBytesChecksum(FINGERPRINT_CRC.checksum(buffer)))
+            }
             FingerprintStrategy::DevInode => {
                 let file_handle = File::open(path).await?;
                 let file_info = file_handle.file_info().await?;
@@ -289,7 +318,7 @@ mod test {
     use bytes::BytesMut;
     use tempfile::{TempDir, tempdir};
 
-    use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+    use crate::{FingerprintStrategy, Fingerprinter, internal_events::FileSourceInternalEvents};
 
     use tokio::io::AsyncReadExt;
 
@@ -299,6 +328,51 @@ mod test {
         let mut out = Vec::new();
         encoder.read_to_end(&mut out).await.expect("Failed to read");
         out
+    }
+
+    #[tokio::test]
+    async fn byte_fingerprint_uses_exact_decompressed_prefix() {
+        use super::{FileFingerprint, NonZeroUsize};
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("plain.log");
+        let compressed = dir.path().join("compressed.log.gz");
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstBytesChecksum {
+                ignored_header_bytes: 4,
+                bytes: NonZeroUsize::new(8).unwrap(),
+            },
+            2, // Byte fingerprint size must be independent of max_line_bytes.
+            false,
+        );
+        for short in ["", "hdr", "hdr!same\nA"] {
+            fs::write(&path, short).unwrap();
+            let result = tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                fingerprinter.fingerprint(&path),
+            )
+            .await
+            .expect("an incomplete header must not loop forever");
+            assert_eq!(
+                result.unwrap_err().kind(),
+                std::io::ErrorKind::UnexpectedEof
+            );
+        }
+        let contents = b"hdr!same\nABCtail";
+        fs::write(&path, contents).unwrap();
+        let original = fingerprinter.fingerprint(&path).await.unwrap();
+        assert!(matches!(original, FileFingerprint::FirstBytesChecksum(_)));
+        fs::write(&compressed, gzip(contents).await).unwrap();
+        assert_eq!(
+            original,
+            fingerprinter.fingerprint(&compressed).await.unwrap()
+        );
+        // A different skipped header and appended data do not change identity.
+        fs::write(&path, b"xxxxsame\nABCother tail").unwrap();
+        assert_eq!(original, fingerprinter.fingerprint(&path).await.unwrap());
+        // A difference after the first newline, but inside the prefix, does.
+        fs::write(&path, b"hdr!same\nABDtail").unwrap();
+        assert_ne!(original, fingerprinter.fingerprint(&path).await.unwrap());
     }
     fn read_byte_content(target_dir: &TempDir, file: &str) -> Vec<u8> {
         use std::{fs::File, io::Read};

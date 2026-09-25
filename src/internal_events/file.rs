@@ -14,7 +14,11 @@ use vector_lib::{
 
 use crate::sinks::util::path_confinement::ConfineError;
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-file_v2",
+    feature = "sources-kubernetes_logs"
+))]
 pub use self::source::*;
 
 /// Configuration of internal metrics for file-based components.
@@ -138,7 +142,11 @@ impl InternalEvent for FilePathOutsideBaseDirError<'_> {
     }
 }
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-file_v2",
+    feature = "sources-kubernetes_logs"
+))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 

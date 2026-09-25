@@ -1,3 +1,5 @@
+pub mod bounded;
+
 use crate::FilePosition;
 use std::{cmp::min, io};
 
