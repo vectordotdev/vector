@@ -34,6 +34,8 @@ pub(super) struct Observed {
     pub(super) messages: Vec<String>,
     pub(super) received_events: f64,
     pub(super) open_files: Option<f64>,
+    pub(super) oversized_errors: f64,
+    pub(super) discarded_events: f64,
 }
 
 impl Observed {
@@ -46,6 +48,18 @@ impl Observed {
                 || event["tags"]["component_kind"] != "source"
             {
                 return Err(format!("metric from an unexpected component: {event}").into());
+            }
+            if event["name"] == "component_errors_total"
+                && event["tags"]["error_code"] == "reading_line_from_file"
+            {
+                self.oversized_errors = event["counter"]["value"]
+                    .as_f64()
+                    .ok_or("missing error count")?;
+            }
+            if event["name"] == "component_discarded_events_total" {
+                self.discarded_events = event["counter"]["value"]
+                    .as_f64()
+                    .ok_or("missing discard count")?;
             }
             if event["name"] == "open_files" {
                 self.open_files = event["gauge"]["value"].as_f64();

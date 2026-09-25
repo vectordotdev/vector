@@ -332,8 +332,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 pub(crate) struct FinalizerEntry {
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
-    pub(crate) delivery_progress:
-        Option<std::sync::Arc<vector_lib::file_v2_source::DeliveryProgress>>,
+    pub(crate) delivery_progress: std::sync::Arc<vector_lib::file_v2_source::DeliveryProgress>,
 }
 
 impl Default for FileConfig {
@@ -371,6 +370,9 @@ impl_generate_config_from_default!(FileConfig);
 #[typetag::serde(name = "file_v2")]
 impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        if self.checkpoint_interval.is_zero() {
+            return Err("`checkpoint_interval` must be greater than zero".into());
+        }
         if self.line_delimiter.is_empty() {
             return Err("`line_delimiter` must not be empty".into());
         }
@@ -629,14 +631,12 @@ pub fn file_v2_source(
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
-                    if let Some(progress) = entry.delivery_progress {
-                        progress.checkpoint(&checkpoints, entry.file_id, entry.offset);
-                    } else {
-                        checkpoints.update(entry.file_id, entry.offset);
-                    }
-                } else if let Some(progress) = entry.delivery_progress {
+                    entry
+                        .delivery_progress
+                        .checkpoint(&checkpoints, entry.file_id, entry.offset);
+                } else {
                     // A later success must not checkpoint past or authorize deleting a failed record.
-                    progress.failed();
+                    entry.delivery_progress.failed();
                 }
             }
             send_shutdown.send(())
@@ -712,15 +712,12 @@ pub fn file_v2_source(
                 let entry = FinalizerEntry {
                     file_id: line.file_id,
                     offset: line.end_offset,
-                    delivery_progress: line.delivery_progress.clone(),
+                    delivery_progress: std::sync::Arc::clone(&line.delivery_progress),
                 };
                 finalizer.add(entry, receiver);
             } else if !track_handoff {
-                if let Some(progress) = &line.delivery_progress {
-                    progress.checkpoint(&checkpoints, line.file_id, line.end_offset);
-                } else {
-                    checkpoints.update(line.file_id, line.end_offset);
-                }
+                line.delivery_progress
+                    .checkpoint(&checkpoints, line.file_id, line.end_offset);
             }
             (event, line.file_id, line.delivery_progress, line.end_offset)
         });
@@ -744,11 +741,7 @@ pub fn file_v2_source(
                             return Err(error);
                         }
                         for (file_id, progress, offset) in progress {
-                            if let Some(progress) = progress {
-                                progress.checkpoint(&handoff_checkpoints, file_id, offset);
-                            } else {
-                                handoff_checkpoints.update(file_id, offset);
-                            }
+                            progress.checkpoint(&handoff_checkpoints, file_id, offset);
                         }
                     }
                     Ok(())
@@ -799,8 +792,11 @@ fn wrap_with_line_agg(
     Box::new(
         LineAgg::new(
             rx.map(|line| {
+                // Buffered contexts retain the Arc, so this address cannot be
+                // reused while an aggregate for that reader generation exists.
+                let generation = std::sync::Arc::as_ptr(&line.delivery_progress) as usize;
                 (
-                    line.filename,
+                    (line.filename, generation),
                     line.text,
                     (
                         line.file_id,
@@ -813,7 +809,12 @@ fn wrap_with_line_agg(
             logic,
         )
         .map(
-            |(filename, text, (file_id, start_offset, initial_end, progress), lastline_context)| {
+            |(
+                (filename, _),
+                text,
+                (file_id, start_offset, initial_end, progress),
+                lastline_context,
+            )| {
                 let (_, _, end_offset, delivery_progress) =
                     lastline_context.unwrap_or((file_id, start_offset, initial_end, progress));
                 Line {
@@ -1052,9 +1053,9 @@ mod tests {
                     assert_eq!(tags.get("component_kind"), Some("source"));
                     assert_eq!(tags.get("component_type"), Some("file_v2"));
                     let raw = metric.name() == "component_received_bytes_total";
-                    let path = tags.get(if raw { "file_v2" } else { "file" });
+                    let path = tags.get("file");
                     assert_eq!(tags.get("protocol"), raw.then_some("file_v2"));
-                    assert_eq!(tags.get(if raw { "file" } else { "file_v2" }), None);
+                    assert_eq!(tags.get("file_v2"), None);
                     let (bytes, events) = if tagged {
                         match path {
                             Some("a.log") => (16, 3),
@@ -1297,6 +1298,28 @@ mod tests {
 
     async fn sleep_millis(millis: u64) {
         sleep(Duration::from_millis(millis)).await;
+    }
+
+    #[tokio::test]
+    async fn rejects_zero_checkpoint_interval() {
+        let dir = tempdir().unwrap();
+        let config = FileConfig {
+            checkpoint_interval: Duration::ZERO,
+            ..test_default_file_config(&dir)
+        };
+        let (sender, _receiver) = SourceSender::new_test();
+        let result = config.build(SourceContext::new_test(sender, None)).await;
+        assert!(
+            result.is_err(),
+            "zero interval must fail source construction"
+        );
+        assert!(
+            result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("checkpoint_interval")
+        );
     }
 
     #[tokio::test]
@@ -2607,6 +2630,104 @@ mod tests {
                 "to be INFO in\nthe middle".into(),
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn multiline_rotation_keeps_records_and_checkpoint_identities_separate() {
+        assert_multiline_generations(false).await;
+    }
+
+    #[tokio::test]
+    async fn multiline_truncation_keeps_generations_with_the_same_fingerprint_separate() {
+        assert_multiline_generations(true).await;
+    }
+
+    #[tokio::test]
+    async fn multiline_rekey_preserves_an_existing_generation() {
+        use std::sync::Arc;
+        use vector_lib::file_v2_source::{DeliveryProgress, FileFingerprint};
+        let progress = Arc::new(DeliveryProgress::new(0));
+        let lines = [
+            Line {
+                text: Bytes::from_static(b"INFO message"),
+                filename: "active.log".into(),
+                file_id: FileFingerprint::FirstBytesChecksum(1),
+                start_offset: 0,
+                end_offset: 13,
+                delivery_progress: Arc::clone(&progress),
+            },
+            Line {
+                text: Bytes::from_static(b" tail"),
+                filename: "active.log".into(),
+                file_id: FileFingerprint::FirstBytesChecksum(2),
+                start_offset: 13,
+                end_offset: 19,
+                delivery_progress: Arc::clone(&progress),
+            },
+        ];
+        let config = line_agg::Config {
+            start_pattern: regex::bytes::Regex::new("^INFO").unwrap(),
+            condition_pattern: regex::bytes::Regex::new("^ ").unwrap(),
+            mode: line_agg::Mode::ContinueThrough,
+            timeout: Duration::from_secs(60),
+        };
+        let output = wrap_with_line_agg(futures::stream::iter(lines), config)
+            .collect::<Vec<_>>()
+            .await;
+        assert_eq!(output.len(), 1);
+        assert_eq!(output[0].text, "INFO message\n tail");
+        assert_eq!(output[0].end_offset, 19);
+        assert!(Arc::ptr_eq(&output[0].delivery_progress, &progress));
+    }
+
+    async fn assert_multiline_generations(same_fingerprint: bool) {
+        use std::sync::Arc;
+        use vector_lib::file_v2_source::{DeliveryProgress, FileFingerprint};
+        let old_id = FileFingerprint::FirstBytesChecksum(1);
+        let new_id = if same_fingerprint {
+            old_id
+        } else {
+            FileFingerprint::FirstBytesChecksum(2)
+        };
+        let old_progress = Arc::new(DeliveryProgress::new(0));
+        let new_progress = Arc::new(DeliveryProgress::new(0));
+        let line =
+            |file_id, progress: &Arc<DeliveryProgress>, text: &'static str, start_offset| Line {
+                text: Bytes::from_static(text.as_bytes()),
+                filename: "/logs/active.log".into(),
+                file_id,
+                start_offset,
+                end_offset: start_offset + text.len() as u64 + 1,
+                delivery_progress: Arc::clone(progress),
+            };
+        let input = futures::stream::iter([
+            line(old_id, &old_progress, "INFO old", 0),
+            line(new_id, &new_progress, "INFO new", 0),
+            line(old_id, &old_progress, " old tail", 9),
+            line(new_id, &new_progress, " new tail", 9),
+        ]);
+        let config = line_agg::Config {
+            start_pattern: regex::bytes::Regex::new("^INFO").unwrap(),
+            condition_pattern: regex::bytes::Regex::new("^ ").unwrap(),
+            mode: line_agg::Mode::ContinueThrough,
+            timeout: Duration::from_secs(60),
+        };
+        let output = wrap_with_line_agg(input, config).collect::<Vec<_>>().await;
+        assert_eq!(output.len(), 2);
+        for (id, progress, expected) in [
+            (old_id, old_progress, "INFO old\n old tail"),
+            (new_id, new_progress, "INFO new\n new tail"),
+        ] {
+            let line = output
+                .iter()
+                .find(|line| Arc::ptr_eq(&line.delivery_progress, &progress))
+                .expect("missing file generation");
+            assert_eq!(line.file_id, id);
+            assert_eq!(line.text.as_ref(), expected.as_bytes());
+            assert_eq!(line.filename, "/logs/active.log");
+            assert_eq!(line.start_offset, 0);
+            assert_eq!(line.end_offset, 19);
+        }
     }
 
     #[tokio::test]
