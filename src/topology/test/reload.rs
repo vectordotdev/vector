@@ -122,10 +122,14 @@ async fn topology_old() {
     old_config.add_sink("out", &["in"], basic_sink(1).1);
 
     let (mut topology, _) = start_topology(old_config.clone().build().unwrap(), false).await;
-    topology
+    let reloaded = topology
         .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
         .await
         .unwrap();
+    assert!(
+        !reloaded,
+        "reloading an identical config should skip component rebuild"
+    );
 }
 
 #[tokio::test]
@@ -314,10 +318,14 @@ async fn topology_reload_component() {
 
     topology.extend_reload_set(HashSet::from_iter(vec![ComponentKey::from("out")]));
 
-    topology
+    let reloaded = topology
         .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
         .await
         .unwrap();
+    assert!(
+        reloaded,
+        "forced reload set should rebuild components even when config is unchanged"
+    );
 
     // TODO: Implement notification to avoid the sleep()
     // Give the old topology configuration a chance to shutdown cleanly, etc.
