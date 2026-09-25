@@ -350,8 +350,12 @@ impl MetricGroupSet {
         {
             base
         } else {
-            self.0
-                .insert(name.into(), GroupKind::new(MetricKind::Untyped));
+            let kind = if name.ends_with("_total") {
+                MetricKind::Counter
+            } else {
+                MetricKind::Untyped
+            };
+            self.0.insert(name.into(), GroupKind::new(kind));
             name
         };
         self.0.get_full_mut(name).unwrap()
@@ -850,6 +854,52 @@ mod test {
     }
 
     #[test]
+    fn parse_request_counter() {
+        let request = write_request!(
+            ["requests_total" = Counter],
+            [[__name__ => "requests_total"] => [12 @ 1395066367600]]
+        );
+        assert_eq!(request.metadata.len(), 1);
+        assert_eq!(request.metadata[0].metric_family_name, "requests_total");
+        assert_eq!(
+            request.metadata[0].r#type,
+            proto::MetricType::Counter as i32
+        );
+
+        let parsed = parse_request(request, MetadataConflictStrategy::Ignore).unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066367600), labels!(), 12.0)
+            );
+        });
+    }
+
+    #[test]
+    fn parse_request_counter_from_total_suffix() {
+        let parsed = parse_request(
+            write_request!(
+                [],
+                [[__name__ => "requests_total"] => [12 @ 1395066367600]]
+            ),
+            MetadataConflictStrategy::Ignore,
+        )
+        .unwrap();
+
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "requests_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066367600), labels!(), 12.0)
+            );
+        });
+    }
+
+    #[test]
     fn parse_request_histogram() {
         let parsed = parse_request(
             write_request!(
@@ -885,7 +935,7 @@ mod test {
                     })
             );
         });
-        match_group!(parsed[1], "one_total", Untyped => |metrics: &MetricMap<SimpleMetric>| {
+        match_group!(parsed[1], "one_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
         });
@@ -927,7 +977,7 @@ mod test {
                     })
             );
         });
-        match_group!(parsed[1], "one_total", Untyped => |metrics: &MetricMap<SimpleMetric>| {
+        match_group!(parsed[1], "one_total", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
         });
