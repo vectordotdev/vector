@@ -22,7 +22,7 @@ use tokio_util::task::JoinMap;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    file_watcher::{DeletionProgress, FileWatcher},
+    file_watcher::{DeliveryProgress, FileWatcher},
     paths_provider::{PathUpdates, PathsProvider},
     Checkpointer, CheckpointsView, FilePosition, ReadFrom,
 };
@@ -58,8 +58,9 @@ where
     pub line_delimiter: Bytes,
     pub fingerprinter: Fingerprinter,
     pub remove_after: Option<Duration>,
+    pub acknowledgements: bool,
     pub emitter: E,
-    pub rotate_wait: Duration,
+    pub reader_idle_timeout: Duration,
     /// Duration after which to checkpoint files
     pub checkpoint_interval: Duration,
     #[cfg(not(any(test, feature = "test")))]
@@ -354,7 +355,14 @@ where
                 let mut bytes_read = 0;
                 if watcher.check_for_truncation().await.is_ok() {
                     let turn_start = watcher.get_file_position();
-                    while let Ok(Some(line)) = watcher.read_line().await {
+                    // A zero budget still permits progress on the next record.
+                    let budget = self.max_read_bytes.max(1) as u64;
+                    while watcher.get_file_position() - turn_start < budget {
+                        let remaining = budget - (watcher.get_file_position() - turn_start);
+                        let Ok(Some(line)) = watcher.read_line_bounded(remaining as usize).await
+                        else {
+                            break;
+                        };
                         let sz = line.bytes.len();
                         trace!(
                             message = "Read bytes.",
@@ -363,9 +371,6 @@ where
                         );
                         stats.record_bytes(sz);
 
-                        // Include delimiters and discarded bytes in the file's
-                        // turn budget so empty records cannot monopolize reads.
-                        bytes_read = watcher.get_file_position() - turn_start;
                         batch_bytes += sz;
                         made_progress = true;
 
@@ -375,7 +380,7 @@ where
                             file_id,
                             start_offset: line.offset,
                             end_offset: watcher.get_file_position(),
-                            deletion_progress: watcher.deletion_progress.clone(),
+                            delivery_progress: watcher.delivery_progress.clone(),
                         });
 
                         // Flush without restarting the file traversal or consuming
@@ -386,11 +391,11 @@ where
                             batch_bytes = 0;
                             start = time::Instant::now();
                         }
-
-                        if bytes_read > self.max_read_bytes as u64 {
-                            break;
-                        }
                     }
+                    bytes_read = watcher.get_file_position() - turn_start;
+                    // Partial and discarded records must keep backlog draining
+                    // without waiting for another filesystem notification.
+                    made_progress |= bytes_read > 0;
                 }
                 stats.record("reading", start.elapsed());
 
@@ -414,10 +419,10 @@ where
                 }
             }
 
-            // A FileWatcher is dead when the underlying file has disappeared.
-            // If the FileWatcher is dead we don't retain it; it will be deallocated.
+            // Retire missing files only after draining them and waiting for
+            // further writes. Discoverable files remain watched while idle.
             fp_map.retain(|file_id, watcher| {
-                if !watcher.file_findable() && watcher.last_seen().elapsed() > self.rotate_wait {
+                if watcher.should_retire(self.reader_idle_timeout) {
                     watcher.set_dead();
                 }
                 if watcher.dead() {
@@ -537,8 +542,8 @@ where
                     }
                 }
 
-                if self.remove_after.is_some() {
-                    watcher.enable_deletion(match read_from {
+                if self.acknowledgements || self.remove_after.is_some() {
+                    watcher.enable_delivery_tracking(match read_from {
                         ReadFrom::Checkpoint(offset) => Some(offset),
                         _ => None,
                     });
@@ -662,5 +667,5 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: FilePosition,
     pub end_offset: FilePosition,
-    pub deletion_progress: Option<Arc<DeletionProgress>>,
+    pub delivery_progress: Option<Arc<DeliveryProgress>>,
 }

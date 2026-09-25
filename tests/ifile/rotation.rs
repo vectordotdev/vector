@@ -167,3 +167,85 @@ async fn rotation_discovers_replacement_while_draining_backlog() -> vector::Resu
     assert_eq!(new, replacement);
     Ok(())
 }
+
+#[tokio::test]
+async fn missing_readers_retire_after_late_writes_go_idle() -> vector::Result<()> {
+    for unlink in [true, false] {
+        let fixture = Fixture::new()?;
+        let mut expected = records("initial", 1);
+        fixture.write("active.log", &expected)?;
+        let path = fixture.input.join("active.log");
+        let mut writer = OpenOptions::new().append(true).open(&path)?;
+        let mut run = fixture.start("*.log", json!({"reader_idle_timeout_secs": 1}))?;
+        run.wait_count(1).await?;
+        if unlink {
+            std::fs::remove_file(&path)?;
+        } else {
+            std::fs::rename(&path, fixture.input.join("rotated.1"))?;
+        }
+        // Keep the writer open beyond the initial timeout. Each consumed append
+        // must restart the grace period, including for an unlinked inode.
+        for index in 0..5 {
+            tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+            let late = records(&format!("late-{index}"), 1);
+            writer.write_all(lines(&late).as_bytes())?;
+            writer.sync_all()?;
+            expected.extend(late);
+            run.wait_count(expected.len()).await?;
+        }
+        run.wait_for("idle missing reader released", |seen| {
+            seen.open_files == Some(0.0)
+        })
+        .await?;
+        // Keeping the writer open must not prevent Vector retiring its reader.
+        assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn zero_idle_timeout_drains_missing_backlog() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    let expected = records("drain-before-retirement", 10000);
+    fixture.write("active.log", &expected)?;
+    let mut run = fixture.start(
+        "*.log",
+        json!({
+            "reader_idle_timeout_secs": 0, "max_read_bytes": 64
+        }),
+    )?;
+    run.wait_for("first backlog record", |seen| !seen.messages.is_empty())
+        .await?;
+    std::fs::remove_file(fixture.input.join("active.log"))?;
+    run.wait_count(expected.len()).await?;
+    run.wait_for("drained reader released", |seen| {
+        seen.open_files == Some(0.0)
+    })
+    .await?;
+    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
+    Ok(())
+}
+
+#[tokio::test]
+async fn repeated_unlinks_release_readers_but_discoverable_files_stay_open() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    let mut run = fixture.start("*.log", json!({"reader_idle_timeout_secs": 0}))?;
+    run.wait_for("empty source", |seen| seen.open_files == Some(0.0))
+        .await?;
+    let mut expected = Vec::new();
+    for index in 0..5 {
+        let added = records(&format!("cycle-{index}"), 1);
+        fixture.write("active.log", &added)?;
+        expected.extend(added);
+        run.wait_count(expected.len()).await?;
+        run.wait_for("discoverable reader", |seen| seen.open_files == Some(1.0))
+            .await?;
+        std::fs::remove_file(fixture.input.join("active.log"))?;
+        run.wait_for("deleted reader released", |seen| {
+            seen.open_files == Some(0.0)
+        })
+        .await?;
+    }
+    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
+    Ok(())
+}
