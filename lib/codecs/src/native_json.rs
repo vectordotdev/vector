@@ -1,10 +1,13 @@
 use std::sync::LazyLock;
 
 use chrono::{TimeZone, Utc};
+use http::HeaderValue;
 use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, ReflectMessage, Value};
 use vector_core::event::{Event, proto};
 
 const SOURCE_EVENT_ID_BYTES: usize = 16;
+// Match the maximum container nesting accepted by serde_json's default decoder.
+const MAX_JSON_EVENT_DEPTH: usize = 127;
 
 static DESCRIPTOR_POOL: LazyLock<DescriptorPool> =
     LazyLock::new(
@@ -31,14 +34,17 @@ static NATIVE_JSON_DESCRIPTOR: LazyLock<MessageDescriptor> = LazyLock::new(
 
 pub(crate) fn to_json_value(event: Event) -> vector_common::Result<serde_json::Value> {
     let event = proto::EventWrapper::from_event_for_native_json(event);
+    let encoded = prost::Message::encode_to_vec(&event);
+
+    // The generated decoder counts map entries toward its recursion limit,
+    // unlike prost-reflect. Reject events that cannot pass the decoding bridge.
+    <proto::EventWrapper as prost::Message>::decode(encoded.as_slice())
+        .map_err(|error| format!("Error encoding native JSON event: {error}"))?;
 
     // The generated event types and prost-reflect currently use different prost
     // versions, so bridge between them through their shared wire representation.
-    let mut dynamic = DynamicMessage::decode(
-        EVENT_WRAPPER_DESCRIPTOR.clone(),
-        prost::Message::encode_to_vec(&event).as_slice(),
-    )
-    .map_err(|error| format!("Error encoding native JSON event: {error}"))?;
+    let mut dynamic = DynamicMessage::decode(EVENT_WRAPPER_DESCRIPTOR.clone(), encoded.as_slice())
+        .map_err(|error| format!("Error encoding native JSON event: {error}"))?;
     omit_deprecated_fields(&mut dynamic);
 
     let event_field = NATIVE_JSON_DESCRIPTOR
@@ -48,8 +54,27 @@ pub(crate) fn to_json_value(event: Event) -> vector_common::Result<serde_json::V
     envelope.set_field(&event_field, Value::Message(dynamic));
 
     let mut json = serde_json::to_value(envelope)?;
+    if !fits_json_depth(&json, MAX_JSON_EVENT_DEPTH) {
+        return Err("Error encoding native JSON event: JSON nesting limit exceeded".into());
+    }
     json.sort_all_objects();
     Ok(json)
+}
+
+fn fits_json_depth(value: &serde_json::Value, remaining_depth: usize) -> bool {
+    if remaining_depth == 0 {
+        return !value.is_array() && !value.is_object();
+    }
+
+    match value {
+        serde_json::Value::Array(values) => values
+            .iter()
+            .all(|value| fits_json_depth(value, remaining_depth - 1)),
+        serde_json::Value::Object(values) => values
+            .values()
+            .all(|value| fits_json_depth(value, remaining_depth - 1)),
+        _ => true,
+    }
 }
 
 pub(crate) fn from_dynamic_message(message: DynamicMessage) -> vector_common::Result<Event> {
@@ -142,6 +167,14 @@ fn validate_event_wrapper(wrapper: &proto::EventWrapper) -> Result<(), &'static 
 fn validate_metadata(metadata: Option<&proto::Metadata>) -> Result<(), &'static str> {
     if let Some(metadata) = metadata {
         validate_optional_value(metadata.value.as_ref())?;
+        if let Some(api_key) = metadata
+            .secrets
+            .as_ref()
+            .and_then(|secrets| secrets.entries.get("datadog_api_key"))
+        {
+            // Datadog sinks use forwarded API keys as HTTP header values.
+            HeaderValue::from_str(api_key).map_err(|_| "metadata has invalid Datadog API key")?;
+        }
         if !metadata.source_event_id.is_empty()
             && metadata.source_event_id.len() != SOURCE_EVENT_ID_BYTES
         {

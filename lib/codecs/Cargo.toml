@@ -31,6 +31,7 @@ derive_more.workspace = true
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 futures.workspace = true
+http = { version = "0.2.9", default-features = false }
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
