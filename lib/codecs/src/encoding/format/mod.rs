@@ -23,6 +23,8 @@ mod raw_message;
 #[cfg(feature = "syslog")]
 mod syslog;
 mod text;
+#[cfg(feature = "arrow")]
+mod variant;
 
 use std::fmt::Debug;
 
