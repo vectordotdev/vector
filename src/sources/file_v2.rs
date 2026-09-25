@@ -537,7 +537,9 @@ pub fn file_v2_source(
         .exclude
         .iter()
         .map(|path_buf| path_buf.iter().collect::<std::path::PathBuf>())
-        .map(resolve_symlinks)
+        // Globs can return the configured path or a canonicalized directory alias.
+        .flat_map(|path| [path.clone(), resolve_symlinks(path)])
+        .unique()
         .collect::<Vec<PathBuf>>();
     let ignore_before = calculate_ignore_before(config.ignore_older_secs);
     let checkpoint_interval = config.checkpoint_interval;
