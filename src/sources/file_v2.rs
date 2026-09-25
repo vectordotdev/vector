@@ -2237,44 +2237,60 @@ mod tests {
     #[tokio::test]
     async fn file_start_position_server_restart_unfinalized() {
         let dir = tempdir().unwrap();
+        let path = dir.path().join("file");
         let config = file_v2::FileConfig {
-            include: vec![dir.path().join("*")],
+            include: vec![path.clone()],
             ..test_default_file_config(&dir)
         };
+        fs::write(&path, "the line\n").await.unwrap();
 
-        let path = dir.path().join("file");
-        let mut file = File::create(&path).await.unwrap();
-        file.write_line("the line").await.unwrap();
-        file.flush().await.unwrap();
+        let first_config = config.clone();
+        let event = tokio::task::spawn_blocking(move || {
+            // Dropping this runtime stops all source tasks, including its
+            // checkpoint writer, before another source uses the same directory.
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            runtime.block_on(async move {
+                let (tx, mut rx) = SourceSender::new_test();
+                let (_stop, shutdown, _) = ShutdownSignal::new_wired();
+                tokio::spawn(file_v2_source(
+                    &first_config,
+                    first_config.data_dir.clone().unwrap(),
+                    shutdown,
+                    Senders {
+                        source_sender: tx,
+                        test_sender: None,
+                    },
+                    true,
+                    LogNamespace::Legacy,
+                ));
+                // Keep the event and its finalizers alive until after the
+                // runtime is gone. Dropping it earlier acknowledges delivery.
+                timeout(Duration::from_secs(5), rx.next())
+                    .await
+                    .expect("first source did not emit the record")
+                    .expect("first source closed before emitting the record")
+            })
+        })
+        .await
+        .unwrap();
+        assert_eq!(extract_messages_string(vec![event]), vec!["the line"]);
 
+        // The first source stopped with an outstanding acknowledgement, so the
+        // replacement must replay the record and then shut down completely.
         let (tx, mut rx) = mpsc::unbounded_channel();
-        // First time server runs it picks up existing lines.
         let received = run_file_v2_source(
             &config,
-            false,
-            Unfinalized,
+            true,
+            Acks,
             LogNamespace::Legacy,
             Some(tx),
             wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000),
         )
         .await;
-        let lines = extract_messages_string(received);
-        assert_eq!(lines, vec!["the line"]);
-
-        // Restart server, it re-reads file since the events were not acknowledged before shutdown
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_file_v2_source(
-            &config,
-            false,
-            Unfinalized,
-            LogNamespace::Legacy,
-            Some(tx),
-            wait_checkpoint_and_n_reads(&mut rx, vec![&path], 1, 5000),
-        )
-        .await;
-
-        let lines = extract_messages_string(received);
-        assert_eq!(lines, vec!["the line"]);
+        assert_eq!(extract_messages_string(received), vec!["the line"]);
     }
 
     #[tokio::test]
@@ -3229,9 +3245,8 @@ mod tests {
 
     #[derive(Clone, Copy, Eq, PartialEq)]
     enum AckingMode {
-        NoAcks,      // No acknowledgement handling and no finalization
-        Unfinalized, // Acknowledgement handling but no finalization
-        Acks,        // Full acknowledgements and proper finalization
+        NoAcks, // No acknowledgement handling and no finalization
+        Acks,   // Full acknowledgements and proper finalization
     }
     use AckingMode::*;
     use vector_lib::lookup::OwnedTargetPath;
@@ -3274,17 +3289,11 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let result = if acking_mode == Unfinalized {
-                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
-                    .collect::<Vec<_>>()
-                    .await
-            } else {
-                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
-                    .await
-                    .expect(
-                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
-                    )
-            };
+            let result = timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                .await
+                .expect(
+                    "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                );
             if wait_shutdown {
                 shutdown_done.await;
             }
