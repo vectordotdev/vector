@@ -1,0 +1,22 @@
+features:
+  - victoriametrics-integration-tests
+
+test_filter: "::victoriametrics::"
+
+env:
+  VICTORIAMETRICS_ADDRESS: http://victoriametrics:8428
+  VMINSERT_ADDRESS: http://vminsert:8480
+  VMSELECT_ADDRESS: http://vmselect:8481
+  VMSTORAGE_ADDRESS: http://vmstorage:8482
+  VMAUTH_ADDRESS: http://vmauth:8427
+
+matrix:
+  version: ["v1.127.0"]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/internal_events/victoriametrics.rs"
+  - "src/sinks/victoriametrics/**"
+  - "src/sinks/util/**"
+  - "tests/integration/victoriametrics/**"
