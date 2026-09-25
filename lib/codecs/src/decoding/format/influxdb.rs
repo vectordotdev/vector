@@ -126,7 +126,7 @@ impl Deserializer for InfluxdbDeserializer {
                         };
                         Some(Event::Metric(
                             Metric::new(
-                                format!("{0}_{1}", measurement, f.0),
+                                format!("{measurement}_{}", f.0),
                                 MetricKind::Absolute,
                                 MetricValue::Gauge { value: val },
                             )

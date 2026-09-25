@@ -4,13 +4,17 @@
 
 {{ define "main" }}
 {{ $version := .File.BaseFileName }}
+{{ $noindex := .Params.noindex }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
+{{ $breaking := where ($release.changelog | default slice) "breaking" true }}
+{{ $breakingTitled := where $breaking "title" "ne" nil }}
+{{ $upgradeGuides := where $highlights ".Title" "like" "Upgrade Guide$" }}
 {{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "security" "security changes" "deprecation" "deprecations" "chore" "chore"}}
 {{ $orderedGroups := slice "security" "feat" "enhancement" "fix" "deprecation" "chore" }}
 
 <div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
-  <main id="page-content" aria-label="Release notes" class="lg:col-span-4 md:px-0 pb-32">
+  <main{{ if not $noindex }} id="page-content" data-pagefind-body{{ end }} aria-label="Release notes" class="lg:col-span-4 md:px-0 pb-32">
     <div class="mb-4 md:mb-6">
       {{ partial "breadcrumb.html" . }}
     </div>
@@ -88,13 +92,38 @@
       </div>
       {{ end }}
 
-      {{ partial "releases/deprecations.html" (dict "version" $version) }}
-
       {{ if gt (len $release.changelog) 0 }}
       <div class="mt-8">
         <div class="prose dark:prose-invert max-w-none">
           {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
         </div>
+
+        {{ if and (gt (len $breakingTitled) 0) (gt (len $upgradeGuides) 0) }}
+        <div class="mt-6">
+          <div class="prose dark:prose-invert max-w-none">
+            {{ $numBreaking := len $breakingTitled }}
+            {{ $breakingWord := cond (eq $numBreaking 1) "breaking change" "breaking changes" }}
+            {{ $breakingHeading := printf "%d %s" $numBreaking $breakingWord }}
+            {{ partial "heading.html" (dict "text" $breakingHeading "level" 3 "icon" false) }}
+          </div>
+
+          <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
+            {{ range $breakingTitled }}
+            <li class="m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5">
+              <a href="{{ (index $upgradeGuides 0).RelPermalink }}#{{ .anchor }}" class="group block underline decoration-primary/50 underline-offset-4 focus:outline-none focus:ring-2 focus:ring-primary hover:decoration-secondary">
+                <div class="prose dark:prose-invert max-w-none font-semibold [&>p]:m-0 [&>p]:text-primary-dark group-hover:[&>p]:text-secondary dark:[&>p]:text-primary dark:group-hover:[&>p]:text-secondary [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+                  {{ .title | markdownify }}
+                </div>
+              </a>
+              <div class="mt-2 prose dark:prose-invert max-w-none leading-relaxed [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+                {{ .description | markdownify }}
+              </div>
+              {{ partial "releases/changelog-attribution.html" . }}
+            </li>
+            {{ end }}
+          </ul>
+        </div>
+        {{ end }}
 
         <div class="mt-6 flex flex-col space-y-8">
           {{ range $orderedGroups }}
@@ -109,23 +138,13 @@
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
-            <ul class="prose dark:prose-invert list-disc ml-6">
+            <ul class="mt-4 grid min-w-0 list-none gap-3 p-0">
               {{ range $changes }}
-              <li>
-                  <span class="prose dark:prose-invert">
-                    {{ .description | markdownify }}
-                  </span>
-                {{ if gt (len .contributors) 0 }}
-                <br>
-                <span class="prose dark:prose-invert italic">
-                  Thanks to
-                  {{ $len := len .contributors }}
-                  {{ range $i, $contributor := .contributors }}
-                    <a href="https://github.com/{{ replace $contributor "@" "" }}" rel="noopener" target="_blank">{{ $contributor }}</a>{{ if lt (add $i 1) $len }}, {{ end }}
-                  {{ end }}
-                  for contributing this change!
-                </span>
-                {{ end }}
+              <li class="m-0 min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/40 md:px-5">
+                <div class="prose dark:prose-invert max-w-none leading-relaxed [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
+                  {{ .description | markdownify }}
+                </div>
+                {{ partial "releases/changelog-attribution.html" . }}
               </li>
               {{ end }}
             </ul>
@@ -174,7 +193,7 @@
           {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
         </div>
 
-        <div class="mt-6 prose dark:prose-invert max-w-none">
+        <div class="vrl-changelog mt-6 prose dark:prose-invert max-w-none [&_:not(pre)>code]:max-w-full [&_:not(pre)>code]:break-all [&_:not(pre)>code]:whitespace-normal">
           {{ . | markdownify }}
         </div>
       </div>
@@ -217,6 +236,7 @@
         </div>
       </div>
     </div>
+    {{ partial "releases/deprecations.html" (dict "version" $version) }}
   </main>
 
   <div class="hidden lg:block xl:col-span-1">

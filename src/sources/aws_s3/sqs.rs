@@ -166,21 +166,18 @@ pub(super) struct Config {
     #[configurable(metadata(docs::examples = 1))]
     pub(super) max_number_of_messages: u32,
 
-    #[configurable(derived)]
     #[serde(default)]
     #[derivative(Default)]
     pub(super) tls_options: Option<TlsConfig>,
 
     // Client timeout configuration for SQS operations. Take care when configuring these settings
     // to allow enough time for the polling interval configured in `poll_secs`.
-    #[configurable(derived)]
     #[derivative(Default)]
     #[serde(default)]
     #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
 
     /// Configuration for deferring events to another queue based on their age.
-    #[configurable(derived)]
     pub(super) deferred: Option<DeferredConfig>,
 }
 
@@ -304,7 +301,7 @@ pub(super) struct Ingestor {
 }
 
 impl Ingestor {
-    pub(super) async fn new(
+    pub(super) fn new(
         region: Region,
         sqs_client: SqsClient,
         s3_client: S3Client,

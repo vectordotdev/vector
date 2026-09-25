@@ -412,7 +412,7 @@ impl observability::Service for ObservabilityService {
         &self,
         _request: Request<GetMetaRequest>,
     ) -> Result<Response<GetMetaResponse>, Status> {
-        let version = crate::get_version().to_string();
+        let version = crate::get_version();
         let hostname = hostname::get()
             .ok()
             .and_then(|h| h.into_string().ok())

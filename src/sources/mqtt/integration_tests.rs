@@ -49,7 +49,7 @@ fn message_body(event: &Event) -> String {
         .into_owned()
 }
 
-async fn get_mqtt_client() -> AsyncClient {
+fn get_mqtt_client() -> AsyncClient {
     // Unique client ID per producer: brokers that strictly enforce client-ID
     // uniqueness (e.g. RabbitMQ) otherwise kick a previous connection when tests
     // run concurrently, which manifests as spurious publish timeouts.
@@ -106,7 +106,7 @@ async fn mqtt_one_topic_happy() {
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let client = get_mqtt_client().await;
+        let client = get_mqtt_client();
         send_test_events(&client, topic, &input).await;
 
         let mut expected_messages: HashSet<_> = input.into_iter().collect();
@@ -175,7 +175,7 @@ async fn mqtt_redelivers_unacknowledged_messages() {
     // Wait for the subscription to be established before publishing.
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let producer = get_mqtt_client().await;
+    let producer = get_mqtt_client();
     producer
         .publish(topic, QoS::AtLeastOnce, false, message.as_bytes())
         .await
@@ -317,7 +317,7 @@ async fn mqtt_forces_reconnect_after_withheld_ack() {
 
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let producer = get_mqtt_client().await;
+    let producer = get_mqtt_client();
     producer
         .publish(topic, QoS::AtLeastOnce, false, message.as_bytes())
         .await
@@ -383,7 +383,7 @@ async fn mqtt_recovers_from_server_side_disconnect() {
     });
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let producer = get_mqtt_client().await;
+    let producer = get_mqtt_client();
     producer
         .publish(topic, QoS::AtLeastOnce, false, msg_before.as_bytes())
         .await
@@ -450,7 +450,7 @@ async fn mqtt_resubscribes_after_broker_discards_the_session() {
     });
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let producer = get_mqtt_client().await;
+    let producer = get_mqtt_client();
     producer
         .publish(topic, QoS::AtLeastOnce, false, msg_before.as_bytes())
         .await
@@ -522,7 +522,7 @@ async fn mqtt_does_not_lose_messages_across_server_side_disconnect_without_acks(
     });
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let producer = get_mqtt_client().await;
+    let producer = get_mqtt_client();
 
     let (batch_before, ..) = random_lines_with_stream(100, num_messages, None);
     send_test_events(&producer, topic, &batch_before).await;
@@ -590,7 +590,7 @@ async fn mqtt_many_topics_happy() {
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let client = get_mqtt_client().await;
+        let client = get_mqtt_client();
         send_test_events(&client, &format!("{topic_prefix_1}/test"), &input_1).await;
         send_test_events(&client, &format!("{topic_prefix_2}/test"), &input_2).await;
 

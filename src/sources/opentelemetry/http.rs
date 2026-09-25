@@ -59,7 +59,10 @@ pub(crate) async fn run_http_server(
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
 ) -> crate::Result<()> {
-    let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
+    let listener = tls_settings
+        .bind_reloadable(&address, tls_reloader)
+        .await?
+        .with_keepalive(keepalive_settings.tcp_keepalive);
     let routes = filters.recover(handle_rejection);
 
     info!(message = "Building HTTP server.", address = %address);
@@ -119,10 +122,10 @@ pub(crate) fn build_warp_filter(
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
-        out.clone(),
+        out,
         bytes_received,
         events_received,
-        headers.clone(),
+        headers,
         traces_deserializer,
     );
     log_filters

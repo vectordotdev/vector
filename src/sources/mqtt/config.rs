@@ -33,17 +33,14 @@ pub struct MqttSourceConfig {
     pub common: MqttCommonConfig,
 
     /// MQTT topic or topics from which messages are to be read.
-    #[configurable(derived)]
     #[serde(default = "default_topic")]
     #[derivative(Default(value = "default_topic()"))]
     pub topic: OneOrMany<String>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
@@ -78,7 +75,6 @@ pub struct MqttSourceConfig {
     /// can be resumed after a restart.
     ///
     /// [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
 }
@@ -106,7 +102,7 @@ impl SourceConfig for MqttSourceConfig {
                 .build()?;
 
         let source = MqttSource::new(
-            connector.clone(),
+            connector,
             decoder,
             log_namespace,
             self.clone(),

@@ -140,7 +140,7 @@ async fn flush(common: ElasticsearchCommon) -> crate::Result<()> {
 
 async fn create_template_index(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
     let client = create_http_client();
-    let uri = format!("{}/_index_template/{}", common.base_url, name);
+    let uri = format!("{}/_index_template/{name}", common.base_url);
     let response = client
         .put(uri)
         .json(&json!({
@@ -553,8 +553,8 @@ async fn insert_events_with_failure_and_gzip_compression() {
 async fn insert_events_in_data_stream() {
     trace_init();
     let index = gen_index();
-    let template_index = format!("my-template-{}", index);
-    let stream_index = format!("my-stream-{}", index);
+    let template_index = format!("my-template-{index}");
+    let stream_index = format!("my-stream-{index}");
 
     let cfg = ElasticsearchConfig {
         endpoints: vec![http_server()],
@@ -893,7 +893,7 @@ fn gen_index() -> Template {
 
 async fn create_data_stream(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
     let client = create_http_client();
-    let uri = format!("{}/_data_stream/{}", common.base_url, name);
+    let uri = format!("{}/_data_stream/{name}", common.base_url);
     let response = client
         .put(uri)
         .header("Content-Type", "application/json")

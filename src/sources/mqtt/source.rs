@@ -1179,7 +1179,7 @@ mod tests {
         let (kept, orphaned) = partition_buffered_events(events.clone(), true);
         assert_eq!(
             kept,
-            VecDeque::from([publish_with_qos(1, QoS::AtMostOnce), suback.clone()]),
+            VecDeque::from([publish_with_qos(1, QoS::AtMostOnce), suback]),
             "QoS 1/2 publishes must be pulled out, everything else stays, order preserved"
         );
         assert_eq!(
