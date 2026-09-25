@@ -15,12 +15,14 @@ jobs:
     # Only the new bot-authored minor-release path uses this validator. Existing manual
     # releases (including patch releases) keep their current checks; patch automation is
     # separate work. Keep this trigger broad: vdev owns branch-format and version validation.
+    # Post-release housekeeping never opens a PR; it validates its own commit before
+    # pushing to master, so this workflow only sees preparation PRs.
     # Release PRs must be directly squash-merged during the freeze, never queued.
     # Skipped merge-group runs emit the required check for ordinary queued PRs only.
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login == 'vectordotdev-bot[bot]' &&
-      (startsWith(github.head_ref, 'prepare') || startsWith(github.head_ref, 'release/housekeeping-v'))
+      startsWith(github.head_ref, 'prepare')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

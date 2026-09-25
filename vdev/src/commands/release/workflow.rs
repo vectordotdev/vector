@@ -32,14 +32,16 @@ pub struct Cli {
 enum WorkflowCommand {
     /// Validate a request before generating a release preparation PR.
     PrepareCheck(PrepareCheck),
-    /// Validate a generated release preparation or housekeeping PR.
+    /// Validate a generated release preparation PR.
     PrCheck(PrCheck),
     /// Validate an approved minor-release squash merge before creating its refs.
     AutotagCheck(AutotagCheck),
-    /// Check whether a published minor release needs a housekeeping PR.
+    /// Check whether a published minor release needs post-release housekeeping.
     HousekeepingCheck(HousekeepingCheck),
     /// Begin the next development version and restore VRL main locally.
     HousekeepingPrepare(HousekeepingPrepare),
+    /// Validate a generated housekeeping commit before it is pushed to master.
+    HousekeepingValidate(HousekeepingValidate),
     /// Check that resetting the website branch to a release won't roll it back.
     WebsiteCheck(WebsiteCheck),
     /// Decide whether a release tag should reset the website branch.
@@ -60,8 +62,16 @@ struct HousekeepingCheck {
 struct HousekeepingPrepare {
     #[arg(long)]
     version: Version,
+}
+
+#[derive(clap::Args, Debug)]
+struct HousekeepingValidate {
+    /// Released stable version whose housekeeping commit is being validated, e.g. 0.59.0.
     #[arg(long)]
-    release_commit: String,
+    version: Version,
+    /// Frozen master commit the housekeeping commit is based on.
+    #[arg(long)]
+    base_sha: String,
 }
 
 #[derive(clap::Args, Debug)]
@@ -157,6 +167,7 @@ impl Cli {
             WorkflowCommand::AutotagCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingCheck(args) => args.exec(),
             WorkflowCommand::HousekeepingPrepare(args) => args.exec(),
+            WorkflowCommand::HousekeepingValidate(args) => args.exec(),
             WorkflowCommand::WebsiteCheck(args) => args.exec(),
             WorkflowCommand::WebsitePreflight(args) => args.exec(),
         }
@@ -300,21 +311,24 @@ impl HousekeepingCheck {
             println!("Master has advanced beyond {version}; no housekeeping needed.");
             return set_github_output("skip", "true");
         }
-        ensure_release_checkout(&version, &self.release_commit)?;
+        // Authorized release-time pushes (e.g. the Kubernetes manifests refresh)
+        // may have landed on top of the release commit; housekeeping generates
+        // from the current frozen master, so HEAD need only contain the release
+        // commit (checked above via merge-base) and still carry the released
+        // version.
+        ensure!(
+            current_cargo_version()? == version,
+            "master must still contain release version {version}"
+        );
         validate_associated_preparation_pr(
             &self.repository,
             &self.release_commit,
             &preparation_branch(&version),
         )?;
-        let branch = format!("release/housekeeping-v{version}");
+        // Housekeeping commits directly to master under the freeze, so there is
+        // no branch to resume and no PR to detect; the "master already advanced"
+        // check above makes re-runs idempotent.
         set_github_output("version", &version.to_string())?;
-        set_github_output("branch", &branch)?;
-        if let Some(url) = find_existing_pr(&self.repository, &branch, "vectordotdev-bot")? {
-            append_github_step_summary(&format!("Existing housekeeping PR: {url}"))?;
-            return set_github_output("skip", "true");
-        }
-        let resume = remote_ref_exists(&format!("refs/heads/{branch}"))?;
-        set_github_output("resume", if resume { "true" } else { "false" })?;
         set_github_output("skip", "false")
     }
 }
@@ -322,7 +336,15 @@ impl HousekeepingCheck {
 impl HousekeepingPrepare {
     fn exec(self) -> Result<()> {
         git::ensure_worktree_clean()?;
-        ensure_release_checkout(&self.version, &self.release_commit)?;
+        // Authorized release-time pushes (e.g. the Kubernetes manifests
+        // refresh) may have advanced master past the release commit; generate
+        // from the current frozen master, which the check step verified still
+        // contains the release commit at the released version.
+        ensure!(
+            current_cargo_version()? == self.version,
+            "master must still contain release version {}",
+            self.version
+        );
         let manifest = housekeeping_manifest(&fs::read_to_string("Cargo.toml")?, &self.version)?;
         fs::write("Cargo.toml", manifest)?;
         Command::new("cargo")
@@ -331,6 +353,14 @@ impl HousekeepingPrepare {
         Command::new("cargo")
             .args(["update", "-p", "vrl"])
             .check_run()
+    }
+}
+
+impl HousekeepingValidate {
+    fn exec(self) -> Result<()> {
+        git::ensure_sha(&self.base_sha, "base SHA")?;
+        git::ensure_worktree_clean()?;
+        validate_housekeeping(&self.base_sha, &self.version)
     }
 }
 
@@ -383,20 +413,6 @@ impl WebsitePreflight {
         }
         set_github_output("skip", if skip { "true" } else { "false" })
     }
-}
-
-fn ensure_release_checkout(version: &Version, sha: &str) -> Result<()> {
-    next_minor_development_version(version)?;
-    git::ensure_sha(sha, "release commit")?;
-    ensure!(
-        current_cargo_version()? == *version,
-        "master must still contain release version {version}"
-    );
-    ensure!(
-        git::run_and_check_output(&["rev-parse", "HEAD"])?.trim() == sha,
-        "master must still match the published release commit"
-    );
-    Ok(())
 }
 
 fn next_minor_development_version(version: &Version) -> Result<Version> {
@@ -471,10 +487,6 @@ impl PrCheck {
     fn exec(self) -> Result<()> {
         git::ensure_sha(&self.base_sha, "base SHA")?;
         git::ensure_worktree_clean()?;
-        if let Some(version) = self.head_ref.strip_prefix("release/housekeeping-v") {
-            let version = parse_stable_version(version, "housekeeping branch version")?;
-            return validate_housekeeping(&self.base_sha, &version);
-        }
         let version = parse_preparation_branch(&self.head_ref)?;
         ensure!(
             version.patch == 0,

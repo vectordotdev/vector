@@ -190,19 +190,23 @@ impl SchemaContext {
 
                 if let Some(addl_props) = schema.get("additionalProperties") {
                     debug!("Handling additional properties.");
-                    let Some(sing_desc) =
-                        get_schema_metadata(schema, "docs::additional_props_description")
-                    else {
-                        bail!(
-                            "Missing 'docs::additional_props_description' metadata for a wildcard field. Schema: {schema}"
-                        );
-                    };
-
-                    let mut resolved_addl = self.resolve_schema(addl_props)?;
-                    if let Value::Object(ref mut map) = resolved_addl {
+                    if let Value::Object(mut map) = self.resolve_schema(addl_props)? {
                         map.insert("required".to_string(), Value::Bool(true));
-                        map.insert("description".to_string(), sing_desc.clone());
-                        options.insert("*".to_string(), Value::Object(map.clone()));
+                        if let Some(description) =
+                            get_schema_metadata(schema, "docs::additional_props_description")
+                        {
+                            map.insert("description".to_string(), description.clone());
+                        }
+                        if map
+                            .get("description")
+                            .and_then(Value::as_str)
+                            .is_none_or(|description| description.trim().is_empty())
+                        {
+                            bail!(
+                                "Missing description for a wildcard field. Document its value type or provide 'docs::additional_props_description' metadata. Schema: {schema}"
+                            );
+                        }
+                        options.insert("*".to_string(), Value::Object(map));
                     }
                 }
 
@@ -300,5 +304,100 @@ impl SchemaContext {
         };
 
         Ok(json!({ "type": res }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indexmap::IndexMap;
+
+    fn context() -> SchemaContext {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        INIT.call_once(|| crate::app::set_global_verbosity(log::LevelFilter::Off));
+
+        SchemaContext {
+            root_schema: json!({
+                "definitions": {
+                    "Backend": {
+                        "type": "object",
+                        "title": "A documented backend.",
+                        "description": "Request format:\n\n```json\n{\"version\": \"1.0\"}\n```",
+                        "properties": {
+                            "path": { "type": "string", "description": "Path to the secrets." }
+                        }
+                    }
+                }
+            }),
+            cue_binary_path: String::new(),
+            resolved_schema_cache: IndexMap::new(),
+            expanded_schema_cache: IndexMap::new(),
+        }
+    }
+
+    #[test]
+    fn wildcard_inherits_referenced_value_description() {
+        let resolved = context()
+            .resolve_schema(&json!({
+                "type": "object",
+                "description": "All configured backends.",
+                "additionalProperties": { "$ref": "#/definitions/Backend" }
+            }))
+            .unwrap();
+
+        assert_eq!(resolved["description"], "All configured backends.");
+        let entry = &resolved["type"]["object"]["options"]["*"];
+        assert_eq!(
+            entry["description"],
+            "A documented backend.\n\nRequest format:\n\n```json\n{\"version\": \"1.0\"}\n```"
+        );
+        assert_eq!(entry["required"], true);
+        assert_eq!(
+            entry["type"]["object"]["options"]["path"]["description"],
+            "Path to the secrets."
+        );
+    }
+
+    #[test]
+    fn wildcard_explicit_description_overrides_value_description() {
+        for value_schema in [
+            json!({ "$ref": "#/definitions/Backend" }),
+            json!({ "type": "string" }),
+        ] {
+            let resolved = context()
+                .resolve_schema(&json!({
+                    "type": "object",
+                    "_metadata": { "docs::additional_props_description": "A custom entry." },
+                    "additionalProperties": value_schema
+                }))
+                .unwrap();
+
+            assert_eq!(
+                resolved["type"]["object"]["options"]["*"]["description"],
+                "A custom entry."
+            );
+        }
+    }
+
+    #[test]
+    fn wildcard_rejects_missing_value_description() {
+        for value_schema in [
+            json!({ "type": "string" }),
+            json!({ "type": "string", "description": " \n " }),
+        ] {
+            let error = context()
+                .resolve_schema(&json!({
+                    "type": "object",
+                    "description": "The map description does not describe an entry.",
+                    "additionalProperties": value_schema
+                }))
+                .unwrap_err();
+
+            assert!(
+                error
+                    .to_string()
+                    .contains("Missing description for a wildcard field")
+            );
+        }
     }
 }
