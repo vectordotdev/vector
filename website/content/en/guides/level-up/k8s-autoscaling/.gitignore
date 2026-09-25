@@ -1,0 +1,16 @@
+kubeconfig
+*.plan
+*.pyc
+*.retry
+*.tfplan
+*.tfstate*
+
+.cache/
+.DS_Store
+.envrc
+.env
+.terraform
+tmp/
+massif.out*
+*.zip
+*.svg
