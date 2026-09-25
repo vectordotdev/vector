@@ -57,6 +57,7 @@ fn build_file_benchmark_environment(
             truncate: Default::default(),
             base_dir: None,
             confinement: Default::default(),
+            batch: Default::default(),
         },
     );
 
@@ -129,6 +130,7 @@ fn benchmark_files_no_partitions(c: &mut Criterion) {
                         truncate: Default::default(),
                         base_dir: None,
                         confinement: Default::default(),
+                        batch: Default::default(),
                     },
                 );
 

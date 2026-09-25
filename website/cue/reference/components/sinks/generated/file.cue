@@ -26,6 +26,18 @@ generated: components: sinks: file: configuration: {
 		required: false
 		type: string: examples: ["/var/log/vector"]
 	}
+	batch: {
+		description: """
+			Controls how events are batched per destination file before writing.
+
+			Events sharing the same rendered path are accumulated into a single buffer and written
+			with one syscall per batch, reducing overhead when routing to many partitions
+			(for example, one file per Kafka topic). The default timeout is 1 second; raising it
+			increases throughput at the cost of end-to-end latency.
+			"""
+		required: false
+		type:     _schemaDefinitions["vector::sinks::util::batch::BatchConfig<vector::sinks::util::batch::RealtimeSizeBasedDefaultBatchSettings>"]
+	}
 	compression: {
 		description: "Compression configuration."
 		required:    false
