@@ -85,9 +85,6 @@ pub struct HttpClientConfig {
     /// use functions like `now()` to dynamically modify query
     /// parameter values.
     #[serde(default)]
-    #[configurable(metadata(
-        docs::additional_props_description = "A query string parameter and its value(s)."
-    ))]
     #[configurable(metadata(docs::examples = "query_examples()"))]
     pub query: QueryParameters,
 

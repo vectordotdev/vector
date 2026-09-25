@@ -112,7 +112,6 @@ pub struct MetricConfig {
     ///
     /// Both keys and values can be templated, allowing you to attach dynamic tags to events.
     ///
-    #[configurable(metadata(docs::additional_props_description = "A metric tag."))]
     pub tags: Option<IndexMap<UnconfinedTemplate, TagConfig>>,
 
     #[serde(flatten)]
