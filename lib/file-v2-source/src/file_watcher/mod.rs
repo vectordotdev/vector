@@ -25,6 +25,22 @@ use file_source_common::{
     AsyncFileInfo,
 };
 
+/// Physical identity of an opened file, independent of its path and checkpoint fingerprint.
+#[derive(Debug, PartialEq, Eq)]
+struct FileIdentity {
+    device: u64,
+    inode: u64,
+}
+
+impl FileIdentity {
+    fn from_file_info(info: &impl PortableFileExt) -> Self {
+        Self {
+            device: info.portable_dev(),
+            inode: info.portable_ino(),
+        }
+    }
+}
+
 /// Contiguous delivery progress for acknowledgements and automatic file deletion.
 /// A new instance after truncation isolates acknowledgements for old contents.
 #[derive(Debug)]
@@ -83,8 +99,7 @@ pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
     file_position: FilePosition,
-    devno: u64,
-    inode: u64,
+    identity: FileIdentity,
     is_dead: bool,
     reached_eof: bool,
     last_read_success: Instant,
@@ -122,7 +137,7 @@ impl FileWatcher {
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path).await?;
         let file_info = f.file_info().await?;
-        let (devno, ino) = (file_info.portable_dev(), file_info.portable_ino());
+        let identity = FileIdentity::from_file_info(&file_info);
         #[cfg(unix)]
         let metadata = file_info;
         #[cfg(windows)]
@@ -203,8 +218,7 @@ impl FileWatcher {
             path: path.clone(),
             findable: true,
             file_position,
-            devno,
-            inode: ino,
+            identity,
             is_dead: false,
             reached_eof: false,
             last_read_success: ts,
@@ -244,7 +258,7 @@ impl FileWatcher {
         // The final identity check and unlink cannot be atomic against external renames.
         let file = File::open(&self.path).await?;
         let info = file.file_info().await?;
-        if (info.portable_dev(), info.portable_ino()) != (self.devno, self.inode) {
+        if FileIdentity::from_file_info(&info) != self.identity {
             return Ok(false);
         }
         let metadata = file.metadata().await?;
@@ -263,7 +277,8 @@ impl FileWatcher {
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
         let file_handle = File::open(&path).await?;
         let file_info = file_handle.file_info().await?;
-        if (file_info.portable_dev(), file_info.portable_ino()) != (self.devno, self.inode) {
+        let identity = FileIdentity::from_file_info(&file_info);
+        if identity != self.identity {
             // Carrying an offset to another inode does not establish that its
             // skipped prefix was delivered. Do not authorize deleting that file.
             self.deletion_allowed = false;
@@ -272,15 +287,14 @@ impl FileWatcher {
                 reader.seek(SeekFrom::Start(self.file_position)).await?;
                 self.reader = FileReader::Plain(reader);
             }
-            self.devno = file_info.portable_dev();
-            self.inode = file_info.portable_ino();
+            self.identity = identity;
         }
         self.path = path;
         Ok(())
     }
 
     pub(super) fn same_file(&self, other: &Self) -> bool {
-        (self.devno, self.inode) == (other.devno, other.inode)
+        self.identity == other.identity
     }
 
     pub fn set_file_findable(&mut self, f: bool) {
