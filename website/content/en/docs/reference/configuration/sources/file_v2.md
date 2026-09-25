@@ -1,5 +1,5 @@
 ---
-title: IFile
+title: File v2
 description: Collect logs from [files](https://en.wikipedia.org/wiki/File_system) with improved performance
 component_kind: source
 layout: component

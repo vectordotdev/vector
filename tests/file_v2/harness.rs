@@ -112,7 +112,7 @@ impl Fixture {
 
     pub(super) fn start(&self, pattern: &str, options: Value) -> vector::Result<Running> {
         let mut source = json!({
-            "type": "ifile",
+            "type": "file_v2",
             "include": [self.input.join(pattern)],
             "read_from": "beginning",
             "internal_metrics": {"include_file_tag": false},
