@@ -1,8 +1,4 @@
-use std::{
-    net::SocketAddr,
-    num::{NonZeroU64, NonZeroUsize},
-    time::Duration,
-};
+use std::{net::SocketAddr, num::NonZeroUsize, time::Duration};
 
 use crate::{
     config::{
@@ -28,6 +24,7 @@ use crate::{
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
 use serde::{Deserialize, Deserializer, de};
+use serde_with::serde_as;
 use tokio::sync::Semaphore;
 use tonic::transport::server::RoutesBuilder;
 use vector_config::indexmap::IndexSet;
@@ -117,6 +114,7 @@ impl OtlpDecodingConfig {
 }
 
 /// Configuration for the `opentelemetry` source.
+#[serde_as]
 #[configurable_component(source("opentelemetry", "Receive OTLP data through gRPC or HTTP."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
@@ -138,9 +136,10 @@ pub struct OpentelemetryConfig {
     pub max_concurrent_requests: NonZeroUsize,
 
     /// Maximum time spent processing a request through submission to the source output.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[serde(default = "default_request_timeout_secs")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    pub request_timeout_secs: NonZeroU64,
+    pub request_timeout_secs: Duration,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -179,8 +178,8 @@ pub struct OpentelemetryConfig {
     pub use_otlp_decoding: OtlpDecodingConfig,
 }
 
-const fn default_request_timeout_secs() -> NonZeroU64 {
-    NonZeroU64::new(30).unwrap()
+const fn default_request_timeout_secs() -> Duration {
+    Duration::from_secs(30)
 }
 
 fn deserialize_max_concurrent_requests<'de, D>(deserializer: D) -> Result<NonZeroUsize, D::Error>
@@ -319,7 +318,7 @@ impl OpentelemetryConfig {
         let events_received = register!(EventsReceived);
         let request_control = RequestControl::new(
             self.max_concurrent_requests.get(),
-            Duration::from_secs(self.request_timeout_secs.get()),
+            self.request_timeout_secs,
         );
         let log_namespace = cx.log_namespace(self.log_namespace);
 

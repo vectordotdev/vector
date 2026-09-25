@@ -219,7 +219,7 @@ fn admission_config_defaults_and_rejects_invalid_values() {
     )
     .unwrap();
     assert_eq!(config.max_concurrent_requests.get(), 100);
-    assert_eq!(config.request_timeout_secs.get(), 30);
+    assert_eq!(config.request_timeout_secs.as_secs(), 30);
 
     let configured: OpentelemetryConfig = serde_yaml::from_str(
         r#"
@@ -233,12 +233,11 @@ fn admission_config_defaults_and_rejects_invalid_values() {
     )
     .unwrap();
     assert_eq!(configured.max_concurrent_requests.get(), 7);
-    assert_eq!(configured.request_timeout_secs.get(), 11);
+    assert_eq!(configured.request_timeout_secs.as_secs(), 11);
 
     for invalid in [
         "max_concurrent_requests: 0",
         "max_concurrent_requests: null",
-        "request_timeout_secs: 0",
     ] {
         let yaml =
             format!("grpc:\n  address: 0.0.0.0:4317\nhttp:\n  address: 0.0.0.0:4318\n{invalid}\n");
@@ -288,7 +287,7 @@ async fn http_and_grpc_acknowledgement_waits_do_not_hold_admission() {
     let mut config = get_source_config_with_headers(grpc_addr, http_addr, false);
     config.acknowledgements = true.into();
     config.max_concurrent_requests = 1.try_into().unwrap();
-    config.request_timeout_secs = 1.try_into().unwrap();
+    config.request_timeout_secs = std::time::Duration::from_secs(1);
 
     let (sender, mut output) = new_unacknowledged_logs_source(&config);
     let server = config
@@ -369,7 +368,7 @@ async fn grpc_acknowledgement_wait_does_not_use_request_timeout() {
     let mut config = get_source_config_with_headers(grpc_addr, http_addr, false);
     config.acknowledgements = true.into();
     config.max_concurrent_requests = 1.try_into().unwrap();
-    config.request_timeout_secs = 1.try_into().unwrap();
+    config.request_timeout_secs = std::time::Duration::from_secs(1);
 
     let (sender, mut output) = new_unacknowledged_logs_source(&config);
     let server = config
@@ -1398,7 +1397,7 @@ fn get_source_config_with_headers(
         },
         acknowledgements: Default::default(),
         max_concurrent_requests: 100.try_into().unwrap(),
-        request_timeout_secs: 30.try_into().unwrap(),
+        request_timeout_secs: std::time::Duration::from_secs(30),
         log_namespace: Default::default(),
         use_otlp_decoding: use_otlp_decoding.into(),
     }
@@ -1732,7 +1731,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         max_concurrent_requests: 100.try_into().unwrap(),
-        request_timeout_secs: 30.try_into().unwrap(),
+        request_timeout_secs: std::time::Duration::from_secs(30),
         log_namespace,
         use_otlp_decoding: false.into(),
     };
@@ -1831,7 +1830,7 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         },
         acknowledgements: Default::default(),
         max_concurrent_requests: 100.try_into().unwrap(),
-        request_timeout_secs: 30.try_into().unwrap(),
+        request_timeout_secs: std::time::Duration::from_secs(30),
         log_namespace: None,
         use_otlp_decoding: true.into(),
     };
@@ -2060,7 +2059,7 @@ mod otlp_decoding_config_tests {
             },
             acknowledgements: Default::default(),
             max_concurrent_requests: 100.try_into().unwrap(),
-            request_timeout_secs: 30.try_into().unwrap(),
+            request_timeout_secs: std::time::Duration::from_secs(30),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: true,
@@ -2103,7 +2102,7 @@ mod otlp_decoding_config_tests {
             },
             acknowledgements: Default::default(),
             max_concurrent_requests: 100.try_into().unwrap(),
-            request_timeout_secs: 30.try_into().unwrap(),
+            request_timeout_secs: std::time::Duration::from_secs(30),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,
@@ -2149,7 +2148,7 @@ mod otlp_decoding_config_tests {
             },
             acknowledgements: Default::default(),
             max_concurrent_requests: 100.try_into().unwrap(),
-            request_timeout_secs: 30.try_into().unwrap(),
+            request_timeout_secs: std::time::Duration::from_secs(30),
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,

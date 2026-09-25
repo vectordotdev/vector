@@ -208,27 +208,35 @@ where
         // Acquire shared capacity immediately, reject requests when none is available, and release
         // the permit before finalizing the acknowledgement without a timeout.
         let processing = TimeoutLayer::new(self.timeout).layer(service);
+        let timeout = self.timeout;
         let semaphore = Arc::clone(&self.semaphore);
         let metrics = Arc::clone(&self.metrics);
         let protocol = self.protocol;
         let error_response = self.error_response.clone();
         let service = service_fn(move |request: Request<Body>| {
-            let admitted = Arc::clone(&semaphore).try_acquire_owned().map(|permit| {
-                let active = metrics.active_token();
-                (permit, active, processing.clone())
+            let admitted = tokio::time::Instant::now().checked_add(timeout).map(|_| {
+                Arc::clone(&semaphore).try_acquire_owned().map(|permit| {
+                    let active = metrics.active_token();
+                    (permit, active, processing.clone())
+                })
             });
             let metrics = Arc::clone(&metrics);
             let error_response = error_response.clone();
 
             async move {
                 let response = match admitted {
-                    Ok((_permit, _active, processing)) => match processing.oneshot(request).await {
-                        Ok(response) => response,
-                        Err(error) => {
-                            error_response.make_response(classify_error(error, &metrics, protocol))
+                    Some(Ok((_permit, _active, processing))) => {
+                        match processing.oneshot(request).await {
+                            Ok(response) => response,
+                            Err(error) => error_response
+                                .make_response(classify_error(error, &metrics, protocol)),
                         }
-                    },
-                    Err(_) => error_response.make_response(MiddlewareError::Overloaded),
+                    }
+                    Some(Err(_)) => error_response.make_response(MiddlewareError::Overloaded),
+                    None => {
+                        metrics.time_out(protocol);
+                        error_response.make_response(MiddlewareError::TimedOut)
+                    }
                 };
 
                 Ok::<_, Infallible>(response)
