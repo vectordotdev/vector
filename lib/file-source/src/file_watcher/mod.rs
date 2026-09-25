@@ -54,7 +54,7 @@ enum FileReader {
 
 impl FileReader {
     /// Get the current file size by accessing the underlying File.
-    /// Returns None for gzipped or null readers where file size isn't meaningful.
+    /// Returns None for metadata errors, or gzipped or null readers where file size isn't meaningful.
     /// This works even after the file has been deleted (on Unix) since the fd is still open.
     async fn file_size(&self) -> Option<u64> {
         match self {
@@ -123,8 +123,8 @@ pub struct RawLineResult {
 pub struct FileUnwatchInfo {
     /// The path of the file
     pub path: PathBuf,
-    /// Number of bytes that were not read from the file
-    pub bytes_unread: u64,
+    /// Number of unread bytes, or None when the count cannot be determined.
+    pub bytes_unread: Option<u64>,
     /// Whether the file reached EOF before being unwatched
     pub reached_eof: bool,
 }
@@ -336,15 +336,15 @@ impl FileWatcher {
     /// Returns the number of bytes that were not read.
     /// Uses the current file size from the underlying File (works even after
     /// file deletion since the fd remains valid).
-    /// Returns 0 for gzipped or null readers: file_position tracks decompressed bytes
-    /// while the on-disk size is compressed, so the subtraction would be meaningless.
-    /// When the file reaches EOF, this will be 0. When the file is unwatched before EOF,
-    /// this represents the bytes that were never read.
-    pub async fn get_bytes_unread(&self) -> u64 {
-        match self.reader.file_size().await {
-            Some(current_size) => current_size.saturating_sub(self.file_position),
-            None => 0,
-        }
+    /// Returns None for metadata errors, gzipped files, or skipped readers.
+    /// For gzip, file_position tracks decompressed bytes while the on-disk size is
+    /// compressed, so the subtraction would be meaningless, even after reaching EOF.
+    /// Some(0) means the size is known and no bytes remain unread at measurement time.
+    pub async fn get_bytes_unread(&self) -> Option<u64> {
+        self.reader
+            .file_size()
+            .await
+            .map(|current_size| current_size.saturating_sub(self.file_position))
     }
 
     /// Returns information about this file for metric emission when unwatching.

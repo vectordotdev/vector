@@ -349,10 +349,9 @@ mod source {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
         pub reached_eof: bool,
-        /// Number of bytes that were not read from the file.
-        /// When reached_eof is true, this will be 0. When false, this represents
-        /// the bytes that were not read before the file was unwatched.
-        pub bytes_unread: u64,
+        /// Number of unread bytes, or None when the count cannot be determined.
+        /// An unknown count does not imply that no unread bytes remain.
+        pub bytes_unread: Option<u64>,
     }
 
     impl InternalEvent for FileUnwatched<'_> {
@@ -363,6 +362,7 @@ mod source {
                 file = %self.file.display(),
                 reached_eof,
                 bytes_unread = self.bytes_unread,
+                bytes_unread_known = self.bytes_unread.is_some(),
             );
             if self.include_file_metric_tag {
                 let file_tag = self.file.to_string_lossy().into_owned();
@@ -372,23 +372,38 @@ mod source {
                     "reached_eof" => reached_eof,
                 )
                 .increment(1);
-                counter!(
-                    CounterName::FilesUnwatchedBytesUnreadTotal,
-                    "file" => file_tag,
-                    "reached_eof" => reached_eof,
-                )
-                .increment(self.bytes_unread);
+                match self.bytes_unread {
+                    Some(bytes_unread) => counter!(
+                        CounterName::FilesUnwatchedBytesUnreadTotal,
+                        "file" => file_tag,
+                        "reached_eof" => reached_eof,
+                    )
+                    .increment(bytes_unread),
+                    None => counter!(
+                        CounterName::FilesUnwatchedWithUnknownBytesTotal,
+                        "file" => file_tag,
+                        "reached_eof" => reached_eof,
+                    )
+                    .increment(1),
+                }
             } else {
                 counter!(
                     CounterName::FilesUnwatchedTotal,
                     "reached_eof" => reached_eof,
                 )
                 .increment(1);
-                counter!(
-                    CounterName::FilesUnwatchedBytesUnreadTotal,
-                    "reached_eof" => reached_eof,
-                )
-                .increment(self.bytes_unread);
+                match self.bytes_unread {
+                    Some(bytes_unread) => counter!(
+                        CounterName::FilesUnwatchedBytesUnreadTotal,
+                        "reached_eof" => reached_eof,
+                    )
+                    .increment(bytes_unread),
+                    None => counter!(
+                        CounterName::FilesUnwatchedWithUnknownBytesTotal,
+                        "reached_eof" => reached_eof,
+                    )
+                    .increment(1),
+                }
             }
         }
     }
@@ -607,7 +622,7 @@ mod source {
             });
         }
 
-        fn emit_file_unwatched(&self, file: &Path, reached_eof: bool, bytes_unread: u64) {
+        fn emit_file_unwatched(&self, file: &Path, reached_eof: bool, bytes_unread: Option<u64>) {
             emit!(FileUnwatched {
                 file,
                 include_file_metric_tag: self.include_file_metric_tag,
@@ -673,6 +688,65 @@ mod source {
                 configured_limit,
                 encountered_size_so_far
             });
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use vector_lib::{event::MetricValue, metrics::Controller};
+
+        use super::*;
+
+        #[test]
+        fn file_unwatched_metrics_distinguish_known_and_unknown_bytes() {
+            vector_lib::metrics::init_test();
+            let controller = Controller::get().unwrap();
+            let file = Path::new("unwatched.log");
+
+            for include_file_metric_tag in [false, true] {
+                for reached_eof in [false, true] {
+                    for (bytes_unread, expected_name, expected_value) in [
+                        (Some(12), "files_unwatched_bytes_unread_total", 24.0),
+                        (Some(0), "files_unwatched_bytes_unread_total", 0.0),
+                        (None, "files_unwatched_with_unknown_bytes_total", 2.0),
+                    ] {
+                        controller.reset();
+                        let emitter = FileSourceInternalEventsEmitter {
+                            include_file_metric_tag,
+                        };
+                        for _ in 0..2 {
+                            emitter.emit_file_unwatched(file, reached_eof, bytes_unread);
+                        }
+                        let metrics = controller.capture_metrics();
+                        let counters: Vec<_> = metrics
+                            .iter()
+                            .filter(|metric| metric.name().starts_with("files_unwatched"))
+                            .collect();
+                        // The alternate size counter must be absent, so unknown
+                        // measurements cannot masquerade as known zero-byte samples.
+                        assert_eq!(counters.len(), 2);
+                        for (name, value) in [
+                            ("files_unwatched_total", 2.0),
+                            (expected_name, expected_value),
+                        ] {
+                            let metric = counters
+                                .iter()
+                                .find(|metric| metric.name() == name)
+                                .unwrap_or_else(|| panic!("missing counter {name}"));
+                            assert_eq!(metric.value(), &MetricValue::Counter { value });
+                            let tags = metric.tags().unwrap();
+                            assert_eq!(
+                                tags.get("reached_eof"),
+                                Some(if reached_eof { "true" } else { "false" }),
+                            );
+                            assert_eq!(
+                                tags.get("file"),
+                                include_file_metric_tag.then_some("unwatched.log"),
+                            );
+                        }
+                    }
+                }
+            }
         }
     }
 }
