@@ -174,6 +174,10 @@ pub(crate) fn from_tls_auth_config(
 
             validate_tls_cert_key_pair(tls_config)?;
 
+            if tls_config.options.has_protocol_version_bounds() {
+                vector_lib::tls::warn_unenforceable_protocol_versions("async-nats");
+            }
+
             let nats_options = match &tls_config.options.ca_file {
                 None => nats_options,
                 Some(ca_file) => nats_options.add_root_certificates(ca_file.clone()),
