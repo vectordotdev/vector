@@ -62,7 +62,6 @@ pub struct ConfigBuilder {
     pub provider: Option<Providers>,
 
     /// All configured secrets backends.
-    #[configurable(metadata(docs::additional_props_description = "A secret backend."))]
     #[serde(default)]
     pub secret: IndexMap<ComponentKey, SecretBackends>,
 
@@ -137,7 +136,7 @@ impl ConfigBuilder {
         let (config, warnings) = self.build_with_warnings()?;
 
         for warning in warnings {
-            warn!("{}", warning);
+            warn!("{warning}");
         }
 
         Ok(config)

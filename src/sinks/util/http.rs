@@ -10,7 +10,7 @@ use http_body::Body as _;
 use tracing::debug;
 
 /// Maximum number of response body bytes to include in a non-retriable error's reason.
-const MAX_ERROR_BODY_BYTES: usize = 1024;
+pub(crate) const MAX_ERROR_BODY_BYTES: usize = 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);

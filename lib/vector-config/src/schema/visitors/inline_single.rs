@@ -42,6 +42,16 @@ impl Visitor for InlineSingleUseReferencesVisitor {
         occurrence_visitor.visit_root_schema(root);
         let occurrence_map = occurrence_visitor.occurrence_map;
 
+        // The root component maps identify their outer schemas. Keep those
+        // definitions available to docs consumers even when referenced once.
+        let component_bases: HashSet<&str> = ["sources", "transforms", "sinks"]
+            .into_iter()
+            .filter_map(|property| root.root_map_value_schema(property))
+            .filter_map(Schema::as_object)
+            .filter_map(|schema| schema.reference.as_deref())
+            .map(get_cleaned_schema_reference)
+            .collect();
+
         self.eligible_to_inline = occurrence_map
             .into_iter()
             // Filter out any schemas which have more than one occurrence, as naturally, we're
@@ -60,7 +70,8 @@ impl Visitor for InlineSingleUseReferencesVisitor {
                     .and_then(Schema::as_object)
                     .expect("schema definition must exist");
 
-                is_inlineable_schema(def_name.as_ref(), schema)
+                !component_bases.contains(def_name.as_ref())
+                    && is_inlineable_schema(def_name.as_ref(), schema)
             })
             .map(|s| s.as_ref().to_string())
             .collect::<HashSet<_>>();
@@ -122,19 +133,18 @@ fn is_inlineable_schema(definition_name: &str, schema: &SchemaObject) -> bool {
         "vector::sinks::Sinks",
     ];
 
-    // We want to avoid inlining all of the relevant top-level types used for defining components:
-    // the "outer" types (i.e. `SinkOuter<T>`), the enum/collection types (i.e. the big `Sources`
-    // enum), and the component configuration types themselves (i.e. `AmqpSinkConfig`).
+    // Outer types are protected through the root component maps above. Also keep
+    // enum/collection types (the big `Sources` enum) and individual component
+    // configuration types (such as `AmqpSinkConfig`).
     //
     // There's nothing _technically_ wrong with doing so, but it would break downstream consumers of
     // the schema that parse it in order to extract the individual components and other
     // component-specific metadata.
-    let is_component_base = get_schema_metadata_attr(schema, "docs::component_base_type").is_some();
     let is_component = get_schema_metadata_attr(schema, "docs::component_type").is_some();
 
     let is_allowed_schema = !DISALLOWED_SCHEMAS.contains(&definition_name);
 
-    !is_component_base && !is_component && is_allowed_schema
+    !is_component && is_allowed_schema
 }
 
 #[derive(Debug, Default)]
@@ -205,6 +215,38 @@ mod tests {
         visitor.visit_root_schema(&mut actual_schema);
 
         assert_schemas_eq(expected_schema, actual_schema);
+    }
+
+    #[test]
+    fn retains_root_component_map_values_without_metadata() {
+        for property in ["sources", "sinks", "transforms"] {
+            let mut schema = as_schema(json!({
+                "allOf": [{"$ref": "#/definitions/config"}],
+                "definitions": {
+                    "config": {"properties": {property: {"$ref": "#/definitions/map"}}},
+                    "map": {"type": "object", "additionalProperties": {"$ref": "#/definitions/renamed_outer"}},
+                    "renamed_outer": {"type": "object", "properties": {
+                        "shared": {"$ref": "#/definitions/inline_me"}
+                    }},
+                    "inline_me": {"type": "string"}
+                }
+            }));
+            InlineSingleUseReferencesVisitor::default().visit_root_schema(&mut schema);
+            assert!(schema.definitions.contains_key("renamed_outer"));
+            assert!(!schema.definitions.contains_key("map"));
+            assert!(!schema.definitions.contains_key("inline_me"));
+            assert_eq!(schema.definitions.len(), 1);
+            assert_eq!(
+                schema
+                    .root_map_value_schema(property)
+                    .unwrap()
+                    .as_object()
+                    .unwrap()
+                    .reference
+                    .as_deref(),
+                Some("#/definitions/renamed_outer")
+            );
+        }
     }
 
     #[test]

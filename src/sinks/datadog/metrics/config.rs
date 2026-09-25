@@ -35,6 +35,7 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
 
 pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
+pub(super) const SERIES_V3_PATH: &str = "/api/intake/metrics/v3/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
 
 /// The API version to use when submitting series metrics to Datadog.
@@ -49,10 +50,17 @@ pub enum SeriesApiVersion {
     V1,
 
     /// Use the v2 series endpoint (`/api/v2/series`).
+    V2,
+
+    /// Use the v3 series endpoint (`/api/intake/metrics/v3/series`).
+    ///
+    /// Columnar protobuf format with dictionary-based string deduplication and delta
+    /// encoding. More efficient than v2 for workloads with many metrics that share
+    /// common tags or names.
     ///
     /// This is the recommended and default endpoint.
     #[default]
-    V2,
+    V3,
 }
 
 impl SeriesApiVersion {
@@ -60,7 +68,13 @@ impl SeriesApiVersion {
         match self {
             Self::V1 => SERIES_V1_PATH,
             Self::V2 => SERIES_V2_PATH,
+            Self::V3 => SERIES_V3_PATH,
         }
+    }
+
+    /// Returns true if this version uses the V3 columnar encoding format.
+    pub const fn is_v3_format(self) -> bool {
+        matches!(self, Self::V3)
     }
 }
 
@@ -84,7 +98,9 @@ impl DatadogMetricsEndpoint {
     pub const fn content_type(self) -> &'static str {
         match self {
             Self::Series(SeriesApiVersion::V1) => "application/json",
-            Self::Sketches | Self::Series(SeriesApiVersion::V2) => "application/x-protobuf",
+            Self::Sketches | Self::Series(SeriesApiVersion::V2 | SeriesApiVersion::V3) => {
+                "application/x-protobuf"
+            }
         }
     }
 
@@ -97,7 +113,7 @@ impl DatadogMetricsEndpoint {
                 62_914_560, // 60 MiB
                 3_200_000,  // 3.2 MB
             ),
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2) => (
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2 | SeriesApiVersion::V3) => (
                 5_242_880, // 5 MiB
                 512_000,   // 512 KB
             ),
@@ -178,8 +194,8 @@ pub struct DatadogMetricsConfig {
 
     /// Controls which Datadog series API endpoint is used to submit metrics.
     ///
-    /// Defaults to `v2` (`/api/v2/series`). Set to `v1` (`/api/v1/series`) only if you need to
-    /// fall back to the legacy endpoint.
+    /// Defaults to `v3` (`/api/intake/metrics/v3/series`). Set to `v2` (`/api/v2/series`) or
+    /// to `v1` (`/api/v1/series`) only if you need to fall back to the legacy endpoint.
     #[serde(default)]
     pub series_api_version: SeriesApiVersion,
 
@@ -387,7 +403,7 @@ mod tests {
     fn validate_produces_endpoint_specific_batch_settings() {
         let config = DatadogMetricsConfig::default();
         let validated = config.validate().expect("validation should succeed");
-        assert_eq!(validated.batcher_settings.size_limit, 5_242_880); // 5 MiB — Series v2 limit
+        assert_eq!(validated.batcher_settings.size_limit, 5_242_880); // 5 MiB — Series v3 limit
         assert_eq!(validated.sketches_batcher_settings.size_limit, 62_914_560); // 60 MiB — Sketches limit
     }
 
@@ -447,5 +463,45 @@ mod tests {
 
         assert_eq!(series.size_limit, 1_000_000);
         assert_eq!(sketches.size_limit, 1_000_000);
+    }
+
+    // `v1`, `v2`, `v3` -- and the unset default, which is now `v3` -- must all still parse.
+    #[test]
+    fn series_api_version_v1_v2_v3_and_default_are_configurable() {
+        for (toml, expected) in [
+            (r#"default_api_key = "unused""#, SeriesApiVersion::V3),
+            (
+                r#"default_api_key = "unused"
+            series_api_version = "v1""#,
+                SeriesApiVersion::V1,
+            ),
+            (
+                r#"default_api_key = "unused"
+            series_api_version = "v2""#,
+                SeriesApiVersion::V2,
+            ),
+            (
+                r#"default_api_key = "unused"
+            series_api_version = "v3""#,
+                SeriesApiVersion::V3,
+            ),
+        ] {
+            let config = toml::from_str::<DatadogMetricsConfig>(toml)
+                .expect("v1, v2, v3, and the unset default must all parse");
+            assert_eq!(config.series_api_version, expected);
+        }
+    }
+
+    // Each configurable series version must resolve to its own intake path, and only `v3` uses
+    // the columnar wire format.
+    #[test]
+    fn series_api_version_paths_and_formats() {
+        assert_eq!(SeriesApiVersion::V1.get_path(), SERIES_V1_PATH);
+        assert_eq!(SeriesApiVersion::V2.get_path(), SERIES_V2_PATH);
+        assert_eq!(SeriesApiVersion::V3.get_path(), SERIES_V3_PATH);
+
+        assert!(!SeriesApiVersion::V1.is_v3_format());
+        assert!(!SeriesApiVersion::V2.is_v3_format());
+        assert!(SeriesApiVersion::V3.is_v3_format());
     }
 }

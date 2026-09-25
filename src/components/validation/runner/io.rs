@@ -46,7 +46,9 @@ impl VectorService for EventForwardService {
             .into_inner()
             .events
             .into_iter()
-            .map(Event::from)
+            .map(|wrapper| {
+                Event::try_from(wrapper).expect("validation events are encoded by Vector")
+            })
             .collect();
 
         self.tx

@@ -218,9 +218,8 @@ impl FileConfig {
             .collect::<crate::Result<Vec<_>>>()?;
 
         trace!(
-            "Loaded enrichment file {} with headers {:?}.",
-            self.file.path.to_str().unwrap_or("path with invalid utf"),
-            headers
+            "Loaded enrichment file {} with headers {headers:?}.",
+            self.file.path.to_str().unwrap_or("path with invalid utf")
         );
 
         let file = reader.into_inner();

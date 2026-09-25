@@ -261,7 +261,7 @@ mod test {
         wait_for_tcp(address).await;
 
         let sink = RemoteWriteConfig {
-            endpoint: HttpEndpoint::parse(&format!("{}://localhost:{}/", proto, address.port()))
+            endpoint: HttpEndpoint::parse(&format!("{proto}://localhost:{}/", address.port()))
                 .unwrap(),
             tls: tls.map(|tls| tls.options),
             ..Default::default()
@@ -335,7 +335,7 @@ mod test {
         // Send the request via HTTP POST
         let client = reqwest::Client::new();
         let response = client
-            .post(format!("http://localhost:{}{}", port, default_path()))
+            .post(format!("http://localhost:{port}{}", default_path()))
             .header("Content-Type", "application/x-protobuf")
             .header("Content-Encoding", "snappy")
             .body(request_body)
@@ -422,7 +422,7 @@ mod test {
     async fn send_request(port: u16, request_body: Vec<u8>) -> reqwest::Response {
         let client = reqwest::Client::new();
         client
-            .post(format!("http://localhost:{}{}", port, default_path()))
+            .post(format!("http://localhost:{port}{}", default_path()))
             .header("Content-Type", "application/x-protobuf")
             .header("Content-Encoding", "snappy")
             .body(request_body)
@@ -571,7 +571,7 @@ mod test {
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we only received the valid metric (NaN metric should be filtered)
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();
@@ -663,7 +663,7 @@ mod test {
         // Before the fix this returned 400 and the valid sample was lost with it.
         send_request_and_assert(address.port(), request_body).await;
 
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();
@@ -734,7 +734,7 @@ mod test {
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we received both metrics (including NaN metric)
-        let mut output = test_util::collect_ready(rx).await;
+        let mut output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 2);
 
         // Sort by name for predictable testing
@@ -875,7 +875,7 @@ mod test {
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we received the metric data
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();
@@ -956,7 +956,7 @@ mod test {
         );
 
         // Verify we received the metric data
-        let output = test_util::collect_ready(rx).await;
+        let output = test_util::collect_ready(rx);
         assert_eq!(output.len(), 1);
 
         let metric = output[0].as_metric();

@@ -12,6 +12,7 @@ use goauth::{
     credentials::Credentials,
 };
 use http::{Uri, uri::PathAndQuery};
+use http_1::{Uri as UriV1, header::AUTHORIZATION as AUTHORIZATION_V1};
 use http_body::{Body as _, Collected};
 use hyper::header::AUTHORIZATION;
 use smpl_jwt::Jwt;
@@ -171,6 +172,16 @@ impl GcpAuthenticator {
         self.apply_uri(request.uri_mut());
     }
 
+    /// Applies authentication to a native `http 1` request, mirroring [`Self::apply`].
+    pub fn apply_v1<T>(&self, request: &mut http_1::Request<T>) {
+        if let Some(token) = self.make_token() {
+            request
+                .headers_mut()
+                .insert(AUTHORIZATION_V1, token.parse().unwrap());
+        }
+        self.apply_uri_v1(request.uri_mut());
+    }
+
     pub fn apply_uri(&self, uri: &mut Uri) {
         match self {
             Self::Credentials(_) | Self::None => (),
@@ -188,6 +199,27 @@ impl GcpAuthenticator {
                 parts.path_and_query =
                     Some(paq.parse().expect("Could not re-parse path and query"));
                 *uri = Uri::from_parts(parts).expect("Could not re-parse URL");
+            }
+        }
+    }
+
+    fn apply_uri_v1(&self, uri: &mut UriV1) {
+        match self {
+            Self::Credentials(_) | Self::None => (),
+            Self::ApiKey(api_key) => {
+                let mut parts = uri.clone().into_parts();
+                let path = parts
+                    .path_and_query
+                    .as_ref()
+                    .map_or("/", http_1::uri::PathAndQuery::path);
+                let paq = format!("{path}?key={api_key}");
+                // The API key is verified above to only contain
+                // URL-safe characters. That key is added to a path
+                // that came from a successfully parsed URI. As such,
+                // re-parsing the string cannot fail.
+                parts.path_and_query =
+                    Some(paq.parse().expect("Could not re-parse path and query"));
+                *uri = UriV1::from_parts(parts).expect("Could not re-parse URL");
             }
         }
     }

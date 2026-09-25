@@ -87,9 +87,6 @@ pub struct ReduceConfig {
     /// - Numeric values are summed.
     /// - For nested paths, the field value is retrieved and then reduced using the default strategies mentioned above (unless explicitly specified otherwise).
     #[serde(default)]
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual merge strategy."
-    ))]
     pub merge_strategies: IndexMap<KeyString, MergeStrategy>,
 
     /// A condition used to distinguish the final event of a transaction.
