@@ -118,6 +118,11 @@ impl UncompressedReader for UncompressedReaderImpl {
 
             if let Err(err) = result {
                 fp.seek(SeekFrom::Start(0)).await?;
+                // A shorter file has no complete compression header. The
+                // fingerprint reader still enforces its own required length.
+                if err.kind() == ErrorKind::UnexpectedEof {
+                    return Ok(None);
+                }
                 return Err(err);
             }
 
@@ -328,6 +333,31 @@ mod test {
         let mut out = Vec::new();
         encoder.read_to_end(&mut out).await.expect("Failed to read");
         out
+    }
+
+    #[tokio::test]
+    async fn one_byte_file_satisfies_one_byte_fingerprint() {
+        use super::{FINGERPRINT_CRC, FileFingerprint, NonZeroUsize};
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("one.log");
+        fs::write(&path, b"\n").unwrap();
+        let mut fingerprinter = Fingerprinter::new(
+            FingerprintStrategy::FirstBytesChecksum {
+                ignored_header_bytes: 0,
+                bytes: NonZeroUsize::new(1).unwrap(),
+            },
+            1024,
+            false,
+        );
+        assert_eq!(
+            fingerprinter.fingerprint(&path).await.unwrap(),
+            FileFingerprint::FirstBytesChecksum(FINGERPRINT_CRC.checksum(b"\n"))
+        );
+        fs::write(&path, b"").unwrap();
+        assert_eq!(
+            fingerprinter.fingerprint(&path).await.unwrap_err().kind(),
+            std::io::ErrorKind::UnexpectedEof
+        );
     }
 
     #[tokio::test]

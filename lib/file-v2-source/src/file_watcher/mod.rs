@@ -580,6 +580,9 @@ impl FileWatcher {
             }
 
             Err(e) => {
+                // Some decoders report EOF after an error without reading the
+                // remaining input. That is not proof the file can be deleted.
+                self.deletion_allowed = false;
                 if let io::ErrorKind::NotFound = e.kind() {
                     self.set_dead();
                 }
@@ -839,6 +842,53 @@ mod tests {
                 (6 + delimiter.len() + 9 + delimiter.len()) as u64
             );
         }
+    }
+
+    #[tokio::test]
+    async fn gzip_decode_error_prevents_deleting_unread_members() {
+        use async_compression::tokio::bufread::GzipEncoder;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.gz");
+        // Fill the decoder's output buffer with complete records before it
+        // encounters the corrupt first-member checksum.
+        let line = format!("{}\n", "x".repeat(1023));
+        let first = line.repeat(8);
+        let mut archive = Vec::new();
+        for (contents, corrupt) in [
+            (first.as_bytes(), true),
+            (b"unread later member\n".as_slice(), false),
+        ] {
+            let mut member = Vec::new();
+            GzipEncoder::new(contents)
+                .read_to_end(&mut member)
+                .await
+                .unwrap();
+            if corrupt {
+                let checksum_start = member.len() - 8;
+                member[checksum_start] ^= 0xff;
+            }
+            archive.extend(member);
+        }
+        fs::write(&path, archive).await.unwrap();
+        let mut watcher = FileWatcher::new(
+            path,
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        for _ in 0..8 {
+            assert!(watcher.read_line().await.unwrap().is_some());
+        }
+        assert!(watcher.read_line().await.is_err());
+        // The decoder reports its error once, then EOF. Acknowledging every
+        // emitted record still cannot authorize deleting the unread member.
+        assert!(watcher.read_line().await.unwrap().is_none());
+        assert_eq!(watcher.file_position, first.len() as u64);
+        watcher.delivery_progress.delivered(watcher.file_position);
+        assert!(!watcher.ready_to_delete(Duration::ZERO).await.unwrap());
     }
 
     #[tokio::test]
