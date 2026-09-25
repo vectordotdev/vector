@@ -1,12 +1,17 @@
 use std::{
+    num::NonZeroUsize,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use tokio::{pin, sync::Barrier, time::sleep};
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier, BatchStatus};
 
 use crate::{
     Bufferable, WhenFull,
+    buffer_usage_data::BufferUsageHandle,
+    test::SizedRecord,
+    topology::builder::TopologyBuilder,
     topology::{
         channel::{BufferReceiver, BufferSender},
         test_util::{assert_current_send_capacity, build_buffer},
@@ -269,4 +274,23 @@ async fn test_buffer_metrics_overflow_block() {
     assert_eq!(4, snapshot.received_event_count);
     assert_eq!(4, snapshot.sent_event_count);
     assert_eq!(0, snapshot.dropped_event_count_intentional);
+}
+
+#[tokio::test]
+async fn drop_newest_fails_acknowledgement_without_removing_accepted_events() {
+    let (mut sender, mut receiver) = TopologyBuilder::<SizedRecord>::standalone_memory_test(
+        NonZeroUsize::new(1).unwrap(),
+        WhenFull::DropNewest,
+        BufferUsageHandle::noop(),
+        None,
+    );
+    sender.send(SizedRecord::new(10), None).await.unwrap();
+    let (notifier, acknowledgement) = BatchNotifier::new_with_receiver();
+    let mut dropped = SizedRecord::new(20);
+    dropped.add_batch_notifier(notifier);
+    sender.send(dropped, None).await.unwrap();
+    assert_eq!(acknowledgement.await, BatchStatus::Errored);
+    drop(sender);
+    assert_eq!(receiver.next().await, Some(SizedRecord::new(10)));
+    assert!(receiver.next().await.is_none());
 }

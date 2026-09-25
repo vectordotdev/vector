@@ -7,7 +7,10 @@ use async_recursion::async_recursion;
 use derivative::Derivative;
 use tokio::sync::Mutex;
 use tracing::Span;
-use vector_common::internal_event::{InternalEventHandle, Registered, register};
+use vector_common::{
+    finalization::EventStatus,
+    internal_event::{InternalEventHandle, Registered, register},
+};
 
 use super::limited_queue::LimitedSender;
 use crate::{
@@ -260,7 +263,12 @@ impl<T: Bufferable> BufferSender<T> {
             },
             WhenFull::DropNewest => match self.base.try_send(item).await? {
                 TryWriteOutcome::Written => UsageAccounting::Accepted,
-                TryWriteOutcome::Full(_) => UsageAccounting::DroppedNewest,
+                TryWriteOutcome::Full(mut item) => {
+                    // A full buffer did not accept this event. Sources awaiting
+                    // acknowledgement must not mistake its drop for delivery.
+                    item.take_finalizers().update_status(EventStatus::Errored);
+                    UsageAccounting::DroppedNewest
+                }
                 TryWriteOutcome::Dropped => UsageAccounting::NotAccepted,
             },
             WhenFull::Overflow => match self.base.try_send(item).await? {

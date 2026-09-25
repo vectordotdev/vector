@@ -247,9 +247,8 @@ pub enum TryWriteOutcome<T> {
     Full(T),
     /// The record permanently exceeded the maximum record size and was dropped.
     ///
-    /// Its finalizers have already been resolved as [`EventStatus::Dropped`] (equivalent to
-    /// `BatchStatus::Delivered`), so acking sources ack/checkpoint rather than redelivering
-    /// a record that can never be written.
+    /// Its finalizers have already been resolved as [`EventStatus::Errored`], so
+    /// acknowledging sources do not report successful delivery for an unwritten record.
     Dropped,
 }
 
@@ -273,8 +272,7 @@ impl FinalizerGuard {
 
     /// Releases the guard without marking finalizers as errored.
     ///
-    /// Call when the record was intentionally dropped (unwritable) or successfully flushed to
-    /// disk — both cases where the upstream source should ack rather than retry.
+    /// Call when the record was successfully flushed to disk.
     fn disarm(mut self) {
         self.error_on_drop = false;
     }
@@ -1738,17 +1736,11 @@ where
                         );
                     }
                     e if e.is_unwritable_record() => {
-                        // The record can never be written regardless of retries — either it
-                        // exceeds the maximum record size or the rkyv wrapper serialization
-                        // failed permanently. Retrying would loop forever and propagating the
-                        // error would tear down the entire buffer/topology. Instead, drop just
-                        // this record and carry on: the buffer and every other record are unharmed.
-                        //
-                        // Drop the finalizers with their default EventStatus::Dropped, which
-                        // propagates as BatchStatus::Delivered. Acking sources therefore ack/checkpoint
-                        // the record rather than nacking or stalling, preventing a permanent
-                        // failure from becoming a retry loop. The ledger records matching
-                        // received and dropped usage so occupancy stays balanced.
+                        // Keep the buffer available after an unwritable record, but resolve
+                        // its acknowledgement as an error: no bytes reached durable storage.
+                        // Source retry policy owns whether and how long to retry this failure.
+                        // The ledger records matching received and dropped usage so occupancy
+                        // stays balanced.
                         //
                         // `RecordTooLarge` carries the exact encoded length; `FailedToEncode` bails
                         // before that size is known, so we fall back to the configured limit as a
@@ -1768,7 +1760,7 @@ where
                             max_record_size = self.config.max_record_size,
                             error = %e,
                         );
-                        record_finalizers.disarm();
+                        drop(record_finalizers);
                         self.ledger.track_unwritable_dropped_record(
                             record_events.get() as u64,
                             encoded_len as u64,
