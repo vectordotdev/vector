@@ -1,15 +1,10 @@
-#![allow(dead_code)] // FIXME
-use std::borrow::Cow;
-use vector_lib::internal_event::{CounterName, GaugeName};
-use vector_lib::{
-    configurable::configurable_component,
-    internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
-};
-use vector_lib::{counter, gauge};
+use vector_lib::{configurable::configurable_component, internal_event::InternalEvent};
 
 pub use self::source::*;
-
-use vector_lib::internal_event::{error_stage, error_type};
+pub use super::file::{
+    FileAdded, FileCheckpointed, FileChecksumFailed, FileDeleted, FileOpen, FileResumed,
+    FileUnwatched,
+};
 
 /// Configuration of internal metrics for file-based components.
 #[configurable_component]
@@ -24,85 +19,6 @@ pub struct FileInternalMetricsConfig {
     pub include_file_tag: bool,
 }
 
-#[derive(Debug, vector_lib::NamedInternalEvent)]
-pub struct FileOpen {
-    pub count: usize,
-}
-
-impl InternalEvent for FileOpen {
-    fn emit(self) {
-        gauge!(GaugeName::OpenFiles).set(self.count as f64);
-    }
-}
-
-#[derive(Debug, vector_lib::NamedInternalEvent)]
-pub struct FileBytesSent<'a> {
-    pub byte_size: usize,
-    pub file: Cow<'a, str>,
-    pub include_file_metric_tag: bool,
-}
-
-impl InternalEvent for FileBytesSent<'_> {
-    fn emit(self) {
-        trace!(
-            message = "Bytes sent.",
-            byte_size = %self.byte_size,
-            protocol = "file",
-            file = %self.file,
-        );
-        if self.include_file_metric_tag {
-            counter!(
-                CounterName::ComponentSentBytesTotal,
-                "protocol" => "file",
-                "file" => self.file.clone().into_owned(),
-            )
-        } else {
-            counter!(
-                CounterName::ComponentSentBytesTotal,
-                "protocol" => "file",
-            )
-        }
-        .increment(self.byte_size as u64);
-    }
-}
-
-#[derive(Debug, vector_lib::NamedInternalEvent)]
-pub struct FileIoError<'a, P> {
-    pub error: std::io::Error,
-    pub code: &'static str,
-    pub message: &'static str,
-    pub path: &'a P,
-    pub dropped_events: usize,
-}
-
-impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
-    fn emit(self) {
-        error!(
-            message = %self.message,
-            path = ?self.path,
-            error = %self.error,
-            error_code = %self.code,
-            error_type = error_type::IO_FAILED,
-            stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
-        );
-        counter!(
-            CounterName::ComponentErrorsTotal,
-            "error_code" => self.code,
-            "error_type" => error_type::IO_FAILED,
-            "stage" => error_stage::SENDING,
-        )
-        .increment(1);
-
-        if self.dropped_events > 0 {
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: self.dropped_events,
-                reason: self.message,
-            });
-        }
-    }
-}
-
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
@@ -111,7 +27,10 @@ mod source {
 
     use crate::internal_events::FileLineTooBigError;
 
-    use super::{FileOpen, InternalEvent};
+    use super::{
+        FileAdded, FileCheckpointed, FileChecksumFailed, FileDeleted, FileOpen, FileResumed,
+        FileUnwatched, InternalEvent,
+    };
     use vector_lib::emit;
     use vector_lib::internal_event::{error_stage, error_type};
 
@@ -123,7 +42,7 @@ mod source {
             file: Option<String>,
         } => {
             bytes: Counter = match self.file {
-                Some(file) => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "file_v2", "file_v2" => file),
+                Some(file) => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "file_v2", "file" => file),
                 None => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "file_v2"),
             },
         }
@@ -152,30 +71,6 @@ mod source {
             self.event_bytes.increment(data.1.get() as u64);
         }
     );
-
-    #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileChecksumFailed<'a> {
-        pub file: &'a Path,
-        pub include_file_metric_tag: bool,
-    }
-
-    impl InternalEvent for FileChecksumFailed<'_> {
-        fn emit(self) {
-            warn!(
-                message = "Currently ignoring file too small to fingerprint.",
-                file = %self.file.display(),
-            );
-            if self.include_file_metric_tag {
-                counter!(
-                    CounterName::ChecksumErrorsTotal,
-                    "file" => self.file.to_string_lossy().into_owned(),
-                )
-            } else {
-                counter!(CounterName::ChecksumErrorsTotal)
-            }
-            .increment(1);
-        }
-    }
 
     #[derive(Debug, vector_lib::NamedInternalEvent)]
     pub struct FileFingerprintReadError<'a> {
@@ -256,61 +151,6 @@ mod source {
     }
 
     #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileDeleted<'a> {
-        pub file: &'a Path,
-        pub include_file_metric_tag: bool,
-    }
-
-    impl InternalEvent for FileDeleted<'_> {
-        fn emit(self) {
-            info!(
-                message = "File deleted.",
-                file = %self.file.display(),
-            );
-            if self.include_file_metric_tag {
-                counter!(
-                    CounterName::FilesDeletedTotal,
-                    "file" => self.file.to_string_lossy().into_owned(),
-                )
-            } else {
-                counter!(CounterName::FilesDeletedTotal)
-            }
-            .increment(1);
-        }
-    }
-
-    #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileUnwatched<'a> {
-        pub file: &'a Path,
-        pub include_file_metric_tag: bool,
-        pub reached_eof: bool,
-    }
-
-    impl InternalEvent for FileUnwatched<'_> {
-        fn emit(self) {
-            let reached_eof = if self.reached_eof { "true" } else { "false" };
-            info!(
-                message = "Stopped watching file.",
-                file = %self.file.display(),
-                reached_eof
-            );
-            if self.include_file_metric_tag {
-                counter!(
-                    CounterName::FilesUnwatchedTotal,
-                    "file" => self.file.to_string_lossy().into_owned(),
-                    "reached_eof" => reached_eof,
-                )
-            } else {
-                counter!(
-                    CounterName::FilesUnwatchedTotal,
-                    "reached_eof" => reached_eof,
-                )
-            }
-            .increment(1);
-        }
-    }
-
-    #[derive(Debug, vector_lib::NamedInternalEvent)]
     struct FileWatchError<'a> {
         pub file: &'a Path,
         pub error: Error,
@@ -345,73 +185,6 @@ mod source {
                 )
             }
             .increment(1);
-        }
-    }
-
-    #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileResumed<'a> {
-        pub file: &'a Path,
-        pub file_position: u64,
-        pub include_file_metric_tag: bool,
-    }
-
-    impl InternalEvent for FileResumed<'_> {
-        fn emit(self) {
-            info!(
-                message = "Resuming to watch file.",
-                file = %self.file.display(),
-                file_position = %self.file_position
-            );
-            if self.include_file_metric_tag {
-                counter!(
-                    CounterName::FilesResumedTotal,
-                    "file" => self.file.to_string_lossy().into_owned(),
-                )
-            } else {
-                counter!(CounterName::FilesResumedTotal)
-            }
-            .increment(1);
-        }
-    }
-
-    #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileAdded<'a> {
-        pub file: &'a Path,
-        pub include_file_metric_tag: bool,
-    }
-
-    impl InternalEvent for FileAdded<'_> {
-        fn emit(self) {
-            info!(
-                message = "Found new file to watch.",
-                file = %self.file.display(),
-            );
-            if self.include_file_metric_tag {
-                counter!(
-                    CounterName::FilesAddedTotal,
-                    "file" => self.file.to_string_lossy().into_owned(),
-                )
-            } else {
-                counter!(CounterName::FilesAddedTotal)
-            }
-            .increment(1);
-        }
-    }
-
-    #[derive(Debug, vector_lib::NamedInternalEvent)]
-    pub struct FileCheckpointed {
-        pub count: usize,
-        pub duration: Duration,
-    }
-
-    impl InternalEvent for FileCheckpointed {
-        fn emit(self) {
-            debug!(
-                message = "Files checkpointed.",
-                count = %self.count,
-                duration_ms = self.duration.as_millis() as u64,
-            );
-            counter!(CounterName::CheckpointsTotal).increment(self.count as u64);
         }
     }
 

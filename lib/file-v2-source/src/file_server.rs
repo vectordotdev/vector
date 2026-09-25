@@ -1,14 +1,13 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     path::PathBuf,
     sync::Arc,
-    time::Instant,
     time::{self, Duration},
 };
 
 #[cfg(any(test, feature = "test"))]
 use bytes::Buf;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use futures::{Future, Sink, SinkExt};
 use indexmap::IndexMap;
@@ -22,7 +21,7 @@ use tokio_util::task::JoinMap;
 use tracing::{debug, error, info, trace};
 
 use crate::{
-    file_watcher::{DeliveryProgress, FileIdentity, FileWatcher},
+    file_watcher::{DeliveryProgress, FileIdentity, FileWatcher, RawLine, ReadResult},
     paths_provider::{PathUpdates, PathsProvider},
     Checkpointer, CheckpointsView, FilePosition, ReadFrom,
 };
@@ -86,12 +85,7 @@ where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
 {
-    async fn send_lines<C>(
-        &self,
-        chans: &mut C,
-        lines: &mut Vec<Line>,
-        stats: &mut TimingStats,
-    ) -> Result<(), C::Error>
+    async fn send_lines<C>(&self, chans: &mut C, lines: &mut Vec<Line>) -> Result<(), C::Error>
     where
         C: Sink<Vec<Line>> + Unpin,
         C::Error: std::error::Error,
@@ -111,12 +105,10 @@ where
                     .unwrap();
             }
         }
-        let start = time::Instant::now();
         if let Err(error) = chans.send(std::mem::take(lines)).await {
             error!(message = "Output channel closed.", %error);
             return Err(error);
         }
-        stats.record("sending", start.elapsed());
         Ok(())
     }
 
@@ -208,8 +200,6 @@ where
         }
         self.emitter.emit_files_open(fp_map.len());
 
-        let mut stats = TimingStats::default();
-
         // Spawn the checkpoint writer task with the configured interval
         // This ensures that checkpoints are written periodically to disk
         let checkpoint_interval = self.checkpoint_interval;
@@ -221,7 +211,6 @@ where
             self.emitter.clone(),
         ));
 
-        let mut last_stats_report: Option<Instant> = None;
         let mut next_glob_time = time::Instant::now() + Duration::from_secs(1);
         loop {
             // Reconcile periodically even while draining a backlog. Notifications
@@ -229,41 +218,16 @@ where
             let now_time = time::Instant::now();
             let should_discover_glob = next_glob_time <= now_time;
 
-            // Report stats periodically, but only if enough time has passed since the last report
-            // This prevents excessive logging when the main loop is running frequently
-            let now = Instant::now();
-            let should_report_stats = {
-                if let Some(last_report) = last_stats_report {
-                    if now.duration_since(last_report) >= Duration::from_secs(10) {
-                        last_stats_report = Some(now);
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    last_stats_report = Some(now);
-                    true
-                }
-            };
-
-            if should_report_stats && stats.started_at.elapsed() > Duration::from_secs(10) {
-                stats.report();
-            }
-
-            if stats.started_at.elapsed() > Duration::from_secs(10) {
-                stats = TimingStats::default();
-            }
-
             if should_discover_glob {
                 // Schedule the next glob time - use a fixed interval of 1 second
                 next_glob_time = now_time.checked_add(Duration::from_secs(1)).unwrap();
             }
 
             // Search for files to detect major file changes.
-            let start = time::Instant::now();
             let updates = self.paths_provider.paths(should_discover_glob).await;
             match &updates {
-                PathUpdates::Snapshot(_) => {
+                PathUpdates::Snapshot(paths) => {
+                    known_small_files.retain(|path, _| paths.contains(path));
                     for watcher in fp_map.values_mut() {
                         watcher.set_file_findable(false);
                     }
@@ -359,13 +323,11 @@ where
                     }
                 }
             }
-            stats.record("discovery", start.elapsed());
 
             // Collect lines by polling files.
             let mut batch_bytes = 0;
             let mut made_progress = false;
             for (&file_id, watcher) in &mut fp_map {
-                let mut start = time::Instant::now();
                 let mut bytes_read = 0;
                 let previous_position = watcher.get_file_position();
                 if watcher.check_for_truncation().await.is_ok() {
@@ -378,14 +340,25 @@ where
                     while watcher.get_file_position() - turn_start < budget {
                         let remaining = budget - (watcher.get_file_position() - turn_start);
                         let result = watcher.read_line_bounded(remaining as usize).await;
-                        if let Some((start, end)) = watcher.discarded.take() {
-                            if let Some(progress) = &watcher.delivery_progress {
-                                progress.discard(start, end, file_id, &checkpoints);
-                            }
-                            continue;
+                        if let Some(size) = watcher.take_oversized() {
+                            self.emitter.emit_file_line_too_long(
+                                &BytesMut::new(),
+                                self.max_line_bytes,
+                                size,
+                            );
                         }
-                        let Ok(Some(line)) = result else {
-                            break;
+                        let line = match result {
+                            Ok(ReadResult::Line(line)) => line,
+                            Ok(ReadResult::Discarded { start, end }) => {
+                                watcher.delivery_progress.discard(
+                                    start,
+                                    end,
+                                    file_id,
+                                    &checkpoints,
+                                );
+                                continue;
+                            }
+                            Ok(ReadResult::Yield | ReadResult::Eof) | Err(_) => break,
                         };
                         let sz = line.bytes.len();
                         trace!(
@@ -393,27 +366,17 @@ where
                             path = ?watcher.path,
                             bytes = ?sz
                         );
-                        stats.record_bytes(sz);
 
                         batch_bytes += sz;
                         made_progress = true;
 
-                        lines.push(Line {
-                            text: line.bytes,
-                            filename: watcher.path.to_str().expect("not a valid path").to_owned(),
-                            file_id,
-                            start_offset: line.offset,
-                            end_offset: watcher.get_file_position(),
-                            delivery_progress: watcher.delivery_progress.clone(),
-                        });
+                        lines.push(Line::from_watcher(line, file_id, watcher));
 
                         // Flush without restarting the file traversal or consuming
                         // another per-file budget. A single line may exceed the cap.
                         if batch_bytes >= MAX_BATCH_BYTES || lines.len() >= MAX_BATCH_LINES {
-                            stats.record("reading", start.elapsed());
-                            self.send_lines(&mut chans, &mut lines, &mut stats).await?;
+                            self.send_lines(&mut chans, &mut lines).await?;
                             batch_bytes = 0;
-                            start = time::Instant::now();
                         }
                     }
                     bytes_read = watcher.get_file_position() - turn_start;
@@ -422,29 +385,32 @@ where
                     made_progress |= bytes_read > 0;
                 }
                 if watcher.should_retire(self.reader_idle_timeout) {
-                    if let Some(line) = watcher.finish_partial() {
-                        batch_bytes += line.bytes.len();
-                        lines.push(Line {
-                            text: line.bytes,
-                            filename: watcher.path.to_str().expect("not a valid path").to_owned(),
-                            file_id,
-                            start_offset: line.offset,
-                            end_offset: watcher.get_file_position(),
-                            delivery_progress: watcher.delivery_progress.clone(),
-                        });
+                    let result = watcher.finish_partial();
+                    if let Some(size) = watcher.take_oversized() {
+                        self.emitter.emit_file_line_too_long(
+                            &BytesMut::new(),
+                            self.max_line_bytes,
+                            size,
+                        );
                     }
-                    if let Some((start, end)) = watcher.discarded.take() {
-                        if let Some(progress) = &watcher.delivery_progress {
-                            progress.discard(start, end, file_id, &checkpoints);
+                    match result {
+                        ReadResult::Line(line) => {
+                            batch_bytes += line.bytes.len();
+                            lines.push(Line::from_watcher(line, file_id, watcher));
                         }
+                        ReadResult::Discarded { start, end } => {
+                            watcher
+                                .delivery_progress
+                                .discard(start, end, file_id, &checkpoints);
+                        }
+                        ReadResult::Yield | ReadResult::Eof => {}
                     }
                     watcher.set_dead();
                     if batch_bytes >= MAX_BATCH_BYTES || lines.len() >= MAX_BATCH_LINES {
-                        self.send_lines(&mut chans, &mut lines, &mut stats).await?;
+                        self.send_lines(&mut chans, &mut lines).await?;
                         batch_bytes = 0;
                     }
                 }
-                stats.record("reading", start.elapsed());
 
                 if bytes_read == 0 {
                     // Should the file be removed
@@ -480,7 +446,7 @@ where
             });
             self.emitter.emit_files_open(fp_map.len());
 
-            self.send_lines(&mut chans, &mut lines, &mut stats).await?;
+            self.send_lines(&mut chans, &mut lines).await?;
 
             let shutdown_token = tokio::select! {
                 biased;
@@ -576,17 +542,15 @@ where
                     if previous.same_generation(&watcher) {
                         // A shrink was already observed and its new prefix has
                         // only grown. Preserve reads and redirect late acknowledgements.
-                        if let Some(progress) = &previous.delivery_progress {
-                            progress.rekey(old_id, file_id, checkpoints);
-                        }
+                        previous
+                            .delivery_progress
+                            .rekey(old_id, file_id, checkpoints);
                         watcher = previous;
                         watcher.update_path(path.clone()).await.ok();
                     } else {
                         // A changed prefix without an observed rewind is a new
                         // generation, even if the file regrew beyond our offset.
-                        if let Some(progress) = &previous.delivery_progress {
-                            progress.failed();
-                        }
+                        previous.delivery_progress.failed();
                         if let Err(error) = watcher.rewind().await {
                             self.emitter.emit_file_watch_error(&path, error);
                             return;
@@ -607,10 +571,8 @@ where
                     }
                 }
 
-                // Tracking is also needed without acknowledgements: buffered
-                // lines can outlive a fingerprint rekey or a truncation.
-                watcher.enable_delivery_tracking();
                 watcher.set_file_findable(true);
+                checkpoints.set_live(file_id);
                 fp_map.insert(file_id, watcher);
             }
             Err(error) => self.emitter.emit_file_watch_error(&path, error),
@@ -660,68 +622,6 @@ pub fn calculate_ignore_before(ignore_older_secs: Option<u64>) -> Option<DateTim
 #[derive(Debug)]
 pub struct Shutdown;
 
-struct TimingStats {
-    started_at: time::Instant,
-    segments: BTreeMap<&'static str, Duration>,
-    events: usize,
-    bytes: usize,
-}
-
-impl TimingStats {
-    fn record(&mut self, key: &'static str, duration: Duration) {
-        let segment = self.segments.entry(key).or_default();
-        *segment += duration;
-    }
-
-    fn record_bytes(&mut self, bytes: usize) {
-        self.events += 1;
-        self.bytes += bytes;
-    }
-
-    fn report(&self) {
-        let total = self.started_at.elapsed();
-        let counted: Duration = self.segments.values().sum();
-        let other: Duration = self.started_at.elapsed() - counted;
-        let mut ratios = self
-            .segments
-            .iter()
-            .map(|(k, v)| (*k, v.as_secs_f32() / total.as_secs_f32()))
-            .collect::<BTreeMap<_, _>>();
-        ratios.insert("other", other.as_secs_f32() / total.as_secs_f32());
-        let (event_throughput, bytes_throughput) = if total.as_secs() > 0 {
-            (
-                self.events as u64 / total.as_secs(),
-                self.bytes as u64 / total.as_secs(),
-            )
-        } else {
-            (0, 0)
-        };
-        debug!(event_throughput = %scale(event_throughput), bytes_throughput = %scale(bytes_throughput), ?ratios);
-    }
-}
-
-fn scale(bytes: u64) -> String {
-    let units = ["", "k", "m", "g"];
-    let mut bytes = bytes as f32;
-    let mut i = 0;
-    while bytes > 1000.0 && i <= 3 {
-        bytes /= 1000.0;
-        i += 1;
-    }
-    format!("{:.3}{}/sec", bytes, units[i])
-}
-
-impl Default for TimingStats {
-    fn default() -> Self {
-        Self {
-            started_at: time::Instant::now(),
-            segments: Default::default(),
-            events: Default::default(),
-            bytes: Default::default(),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Line {
     pub text: Bytes,
@@ -729,5 +629,21 @@ pub struct Line {
     pub file_id: FileFingerprint,
     pub start_offset: FilePosition,
     pub end_offset: FilePosition,
-    pub delivery_progress: Option<Arc<DeliveryProgress>>,
+    pub delivery_progress: Arc<DeliveryProgress>,
+}
+
+#[cfg(test)]
+mod tests;
+
+impl Line {
+    fn from_watcher(line: RawLine, file_id: FileFingerprint, watcher: &FileWatcher) -> Self {
+        Self {
+            text: line.bytes,
+            filename: watcher.path.to_string_lossy().into_owned(),
+            file_id,
+            start_offset: line.offset,
+            end_offset: watcher.get_file_position(),
+            delivery_progress: watcher.delivery_progress.clone(),
+        }
+    }
 }

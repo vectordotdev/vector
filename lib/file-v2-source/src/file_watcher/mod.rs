@@ -74,7 +74,7 @@ impl DeliveryState {
 }
 
 impl DeliveryProgress {
-    fn new(offset: FilePosition) -> Self {
+    pub fn new(offset: FilePosition) -> Self {
         Self {
             state: Mutex::new(DeliveryState {
                 offset,
@@ -168,6 +168,19 @@ pub struct RawLine {
     pub bytes: Bytes,
 }
 
+/// Result of one read attempt, including completed discarded records.
+#[derive(Debug)]
+pub(super) enum ReadResult {
+    Line(RawLine),
+    Discarded {
+        start: FilePosition,
+        end: FilePosition,
+    },
+    /// No completed record and no proven EOF (budget exhausted or reader dead).
+    Yield,
+    Eof,
+}
+
 /// The `FileWatcher` struct defines the state machine which reads
 /// from a file path, transparently handling file rollovers as is common for logs.
 ///
@@ -192,7 +205,7 @@ pub struct FileWatcher {
     line_delimiter: Bytes,
     buf: BytesMut,
     reader: FileReader,
-    pub(super) delivery_progress: Option<Arc<DeliveryProgress>>,
+    pub(super) delivery_progress: Arc<DeliveryProgress>,
     compressed: bool,
     deletion_allowed: bool,
     opened_length: u64,
@@ -200,7 +213,6 @@ pub struct FileWatcher {
     prefix_length: Option<usize>,
     generation_prefix: Bytes,
     record_start: FilePosition,
-    pub(super) discarded: Option<(FilePosition, FilePosition)>,
 }
 
 enum FileReader {
@@ -276,21 +288,18 @@ impl FileWatcher {
                     FileReader::Gzip(Box::new(BufReader::new(gzip_multiple_decoder(reader)))),
                     0,
                 ),
-                (false, true, _) => {
-                    let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
-                    (FileReader::Plain(reader), pos)
-                }
-                (false, false, ReadFrom::Checkpoint(file_position)) => {
-                    let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
-                    (FileReader::Plain(reader), pos)
-                }
-                (false, false, ReadFrom::Beginning) => {
-                    let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
-                    (FileReader::Plain(reader), pos)
-                }
-                (false, false, ReadFrom::End) => {
-                    let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
-                    (FileReader::Plain(reader), pos)
+                (false, too_old, read_from) => {
+                    let seek_from = if too_old {
+                        SeekFrom::End(0)
+                    } else {
+                        match read_from {
+                            ReadFrom::Beginning => SeekFrom::Start(0),
+                            ReadFrom::End => SeekFrom::End(0),
+                            ReadFrom::Checkpoint(position) => SeekFrom::Start(position),
+                        }
+                    };
+                    let position = reader.seek(seek_from).await.unwrap();
+                    (FileReader::Plain(reader), position)
                 }
             };
 
@@ -316,21 +325,14 @@ impl FileWatcher {
             buf: BytesMut::new(),
             deletion_allowed: !matches!(reader, FileReader::Empty),
             reader,
-            delivery_progress: None,
+            delivery_progress: Arc::new(DeliveryProgress::new(file_position)),
             compressed: gzipped,
             opened_length: metadata.len(),
             opened_modified: metadata.modified().ok(),
             prefix_length: None,
             generation_prefix: Bytes::new(),
             record_start: file_position,
-            discarded: None,
         })
-    }
-
-    pub(super) fn enable_delivery_tracking(&mut self) {
-        if self.delivery_progress.is_none() {
-            self.delivery_progress = Some(Arc::new(DeliveryProgress::new(self.file_position)));
-        }
     }
 
     pub(super) async fn capture_generation_prefix(
@@ -360,17 +362,22 @@ impl FileWatcher {
         self.identity == *identity
     }
 
-    pub(super) fn finish_partial(&mut self) -> Option<RawLine> {
+    pub(super) fn take_oversized(&mut self) -> Option<usize> {
+        self.line_reader.take_oversized()
+    }
+
+    pub(super) fn finish_partial(&mut self) -> ReadResult {
         match self.line_reader.finish(&mut self.buf) {
-            ReadOutcome::Line => Some(RawLine {
+            ReadOutcome::Line => ReadResult::Line(RawLine {
                 offset: self.record_start,
                 bytes: self.buf.split().freeze(),
             }),
-            ReadOutcome::Discarded => {
-                self.discarded = Some((self.record_start, self.file_position));
-                None
-            }
-            _ => None,
+            ReadOutcome::Discarded => ReadResult::Discarded {
+                start: self.record_start,
+                end: self.file_position,
+            },
+            ReadOutcome::Eof => ReadResult::Eof,
+            ReadOutcome::Yield => unreachable!("finishing a record has no read budget"),
         }
     }
 
@@ -379,10 +386,7 @@ impl FileWatcher {
             || !self.reached_eof
             || !self.buf.is_empty()
             || self.last_read_success.elapsed() < grace
-            || !self
-                .delivery_progress
-                .as_ref()
-                .is_some_and(|p| p.covers(self.file_position))
+            || !self.delivery_progress.covers(self.file_position)
         {
             return Ok(false);
         }
@@ -491,11 +495,8 @@ impl FileWatcher {
         self.record_start = 0;
         self.buf.clear();
         self.line_reader.reset();
-        self.discarded = None;
-        if let Some(progress) = &self.delivery_progress {
-            progress.failed();
-            self.delivery_progress = Some(Arc::new(DeliveryProgress::new(0)));
-        }
+        self.delivery_progress.failed();
+        self.delivery_progress = Arc::new(DeliveryProgress::new(0));
         self.generation_prefix = Bytes::new();
         self.capture_generation_prefix(self.prefix_length).await
     }
@@ -507,17 +508,18 @@ impl FileWatcher {
     #[cfg(test)]
     async fn read_line(&mut self) -> io::Result<Option<RawLine>> {
         loop {
-            let line = self.read_line_bounded(usize::MAX).await?;
-            if self.discarded.take().is_none() {
-                return Ok(line);
+            match self.read_line_bounded(usize::MAX).await? {
+                ReadResult::Line(line) => return Ok(Some(line)),
+                ReadResult::Discarded { .. } => {}
+                ReadResult::Yield | ReadResult::Eof => return Ok(None),
             }
         }
     }
 
-    pub(super) async fn read_line_bounded(&mut self, budget: usize) -> io::Result<Option<RawLine>> {
+    pub(super) async fn read_line_bounded(&mut self, budget: usize) -> io::Result<ReadResult> {
         self.reached_eof = false;
         if self.is_dead {
-            return Ok(None);
+            return Ok(ReadResult::Yield);
         }
 
         let reader: &mut (dyn AsyncBufRead + Send + Unpin) = match &mut self.reader {
@@ -525,7 +527,7 @@ impl FileWatcher {
             FileReader::Gzip(reader) => reader.as_mut(),
             FileReader::Empty => {
                 self.reached_eof = true;
-                return Ok(None);
+                return Ok(ReadResult::Eof);
             }
         };
         // Preserve whole-record reads for valid lines even with a tiny turn
@@ -547,28 +549,26 @@ impl FileWatcher {
         match result {
             Ok(ReadOutcome::Line) => {
                 self.reached_eof = false;
-                self.record_start = self.file_position;
+                let offset = std::mem::replace(&mut self.record_start, self.file_position);
                 self.track_read_success();
                 let bytes = self.buf.split().freeze();
-                // The call may finish a previously buffered record or skip
-                // oversized records. Derive the start from the completed record.
-                let offset =
-                    self.file_position - bytes.len() as u64 - self.line_delimiter.len() as u64;
 
                 debug!(
                     "read_line {}",
                     String::from_utf8_lossy(bytes::Buf::chunk(&bytes))
                 );
                 // Return all lines, including empty ones
-                Ok(Some(RawLine { offset, bytes }))
+                Ok(ReadResult::Line(RawLine { offset, bytes }))
             }
             Ok(ReadOutcome::Discarded) => {
-                self.discarded = Some((self.record_start, self.file_position));
-                self.record_start = self.file_position;
+                let start = std::mem::replace(&mut self.record_start, self.file_position);
                 self.track_read_success();
-                Ok(None)
+                Ok(ReadResult::Discarded {
+                    start,
+                    end: self.file_position,
+                })
             }
-            Ok(ReadOutcome::Yield) => Ok(None),
+            Ok(ReadOutcome::Yield) => Ok(ReadResult::Yield),
             Ok(ReadOutcome::Eof) => {
                 if matches!(self.reader, FileReader::Gzip(_)) {
                     self.reader = FileReader::Empty;
@@ -576,7 +576,7 @@ impl FileWatcher {
                 // A renamed file can still receive writes through an open handle.
                 // FileServer retires missing readers after an idle timeout at EOF.
                 self.reached_eof = true;
-                Ok(None)
+                Ok(ReadResult::Eof)
             }
 
             Err(e) => {
@@ -666,7 +666,6 @@ mod tests {
             FileWatcher::new(path, ReadFrom::End, None, 1024, Bytes::from_static(b"\n"))
                 .await
                 .unwrap();
-        watcher.enable_delivery_tracking();
         assert!(watcher.read_line().await.unwrap().is_none());
         assert!(watcher.ready_to_delete(Duration::ZERO).await.unwrap());
     }
@@ -740,16 +739,16 @@ mod tests {
             .await
             .unwrap();
             assert!(watcher.read_line().await.unwrap().is_none());
-            let line = watcher.finish_partial();
-            assert_eq!(
-                line.as_ref()
-                    .map(|line| std::str::from_utf8(&line.bytes).unwrap()),
-                expected
-            );
-            if let Some(line) = line {
-                assert_eq!(line.offset, 0);
-            } else {
-                assert_eq!(watcher.discarded, Some((0, input.len() as u64)));
+            match watcher.finish_partial() {
+                ReadResult::Line(line) => {
+                    assert_eq!(Some(std::str::from_utf8(&line.bytes).unwrap()), expected);
+                    assert_eq!(line.offset, 0);
+                }
+                ReadResult::Discarded { start, end } => {
+                    assert_eq!(expected, None);
+                    assert_eq!((start, end), (0, input.len() as u64));
+                }
+                result => panic!("expected a terminal record, got {result:?}"),
             }
         }
     }
@@ -856,10 +855,9 @@ mod tests {
         )
         .await
         .unwrap();
-        watcher.enable_delivery_tracking();
         while watcher.read_line().await.unwrap().is_some() {}
         assert!(!watcher.ready_to_delete(Duration::ZERO).await.unwrap());
-        let progress = watcher.delivery_progress.as_ref().unwrap().clone();
+        let progress = watcher.delivery_progress.clone();
         progress.delivered(8);
         assert!(watcher.ready_to_delete(Duration::ZERO).await.unwrap());
         assert!(!watcher
@@ -915,15 +913,14 @@ mod tests {
         )
         .await
         .unwrap();
-        watcher.enable_delivery_tracking();
         while watcher.read_line().await.unwrap().is_some() {}
-        let old_progress = watcher.delivery_progress.as_ref().unwrap().clone();
+        let old_progress = watcher.delivery_progress.clone();
         fs::write(&path, "new\n").await.unwrap();
         watcher.check_for_truncation().await.unwrap();
         while watcher.read_line().await.unwrap().is_some() {}
         assert!(!old_progress.delivered(4));
         assert!(!watcher.ready_to_delete(Duration::ZERO).await.unwrap());
-        watcher.delivery_progress.as_ref().unwrap().delivered(4);
+        watcher.delivery_progress.delivered(4);
         assert!(watcher.ready_to_delete(Duration::ZERO).await.unwrap());
     }
 
@@ -974,11 +971,16 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(watcher.read_line_bounded(64).await.unwrap().is_none());
+        assert!(matches!(
+            watcher.read_line_bounded(64).await.unwrap(),
+            ReadResult::Yield
+        ));
         assert!(!watcher.reached_eof());
         fs::write(&path, "new\n").await.unwrap();
         watcher.check_for_truncation().await.unwrap();
-        let line = watcher.read_line_bounded(64).await.unwrap().unwrap();
+        let ReadResult::Line(line) = watcher.read_line_bounded(64).await.unwrap() else {
+            panic!("expected replacement line");
+        };
         assert_eq!(line.bytes, "new");
         assert_eq!(line.offset, 0);
     }

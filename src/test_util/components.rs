@@ -51,7 +51,7 @@ pub const SOCKET_PULL_SOURCE_TAGS: [&str; 2] = ["remote_addr", "protocol"];
 pub const FILE_SOURCE_TAGS: [&str; 1] = ["file"];
 
 /// The standard set of tags for the improved file source.
-pub const FILE_V2_SOURCE_TAGS: [&str; 1] = ["file_v2"];
+pub const FILE_V2_SOURCE_TAGS: [&str; 1] = ["file"];
 
 /// The component test specification for the file_v2 source.
 pub static FILE_V2_SOURCE_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTests {

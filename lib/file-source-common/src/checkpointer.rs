@@ -70,6 +70,11 @@ impl CheckpointsView {
         self.checkpoints.get(&fng).map(|r| *r.value())
     }
 
+    /// Cancel retirement when a reader starts tracking this fingerprint again.
+    pub fn set_live(&self, fng: FileFingerprint) {
+        self.removed_times.remove(&fng);
+    }
+
     pub fn set_dead(&self, fng: FileFingerprint) {
         self.removed_times.insert(fng, Utc::now());
     }
