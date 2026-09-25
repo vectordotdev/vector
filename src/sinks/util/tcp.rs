@@ -1,13 +1,15 @@
 use std::{
-    io::ErrorKind,
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::{SinkExt, StreamExt, stream::BoxStream, task::noop_waker_ref};
+use futures::{
+    SinkExt, Stream, StreamExt, future::poll_fn, stream::BoxStream, task::noop_waker_ref,
+};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::{AsyncRead, ReadBuf},
@@ -26,20 +28,26 @@ use crate::{
     dns,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, SocketSendError, TcpSocketConnectionEstablished,
-        TcpSocketConnectionShutdown, TcpSocketOutgoingConnectionError,
+        ConnectionOpen, OpenGauge, OpenToken, SocketMode, SocketSendError,
+        TcpSocketConnectionEstablished, TcpSocketConnectionShutdown,
+        TcpSocketOutgoingConnectionError,
     },
-    sink_ext::VecSinkExt,
     sinks::{
         Healthcheck, VectorSink,
         util::{
             EncodedEvent, SinkBuildError, StreamSink,
-            socket_bytes_sink::{BytesSink, ShutdownCheck},
+            socket_bytes_sink::{
+                BytesSink, MAX_PENDING_ITEMS, PendingBatch, ShutdownCheck, is_peer_shutdown_error,
+            },
         },
     },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
 };
+
+fn emit_tcp_connection_open(count: usize) {
+    emit!(ConnectionOpen { count });
+}
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -254,12 +262,28 @@ impl<E> TcpSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync + 'static,
 {
+    const SEND_FAILURE_MAX_BACKOFF: Duration = Duration::from_secs(5);
+
     const fn new(connector: TcpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
             transformer,
             encoder,
         }
+    }
+
+    fn fresh_send_failure_backoff() -> ExponentialBackoff {
+        ExponentialBackoff::default().max_delay(Self::SEND_FAILURE_MAX_BACKOFF)
+    }
+
+    fn add_full_jitter(d: Duration) -> Duration {
+        let max_millis = u64::try_from(d.as_millis()).unwrap_or(u64::MAX);
+        if max_millis == 0 {
+            return Duration::ZERO;
+        }
+
+        let jitter_millis = (rand::random::<u64>() % max_millis) + 1;
+        Duration::from_millis(jitter_millis)
     }
 
     async fn connect(&self) -> BytesSink<MaybeTlsStream<TcpStream>> {
@@ -329,28 +353,124 @@ where
             })
             .peekable();
 
-        while Pin::new(&mut input).peek().await.is_some() {
-            let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
+        // Keep queued events in memory until a flush succeeds. If the connection fails after
+        // partially writing bytes, we resend the unflushed events on reconnect (at-least-once).
+        let mut pending_batch = PendingBatch::new();
+        let mut connection: Option<(BytesSink<MaybeTlsStream<TcpStream>>, OpenToken<fn(usize)>)> =
+            None;
+        let mut send_failure_backoff = Self::fresh_send_failure_backoff();
+        let mut flush_chunk = MAX_PENDING_ITEMS;
 
-            let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
-                Ok(()) => sink.close().await,
-                Err(error) => Err(error),
-            };
+        loop {
+            if pending_batch.is_empty() {
+                poll_fn(|cx| {
+                    let mut input = Pin::new(&mut input);
+                    loop {
+                        if pending_batch.is_full() {
+                            return Poll::Ready(());
+                        }
+                        match input.as_mut().poll_peek(cx) {
+                            Poll::Pending => {
+                                return if pending_batch.is_empty() {
+                                    Poll::Pending
+                                } else {
+                                    Poll::Ready(())
+                                };
+                            }
+                            Poll::Ready(None) => return Poll::Ready(()),
+                            Poll::Ready(Some(_)) => match input.as_mut().poll_next(cx) {
+                                Poll::Ready(Some(item)) => pending_batch.push(item),
+                                Poll::Ready(None) => return Poll::Ready(()),
+                                Poll::Pending => {
+                                    return if pending_batch.is_empty() {
+                                        Poll::Pending
+                                    } else {
+                                        Poll::Ready(())
+                                    };
+                                }
+                            },
+                        }
+                    }
+                })
+                .await;
 
-            // TODO we can consider retrying once in the Error case. This sink is a "best effort"
-            // delivery due to the nature of the underlying protocol.
-            // For now, if an error occurs we cannot assume that the events succeeded in delivery
-            // so we will emit `Error` / `EventsDropped` internal events regardless of if the server
-            // responded with Ok(0).
-            if let Err(error) = result {
-                if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(TcpSocketConnectionShutdown {});
+                if pending_batch.is_empty() {
+                    if let Some((mut sink, _open_token)) = connection.take()
+                        && let Err(error) = sink.close().await
+                    {
+                        emit!(SocketSendError {
+                            mode: SocketMode::Tcp,
+                            error
+                        });
+                    }
+                    break;
                 }
-                emit!(SocketSendError {
-                    mode: SocketMode::Tcp,
-                    error
-                });
+            }
+
+            if connection.is_none() {
+                let sink = self.connect().await;
+                let open_token = OpenGauge::new().open(emit_tcp_connection_open as fn(usize));
+                connection = Some((sink, open_token));
+            }
+
+            // Flush in chunks and retire each chunk as soon as it lands. A peer that closes the
+            // connection at a fixed record or byte boundary would otherwise make every reconnect
+            // restart from the first event, resending the same prefix forever without the suffix
+            // ever being attempted.
+            let mut send_error = None;
+            while !pending_batch.is_empty() {
+                let chunk_len = flush_chunk.min(pending_batch.len());
+                let chunk_result: std::io::Result<()> = async {
+                    let (sink, _open_token) = connection
+                        .as_mut()
+                        .expect("connection should be initialized before send");
+                    for enc in pending_batch.head(chunk_len) {
+                        let wire = EncodedEvent {
+                            item: enc.item.clone(),
+                            finalizers: Default::default(),
+                            byte_size: enc.byte_size,
+                            json_byte_size: enc.json_byte_size,
+                        };
+                        sink.feed(wire).await?;
+                    }
+                    sink.flush().await
+                }
+                .await;
+
+                match chunk_result {
+                    Ok(()) => {
+                        pending_batch.ack_delivered(chunk_len);
+                        // Ramp back up so a transient failure does not permanently cap throughput.
+                        flush_chunk = flush_chunk.saturating_mul(2).min(MAX_PENDING_ITEMS);
+                    }
+                    Err(error) => {
+                        // Halve the unit of work so a peer limit smaller than the current chunk
+                        // converges on a size that fits instead of failing indefinitely.
+                        flush_chunk = (chunk_len / 2).max(1);
+                        send_error = Some(error);
+                        break;
+                    }
+                }
+            }
+
+            match send_error {
+                None => send_failure_backoff.reset(),
+                Some(error) => {
+                    if is_peer_shutdown_error(&error) {
+                        emit!(TcpSocketConnectionShutdown {});
+                    }
+                    emit!(SocketSendError {
+                        mode: SocketMode::Tcp,
+                        error
+                    });
+                    if let Some((mut sink, _open_token)) = connection.take() {
+                        _ = sink.close().await;
+                    }
+
+                    if let Some(delay) = send_failure_backoff.next() {
+                        sleep(Self::add_full_jitter(delay)).await;
+                    }
+                }
             }
         }
 
@@ -360,6 +480,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
+
     use tokio::net::TcpListener;
 
     use super::*;
@@ -377,5 +499,20 @@ mod test {
         let (_guard, addr) = next_addr();
         let bad = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(bad.healthcheck().await.is_err());
+    }
+
+    #[test]
+    fn send_failure_jitter_stays_bounded() {
+        let max = Duration::from_millis(500);
+        let mut backoff = ExponentialBackoff::from_millis(2)
+            .factor(250)
+            .max_delay(max);
+
+        for _ in 0..32 {
+            let delay =
+                TcpSink::<crate::codecs::Encoder<()>>::add_full_jitter(backoff.next().unwrap());
+            assert!(delay > Duration::ZERO);
+            assert!(delay <= max);
+        }
     }
 }
