@@ -49,3 +49,34 @@ async fn assert_fair_reads(
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn oversized_records_do_not_monopolize_file_turns() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    for name in ["a", "b"] {
+        let oversized = format!("{}\n", name.repeat(1024)).repeat(128);
+        std::fs::write(
+            fixture.input.join(format!("{name}.log")),
+            format!("start-{name}\n{oversized}end-{name}\n"),
+        )?;
+    }
+    let mut run = fixture.start(
+        "*.log",
+        json!({
+            "max_line_bytes": 32, "max_read_bytes": 1024
+        }),
+    )?;
+    run.wait_count(4).await?;
+    let seen = run.stop(Signal::SIGTERM).await?;
+    let mut first = seen.messages[..2].to_vec();
+    first.sort();
+    assert_eq!(
+        first,
+        ["start-a", "start-b"],
+        "oversized backlog monopolized a file turn"
+    );
+    let mut all = seen.messages;
+    all.sort();
+    assert_eq!(all, ["end-a", "end-b", "start-a", "start-b"]);
+    Ok(())
+}

@@ -12,13 +12,13 @@ use tracing::{Instrument, Span, debug};
 use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source_common::{FileFingerprint, FingerprintStrategy, Fingerprinter};
-use vector_lib::finalizer::OrderedFinalizer;
 #[cfg(test)]
 use vector_lib::ifile_source::TestEvent;
 use vector_lib::ifile_source::{
     Checkpointer, FileServer, Line, NotifyPathsProvider, ReadFromConfig, calculate_ignore_before,
     paths_provider::GlobMatchOptions,
 };
+use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::internal_event::{
     ByteSize, CountByteSize, InternalEventHandle, RegisterInternalEvent,
 };
@@ -52,7 +52,10 @@ use crate::{
 
 /// Configuration for the `ifile` source.
 #[serde_as]
-#[configurable_component(source("ifile", "Collect logs from files with improved implementation."))]
+#[configurable_component(source(
+    "ifile",
+    "Collect logs from files with improved implementation."
+))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct FileConfig {
@@ -211,12 +214,19 @@ pub struct FileConfig {
     #[serde(default)]
     internal_metrics: FileInternalMetricsConfig,
 
-    /// How long to keep an open handle to a rotated log file.
-    /// The default value represents "no limit"
+    /// How long to retain an idle reader for a file no longer matched by `include`.
+    ///
+    /// The timeout starts at EOF after the file becomes undiscoverable. Reading new
+    /// bytes resets it, including bytes of an incomplete record. Readers still
+    /// draining data and files that remain discoverable are not retired by this timeout.
+    /// Writes made after the reader closes cannot be collected unless the file is discovered again.
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     #[configurable(metadata(docs::type_unit = "seconds"))]
-    #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
-    pub rotate_wait: Duration,
+    #[serde(
+        default = "default_reader_idle_timeout",
+        rename = "reader_idle_timeout_secs"
+    )]
+    pub reader_idle_timeout: Duration,
 }
 
 fn default_max_line_bytes() -> usize {
@@ -243,8 +253,8 @@ fn default_line_delimiter() -> String {
     "\n".to_string()
 }
 
-const fn default_rotate_wait() -> Duration {
-    Duration::from_secs(u64::MAX / 2)
+const fn default_reader_idle_timeout() -> Duration {
+    Duration::from_secs(30)
 }
 
 /// Configuration for how files should be identified.
@@ -322,8 +332,8 @@ impl From<FingerprintConfig> for FingerprintStrategy {
 pub(crate) struct FinalizerEntry {
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
-    pub(crate) deletion_progress:
-        Option<std::sync::Arc<vector_lib::ifile_source::DeletionProgress>>,
+    pub(crate) delivery_progress:
+        Option<std::sync::Arc<vector_lib::ifile_source::DeliveryProgress>>,
 }
 
 impl Default for FileConfig {
@@ -350,7 +360,7 @@ impl Default for FileConfig {
             acknowledgements: Default::default(),
             log_namespace: None,
             internal_metrics: Default::default(),
-            rotate_wait: default_rotate_wait(),
+            reader_idle_timeout: default_reader_idle_timeout(),
         }
     }
 }
@@ -581,8 +591,9 @@ pub fn ifile_source(
             config.ignore_not_found,
         ),
         remove_after: config.remove_after_secs.map(Duration::from_secs),
+        acknowledgements,
         emitter,
-        rotate_wait: config.rotate_wait,
+        reader_idle_timeout: config.reader_idle_timeout,
         checkpoint_interval,
         #[cfg(not(test))]
         test_sender: None,
@@ -620,14 +631,14 @@ pub fn ifile_source(
             while let Some((status, entry)) = ack_stream.next().await {
                 if status == BatchStatus::Delivered {
                     if entry
-                        .deletion_progress
+                        .delivery_progress
                         .as_ref()
                         .is_none_or(|progress| progress.delivered(entry.offset))
                     {
                         checkpoints.update(entry.file_id, entry.offset);
                     }
-                } else if let Some(progress) = entry.deletion_progress {
-                    // A later successful record must not authorize deleting a failed one.
+                } else if let Some(progress) = entry.delivery_progress {
+                    // A later success must not checkpoint past or authorize deleting a failed record.
                     progress.failed();
                 }
             }
@@ -704,13 +715,13 @@ pub fn ifile_source(
                 let entry = FinalizerEntry {
                     file_id: line.file_id,
                     offset: line.end_offset,
-                    deletion_progress: line.deletion_progress.clone(),
+                    delivery_progress: line.delivery_progress.clone(),
                 };
                 finalizer.add(entry, receiver);
             } else if !track_handoff {
                 checkpoints.update(line.file_id, line.end_offset);
             }
-            (event, line.file_id, line.deletion_progress, line.end_offset)
+            (event, line.file_id, line.delivery_progress, line.end_offset)
         });
 
         let mut out_source_sender = out.source_sender;
@@ -793,7 +804,7 @@ fn wrap_with_line_agg(
                         line.file_id,
                         line.start_offset,
                         line.end_offset,
-                        line.deletion_progress,
+                        line.delivery_progress,
                     ),
                 )
             }),
@@ -801,7 +812,7 @@ fn wrap_with_line_agg(
         )
         .map(
             |(filename, text, (file_id, start_offset, initial_end, progress), lastline_context)| {
-                let (_, _, end_offset, deletion_progress) =
+                let (_, _, end_offset, delivery_progress) =
                     lastline_context.unwrap_or((file_id, start_offset, initial_end, progress));
                 Line {
                     text,
@@ -809,7 +820,7 @@ fn wrap_with_line_agg(
                     file_id,
                     start_offset,
                     end_offset,
-                    deletion_progress,
+                    delivery_progress,
                 }
             },
         ),
@@ -1113,8 +1124,9 @@ mod tests {
                 line_delimiter: Bytes::from_static(b"\n"),
                 fingerprinter: Fingerprinter::new(FingerprintStrategy::DevInode, 4096, false),
                 remove_after: None,
+                acknowledgements: false,
                 emitter,
-                rotate_wait: Duration::from_secs(60),
+                reader_idle_timeout: Duration::from_secs(60),
                 checkpoint_interval: Duration::from_secs(60),
                 test_sender: None,
             };
@@ -1300,6 +1312,18 @@ mod tests {
             "empty delimiters must fail source construction"
         );
         assert!(result.err().unwrap().to_string().contains("line_delimiter"));
+    }
+
+    #[test]
+    fn reader_idle_timeout_has_finite_default_and_canonical_name() {
+        assert_eq!(
+            FileConfig::default().reader_idle_timeout,
+            Duration::from_secs(30)
+        );
+        let config: FileConfig =
+            serde_yaml::from_str("include: []\nreader_idle_timeout_secs: 2").unwrap();
+        assert_eq!(config.reader_idle_timeout, Duration::from_secs(2));
+        assert!(serde_yaml::from_str::<FileConfig>("include: []\nrotate_wait_secs: 2").is_err());
     }
 
     #[test]
@@ -2864,6 +2888,149 @@ mod tests {
                 "CRLF is how we end".into(),
                 "please treat us well".into()
             ]
+        );
+    }
+
+    #[tokio::test]
+    async fn failed_delivery_without_deletion_replays_after_restart() {
+        use vector_lib::event::Finalizable;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("file");
+        let healthy_path = dir.path().join("healthy");
+        let config = FileConfig {
+            include: vec![path.clone(), healthy_path.clone()],
+            remove_after_secs: None,
+            checkpoint_interval: Duration::from_secs(3600),
+            ..test_default_file_config(&dir)
+        };
+        fs::write(&path, "P\nA\nB\n").await.unwrap();
+        let (tx, mut rx) = SourceSender::new_test();
+        let (stop, shutdown, _) = ShutdownSignal::new_wired();
+        let task = tokio::spawn(ifile_source(
+            &config,
+            dir.path().to_path_buf(),
+            shutdown,
+            Senders {
+                source_sender: tx,
+                test_sender: None,
+            },
+            true,
+            LogNamespace::Legacy,
+        ));
+        for (message, status) in [
+            ("P", EventStatus::Delivered),
+            ("A", EventStatus::Errored),
+            ("B", EventStatus::Delivered),
+        ] {
+            let mut event = timeout(Duration::from_secs(5), rx.next())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                event.as_log().get_message().unwrap().to_string_lossy(),
+                message
+            );
+            let finalizers = event.take_finalizers();
+            finalizers.update_status(status);
+            drop(finalizers);
+        }
+        // A failure in one file must not block checkpointing another file.
+        fs::write(&healthy_path, "healthy-before\n").await.unwrap();
+        let mut event = timeout(Duration::from_secs(5), rx.next())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            event.as_log().get_message().unwrap().to_string_lossy(),
+            "healthy-before"
+        );
+        let finalizers = event.take_finalizers();
+        finalizers.update_status(EventStatus::Delivered);
+        drop(finalizers);
+        drop(stop);
+        timeout(Duration::from_secs(5), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let checkpoint: serde_json::Value =
+            serde_json::from_slice(&fs::read(dir.path().join("checkpoints.json")).await.unwrap())
+                .unwrap();
+
+        // C proves that the restarted reader is making progress; the assertion
+        // does not rely on waiting for the absence of replayed records.
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .await
+            .unwrap();
+        file.write_all(b"C\n").await.unwrap();
+        file.sync_all().await.unwrap();
+        let mut healthy_file = fs::OpenOptions::new()
+            .append(true)
+            .open(&healthy_path)
+            .await
+            .unwrap();
+        healthy_file.write_all(b"healthy-after\n").await.unwrap();
+        healthy_file.sync_all().await.unwrap();
+        let (tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+        let (stop, shutdown, _) = ShutdownSignal::new_wired();
+        let task = tokio::spawn(ifile_source(
+            &config,
+            dir.path().to_path_buf(),
+            shutdown,
+            Senders {
+                source_sender: tx,
+                test_sender: None,
+            },
+            true,
+            LogNamespace::Legacy,
+        ));
+        let mut replayed = Vec::new();
+        let mut healthy_replayed = Vec::new();
+        timeout(Duration::from_secs(5), async {
+            loop {
+                let event = rx.next().await.expect("source closed before reading C");
+                let message = event
+                    .as_log()
+                    .get_message()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
+                if message.starts_with("healthy-") {
+                    healthy_replayed.push(message);
+                } else {
+                    replayed.push(message);
+                }
+                if replayed.last().is_some_and(|message| message == "C")
+                    && healthy_replayed
+                        .last()
+                        .is_some_and(|message| message == "healthy-after")
+                {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("restarted source did not read C");
+        drop(stop);
+        assert!(
+            timeout(Duration::from_secs(5), rx.next())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        timeout(Duration::from_secs(5), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(healthy_replayed, ["healthy-after"]);
+        assert_eq!(
+            replayed,
+            ["A", "B", "C"],
+            "failed A must be replayed despite successful B; persisted checkpoint: {checkpoint}"
         );
     }
 
