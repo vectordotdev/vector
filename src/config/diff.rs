@@ -65,6 +65,36 @@ impl ConfigDiff {
             || self.sinks.is_removed(key)
             || self.enrichment_tables.is_removed(key)
     }
+
+    /// Returns components removed from the resulting topology.
+    pub fn removed_components(&self) -> HashSet<(&ComponentKey, &'static str)> {
+        self.sources
+            .to_remove
+            .iter()
+            .map(|key| (key, "source"))
+            .chain(
+                self.transforms
+                    .to_remove
+                    .iter()
+                    .map(|key| (key, "transform")),
+            )
+            .chain(self.sinks.to_remove.iter().map(|key| (key, "sink")))
+            .chain(
+                self.enrichment_tables
+                    .sources
+                    .to_remove
+                    .iter()
+                    .map(|key| (key, "source")),
+            )
+            .chain(
+                self.enrichment_tables
+                    .sinks
+                    .to_remove
+                    .iter()
+                    .map(|key| (key, "sink")),
+            )
+            .collect()
+    }
 }
 
 #[derive(Debug)]
