@@ -39,7 +39,7 @@ components: sources: file: {
 				permissions](#file-permissions) for more details.
 				""",
 		]
-		warnings: []
+		warnings: ["The `file` source is deprecated in favor of `file_v2`. See [migration guidance](https://vector.dev/deprecations/) before switching."]
 	}
 
 	installation: {

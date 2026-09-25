@@ -1,6 +1,6 @@
 package metadata
 
-generated: components: sources: ifile: configuration: {
+generated: components: sources: file_v2: configuration: {
 	acknowledgements: {
 		deprecated: true
 		description: """

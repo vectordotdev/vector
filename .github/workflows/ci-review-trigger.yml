@@ -12,7 +12,7 @@
 # /ci-run-all                 : runs all of the below
 # /ci-run-cli                 : runs CLI - Linux
 # /ci-run-test-vector-api     : runs make test-vector-api
-# /ci-run-test-ifile          : runs make test-ifile
+# /ci-run-test-file_v2          : runs make test-file_v2
 # /ci-run-test-behavior       : runs make test-behavior
 # /ci-run-check-examples      : runs make check-examples
 # /ci-run-test-docs           : runs make test-docs
@@ -70,7 +70,7 @@ jobs:
       startsWith(github.event.review.body, '/ci-run-all')
       || startsWith(github.event.review.body, '/ci-run-cli')
       || startsWith(github.event.review.body, '/ci-run-test-vector-api')
-      || startsWith(github.event.review.body, '/ci-run-test-ifile')
+      || startsWith(github.event.review.body, '/ci-run-test-file_v2')
       || startsWith(github.event.review.body, '/ci-run-test-behavior')
       || startsWith(github.event.review.body, '/ci-run-check-examples')
       || startsWith(github.event.review.body, '/ci-run-test-docs')
@@ -124,14 +124,14 @@ jobs:
       cargo_nextest: true
     secrets: inherit
 
-  make-test-ifile:
+  make-test-file_v2:
     needs: validate
-    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-ifile')
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-file_v2')
     uses: ./.github/workflows/test-make-command.yml
     with:
       ref: ${{ github.event.review.commit_id }}
-      command: test-ifile
-      job_name: make test-ifile
+      command: test-file_v2
+      job_name: make test-file_v2
       cargo_nextest: true
     secrets: inherit
 

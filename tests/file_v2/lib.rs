@@ -1,4 +1,4 @@
-//! Real-binary ifile tests. Run with `make test-ifile`.
+//! Real-binary file_v2 tests. Run with `make test-file_v2`.
 //!
 //! Scenarios use real files and source-filtered internal metrics. Readiness comes
 //! from observed output; timeouts bound failures without startup sleeps.

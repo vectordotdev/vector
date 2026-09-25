@@ -123,8 +123,8 @@ mod source {
             file: Option<String>,
         } => {
             bytes: Counter = match self.file {
-                Some(file) => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "ifile", "ifile" => file),
-                None => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "ifile"),
+                Some(file) => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "file_v2", "file_v2" => file),
+                None => counter!(CounterName::ComponentReceivedBytesTotal, "protocol" => "file_v2"),
             },
         }
 

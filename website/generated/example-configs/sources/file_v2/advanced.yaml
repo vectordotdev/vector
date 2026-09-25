@@ -1,6 +1,6 @@
 sources:
   my_source_id:
-    type: ifile
+    type: file_v2
     checkpoint_interval: 500
     data_dir: /var/local/lib/vector/
     exclude:

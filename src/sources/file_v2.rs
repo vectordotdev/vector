@@ -13,8 +13,8 @@ use vector_lib::codecs::{BytesDeserializer, BytesDeserializerConfig};
 use vector_lib::configurable::configurable_component;
 use vector_lib::file_source_common::{FileFingerprint, FingerprintStrategy, Fingerprinter};
 #[cfg(test)]
-use vector_lib::ifile_source::TestEvent;
-use vector_lib::ifile_source::{
+use vector_lib::file_v2_source::TestEvent;
+use vector_lib::file_v2_source::{
     Checkpointer, FileServer, Line, NotifyPathsProvider, ReadFromConfig, calculate_ignore_before,
     paths_provider::GlobMatchOptions,
 };
@@ -40,7 +40,7 @@ use crate::{
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
         StreamClosedError,
-        ifile::{
+        file_v2::{
             FileBytesReceived, FileEventsReceived, FileInternalMetricsConfig, FileOpen,
             FileSourceInternalEventsEmitter,
         },
@@ -50,10 +50,10 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
-/// Configuration for the `ifile` source.
+/// Configuration for the `file_v2` source.
 #[serde_as]
 #[configurable_component(source(
-    "ifile",
+    "file_v2",
     "Collect logs from files with improved implementation."
 ))]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -333,7 +333,7 @@ pub(crate) struct FinalizerEntry {
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
     pub(crate) delivery_progress:
-        Option<std::sync::Arc<vector_lib::ifile_source::DeliveryProgress>>,
+        Option<std::sync::Arc<vector_lib::file_v2_source::DeliveryProgress>>,
 }
 
 impl Default for FileConfig {
@@ -368,7 +368,7 @@ impl Default for FileConfig {
 impl_generate_config_from_default!(FileConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "ifile")]
+#[typetag::serde(name = "file_v2")]
 impl SourceConfig for FileConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.line_delimiter.is_empty() {
@@ -392,7 +392,7 @@ impl SourceConfig for FileConfig {
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(ifile_source(
+        Ok(file_v2_source(
             self,
             data_dir,
             cx.shutdown,
@@ -463,7 +463,7 @@ pub struct Senders {
     pub test_sender: Option<mpsc::UnboundedSender<TestEvent>>,
 }
 
-pub fn ifile_source(
+pub fn file_v2_source(
     config: &FileConfig,
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
@@ -669,7 +669,7 @@ pub fn ifile_source(
             .map(futures::stream::iter)
             .flatten()
             .map(move |mut line| {
-                trace!(message = "Bytes received.", byte_size = %line.text.len(), protocol = "ifile", file = %line.filename);
+                trace!(message = "Bytes received.", byte_size = %line.text.len(), protocol = "file_v2", file = %line.filename);
                 bytes_received
                     .get(&line.filename, |file| FileBytesReceived { file })
                     .emit(ByteSize(line.text.len()));
@@ -938,8 +938,8 @@ mod tests {
         config::Config,
         event::{Event, EventStatus, Value},
         shutdown::ShutdownSignal,
-        sources::ifile,
-        test_util::components::{IFILE_SOURCE_TAGS, IFILE_SOURCE_TESTS, assert_source},
+        sources::file_v2,
+        test_util::components::{FILE_V2_SOURCE_TAGS, FILE_V2_SOURCE_TESTS, assert_source},
     };
     use vrl::value;
 
@@ -1000,7 +1000,7 @@ mod tests {
         for tagged in [false, true] {
             for component in ["first", "second"] {
                 let id = format!("{component}-{tagged}");
-                let span = info_span!("source", component_id = %id, component_kind = "source", component_type = "ifile");
+                let span = info_span!("source", component_id = %id, component_kind = "source", component_type = "file_v2");
                 span.in_scope(|| {
                     let mut raw = FileMetricCache::<FileBytesReceived>::new(tagged);
                     let mut events = FileMetricCache::<FileEventsReceived>::new(tagged);
@@ -1048,11 +1048,11 @@ mod tests {
                 for metric in metrics {
                     let tags = metric.tags().unwrap();
                     assert_eq!(tags.get("component_kind"), Some("source"));
-                    assert_eq!(tags.get("component_type"), Some("ifile"));
+                    assert_eq!(tags.get("component_type"), Some("file_v2"));
                     let raw = metric.name() == "component_received_bytes_total";
-                    let path = tags.get(if raw { "ifile" } else { "file" });
-                    assert_eq!(tags.get("protocol"), raw.then_some("ifile"));
-                    assert_eq!(tags.get(if raw { "file" } else { "ifile" }), None);
+                    let path = tags.get(if raw { "file_v2" } else { "file" });
+                    assert_eq!(tags.get("protocol"), raw.then_some("file_v2"));
+                    assert_eq!(tags.get(if raw { "file" } else { "file_v2" }), None);
                     let (bytes, events) = if tagged {
                         match path {
                             Some("a.log") => (16, 3),
@@ -1118,7 +1118,7 @@ mod tests {
                 ),
                 max_read_bytes: read_budget,
                 ignore_checkpoints: false,
-                read_from: vector_lib::ifile_source::ReadFrom::Beginning,
+                read_from: vector_lib::file_v2_source::ReadFrom::Beginning,
                 ignore_before: None,
                 max_line_bytes: 4096,
                 line_delimiter: Bytes::from_static(b"\n"),
@@ -1183,7 +1183,7 @@ mod tests {
 
     #[tokio::test]
     async fn discovery_scan_removes_paths_without_notifications() {
-        use vector_lib::ifile_source::paths_provider::{PathUpdates, PathsProvider};
+        use vector_lib::file_v2_source::paths_provider::{PathUpdates, PathsProvider};
 
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("not-created-yet");
@@ -1271,11 +1271,11 @@ mod tests {
         crate::test_util::test_generate_config::<FileConfig>();
     }
 
-    fn test_default_file_config(dir: &tempfile::TempDir) -> ifile::FileConfig {
-        ifile::FileConfig {
+    fn test_default_file_config(dir: &tempfile::TempDir) -> file_v2::FileConfig {
+        file_v2::FileConfig {
             // These unit fixtures contain short records; E2E tests exercise the
             // production 1024-byte default.
-            fingerprint: ifile::FingerprintConfig::Checksum {
+            fingerprint: file_v2::FingerprintConfig::Checksum {
                 ignored_header_bytes: 0,
                 bytes: NonZeroUsize::new(2).unwrap(),
             },
@@ -1283,7 +1283,7 @@ mod tests {
             exclude: vec![dir.path().join("checkpoints*.json")],
             data_dir: Some(dir.path().to_path_buf()),
             checkpoint_interval: Duration::from_millis(100),
-            internal_metrics: ifile::FileInternalMetricsConfig {
+            internal_metrics: file_v2::FileInternalMetricsConfig {
                 include_file_tag: true,
             },
             ..Default::default()
@@ -1607,7 +1607,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1616,7 +1616,7 @@ mod tests {
         let path2 = dir.path().join("file2");
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             true,
             NoAcks,
@@ -1674,7 +1674,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1682,7 +1682,7 @@ mod tests {
         let path = dir.path().join("file");
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             NoAcks,
@@ -1712,14 +1712,14 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
         let path = dir.path().join("file");
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             NoAcks,
@@ -1784,7 +1784,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -1793,7 +1793,7 @@ mod tests {
         let archive_path = dir.path().join("file.old");
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             NoAcks,
@@ -1896,7 +1896,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*.txt"), dir.path().join("a.*")],
             exclude: vec![dir.path().join("a.*.txt")],
             ..test_default_file_config(&dir)
@@ -1908,7 +1908,7 @@ mod tests {
         let path4 = dir.path().join("a.ignore.txt");
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             NoAcks,
@@ -1965,7 +1965,7 @@ mod tests {
         let n = 5;
 
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("a//b/*.log.*")],
             exclude: vec![dir.path().join("a//b/test.log.*")],
             ..test_default_file_config(&dir)
@@ -1989,7 +1989,7 @@ mod tests {
         file2.flush().await.unwrap();
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             NoAcks,
@@ -2045,7 +2045,7 @@ mod tests {
         // Default
         {
             let dir = tempdir().unwrap();
-            let config = ifile::FileConfig {
+            let config = file_v2::FileConfig {
                 include: vec![dir.path().join("*")],
                 ..test_default_file_config(&dir)
             };
@@ -2053,7 +2053,7 @@ mod tests {
             let path = dir.path().join("file");
             let (tx, mut rx) = mpsc::unbounded_channel();
             let received =
-                run_ifile_source(&config, true, acks, LogNamespace::Legacy, Some(tx), async {
+                run_file_v2_source(&config, true, acks, LogNamespace::Legacy, Some(tx), async {
                     let mut file = File::create(&path).await.unwrap();
                     file.write_line("hello there").await.unwrap();
                     file.flush().await.unwrap();
@@ -2072,7 +2072,7 @@ mod tests {
         // Custom
         {
             let dir = tempdir().unwrap();
-            let config = ifile::FileConfig {
+            let config = file_v2::FileConfig {
                 include: vec![dir.path().join("*")],
                 file_key: OptionalValuePath::from(owned_value_path!("source")),
                 ..test_default_file_config(&dir)
@@ -2081,7 +2081,7 @@ mod tests {
             let path = dir.path().join("file");
             let (tx, mut rx) = mpsc::unbounded_channel();
             let received =
-                run_ifile_source(&config, true, acks, LogNamespace::Legacy, Some(tx), async {
+                run_file_v2_source(&config, true, acks, LogNamespace::Legacy, Some(tx), async {
                     let mut file = File::create(&path).await.unwrap();
                     file.write_line("hello there").await.unwrap();
                     file.flush().await.unwrap();
@@ -2100,7 +2100,7 @@ mod tests {
         // Hidden
         {
             let dir = tempdir().unwrap();
-            let config = ifile::FileConfig {
+            let config = file_v2::FileConfig {
                 include: vec![dir.path().join("*")],
                 ..test_default_file_config(&dir)
             };
@@ -2108,7 +2108,7 @@ mod tests {
             let path = dir.path().join("file");
             let (tx, mut rx) = mpsc::unbounded_channel();
             let received =
-                run_ifile_source(&config, true, acks, LogNamespace::Legacy, Some(tx), async {
+                run_file_v2_source(&config, true, acks, LogNamespace::Legacy, Some(tx), async {
                     let mut file = File::create(&path).await.unwrap();
                     file.write_line("hello there").await.unwrap();
                     file.flush().await.unwrap();
@@ -2150,7 +2150,7 @@ mod tests {
     // FIXME: sleeps should not be needed in here
     async fn file_start_position_server_restart(acking: AckingMode) {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -2163,7 +2163,7 @@ mod tests {
         // First time server runs it picks up existing lines.
         {
             let (tx, mut rx) = mpsc::unbounded_channel();
-            let received = run_ifile_source(
+            let received = run_file_v2_source(
                 &config,
                 true,
                 acking,
@@ -2184,7 +2184,7 @@ mod tests {
         // Restart server, read file from checkpoint.
         {
             let (tx, mut rx) = mpsc::unbounded_channel();
-            let received = run_ifile_source(
+            let received = run_file_v2_source(
                 &config,
                 true,
                 acking,
@@ -2204,14 +2204,14 @@ mod tests {
         }
         // Restart server, read files from beginning.
         {
-            let config = ifile::FileConfig {
+            let config = file_v2::FileConfig {
                 include: vec![dir.path().join("*")],
                 ignore_checkpoints: Some(true),
-                read_from: ifile::ReadFromConfig::Beginning,
+                read_from: file_v2::ReadFromConfig::Beginning,
                 ..test_default_file_config(&dir)
             };
             let (tx, mut rx) = mpsc::unbounded_channel();
-            let received = run_ifile_source(
+            let received = run_file_v2_source(
                 &config,
                 false,
                 acking,
@@ -2237,7 +2237,7 @@ mod tests {
     #[tokio::test]
     async fn file_start_position_server_restart_unfinalized() {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -2249,7 +2249,7 @@ mod tests {
 
         let (tx, mut rx) = mpsc::unbounded_channel();
         // First time server runs it picks up existing lines.
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             Unfinalized,
@@ -2263,7 +2263,7 @@ mod tests {
 
         // Restart server, it re-reads file since the events were not acknowledged before shutdown
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             Unfinalized,
@@ -2280,7 +2280,7 @@ mod tests {
     #[tokio::test]
     async fn file_duplicate_processing_after_restart() {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("file")],
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
@@ -2300,7 +2300,7 @@ mod tests {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         // First time server runs it should pick up a bunch of lines
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             true,
             Acks,
@@ -2322,7 +2322,7 @@ mod tests {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         // Restart the server, and it should read the rest without duplicating any
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             true,
             Acks,
@@ -2354,7 +2354,7 @@ mod tests {
 
     async fn file_start_position_server_restart_with_file_rotation(acking: AckingMode) {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             ..test_default_file_config(&dir)
         };
@@ -2364,7 +2364,7 @@ mod tests {
         // Run server first time, collect some lines.
         {
             let received =
-                run_ifile_source(&config, true, acking, LogNamespace::Legacy, None, async {
+                run_file_v2_source(&config, true, acking, LogNamespace::Legacy, None, async {
                     let mut file = File::create(&path).await.unwrap();
                     sleep_500_millis().await;
                     file.write_line("first line").await.unwrap();
@@ -2383,7 +2383,7 @@ mod tests {
         // even though it has a new name.
         {
             let received =
-                run_ifile_source(&config, false, acking, LogNamespace::Legacy, None, async {
+                run_file_v2_source(&config, false, acking, LogNamespace::Legacy, None, async {
                     let mut file = File::create(&path).await.unwrap();
                     sleep_500_millis().await;
                     file.write_line("second line").await.unwrap();
@@ -2410,7 +2410,7 @@ mod tests {
         };
 
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             ignore_older_secs: Some(5),
             ..test_default_file_config(&dir)
@@ -2450,7 +2450,7 @@ mod tests {
         newer_file.sync_all().await.unwrap();
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             true,
             NoAcks,
@@ -2491,14 +2491,14 @@ mod tests {
     #[tokio::test]
     async fn file_max_line_bytes() {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             max_line_bytes: 10,
             ..test_default_file_config(&dir)
         };
 
         let path = dir.path().join("file");
-        let received = run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+        let received = run_file_v2_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
             let mut file = File::create(&path).await.unwrap();
 
             sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -2532,7 +2532,7 @@ mod tests {
     #[tokio::test]
     async fn test_multi_line_aggregation() {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             multiline: Some(MultilineConfig {
                 start_pattern: "INFO".to_owned(),
@@ -2545,7 +2545,7 @@ mod tests {
 
         let path = dir.path().join("file");
         let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+            run_file_v2_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
                 let mut file = File::create(&path).await.unwrap();
 
                 sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -2595,7 +2595,7 @@ mod tests {
     #[tokio::test]
     async fn test_multi_line_checkpointing() {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             offset_key: Some(OptionalValuePath::from(owned_value_path!("offset"))),
             multiline: Some(MultilineConfig {
@@ -2615,7 +2615,7 @@ mod tests {
 
         // Finish shutdown and its checkpoint write before restarting the source.
         // Read and aggregate existing lines
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             true,
             Acks,
@@ -2632,7 +2632,7 @@ mod tests {
 
         // After restart, we should not see any part of the previously aggregated lines
         let received_after_restart =
-            run_ifile_source(&config, true, Acks, LogNamespace::Legacy, None, async {
+            run_file_v2_source(&config, true, Acks, LogNamespace::Legacy, None, async {
                 file.write_line("INFO goodbye").await.unwrap();
             })
             .await;
@@ -2651,7 +2651,7 @@ mod tests {
     #[tokio::test]
     async fn test_fair_reads() {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
@@ -2688,7 +2688,7 @@ mod tests {
         newer.sync_all().await.unwrap();
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             NoAcks,
@@ -2721,7 +2721,7 @@ mod tests {
     #[tokio::test]
     async fn test_split_reads() {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
@@ -2735,7 +2735,7 @@ mod tests {
         file.flush().await.unwrap();
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             NoAcks,
@@ -2774,7 +2774,7 @@ mod tests {
     async fn test_gzipped_file() {
         let dir = tempdir().unwrap();
         let path = PathBuf::from("tests/data/gzipped.log");
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![path.clone()],
             // TODO: remove this once files are fingerprinted after decompression
             //
@@ -2794,7 +2794,7 @@ mod tests {
         );
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             NoAcks,
@@ -2822,14 +2822,14 @@ mod tests {
     async fn test_non_utf8_encoded_file() {
         let dir = tempdir().unwrap();
         let path = PathBuf::from("tests/data/utf-16le.log");
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![path.clone()],
             encoding: Some(EncodingConfig { charset: UTF_16LE }),
             ..test_default_file_config(&dir)
         };
 
         let (tx, mut rx) = mpsc::unbounded_channel();
-        let received = run_ifile_source(
+        let received = run_file_v2_source(
             &config,
             false,
             NoAcks,
@@ -2856,7 +2856,7 @@ mod tests {
     #[tokio::test]
     async fn test_non_default_line_delimiter() {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("*")],
             line_delimiter: "\r\n".to_string(),
             ..test_default_file_config(&dir)
@@ -2864,7 +2864,7 @@ mod tests {
 
         let path = dir.path().join("file");
         let received =
-            run_ifile_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
+            run_file_v2_source(&config, false, NoAcks, LogNamespace::Legacy, None, async {
                 let mut file = File::create(&path).await.unwrap();
 
                 sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
@@ -2907,7 +2907,7 @@ mod tests {
         fs::write(&path, "P\nA\nB\n").await.unwrap();
         let (tx, mut rx) = SourceSender::new_test();
         let (stop, shutdown, _) = ShutdownSignal::new_wired();
-        let task = tokio::spawn(ifile_source(
+        let task = tokio::spawn(file_v2_source(
             &config,
             dir.path().to_path_buf(),
             shutdown,
@@ -2976,7 +2976,7 @@ mod tests {
         healthy_file.sync_all().await.unwrap();
         let (tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let (stop, shutdown, _) = ShutdownSignal::new_wired();
-        let task = tokio::spawn(ifile_source(
+        let task = tokio::spawn(file_v2_source(
             &config,
             dir.path().to_path_buf(),
             shutdown,
@@ -3040,7 +3040,7 @@ mod tests {
 
         for (acknowledgements, fail_first) in [(true, false), (false, false), (true, true)] {
             let dir = tempdir().unwrap();
-            let config = ifile::FileConfig {
+            let config = file_v2::FileConfig {
                 include: vec![dir.path().join("file")],
                 remove_after_secs: Some(1),
                 ..test_default_file_config(&dir)
@@ -3049,7 +3049,7 @@ mod tests {
             fs::write(&path, "one\ntwo\n").await.unwrap();
             let (tx, mut rx) = SourceSender::new_test();
             let (stop, shutdown, _) = ShutdownSignal::new_wired();
-            let task = tokio::spawn(ifile::ifile_source(
+            let task = tokio::spawn(file_v2::file_v2_source(
                 &config,
                 config.data_dir.clone().unwrap(),
                 shutdown,
@@ -3121,7 +3121,7 @@ mod tests {
     #[tokio::test]
     async fn remove_file_waits_for_handoff_without_acknowledgements() {
         let dir = tempdir().unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![dir.path().join("file")],
             remove_after_secs: Some(1),
             ..test_default_file_config(&dir)
@@ -3134,7 +3134,7 @@ mod tests {
             .flat_map(vector_lib::event::into_event_stream);
         let (test_tx, mut test_rx) = mpsc::unbounded_channel();
         let (stop, shutdown, _) = ShutdownSignal::new_wired();
-        let task = tokio::spawn(ifile::ifile_source(
+        let task = tokio::spawn(file_v2::file_v2_source(
             &config,
             config.data_dir.clone().unwrap(),
             shutdown,
@@ -3175,7 +3175,7 @@ mod tests {
         let path = dir.path().join("file");
         let contents = "record\n".repeat(2000);
         fs::write(&path, &contents).await.unwrap();
-        let config = ifile::FileConfig {
+        let config = file_v2::FileConfig {
             include: vec![path.clone()],
             remove_after_secs: Some(3600),
             checkpoint_interval: Duration::from_secs(3600),
@@ -3187,7 +3187,7 @@ mod tests {
             .flat_map(vector_lib::event::into_event_stream);
         let (test_tx, mut test_rx) = mpsc::unbounded_channel();
         let (stop, shutdown, _) = ShutdownSignal::new_wired();
-        let mut task = tokio::spawn(ifile::ifile_source(
+        let mut task = tokio::spawn(file_v2::file_v2_source(
             &config,
             config.data_dir.clone().unwrap(),
             shutdown,
@@ -3236,16 +3236,16 @@ mod tests {
     use AckingMode::*;
     use vector_lib::lookup::OwnedTargetPath;
 
-    async fn run_ifile_source(
-        config: &ifile::FileConfig,
+    async fn run_file_v2_source(
+        config: &file_v2::FileConfig,
         wait_shutdown: bool,
         acking_mode: AckingMode,
         log_namespace: LogNamespace,
-        test_sender: Option<mpsc::UnboundedSender<vector_lib::ifile_source::TestEvent>>,
+        test_sender: Option<mpsc::UnboundedSender<vector_lib::file_v2_source::TestEvent>>,
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
         // Make sure we're using the correct tags for file sources
-        assert_source(&IFILE_SOURCE_TESTS, &IFILE_SOURCE_TAGS, async move {
+        assert_source(&FILE_V2_SOURCE_TESTS, &FILE_V2_SOURCE_TAGS, async move {
             let (tx, rx) = if acking_mode == Acks {
                 let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
                 (tx, rx.boxed())
@@ -3258,7 +3258,7 @@ mod tests {
             let data_dir = config.data_dir.clone().unwrap();
             let acks = !matches!(acking_mode, NoAcks);
 
-            tokio::spawn(ifile::ifile_source(
+            tokio::spawn(file_v2::file_v2_source(
                 config,
                 data_dir,
                 shutdown,

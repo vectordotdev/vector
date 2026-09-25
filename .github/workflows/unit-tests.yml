@@ -1,7 +1,7 @@
 # Reusable Workflow: Tests
 #
 # Runs test suites via the Makefile. By default runs unit tests and component
-# validation. Callers can enable additional suites (CLI, Vector API, ifile, behavior)
+# validation. Callers can enable additional suites (CLI, Vector API, file_v2, behavior)
 # via boolean inputs.
 #
 # With coverage: false (default), plain cargo-nextest; uploads test results to Datadog.
@@ -45,8 +45,8 @@ on:
         required: false
         type: boolean
         default: false
-      ifile:
-        description: "Include real-binary ifile source tests"
+      file_v2:
+        description: "Include real-binary file_v2 source tests"
         required: false
         type: boolean
         default: false
@@ -107,7 +107,7 @@ jobs:
           add_suite "${{ inputs.component-validation }}" "component-validation-tests" "test(components::validation::tests)"
           add_suite "${{ inputs.cli }}" "cli-tests" "package(vector) & binary(=integration)"
           add_suite "${{ inputs.vector-api }}" "vector-api-tests" "binary(=vector_api)"
-          add_suite "${{ inputs.ifile }}" "ifile-tests" "binary(=ifile)"
+          add_suite "${{ inputs.file_v2 }}" "file_v2-tests" "binary(=file_v2)"
 
           # Skip `make test` entirely if no nextest-based suite was selected
           # (e.g. behavior-only runs). Running `make test` with empty FEATURES
