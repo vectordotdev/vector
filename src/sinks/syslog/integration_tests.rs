@@ -85,15 +85,47 @@ async fn run_sink(config: SyslogSinkConfig, event: Event) {
     .await;
 }
 
-async fn wait_for_log_contains(file_name: &str, needle: &str) -> String {
+/// Fields a receiver parsed out of one syslog message, as written by the JSON
+/// templates in `tests/integration/syslog/data`.
+#[derive(Debug)]
+struct ParsedRecord(serde_json::Value);
+
+impl ParsedRecord {
+    /// Returns a field as a string. syslog-ng may emit numeric macros as JSON
+    /// numbers, so numbers are rendered without quotes; missing fields are empty.
+    fn field(&self, name: &str) -> String {
+        match self.0.get(name) {
+            Some(serde_json::Value::String(s)) => s.clone(),
+            Some(serde_json::Value::Null) | None => String::new(),
+            Some(other) => other.to_string(),
+        }
+    }
+
+    /// The parsed MSG part. rsyslog keeps the space that follows an RFC 3164
+    /// TAG in `msg`, so leading whitespace is not significant here.
+    fn message(&self) -> String {
+        self.field("message").trim_start().to_owned()
+    }
+}
+
+/// Waits for a receiver to log a message whose parsed MSG contains `needle`.
+///
+/// The receiver log files are shared between tests (and across local runs),
+/// so every test uses a unique message and matches only its own record.
+async fn wait_for_record(file_name: &str, needle: &str) -> ParsedRecord {
     let path = syslog_log_dir().join(file_name);
     let started = Instant::now();
     let mut contents = String::new();
 
     while started.elapsed() <= Duration::from_secs(15) {
         contents = std::fs::read_to_string(&path).unwrap_or_default();
-        if contents.contains(needle) {
-            return contents;
+        let record = contents
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .map(ParsedRecord)
+            .find(|record| record.message().contains(needle));
+        if let Some(record) = record {
+            return record;
         }
 
         sleep(Duration::from_millis(100)).await;
@@ -105,27 +137,35 @@ async fn wait_for_log_contains(file_name: &str, needle: &str) -> String {
     );
 }
 
-fn assert_received_syslog(contents: &str, pri_prefix: &str, message: &str) {
-    // Assert against the specific line carrying this test's unique message:
-    // the receiver log files are shared between tests (and across local runs),
-    // so whole-file substring checks could be satisfied by another test's
-    // output.
-    let line = contents
-        .lines()
-        .find(|line| line.contains(message))
-        .unwrap_or_else(|| panic!("expected message {message:?} in rsyslog output:\n{contents}"));
+/// Asserts that the receiver parsed the PRI, HOSTNAME, APP-NAME, and MSG that
+/// the sink sent.
+fn assert_received_syslog(record: &ParsedRecord, pri: u8, message: &str) {
+    assert_received_header(record, pri);
+    assert_eq!(record.message(), message, "message mismatch: {record:?}");
+}
 
-    assert!(
-        line.contains(pri_prefix),
-        "expected PRI prefix {pri_prefix:?} in received line:\n{line}"
+/// Asserts that the receiver parsed the PRI, HOSTNAME, and APP-NAME that the
+/// sink sent.
+fn assert_received_header(record: &ParsedRecord, pri: u8) {
+    assert_eq!(
+        record.field("facility"),
+        (pri / 8).to_string(),
+        "facility mismatch: {record:?}"
     );
-    assert!(
-        line.contains("vector-integration-host"),
-        "expected host in received line:\n{line}"
+    assert_eq!(
+        record.field("severity"),
+        (pri % 8).to_string(),
+        "severity mismatch: {record:?}"
     );
-    assert!(
-        line.contains("vector-integration-app"),
-        "expected app name in received line:\n{line}"
+    assert_eq!(
+        record.field("hostname"),
+        "vector-integration-host",
+        "hostname mismatch: {record:?}"
+    );
+    assert_eq!(
+        record.field("app_name"),
+        "vector-integration-app",
+        "app name mismatch: {record:?}"
     );
 }
 
@@ -162,8 +202,8 @@ async fn udp_rfc3164_reaches_rsyslog() {
 
     run_sink(config, log_event(&message, "local0", "notice")).await;
 
-    let contents = wait_for_log_contains("udp.log", &message).await;
-    assert_received_syslog(&contents, "<133>", &message);
+    let record = wait_for_record("udp.log", &message).await;
+    assert_received_syslog(&record, 133, &message);
 }
 
 #[tokio::test]
@@ -187,8 +227,8 @@ async fn udp_rfc5424_reaches_rsyslog() {
 
     run_sink(config, log_event(&message, "local0", "info")).await;
 
-    let contents = wait_for_log_contains("udp.log", &message).await;
-    assert_received_syslog(&contents, "<134>1", &message);
+    let record = wait_for_record("udp.log", &message).await;
+    assert_received_syslog(&record, 134, &message);
 }
 
 #[tokio::test]
@@ -212,8 +252,8 @@ async fn tcp_newline_rfc3164_reaches_rsyslog() {
 
     run_sink(config, log_event(&message, "local1", "warning")).await;
 
-    let contents = wait_for_log_contains("tcp-line.log", &message).await;
-    assert_received_syslog(&contents, "<140>", &message);
+    let record = wait_for_record("tcp-line.log", &message).await;
+    assert_received_syslog(&record, 140, &message);
 }
 
 #[tokio::test]
@@ -237,8 +277,8 @@ async fn tcp_newline_rfc5424_reaches_rsyslog() {
 
     run_sink(config, log_event(&message, "local1", "err")).await;
 
-    let contents = wait_for_log_contains("tcp-line.log", &message).await;
-    assert_received_syslog(&contents, "<139>1", &message);
+    let record = wait_for_record("tcp-line.log", &message).await;
+    assert_received_syslog(&record, 139, &message);
 }
 
 #[tokio::test]
@@ -263,8 +303,8 @@ async fn tcp_octet_counting_rfc5424_reaches_rsyslog() {
 
     run_sink(config, log_event(&message, "local2", "crit")).await;
 
-    let contents = wait_for_log_contains("tcp-octet.log", &message).await;
-    assert_received_syslog(&contents, "<146>1", &message);
+    let record = wait_for_record("tcp-octet.log", &message).await;
+    assert_received_syslog(&record, 146, &message);
 }
 
 /// Verifies that `proc_id`, `msg_id`, and `structured_data` configured at the
@@ -310,20 +350,22 @@ async fn tcp_octet_counting_rfc5424_with_proc_id_msg_id_structured_data_reaches_
 
     run_sink(config, event).await;
 
-    let contents = wait_for_log_contains("tcp-octet.log", &message).await;
-    assert_received_syslog(&contents, "<150>1", &message);
-    assert!(
-        contents.contains(&proc_id),
-        "expected proc_id {proc_id:?} in rsyslog output:\n{contents}"
+    let record = wait_for_record("tcp-octet.log", &message).await;
+    assert_received_syslog(&record, 150, &message);
+    assert_eq!(
+        record.field("proc_id"),
+        proc_id,
+        "proc_id mismatch: {record:?}"
     );
-    assert!(
-        contents.contains(&msg_id),
-        "expected msg_id {msg_id:?} in rsyslog output:\n{contents}"
+    assert_eq!(
+        record.field("msg_id"),
+        msg_id,
+        "msg_id mismatch: {record:?}"
     );
-    let sd_fragment = format!("[metrics@1234 retry=\"{sd_param_value}\"]");
-    assert!(
-        contents.contains(&sd_fragment),
-        "expected structured-data element {sd_fragment:?} in rsyslog output:\n{contents}"
+    assert_eq!(
+        record.field("structured_data"),
+        format!("[metrics@1234 retry=\"{sd_param_value}\"]"),
+        "structured data mismatch: {record:?}"
     );
 }
 
@@ -352,11 +394,15 @@ async fn tcp_octet_counting_rfc5424_multiline_reaches_rsyslog() {
 
     run_sink(config, log_event(&message, "local2", "crit")).await;
 
-    let contents = wait_for_log_contains("tcp-octet.log", &second_line).await;
-    assert_received_syslog(&contents, "<146>1", &first_line);
+    let record = wait_for_record("tcp-octet.log", &first_line).await;
+    assert_received_header(&record, 146);
+    // rsyslog escapes control characters on receipt by default (LF becomes
+    // `#012`), so assert that both lines were parsed as a single message
+    // rather than comparing the separator byte.
+    let received = record.message();
     assert!(
-        contents.contains(&second_line),
-        "expected multiline message tail in rsyslog output:\n{contents}"
+        received.starts_with(&first_line) && received.ends_with(&second_line),
+        "expected both lines in a single parsed message: {record:?}"
     );
 }
 
@@ -407,8 +453,8 @@ async fn tcp_tls_octet_counting_rfc5424_to_syslog_ng() {
 
     run_sink(config, log_event(&message, "local3", "warning")).await;
 
-    let contents = wait_for_log_contains("syslog-ng-tcp-tls.log", &message).await;
-    assert_received_syslog(&contents, "<156>1", &message);
+    let record = wait_for_record("syslog-ng-tcp-tls.log", &message).await;
+    assert_received_syslog(&record, 156, &message);
 }
 
 #[tokio::test]
@@ -432,8 +478,8 @@ async fn udp_rfc5424_reaches_syslog_ng() {
 
     run_sink(config, log_event(&message, "local4", "info")).await;
 
-    let contents = wait_for_log_contains("syslog-ng-udp.log", &message).await;
-    assert_received_syslog(&contents, "<166>1", &message);
+    let record = wait_for_record("syslog-ng-udp.log", &message).await;
+    assert_received_syslog(&record, 166, &message);
 }
 
 #[tokio::test]
@@ -458,6 +504,6 @@ async fn tcp_octet_counting_rfc5424_reaches_syslog_ng() {
 
     run_sink(config, log_event(&message, "local5", "notice")).await;
 
-    let contents = wait_for_log_contains("syslog-ng-tcp-octet.log", &message).await;
-    assert_received_syslog(&contents, "<173>1", &message);
+    let record = wait_for_record("syslog-ng-tcp-octet.log", &message).await;
+    assert_received_syslog(&record, 173, &message);
 }
