@@ -11,6 +11,6 @@ pub trait SecretBackend: NamedComponent + core::fmt::Debug + Send + Sync {
     async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
-        signal_rx: &mut signal::SignalRx,
+        signal_rx: &mut tokio::sync::watch::Receiver<signal::ShutdownState>,
     ) -> crate::Result<HashMap<String, String>>;
 }
