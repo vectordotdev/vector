@@ -249,3 +249,84 @@ async fn repeated_unlinks_release_readers_but_discoverable_files_stay_open() -> 
     assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
     Ok(())
 }
+
+#[tokio::test]
+async fn rewrite_regrown_past_offset_reads_new_prefix_and_checkpoints_it() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    fixture.write("active.log", &["old".into()])?;
+    let options = json!({"fingerprint": {"strategy": "checksum", "bytes": 4}});
+    let mut run = fixture.start("*.log", options.clone())?;
+    run.wait_count(1).await?;
+    // Prevent the reader from observing the intermediate truncated length.
+    run.pause()?;
+    fixture.write("active.log", &["new first".into(), "new second".into()])?;
+    run.resume()?;
+    run.wait_count(3).await?;
+    assert_eq!(
+        run.stop(Signal::SIGTERM).await?.messages,
+        ["old", "new first", "new second"]
+    );
+    fixture.append("active.log", &["after restart".into()])?;
+    let mut run = fixture.start("*.log", options)?;
+    run.wait_count(1).await?;
+    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, ["after restart"]);
+    Ok(())
+}
+
+#[tokio::test]
+async fn tracked_file_below_prefix_survives_idle_retirement_and_growth() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    fixture.write("active.log", &["original contents".into()])?;
+    let options = json!({"fingerprint": {"strategy": "checksum", "bytes": 16}, "reader_idle_timeout_secs": 0});
+    let mut run = fixture.start("*.log", options.clone())?;
+    run.wait_count(1).await?;
+    fixture.write("active.log", &["new".into()])?;
+    run.wait_count(2).await?;
+    // Cross a reconciliation interval while the file cannot be fingerprinted.
+    tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
+    fixture.append("active.log", &["tiny".into()])?;
+    run.wait_count(3).await?;
+    fixture.append("active.log", &["grow past the fingerprint".into()])?;
+    run.wait_count(4).await?;
+    assert_eq!(
+        run.stop(Signal::SIGTERM).await?.messages,
+        [
+            "original contents",
+            "new",
+            "tiny",
+            "grow past the fingerprint"
+        ]
+    );
+    fixture.append("active.log", &["after restart".into()])?;
+    let mut run = fixture.start("*.log", options)?;
+    run.wait_count(1).await?;
+    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, ["after restart"]);
+    Ok(())
+}
+
+#[tokio::test]
+async fn retirement_emits_unterminated_record_after_late_append() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    std::fs::write(fixture.input.join("active.log"), "first\r\npartial")?;
+    let mut writer = OpenOptions::new()
+        .append(true)
+        .open(fixture.input.join("active.log"))?;
+    let mut run = fixture.start("*.log", json!({"fingerprint": {"strategy": "checksum", "bytes": 4}, "reader_idle_timeout_secs": 1, "line_delimiter": "\r\n"}))?;
+    run.wait_count(1).await?;
+    std::fs::rename(
+        fixture.input.join("active.log"),
+        fixture.input.join("rotated.1"),
+    )?;
+    writer.write_all(b" tail\r")?;
+    writer.sync_all()?;
+    run.wait_count(2).await?;
+    run.wait_for("retired partial reader", |seen| {
+        seen.open_files == Some(0.0)
+    })
+    .await?;
+    assert_eq!(
+        run.stop(Signal::SIGTERM).await?.messages,
+        ["first", "partial tail\r"]
+    );
+    Ok(())
+}
