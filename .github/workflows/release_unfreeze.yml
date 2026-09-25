@@ -70,6 +70,11 @@ jobs:
           # after the release workflow finishes. Failing on a transient state
           # would leave the closeout to a manual dispatch, so wait instead.
           DEADLINE_SECONDS: 600
+          # The automatic path must also survive a failed preparation: the
+          # next window's retry needs its freeze, so a failed Prepare release
+          # run blocks the automatic closeout. A manual dispatch is the
+          # documented cleanup path for a preparation that cannot finish.
+          AUTOMATIC: ${{ github.event_name == 'workflow_run' }}
         run: |
           deadline=$((SECONDS + DEADLINE_SECONDS))
           idle=0
@@ -115,6 +120,16 @@ jobs:
               # needs the freeze to recreate the release tag, and until it
               # succeeds no Release Suite run exists to check instead.
               latest+="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release_autotag.yml --limit 1 \
+                --json conclusion,url --jq '.[] | select(.conclusion != "success")
+                  | "\(.conclusion) \(.url)"')" || failed=1
+            fi
+            if (( failed == 0 )) && [[ "$AUTOMATIC" == "true" ]]; then
+              # A failed "Prepare release" run also keeps the freeze: it
+              # activated a window whose retry re-enters release_prepare.yml,
+              # which is the documented cleanup path, not this workflow. Only
+              # the automatic closeout is blocked by it; a manual dispatch
+              # remains the escape hatch for an unfinished preparation.
+              latest+="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release_prepare.yml --limit 1 \
                 --json conclusion,url --jq '.[] | select(.conclusion != "success")
                   | "\(.conclusion) \(.url)"')" || failed=1
             fi
