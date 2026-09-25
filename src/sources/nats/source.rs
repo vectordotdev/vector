@@ -1,11 +1,18 @@
-use async_nats::jetstream::consumer::PullConsumer;
+use std::time::Duration;
+
+use async_nats::jetstream::{
+    AckKind,
+    consumer::{AckPolicy, PullConsumer},
+    message::Acker,
+};
 use chrono::Utc;
-use futures::StreamExt;
+use futures::{StreamExt, stream::FuturesUnordered};
 use snafu::ResultExt;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{DecoderFramedRead, decoding::StreamDecodingError},
     config::{LegacyKey, LogNamespace},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver},
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, EventsReceived, EventsReceivedHandle,
         InternalEventHandle as _, Protocol,
@@ -29,7 +36,7 @@ use crate::{
 /// The outcome of processing a single NATS message.
 pub enum ProcessingStatus {
     /// The message payload was fully decoded and sent downstream.
-    Success,
+    Success(Option<BatchStatusReceiver>),
     /// A non-recoverable error occurred while decoding the payload.
     Failed,
     /// The downstream channel is closed, and the source should shut down.
@@ -46,9 +53,11 @@ pub async fn process_message(
     log_namespace: LogNamespace,
     out: &mut SourceSender,
     events_received: &EventsReceivedHandle,
+    acknowledgements: bool,
 ) -> ProcessingStatus {
     let mut framed = DecoderFramedRead::new(msg.payload.as_ref(), decoder.clone());
     let mut success = true;
+    let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(acknowledgements);
 
     while let Some(next) = framed.next().await {
         match next {
@@ -81,7 +90,7 @@ pub async fn process_message(
                             msg.subject.as_str(),
                         );
                     }
-                    event
+                    event.with_batch_notifier_option(&batch)
                 });
 
                 if out.send_batch(events).await.is_err() {
@@ -100,17 +109,87 @@ pub async fn process_message(
         }
     }
 
-    if success {
-        ProcessingStatus::Success
+    if !success {
+        return ProcessingStatus::Failed;
+    }
+
+    ProcessingStatus::Success(receiver)
+}
+
+fn ack_deadline(ack_wait: Duration, backoff: &[Duration]) -> Duration {
+    backoff
+        .first()
+        .copied()
+        .filter(|delay| !delay.is_zero())
+        .unwrap_or(ack_wait)
+}
+
+fn ack_progress_interval(ack_wait: Duration) -> Duration {
+    if ack_wait.is_zero() {
+        Duration::from_secs(1)
     } else {
-        ProcessingStatus::Failed
+        ack_wait
+            .checked_div(2)
+            .filter(|delay| !delay.is_zero())
+            .unwrap_or(ack_wait)
+    }
+}
+
+async fn send_progress(acker: &Acker, ack_wait: Duration) {
+    let mut progress = tokio::time::interval(ack_progress_interval(ack_wait));
+    loop {
+        progress.tick().await;
+        if let Err(error) = acker.ack_with(AckKind::Progress).await {
+            error!(
+                message = "Failed to extend JetStream message acknowledgement deadline.",
+                %error
+            );
+        }
+    }
+}
+
+async fn wait_for_delivery(
+    acker: &Acker,
+    receiver: &mut BatchStatusReceiver,
+    ack_wait: Duration,
+) -> BatchStatus {
+    tokio::select! {
+        status = &mut *receiver => status,
+        () = send_progress(acker, ack_wait) => {
+            unreachable!("progress acknowledgements never complete");
+        }
+    }
+}
+
+async fn acknowledge(acker: &Acker) {
+    if let Err(err) = acker.ack().await {
+        error!(message = "Failed to acknowledge JetStream message.", %err);
+    }
+}
+
+async fn finalize_message(acker: Acker, mut receiver: BatchStatusReceiver, ack_wait: Duration) {
+    if wait_for_delivery(&acker, &mut receiver, ack_wait).await == BatchStatus::Delivered {
+        acknowledge(&acker).await;
+    }
+}
+
+fn handle_ack_task_result(result: Result<(), tokio::task::JoinError>) {
+    if let Err(error) = result {
+        error!(message = "JetStream acknowledgement task failed.", %error);
+    }
+}
+
+async fn drain_ack_tasks(tasks: &mut FuturesUnordered<tokio::task::JoinHandle<()>>) {
+    while let Some(result) = tasks.next().await {
+        handle_ack_task_result(result);
     }
 }
 
 pub(crate) async fn create_consumer_stream(
     connection: &async_nats::Client,
     js_config: &JetStreamConfig,
-) -> Result<async_nats::jetstream::consumer::pull::Stream, BuildError> {
+    acknowledgements: bool,
+) -> Result<(async_nats::jetstream::consumer::pull::Stream, Duration), BuildError> {
     let js = async_nats::jetstream::new(connection.clone());
     let stream = js
         .get_stream(&js_config.stream)
@@ -120,23 +199,33 @@ pub(crate) async fn create_consumer_stream(
         .get_consumer(&js_config.consumer)
         .await
         .context(ConsumerSnafu)?;
-    consumer
+    let consumer_config = &consumer.cached_info().config;
+    if acknowledgements && consumer_config.ack_policy != AckPolicy::Explicit {
+        return Err(BuildError::InvalidAckPolicy {
+            policy: consumer_config.ack_policy,
+        });
+    }
+    let ack_wait = ack_deadline(consumer_config.ack_wait, &consumer_config.backoff);
+    let messages = consumer
         .stream()
         .max_messages_per_batch(js_config.batch_config.batch)
         .max_bytes_per_batch(js_config.batch_config.max_bytes)
         .messages()
         .await
-        .context(MessagesSnafu)
+        .context(MessagesSnafu)?;
+    Ok((messages, ack_wait))
 }
 
 pub async fn run_nats_jetstream(
     config: NatsSourceConfig,
     connection: async_nats::Client,
     initial_messages: async_nats::jetstream::consumer::pull::Stream,
+    mut ack_wait: Duration,
     decoder: Decoder,
     log_namespace: LogNamespace,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
+    acknowledgements: bool,
 ) -> Result<(), ()> {
     let events_received = register!(EventsReceived);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
@@ -148,6 +237,7 @@ pub async fn run_nats_jetstream(
         .expect("jetstream config must be present");
 
     let mut messages = initial_messages;
+    let mut finalizers = FuturesUnordered::new();
 
     loop {
         // `ShutdownSignal` fires once then polls `Pending` forever, so shutdown must be handled here via `select!`, not re-polled afterwards.
@@ -155,30 +245,46 @@ pub async fn run_nats_jetstream(
             tokio::select! {
                 biased;
 
-                _ = &mut shutdown => return Ok(()),
+                _ = &mut shutdown => {
+                    drop(messages);
+                    drop(out);
+                    drain_ack_tasks(&mut finalizers).await;
+                    return Ok(());
+                },
+
+                Some(result) = finalizers.next(), if !finalizers.is_empty() => {
+                    handle_ack_task_result(result);
+                }
 
                 maybe_msg = messages.next() => {
                     match maybe_msg {
                         Some(Ok(msg)) => {
+                            let (msg, acker) = msg.split();
                             backoff.reset();
                             bytes_received.emit(ByteSize(msg.payload.len()));
 
-                            let status = process_message(
-                                &msg,
-                                &config,
-                                &decoder,
-                                log_namespace,
-                                &mut out,
-                                &events_received,
-                            )
-                            .await;
+                            let status = tokio::select! {
+                                status = process_message(
+                                    &msg,
+                                    &config,
+                                    &decoder,
+                                    log_namespace,
+                                    &mut out,
+                                    &events_received,
+                                    acknowledgements,
+                                ) => status,
+                                () = send_progress(&acker, ack_wait) => {
+                                    unreachable!("progress acknowledgements never complete");
+                                }
+                            };
 
                             match status {
-                                ProcessingStatus::Success => {
-                                    if let Err(err) = msg.ack().await {
-                                        error!(message = "Failed to acknowledge JetStream message.", %err);
-                                    }
+                                ProcessingStatus::Success(Some(receiver)) => {
+                                    finalizers.push(crate::spawn_in_current_span(
+                                        finalize_message(acker, receiver, ack_wait)
+                                    ));
                                 }
+                                ProcessingStatus::Success(None) => acknowledge(&acker).await,
                                 ProcessingStatus::ChannelClosed => return Err(()),
                                 // Do not acknowledge on failure; the message will be redelivered.
                                 ProcessingStatus::Failed => {}
@@ -204,16 +310,31 @@ pub async fn run_nats_jetstream(
         drop(messages);
         loop {
             let delay = backoff.next().expect("backoff never ends");
-            tokio::select! {
-                _ = &mut shutdown => return Ok(()),
-                _ = tokio::time::sleep(delay) => {},
+            let reconnect = tokio::time::sleep(delay);
+            tokio::pin!(reconnect);
+
+            loop {
+                tokio::select! {
+                    _ = &mut shutdown => {
+                        drop(out);
+                        drain_ack_tasks(&mut finalizers).await;
+                        return Ok(());
+                    }
+
+                    Some(result) = finalizers.next(), if !finalizers.is_empty() => {
+                        handle_ack_task_result(result);
+                    }
+
+                    _ = &mut reconnect => break,
+                }
             }
 
-            match create_consumer_stream(&connection, js_config).await {
-                Ok(m) => {
+            match create_consumer_stream(&connection, js_config, acknowledgements).await {
+                Ok((new_messages, new_ack_wait)) => {
                     // Don't reset backoff on construction; a built stream hasn't pulled
                     // yet. Backoff is reset only after a message is successfully pulled.
-                    messages = m;
+                    messages = new_messages;
+                    ack_wait = new_ack_wait;
                     break;
                 }
                 Err(err) => {
@@ -258,6 +379,7 @@ pub async fn run_nats_core(
                             log_namespace,
                             &mut out,
                             &events_received,
+                            false,
                         )
                         .await;
 
@@ -295,4 +417,43 @@ pub async fn create_subscription(
     let subscription = subscription.context(SubscribeSnafu)?;
 
     Ok((nc, subscription))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{ack_deadline, ack_progress_interval};
+
+    #[test]
+    fn ack_deadline_prefers_first_backoff() {
+        assert_eq!(
+            ack_deadline(Duration::from_secs(30), &[Duration::from_millis(100)]),
+            Duration::from_millis(100)
+        );
+    }
+
+    #[test]
+    fn ack_deadline_ignores_zero_backoff() {
+        assert_eq!(
+            ack_deadline(Duration::from_secs(30), &[Duration::ZERO]),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn ack_deadline_uses_ack_wait_without_backoff() {
+        assert_eq!(
+            ack_deadline(Duration::from_secs(30), &[]),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn ack_progress_interval_is_half_deadline() {
+        assert_eq!(
+            ack_progress_interval(Duration::from_millis(100)),
+            Duration::from_millis(50)
+        );
+    }
 }
