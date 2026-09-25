@@ -124,7 +124,9 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             log_namespace: cx.log_namespace(None),
         };
         source.run(
-            self.address,
+            Some(self.address),
+            #[cfg(unix)]
+            None,
             self.path.as_str(),
             HttpMethod::Post,
             StatusCode::OK,

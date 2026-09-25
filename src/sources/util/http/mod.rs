@@ -30,6 +30,6 @@ pub use encoding::{decompress_body, emit_decompress_error, set_max_decompressed_
 pub use headers::add_headers;
 pub use method::HttpMethod;
 #[cfg(feature = "sources-utils-http-prelude")]
-pub use prelude::HttpSource;
+pub use prelude::{HttpSource, UnixSocketConfig};
 #[cfg(feature = "sources-utils-http-query")]
 pub use query::add_query_parameters;
