@@ -818,7 +818,7 @@ async fn run_insert_tests_with_config(
 
 async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) {
     let cx = SinkContext::default();
-    let commons = ElasticsearchCommon::parse_many(config, cx.proxy())
+    let commons = ElasticsearchCommon::parse_many(config, cx.proxy(), cx.globals.timezone())
         .await
         .expect("Config error");
     let index = match config.mode {

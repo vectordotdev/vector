@@ -3,7 +3,10 @@ use http::{Response, StatusCode, Uri};
 use http_body::Body as _;
 use hyper::Body;
 use serde::Deserialize;
-use vector_lib::config::{LogNamespace, proxy::ProxyConfig};
+use vector_lib::{
+    TimeZone,
+    config::{LogNamespace, proxy::ProxyConfig},
+};
 
 use super::{
     ElasticsearchApiVersion, ElasticsearchEncoder, Request, VersionType,
@@ -43,6 +46,7 @@ impl ElasticsearchCommon {
         endpoint: &HttpEndpoint,
         proxy_config: &ProxyConfig,
         version: &mut Option<usize>,
+        timezone: TimeZone,
     ) -> crate::Result<Self> {
         let uri = UriSerde::try_from(endpoint.as_uri().clone())?;
 
@@ -126,10 +130,10 @@ impl ElasticsearchCommon {
         let metric_config = config.metrics.clone().unwrap_or_default();
         let metric_to_log = MetricToLog::new(
             metric_config.host_tag.as_deref(),
-            metric_config.timezone.unwrap_or_default(),
+            metric_config.timezone.unwrap_or(timezone),
             LogNamespace::Legacy,
             metric_config.metric_tag_values,
-        );
+        )?;
 
         let service_type = config.opensearch_service_type;
 
@@ -273,6 +277,7 @@ impl ElasticsearchCommon {
     pub async fn parse_many(
         config: &ElasticsearchConfig,
         proxy_config: &ProxyConfig,
+        timezone: TimeZone,
     ) -> crate::Result<Vec<Self>> {
         let mut version = None;
         if let Some(endpoint) = config.endpoint.as_ref() {
@@ -281,7 +286,8 @@ impl ElasticsearchCommon {
             );
             if config.endpoints.is_empty() {
                 Ok(vec![
-                    Self::parse_config(config, endpoint, proxy_config, &mut version).await?,
+                    Self::parse_config(config, endpoint, proxy_config, &mut version, timezone)
+                        .await?,
                 ])
             } else {
                 Err(ParseError::EndpointsExclusive.into())
@@ -291,8 +297,10 @@ impl ElasticsearchCommon {
         } else {
             let mut commons = Vec::new();
             for endpoint in config.endpoints.iter() {
-                commons
-                    .push(Self::parse_config(config, endpoint, proxy_config, &mut version).await?);
+                commons.push(
+                    Self::parse_config(config, endpoint, proxy_config, &mut version, timezone)
+                        .await?,
+                );
             }
             Ok(commons)
         }
@@ -301,8 +309,8 @@ impl ElasticsearchCommon {
     /// Parses a single endpoint, else panics.
     #[cfg(test)]
     pub async fn parse_single(config: &ElasticsearchConfig) -> crate::Result<Self> {
-        let mut commons =
-            Self::parse_many(config, crate::config::SinkContext::default().proxy()).await?;
+        let cx = crate::config::SinkContext::default();
+        let mut commons = Self::parse_many(config, cx.proxy(), cx.globals.timezone()).await?;
         assert_eq!(commons.len(), 1);
         Ok(commons.remove(0))
     }

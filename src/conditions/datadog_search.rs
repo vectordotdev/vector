@@ -88,6 +88,7 @@ impl ConditionalConfig for DatadogSearchConfig {
         &self,
         _enrichment_tables: &vector_lib::enrichment::TableRegistry,
         _: &MetricsStorage,
+        _timezone: vector_lib::TimeZone,
     ) -> crate::Result<Condition> {
         Ok(Condition::DatadogSearch(self.try_into()?))
     }
@@ -1641,7 +1642,11 @@ mod test {
 
             // Every query should build successfully.
             let cond = config
-                .build(&Default::default(), &Default::default())
+                .build(
+                    &Default::default(),
+                    &Default::default(),
+                    vector_lib::TimeZone::default(),
+                )
                 .unwrap_or_else(|_| panic!("build failed: {source}"));
 
             assert!(

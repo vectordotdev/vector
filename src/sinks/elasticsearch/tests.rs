@@ -697,7 +697,14 @@ async fn test_parse_config_with_uri_auth() {
     let mut version = None;
     let endpoint = HttpEndpoint::parse("http://user:pass@localhost:9200").unwrap();
 
-    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
+    let result = ElasticsearchCommon::parse_config(
+        &config,
+        &endpoint,
+        &proxy,
+        &mut version,
+        vector_lib::TimeZone::default(),
+    )
+    .await;
     assert!(result.is_ok());
     let common = result.unwrap();
 
@@ -737,7 +744,14 @@ async fn test_parse_config_with_config_auth() {
     let mut version = None;
     let endpoint = HttpEndpoint::parse("http://localhost:9200").unwrap();
 
-    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
+    let result = ElasticsearchCommon::parse_config(
+        &config,
+        &endpoint,
+        &proxy,
+        &mut version,
+        vector_lib::TimeZone::default(),
+    )
+    .await;
     assert!(result.is_ok());
     let common = result.unwrap();
 
@@ -772,7 +786,14 @@ async fn test_parse_config_with_conflicting_auth() {
     let mut version = None;
     let endpoint = HttpEndpoint::parse("http://uri_user:uri_pass@localhost:9200").unwrap();
 
-    let result = ElasticsearchCommon::parse_config(&config, &endpoint, &proxy, &mut version).await;
+    let result = ElasticsearchCommon::parse_config(
+        &config,
+        &endpoint,
+        &proxy,
+        &mut version,
+        vector_lib::TimeZone::default(),
+    )
+    .await;
 
     // Should fail due to auth being specified in both places
     assert!(result.is_err());
