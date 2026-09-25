@@ -1,5 +1,5 @@
 # Close the release freeze window opened by "Prepare release". The window stays
-# open until the release workflow has merged its housekeeping PR and the
+# open until the release workflow has finished its housekeeping push and the
 # Kubernetes manifests push has landed, so this runs when "Refresh Kubernetes
 # manifests" completes, and waits for the other stages that may still be
 # pending. It revokes the temporary vectordotdev-bot direct-push bypasses before
@@ -66,9 +66,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           # The freeze outlives the manifests push: the release workflow also
-          # merges its housekeeping PR during the window, and that PR appears only
-          # after the release workflow finishes. Failing on a transient state
-          # would leave the closeout to a manual dispatch, so wait instead.
+          # pushes its housekeeping commit during the window. Failing on a
+          # transient state would leave the closeout to a manual dispatch, so
+          # wait instead.
           DEADLINE_SECONDS: 600
           # The automatic path must also survive a failed preparation: the
           # next window's retry needs its freeze, so a failed Prepare release
@@ -132,6 +132,30 @@ jobs:
               latest+="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release_prepare.yml --limit 1 \
                 --json conclusion,url --jq '.[] | select(.conclusion != "success")
                   | "\(.conclusion) \(.url)"')" || failed=1
+            fi
+            if (( failed == 0 )); then
+              # Correlate the manifests run with the release whose freeze this
+              # is: the Helm chart for the latest stable release must already
+              # be published on helm.vector.dev. A rerun of an older chart
+              # release dispatches a legitimate-looking refresh that changes
+              # nothing, and the real chart refresh for this release would then
+              # fail its active-freeze check, so keep waiting until the index
+              # carries this release's chart.
+              chart=$(curl -sSL --max-time 30 https://helm.vector.dev/index.yaml \
+                | awk '/^  vector:/{in_vector=1} in_vector && /^    version:/{print; exit}' \
+                | sed -nE 's/^    version: "?([0-9]+\.[0-9]+\.[0-9]+)"?$/\1/p')
+              if [[ -z "$chart" ]]; then
+                echo "Could not read the published chart version from helm.vector.dev." >&2
+                failed=1
+              else
+                release=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 30 \
+                  --json tagName,isPrerelease --jq '[.[] | select((.isPrerelease | not)
+                    and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))) | .tagName] | .[0]
+                    | ltrimstr("v")') || failed=1
+                if (( failed == 0 )) && [[ "$chart" != "$release" ]]; then
+                  latest+="chart $chart is not the latest release $release"
+                fi
+              fi
             fi
             if (( failed == 0 )); then
               open=$(gh pr list --repo "$GITHUB_REPOSITORY" --base master --app vectordotdev-bot \

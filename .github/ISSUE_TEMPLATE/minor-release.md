@@ -69,7 +69,7 @@ The tag starts the release workflow; do not create the tag or release branch man
       workflow to close the direct-push window after the manifests run succeeds.
   - It removes the temporary `vectordotdev-bot` **Always** bypass from every ruleset in
     `RELEASE_FREEZE_BOT_BYPASS`, then sets the `RELEASE_FREEZE_RULESET_ID` ruleset back to **Disabled**.
-    It waits for the housekeeping PR to merge and for any pending release or manifests run first,
+    It waits for the "Release Suite" run and any pending release workflow first,
     and gives up after ten minutes, leaving the freeze active.
   - Run it manually with `workflow_dispatch` if the release never starts the manifests workflow, if that
     run fails, or to retry a failed closeout.
