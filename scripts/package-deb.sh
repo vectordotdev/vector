@@ -49,6 +49,21 @@ rm -rf "$td"
 df -h
 
 #
+# Generate shell completions
+#
+
+mkdir -p "$PROJECT_ROOT/target/completion/bash" \
+         "$PROJECT_ROOT/target/completion/zsh" \
+         "$PROJECT_ROOT/target/completion/fish"
+VECTOR_BIN="$PROJECT_ROOT/target/$TARGET/$PROFILE/vector"
+"$VECTOR_BIN" completion bash > "$PROJECT_ROOT/target/completion/bash/vector"   2>/dev/null || \
+  touch "$PROJECT_ROOT/target/completion/bash/vector"
+"$VECTOR_BIN" completion zsh  > "$PROJECT_ROOT/target/completion/zsh/_vector"   2>/dev/null || \
+  touch "$PROJECT_ROOT/target/completion/zsh/_vector"
+"$VECTOR_BIN" completion fish > "$PROJECT_ROOT/target/completion/fish/vector.fish" 2>/dev/null || \
+  touch "$PROJECT_ROOT/target/completion/fish/vector.fish"
+
+#
 # Package
 #
 
