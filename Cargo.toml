@@ -463,6 +463,7 @@ socket2.workspace = true
 sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio", "tls-rustls-ring"], optional = true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
+strum.workspace = true
 syslog = { version = "6.1.1", default-features = false, optional = true }
 tempfile = { workspace = true, optional = true }
 tokio-postgres = { version = "0.7.18", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
@@ -515,7 +516,6 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 
 [dev-dependencies]
 approx = "0.5.1"
-strum.workspace = true
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 base64.workspace = true

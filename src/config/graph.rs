@@ -6,48 +6,123 @@ use std::{
 use indexmap::{IndexMap, set::IndexSet};
 
 use super::{
-    ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformContext,
-    TransformOuter, TransformOutput, WildcardMatching, schema,
+    Component, ComponentKey, ComponentKind, DataType, OutputId, SinkOuter, SourceOuter,
+    SourceOutput, TransformContext, TransformOuter, TransformOutput, WildcardMatching, schema,
 };
 
+/// Port metadata derived from a component for graph validation.
+///
+/// Schemas remain on the component configuration; this graph only uses port
+/// names and event data types to resolve and validate connections.
 #[derive(Debug, Clone)]
-pub enum Node {
-    Source {
-        outputs: Vec<SourceOutput>,
-    },
-    Transform {
-        in_ty: DataType,
-        outputs: Vec<TransformOutput>,
-    },
-    Sink {
-        ty: DataType,
-    },
+struct Output {
+    port: Option<String>,
+    ty: DataType,
+}
+
+impl From<SourceOutput> for Output {
+    fn from(output: SourceOutput) -> Self {
+        Self {
+            port: output.port,
+            ty: output.ty,
+        }
+    }
+}
+
+impl From<TransformOutput> for Output {
+    fn from(output: TransformOutput) -> Self {
+        Self {
+            port: output.port,
+            ty: output.ty,
+        }
+    }
+}
+
+impl fmt::Display for Output {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.port {
+            Some(port) => write!(f, "port: \"{port}\","),
+            None => write!(f, "port: None,"),
+        }?;
+        write!(f, " types: {}", self.ty)
+    }
+}
+
+/// A graph snapshot of a component's kind and ports, keyed by its component ID.
+#[derive(Debug, Clone)]
+struct Node {
+    kind: ComponentKind,
+    input_type: Option<DataType>,
+    outputs: Vec<Output>,
+}
+
+impl Node {
+    fn new(component: &Component<'_, String>, id: &ComponentKey, schema: schema::Options) -> Self {
+        let (input_type, outputs) = match component {
+            Component::Source(source) => (
+                None,
+                source
+                    .inner
+                    .outputs(schema.log_namespace())
+                    .into_iter()
+                    .map(Output::from)
+                    .collect(),
+            ),
+            Component::Transform(transform) => (
+                Some(transform.inner.input().data_type()),
+                transform
+                    .inner
+                    .outputs(
+                        &TransformContext {
+                            schema,
+                            ..Default::default()
+                        },
+                        &[(id.into(), schema::Definition::any())],
+                    )
+                    .into_iter()
+                    .map(Output::from)
+                    .collect(),
+            ),
+            Component::Sink(sink) => (Some(sink.inner.input().data_type()), Vec::new()),
+            Component::EnrichmentTable(_) => {
+                unreachable!("enrichment tables are expanded before graph construction")
+            }
+        };
+        Self {
+            kind: component.kind(),
+            input_type,
+            outputs,
+        }
+    }
 }
 
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Node::Source { outputs } => {
-                write!(f, "component_kind: source\n  outputs:")?;
-                for output in outputs {
-                    write!(f, "\n    {output}")?;
-                }
-                Ok(())
-            }
-            Node::Transform { in_ty, outputs } => {
+        match self.kind {
+            ComponentKind::Source => write!(f, "component_kind: source\n  outputs:")?,
+            ComponentKind::Transform => {
+                // Preserve the existing diagnostic text during this refactor.
                 write!(
                     f,
-                    "component_kind: source\n  input_types: {in_ty}\n  outputs:"
+                    "component_kind: source\n  input_types: {}\n  outputs:",
+                    self.input_type.expect("transform has inputs")
                 )?;
-                for output in outputs {
-                    write!(f, "\n    {output}")?;
-                }
-                Ok(())
             }
-            Node::Sink { ty } => {
-                write!(f, "component_kind: sink\n  types: {ty}")
+            ComponentKind::Sink => {
+                return write!(
+                    f,
+                    "component_kind: sink\n  types: {}",
+                    self.input_type.expect("sink has inputs")
+                );
+            }
+            ComponentKind::EnrichmentTable => {
+                unreachable!("enrichment tables are expanded before graph construction")
             }
         }
+        for output in &self.outputs {
+            write!(f, "\n    {output}")?;
+        }
+        Ok(())
     }
 }
 
@@ -96,55 +171,28 @@ impl Graph {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
 
-        // First, insert all of the different node types
-        for (id, config) in sources.iter() {
-            graph.nodes.insert(
-                id.clone(),
-                Node::Source {
-                    outputs: config.inner.outputs(schema.log_namespace()),
-                },
-            );
+        let components = || {
+            sources
+                .iter()
+                .map(|(id, source)| (id, Component::Source(source)))
+                .chain(
+                    transforms
+                        .iter()
+                        .map(|(id, transform)| (id, Component::Transform(transform))),
+                )
+                .chain(sinks.iter().map(|(id, sink)| (id, Component::Sink(sink))))
+        };
+
+        // Derive each node from its component before resolving any connections.
+        for (id, component) in components() {
+            graph
+                .nodes
+                .insert(id.clone(), Node::new(&component, id, schema));
         }
 
-        for (id, transform) in transforms.iter() {
-            graph.nodes.insert(
-                id.clone(),
-                Node::Transform {
-                    in_ty: transform.inner.input().data_type(),
-                    outputs: transform.inner.outputs(
-                        &TransformContext {
-                            schema,
-                            ..Default::default()
-                        },
-                        &[(id.into(), schema::Definition::any())],
-                    ),
-                },
-            );
-        }
-
-        for (id, config) in sinks {
-            graph.nodes.insert(
-                id.clone(),
-                Node::Sink {
-                    ty: config.inner.input().data_type(),
-                },
-            );
-        }
-
-        // With all of the nodes added, go through inputs and add edges, resolving strings into
-        // actual `OutputId`s along the way.
         let available_inputs = graph.input_map()?;
-
-        for (id, config) in transforms.iter() {
-            for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs, wildcard_matching) {
-                    errors.push(e);
-                }
-            }
-        }
-
-        for (id, config) in sinks {
-            for input in config.inputs.iter() {
+        for (id, component) in components() {
+            for input in component.inputs().into_iter().flatten() {
                 if let Err(e) = graph.add_input(input, id, &available_inputs, wildcard_matching) {
                     errors.push(e);
                 }
@@ -173,8 +221,8 @@ impl Graph {
             Ok(())
         } else {
             let output_type = match self.nodes.get(to) {
-                Some(Node::Transform { .. }) => "transform",
-                Some(Node::Sink { .. }) => "sink",
+                Some(node) if node.kind == ComponentKind::Transform => "transform",
+                Some(node) if node.kind == ComponentKind::Sink => "sink",
                 _ => panic!("only transforms and sinks have inputs"),
             };
             // allow empty result if relaxed wildcard matching is enabled
@@ -212,11 +260,7 @@ impl Graph {
     /// Will panic if the given key is not present in the graph or identifies a source, which can't
     /// have inputs.
     fn get_input_type(&self, key: &ComponentKey) -> DataType {
-        match self.nodes[key] {
-            Node::Source { .. } => panic!("no inputs on sources"),
-            Node::Transform { in_ty, .. } => in_ty,
-            Node::Sink { ty } => ty,
-        }
+        self.nodes[key].input_type.expect("no inputs on sources")
     }
 
     /// Return the output type associated with a given `OutputId`.
@@ -226,19 +270,13 @@ impl Graph {
     /// Will panic if the given id is not present in the graph or identifies a sink, which can't
     /// have inputs.
     fn get_output_type(&self, id: &OutputId) -> DataType {
-        match &self.nodes[&id.component] {
-            Node::Source { outputs } => outputs
-                .iter()
-                .find(|output| output.port == id.port)
-                .map(|output| output.ty)
-                .expect("output didn't exist"),
-            Node::Transform { outputs, .. } => outputs
-                .iter()
-                .find(|output| output.port == id.port)
-                .map(|output| output.ty)
-                .expect("output didn't exist"),
-            Node::Sink { .. } => panic!("no outputs on sinks"),
-        }
+        let node = &self.nodes[&id.component];
+        assert!(node.kind != ComponentKind::Sink, "no outputs on sinks");
+        node.outputs
+            .iter()
+            .find(|output| output.port == id.port)
+            .map(|output| output.ty)
+            .expect("output didn't exist")
     }
 
     pub fn typecheck(&self) -> Result<(), Vec<String>> {
@@ -268,10 +306,10 @@ impl Graph {
 
     pub fn check_for_cycles(&self) -> Result<(), String> {
         // find all sinks
-        let sinks = self.nodes.iter().filter_map(|(name, node)| match node {
-            Node::Sink { .. } => Some(name),
-            _ => None,
-        });
+        let sinks = self
+            .nodes
+            .iter()
+            .filter_map(|(name, node)| (node.kind == ComponentKind::Sink).then_some(name));
 
         // run DFS from each sink while keep tracking the current stack to detect cycles
         for s in sinks {
@@ -321,22 +359,11 @@ impl Graph {
     pub fn valid_inputs(&self) -> HashSet<OutputId> {
         self.nodes
             .iter()
-            .flat_map(|(key, node)| match node {
-                Node::Sink { .. } => vec![],
-                Node::Source { outputs } => outputs
-                    .iter()
-                    .map(|output| OutputId {
-                        component: key.clone(),
-                        port: output.port.clone(),
-                    })
-                    .collect(),
-                Node::Transform { outputs, .. } => outputs
-                    .iter()
-                    .map(|output| OutputId {
-                        component: key.clone(),
-                        port: output.port.clone(),
-                    })
-                    .collect(),
+            .flat_map(|(key, node)| {
+                node.outputs.iter().map(|output| OutputId {
+                    component: key.clone(),
+                    port: output.port.clone(),
+                })
             })
             .collect()
     }
@@ -414,7 +441,9 @@ impl Graph {
             .into_iter()
             .filter(|path| {
                 if let Some(key) = path.last() {
-                    matches!(self.nodes.get(key), Some(Node::Sink { ty: _ }))
+                    self.nodes
+                        .get(key)
+                        .is_some_and(|node| node.kind == ComponentKind::Sink)
                 } else {
                     false
                 }
@@ -430,17 +459,65 @@ mod test {
 
     use super::*;
 
+    #[test]
+    fn preserves_node_diagnostics() {
+        let source = Node::source(vec![SourceOutput::new_metrics().with_port("metrics")]);
+        assert_eq!(
+            source.to_string(),
+            "component_kind: source\n  outputs:\n    port: \"metrics\", types: [\"Metric\"]"
+        );
+
+        let transform = Node::transform(
+            DataType::Log,
+            vec![TransformOutput::new(DataType::Trace, HashMap::new())],
+        );
+        assert_eq!(
+            transform.to_string(),
+            "component_kind: source\n  input_types: [\"Log\"]\n  outputs:\n    port: None, types: [\"Trace\"]"
+        );
+
+        let sink = Node::sink(DataType::Metric);
+        assert_eq!(
+            sink.to_string(),
+            "component_kind: sink\n  types: [\"Metric\"]"
+        );
+    }
+
+    impl Node {
+        fn source(outputs: Vec<SourceOutput>) -> Self {
+            Self {
+                kind: ComponentKind::Source,
+                input_type: None,
+                outputs: outputs.into_iter().map(Output::from).collect(),
+            }
+        }
+
+        fn transform(input_type: DataType, outputs: Vec<TransformOutput>) -> Self {
+            Self {
+                kind: ComponentKind::Transform,
+                input_type: Some(input_type),
+                outputs: outputs.into_iter().map(Output::from).collect(),
+            }
+        }
+
+        fn sink(input_type: DataType) -> Self {
+            Self {
+                kind: ComponentKind::Sink,
+                input_type: Some(input_type),
+                outputs: Vec::new(),
+            }
+        }
+    }
+
     impl Graph {
         fn add_source(&mut self, id: &str, ty: DataType) {
             self.nodes.insert(
                 id.into(),
-                Node::Source {
-                    outputs: vec![match ty {
-                        DataType::Metric => SourceOutput::new_metrics(),
-                        DataType::Trace => SourceOutput::new_traces(),
-                        _ => SourceOutput::new_maybe_logs(ty, Definition::any()),
-                    }],
-                },
+                Node::source(vec![match ty {
+                    DataType::Metric => SourceOutput::new_metrics(),
+                    DataType::Trace => SourceOutput::new_traces(),
+                    _ => SourceOutput::new_maybe_logs(ty, Definition::any()),
+                }]),
             );
         }
 
@@ -455,13 +532,13 @@ mod test {
             let inputs = clean_inputs(inputs);
             self.nodes.insert(
                 id.clone(),
-                Node::Transform {
+                Node::transform(
                     in_ty,
-                    outputs: vec![TransformOutput::new(
+                    vec![TransformOutput::new(
                         out_ty,
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     )],
-                },
+                ),
             );
             for from in inputs {
                 self.edges.push(Edge {
@@ -474,12 +551,13 @@ mod test {
         fn add_transform_output(&mut self, id: &str, name: &str, ty: DataType) {
             let id = id.into();
             match self.nodes.get_mut(&id) {
-                Some(Node::Transform { outputs, .. }) => outputs.push(
+                Some(node) if node.kind == ComponentKind::Transform => node.outputs.push(
                     TransformOutput::new(
                         ty,
                         [("test".into(), Definition::default_legacy_namespace())].into(),
                     )
-                    .with_port(name),
+                    .with_port(name)
+                    .into(),
                 ),
                 _ => panic!("invalid transform"),
             }
@@ -488,7 +566,7 @@ mod test {
         fn add_sink(&mut self, id: &str, ty: DataType, inputs: Vec<&str>) {
             let id = ComponentKey::from(id);
             let inputs = clean_inputs(inputs);
-            self.nodes.insert(id.clone(), Node::Sink { ty });
+            self.nodes.insert(id.clone(), Node::sink(ty));
             for from in inputs {
                 self.edges.push(Edge {
                     from,
@@ -710,27 +788,23 @@ mod test {
         // these all look like "foo.bar", but should only yield one error
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
-            Node::Source {
-                outputs: vec![SourceOutput::new_maybe_logs(
-                    DataType::all_bits(),
-                    Definition::any(),
-                )],
-            },
+            Node::source(vec![SourceOutput::new_maybe_logs(
+                DataType::all_bits(),
+                Definition::any(),
+            )]),
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
-            Node::Source {
-                outputs: vec![SourceOutput::new_maybe_logs(
-                    DataType::all_bits(),
-                    Definition::any(),
-                )],
-            },
+            Node::source(vec![SourceOutput::new_maybe_logs(
+                DataType::all_bits(),
+                Definition::any(),
+            )]),
         );
         graph.nodes.insert(
             ComponentKey::from("foo"),
-            Node::Transform {
-                in_ty: DataType::all_bits(),
-                outputs: vec![
+            Node::transform(
+                DataType::all_bits(),
+                vec![
                     TransformOutput::new(
                         DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
@@ -741,24 +815,22 @@ mod test {
                     )
                     .with_port("bar"),
                 ],
-            },
+            ),
         );
 
         // make sure we return more than one
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
-            Node::Source {
-                outputs: vec![SourceOutput::new_maybe_logs(
-                    DataType::all_bits(),
-                    Definition::any(),
-                )],
-            },
+            Node::source(vec![SourceOutput::new_maybe_logs(
+                DataType::all_bits(),
+                Definition::any(),
+            )]),
         );
         graph.nodes.insert(
             ComponentKey::from("baz"),
-            Node::Transform {
-                in_ty: DataType::all_bits(),
-                outputs: vec![
+            Node::transform(
+                DataType::all_bits(),
+                vec![
                     TransformOutput::new(
                         DataType::all_bits(),
                         [("test".into(), Definition::default_legacy_namespace())].into(),
@@ -769,7 +841,7 @@ mod test {
                     )
                     .with_port("errors"),
                 ],
-            },
+            ),
         );
 
         let mut errors = graph.input_map().unwrap_err();
