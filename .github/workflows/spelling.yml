@@ -4,8 +4,6 @@ on:
   pull_request:
     branches:
       - "**"
-    tags-ignore:
-      - "**"
     types:
       - "opened"
       - "reopened"
