@@ -1,0 +1,8 @@
+sinks:
+  my_sink_id:
+    type: syslog
+    inputs:
+      - my-source-or-transform-id
+    address: 92.12.333.224:5000
+    mode: tcp
+    send_buffer_bytes: 65536
