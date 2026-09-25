@@ -19,8 +19,8 @@ advised not to include sensitive data in environment variables and are encourage
 
 ## Usage
 
-Vector interpolates environment variables within your configuration file with
-the following syntax:
+Vector parses the configuration file first, then interpolates environment variables
+in string values with the following syntax. Keys and comments are not interpolated.
 
 ```yaml
 transforms:
@@ -38,6 +38,9 @@ transforms:
 ```
 
 ## How interpolation can be misused
+
+Substitution cannot add configuration keys or array elements, but it can still change
+the meaning of a string value, including a file path or code in an embedded language.
 
 Vector configuration templates can use environment variable interpolation, for example:
 
@@ -100,14 +103,29 @@ with `--dangerously-allow-env-var-interpolation` if you fully control every envi
 to the Vector process and accept that environment variables may leak to users that have access to
 the Vector process.
 
-Even when enabled, Vector prevents some security issues related to environment variable interpolation by rejecting environment variables that contain newline
-characters. This also prevents injection of multi-line configuration blocks.
+Vector parses configuration before interpolation. Quotes, newlines, braces, and other
+configuration syntax in an environment variable remain part of the string value; they
+cannot add configuration keys or components. Vector does not escape values for embedded
+languages such as VRL, or restrict the files and destinations a substituted value can select.
+Operators remain responsible for controlling the content of interpolated environment variables.
 
-Vector does not validate or escape other characters in interpolated values. Values containing config-structural characters such as
-`"`, `{`, `}`, `[`, or `]` are substituted verbatim before the config file is parsed, and may affect the resulting parsed structure.
-Operators are responsible for controlling the content of interpolated environment variables.
+Configuration must be valid before interpolation. In TOML and JSON, quote placeholders
+even in numeric and boolean fields; Vector converts the resulting string to the field's
+declared type. YAML string placeholders also work in these fields:
 
-If you need to inject multi-line configuration blocks, use a config pre-processing step with a tool like `envsubst`.
+```yaml
+sources:
+  demo:
+    type: demo_logs
+    format: json
+    count: "${MY_COUNT}"
+```
+
+Use literal map keys and component names. A placeholder cannot expand into multiple
+array elements; use a separate string placeholder for each element instead.
+
+Multiline values can be interpolated into a string field. If you need to inject configuration
+blocks instead, use a config pre-processing step with a tool like `envsubst`.
 This approach gives you more control over the configuration and allows you to inspect the result before passing it to Vector.
 Note that `envsubst` only expands plain `$VAR` and `${VAR}` references; it does not understand Vector's extended syntax
 such as `${VAR:-default}` or `${VAR:?err}`, which are passed through unchanged.
