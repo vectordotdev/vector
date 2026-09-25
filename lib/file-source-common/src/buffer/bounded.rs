@@ -28,6 +28,7 @@ pub struct BoundedLineReader {
     max_size: usize,
     discarding: bool,
     prefix: BytesMut,
+    oversized: Option<usize>,
 }
 
 impl BoundedLineReader {
@@ -37,6 +38,7 @@ impl BoundedLineReader {
             max_size,
             discarding: false,
             prefix: BytesMut::new(),
+            oversized: None,
         }
     }
 
@@ -44,11 +46,24 @@ impl BoundedLineReader {
     pub fn reset(&mut self) {
         self.discarding = false;
         self.prefix.clear();
+        self.oversized = None;
+    }
+
+    /// Report the first size exceeding the limit, once per record. Drain after
+    /// each read or finish, including reads that stop before a delimiter or EOF.
+    pub fn take_oversized(&mut self) -> Option<usize> {
+        self.oversized.take()
     }
 
     /// Complete an unterminated record when its reader is permanently retired.
     pub fn finish(&mut self, buf: &mut BytesMut) -> ReadOutcome {
-        append_payload(buf, &mut self.discarding, self.max_size, &self.prefix);
+        append_payload(
+            buf,
+            &mut self.discarding,
+            self.max_size,
+            &self.prefix,
+            &mut self.oversized,
+        );
         let outcome = if self.discarding {
             ReadOutcome::Discarded
         } else if buf.is_empty() {
@@ -56,7 +71,8 @@ impl BoundedLineReader {
         } else {
             ReadOutcome::Line
         };
-        self.reset();
+        self.discarding = false;
+        self.prefix.clear();
         outcome
     }
 
@@ -97,6 +113,7 @@ impl BoundedLineReader {
                         &mut self.discarding,
                         self.max_size,
                         &available[..index],
+                        &mut self.oversized,
                     );
                     (index + self.delimiter.len(), true)
                 } else {
@@ -110,6 +127,7 @@ impl BoundedLineReader {
                         &mut self.discarding,
                         self.max_size,
                         &available[..split],
+                        &mut self.oversized,
                     );
                     self.prefix.extend_from_slice(&available[split..]);
                     (available.len(), false)
@@ -132,6 +150,7 @@ impl BoundedLineReader {
                         &mut self.discarding,
                         self.max_size,
                         &self.prefix[..confirmed],
+                        &mut self.oversized,
                     );
                     self.prefix.advance(confirmed);
                     (1, false)
@@ -153,9 +172,16 @@ impl BoundedLineReader {
     }
 }
 
-fn append_payload(buf: &mut BytesMut, discarding: &mut bool, max_size: usize, bytes: &[u8]) {
+fn append_payload(
+    buf: &mut BytesMut,
+    discarding: &mut bool,
+    max_size: usize,
+    bytes: &[u8],
+    oversized: &mut Option<usize>,
+) {
     if !*discarding {
         if bytes.len() > max_size.saturating_sub(buf.len()) {
+            *oversized = Some(buf.len().saturating_add(bytes.len()));
             buf.clear();
             *discarding = true;
         } else {
@@ -185,12 +211,17 @@ mod tests {
                     let mut position = 0;
                     let mut buf = BytesMut::new();
                     let mut lines = Vec::new();
+                    let mut oversized_records = 0;
                     loop {
                         let before = position;
                         let result = state
                             .read(&mut reader, &mut position, &mut buf, budget)
                             .await
                             .unwrap();
+                        if let Some(size) = state.take_oversized() {
+                            assert!(size > 3);
+                            oversized_records += 1;
+                        }
                         assert!(position - before <= budget as u64);
                         assert!(buf.len() <= 3);
                         assert!(state.prefix.len() < delimiter.len());
@@ -202,6 +233,7 @@ mod tests {
                             ReadOutcome::Eof => break,
                         }
                     }
+                    assert_eq!(oversized_records, 1);
                     assert_eq!(position, input.len() as u64);
                     assert_eq!(
                         lines,

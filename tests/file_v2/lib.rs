@@ -14,3 +14,5 @@ mod harness;
 mod restart;
 mod rotation;
 mod shutdown;
+
+mod telemetry;
