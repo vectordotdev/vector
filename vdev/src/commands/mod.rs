@@ -85,6 +85,7 @@ mod status;
 mod style;
 mod test;
 mod test_vrl;
+mod update;
 mod version;
 
 cli_commands! {
@@ -105,6 +106,7 @@ cli_commands! {
     status,
     test,
     test_vrl,
+    update,
     version,
 }
 

@@ -11,6 +11,28 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 
+use super::git::git_ls_files;
+
+/// Vendored protocol trees. Prettier reformats their YAML indentation, and it
+/// formats a path given on the command line even when `.prettierignore` lists it.
+const VENDORED_PROTO_PREFIXES: &[&str] = &[
+    "lib/opentelemetry-proto/src/proto/opentelemetry-proto/",
+    "lib/datadog-proto/proto/datadog/trace/",
+];
+
+pub(crate) fn files_for_prettier(extension: &str) -> Result<Vec<String>> {
+    Ok(git_ls_files(Some(extension))?
+        .into_iter()
+        .filter(|path| !is_vendored_proto(path))
+        .collect())
+}
+
+fn is_vendored_proto(path: &str) -> bool {
+    VENDORED_PROTO_PREFIXES
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
+}
+
 /// Find the Vector repository root by searching upward for markers like .git or Cargo.toml
 /// with a `[workspace]` section.
 pub fn find_repo_root() -> Result<PathBuf> {
@@ -178,6 +200,17 @@ mod tests {
 
         assert_eq!(npm_tool_path(&repo_root, "prettier").unwrap(), tool);
         assert!(npm_tool_path(&repo_root, "markdownlint-cli2").is_err());
+    }
+
+    #[test]
+    fn skips_vendored_protocol_files() {
+        assert!(is_vendored_proto(
+            "lib/opentelemetry-proto/src/proto/opentelemetry-proto/opentelemetry/proto/collector/logs/v1/logs_service_http.yaml"
+        ));
+        assert!(is_vendored_proto(
+            "lib/datadog-proto/proto/datadog/trace/span.proto"
+        ));
+        assert!(!is_vendored_proto("config/vector.yaml"));
     }
 
     #[cfg(unix)]

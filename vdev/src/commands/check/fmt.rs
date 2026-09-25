@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::{
     app,
     commands::{fmt::PRETTIER_EXTENSIONS, style},
-    utils::{git::git_ls_files, paths::prettier},
+    utils::paths::{files_for_prettier, prettier},
 };
 
 /// Check that all files are formatted properly
@@ -20,7 +20,7 @@ impl Cli {
         app::exec("cargo", ["fmt", "--", "--check"], true)?;
 
         for ext in PRETTIER_EXTENSIONS {
-            let files = git_ls_files(Some(ext))?;
+            let files = files_for_prettier(ext)?;
             if files.is_empty() {
                 continue;
             }

@@ -414,7 +414,9 @@ fix-markdown: ## Auto-fix markdown style issues
 .PHONY: check-prettier
 check-prettier: ## Check that JS/TS/YAML/JSON files are formatted with prettier
 	@for ext in yml yaml js ts tsx json; do \
-		files=$$(git ls-files "*.$$ext"); \
+		files=$$(git ls-files "*.$$ext" | grep -v \
+			-e '^lib/opentelemetry-proto/src/proto/opentelemetry-proto/' \
+			-e '^lib/datadog-proto/proto/datadog/trace/'); \
 		if [ -n "$$files" ]; then \
 		prettier --ignore-path .prettierignore --check $$files || exit 1; \
 		fi; \
@@ -423,7 +425,9 @@ check-prettier: ## Check that JS/TS/YAML/JSON files are formatted with prettier
 .PHONY: fix-prettier
 fix-prettier: ## Auto-fix JS/TS/YAML/JSON formatting with prettier
 	@for ext in yml yaml js ts tsx json; do \
-		files=$$(git ls-files "*.$$ext"); \
+		files=$$(git ls-files "*.$$ext" | grep -v \
+			-e '^lib/opentelemetry-proto/src/proto/opentelemetry-proto/' \
+			-e '^lib/datadog-proto/proto/datadog/trace/'); \
 		if [ -n "$$files" ]; then \
 		prettier --ignore-path .prettierignore --write $$files || exit 1; \
 		fi; \

@@ -170,6 +170,8 @@ cargo vdev int test <name>    # Integration tests
 cargo vdev fmt                # Format code
 ```
 
+For new tooling that will be used by future developers, add a `vdev` subcommand instead of a shell or Python script. Do not introduce new top-level subcommands unless none of the existing ones are appropriate.
+
 ### Pre-Push Hook (Optional but Recommended)
 
 Create `.git/hooks/pre-push` with:
