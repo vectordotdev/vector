@@ -81,8 +81,8 @@ pub struct DatadogLogsConfig {
     /// to not set it above 5,000,000 (5 MB, the standard Datadog API limit). Increase
     /// this when targeting a compatible endpoint that accepts larger payloads. The batch
     /// goal is derived as `max_payload_bytes - 750,000` bytes; events larger than the
-    /// batch goal are sent alone in their batch. Events exceeding `max_payload_bytes` are
-    /// dropped.
+    /// batch goal are sent alone in their batch. Events exceeding `max_payload_bytes` are reduced
+    /// to their reserved fields, their messages are truncated, and they are retried once.
     #[derivative(Default(value = "default_max_payload_bytes()"))]
     #[serde(default = "default_max_payload_bytes")]
     pub max_payload_bytes: Option<usize>,

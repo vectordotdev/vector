@@ -107,6 +107,7 @@ pub enum CounterName {
     MemoryEnrichmentTableTtlExpirationsTotal,
     ComponentCpuUsageNsTotal,
     DatadogLogsReservedAttributeConflictsTotal,
+    DatadogLogsEventsTruncatedTotal,
     // Data-plane counter names emitted by the `host_metrics` source.
     CpuSecondsTotal,
     CgroupCpuUsageSecondsTotal,
@@ -496,6 +497,7 @@ impl CounterName {
             Self::DatadogLogsReservedAttributeConflictsTotal => {
                 "datadog_logs_reserved_attribute_conflicts_total"
             }
+            Self::DatadogLogsEventsTruncatedTotal => "datadog_logs_events_truncated_total",
             Self::CpuSecondsTotal => "cpu_seconds_total",
             Self::CgroupCpuUsageSecondsTotal => "cgroup_cpu_usage_seconds_total",
             Self::CgroupCpuUserSecondsTotal => "cgroup_cpu_user_seconds_total",
