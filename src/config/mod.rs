@@ -30,6 +30,7 @@ use crate::{
 pub mod api;
 mod builder;
 mod compiler;
+pub mod deprecation;
 mod diff;
 pub mod dot_graph;
 mod enrichment_table;
