@@ -304,6 +304,8 @@ impl FileWatcher {
                 None
             };
 
+        self.reached_eof = false;
+        self.read_retry_delay = EOF_READ_BACKOFF_MIN;
         self.path = path;
         Ok(unwatch_info)
     }

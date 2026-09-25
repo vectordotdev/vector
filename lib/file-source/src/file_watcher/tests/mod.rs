@@ -8,7 +8,7 @@ use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
 use tokio::time::Instant;
 
-use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, null_reader};
+use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileReader, FileWatcher};
 
 // Welcome.
 //
@@ -227,7 +227,7 @@ fn watcher_for_timing() -> FileWatcher {
     FileWatcher {
         path: PathBuf::new(),
         findable: true,
-        reader: Box::new(null_reader()),
+        reader: FileReader::Null(std::io::Cursor::new(Vec::new())),
         file_position: 0,
         devno: 0,
         inode: 0,
@@ -281,6 +281,46 @@ fn caps_and_resets_eof_backoff() {
 
     assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
     assert!(!watcher.reached_eof());
+}
+
+#[tokio::test]
+async fn updating_path_resets_eof_backoff() {
+    for replace_file in [false, true] {
+        let dir = tempfile::TempDir::new().unwrap();
+        let old_path = dir.path().join("old.log");
+        let new_path = dir.path().join("new.log");
+        std::fs::write(&old_path, b"first\n").unwrap();
+        let mut watcher = FileWatcher::new(
+            old_path.clone(),
+            file_source_common::ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        for _ in 0..16 {
+            watcher.track_read_attempt();
+            watcher.track_read_eof();
+        }
+        assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MAX);
+
+        if replace_file {
+            std::fs::write(&new_path, b"second\n").unwrap();
+        } else {
+            std::fs::rename(&old_path, &new_path).unwrap();
+        }
+        let old_info = watcher.update_path(new_path).await.unwrap();
+        assert_eq!(old_info.is_some(), replace_file);
+        if let Some(old_info) = old_info {
+            assert!(old_info.reached_eof);
+        }
+        assert!(!watcher.reached_eof());
+        assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
+        let line = watcher.read_line().await.unwrap().raw_line.unwrap();
+        let expected: &[u8] = if replace_file { b"second" } else { b"first" };
+        assert_eq!(line.bytes.as_ref(), expected);
+    }
 }
 
 #[inline]
