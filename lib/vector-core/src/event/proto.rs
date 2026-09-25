@@ -954,7 +954,8 @@ mod tests {
 
     #[test]
     fn decodes_pre_v23_log_fields() {
-        let decoded = crate::event::LogEvent::from(Log::decode(PRE_V23_LOG_FIELDS).unwrap());
+        let decoded = crate::event::LogEvent::try_from(Log::decode(PRE_V23_LOG_FIELDS).unwrap())
+            .expect("legacy log fields should decode");
 
         assert_eq!(
             decoded.value(),
@@ -1102,7 +1103,9 @@ mod tests {
             assert!(native_json.namespace.is_empty());
             assert_eq!(native_json.namespace_v2.as_deref(), namespace);
             assert_eq!(
-                crate::event::Metric::from(native_json).namespace(),
+                crate::event::Metric::try_from(native_json)
+                    .expect("native JSON metric should decode")
+                    .namespace(),
                 namespace
             );
         }
@@ -1119,7 +1122,9 @@ mod tests {
         };
 
         assert_eq!(
-            crate::event::Metric::from(metric).namespace(),
+            crate::event::Metric::try_from(metric)
+                .expect("metric with namespace_v2 should decode")
+                .namespace(),
             Some("current")
         );
     }

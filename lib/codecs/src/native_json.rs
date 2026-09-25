@@ -68,7 +68,9 @@ pub(crate) fn from_dynamic_message(message: DynamicMessage) -> vector_common::Re
         .map_err(|error| format!("Error decoding native JSON event: {error}"))?;
     validate_event_wrapper(&event)
         .map_err(|error| format!("Error decoding native JSON event: {error}"))?;
-    Ok(event.into())
+    event
+        .try_into()
+        .map_err(|error| format!("Error decoding native JSON event: {error}").into())
 }
 
 pub(crate) fn descriptor() -> MessageDescriptor {
