@@ -85,6 +85,13 @@ impl Drop for UnsentEventCount {
 #[derive(Clone)]
 pub(super) struct Output {
     sender: LimitedSender<SourceSenderItem>,
+    // Sources can clone their sender for each request. Share infrequently changed output state so
+    // that this hot path does not clone every metric handle and metadata reference separately.
+    context: Arc<OutputContext>,
+}
+
+#[derive(Clone)]
+struct OutputContext {
     metrics: OutputMetrics,
     events_sent: Registered<EventsSent>,
     /// The schema definition that will be attached to Log events sent through here
@@ -118,13 +125,12 @@ impl OutputMetrics {
     }
 }
 
-#[expect(clippy::missing_fields_in_debug)]
 impl fmt::Debug for Output {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Output")
             .field("sender", &self.sender)
-            .field("output_id", &self.id)
-            .field("timeout", &self.timeout)
+            .field("output_id", &self.context.id)
+            .field("timeout", &self.context.timeout)
             // `metrics::Histogram` is missing `impl Debug`
             .finish()
     }
@@ -147,14 +153,16 @@ impl Output {
         (
             Self {
                 sender: tx,
-                metrics,
-                events_sent: internal_event::register(EventsSent::from(internal_event::Output(
-                    Some(output.into()),
-                ))),
-                log_definition,
-                id: Arc::new(output_id),
-                timeout,
-                post_processor: None,
+                context: Arc::new(OutputContext {
+                    metrics,
+                    events_sent: internal_event::register(EventsSent::from(
+                        internal_event::Output(Some(output.into())),
+                    )),
+                    log_definition,
+                    id: Arc::new(output_id),
+                    timeout,
+                    post_processor: None,
+                }),
             },
             rx,
         )
@@ -162,7 +170,7 @@ impl Output {
 
     /// Attach a post-processing step to this output, replacing any previously set one.
     pub(super) fn with_post_processor(mut self, pp: Arc<dyn PostProcessor>) -> Self {
-        self.post_processor = Some(pp);
+        Arc::make_mut(&mut self.context).post_processor = Some(pp);
         self
     }
 
@@ -192,7 +200,7 @@ impl Output {
         // methods are synchronous, they cannot be cancelled by tokio::time::timeout (which
         // only fires at .await points). Implementations are expected to be fast; heavy
         // processing should be done in a transform, not here.
-        if let Some(ref pp) = self.post_processor {
+        if let Some(pp) = &self.context.post_processor {
             events.iter_events_mut().for_each(|mut event| {
                 let original_finalizers = event.metadata_mut().take_finalizers();
                 pp.process(&mut event);
@@ -215,10 +223,12 @@ impl Output {
 
         events.iter_events_mut().for_each(|mut event| {
             // attach runtime schema definitions from the source
-            if let Some(log_definition) = &self.log_definition {
+            if let Some(log_definition) = &self.context.log_definition {
                 event.metadata_mut().set_schema_definition(log_definition);
             }
-            event.metadata_mut().set_upstream_id(Arc::clone(&self.id));
+            event
+                .metadata_mut()
+                .set_upstream_id(Arc::clone(&self.context.id));
         });
 
         let byte_size = events.estimated_json_encoded_size_of();
@@ -227,13 +237,15 @@ impl Output {
         let send_start = Instant::now();
         let send_result = self.send_with_timeout(events, send_reference).await;
 
-        if let Some(send_latency) = &self.metrics.send_latency {
+        if let Some(send_latency) = &self.context.metrics.send_latency {
             send_latency.record(send_start.elapsed().as_secs_f64());
         }
 
         send_result?;
 
-        self.events_sent.emit(CountByteSize(count, byte_size));
+        self.context
+            .events_sent
+            .emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
         Ok(())
     }
@@ -247,7 +259,7 @@ impl Output {
             events,
             send_reference,
         };
-        if let Some(timeout) = self.timeout {
+        if let Some(timeout) = self.context.timeout {
             match tokio::time::timeout(timeout, self.sender.send(item)).await {
                 Ok(Ok(())) => Ok(()),
                 Ok(Err(error)) => Err(error.into()),
@@ -319,12 +331,12 @@ impl Output {
                             unsent_event_count.discard();
                         }
                     }
-                    if let Some(send_batch_latency) = &self.metrics.send_batch_latency {
+                    if let Some(send_batch_latency) = &self.context.metrics.send_batch_latency {
                         send_batch_latency.record(send_batch_start.elapsed().as_secs_f64());
                     }
                 })?;
         }
-        if let Some(send_batch_latency) = &self.metrics.send_batch_latency {
+        if let Some(send_batch_latency) = &self.context.metrics.send_batch_latency {
             send_batch_latency.record(send_batch_start.elapsed().as_secs_f64());
         }
         Ok(())
@@ -332,14 +344,14 @@ impl Output {
 
     /// Attach a post-processing step to this output, replacing any previously set one.
     pub(super) fn set_post_processor(&mut self, pp: Arc<dyn PostProcessor>) {
-        self.post_processor = Some(pp);
+        Arc::make_mut(&mut self.context).post_processor = Some(pp);
     }
 
     /// Calculate the difference between the reference time and the
     /// timestamp stored in the given event reference, and emit the
     /// different, as expressed in milliseconds, as a histogram.
     pub(super) fn emit_lag_time(&self, event: EventRef<'_>, reference: i64) {
-        if let Some(lag_time_metric) = &self.metrics.lag_time {
+        if let Some(lag_time_metric) = &self.context.metrics.lag_time {
             let timestamp = match event {
                 EventRef::Log(log) => {
                     log_schema()
