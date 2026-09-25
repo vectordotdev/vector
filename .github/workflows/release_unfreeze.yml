@@ -34,9 +34,17 @@ concurrency:
 jobs:
   unfreeze:
     name: Close the release freeze window
+    # Only the Helm chart release closes the window automatically: it
+    # dispatches the manifests refresh with the release bot's token. A human
+    # running that workflow manually can succeed before the chart-triggered
+    # refresh lands, so their run must not close the window; they keep the
+    # deliberate manual dispatch of this workflow, which still checks the
+    # release state (and has the force input).
     if: >-
       github.repository == 'vectordotdev/vector' &&
-      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+      (github.event_name == 'workflow_dispatch' ||
+        (github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.actor.login == 'vectordotdev-bot[bot]'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
