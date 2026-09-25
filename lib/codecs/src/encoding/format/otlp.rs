@@ -107,9 +107,14 @@ impl Encoder<Event> for OtlpSerializer {
                 } else if log.contains(event_path!(RESOURCE_METRICS_JSON_FIELD)) {
                     // Currently the OTLP metrics are Vector logs (not metrics).
                     self.metrics_descriptor.encode(Event::Log(log), buffer)
+                } else if log.contains(event_path!(RESOURCE_SPANS_JSON_FIELD)) {
+                    // OTLP spans can arrive as Log events when the source is configured
+                    // without use_otlp_decoding.traces = true.
+                    self.traces_descriptor.encode(Event::Log(log), buffer)
                 } else {
                     Err(format!(
-                        "Log event does not contain OTLP top-level fields ({RESOURCE_LOGS_JSON_FIELD} or {RESOURCE_METRICS_JSON_FIELD})",
+                        "Log event does not contain OTLP top-level fields \
+                         ({RESOURCE_LOGS_JSON_FIELD}, {RESOURCE_METRICS_JSON_FIELD}, or {RESOURCE_SPANS_JSON_FIELD})",
                     )
                         .into())
                 }

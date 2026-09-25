@@ -3,8 +3,5 @@ sinks:
     type: opentelemetry
     inputs:
       - my-source-or-transform-id
-    protocol:
-      encoding:
-        codec: json
-      type: http
-      uri: https://10.22.212.22:9000/endpoint
+    protocol: grpc
+    uri: http://localhost:5318/v1/logs

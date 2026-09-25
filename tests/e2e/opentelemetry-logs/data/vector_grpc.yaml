@@ -17,24 +17,22 @@ sources:
 sinks:
   otel_sink:
     inputs:
-      - source0.metrics
+      - source0.logs
     type: opentelemetry
-    protocol: http
-    uri: http://otel-collector-sink:5318/v1/metrics
-    encoding:
-      codec: otlp
+    protocol: grpc
+    uri: http://otel-collector-sink:4317
 
   otel_file_sink:
     type: file
-    path: "/output/opentelemetry-metrics/vector-file-sink.log"
+    path: "/output/opentelemetry-logs/vector-file-sink.log"
     inputs:
-      - source0.metrics
+      - source0.logs
     encoding:
       codec: json
 
   metrics_file_sink:
     type: file
-    path: "/output/opentelemetry-metrics/vector-internal-metrics-sink.log"
+    path: "/output/opentelemetry-logs/vector-internal-metrics-sink.log"
     inputs:
       - internal_metrics
     encoding:
