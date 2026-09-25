@@ -1359,6 +1359,7 @@ impl Runner {
             super::ready_arrays::ReadyArrays::with_capacity(input_rx, ready_array_capacity());
 
         let mut in_flight = FuturesOrdered::new();
+        let mut idle_transforms = Vec::new();
         let mut shutting_down = false;
 
         self.timer_tx.try_send_start_wait();
@@ -1368,9 +1369,10 @@ impl Runner {
 
                 result = in_flight.next(), if !in_flight.is_empty() => {
                     match result {
-                        Some(Ok(mut outputs_buf)) => {
+                        Some(Ok((transform, mut outputs_buf))) => {
                             self.send_outputs(&mut outputs_buf).await
                                 .map_err(TaskError::wrapped)?;
+                            idle_transforms.push(transform);
                         }
                         _ => unreachable!("join error or bad poll"),
                     }
@@ -1385,7 +1387,9 @@ impl Runner {
                                 len += events.len();
                             }
 
-                            let mut t = self.transform.clone();
+                            let mut transform = idle_transforms
+                                .pop()
+                                .unwrap_or_else(|| self.transform.clone());
                             let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
                             // Hook CPU-time accounting onto the spawned task at
                             // the `Future::poll` boundary.
@@ -1393,9 +1397,9 @@ impl Runner {
                             let task = spawn_timed(
                                 async move {
                                     for events in input_arrays {
-                                        t.transform_all(events, &mut outputs_buf);
+                                        transform.transform_all(events, &mut outputs_buf);
                                     }
-                                    outputs_buf
+                                    (transform, outputs_buf)
                                 },
                                 self.cpu_ns.clone(),
                             );
