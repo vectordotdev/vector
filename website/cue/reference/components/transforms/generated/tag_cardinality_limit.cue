@@ -143,6 +143,25 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					required: false
 					type:     _schemaDefinitions["derived::9e26f78cee8a2ec00ecddfee"]
 				}
+				ttl_generations: {
+					description: "Per-metric override for `ttl_generations`. See [`Inner::ttl_generations`]."
+					required:    false
+					type: uint: default: 4
+				}
+				ttl_secs: {
+					description: """
+						Per-metric TTL for tracked tag values. See [`Inner::ttl_secs`] for the
+						full description.
+
+						Per-metric TTL is a **full override** of the global TTL — it does not
+						inherit. Leaving this unset means "no TTL for this metric", *not*
+						"fall back to the global `ttl_secs`". This mirrors how a per-metric
+						`value_limit` fully shadows the global one. If you want a metric to
+						share the global TTL, copy the value explicitly.
+						"""
+					required: false
+					type: uint: {}
+				}
 				value_limit: {
 					description: "How many distinct values to accept for any given key. Ignored when `mode: excluded`."
 					required:    false
@@ -180,6 +199,66 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					"""
 			}
 		}
+	}
+	ttl_generations: {
+		description: """
+			Number of time-slices the TTL window is split into.
+
+			In `probabilistic` mode, higher values smooth eviction (closer to a true
+			sliding window) at the cost of `(effective ttl_generations + 1) *
+			cache_size_per_key` memory per (metric, tag-key) pair. The extra shard is
+			the one currently being written: it covers only part of a slice, so
+			retiring without it would expire values after `ttl_secs - (ttl_secs /
+			ttl_generations)` instead of the full TTL. Explicitly setting `1`
+			produces a one-shard tumbling window: all tracked values are dropped at
+			once every `ttl_secs`, using
+			`cache_size_per_key` memory. When `ttl_secs` is shorter than the requested
+			generation count (slices are capped at ≥1s), generations are clamped but
+			the extra shard is still kept so short TTLs do not silently tumble.
+
+			In `exact` mode this does not change eviction precision (each value still
+			carries its own last-accepted timestamp). It only sets how often the
+			transform may proactively scan the value map (`sweep_interval ≈
+			ttl_secs / ttl_generations`): higher values scan more frequently. Raising
+			it has no benefit for correctness and can increase CPU on large
+			`value_limit` buckets.
+
+			Ignored when `ttl_secs` is unset.
+			"""
+		required: false
+		type: uint: default: 4
+	}
+	ttl_secs: {
+		description: """
+			Expire tracked tag values after this many seconds since they were last
+			accepted into the cardinality cache.
+
+			When unset (default) or set to `0`, values persist for the lifetime of the
+			process — the historical behavior. When set to a positive value, the
+			transform behaves like a sliding window: any tag value not accepted within
+			the TTL is dropped, freeing room under `value_limit` for fresh values.
+			Useful for bounding cost on backends (e.g. Datadog custom metrics) that
+			bill on a rolling unique-series window.
+
+			"Accepted" means the value was recorded on an emitted event. With
+			`limit_exceeded_action: drop_tag`, every retained tag sighting refreshes
+			the lease. With `limit_exceeded_action: drop_event`, the pre-check uses a
+			non-refreshing membership test and the record pass runs only when the
+			whole event is kept — so a value present on every *incoming* event can
+			still expire if those events are rejected because another tag is over
+			limit. Size the TTL around the active accepted set, not raw event volume.
+
+			In `exact` mode every value carries a precise last-accepted timestamp; in
+			`probabilistic` mode the underlying bloom filter is split into
+			`ttl_generations` rolling shards, so eviction is approximate to within
+			`ttl_secs / ttl_generations`.
+
+			Not supported in `exact_fingerprint` mode, which keeps only hashes and has
+			nowhere to record a last-accepted time; combining the two is a configuration
+			error rather than a silently ignored setting.
+			"""
+		required: false
+		type: uint: {}
 	}
 	value_limit: {
 		description: "How many distinct values to accept for any given key."
