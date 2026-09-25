@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use regex::Regex;
 use semver::Version;
 use tempfile::TempDir;
@@ -99,6 +99,8 @@ fn version_of(tag: &str) -> Result<Version> {
 }
 
 fn copy_existing_files(source_root: &Path, dest_root: &Path) -> Result<()> {
+    let mut prepared = Vec::new();
+    let mut failures = Vec::new();
     for path in files_in(dest_root)? {
         let relative = path
             .strip_prefix(dest_root)
@@ -106,23 +108,30 @@ fn copy_existing_files(source_root: &Path, dest_root: &Path) -> Result<()> {
         if relative == Path::new("README.md") {
             continue;
         }
-        info!("Updating {}", path.display());
-        copy(&source_root.join(relative), &path)?;
+        match fs::read(source_root.join(relative)) {
+            Ok(contents) => prepared.push((path, normalize(&contents))),
+            Err(error) => failures.push((relative.to_path_buf(), error)),
+        }
+    }
+    if !failures.is_empty() {
+        failures.sort_by(|(left, _), (right, _)| left.cmp(right));
+        let detail = failures
+            .iter()
+            .map(|(path, error)| format!("{}: {error}", path.display()))
+            .collect::<Vec<_>>()
+            .join("\n");
+        bail!("Could not read vendored files:\n{detail}");
+    }
+    for (dest, contents) in prepared {
+        info!("Updating {}", dest.display());
+        fs::write(&dest, contents)
+            .with_context(|| format!("Could not write {}", dest.display()))?;
     }
     Ok(())
 }
 
-/// Read `source` and write it to `dest`.
-///
-/// Trailing spaces are removed from each line, matching `vdev check fmt`, and
-/// every line is written with a newline.
-fn copy(source: &Path, dest: &Path) -> Result<()> {
-    let contents =
-        fs::read(source).with_context(|| format!("Could not read {}", source.display()))?;
-    fs::write(dest, normalize(&contents))
-        .with_context(|| format!("Could not write {}", dest.display()))
-}
-
+/// Remove trailing spaces from each line, matching `vdev check fmt`, and end
+/// every line with a newline.
 fn normalize(contents: &[u8]) -> Vec<u8> {
     let mut normalized = Vec::with_capacity(contents.len() + 1);
     let mut lines = contents.split(|byte| *byte == b'\n').peekable();
@@ -222,20 +231,25 @@ mod tests {
 
     #[test]
     fn adds_a_missing_trailing_newline() {
+        assert_eq!(normalize(b"proto"), b"proto\n");
+        assert_eq!(normalize(b"proto\n"), b"proto\n");
+        assert_eq!(normalize(b"kept \ntrimmed  \r\n"), b"kept\ntrimmed\n");
+    }
+
+    #[test]
+    fn leaves_the_destination_unchanged_when_a_source_file_is_missing() {
         let directory = TempDir::new().unwrap();
-        let source = directory.path().join("source.txt");
-        let dest = directory.path().join("dest.txt");
+        let source_root = directory.path().join("source");
+        let dest_root = directory.path().join("dest");
+        fs::create_dir(&source_root).unwrap();
+        fs::create_dir(&dest_root).unwrap();
+        fs::write(source_root.join("kept.proto"), b"new\n").unwrap();
+        fs::write(dest_root.join("kept.proto"), b"old\n").unwrap();
+        fs::write(dest_root.join("gone.proto"), b"old\n").unwrap();
 
-        fs::write(&source, b"proto").unwrap();
-        copy(&source, &dest).unwrap();
-        assert_eq!(fs::read(&dest).unwrap(), b"proto\n");
-
-        fs::write(&source, b"proto\n").unwrap();
-        copy(&source, &dest).unwrap();
-        assert_eq!(fs::read(&dest).unwrap(), b"proto\n");
-
-        fs::write(&source, b"kept \ntrimmed  \r\n").unwrap();
-        copy(&source, &dest).unwrap();
-        assert_eq!(fs::read(&dest).unwrap(), b"kept\ntrimmed\n");
+        let error = copy_existing_files(&source_root, &dest_root).unwrap_err();
+        assert!(error.to_string().contains("gone.proto"), "{error}");
+        assert_eq!(fs::read(dest_root.join("kept.proto")).unwrap(), b"old\n");
+        assert_eq!(fs::read(dest_root.join("gone.proto")).unwrap(), b"old\n");
     }
 }
