@@ -9,49 +9,20 @@ use crate::{
     transforms::Transform,
 };
 
-/// Marker type for the version one of the configuration for the `lua` transform.
-#[configurable_component]
-#[derive(Clone, Debug)]
-enum V1 {
-    /// Lua transform API version 1.
-    ///
-    /// This version is deprecated and will be removed in a future version.
-    #[configurable(metadata(deprecated))]
-    #[serde(rename = "1")]
-    V1,
-}
-
 /// Configuration for the version one of the `lua` transform.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct LuaConfigV1 {
-    /// Transform API version.
-    ///
-    /// Specifying this version ensures that backward compatibility is not broken.
-    version: Option<V1>,
-
     #[serde(flatten)]
     config: v1::LuaConfig,
-}
-
-/// Marker type for version two of the configuration for the `lua` transform.
-#[configurable_component]
-#[derive(Clone, Debug)]
-enum V2 {
-    /// Lua transform API version 2.
-    #[serde(rename = "2")]
-    V2,
 }
 
 /// Configuration for the version two of the `lua` transform.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct LuaConfigV2 {
-    /// Transform API version.
-    ///
-    /// Specifying this version ensures that backward compatibility is not broken.
-    version: V2,
-
     #[serde(flatten)]
     config: v2::LuaConfig,
 }
@@ -62,13 +33,21 @@ pub struct LuaConfigV2 {
     "Modify event data using the Lua programming language."
 ))]
 #[derive(Clone, Debug)]
-#[serde(untagged)]
+#[serde(tag = "version")]
+#[configurable(metadata(
+    docs::enum_tag_description = "Transform API version. Specifying this version ensures that backward compatibility is not broken."
+))]
 pub enum LuaConfig {
-    /// Configuration for version one.
-    V1(LuaConfigV1),
-
     /// Configuration for version two.
+    #[serde(rename = "2")]
     V2(LuaConfigV2),
+
+    /// Configuration for version one.
+    ///
+    /// This version is deprecated and will be removed in a future version.
+    #[configurable(metadata(deprecated))]
+    #[serde(rename = "1")]
+    V1(LuaConfigV1),
 }
 
 impl GenerateConfig for LuaConfig {
@@ -136,6 +115,59 @@ mod test {
             "#})
             .is_err(),
             "metric_tag_values = auto must be rejected at parse time"
+        );
+    }
+
+    #[test]
+    fn version_is_required() {
+        // The `version` field is the enum tag and must always be specified.
+        assert!(
+            serde_yaml::from_str::<super::LuaConfig>(indoc::indoc! {r#"
+                source: |
+                  event["a"] = "b"
+            "#})
+            .is_err(),
+            "a config without `version` must be rejected"
+        );
+    }
+
+    #[test]
+    fn version_dispatches_to_the_correct_config() {
+        let v1 = serde_yaml::from_str::<super::LuaConfig>(indoc::indoc! {r#"
+            version: "1"
+            source: |
+              event["a"] = "b"
+        "#})
+        .unwrap();
+        assert!(matches!(v1, super::LuaConfig::V1(_)));
+
+        let v2 = serde_yaml::from_str::<super::LuaConfig>(indoc::indoc! {r#"
+            version: "2"
+            hooks:
+              process: |
+                function (event, emit)
+                  emit(event)
+                end
+        "#})
+        .unwrap();
+        assert!(matches!(v2, super::LuaConfig::V2(_)));
+    }
+
+    #[test]
+    fn rejects_unknown_fields() {
+        // `deny_unknown_fields` must still be enforced on the versioned configs.
+        assert!(
+            serde_yaml::from_str::<super::LuaConfig>(indoc::indoc! {r#"
+                version: "2"
+                hooks:
+                  process: |
+                    function (event, emit)
+                      emit(event)
+                    end
+                unknown_field: true
+            "#})
+            .is_err(),
+            "unknown fields must be rejected"
         );
     }
 }
