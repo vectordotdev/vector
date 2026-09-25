@@ -11,7 +11,10 @@ use std::{
 };
 
 use nix::{
-    sys::signal::{Signal, kill},
+    sys::{
+        signal::{Signal, kill},
+        wait::{WaitPidFlag, WaitStatus, waitpid},
+    },
     unistd::Pid,
 };
 use serde_json::{Value, json};
@@ -122,6 +125,9 @@ impl Fixture {
             .as_object_mut()
             .unwrap()
             .extend(options.as_object().unwrap().clone());
+        let acknowledgements = source["acknowledgements"]["enabled"]
+            .as_bool()
+            .unwrap_or(true);
         let config = self.root.join("vector.yaml");
         std::fs::write(
             &config,
@@ -141,7 +147,7 @@ impl Fixture {
                     "observed": {
                         "type": "console", "inputs": ["files", "files_metrics"],
                         "target": "stdout", "encoding": {"codec": "json"},
-                        "acknowledgements": {"enabled": true}
+                        "acknowledgements": {"enabled": acknowledgements}
                     }
                 }
             }))?,
@@ -226,6 +232,22 @@ impl Running {
             seen.messages.len() >= count && seen.received_events >= count as f64
         })
         .await
+    }
+
+    pub(super) fn pause(&self) -> vector::Result<()> {
+        let pid = Pid::from_raw(self.child.id().ok_or("Vector exited before pause")? as i32);
+        kill(pid, Signal::SIGSTOP)?;
+        assert!(matches!(
+            waitpid(pid, Some(WaitPidFlag::WUNTRACED))?,
+            WaitStatus::Stopped(_, Signal::SIGSTOP)
+        ));
+        Ok(())
+    }
+
+    pub(super) fn resume(&self) -> vector::Result<()> {
+        let pid = Pid::from_raw(self.child.id().ok_or("Vector exited before resume")? as i32);
+        kill(pid, Signal::SIGCONT)?;
+        Ok(())
     }
 
     pub(super) async fn stop(mut self, signal: Signal) -> vector::Result<Observed> {

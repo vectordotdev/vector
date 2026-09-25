@@ -12,6 +12,8 @@ use crate::FilePosition;
 #[derive(Debug, PartialEq, Eq)]
 pub enum ReadOutcome {
     Line,
+    /// An oversized record was consumed through its delimiter.
+    Discarded,
     Yield,
     Eof,
 }
@@ -42,6 +44,20 @@ impl BoundedLineReader {
     pub fn reset(&mut self) {
         self.discarding = false;
         self.prefix.clear();
+    }
+
+    /// Complete an unterminated record when its reader is permanently retired.
+    pub fn finish(&mut self, buf: &mut BytesMut) -> ReadOutcome {
+        append_payload(buf, &mut self.discarding, self.max_size, &self.prefix);
+        let outcome = if self.discarding {
+            ReadOutcome::Discarded
+        } else if buf.is_empty() {
+            ReadOutcome::Eof
+        } else {
+            ReadOutcome::Line
+        };
+        self.reset();
+        outcome
     }
 
     /// Consume at most `budget` bytes, including delimiters and discarded data.
@@ -128,9 +144,9 @@ impl BoundedLineReader {
                 if self.discarding {
                     self.discarding = false;
                     buf.clear();
-                } else {
-                    return Ok(ReadOutcome::Line);
+                    return Ok(ReadOutcome::Discarded);
                 }
+                return Ok(ReadOutcome::Line);
             }
         }
         Ok(ReadOutcome::Yield)
@@ -180,7 +196,9 @@ mod tests {
                         assert!(state.prefix.len() < delimiter.len());
                         match result {
                             ReadOutcome::Line => lines.push(buf.split().freeze()),
-                            ReadOutcome::Yield => assert!(position > before),
+                            ReadOutcome::Yield | ReadOutcome::Discarded => {
+                                assert!(position > before);
+                            }
                             ReadOutcome::Eof => break,
                         }
                     }
@@ -210,13 +228,22 @@ mod tests {
                 ReadOutcome::Eof
             );
             reader.get_mut().get_mut().extend_from_slice(b"\nfin\r\n");
-            assert_eq!(
-                state
-                    .read(&mut reader, &mut position, &mut buf, 64)
-                    .await
-                    .unwrap(),
-                ReadOutcome::Line
-            );
+            let outcome = state
+                .read(&mut reader, &mut position, &mut buf, 64)
+                .await
+                .unwrap();
+            if prefix == "ok" {
+                assert_eq!(outcome, ReadOutcome::Line);
+            } else {
+                assert_eq!(outcome, ReadOutcome::Discarded);
+                assert_eq!(
+                    state
+                        .read(&mut reader, &mut position, &mut buf, 64)
+                        .await
+                        .unwrap(),
+                    ReadOutcome::Line
+                );
+            }
             assert_eq!(
                 &buf[..],
                 if prefix == "ok" {
@@ -269,6 +296,13 @@ mod tests {
             assert!(buf.len() <= 8);
             assert!(state.prefix.is_empty());
         }
+        assert_eq!(
+            state
+                .read(&mut reader, &mut position, &mut buf, 1024)
+                .await
+                .unwrap(),
+            ReadOutcome::Discarded
+        );
         assert_eq!(
             state
                 .read(&mut reader, &mut position, &mut buf, 1024)

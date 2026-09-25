@@ -1,10 +1,8 @@
 use std::{
+    collections::VecDeque,
     io::{self, SeekFrom},
     path::PathBuf,
-    sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc,
-    },
+    sync::{Arc, Mutex},
     time::{Duration, Instant, SystemTime},
 };
 
@@ -12,13 +10,14 @@ use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use tokio::{
     fs::{self, File},
-    io::{AsyncBufRead, AsyncBufReadExt, AsyncSeekExt, BufReader},
+    io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, BufReader},
 };
 use tracing::debug;
 use vector_common::compression::gzip_multiple_decoder;
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{FilePosition, ReadFrom};
+use crate::{CheckpointsView, FilePosition, ReadFrom};
+use file_source_common::FileFingerprint;
 use file_source_common::PortableFileExt;
 use file_source_common::{
     buffer::bounded::{BoundedLineReader, ReadOutcome},
@@ -27,12 +26,17 @@ use file_source_common::{
 
 /// Physical identity of an opened file, independent of its path and checkpoint fingerprint.
 #[derive(Debug, PartialEq, Eq)]
-struct FileIdentity {
+pub(super) struct FileIdentity {
     device: u64,
     inode: u64,
 }
 
 impl FileIdentity {
+    pub(super) async fn at_path(path: &std::path::Path) -> io::Result<Self> {
+        let file = File::open(path).await?;
+        Ok(Self::from_file_info(&file.file_info().await?))
+    }
+
     fn from_file_info(info: &impl PortableFileExt) -> Self {
         Self {
             device: info.portable_dev(),
@@ -45,32 +49,111 @@ impl FileIdentity {
 /// A new instance after truncation isolates acknowledgements for old contents.
 #[derive(Debug)]
 pub struct DeliveryProgress {
-    offset: AtomicU64,
-    failed: AtomicBool,
+    state: Mutex<DeliveryState>,
+}
+
+#[derive(Debug)]
+struct DeliveryState {
+    offset: FilePosition,
+    failed: bool,
+    file_id: Option<FileFingerprint>,
+    discarded: VecDeque<(FilePosition, FilePosition)>,
+}
+
+impl DeliveryState {
+    fn advance(&mut self, offset: FilePosition) {
+        self.offset = self.offset.max(offset);
+        while self
+            .discarded
+            .front()
+            .is_some_and(|(start, _)| *start <= self.offset)
+        {
+            self.offset = self.offset.max(self.discarded.pop_front().unwrap().1);
+        }
+    }
 }
 
 impl DeliveryProgress {
     fn new(offset: FilePosition) -> Self {
         Self {
-            offset: AtomicU64::new(offset),
-            failed: AtomicBool::new(false),
+            state: Mutex::new(DeliveryState {
+                offset,
+                failed: false,
+                file_id: None,
+                discarded: VecDeque::new(),
+            }),
         }
     }
 
-    pub fn delivered(&self, offset: FilePosition) -> bool {
-        if self.failed.load(Ordering::Acquire) {
+    /// Update the current checkpoint identity, including acknowledgements queued before a rekey.
+    pub fn checkpoint(
+        &self,
+        checkpoints: &CheckpointsView,
+        file_id: FileFingerprint,
+        offset: FilePosition,
+    ) {
+        let mut state = self.state.lock().unwrap();
+        if !state.failed {
+            state.advance(offset);
+            checkpoints.update(state.file_id.unwrap_or(file_id), state.offset);
+        }
+    }
+
+    #[cfg(test)]
+    fn delivered(&self, offset: FilePosition) -> bool {
+        let mut state = self.state.lock().unwrap();
+        if state.failed {
             return false;
         }
-        self.offset.store(offset, Ordering::Release);
+        state.advance(offset);
         true
     }
 
     pub fn failed(&self) {
-        self.failed.store(true, Ordering::Release);
+        self.state.lock().unwrap().failed = true;
+    }
+
+    pub(super) fn rekey(
+        &self,
+        old: FileFingerprint,
+        new: FileFingerprint,
+        checkpoints: &CheckpointsView,
+    ) {
+        let mut state = self.state.lock().unwrap();
+        checkpoints.update_key(old, new);
+        state.file_id = Some(new);
+    }
+
+    pub(super) fn discard(
+        &self,
+        start: FilePosition,
+        end: FilePosition,
+        file_id: FileFingerprint,
+        checkpoints: &CheckpointsView,
+    ) {
+        let mut state = self.state.lock().unwrap();
+        if state.failed {
+            return;
+        }
+        if let Some((_, previous_end)) = state
+            .discarded
+            .back_mut()
+            .filter(|(_, previous_end)| *previous_end == start)
+        {
+            *previous_end = end;
+        } else {
+            state.discarded.push_back((start, end));
+        }
+        let offset = state.offset;
+        state.advance(offset);
+        if state.offset != offset {
+            checkpoints.update(state.file_id.unwrap_or(file_id), state.offset);
+        }
     }
 
     fn covers(&self, offset: FilePosition) -> bool {
-        !self.failed.load(Ordering::Acquire) && self.offset.load(Ordering::Acquire) == offset
+        let state = self.state.lock().unwrap();
+        !state.failed && state.offset == offset
     }
 }
 
@@ -114,6 +197,10 @@ pub struct FileWatcher {
     deletion_allowed: bool,
     opened_length: u64,
     opened_modified: Option<SystemTime>,
+    prefix_length: Option<usize>,
+    generation_prefix: Bytes,
+    record_start: FilePosition,
+    pub(super) discarded: Option<(FilePosition, FilePosition)>,
 }
 
 enum FileReader {
@@ -233,12 +320,57 @@ impl FileWatcher {
             compressed: gzipped,
             opened_length: metadata.len(),
             opened_modified: metadata.modified().ok(),
+            prefix_length: None,
+            generation_prefix: Bytes::new(),
+            record_start: file_position,
+            discarded: None,
         })
     }
 
-    pub(super) fn enable_delivery_tracking(&mut self, checkpoint: Option<FilePosition>) {
+    pub(super) fn enable_delivery_tracking(&mut self) {
         if self.delivery_progress.is_none() {
-            self.delivery_progress = Some(Arc::new(DeliveryProgress::new(checkpoint.unwrap_or(0))));
+            self.delivery_progress = Some(Arc::new(DeliveryProgress::new(self.file_position)));
+        }
+    }
+
+    pub(super) async fn capture_generation_prefix(
+        &mut self,
+        length: Option<usize>,
+    ) -> io::Result<()> {
+        self.prefix_length = length;
+        if let (Some(length), FileReader::Plain(reader)) = (length, &mut self.reader) {
+            reader.seek(SeekFrom::Start(0)).await?;
+            let mut prefix = Vec::new();
+            let read = reader.take(length as u64).read_to_end(&mut prefix).await;
+            reader.seek(SeekFrom::Start(self.file_position)).await?;
+            read?;
+            self.generation_prefix = Bytes::from(prefix);
+        }
+        Ok(())
+    }
+
+    pub(super) fn same_generation(&self, other: &Self) -> bool {
+        self.prefix_length.is_some()
+            && (!self.generation_prefix.is_empty() || self.file_position == 0)
+            && !self.compressed
+            && other.generation_prefix.starts_with(&self.generation_prefix)
+    }
+
+    pub(super) fn matches_identity(&self, identity: &FileIdentity) -> bool {
+        self.identity == *identity
+    }
+
+    pub(super) fn finish_partial(&mut self) -> Option<RawLine> {
+        match self.line_reader.finish(&mut self.buf) {
+            ReadOutcome::Line => Some(RawLine {
+                offset: self.record_start,
+                bytes: self.buf.split().freeze(),
+            }),
+            ReadOutcome::Discarded => {
+                self.discarded = Some((self.record_start, self.file_position));
+                None
+            }
+            _ => None,
         }
     }
 
@@ -328,20 +460,44 @@ impl FileWatcher {
     /// buffered data. Seeking after a shrink discards that stale buffered data.
     pub(super) async fn check_for_truncation(&mut self) -> io::Result<()> {
         self.reached_eof = false;
-        if let FileReader::Plain(reader) = &mut self.reader {
-            if reader.get_ref().metadata().await?.len() < self.file_position {
-                reader.seek(SeekFrom::Start(0)).await?;
-                self.file_position = 0;
-                self.buf.clear();
-                self.line_reader.reset();
-                if let Some(progress) = &self.delivery_progress {
-                    // Reject late acknowledgements for the previous contents.
-                    progress.failed();
-                    self.delivery_progress = Some(Arc::new(DeliveryProgress::new(0)));
-                }
+        let shrunk = if let FileReader::Plain(reader) = &mut self.reader {
+            reader.get_ref().metadata().await?.len() < self.file_position
+        } else {
+            false
+        };
+        if shrunk {
+            self.rewind().await?;
+        } else if self
+            .prefix_length
+            .is_some_and(|length| self.generation_prefix.len() < length)
+        {
+            // A tracked file can be smaller than its fingerprint after truncation.
+            // Record its new prefix before reading, so rediscovery can distinguish
+            // subsequent growth from another rewrite of the same inode.
+            let previous = self.generation_prefix.clone();
+            self.capture_generation_prefix(self.prefix_length).await?;
+            if !self.generation_prefix.starts_with(&previous) {
+                self.rewind().await?;
             }
         }
         Ok(())
+    }
+
+    pub(super) async fn rewind(&mut self) -> io::Result<()> {
+        if let FileReader::Plain(reader) = &mut self.reader {
+            reader.seek(SeekFrom::Start(0)).await?;
+        }
+        self.file_position = 0;
+        self.record_start = 0;
+        self.buf.clear();
+        self.line_reader.reset();
+        self.discarded = None;
+        if let Some(progress) = &self.delivery_progress {
+            progress.failed();
+            self.delivery_progress = Some(Arc::new(DeliveryProgress::new(0)));
+        }
+        self.generation_prefix = Bytes::new();
+        self.capture_generation_prefix(self.prefix_length).await
     }
 
     /// Read a single line from the underlying file
@@ -350,7 +506,12 @@ impl FileWatcher {
     /// up to some maximum but unspecified amount of time.
     #[cfg(test)]
     async fn read_line(&mut self) -> io::Result<Option<RawLine>> {
-        self.read_line_bounded(usize::MAX).await
+        loop {
+            let line = self.read_line_bounded(usize::MAX).await?;
+            if self.discarded.take().is_none() {
+                return Ok(line);
+            }
+        }
     }
 
     pub(super) async fn read_line_bounded(&mut self, budget: usize) -> io::Result<Option<RawLine>> {
@@ -386,6 +547,7 @@ impl FileWatcher {
         match result {
             Ok(ReadOutcome::Line) => {
                 self.reached_eof = false;
+                self.record_start = self.file_position;
                 self.track_read_success();
                 let bytes = self.buf.split().freeze();
                 // The call may finish a previously buffered record or skip
@@ -399,6 +561,12 @@ impl FileWatcher {
                 );
                 // Return all lines, including empty ones
                 Ok(Some(RawLine { offset, bytes }))
+            }
+            Ok(ReadOutcome::Discarded) => {
+                self.discarded = Some((self.record_start, self.file_position));
+                self.record_start = self.file_position;
+                self.track_read_success();
+                Ok(None)
             }
             Ok(ReadOutcome::Yield) => Ok(None),
             Ok(ReadOutcome::Eof) => {
@@ -450,6 +618,141 @@ async fn is_gzipped(r: &mut BufReader<File>) -> io::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rekey_redirects_pending_acknowledgements_and_preserves_completed_progress() {
+        let checkpoints = CheckpointsView::default();
+        let old = FileFingerprint::FirstBytesChecksum(1);
+        let new = FileFingerprint::FirstBytesChecksum(2);
+        let progress = DeliveryProgress::new(0);
+        progress.checkpoint(&checkpoints, old, 4);
+        progress.rekey(old, new, &checkpoints);
+        assert_eq!(checkpoints.get(old), None);
+        assert_eq!(checkpoints.get(new), Some(4));
+        // This acknowledgement was queued before the fingerprint changed.
+        progress.checkpoint(&checkpoints, old, 8);
+        assert_eq!(checkpoints.get(old), None);
+        assert_eq!(checkpoints.get(new), Some(8));
+        progress.failed();
+        progress.checkpoint(&checkpoints, old, 12);
+        assert_eq!(checkpoints.get(new), Some(8));
+    }
+
+    #[test]
+    fn discarded_records_wait_for_preceding_delivery() {
+        let checkpoints = CheckpointsView::default();
+        let id = FileFingerprint::FirstBytesChecksum(1);
+        let progress = DeliveryProgress::new(0);
+        progress.discard(4, 100, id, &checkpoints);
+        progress.discard(100, 200, id, &checkpoints);
+        assert_eq!(checkpoints.get(id), None);
+        assert!(!progress.covers(200));
+        progress.checkpoint(&checkpoints, id, 4);
+        assert_eq!(checkpoints.get(id), Some(200));
+        assert!(progress.covers(200));
+        let failed = DeliveryProgress::new(0);
+        failed.discard(4, 200, id, &checkpoints);
+        failed.failed();
+        failed.checkpoint(&checkpoints, id, 4);
+        assert!(!failed.covers(200));
+    }
+
+    #[tokio::test]
+    async fn end_position_is_already_covered_for_deletion() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        fs::write(&path, "old record\n").await.unwrap();
+        let mut watcher =
+            FileWatcher::new(path, ReadFrom::End, None, 1024, Bytes::from_static(b"\n"))
+                .await
+                .unwrap();
+        watcher.enable_delivery_tracking();
+        assert!(watcher.read_line().await.unwrap().is_none());
+        assert!(watcher.ready_to_delete(Duration::ZERO).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn generation_prefix_distinguishes_rewrite_from_post_truncation_growth() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        fs::write(&path, "old\n").await.unwrap();
+        let mut old = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        old.capture_generation_prefix(Some(4)).await.unwrap();
+        assert!(old.read_line().await.unwrap().is_some());
+        fs::write(&path, "new contents\n").await.unwrap();
+        let mut new = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        new.capture_generation_prefix(Some(4)).await.unwrap();
+        assert!(old.same_file(&new));
+        assert!(
+            !old.same_generation(&new),
+            "regrowth past the old offset is still a rewrite"
+        );
+
+        fs::write(&path, "n\n").await.unwrap();
+        old.check_for_truncation().await.unwrap();
+        assert_eq!(old.read_line().await.unwrap().unwrap().bytes, "n");
+        fs::write(&path, "n\nnext\n").await.unwrap();
+        let mut grown = FileWatcher::new(
+            path,
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        grown.capture_generation_prefix(Some(4)).await.unwrap();
+        assert!(
+            old.same_generation(&grown),
+            "already-read replacement must not replay"
+        );
+    }
+
+    #[tokio::test]
+    async fn retirement_flushes_partial_delimiter_and_discards_oversized_tail() {
+        for (input, expected) in [("ok\r", Some("ok\r")), ("abc\r", None), ("oversized", None)] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("input.log");
+            fs::write(&path, input).await.unwrap();
+            let mut watcher = FileWatcher::new(
+                path,
+                ReadFrom::Beginning,
+                None,
+                3,
+                Bytes::from_static(b"\r\n"),
+            )
+            .await
+            .unwrap();
+            assert!(watcher.read_line().await.unwrap().is_none());
+            let line = watcher.finish_partial();
+            assert_eq!(
+                line.as_ref()
+                    .map(|line| std::str::from_utf8(&line.bytes).unwrap()),
+                expected
+            );
+            if let Some(line) = line {
+                assert_eq!(line.offset, 0);
+            } else {
+                assert_eq!(watcher.discarded, Some((0, input.len() as u64)));
+            }
+        }
+    }
 
     #[tokio::test]
     async fn idle_retirement_requires_missing_eof_and_resets_on_partial_bytes() {
@@ -553,7 +856,7 @@ mod tests {
         )
         .await
         .unwrap();
-        watcher.enable_delivery_tracking(None);
+        watcher.enable_delivery_tracking();
         while watcher.read_line().await.unwrap().is_some() {}
         assert!(!watcher.ready_to_delete(Duration::ZERO).await.unwrap());
         let progress = watcher.delivery_progress.as_ref().unwrap().clone();
@@ -612,7 +915,7 @@ mod tests {
         )
         .await
         .unwrap();
-        watcher.enable_delivery_tracking(None);
+        watcher.enable_delivery_tracking();
         while watcher.read_line().await.unwrap().is_some() {}
         let old_progress = watcher.delivery_progress.as_ref().unwrap().clone();
         fs::write(&path, "new\n").await.unwrap();
