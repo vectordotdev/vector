@@ -1,0 +1,32 @@
+version: "3"
+
+services:
+  rsyslog:
+    image: docker.io/rsyslog/rsyslog:${CONFIG_VERSION}
+    user: root
+    environment:
+      - RSYSLOG_HOSTNAME=vector-rsyslog
+    volumes:
+      - ../data/rsyslog.conf:/etc/rsyslog.d/vector-test.conf:ro
+      - logs:/var/log/vector-test
+
+  syslog-ng:
+    image: docker.io/balabit/syslog-ng:4.8.3
+    command: ["--no-caps", "--foreground", "-f", "/etc/syslog-ng/vector-test.conf"]
+    volumes:
+      - ../data/syslog-ng.conf:/etc/syslog-ng/vector-test.conf:ro
+      - ../../../../tests/data/ca/intermediate_server/certs/localhost.cert.pem:/etc/syslog-ng/tls/localhost.cert.pem:ro
+      - ../../../../tests/data/ca/intermediate_server/private/localhost.key.pem:/etc/syslog-ng/tls/localhost.key.pem:ro
+      - logs:/var/log/vector-test
+
+volumes:
+  # Use external volume 'syslog_logs' that's shared with the test runner.
+  # The runner creates this volume and mounts it at /syslog_logs.
+  logs:
+    name: syslog_logs
+    external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

@@ -48,7 +48,7 @@ pub use otlp::{OtlpSerializer, OtlpSerializerConfig};
 pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 #[cfg(feature = "syslog")]
-pub use syslog::{SyslogSerializer, SyslogSerializerConfig};
+pub use syslog::{SyslogSerializer, SyslogSerializerConfig, SyslogSerializerOptions};
 pub use text::{TextSerializer, TextSerializerConfig};
 use vector_core::event::Event;
 
