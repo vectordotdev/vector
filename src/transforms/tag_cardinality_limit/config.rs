@@ -42,9 +42,6 @@ pub struct Config {
     pub max_tracked_keys: Option<usize>,
 
     /// Tag cardinality limits configuration per metric name.
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual metric configuration."
-    ))]
     #[serde(default)]
     pub per_metric_limits: HashMap<String, PerMetricConfig>,
 
@@ -54,9 +51,6 @@ pub struct Config {
     ///
     /// See the "Per-tag overrides" section under "How it works" for a worked example
     /// and the precedence rules.
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual tag configuration."
-    ))]
     #[serde(default)]
     pub per_tag_limits: HashMap<String, PerTagConfig>,
 }
@@ -141,9 +135,6 @@ pub struct PerMetricConfig {
     /// are inherited from the enclosing per-metric configuration, except
     /// `cache_size_per_key`, which can be overridden per tag in probabilistic mode.
     /// Tags not listed here use the per-metric configuration.
-    #[configurable(metadata(
-        docs::additional_props_description = "An individual tag configuration."
-    ))]
     #[serde(default)]
     pub per_tag_limits: HashMap<String, PerTagConfig>,
 

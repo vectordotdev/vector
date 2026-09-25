@@ -93,8 +93,12 @@ generated: components: transforms: log_to_metric: configuration: {
 					"""
 				required: false
 				type: object: options: "*": {
-					description: "A metric tag."
-					required:    true
+					description: """
+						Specification of the value of a created tag.
+
+						This may be a single value, a `null` for a bare tag, or an array of either.
+						"""
+					required: true
 					type: string: syntax: "template"
 				}
 			}

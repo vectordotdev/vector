@@ -78,7 +78,7 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 		description: "Tag cardinality limits configuration per metric name."
 		required:    false
 		type: object: options: "*": {
-			description: "An individual metric configuration."
+			description: "Per-metric name tag cardinality limit configuration."
 			required:    true
 			type: object: options: {
 				cache_size_per_key: {

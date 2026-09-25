@@ -98,8 +98,6 @@ pub struct AvroDeserializerOptions {
     /// * `TimeMillis`
     #[configurable(metadata(
         docs::examples = r#"{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"#,
-        docs::additional_props_description = r#"Supports most avro data types, unsupported data types includes
-        ["decimal", "duration", "local-timestamp-millis", "local-timestamp-micros"]"#,
     ))]
     pub schema: String,
 

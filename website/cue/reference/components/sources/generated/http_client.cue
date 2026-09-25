@@ -99,7 +99,7 @@ generated: components: sources: http_client: configuration: {
 				}
 			}]
 			options: "*": {
-				description: "A query string parameter and its value(s)."
+				description: "Configuration of the query parameter value for HTTP requests."
 				required:    true
 				type:        _schemaDefinitions["vector::http::ParameterValue"]
 			}
