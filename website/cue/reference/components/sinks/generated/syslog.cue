@@ -33,24 +33,29 @@ generated: components: sinks: syslog: configuration: {
 			"""
 		relevant_when: "mode = \"tcp\" or mode = \"unix_stream\""
 		required:      false
-		type: object: options: method: {
-			description: "The framing method used to separate syslog messages in stream transports."
-			required:    false
-			type: string: {
-				default: "newline_delimited"
-				enum: {
-					newline_delimited: """
-						Terminates each syslog message with a newline (LF) character.
+		type: object: {
+			examples: [{
+				method: "octet_counting"
+			}]
+			options: method: {
+				description: "The framing method used to separate syslog messages in stream transports."
+				required:    false
+				type: string: {
+					default: "newline_delimited"
+					enum: {
+						newline_delimited: """
+															Terminates each syslog message with a newline (LF) character.
 
-						This is RFC 6587 non-transparent framing. Use octet-counting if
-						messages can contain embedded newlines.
-						"""
-					octet_counting: """
-						Prefixes each syslog message with its byte length and a space.
+															This is RFC 6587 non-transparent framing. Use octet-counting if
+															messages can contain embedded newlines.
+															"""
+						octet_counting: """
+															Prefixes each syslog message with its byte length and a space.
 
-						This is RFC 6587 octet-counting framing. When used with TCP, TLS, and
-						RFC 5424 messages, this is the framing required by RFC 5425.
-						"""
+															This is RFC 6587 octet-counting framing. When used with TCP, TLS, and
+															RFC 5424 messages, this is the framing required by RFC 5425.
+															"""
+					}
 				}
 			}
 		}
@@ -106,47 +111,57 @@ generated: components: sinks: syslog: configuration: {
 			Controls the RFC format, facility, severity, and field mappings for the syslog output.
 			"""
 		required: false
-		type: object: options: {
-			app_name: {
-				description: """
-					Path to a field in the event to use for the app name.
+		type: object: {
+			examples: [{
+				app_name: ".app_name"
+				facility: ".facility"
+				msg_id:   ".msg_id"
+				proc_id:  ".proc_id"
+				rfc:      "rfc5424"
+				severity: ".severity"
+			}]
+			options: {
+				app_name: {
+					description: """
+						Path to a field in the event to use for the app name.
 
-					If not provided, the encoder checks for a semantic "service" field.
-					If that is also missing, it defaults to "vector".
-					"""
-				required: false
-				type: string: {}
-			}
-			facility: {
-				description: "Path to a field in the event to use for the facility. Defaults to \"user\"."
-				required:    false
-				type: string: {}
-			}
-			msg_id: {
-				description: "Path to a field in the event to use for the msg ID."
-				required:    false
-				type: string: {}
-			}
-			proc_id: {
-				description: "Path to a field in the event to use for the proc ID."
-				required:    false
-				type: string: {}
-			}
-			rfc: {
-				description: "RFC to use for formatting."
-				required:    false
-				type: string: {
-					default: "rfc5424"
-					enum: {
-						rfc3164: "The legacy RFC3164 syslog format."
-						rfc5424: "The modern RFC5424 syslog format."
+						If not provided, the encoder checks for a semantic "service" field.
+						If that is also missing, it defaults to "vector".
+						"""
+					required: false
+					type: string: {}
+				}
+				facility: {
+					description: "Path to a field in the event to use for the facility. Defaults to \"user\"."
+					required:    false
+					type: string: {}
+				}
+				msg_id: {
+					description: "Path to a field in the event to use for the msg ID."
+					required:    false
+					type: string: {}
+				}
+				proc_id: {
+					description: "Path to a field in the event to use for the proc ID."
+					required:    false
+					type: string: {}
+				}
+				rfc: {
+					description: "RFC to use for formatting."
+					required:    false
+					type: string: {
+						default: "rfc5424"
+						enum: {
+							rfc3164: "The legacy RFC3164 syslog format."
+							rfc5424: "The modern RFC5424 syslog format."
+						}
 					}
 				}
-			}
-			severity: {
-				description: "Path to a field in the event to use for the severity. Defaults to \"informational\"."
-				required:    false
-				type: string: {}
+				severity: {
+					description: "Path to a field in the event to use for the severity. Defaults to \"informational\"."
+					required:    false
+					type: string: {}
+				}
 			}
 		}
 	}

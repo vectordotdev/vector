@@ -4,5 +4,14 @@ sinks:
     inputs:
       - my-source-or-transform-id
     address: 92.12.333.224:5000
+    framing:
+      method: octet_counting
     mode: tcp
     send_buffer_bytes: 65536
+    syslog:
+      app_name: .app_name
+      facility: .facility
+      msg_id: .msg_id
+      proc_id: .proc_id
+      rfc: rfc5424
+      severity: .severity

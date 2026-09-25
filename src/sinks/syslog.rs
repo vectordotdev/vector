@@ -37,6 +37,7 @@ pub struct SyslogSinkConfig {
     ///
     /// Controls the RFC format, facility, severity, and field mappings for the syslog output.
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "syslog_options_example()"))]
     pub syslog: SyslogSerializerOptions,
 
     #[serde(
@@ -72,6 +73,7 @@ pub struct TcpMode {
     pub config: TcpSinkConfig,
 
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "framing_example()"))]
     pub framing: SyslogFramingConfig,
 }
 
@@ -91,7 +93,26 @@ pub struct UnixMode {
     pub config: UnixSinkConfig,
 
     #[serde(default)]
+    #[configurable(metadata(docs::examples = "framing_example()"))]
     pub framing: SyslogFramingConfig,
+}
+
+fn syslog_options_example() -> SyslogSerializerOptions {
+    serde_json::from_value(serde_json::json!({
+        "rfc": "rfc5424",
+        "facility": ".facility",
+        "severity": ".severity",
+        "app_name": ".app_name",
+        "proc_id": ".proc_id",
+        "msg_id": ".msg_id",
+    }))
+    .expect("syslog options example should deserialize")
+}
+
+const fn framing_example() -> SyslogFramingConfig {
+    SyslogFramingConfig {
+        method: SyslogFramingMethod::OctetCounting,
+    }
 }
 
 /// Stream framing configuration.
