@@ -27,8 +27,8 @@ export RELEASE_BRANCH="v${NEW_VECTOR_VERSION%.*}"
       changelog, upgrade guidance, and release date as needed. Review deprecations with
       `cargo vdev deprecation show --version "${NEW_VECTOR_VERSION}"`.
 
-Keep the freeze active until **both** the release workflow's housekeeping PR has
-merged **and** the Kubernetes manifests push below has completed. Maintainers with
+Keep the freeze active until **both** the release workflow has pushed its post-release housekeeping
+to `master` **and** the Kubernetes manifests push below has completed. Maintainers with
 bypass access must also respect this window: do not merge unrelated PRs into `master`.
 [Unfreeze master](https://github.com/vectordotdev/vector/actions/workflows/release_unfreeze.yml)
 closes the window automatically once both are done.
@@ -58,7 +58,7 @@ The tag starts the release workflow; do not create the tag or release branch man
 
 # Post-release housekeeping
 
-- [ ] Wait for the release workflow to merge its housekeeping PR after checks pass.
+- [ ] Wait for the release workflow to push its post-release housekeeping directly to `master`.
       It begins the next minor `-dev` version, restores VRL `main`, and refreshes licenses and documentation.
 - [ ] Wait for the Helm chart release to push the Kubernetes manifests directly to `master`.
   - The chart release triggers [Refresh Kubernetes manifests](https://github.com/vectordotdev/vector/actions/workflows/release_manifests.yml),
