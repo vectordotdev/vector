@@ -124,6 +124,15 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		reduce_max_groups_exceeded_total: {
+			description: """
+				The total number of times the `reduce` transform flushed a group early because
+				the configured `max_groups` limit was reached.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		reloaded_total: {
 			description:       "The total number of times the Vector instance has been reloaded."
 			type:              "counter"
