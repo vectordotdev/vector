@@ -144,6 +144,9 @@ make check-fmt
 make check-clippy
 make check-generated-docs
 
+# Lint GitHub Actions workflows.
+make check-actionlint
+
 # Some other checks that in our experience rarely fail on PRs.
 make check-deny
 make check-docs

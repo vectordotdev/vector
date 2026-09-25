@@ -377,7 +377,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-docs
 check-all: check-examples check-component-features
-check-all: check-scripts check-deny check-generated-docs check-licenses
+check-all: check-actionlint check-scripts check-deny check-generated-docs check-licenses
 
 .PHONY: check-changelog-fragments
 check-changelog-fragments: ## Validate changelog fragments added in this branch/PR
@@ -394,6 +394,10 @@ check-clippy: ## Check code with Clippy; when set, FEATURES is the exact feature
 .PHONY: check-docs
 check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
 	$(VDEV) check docs
+
+.PHONY: check-actionlint
+check-actionlint: ## Check GitHub Actions workflows
+	actionlint
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly

@@ -2,7 +2,7 @@ name: "Install vector-vrl-doc-builder"
 description: "Install vector-vrl-doc-builder CLI tool with caching based on source code changes"
 
 branding:
-  icon: tool
+  icon: package
   color: purple
 
 runs:
