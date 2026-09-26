@@ -80,7 +80,7 @@ generated: components: transforms: reduce: configuration: {
 			"""
 		required: false
 		type: object: options: "*": {
-			description: "An individual merge strategy."
+			description: "Strategies for merging events."
 			required:    true
 			type: string: enum: {
 				array:          "Append each value to an array."

@@ -91,6 +91,13 @@ message OutputId {
   optional string port = 2;
 }
 
+enum TraceLayout {
+  TRACE_LAYOUT_UNSPECIFIED = 0;
+  TRACE_LAYOUT_DATADOG = 1;
+  TRACE_LAYOUT_OTEL_FLATTENED = 2;
+  TRACE_LAYOUT_OTLP_RESOURCE_SPANS = 3;
+}
+
 message Metadata {
   Value value = 1;
   DatadogOriginMetadata datadog_origin_metadata = 2;
@@ -99,7 +106,8 @@ message Metadata {
   OutputId upstream_id = 5;
   Secrets secrets = 6;
   bytes source_event_id = 7;
-  optional string datadog_metric_unit = 8;
+  optional TraceLayout trace_layout = 8;
+  optional string datadog_metric_unit = 9;
 }
 
 message Metric {

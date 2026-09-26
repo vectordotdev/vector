@@ -7,6 +7,7 @@ use std::{
 
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
+use datadog_agent_metrics_v3::V3EncodeError;
 use datadog_proto::agentpayload as ddmetric_proto;
 use prost_reflect::DescriptorPool;
 use snafu::{ResultExt, Snafu};
@@ -103,6 +104,9 @@ pub enum FinishError {
         metrics: Vec<Metric>,
         recommended_splits: usize,
     },
+
+    #[snafu(display("Failed to encode V3 payload to Protocol Buffers: {}", source))]
+    V3EncodingFailed { source: protobuf::Error },
 }
 
 impl FinishError {
@@ -113,7 +117,22 @@ impl FinishError {
         match self {
             Self::CompressionFailed { .. } => "compression_failed",
             Self::TooLarge { .. } => "too_large",
+            Self::V3EncodingFailed { .. } => "v3_encoding_failed",
         }
+    }
+}
+
+impl From<V3EncodeError> for FinishError {
+    fn from(err: V3EncodeError) -> Self {
+        FinishError::V3EncodingFailed {
+            source: err.into_inner(),
+        }
+    }
+}
+
+impl From<protobuf::Error> for FinishError {
+    fn from(source: protobuf::Error) -> Self {
+        FinishError::V3EncodingFailed { source }
     }
 }
 
@@ -303,6 +322,13 @@ impl DatadogMetricsEncoder {
                     });
                 }
             },
+            // V3 metrics must be routed to DatadogMetricsV3Encoder.
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V3) => {
+                return Err(EncoderError::InvalidMetric {
+                    expected: "v1 or v2 series",
+                    metric_value: "v3",
+                });
+            }
             // Sketches are encoded via ProtoBuf, also in an incremental fashion.
             DatadogMetricsEndpoint::Sketches => match metric.value() {
                 MetricValue::Sketch { sketch } => match sketch {
@@ -600,13 +626,18 @@ fn sketch_to_proto_message(
     })
 }
 
-fn series_to_proto_message(
-    metric: &Metric,
-    default_namespace: &Option<Arc<str>>,
-    log_schema: &'static LogSchema,
-    origin_product_value: u32,
-) -> Result<ddmetric_proto::metric_payload::MetricSeries, EncoderError> {
-    let metric_name = get_namespaced_name(metric, default_namespace);
+/// A metric's tags, split into the three pieces the series wire formats send separately.
+pub(super) struct SeriesTags {
+    /// Remaining tags, encoded as sorted `key:value` (or bare `key`) strings.
+    pub(super) tags: Vec<String>,
+    /// Structured `(type, name)` resources, in wire order.
+    pub(super) resources: Vec<(String, String)>,
+    /// The `source_type_name` tag's value, or empty when absent.
+    pub(super) source_type_name: String,
+}
+
+/// Splits a metric's tags into resources, `source_type_name`, and the remaining tags
+pub(super) fn split_series_tags(metric: &Metric, log_schema: &LogSchema) -> SeriesTags {
     let mut tags = metric.tags().cloned().unwrap_or_default();
 
     let mut resources = vec![];
@@ -615,18 +646,12 @@ fn series_to_proto_message(
         .host_key()
         .map(|key| tags.remove(key.to_string().as_str()).unwrap_or_default())
     {
-        resources.push(ddmetric_proto::metric_payload::Resource {
-            r#type: "host".to_string(),
-            name: host,
-        });
+        resources.push(("host".to_string(), host));
     }
 
     // The Agent source preserves `device` as a plain tag for v1/v2 compatibility.
     if let Some(device) = tags.remove("device") {
-        resources.push(ddmetric_proto::metric_payload::Resource {
-            r#type: "device".to_string(),
-            name: device,
-        });
+        resources.push(("device".to_string(), device));
     }
 
     let resource_tags: Vec<_> = tags
@@ -643,10 +668,7 @@ fn series_to_proto_message(
             for value in values {
                 match value {
                     TagValue::Value(name) if !name.is_empty() => {
-                        resources.push(ddmetric_proto::metric_payload::Resource {
-                            r#type: resource_type.clone(),
-                            name,
-                        });
+                        resources.push((resource_type.clone(), name));
                     }
                     value => tags.insert(tag.clone(), value),
                 }
@@ -656,7 +678,31 @@ fn series_to_proto_message(
 
     let source_type_name = tags.remove("source_type_name").unwrap_or_default();
 
-    let tags = encode_tags(&tags);
+    SeriesTags {
+        tags: encode_tags(&tags),
+        resources,
+        source_type_name,
+    }
+}
+
+fn series_to_proto_message(
+    metric: &Metric,
+    default_namespace: &Option<Arc<str>>,
+    log_schema: &'static LogSchema,
+    origin_product_value: u32,
+) -> Result<ddmetric_proto::metric_payload::MetricSeries, EncoderError> {
+    let metric_name = get_namespaced_name(metric, default_namespace);
+
+    let SeriesTags {
+        tags,
+        resources,
+        source_type_name,
+    } = split_series_tags(metric, log_schema);
+
+    let resources = resources
+        .into_iter()
+        .map(|(r#type, name)| ddmetric_proto::metric_payload::Resource { r#type, name })
+        .collect();
 
     let event_metadata = metric.metadata();
     let metadata = generate_proto_metadata(
@@ -819,7 +865,7 @@ fn source_type_to_service(source_type: &str) -> Option<u32> {
 /// set already upstream or not. The generalized struct `DatadogMetricOriginMetadata` is
 /// utilized in this function, which allows the series and sketch encoding to call and map
 /// the result appropriately for the given protocol they operate on.
-fn generate_origin_metadata(
+pub(super) fn generate_origin_metadata(
     maybe_pass_through: Option<&DatadogMetricOriginMetadata>,
     maybe_source_type: Option<&str>,
     origin_product_value: u32,

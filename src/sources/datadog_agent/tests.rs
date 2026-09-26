@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     iter::FromIterator,
     net::SocketAddr,
-    str,
     sync::Arc,
     time::Duration,
 };
@@ -37,7 +36,7 @@ use crate::{
     components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
-        Event, EventStatus, Metric, Value, into_event_stream,
+        Event, EventStatus, Metric, TraceLayout, Value, into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
     },
     metrics::Controller,
@@ -56,6 +55,14 @@ use crate::{
         },
         spawn_collect_n, trace_init, wait_for_tcp,
     },
+};
+
+#[cfg(all(feature = "sinks-vector", feature = "sources-vector"))]
+use crate::{
+    config::Config,
+    sinks::vector::VectorConfig as VectorSinkConfig,
+    sources::vector::VectorConfig as VectorSourceConfig,
+    test_util::{mock::basic_sink, start_topology},
 };
 
 use crate::sources::datadog_agent::llmobs::decode_llmobs_body;
@@ -408,6 +415,25 @@ async fn send_bytes_and_collect(
         expected_count,
     )
     .await
+}
+
+/// Smallest v2 payload the `datadog_agent` traces decoder accepts.
+#[cfg(all(feature = "sinks-vector", feature = "sources-vector"))]
+fn minimal_v2_trace_body() -> Vec<u8> {
+    let mut buf = Vec::new();
+    ddtrace_proto::AgentPayload {
+        tracer_payloads: vec![ddtrace_proto::TracerPayload {
+            chunks: vec![ddtrace_proto::TraceChunk {
+                spans: vec![ddtrace_proto::Span::default()],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    }
+    .encode(&mut buf)
+    .unwrap();
+    buf
 }
 
 fn dd_api_key_headers() -> HeaderMap {
@@ -1319,6 +1345,10 @@ async fn decode_traces() {
         {
             let trace = events[0].as_trace();
             assert_eq!(
+                events[0].metadata().trace_layout(),
+                Some(TraceLayout::Datadog)
+            );
+            assert_eq!(
                 events[0].metadata().datadog_api_key().as_deref().unwrap(),
                 DD_API_KEY
             );
@@ -1368,6 +1398,71 @@ async fn decode_traces() {
         }
     })
     .await;
+}
+
+#[cfg(all(feature = "sinks-vector", feature = "sources-vector"))]
+#[tokio::test]
+async fn trace_layout_survives_vector_hop_unlike_source_type() {
+    trace_init();
+
+    let (_dd_guard, dd_addr) = next_addr();
+    let (_relay_guard, relay_addr) = next_addr();
+    let (out_rx, out_sink) = basic_sink(10);
+
+    let mut config = Config::builder();
+    config.add_source(
+        "dd",
+        serde_yaml::from_str::<DatadogAgentConfig>(&format!(
+            r#"
+                address: "{dd_addr}"
+                disable_logs: true
+                disable_metrics: true
+                disable_llmobs: true
+                multiple_outputs: true
+            "#
+        ))
+        .unwrap(),
+    );
+    config.add_source(
+        "relay",
+        serde_yaml::from_str::<VectorSourceConfig>(&format!("address: \"{relay_addr}\"")).unwrap(),
+    );
+    config.add_sink(
+        "to_relay",
+        &["dd.traces"],
+        serde_yaml::from_str::<VectorSinkConfig>(&format!(
+            r#"
+                address: "{relay_addr}"
+                batch:
+                  max_events: 1
+            "#
+        ))
+        .unwrap(),
+    );
+    config.add_sink("out", &["relay"], out_sink);
+
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+    wait_for_tcp(dd_addr).await;
+    wait_for_tcp(relay_addr).await;
+
+    let body = minimal_v2_trace_body();
+    assert_eq!(
+        200,
+        send_with_path(dd_addr, body, HeaderMap::new(), DD_API_TRACES_PATH).await
+    );
+
+    let event = timeout(
+        Duration::from_secs(10),
+        out_rx.flat_map(into_event_stream).next(),
+    )
+    .await
+    .expect("timed out waiting for relayed trace")
+    .expect("relay produced no event");
+
+    assert_eq!(event.metadata().trace_layout(), Some(TraceLayout::Datadog));
+    assert_eq!(event.metadata().source_type(), Some("vector"));
+
+    topology.stop().await;
 }
 
 #[tokio::test]

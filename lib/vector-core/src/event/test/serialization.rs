@@ -9,11 +9,11 @@ use similar_asserts::assert_eq;
 use vector_buffers::encoding::Encodable;
 use vrl::event_path;
 
-use crate::event::event_exceeds_max_nesting_cost;
 use crate::event::ser::{
     ARRAY_FRAME_COST, MAX_VALUE_NESTING_FRAMES, OBJECT_FRAME_COST, TIMESTAMP_FRAME_COST,
     check_value_nesting_cost,
 };
+use crate::event::{TraceLayout, event_exceeds_max_nesting_cost};
 use vector_buffers::Bufferable;
 
 fn encode_value<T: Encodable, B: BufMut>(value: T, buffer: &mut B) {
@@ -67,6 +67,68 @@ fn back_and_forth_through_bytes() {
         .tests(1_000)
         .max_tests(10_000)
         .quickcheck(inner as fn(EventArray) -> TestResult);
+}
+
+#[test]
+fn disk_buffer_preserves_trace_layout_metadata() {
+    let mut trace = TraceEvent::default();
+    trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+    let expected = EventArray::from(Event::Trace(trace));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Traces(traces) = actual else {
+        panic!("expected a traces array");
+    };
+    assert_eq!(
+        traces[0].metadata().trace_layout(),
+        Some(TraceLayout::Datadog)
+    );
+}
+
+#[test]
+fn disk_buffer_preserves_unrecognized_trace_layout() {
+    let mut trace = TraceEvent::default();
+    trace
+        .metadata_mut()
+        .set_trace_layout(TraceLayout::Unrecognized(99));
+    let expected = EventArray::from(Event::Trace(trace));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Traces(traces) = actual else {
+        panic!("expected a traces array");
+    };
+    assert_eq!(
+        traces[0].metadata().trace_layout(),
+        Some(TraceLayout::Unrecognized(99))
+    );
+}
+
+#[test]
+fn disk_buffer_preserves_datadog_metric_unit() {
+    let mut metric = Metric::new(
+        "test",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 1.0 },
+    );
+    metric
+        .metadata_mut()
+        .set_datadog_metric_unit("byte".to_owned());
+    let expected = EventArray::from(Event::Metric(metric));
+
+    let mut buffer = BytesMut::with_capacity(64);
+    encode_value(expected, &mut buffer);
+    let actual = decode_value::<EventArray, _>(buffer);
+
+    let EventArray::Metrics(metrics) = actual else {
+        panic!("expected a metrics array");
+    };
+    assert_eq!(metrics[0].metadata().datadog_metric_unit(), Some("byte"));
 }
 
 #[test]

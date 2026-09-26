@@ -640,6 +640,7 @@ impl From<EventMetadata> for Metadata {
             datadog_origin_metadata,
             datadog_metric_unit,
             source_event_id,
+            trace_layout,
             ..
         } = value.into_owned();
 
@@ -654,6 +655,7 @@ impl From<EventMetadata> for Metadata {
             secrets,
             source_event_id: source_event_id.map_or(vec![], std::convert::Into::into),
             datadog_metric_unit,
+            trace_layout: encode_trace_layout(trace_layout),
         }
     }
 }
@@ -671,6 +673,7 @@ impl TryFrom<Metadata> for EventMetadata {
             datadog_origin_metadata,
             datadog_metric_unit,
             source_event_id,
+            trace_layout,
         } = value;
 
         let metadata_value = match metadata_value {
@@ -710,11 +713,31 @@ impl TryFrom<Metadata> for EventMetadata {
                 dropped_fields: ObjectMap::new(),
                 datadog_origin_metadata,
                 datadog_metric_unit,
+                trace_layout: decode_trace_layout(trace_layout),
                 source_event_id,
             }),
             last_transform_timestamp: None,
         })
     }
+}
+
+fn encode_trace_layout(layout: Option<super::TraceLayout>) -> Option<i32> {
+    Some(match layout? {
+        super::TraceLayout::Datadog => TraceLayout::Datadog as i32,
+        super::TraceLayout::OtelFlattened => TraceLayout::OtelFlattened as i32,
+        super::TraceLayout::OtlpResourceSpans => TraceLayout::OtlpResourceSpans as i32,
+        super::TraceLayout::Unrecognized(value) => value,
+    })
+}
+
+fn decode_trace_layout(value: Option<i32>) -> Option<super::TraceLayout> {
+    let value = value?;
+    Some(match TraceLayout::try_from(value) {
+        Ok(TraceLayout::Datadog) => super::TraceLayout::Datadog,
+        Ok(TraceLayout::OtelFlattened) => super::TraceLayout::OtelFlattened,
+        Ok(TraceLayout::OtlpResourceSpans) => super::TraceLayout::OtlpResourceSpans,
+        Ok(TraceLayout::Unspecified) | Err(_) => super::TraceLayout::Unrecognized(value),
+    })
 }
 
 fn decode_event_metadata(
@@ -995,6 +1018,7 @@ mod tests {
 
         assert_eq!(decoded.source_event_id(), None);
         assert_eq!(decoded.source_type(), Some("legacy"));
+        assert_eq!(decoded.trace_layout(), None);
     }
 
     #[test]
