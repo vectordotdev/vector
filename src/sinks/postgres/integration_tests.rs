@@ -438,6 +438,106 @@ async fn extra_fields_are_ignored() {
 }
 
 #[tokio::test]
+async fn excluded_columns_are_not_decoded() {
+    trace_init();
+
+    let table = random_table_name();
+    let endpoint = pg_url();
+    let config_str = format!(
+        r#"
+            endpoint = "{endpoint}"
+            table = "{table}"
+            columns = ["host"]
+            batch.max_events = 1
+        "#,
+    );
+    let (config, _) = load_sink::<PostgresConfig>(&config_str).unwrap();
+    let mut connection = PgConnection::connect(endpoint.as_str())
+        .await
+        .expect("Failed to connect to Postgres");
+    let create_table_sql =
+        format!("CREATE TABLE {table} (id BIGSERIAL PRIMARY KEY, host TEXT NOT NULL)");
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let (input_event, mut receiver) = create_event_with_notifier(0);
+    let mut input_event = input_event;
+    input_event
+        .as_mut_log()
+        .insert(event_path!("id"), "external-id");
+    run_and_assert_sink_compliance(
+        sink,
+        stream::once(ready(input_event.clone())),
+        &POSTGRES_SINK_TAGS,
+    )
+    .await;
+    std::mem::drop(input_event);
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_sql = format!("SELECT id, host FROM {table}");
+    let inserted: (i64, String) = sqlx::query_as(&select_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+    assert_eq!(inserted.0, 1);
+    assert_eq!(inserted.1, "example.com");
+}
+
+#[tokio::test]
+async fn configured_columns_are_quoted_as_identifiers() {
+    trace_init();
+
+    let table = random_table_name();
+    let endpoint = pg_url();
+    let config_str = format!(
+        r#"
+            endpoint = "{endpoint}"
+            table = "{table}"
+            columns = ["Host", "select"]
+            batch.max_events = 1
+        "#,
+    );
+    let (config, _) = load_sink::<PostgresConfig>(&config_str).unwrap();
+    let mut connection = PgConnection::connect(endpoint.as_str())
+        .await
+        .expect("Failed to connect to Postgres");
+    let create_table_sql =
+        format!(r#"CREATE TABLE {table} ("Host" TEXT NOT NULL, "select" TEXT NOT NULL)"#);
+    sqlx::query(&create_table_sql)
+        .execute(&mut connection)
+        .await
+        .unwrap();
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    let (mut input_event, mut receiver) = create_event_with_notifier(0);
+    input_event
+        .as_mut_log()
+        .insert(event_path!("Host"), "mixed-case");
+    input_event
+        .as_mut_log()
+        .insert(event_path!("select"), "reserved-word");
+    run_and_assert_sink_compliance(
+        sink,
+        stream::once(ready(input_event.clone())),
+        &POSTGRES_SINK_TAGS,
+    )
+    .await;
+    std::mem::drop(input_event);
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let select_sql = format!(r#"SELECT "Host", "select" FROM {table}"#);
+    let inserted: (String, String) = sqlx::query_as(&select_sql)
+        .fetch_one(&mut connection)
+        .await
+        .unwrap();
+    assert_eq!(inserted.0, "mixed-case");
+    assert_eq!(inserted.1, "reserved-word");
+}
+
+#[tokio::test]
 async fn insertion_fails_required_field_is_not_present() {
     trace_init();
 

@@ -28,6 +28,17 @@ generated: components: sinks: postgres: configuration: {
 		required: false
 		type:     _schemaDefinitions["vector::sinks::util::batch::BatchConfig<vector::sinks::util::batch::RealtimeSizeBasedDefaultBatchSettings>"]
 	}
+	columns: {
+		description: """
+			The columns to insert data into. If not specified, all columns in the destination table are used.
+			This allows you to exclude columns like serial/auto-increment columns that should be handled by PostgreSQL.
+			"""
+		required: false
+		type: array: {
+			default: []
+			items: type: string: {}
+		}
+	}
 	endpoint: {
 		description: """
 			The PostgreSQL server connection string. It can contain the username and password.
