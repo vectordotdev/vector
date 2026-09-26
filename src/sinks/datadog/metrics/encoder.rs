@@ -768,8 +768,10 @@ fn series_to_proto_message(
         tags,
         points,
         r#type: metric_type.into(),
-        // unit is omitted
-        unit: "".to_string(),
+        unit: event_metadata
+            .datadog_metric_unit()
+            .unwrap_or_default()
+            .to_string(),
         source_type_name,
         interval: maybe_interval.unwrap_or(0) as i64,
         metadata,
@@ -879,11 +881,14 @@ pub(super) fn generate_origin_metadata(
     //     - `log_to_metric` transform set the OriginService in the EventMetadata when it creates
     //        the new metric.
     if let Some(pass_through) = maybe_pass_through {
-        Some(DatadogMetricOriginMetadata::new(
-            pass_through.product().or(Some(origin_product_value)),
-            pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
-            pass_through.service().or(Some(no_value)),
-        ))
+        Some(
+            DatadogMetricOriginMetadata::new(
+                pass_through.product().or(Some(origin_product_value)),
+                pass_through.category().or(Some(ORIGIN_CATEGORY_VALUE)),
+                pass_through.service().or(Some(no_value)),
+            )
+            .with_metric_type(pass_through.metric_type()),
+        )
 
     // No metadata has been set upstream
     } else {
@@ -979,6 +984,7 @@ fn generate_series_metrics(
         host,
         source_type_name,
         device,
+        unit: event_metadata.datadog_metric_unit().map(ToOwned::to_owned),
         metadata,
     }])
 }
@@ -1579,9 +1585,12 @@ mod tests {
         let category = 11;
         let service = 9;
 
-        let event_metadata = EventMetadata::default().with_origin_metadata(
-            DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service)),
-        );
+        let event_metadata = EventMetadata::default()
+            .with_origin_metadata(
+                DatadogMetricOriginMetadata::new(Some(product), Some(category), Some(service))
+                    .with_metric_type(Some(9)),
+            )
+            .with_datadog_metric_unit("byte".to_string());
         let counter = get_simple_counter_with_metadata(event_metadata);
 
         // series v1
@@ -1603,6 +1612,8 @@ mod tests {
             assert_eq!(generated_origin.product().unwrap(), product);
             assert_eq!(generated_origin.category().unwrap(), category);
             assert_eq!(generated_origin.service().unwrap(), service);
+            assert_eq!(generated_origin.metric_type(), Some(9));
+            assert_eq!(actual.unit.as_deref(), Some("byte"));
         }
         // series v2
         {
@@ -1618,6 +1629,7 @@ mod tests {
             assert_eq!(generated_origin.origin_product, product);
             assert_eq!(generated_origin.origin_category, category);
             assert_eq!(generated_origin.origin_service, service);
+            assert_eq!(series_proto.unit, "byte");
         }
     }
 

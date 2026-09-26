@@ -12,13 +12,10 @@ runner:
     FAKE_INTAKE_VECTOR_ENDPOINT: "http://fakeintake-vector:80"
 
 matrix:
-  # Pinned to the last version before the Agent defaulted series metrics to
-  # the v3 intake API (7.81.0), which our datadog_agent source doesn't yet
-  # support. "7" is a floating tag that already resolves to >=7.81.0, so
-  # it's dropped in favor of the explicit 7.80.4 pin. Re-add an unpinned v7
-  # leg once v3 series support lands
-  # (see https://github.com/vectordotdev/vector/issues/25790).
-  agent_version: ["7.80.4", "6"]
+  # Keep the last Agent version before v3 series became the default, and also
+  # test the floating v7 tag to cover v3 series intake.
+  agent_version: ["7.80.4", "7", "6"]
+  # Validate every series API version supported by the Datadog metrics sink.
   series_api_version: ["v1", "v2", "v3"]
 
 # changes to these files/paths will invoke the integration test in CI

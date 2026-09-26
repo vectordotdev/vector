@@ -7,6 +7,7 @@ use std::{
 fn main() -> Result<()> {
     for path in [
         "proto/datadog/agentpayload.proto",
+        "proto/datadog/metrics/intake_v3.proto",
         "proto/datadog/trace/agent_payload.proto",
         "proto/datadog/trace/tracer_payload.proto",
         "proto/datadog/trace/span.proto",
@@ -27,6 +28,7 @@ fn main() -> Result<()> {
     prost_build.compile_protos(
         &[
             "proto/datadog/agentpayload.proto",
+            "proto/datadog/metrics/intake_v3.proto",
             "proto/datadog/trace/agent_payload.proto",
             "proto/datadog/trace/idx/tracer_payload.proto",
         ],
