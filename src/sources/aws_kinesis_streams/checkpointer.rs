@@ -20,7 +20,7 @@ use aws_sdk_dynamodb::{
 };
 use chrono::{DateTime, Utc};
 
-use crate::sources::aws_kinesis_streams::DynamoDbCheckpointConfig;
+use crate::sources::aws_kinesis_streams::{DynamoDbCheckpointConfig, closed_shard::SHARD_END};
 
 /// Error type for checkpointing operations.
 #[derive(Debug)]
@@ -496,9 +496,47 @@ impl KinesisCheckpointer {
         }
     }
 
-    /// Update only the `SequenceNumber` field of an existing checkpoint row.
-    /// Used when yielding a shard to allow the new owner to start from the latest
-    /// sequence rather than the sequence at the time of the steal.
+    /// Extend `LeaseTimeout` without changing the checkpoint sequence.
+    ///
+    /// Returns `Ok(false)` when this client no longer owns the row. Other DynamoDB
+    /// failures are returned so the caller can retry on the next heartbeat.
+    pub async fn renew_lease(&self, stream_id: &str, shard_id: &str) -> crate::Result<bool> {
+        let result = self
+            .svc
+            .update_item()
+            .table_name(&self.conf.table)
+            .key("StreamID", AttributeValue::S(stream_id.to_string()))
+            .key("ShardID", AttributeValue::S(shard_id.to_string()))
+            .update_expression("SET LeaseTimeout = :new_lease_timeout")
+            .condition_expression("ClientID = :client_id")
+            .expression_attribute_values(
+                ":new_lease_timeout",
+                AttributeValue::S(format_lease_timeout(self.lease_duration)),
+            )
+            .expression_attribute_values(":client_id", AttributeValue::S(self.client_id.clone()))
+            .send()
+            .await;
+
+        match result {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                let is_condition_failed = e
+                    .as_service_error()
+                    .map(|se| se.is_conditional_check_failed_exception())
+                    .unwrap_or(false);
+                if is_condition_failed {
+                    return Ok(false);
+                }
+                Err(format!("DynamoDB UpdateItem error: {}", DisplayErrorContext(&e)).into())
+            }
+        }
+    }
+
+    /// Update `SequenceNumber` after this client has lost the lease.
+    ///
+    /// The write succeeds only when another client owns the row, the stored sequence
+    /// is not `SHARD_END`, and it is still lexicographically behind `sequence_number`.
+    /// A failed condition means the new owner already moved on.
     pub async fn yield_shard(
         &self,
         stream_id: &str,
@@ -509,20 +547,38 @@ impl KinesisCheckpointer {
             return Ok(());
         }
 
-        self.svc
+        let result = self
+            .svc
             .update_item()
             .table_name(&self.conf.table)
             .key("StreamID", AttributeValue::S(stream_id.to_string()))
             .key("ShardID", AttributeValue::S(shard_id.to_string()))
             .update_expression("SET SequenceNumber = :new_sequence_number")
+            .condition_expression(
+                "ClientID <> :self AND (attribute_not_exists(SequenceNumber) OR (SequenceNumber <> :shard_end AND SequenceNumber < :new_sequence_number))",
+            )
             .expression_attribute_values(
                 ":new_sequence_number",
                 AttributeValue::S(sequence_number.to_string()),
             )
+            .expression_attribute_values(":self", AttributeValue::S(self.client_id.clone()))
+            .expression_attribute_values(":shard_end", AttributeValue::S(SHARD_END.to_string()))
             .send()
-            .await
-            .map_err(|e| format!("DynamoDB UpdateItem error: {}", DisplayErrorContext(&e)))?;
-        Ok(())
+            .await;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                let is_condition_failed = e
+                    .as_service_error()
+                    .map(|se| se.is_conditional_check_failed_exception())
+                    .unwrap_or(false);
+                if is_condition_failed {
+                    return Ok(());
+                }
+                Err(format!("DynamoDB UpdateItem error: {}", DisplayErrorContext(&e)).into())
+            }
+        }
     }
 
     /// Delete a checkpoint row entirely. Called when a shard has been fully consumed

@@ -97,7 +97,9 @@ pub struct AwsKinesisStreamsConfig {
     /// source directly consumes those shards. When no shard suffix is given, shards
     /// are automatically balanced across all consumers using DynamoDB.
     #[configurable(metadata(docs::examples = "my-stream"))]
-    #[configurable(metadata(docs::examples = "arn:aws:kinesis:us-east-1:123456789012:stream/my-stream"))]
+    #[configurable(metadata(
+        docs::examples = "arn:aws:kinesis:us-east-1:123456789012:stream/my-stream"
+    ))]
     #[configurable(metadata(docs::examples = "my-stream:0"))]
     pub streams: Vec<String>,
 

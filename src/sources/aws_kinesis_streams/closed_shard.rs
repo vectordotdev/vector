@@ -1,20 +1,14 @@
 //! Decision helpers for completing closed Kinesis shards after a reshard.
 //!
-//! After a split/merge, parent shards are CLOSED (`EndingSequenceNumber` set). Polling
-//! them at the tip (especially with `LATEST`) makes CloudWatch
-//! `GetRecords.IteratorAgeMilliseconds` climb 1:1 with wall clock until retention
-//! expires the shard. These helpers decide iterator type, lease eligibility
-//! (KCL 3.0 parent-before-child), when the consumer is finished, and whether a
-//! failed `GetShardIterator` should delete the DynamoDB row or write `SHARD_END`.
+//! After a split/merge, parent shards are CLOSED (`EndingSequenceNumber` set). These
+//! helpers follow KCL 3.0: iterator choice, parent-before-child eligibility, finishing
+//! only on an authoritative end-of-shard signal, and when a `SHARD_END` lease may be
+//! deleted without being created again.
 
 use std::collections::{HashMap, HashSet};
 
-/// Consecutive empty GetRecords polls on a closed shard where `MillisBehindLatest`
-/// only increased. Two is enough to distinguish a frozen tip from a single blip.
-pub const GROWING_AGE_POLLS_TO_FINISH: u32 = 2;
-
 /// KCL `ExtendedSequenceNumber.SHARD_END`. Written when a shard is fully consumed
-/// so children can start, then deleted after children have their own leases.
+/// so children can start, then deleted once children have real checkpoints.
 pub const SHARD_END: &str = "SHARD_END";
 
 /// A shard is closed (parent after split/merge) when it has an ending sequence
@@ -41,52 +35,83 @@ pub fn is_child_shard(parent_ids: &[String]) -> bool {
     !parent_ids.is_empty()
 }
 
-/// KCL `BlockOnParentShardTask`: a child may start when every parent has no
-/// checkpoint (lease never existed / already trimmed) or is checkpointed `SHARD_END`.
-pub fn parents_completed(parent_ids: &[String], sequences: &HashMap<String, String>) -> bool {
+/// KCL `BlockOnParentShardTask`.
+///
+/// A parent with a non-`SHARD_END` checkpoint is still in progress. A missing row is
+/// unfinished only on an empty checkpoint table when `start_from_oldest` is set and
+/// the parent is still listed: that is KCL's first-start path. After any lease
+/// exists, a missing row means the parent was cleaned up or has expired, so children
+/// may start and the closed parent is not read again.
+pub fn parents_completed(
+    parent_ids: &[String],
+    sequences: &HashMap<String, String>,
+    listed_shard_ids: &HashSet<String>,
+    checkpoint_table_empty: bool,
+    start_from_oldest: bool,
+) -> bool {
     parent_ids.iter().all(|parent| match sequences.get(parent) {
-        None => true,
         Some(seq) => is_shard_end(seq),
+        None => !(checkpoint_table_empty && start_from_oldest && listed_shard_ids.contains(parent)),
     })
 }
 
 /// Whether this shard may be leased this cycle (KCL 3.0 eligibility).
 ///
 /// Never claim `SHARD_END`. Never claim a child until its parents are completed.
-/// Closed shards without a checkpoint are skipped (no work, no leftover row).
-/// Closed shards **with** a leftover checkpoint are claimed so remaining records
-/// can be drained instead of polled at `LATEST`.
+/// A closed shard with no row is claimed only when the checkpoint table is empty and
+/// `start_from_oldest` is true. On a non-empty table that missing row means the lease
+/// was already deleted after completion.
 pub fn should_claim_shard(
     shard_closed: bool,
     has_checkpoint: bool,
     sequence: Option<&str>,
     parent_ids: &[String],
     sequences: &HashMap<String, String>,
+    listed_shard_ids: &HashSet<String>,
+    checkpoint_table_empty: bool,
+    start_from_oldest: bool,
 ) -> bool {
     if sequence.map(is_shard_end).unwrap_or(false) {
         return false;
     }
-    if !parents_completed(parent_ids, sequences) {
+    if !parents_completed(
+        parent_ids,
+        sequences,
+        listed_shard_ids,
+        checkpoint_table_empty,
+        start_from_oldest,
+    ) {
         return false;
     }
-    if shard_closed && !has_checkpoint {
+    if shard_closed && !has_checkpoint && !(checkpoint_table_empty && start_from_oldest) {
         return false;
     }
     true
 }
 
-/// KCL `LeaseCleanupManager`: drop a `SHARD_END` parent once every child listed
-/// by ListShards has its own checkpoint. An empty child list means the parent is
-/// still listed but children have not appeared yet — keep the row.
+/// KCL `LeaseCleanupManager.cleanupLeaseForCompletedShard`.
+///
+/// Delete a `SHARD_END` row only when every child has a real sequence checkpoint
+/// (not an empty just-claimed row) and this shard's own parents are already gone
+/// from the table. An empty child list means children have not appeared yet.
 pub fn should_delete_shard_end_lease(
     sequence: &str,
     child_ids: &[String],
+    parent_ids: &[String],
     sequences: &HashMap<String, String>,
 ) -> bool {
     if !is_shard_end(sequence) || child_ids.is_empty() {
         return false;
     }
-    child_ids.iter().all(|child| sequences.contains_key(child))
+    if parent_ids
+        .iter()
+        .any(|parent| sequences.contains_key(parent))
+    {
+        return false;
+    }
+    child_ids
+        .iter()
+        .all(|child| sequences.get(child).is_some_and(|seq| !seq.is_empty()))
 }
 
 /// Checkpoints for shard IDs that ListShards no longer returns (retention expired).
@@ -147,25 +172,15 @@ pub fn shard_iterator_choice(
 
 /// Whether the per-shard consumer should stop and checkpoint `SHARD_END`.
 ///
-/// Finished when:
-/// - `next_shard_iterator` is missing (AWS end-of-shard), or
-/// - the shard is closed and this GetRecords returned no records, or
-/// - `MillisBehindLatest` has only grown across consecutive empty polls
-///   (`GROWING_AGE_POLLS_TO_FINISH`), even if ListShards has not yet marked
-///   the shard closed (frozen iterator after a reshard).
+/// AWS ends a shard only when `NextShardIterator` is null, or when `ChildShards`
+/// is present (returned only once the end of the shard has been reached). An empty
+/// `GetRecords` page still has later records, and a rising `MillisBehindLatest`
+/// means the consumer is behind, not that the shard is closed.
 pub fn should_finish_shard_consumer(
     next_iterator_missing: bool,
-    records_empty: bool,
-    shard_closed: bool,
-    growing_empty_polls: u32,
+    child_shards_present: bool,
 ) -> bool {
-    if next_iterator_missing {
-        return true;
-    }
-    if shard_closed && records_empty {
-        return true;
-    }
-    growing_empty_polls >= GROWING_AGE_POLLS_TO_FINISH
+    next_iterator_missing || child_shards_present
 }
 
 /// Action after a failed `GetShardIterator`.
@@ -173,36 +188,15 @@ pub fn should_finish_shard_consumer(
 pub enum IteratorErrorAction {
     /// Shard is gone (`ResourceNotFound`); delete the DynamoDB row.
     Delete,
-    /// Closed shard that cannot be iterated; write `SHARD_END` so it is not
-    /// reclaimed with `LATEST` and children can start.
-    ShardEnd,
-    /// Open shard; release the lease, keep the existing sequence.
+    /// Transient or non-terminal failure. Keep the sequence and retry on the next claim.
     Release,
 }
 
-pub fn iterator_error_action(shard_closed: bool, resource_not_found: bool) -> IteratorErrorAction {
+pub fn iterator_error_action(resource_not_found: bool) -> IteratorErrorAction {
     if resource_not_found {
         IteratorErrorAction::Delete
-    } else if shard_closed {
-        IteratorErrorAction::ShardEnd
     } else {
         IteratorErrorAction::Release
-    }
-}
-
-/// Update the consecutive-growing counter for empty closed-shard polls.
-pub fn next_growing_empty_polls(
-    records_empty: bool,
-    previous_millis_behind: Option<i64>,
-    current_millis_behind: Option<i64>,
-    previous_growing: u32,
-) -> u32 {
-    if !records_empty {
-        return 0;
-    }
-    match (previous_millis_behind, current_millis_behind) {
-        (Some(prev), Some(cur)) if cur > prev => previous_growing.saturating_add(1),
-        _ => 0,
     }
 }
 
@@ -278,68 +272,23 @@ mod tests {
 
     #[test]
     fn finish_when_next_iterator_missing() {
-        assert!(should_finish_shard_consumer(true, false, false, 0));
+        assert!(should_finish_shard_consumer(true, false));
     }
 
     #[test]
-    fn finish_when_closed_and_empty_even_with_next_iterator() {
-        assert!(should_finish_shard_consumer(false, true, true, 0));
+    fn finish_when_child_shards_present() {
+        assert!(should_finish_shard_consumer(false, true));
     }
 
     #[test]
-    fn do_not_finish_open_empty_with_next_iterator() {
-        assert!(!should_finish_shard_consumer(false, true, false, 0));
+    fn do_not_finish_on_empty_page_with_next_iterator() {
+        assert!(!should_finish_shard_consumer(false, false));
     }
 
     #[test]
-    fn finish_when_millis_behind_grew_enough_times() {
-        assert!(!should_finish_shard_consumer(
-            false,
-            false,
-            true,
-            GROWING_AGE_POLLS_TO_FINISH - 1
-        ));
-        assert!(should_finish_shard_consumer(
-            false,
-            false,
-            true,
-            GROWING_AGE_POLLS_TO_FINISH
-        ));
-        // Frozen iterator can appear before ListShards reports the parent closed.
-        assert!(should_finish_shard_consumer(
-            false,
-            true,
-            false,
-            GROWING_AGE_POLLS_TO_FINISH
-        ));
-    }
-
-    #[test]
-    fn iterator_error_deletes_when_not_found_shard_ends_when_closed() {
-        assert_eq!(
-            iterator_error_action(false, true),
-            IteratorErrorAction::Delete
-        );
-        assert_eq!(
-            iterator_error_action(true, true),
-            IteratorErrorAction::Delete
-        );
-        assert_eq!(
-            iterator_error_action(true, false),
-            IteratorErrorAction::ShardEnd
-        );
-        assert_eq!(
-            iterator_error_action(false, false),
-            IteratorErrorAction::Release
-        );
-    }
-
-    #[test]
-    fn growing_polls_increment_only_on_empty_and_increasing_millis() {
-        assert_eq!(next_growing_empty_polls(true, Some(100), Some(200), 0), 1);
-        assert_eq!(next_growing_empty_polls(true, Some(200), Some(200), 1), 0);
-        assert_eq!(next_growing_empty_polls(false, Some(100), Some(200), 1), 0);
-        assert_eq!(next_growing_empty_polls(true, None, Some(200), 0), 0);
+    fn iterator_error_deletes_only_when_shard_is_gone() {
+        assert_eq!(iterator_error_action(true), IteratorErrorAction::Delete);
+        assert_eq!(iterator_error_action(false), IteratorErrorAction::Release);
     }
 
     #[test]
@@ -353,14 +302,58 @@ mod tests {
         assert_eq!(parent_ids(Some("shard-parent"), None), vec!["shard-parent"]);
     }
 
+    fn listed(ids: &[&str]) -> HashSet<String> {
+        ids.iter().map(|id| (*id).to_string()).collect()
+    }
+
     #[test]
-    fn parents_completed_when_missing_or_shard_end() {
+    fn parents_completed_when_shard_end_or_cleaned_up() {
         let mut sequences = HashMap::new();
         sequences.insert("p1".into(), SHARD_END.into());
-        assert!(parents_completed(&["p1".into(), "p2".into()], &sequences));
+        let listed = listed(&["p1", "p2"]);
+        assert!(parents_completed(
+            &["p1".into(), "p2".into()],
+            &sequences,
+            &listed,
+            false,
+            true
+        ));
         sequences.insert("p2".into(), "4967".into());
-        assert!(!parents_completed(&["p1".into(), "p2".into()], &sequences));
-        assert!(parents_completed(&[], &sequences));
+        assert!(!parents_completed(
+            &["p1".into(), "p2".into()],
+            &sequences,
+            &listed,
+            false,
+            true
+        ));
+        assert!(parents_completed(&[], &sequences, &listed, false, true));
+    }
+
+    #[test]
+    fn empty_table_blocks_children_of_listed_parents_when_starting_from_oldest() {
+        let sequences = HashMap::new();
+        let listed = listed(&["parent"]);
+        assert!(!parents_completed(
+            &["parent".into()],
+            &sequences,
+            &listed,
+            true,
+            true
+        ));
+        assert!(parents_completed(
+            &["parent".into()],
+            &sequences,
+            &listed,
+            true,
+            false
+        ));
+        assert!(parents_completed(
+            &["parent".into()],
+            &sequences,
+            &listed,
+            false,
+            true
+        ));
     }
 
     #[test]
@@ -368,59 +361,148 @@ mod tests {
         let mut sequences = HashMap::new();
         sequences.insert("parent".into(), "4967".into());
         sequences.insert("done-parent".into(), SHARD_END.into());
+        let listed = listed(&["parent", "done-parent", "trimmed-parent", "closed"]);
 
         assert!(!should_claim_shard(
             true,
             true,
             Some(SHARD_END),
             &[],
-            &sequences
+            &sequences,
+            &listed,
+            false,
+            true
         ));
         assert!(!should_claim_shard(
             false,
             false,
             None,
             &["parent".into()],
-            &sequences
+            &sequences,
+            &listed,
+            false,
+            true
         ));
         assert!(should_claim_shard(
             false,
             false,
             None,
             &["done-parent".into()],
-            &sequences
+            &sequences,
+            &listed,
+            false,
+            true
         ));
         assert!(should_claim_shard(
             false,
             false,
             None,
             &["trimmed-parent".into()],
-            &sequences
+            &sequences,
+            &listed,
+            false,
+            true
         ));
-        assert!(!should_claim_shard(true, false, None, &[], &sequences));
-        assert!(should_claim_shard(true, true, Some(""), &[], &sequences));
+        assert!(!should_claim_shard(
+            true,
+            false,
+            None,
+            &[],
+            &sequences,
+            &listed,
+            false,
+            true
+        ));
+        assert!(should_claim_shard(
+            true,
+            true,
+            Some(""),
+            &[],
+            &sequences,
+            &listed,
+            false,
+            true
+        ));
     }
 
     #[test]
-    fn delete_shard_end_only_after_children_have_checkpoints() {
+    fn empty_table_claims_closed_shards_only_when_starting_from_oldest() {
+        let sequences = HashMap::new();
+        let listed = listed(&["closed-parent"]);
+        assert!(should_claim_shard(
+            true,
+            false,
+            None,
+            &[],
+            &sequences,
+            &listed,
+            true,
+            true
+        ));
+        assert!(!should_claim_shard(
+            true,
+            false,
+            None,
+            &[],
+            &sequences,
+            &listed,
+            true,
+            false
+        ));
+        assert!(!should_claim_shard(
+            true,
+            false,
+            None,
+            &[],
+            &sequences,
+            &listed,
+            false,
+            true
+        ));
+    }
+
+    #[test]
+    fn delete_shard_end_only_after_children_have_real_checkpoints() {
         let mut sequences = HashMap::new();
         sequences.insert("parent".into(), SHARD_END.into());
         assert!(!should_delete_shard_end_lease(
             SHARD_END,
             &["child-a".into(), "child-b".into()],
+            &[],
             &sequences
         ));
         sequences.insert("child-a".into(), "1".into());
         sequences.insert("child-b".into(), "".into());
+        assert!(!should_delete_shard_end_lease(
+            SHARD_END,
+            &["child-a".into(), "child-b".into()],
+            &[],
+            &sequences
+        ));
+        sequences.insert("child-b".into(), "2".into());
         assert!(should_delete_shard_end_lease(
             SHARD_END,
             &["child-a".into(), "child-b".into()],
+            &[],
             &sequences
         ));
-        assert!(!should_delete_shard_end_lease(SHARD_END, &[], &sequences));
+        sequences.insert("grandparent".into(), SHARD_END.into());
+        assert!(!should_delete_shard_end_lease(
+            SHARD_END,
+            &["child-a".into(), "child-b".into()],
+            &["grandparent".into()],
+            &sequences
+        ));
+        assert!(!should_delete_shard_end_lease(
+            SHARD_END,
+            &[],
+            &[],
+            &sequences
+        ));
         assert!(!should_delete_shard_end_lease(
             "4967",
             &["child-a".into()],
+            &[],
             &sequences
         ));
     }
