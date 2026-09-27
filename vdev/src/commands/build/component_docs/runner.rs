@@ -364,18 +364,13 @@ pub fn run(schema_path: &Path) -> Result<()> {
     let component_types = ["source", "transform", "sink"];
 
     // 1. Process Component Bases (sorted by component type for deterministic output)
-    let mut component_bases: IndexMap<String, String> = IndexMap::new();
-    if let Some(definitions) = root_schema.get("definitions").and_then(|d| d.as_object()) {
-        for (key, definition) in definitions {
-            if let Some(base_type) =
-                super::schema::get_schema_metadata(definition, "docs::component_base_type")
-                    .and_then(|v| v.as_str())
-                && component_types.contains(&base_type)
-            {
-                component_bases.insert(base_type.to_string(), key.clone());
-            }
-        }
-    }
+    let mut component_bases: IndexMap<String, String> = component_types
+        .iter()
+        .map(|kind| {
+            let name = component_base_schema_name(&context, kind)?;
+            Ok(((*kind).to_owned(), name.to_owned()))
+        })
+        .collect::<Result<_>>()?;
     component_bases.sort_keys();
 
     for (comp_type, schema_name) in &component_bases {
@@ -552,6 +547,18 @@ fn render_schema(
         prefix: format!("config-schema-base-{}-", config_map_path.join("-")),
         output_file: PathBuf::from("website/cue/reference").join(cue_relative_path),
     }
+}
+
+// Component maps already point at their outer configuration schemas. Use that
+// relationship rather than requiring a second identifier on each definition.
+fn component_base_schema_name<'a>(context: &'a SchemaContext, kind: &str) -> Result<&'a str> {
+    let field = format!("{kind}s");
+    context
+        .find_nested_object_property_schema(&context.root_schema, &field)
+        .and_then(|schema| schema.get("additionalProperties"))
+        .and_then(super::schema::get_schema_ref)
+        .and_then(|reference| reference.strip_prefix("#/definitions/"))
+        .with_context(|| format!("Could not find component base reference for '{field}'"))
 }
 
 fn render_generated_component_schema(
@@ -819,6 +826,33 @@ fn hide_cue_definitions_field(cue_output: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn component_bases_come_from_root_map_references() {
+        let context = SchemaContext {
+            root_schema: json!({"allOf": [{"properties": {
+                "sources": {"additionalProperties": {"$ref": "#/definitions/renamed_source"}},
+                "sinks": {"additionalProperties": {"$ref": "#/definitions/generic_sink<String>"}},
+                "transforms": {"additionalProperties": {"$ref": "#/definitions/transform"}}
+            }}]}),
+            cue_binary_path: String::new(),
+            resolved_schema_cache: IndexMap::new(),
+            expanded_schema_cache: IndexMap::new(),
+        };
+        assert_eq!(
+            component_base_schema_name(&context, "source").unwrap(),
+            "renamed_source"
+        );
+        assert_eq!(
+            component_base_schema_name(&context, "sink").unwrap(),
+            "generic_sink<String>"
+        );
+        assert_eq!(
+            component_base_schema_name(&context, "transform").unwrap(),
+            "transform"
+        );
+        assert!(component_base_schema_name(&context, "missing").is_err());
+    }
 
     #[test]
     fn replaces_repeated_values_with_cue_references() {

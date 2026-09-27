@@ -2,6 +2,7 @@ mod config_builder;
 pub(crate) mod interpolation;
 mod loader;
 mod representation;
+pub mod schema_coercion;
 mod secret;
 mod source;
 

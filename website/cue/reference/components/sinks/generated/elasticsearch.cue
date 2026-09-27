@@ -529,7 +529,7 @@ generated: components: sinks: elasticsearch: configuration: {
 				"X-Powered-By": "Vector"
 			}]
 			options: "*": {
-				description: "A query string parameter."
+				description: "Configuration of the query parameter value for HTTP requests."
 				required:    true
 				type:        _schemaDefinitions["vector::http::ParameterValue"]
 			}

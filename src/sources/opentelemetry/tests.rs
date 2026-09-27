@@ -9,7 +9,7 @@ use crate::{
     config::{OutputId, SourceConfig, SourceContext},
     event::{
         Event, EventStatus, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
-        ObjectMap, Value, into_event_stream,
+        ObjectMap, TraceLayout, Value, into_event_stream,
         metric::{Bucket, Quantile},
     },
     sources::opentelemetry::config::{
@@ -39,6 +39,7 @@ use vector_lib::{
             metrics::v1::{
                 ExportMetricsServiceRequest, metrics_service_client::MetricsServiceClient,
             },
+            trace::v1::trace_service_client::TraceServiceClient,
         },
         common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value::Value::StringValue},
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
@@ -1671,6 +1672,10 @@ async fn http_headers_traces_use_otlp_decoding_false() {
                 .unwrap(),
             &value!("Test")
         );
+        assert_eq!(
+            event.metadata().trace_layout(),
+            Some(TraceLayout::OtelFlattened)
+        );
     })
     .await;
 }
@@ -1706,8 +1711,46 @@ async fn http_headers_traces_use_otlp_decoding_true() {
                 .unwrap(),
             &value!("Test")
         );
+        assert_eq!(
+            event.metadata().trace_layout(),
+            Some(TraceLayout::OtlpResourceSpans)
+        );
     })
     .await;
+}
+
+async fn assert_grpc_trace_layout_marker(use_otlp_decoding: bool) {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let env = build_otlp_test_env_with(TRACES, None, use_otlp_decoding).await;
+        let mut client = TraceServiceClient::connect(format!("http://{}", env.grpc_addr))
+            .await
+            .unwrap();
+        _ = client
+            .export(Request::new(create_test_traces_request()))
+            .await;
+        let mut events = test_util::collect_ready(env.output);
+        assert_eq!(events.len(), 1);
+        let expected = if use_otlp_decoding {
+            TraceLayout::OtlpResourceSpans
+        } else {
+            TraceLayout::OtelFlattened
+        };
+        assert_eq!(
+            events.pop().unwrap().metadata().trace_layout(),
+            Some(expected)
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn grpc_traces_use_otlp_decoding_false_sets_layout_marker() {
+    assert_grpc_trace_layout_marker(false).await;
+}
+
+#[tokio::test]
+async fn grpc_traces_use_otlp_decoding_true_sets_layout_marker() {
+    assert_grpc_trace_layout_marker(true).await;
 }
 
 pub struct OTelTestEnv {
@@ -1719,6 +1762,14 @@ pub struct OTelTestEnv {
 pub async fn build_otlp_test_env(
     event_name: &'static str,
     log_namespace: Option<bool>,
+) -> OTelTestEnv {
+    build_otlp_test_env_with(event_name, log_namespace, false).await
+}
+
+async fn build_otlp_test_env_with(
+    event_name: &'static str,
+    log_namespace: Option<bool>,
+    use_otlp_decoding: bool,
 ) -> OTelTestEnv {
     let (_guard_0, grpc_addr) = next_addr();
     let (_guard_1, http_addr) = next_addr();
@@ -1739,7 +1790,7 @@ pub async fn build_otlp_test_env(
         max_concurrent_requests: 100.try_into().unwrap(),
         request_timeout_secs: std::time::Duration::from_secs(30),
         log_namespace,
-        use_otlp_decoding: false.into(),
+        use_otlp_decoding: use_otlp_decoding.into(),
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());

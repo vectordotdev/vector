@@ -15,8 +15,12 @@ on:
 permissions:
   contents: read
 
+# One group for both freeze transitions: an activation that overlaps the
+# closeout in release_unfreeze.yml could end with a disabled freeze and a
+# restored bypass.
 concurrency:
-  group: release-prepare
+  group: release-freeze
+  queue: max
   cancel-in-progress: false
 
 jobs:
@@ -38,12 +42,21 @@ jobs:
           ref: master
           fetch-depth: 0
 
-      - name: Require active release freeze
-        uses: ./.github/actions/require-release-freeze
+      - name: Activate release freeze
+        uses: ./.github/actions/activate-release-freeze
+        with:
+          app-client-id: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_CLIENT_ID }}
+          app-private-key: ${{ secrets.GH_APP_VECTORDOTDEV_BOT_APP_PRIVATE_KEY }}
+          freeze-ruleset-id: ${{ vars.RELEASE_FREEZE_RULESET_ID }}
+          bot-bypass-ruleset-ids: ${{ vars.RELEASE_FREEZE_BOT_BYPASS }}
 
       - name: Record frozen base
         id: base
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          # master may have advanced between checkout and freeze activation.
+          git fetch origin refs/heads/master:refs/remotes/origin/master
+          git switch --detach origin/master
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up release tooling
         uses: ./.github/actions/setup
