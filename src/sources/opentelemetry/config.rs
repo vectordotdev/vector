@@ -11,13 +11,16 @@ use crate::{
         Source,
         http_server::{build_param_matcher, remove_duplicates},
         opentelemetry::{
-            grpc::{GrpcErrorResponse, Service},
-            http::{HttpErrorResponse, build_warp_filter, run_http_server},
+            grpc::{Service, middleware_error_response as grpc_error_response},
+            http::{
+                build_warp_filter, middleware_error_response as http_error_response,
+                run_http_server,
+            },
             request_control::RequestControl,
         },
         util::{
             decompression::max_decompressed_size_bytes,
-            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes_and_layer},
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
         },
     },
 };
@@ -374,14 +377,14 @@ impl OpentelemetryConfig {
             .add_service(metrics_service)
             .add_service(trace_service);
 
-        let grpc_source = run_grpc_server_with_routes_and_layer(
+        let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
             grpc_tls_settings,
             grpc_tls_reloader,
             builder.routes(),
             self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
-            request_control.grpc_layer(GrpcErrorResponse),
+            request_control.grpc_layer(grpc_error_response),
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source gRPC server failed.", %error);
@@ -412,7 +415,7 @@ impl OpentelemetryConfig {
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
-            request_control.http_layer(HttpErrorResponse),
+            request_control.http_layer(http_error_response),
         )
         .map_err(|error| {
             error!(message = "OpenTelemetry source HTTP server failed.", %error);

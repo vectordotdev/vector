@@ -41,8 +41,8 @@ use crate::{
         opentelemetry::{
             config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
             request_control::{
-                AcknowledgementFailure, MiddlewareError, MiddlewareErrorResponse,
-                PendingAcknowledgement, RequestControlLayer,
+                AcknowledgementFailure, MiddlewareError, PendingAcknowledgement,
+                RequestControlLayer,
             },
         },
         util::{add_headers, decompress_body, http::capped_body},
@@ -57,25 +57,18 @@ pub(crate) enum ApiError {
 
 impl warp::reject::Reject for ApiError {}
 
-#[derive(Clone, Copy)]
-pub(crate) struct HttpErrorResponse;
+pub(crate) fn middleware_error_response(error: MiddlewareError) -> Response {
+    let status = match error {
+        MiddlewareError::LoadShed => StatusCode::TOO_MANY_REQUESTS,
+        MiddlewareError::TimedOut | MiddlewareError::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
+    };
 
-impl MiddlewareErrorResponse<Response> for HttpErrorResponse {
-    fn make_response(&self, error: MiddlewareError) -> Response {
-        let status = match error {
-            MiddlewareError::Overloaded => StatusCode::TOO_MANY_REQUESTS,
-            MiddlewareError::TimedOut | MiddlewareError::Unavailable => {
-                StatusCode::SERVICE_UNAVAILABLE
-            }
-        };
-
-        let response = protobuf(Status {
-            code: tonic::Code::Unavailable as i32,
-            message: error.message().to_owned(),
-            ..Default::default()
-        });
-        warp::reply::with_status(response, status).into_response()
-    }
+    let response = protobuf(Status {
+        code: tonic::Code::Unavailable as i32,
+        message: error.message().to_owned(),
+        ..Default::default()
+    });
+    warp::reply::with_status(response, status).into_response()
 }
 
 pub(crate) async fn run_http_server(
@@ -85,7 +78,9 @@ pub(crate) async fn run_http_server(
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
-    request_control: RequestControlLayer<HttpErrorResponse>,
+    request_control: RequestControlLayer<
+        impl Fn(MiddlewareError) -> Response + Clone + Send + 'static,
+    >,
 ) -> crate::Result<()> {
     let listener = tls_settings
         .bind_reloadable(&address, tls_reloader)

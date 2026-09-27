@@ -112,6 +112,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _request_tags
 		}
+		component_load_shed_requests_total: {
+			description:       "The total number of requests rejected because the component's request concurrency limit was reached."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _request_tags
+		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
 			type:              "counter"
@@ -1156,7 +1162,7 @@ components: sources: internal_metrics: {
 			component_type: _component_type
 		}
 		_request_tags: _component_tags & {
-			protocol?: {
+			protocol: {
 				description: "The protocol used to receive the request."
 				required:    false
 				enum: {

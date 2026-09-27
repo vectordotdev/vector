@@ -27,20 +27,12 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     sources::opentelemetry::{
         config::{LOGS, METRICS, TRACES},
-        request_control::{
-            AcknowledgementFailure, MiddlewareError, MiddlewareErrorResponse,
-            PendingAcknowledgement,
-        },
+        request_control::{AcknowledgementFailure, MiddlewareError, PendingAcknowledgement},
     },
 };
 
-#[derive(Clone, Copy)]
-pub(crate) struct GrpcErrorResponse;
-
-impl MiddlewareErrorResponse<http::Response<BoxBody>> for GrpcErrorResponse {
-    fn make_response(&self, error: MiddlewareError) -> http::Response<BoxBody> {
-        Status::unavailable(error.message()).to_http()
-    }
+pub(crate) fn middleware_error_response(error: MiddlewareError) -> http::Response<BoxBody> {
+    Status::unavailable(error.message()).to_http()
 }
 
 #[derive(Clone)]
