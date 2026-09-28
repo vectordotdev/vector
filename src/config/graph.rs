@@ -251,8 +251,8 @@ impl Graph {
 
             if !from_ty.intersects(to_ty) {
                 errors.push(format!(
-                    "Data type mismatch between {} ({}) and {} ({})",
-                    edge.from, from_ty, edge.to, to_ty
+                    "Data type mismatch between {} ({from_ty}) and {} ({to_ty})",
+                    edge.from, edge.to
                 ));
             }
         }

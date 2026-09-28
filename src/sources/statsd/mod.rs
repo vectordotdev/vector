@@ -1,5 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    num::NonZeroU64,
     time::Duration,
 };
 
@@ -81,18 +82,15 @@ pub enum ConversionUnit {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct UdpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
     /// The size of the receive buffer used for each connection.
     receive_buffer_bytes: Option<usize>,
 
     #[serde(default = "default_sanitize")]
-    #[configurable(derived)]
     sanitize: bool,
 
     #[serde(default = "default_convert_to")]
-    #[configurable(derived)]
     convert_to: ConversionUnit,
 }
 
@@ -112,16 +110,12 @@ impl UdpConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct TcpConfig {
-    #[configurable(derived)]
     address: SocketListenAddr,
 
-    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
 
-    #[configurable(derived)]
     pub permit_origin: Option<IpAllowlistConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsSourceConfig>,
 
@@ -139,16 +133,22 @@ pub struct TcpConfig {
     #[configurable(metadata(docs::type_unit = "connections"))]
     connection_limit: Option<u32>,
 
+    /// The timeout, in seconds, before a TLS handshake is aborted if it has not completed.
+    ///
+    /// This bounds how long a connection can hold its slot against `connection_limit`
+    /// before the TLS handshake finishes, protecting against clients that open a
+    /// connection but never complete (or never start) a handshake.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    tls_handshake_timeout_secs: Option<NonZeroU64>,
+
     ///	Whether or not to sanitize incoming statsd key names. When "true", keys are sanitized by:
     /// - "/" is replaced with "-"
     /// - All whitespace is replaced with "_"
     /// - All non alphanumeric characters (A-Z, a-z, 0-9, _, or -) are removed.
     #[serde(default = "default_sanitize")]
-    #[configurable(derived)]
     sanitize: bool,
 
     #[serde(default = "default_convert_to")]
-    #[configurable(derived)]
     convert_to: ConversionUnit,
 }
 
@@ -163,6 +163,7 @@ impl TcpConfig {
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             receive_buffer_bytes: None,
             connection_limit: None,
+            tls_handshake_timeout_secs: None,
             sanitize: default_sanitize(),
             convert_to: default_convert_to(),
         }
@@ -223,6 +224,7 @@ impl SourceConfig for StatsdConfig {
                     tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     None,
+                    config.tls_handshake_timeout_secs,
                     cx,
                     false.into(),
                     config.connection_limit,

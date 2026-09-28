@@ -54,11 +54,9 @@ pub struct UnixConfig {
     #[serde(default = "default_host_key")]
     pub host_key: OptionalValuePath,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 

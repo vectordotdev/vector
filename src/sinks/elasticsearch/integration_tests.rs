@@ -19,7 +19,7 @@ use crate::{
     http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
         HealthcheckError,
-        util::{BatchConfig, Compression, SinkBatchSettings, auth::Auth},
+        util::{BatchConfig, Compression, HttpEndpoint, SinkBatchSettings, auth::Auth},
     },
     template::Template,
     test_util::{
@@ -58,16 +58,28 @@ fn aws_api_version() -> ElasticsearchApiVersion {
     }
 }
 
-fn aws_server() -> String {
-    std::env::var("ELASTICSEARCH_AWS_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
+fn aws_server() -> HttpEndpoint {
+    HttpEndpoint::parse(
+        &std::env::var("ELASTICSEARCH_AWS_ADDRESS")
+            .unwrap_or_else(|_| "http://localhost:4571".into()),
+    )
+    .unwrap()
 }
 
-fn http_server() -> String {
-    std::env::var("ELASTICSEARCH_HTTP_ADDRESS").unwrap_or_else(|_| "http://localhost:9200".into())
+fn http_server() -> HttpEndpoint {
+    HttpEndpoint::parse(
+        &std::env::var("ELASTICSEARCH_HTTP_ADDRESS")
+            .unwrap_or_else(|_| "http://localhost:9200".into()),
+    )
+    .unwrap()
 }
 
-fn https_server() -> String {
-    std::env::var("ELASTICSEARCH_HTTPS_ADDRESS").unwrap_or_else(|_| "https://localhost:9201".into())
+fn https_server() -> HttpEndpoint {
+    HttpEndpoint::parse(
+        &std::env::var("ELASTICSEARCH_HTTPS_ADDRESS")
+            .unwrap_or_else(|_| "https://localhost:9201".into()),
+    )
+    .unwrap()
 }
 
 impl ElasticsearchCommon {
@@ -128,7 +140,7 @@ async fn flush(common: ElasticsearchCommon) -> crate::Result<()> {
 
 async fn create_template_index(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
     let client = create_http_client();
-    let uri = format!("{}/_index_template/{}", common.base_url, name);
+    let uri = format!("{}/_index_template/{name}", common.base_url);
     let response = client
         .put(uri)
         .json(&json!({
@@ -541,8 +553,8 @@ async fn insert_events_with_failure_and_gzip_compression() {
 async fn insert_events_in_data_stream() {
     trace_init();
     let index = gen_index();
-    let template_index = format!("my-template-{}", index);
-    let stream_index = format!("my-stream-{}", index);
+    let template_index = format!("my-template-{index}");
+    let stream_index = format!("my-stream-{index}");
 
     let cfg = ElasticsearchConfig {
         endpoints: vec![http_server()],
@@ -620,7 +632,7 @@ async fn distributed_insert_events_failover() {
         endpoints: vec![
             http_server(),
             https_server(),
-            "http://localhost:2347".into(),
+            HttpEndpoint::parse("http://localhost:2347").unwrap(),
         ],
         doc_type: "log_lines".into(),
         compression: Compression::None,
@@ -881,7 +893,7 @@ fn gen_index() -> Template {
 
 async fn create_data_stream(common: &ElasticsearchCommon, name: &str) -> crate::Result<()> {
     let client = create_http_client();
-    let uri = format!("{}/_data_stream/{}", common.base_url, name);
+    let uri = format!("{}/_data_stream/{name}", common.base_url);
     let response = client
         .put(uri)
         .header("Content-Type", "application/json")

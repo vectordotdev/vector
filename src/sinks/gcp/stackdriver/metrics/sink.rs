@@ -59,7 +59,7 @@ where
                     &MetricValue::Counter { .. } => Some(metric),
                     &MetricValue::Gauge { .. } => Some(metric),
                     not_supported => {
-                        warn!("Unsupported metric type: {:?}.", not_supported);
+                        warn!("Unsupported metric type: {not_supported:?}.");
                         None
                     }
                 })

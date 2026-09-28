@@ -194,8 +194,8 @@ async fn query_backend(
             }
             Some(stderr) = stderr_stream.next() => {
                 match stderr {
-                    Ok(l) => warn!("An exec backend generated message on stderr: {}.", l),
-                    Err(e) => warn!("Error while reading from an exec backend stderr: {}.", e),
+                    Ok(l) => warn!("An exec backend generated message on stderr: {l}."),
+                    Err(e) => warn!("Error while reading from an exec backend stderr: {e}."),
                 }
             }
             stdout = stdout_stream.next() => {

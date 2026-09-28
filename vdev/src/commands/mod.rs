@@ -78,11 +78,11 @@ mod features;
 mod fmt;
 mod info;
 mod integration;
-mod meta;
 mod package;
 mod release;
 mod run;
 mod status;
+mod style;
 mod test;
 mod test_vrl;
 mod version;
@@ -99,7 +99,6 @@ cli_commands! {
     fmt,
     info,
     integration,
-    meta,
     package,
     release,
     run,

@@ -199,7 +199,7 @@ impl RenderData {
     /// is an array, the value on the `other` side is appended to that array, regardless of the
     /// contents of the array.
     pub fn merge(&mut self, _other: Self) {
-        todo!()
+        unimplemented!()
     }
 }
 
@@ -355,7 +355,7 @@ fn render_bare_schema<T: QueryableSchema>(
             // instance type groupings, knowing that _we_ never generate schemas like that, but it's
             // still technically possible in a real-world JSON Schema document... so we should at
             // least make the error message half-way decent so that it explains as much.
-            todo!()
+            unimplemented!()
         }
     }
 
@@ -403,7 +403,7 @@ fn get_rendered_value_type<T: QueryableSchema>(
     _schema: T,
     _value: &Value,
 ) -> Result<String, RenderError> {
-    todo!()
+    unimplemented!()
 }
 
 fn render_schema_description<T: QueryableSchema>(schema: T) -> Result<Option<String>, RenderError> {

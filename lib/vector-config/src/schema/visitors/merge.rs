@@ -1,5 +1,3 @@
-#![allow(clippy::borrowed_box)]
-
 use std::mem::discriminant;
 
 use serde_json::Value;
@@ -26,16 +24,16 @@ impl Mergeable for SchemaObject {
         // will win, except for when both are present, then the individual fields within the
         // optional type will be merged according to the normal precedence rules.
         merge_optional(&mut self.reference, other.reference.as_ref());
-        merge_schema_metadata(&mut self.metadata, other.metadata.as_ref());
+        merge_schema_metadata(&mut self.metadata, other.metadata.as_deref());
         merge_schema_instance_type(&mut self.instance_type, other.instance_type.as_ref());
         merge_schema_format(&mut self.format, other.format.as_ref());
         merge_schema_enum_values(&mut self.enum_values, other.enum_values.as_ref());
         merge_schema_const_value(&mut self.const_value, other.const_value.as_ref());
-        merge_schema_subschemas(&mut self.subschemas, other.subschemas.as_ref());
-        merge_schema_number_validation(&mut self.number, other.number.as_ref());
-        merge_schema_string_validation(&mut self.string, other.string.as_ref());
-        merge_schema_array_validation(&mut self.array, other.array.as_ref());
-        merge_schema_object_validation(&mut self.object, other.object.as_ref());
+        merge_schema_subschemas(&mut self.subschemas, other.subschemas.as_deref());
+        merge_schema_number_validation(&mut self.number, other.number.as_deref());
+        merge_schema_string_validation(&mut self.string, other.string.as_deref());
+        merge_schema_array_validation(&mut self.array, other.array.as_deref());
+        merge_schema_object_validation(&mut self.object, other.object.as_deref());
         merge_schema_extensions(&mut self.extensions, &other.extensions);
     }
 }
@@ -112,8 +110,8 @@ where
     }
 }
 
-fn merge_schema_metadata(destination: &mut Option<Box<Metadata>>, source: Option<&Box<Metadata>>) {
-    merge_optional_with(destination, source, |existing, new| {
+fn merge_schema_metadata(destination: &mut Option<Box<Metadata>>, source: Option<&Metadata>) {
+    merge_optional_box_with(destination, source, |existing, new| {
         merge_optional(&mut existing.id, new.id.as_ref());
         merge_optional(&mut existing.title, new.title.as_ref());
         merge_optional(&mut existing.description, new.description.as_ref());
@@ -151,9 +149,9 @@ fn merge_schema_const_value(destination: &mut Option<Value>, source: Option<&Val
 
 fn merge_schema_subschemas(
     destination: &mut Option<Box<SubschemaValidation>>,
-    source: Option<&Box<SubschemaValidation>>,
+    source: Option<&SubschemaValidation>,
 ) {
-    merge_optional_with(destination, source, |existing, new| {
+    merge_optional_box_with(destination, source, |existing, new| {
         merge_optional_with(&mut existing.all_of, new.all_of.as_ref(), merge_collection);
         merge_optional_with(&mut existing.any_of, new.any_of.as_ref(), merge_collection);
         merge_optional_with(&mut existing.one_of, new.one_of.as_ref(), merge_collection);
@@ -166,9 +164,9 @@ fn merge_schema_subschemas(
 
 fn merge_schema_number_validation(
     destination: &mut Option<Box<NumberValidation>>,
-    source: Option<&Box<NumberValidation>>,
+    source: Option<&NumberValidation>,
 ) {
-    merge_optional_with(destination, source, |existing, new| {
+    merge_optional_box_with(destination, source, |existing, new| {
         merge_optional(&mut existing.multiple_of, new.multiple_of.as_ref());
         merge_optional(&mut existing.maximum, new.maximum.as_ref());
         merge_optional(
@@ -185,9 +183,9 @@ fn merge_schema_number_validation(
 
 fn merge_schema_string_validation(
     destination: &mut Option<Box<StringValidation>>,
-    source: Option<&Box<StringValidation>>,
+    source: Option<&StringValidation>,
 ) {
-    merge_optional_with(destination, source, |existing, new| {
+    merge_optional_box_with(destination, source, |existing, new| {
         merge_optional(&mut existing.max_length, new.max_length.as_ref());
         merge_optional(&mut existing.min_length, new.min_length.as_ref());
         merge_optional(&mut existing.pattern, new.pattern.as_ref());
@@ -196,9 +194,9 @@ fn merge_schema_string_validation(
 
 fn merge_schema_array_validation(
     destination: &mut Option<Box<ArrayValidation>>,
-    source: Option<&Box<ArrayValidation>>,
+    source: Option<&ArrayValidation>,
 ) {
-    merge_optional_with(destination, source, |existing, new| {
+    merge_optional_box_with(destination, source, |existing, new| {
         merge_optional_with(&mut existing.items, new.items.as_ref(), merge_collection);
         merge_optional(
             &mut existing.additional_items,
@@ -217,9 +215,9 @@ fn merge_schema_array_validation(
 
 fn merge_schema_object_validation(
     destination: &mut Option<Box<ObjectValidation>>,
-    source: Option<&Box<ObjectValidation>>,
+    source: Option<&ObjectValidation>,
 ) {
-    merge_optional_with(destination, source, |existing, new| {
+    merge_optional_box_with(destination, source, |existing, new| {
         merge_optional(&mut existing.max_properties, new.max_properties.as_ref());
         merge_optional(&mut existing.min_properties, new.min_properties.as_ref());
         merge_collection(&mut existing.required, &new.required);
@@ -267,6 +265,21 @@ where
 
 fn merge_optional<T: Clone>(destination: &mut Option<T>, source: Option<&T>) {
     merge_optional_with(destination, source, |_, _| {});
+}
+
+fn merge_optional_box_with<T, F>(destination: &mut Option<Box<T>>, source: Option<&T>, f: F)
+where
+    T: Clone,
+    F: Fn(&mut T, &T),
+{
+    match destination {
+        None => *destination = source.cloned().map(Box::new),
+        Some(destination) => {
+            if let Some(source) = source {
+                f(destination, source);
+            }
+        }
+    }
 }
 
 fn merge_optional_with<'a, T, F>(destination: &'a mut Option<T>, source: Option<&'a T>, f: F)

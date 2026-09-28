@@ -288,7 +288,7 @@ mod tests {
         drop(enter);
 
         sleep(Duration::from_millis(1)).await;
-        let mut events = collect_ready(rx).await;
+        let mut events = collect_ready(rx);
         let test_id = Value::from(test_id.to_string());
         events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id));
 
@@ -382,7 +382,7 @@ mod tests {
         }
 
         sleep(Duration::from_millis(1)).await;
-        let mut events = collect_ready(rx).await;
+        let mut events = collect_ready(rx);
         let test_id_value = Value::from(test_id.to_string());
         events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id_value));
 
@@ -412,7 +412,7 @@ mod tests {
         }
 
         sleep(Duration::from_millis(50)).await;
-        let events = collect_ready(rx).await;
+        let events = collect_ready(rx);
 
         // Filter to only our test messages
         let test_events: Vec<_> = events

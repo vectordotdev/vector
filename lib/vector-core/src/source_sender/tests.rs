@@ -91,9 +91,8 @@ async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
             assert_eq!(*count, 1);
             assert!(
                 (*sum - expected).abs() <= 0.002,
-                "Histogram sum does not match expected sum: {} vs {}",
+                "Histogram sum does not match expected sum: {} vs {expected}",
                 *sum,
-                expected,
             );
         }
         _ => panic!("source_lag_time_seconds has invalid type"),

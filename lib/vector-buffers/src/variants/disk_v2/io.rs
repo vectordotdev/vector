@@ -192,6 +192,8 @@ impl Filesystem for ProductionFilesystem {
     async fn open_mmap_readable(&self, path: &Path) -> io::Result<Self::MemoryMap> {
         let file = open_readable_file_options().open(path).await?;
         let std_file = file.into_std().await;
+        // SAFETY: Vector owns the buffer data files and keeps their size stable while a readable
+        // mapping is active.
         unsafe { memmap2::Mmap::map(&std_file) }
     }
 
@@ -199,6 +201,8 @@ impl Filesystem for ProductionFilesystem {
         let file = open_writable_file_options().open(path).await?;
 
         let std_file = file.into_std().await;
+        // SAFETY: Vector exclusively manages writes and resizing for buffer data files while this
+        // mutable mapping is active.
         unsafe { memmap2::MmapMut::map_mut(&std_file) }
     }
 

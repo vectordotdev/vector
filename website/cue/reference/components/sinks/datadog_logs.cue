@@ -12,7 +12,7 @@ components: sinks: datadog_logs: {
 		send: {
 			batch: {
 				enabled:      true
-				max_bytes:    4_250_000
+				max_bytes:    4_250_000 // default: max_payload_bytes (5 MB) - 750 KB headroom
 				max_events:   1000
 				timeout_secs: 5.0
 			}
@@ -72,6 +72,17 @@ components: sinks: datadog_logs: {
 			body: """
 				Datadog's logs API has special handling for the following fields: `ddsource`, `ddtags`, `hostname`, `message`, and `service`.
 				If your event contains any of these fields they will be used as described by the [API reference](https://docs.datadoghq.com/api/latest/logs/#send-logs).
+				"""
+		}
+		payload_size: {
+			title: "Payload size limit"
+			body: """
+				The `max_payload_bytes` option controls the maximum uncompressed payload size sent to the
+				endpoint. It defaults to `5,000,000` bytes (5 MB), which matches the standard Datadog API
+				limit. Increase it when targeting a compatible endpoint that accepts larger payloads.
+
+				A batch that exceeds `max_payload_bytes` is split across multiple requests. A single event
+				that exceeds `max_payload_bytes` is dropped.
 				"""
 		}
 	}

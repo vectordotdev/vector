@@ -443,7 +443,7 @@ async fn handle_signal(
             None
         }
         Err(RecvError::Lagged(amt)) => {
-            warn!("Overflow, dropped {} signals.", amt);
+            warn!("Overflow, dropped {amt} signals.");
             None
         }
         Err(RecvError::Closed) => Some(SignalTo::Shutdown(None)),

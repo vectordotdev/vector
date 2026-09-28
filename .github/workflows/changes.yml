@@ -151,6 +151,8 @@ on:
         value: ${{ jobs.e2e_tests.outputs.opentelemetry-logs }}
       e2e-opentelemetry-metrics:
         value: ${{ jobs.e2e_tests.outputs.opentelemetry-metrics }}
+      e2e-opentelemetry-traces:
+        value: ${{ jobs.e2e_tests.outputs.opentelemetry-traces }}
       int-tests-any:
         value: ${{ jobs.int_tests.outputs.any }}
       e2e-tests-any:
@@ -192,9 +194,9 @@ jobs:
       unit_mac-yml: ${{ steps.filter.outputs.unit_mac-yml }}
       unit_windows-yml: ${{ steps.filter.outputs.unit_windows-yml }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
@@ -376,7 +378,7 @@ jobs:
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup
         with:
@@ -389,7 +391,7 @@ jobs:
       - name: Create filter rules for integrations
         run: vdev int ci-paths > int_test_filters.yaml
 
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
@@ -468,10 +470,11 @@ jobs:
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
       opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
+      opentelemetry-traces: ${{ steps.filter.outputs.opentelemetry-traces }}
       opentelemetry-metrics-native: ${{ steps.filter.outputs.opentelemetry-metrics-native }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup
         with:
@@ -484,7 +487,7 @@ jobs:
       - name: Create filter rules for e2e tests
         run: vdev e2e ci-paths > int_test_filters.yaml
 
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           base: ${{ env.BASE_SHA }}
@@ -502,6 +505,7 @@ jobs:
             "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
             "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }},
             "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }},
+            "opentelemetry-traces": ${{ steps.filter.outputs.opentelemetry-traces }},
             "opentelemetry-metrics-native": ${{ steps.filter.outputs.opentelemetry-metrics-native }}
           }
           EOF
