@@ -63,9 +63,10 @@ impl RenderData {
     /// other than the leaf segment, points to a value that is not an object/map, this method will
     /// panic.
     pub fn write<V: Into<Value>>(&mut self, path: &str, value: V) {
-        if !path.starts_with('/') {
-            panic!("Paths must always start with a leading forward slash (`/`).");
-        }
+        assert!(
+            path.starts_with('/'),
+            "Paths must always start with a leading forward slash (`/`)."
+        );
 
         self.with_mut_object(|map| {
             // Split the path, and take the last element as the actual map key to write to.
@@ -81,7 +82,6 @@ impl RenderData {
                     match destination.get_mut(segment) {
                         Some(Value::Object(next)) => {
                             destination = next;
-                            continue;
                         }
                         Some(_) => {
                             panic!("Only leaf nodes should be allowed to be non-object values.")
@@ -122,9 +122,10 @@ impl RenderData {
     /// other than the leaf segment, points to a value that is not an object/map, this method will
     /// panic.
     pub fn delete(&mut self, path: &str) -> bool {
-        if !path.starts_with('/') {
-            panic!("Paths must always start with a leading forward slash (`/`).");
-        }
+        assert!(
+            path.starts_with('/'),
+            "Paths must always start with a leading forward slash (`/`)."
+        );
 
         self.with_mut_object(|map| {
             // Split the path, and take the last element as the actual map key to write to.
@@ -141,7 +142,6 @@ impl RenderData {
                 match destination.get_mut(segment) {
                     Some(Value::Object(next)) => {
                         destination = next;
-                        continue;
                     }
                     Some(_) => panic!("Only leaf nodes should be allowed to be non-object values."),
                     // If the next segment doesn't exist, there's nothing for us to delete, so return `false`.
@@ -166,9 +166,10 @@ impl RenderData {
     ///
     /// If the path does not start with a forward slash, this method will panic.
     pub fn exists(&self, path: &str) -> bool {
-        if !path.starts_with('/') {
-            panic!("Paths must always start with a leading forward slash (`/`).");
-        }
+        assert!(
+            path.starts_with('/'),
+            "Paths must always start with a leading forward slash (`/`)."
+        );
 
         // The root path always exists.
         if path == "/" {
@@ -271,7 +272,7 @@ where
         // This must happen here because there could be callsite-specific overrides to default
         // values/descriptions/etc which must take precedence, so that must occur after any nested
         // rendering in order to maintain that precedence.
-        apply_schema_default_value(&schema, &mut data)?;
+        apply_schema_default_value(&schema, &mut data);
         apply_schema_metadata(&schema, &mut data)?;
         apply_schema_description(&schema, &mut data)?;
 
@@ -362,12 +363,7 @@ fn render_bare_schema<T: QueryableSchema>(
     Ok(())
 }
 
-fn apply_schema_default_value<T: QueryableSchema>(
-    _schema: T,
-    _data: &mut RenderData,
-) -> Result<(), RenderError> {
-    Ok(())
-}
+fn apply_schema_default_value<T: QueryableSchema>(_schema: T, _data: &mut RenderData) {}
 
 fn apply_schema_metadata<T: QueryableSchema>(
     schema: T,
