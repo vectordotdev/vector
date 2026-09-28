@@ -4,8 +4,8 @@ use vector_lib::config::ComponentKey;
 use vector_lib::id::Inputs;
 
 use super::{
-    Config, DynValidatedSink, OutputId, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
-    transform::get_transform_output_ids, validation,
+    Component, Config, DynValidatedSink, OutputId, builder::ConfigBuilder, graph::Graph,
+    sink::SinkOuter, transform::get_transform_output_ids, validation,
 };
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -77,10 +77,14 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         )
         .collect::<IndexMap<_, _>>();
 
+    let graph_sources = sources_and_table_sources
+        .iter()
+        .map(|(key, c)| (key, Component::from(c)));
+    let graph_transforms = transforms.iter().map(|(key, c)| (key, Component::from(c)));
+    let graph_sinks = all_sinks.iter().map(|(key, c)| (key, Component::from(c)));
+
     let graph = match Graph::new(
-        &sources_and_table_sources,
-        &transforms,
-        &all_sinks,
+        graph_sources.chain(graph_transforms).chain(graph_sinks),
         schema,
         global.wildcard_matching.unwrap_or_default(),
     ) {

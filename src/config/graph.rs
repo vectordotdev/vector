@@ -3,11 +3,11 @@ use std::{
     fmt,
 };
 
-use indexmap::{IndexMap, set::IndexSet};
+use indexmap::set::IndexSet;
 
 use super::{
-    Component, ComponentKey, ComponentKind, DataType, OutputId, SinkOuter, SourceOuter,
-    SourceOutput, TransformContext, TransformOuter, TransformOutput, WildcardMatching, schema,
+    Component, ComponentKey, ComponentKind, DataType, OutputId, SourceOutput, TransformContext,
+    TransformOutput, WildcardMatching, schema,
 };
 
 /// Port metadata derived from a component for graph validation.
@@ -139,31 +139,27 @@ pub struct Graph {
 }
 
 impl Graph {
-    pub fn new(
-        sources: &IndexMap<ComponentKey, SourceOuter>,
-        transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
-        sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+    /// Builds a graph from components in insertion order.
+    ///
+    /// Enrichment tables must already be expanded into their sources and sinks.
+    pub fn new<'a>(
+        components: impl Iterator<Item = (&'a ComponentKey, Component<'a, String>)> + Clone,
         schema: schema::Options,
         wildcard_matching: WildcardMatching,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, false, schema, wildcard_matching)
+        Self::new_inner(components, false, schema, wildcard_matching)
     }
 
-    pub fn new_unchecked(
-        sources: &IndexMap<ComponentKey, SourceOuter>,
-        transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
-        sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+    pub fn new_unchecked<'a>(
+        components: impl Iterator<Item = (&'a ComponentKey, Component<'a, String>)> + Clone,
         schema: schema::Options,
         wildcard_matching: WildcardMatching,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, true, schema, wildcard_matching)
-            .expect("errors ignored")
+        Self::new_inner(components, true, schema, wildcard_matching).expect("errors ignored")
     }
 
-    fn new_inner(
-        sources: &IndexMap<ComponentKey, SourceOuter>,
-        transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
-        sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+    fn new_inner<'a>(
+        components: impl Iterator<Item = (&'a ComponentKey, Component<'a, String>)> + Clone,
         ignore_errors: bool,
         schema: schema::Options,
         wildcard_matching: WildcardMatching,
@@ -171,23 +167,15 @@ impl Graph {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
 
-        let components = || {
-            let sources = sources.iter().map(|(id, c)| (id, Component::from(c)));
-            let transforms = transforms.iter().map(|(id, c)| (id, Component::from(c)));
-            let sinks = sinks.iter().map(|(id, c)| (id, Component::from(c)));
-
-            sources.chain(transforms).chain(sinks)
-        };
-
         // Derive each node from its component before resolving any connections.
-        for (id, component) in components() {
+        for (id, component) in components.clone() {
             graph
                 .nodes
                 .insert(id.clone(), Node::new(&component, id, schema));
         }
 
         let available_inputs = graph.input_map()?;
-        for (id, component) in components() {
+        for (id, component) in components {
             for input in component.inputs().into_iter().flatten() {
                 if let Err(e) = graph.add_input(input, id, &available_inputs, wildcard_matching) {
                     errors.push(e);

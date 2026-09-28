@@ -37,7 +37,7 @@ use super::{OutputId, compiler::expand_globs, graph::Graph, transform::get_trans
 use crate::{
     conditions::Condition,
     config::{
-        self, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
+        self, Component, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
         TestDefinition, TestInput, TestOutput, loading, loading::ConfigBuilderLoader,
     },
     event::{Event, EventMetadata, LogEvent},
@@ -379,6 +379,25 @@ fn get_relevant_test_components(
     }
 }
 
+fn graph_components(
+    config: &ConfigBuilder,
+) -> impl Iterator<Item = (&ComponentKey, Component<'_, String>)> + Clone {
+    let sources = config
+        .sources
+        .iter()
+        .map(|(key, c)| (key, Component::from(c)));
+    let transforms = config
+        .transforms
+        .iter()
+        .map(|(key, c)| (key, Component::from(c)));
+    let sinks = config
+        .sinks
+        .iter()
+        .map(|(key, c)| (key, Component::from(c)));
+
+    sources.chain(transforms).chain(sinks)
+}
+
 async fn build_unit_test(
     metadata: &UnitTestBuildMetadata,
     test: TestDefinition<String>,
@@ -386,9 +405,7 @@ async fn build_unit_test(
 ) -> Result<UnitTest, Vec<String>> {
     let transform_only_config = config_builder.clone();
     let transform_only_graph = Graph::new_unchecked(
-        &transform_only_config.sources,
-        &transform_only_config.transforms,
-        &transform_only_config.sinks,
+        graph_components(&transform_only_config),
         transform_only_config.schema,
         transform_only_config
             .global
@@ -406,9 +423,7 @@ async fn build_unit_test(
     expand_globs(&mut config_builder);
 
     let graph = Graph::new_unchecked(
-        &config_builder.sources,
-        &config_builder.transforms,
-        &config_builder.sinks,
+        graph_components(&config_builder),
         config_builder.schema,
         config_builder.global.wildcard_matching.unwrap_or_default(),
     );
@@ -447,9 +462,7 @@ async fn build_unit_test(
 
     // Sanitize the inputs of all relevant transforms
     let graph = Graph::new_unchecked(
-        &config_builder.sources,
-        &config_builder.transforms,
-        &config_builder.sinks,
+        graph_components(&config_builder),
         config_builder.schema,
         config_builder.global.wildcard_matching.unwrap_or_default(),
     );
