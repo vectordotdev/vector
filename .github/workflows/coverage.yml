@@ -42,6 +42,7 @@ jobs:
       coverage: true
       cli: true
       vector-api: true
+      file_v2: true
 
   integration-tests:
     permissions:

@@ -14,7 +14,11 @@ use vector_lib::{
 
 use crate::sinks::util::path_confinement::ConfineError;
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-file_v2",
+    feature = "sources-kubernetes_logs"
+))]
 pub use self::source::*;
 
 /// Configuration of internal metrics for file-based components.
@@ -69,6 +73,44 @@ impl InternalEvent for FileBytesSent<'_> {
             )
         }
         .increment(self.byte_size as u64);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
+pub struct FileReadError<'a> {
+    pub file: &'a std::path::Path,
+    pub error: std::io::Error,
+    pub include_file_metric_tag: bool,
+}
+
+impl InternalEvent for FileReadError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed reading file.",
+            file = %self.file.display(),
+            error = %self.error,
+            error_code = "reading_file",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        if self.include_file_metric_tag {
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "reading_file",
+                "error_type" => error_type::READER_FAILED,
+                "stage" => error_stage::RECEIVING,
+                "file" => self.file.to_string_lossy().into_owned(),
+            )
+        } else {
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "reading_file",
+                "error_type" => error_type::READER_FAILED,
+                "stage" => error_stage::RECEIVING,
+            )
+        }
+        .increment(1);
     }
 }
 
@@ -138,7 +180,11 @@ impl InternalEvent for FilePathOutsideBaseDirError<'_> {
     }
 }
 
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-file_v2",
+    feature = "sources-kubernetes_logs"
+))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
@@ -152,7 +198,7 @@ mod source {
         json_size::JsonSize,
     };
 
-    use super::{FileOpen, InternalEvent};
+    use super::{FileOpen, FileReadError, InternalEvent};
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileBytesReceived<'a> {
@@ -619,6 +665,14 @@ mod source {
                 file,
                 error,
                 include_file_metric_tag: self.include_file_metric_tag
+            });
+        }
+
+        fn emit_file_read_error(&self, file: &Path, error: Error) {
+            emit!(FileReadError {
+                file,
+                error,
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 

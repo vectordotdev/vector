@@ -79,6 +79,7 @@ jobs:
     with:
       default: true
       component-validation: true
+      file_v2: true
     secrets: inherit
 
   check-scripts:
