@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::{
     fs::{read_to_string, write},
     io::Result,
@@ -12,7 +14,7 @@ fn main() -> Result<()> {
 
     let proto_paths: Vec<_> = glob(&format!("{}/**/*.proto", proto_root.display()))
         .expect("Failed to read glob pattern")
-        .filter_map(|result| result.ok())
+        .filter_map(std::result::Result::ok)
         .collect();
 
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
