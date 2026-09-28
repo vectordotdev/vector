@@ -437,7 +437,7 @@ where
             fp_map.retain(|file_id, watcher| {
                 if watcher.dead() {
                     self.emitter
-                        .emit_file_unwatched(&watcher.path, watcher.reached_eof());
+                        .emit_file_unwatched(&watcher.path, watcher.reached_eof(), None);
                     checkpoints.set_dead(*file_id);
                     false
                 } else {

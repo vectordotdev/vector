@@ -30,7 +30,7 @@ impl FileSourceInternalEvents for Events {
     fn emit_file_watch_error(&self, _: &Path, error: Error) {
         panic!("{error}");
     }
-    fn emit_file_unwatched(&self, _: &Path, _: bool) {}
+    fn emit_file_unwatched(&self, _: &Path, _: bool, _: Option<u64>) {}
     fn emit_file_deleted(&self, _: &Path) {}
     fn emit_file_delete_error(&self, _: &Path, _: Error) {}
     fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {}
