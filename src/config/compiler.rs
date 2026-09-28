@@ -88,6 +88,11 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         }
     };
 
+    if let Err(input_errors) = graph.check_inputs() {
+        errors.extend(input_errors);
+        return Err(errors);
+    }
+
     if let Err(type_errors) = graph.typecheck() {
         errors.extend(type_errors);
     }
@@ -119,9 +124,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             (key, table.with_inputs(inputs))
         })
         .collect();
+    let output_map = graph.input_map().expect("ambiguous outputs");
     let tests = tests
         .into_iter()
-        .map(|test| test.resolve_outputs(&graph))
+        .map(|test| test.resolve_outputs(&output_map))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {

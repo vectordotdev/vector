@@ -33,7 +33,12 @@ pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{OutputId, compiler::expand_globs, graph::Graph, transform::get_transform_output_ids};
+use super::{
+    OutputId,
+    compiler::expand_globs,
+    graph::{Graph, component_output_map},
+    transform::get_transform_output_ids,
+};
 use crate::{
     conditions::Condition,
     config::{
@@ -404,16 +409,9 @@ async fn build_unit_test(
     test: TestDefinition<String>,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
-    let transform_only_config = config_builder.clone();
-    let transform_only_graph = Graph::new_unchecked(
-        graph_components(&transform_only_config),
-        transform_only_config.schema,
-        transform_only_config
-            .global
-            .wildcard_matching
-            .unwrap_or_default(),
-    );
-    let test = test.resolve_outputs(&transform_only_graph)?;
+    let output_map = component_output_map(graph_components(&config_builder), config_builder.schema)
+        .expect("ambiguous outputs");
+    let test = test.resolve_outputs(&output_map)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
@@ -423,11 +421,15 @@ async fn build_unit_test(
     config_builder.sinks = sinks;
     expand_globs(&mut config_builder);
 
-    let graph = Graph::new_unchecked(
+    // Original inputs may reference sources or transforms outside this test.
+    // Inspect the connected paths before pruning those inputs; the final config
+    // build below checks all remaining inputs.
+    let graph = Graph::new(
         graph_components(&config_builder),
         config_builder.schema,
         config_builder.global.wildcard_matching.unwrap_or_default(),
-    );
+    )
+    .expect("ambiguous outputs");
 
     let mut valid_components = get_relevant_test_components(
         config_builder.sources.keys().collect::<Vec<_>>().as_ref(),
@@ -459,12 +461,9 @@ async fn build_unit_test(
         .collect();
 
     // Sanitize the inputs of all relevant transforms
-    let graph = Graph::new_unchecked(
-        graph_components(&config_builder),
-        config_builder.schema,
-        config_builder.global.wildcard_matching.unwrap_or_default(),
-    );
-    let valid_inputs = graph.input_map()?;
+    let valid_inputs =
+        component_output_map(graph_components(&config_builder), config_builder.schema)
+            .expect("ambiguous outputs");
     for (_, transform) in config_builder.transforms.iter_mut() {
         let inputs = std::mem::take(&mut transform.inputs);
         transform.inputs = inputs

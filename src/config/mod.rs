@@ -437,7 +437,7 @@ pub struct TestDefinition<T: 'static = OutputId> {
 impl TestDefinition<String> {
     fn resolve_outputs(
         self,
-        graph: &graph::Graph,
+        output_map: &HashMap<String, OutputId>,
     ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
@@ -447,8 +447,6 @@ impl TestDefinition<String> {
             no_outputs_from,
         } = self;
         let mut errors = Vec::new();
-
-        let output_map = graph.input_map().expect("ambiguous outputs");
 
         let outputs = outputs
             .into_iter()
