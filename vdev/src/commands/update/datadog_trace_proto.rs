@@ -20,7 +20,7 @@ impl Cli {
                 src_rel: "pkg/proto/datadog/trace",
                 tag_pattern: r"^[0-9]+\.[0-9]+\.[0-9]+$",
                 title: "Datadog Agent trace protobufs",
-                command: "update datadog-proto",
+                command: "update datadog-trace-proto",
             },
             self.tag.as_deref(),
         )
