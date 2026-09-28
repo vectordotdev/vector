@@ -15,15 +15,15 @@ use vector_lib::{
 /// Concurrency limit shared by all HTTP and gRPC requests handled by one OTLP source.
 #[derive(Clone)]
 pub(crate) struct RequestControl {
-    semaphore: Arc<Semaphore>,
-    timeout: Duration,
+    semaphore: Option<Arc<Semaphore>>,
+    timeout: Option<Duration>,
     metrics: Arc<RequestControlMetrics>,
 }
 
 impl RequestControl {
-    pub(crate) fn new(concurrency_limit: usize, timeout: Duration) -> Self {
+    pub(crate) fn new(concurrency_limit: Option<usize>, timeout: Option<Duration>) -> Self {
         Self {
-            semaphore: Arc::new(Semaphore::new(concurrency_limit)),
+            semaphore: concurrency_limit.map(|limit| Arc::new(Semaphore::new(limit))),
             timeout,
             metrics: Arc::new(RequestControlMetrics::new(concurrency_limit)),
         }
@@ -40,8 +40,14 @@ impl RequestControl {
     fn layer<R>(&self, error_response: R, protocol: &'static str) -> RequestControlLayer<R> {
         RequestControlLayer {
             control: self.clone(),
-            timed_out: counter!(CounterName::ComponentTimedOutRequestsTotal, "protocol" => protocol),
-            load_shed: counter!(CounterName::ComponentLoadShedRequestsTotal, "protocol" => protocol),
+            timed_out: self.timeout.map_or_else(
+                Counter::noop,
+                |_| counter!(CounterName::ComponentTimedOutRequestsTotal, "protocol" => protocol),
+            ),
+            load_shed: self.semaphore.as_ref().map_or_else(
+                Counter::noop,
+                |_| counter!(CounterName::ComponentLoadShedRequestsTotal, "protocol" => protocol),
+            ),
             error_response,
         }
     }
@@ -70,14 +76,17 @@ struct RequestControlMetrics {
         dead_code,
         reason = "retain the concurrency limit gauge handle for the controller lifetime"
     )]
-    concurrency_limit: Gauge,
+    concurrency_limit: Option<Gauge>,
 }
 
 impl RequestControlMetrics {
     #[expect(clippy::cast_precision_loss)]
-    fn new(concurrency_limit: usize) -> Self {
-        let concurrency_limit_gauge = gauge!(GaugeName::ComponentRequestConcurrencyLimit);
-        concurrency_limit_gauge.set(concurrency_limit as f64);
+    fn new(concurrency_limit: Option<usize>) -> Self {
+        let concurrency_limit_gauge = concurrency_limit.map(|limit| {
+            let gauge = gauge!(GaugeName::ComponentRequestConcurrencyLimit);
+            gauge.set(limit as f64);
+            gauge
+        });
 
         Self {
             active_level: gauge!(GaugeName::ComponentRequestActive),
@@ -167,16 +176,19 @@ where
     type Service = BoxCloneService<Request<Body>, Response<B>, Infallible>;
 
     fn layer(&self, service: S) -> Self::Service {
-        // Acquire shared capacity immediately, reject requests when none is available, and release
-        // the permit before finalizing the acknowledgement without a timeout.
+        // Enforce configured controls independently. Release any permit before finalizing the
+        // acknowledgement, which is never subject to the request processing timeout.
         let control = self.control.clone();
         let timeout = control.timeout;
         let timed_out = self.timed_out.clone();
         let load_shed = self.load_shed.clone();
         let error_response = self.error_response.clone();
         let service = service_fn(move |request: Request<Body>| {
-            let admitted = Arc::clone(&control.semaphore)
-                .try_acquire_owned()
+            let admitted = control
+                .semaphore
+                .as_ref()
+                .map(|semaphore| Arc::clone(semaphore).try_acquire_owned())
+                .transpose()
                 .map(|permit| (permit, control.metrics.active_token(), service.clone()))
                 .map_err(|_| {
                     load_shed.increment(1);
@@ -188,7 +200,12 @@ where
             async move {
                 let response = match admitted {
                     Ok((_permit, _active, service)) => {
-                        match tokio::time::timeout(timeout, service.oneshot(request)).await {
+                        let processing = service.oneshot(request);
+                        let result = match timeout {
+                            Some(timeout) => tokio::time::timeout(timeout, processing).await,
+                            None => Ok(processing.await),
+                        };
+                        match result {
                             Ok(Ok(response)) => response,
                             Ok(Err(error)) => {
                                 error!(message = "OTLP request middleware failed.", %error);
@@ -296,10 +313,150 @@ mod tests {
         }
     }
 
+    fn assert_metric_absent(name: &str) {
+        assert!(
+            vector_lib::metrics::Controller::get()
+                .unwrap()
+                .capture_metrics()
+                .iter()
+                .all(|metric| metric.name() != name),
+            "disabled control must not register {name}"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn omitted_controls_allow_concurrent_requests_without_timeout() {
+        init_metrics();
+        let control = RequestControl::new(None, None);
+        assert!(control.semaphore.is_none());
+        let gate = Arc::new(Semaphore::new(0));
+        let http = control
+            .http_layer(http_error_response)
+            .layer(gate_service(Arc::clone(&gate), || {
+                Response::new(Body::empty())
+            }));
+        let grpc = control
+            .grpc_layer(grpc_error_response)
+            .layer(gate_service(Arc::clone(&gate), || {
+                tonic::Status::new(tonic::Code::Ok, "").to_http()
+            }));
+        // Exceed the old default of 100 requests, and keep them pending beyond 30 seconds.
+        let mut requests = Vec::new();
+        for _ in 0..101 {
+            let mut request = Box::pin(http.clone().oneshot(Request::new(Body::empty())));
+            assert!(futures::poll!(&mut request).is_pending());
+            requests.push(request);
+        }
+        let mut grpc_request = Box::pin(grpc.oneshot(Request::new(Body::empty())));
+        assert!(futures::poll!(&mut grpc_request).is_pending());
+        tokio::time::advance(Duration::from_secs(60)).await;
+        for request in &mut requests {
+            assert!(futures::poll!(request).is_pending());
+        }
+        assert!(futures::poll!(&mut grpc_request).is_pending());
+        assert_eq!(active_requests(), 102.0);
+        assert_metric_absent(GaugeName::ComponentRequestConcurrencyLimit.as_str());
+        assert_metric_absent(CounterName::ComponentTimedOutRequestsTotal.as_str());
+        assert_metric_absent(CounterName::ComponentLoadShedRequestsTotal.as_str());
+        gate.add_permits(1);
+        for request in requests {
+            assert_eq!(request.await.unwrap().status(), StatusCode::OK);
+        }
+        assert_eq!(grpc_request.await.unwrap().headers()["grpc-status"], "0");
+        assert_eq!(active_requests(), 0.0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn concurrency_limit_without_timeout() {
+        init_metrics();
+        let control = RequestControl::new(Some(1), None);
+        let gate = Arc::new(Semaphore::new(0));
+        let http = control
+            .http_layer(http_error_response)
+            .layer(gate_service(Arc::clone(&gate), || {
+                Response::new(Body::empty())
+            }));
+        let grpc = control
+            .grpc_layer(grpc_error_response)
+            .layer(gate_service(Arc::clone(&gate), || {
+                tonic::Status::new(tonic::Code::Ok, "").to_http()
+            }));
+        let mut request = Box::pin(grpc.oneshot(Request::new(Body::empty())));
+        assert!(futures::poll!(&mut request).is_pending());
+        tokio::time::advance(Duration::from_secs(60)).await;
+        assert!(futures::poll!(&mut request).is_pending());
+        assert_eq!(active_requests(), 1.0);
+        let rejected = http
+            .clone()
+            .oneshot(Request::new(Body::empty()))
+            .await
+            .unwrap();
+        assert_eq!(rejected.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            counter_value(CounterName::ComponentLoadShedRequestsTotal, "http"),
+            1.0
+        );
+        assert_metric_absent(CounterName::ComponentTimedOutRequestsTotal.as_str());
+        drop(request);
+        assert_eq!(active_requests(), 0.0);
+        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
+        gate.add_permits(1);
+        assert_eq!(
+            http.oneshot(Request::new(Body::empty()))
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::OK
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn timeout_without_concurrency_limit() {
+        init_metrics();
+        let control = RequestControl::new(None, Some(Duration::from_secs(1)));
+        assert!(control.semaphore.is_none());
+        let http = control
+            .http_layer(http_error_response)
+            .layer(UnreadyService);
+        let grpc = control
+            .grpc_layer(grpc_error_response)
+            .layer(service_fn(|_: Request<Body>| {
+                pending::<Result<Response<BoxBody>, Infallible>>()
+            }));
+        let mut first = Box::pin(http.clone().oneshot(Request::new(Body::empty())));
+        let mut second = Box::pin(http.oneshot(Request::new(Body::empty())));
+        let mut third = Box::pin(grpc.oneshot(Request::new(Body::empty())));
+        assert!(futures::poll!(&mut first).is_pending());
+        assert!(futures::poll!(&mut second).is_pending());
+        assert!(futures::poll!(&mut third).is_pending());
+        assert_eq!(active_requests(), 3.0);
+        tokio::time::advance(Duration::from_secs(2)).await;
+        assert_eq!(
+            first.await.unwrap().status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            second.await.unwrap().status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(third.await.unwrap().headers()["grpc-status"], "14");
+        assert_eq!(active_requests(), 0.0);
+        assert_eq!(
+            counter_value(CounterName::ComponentTimedOutRequestsTotal, "http"),
+            2.0
+        );
+        assert_eq!(
+            counter_value(CounterName::ComponentTimedOutRequestsTotal, "grpc"),
+            1.0
+        );
+        assert_metric_absent(GaugeName::ComponentRequestConcurrencyLimit.as_str());
+        assert_metric_absent(CounterName::ComponentLoadShedRequestsTotal.as_str());
+    }
+
     #[tokio::test]
     async fn processing_error_releases_capacity() {
         init_metrics();
-        let control = RequestControl::new(1, Duration::from_secs(5));
+        let control = RequestControl::new(Some(1), Some(Duration::from_secs(5)));
         let service =
             control
                 .http_layer(http_error_response)
@@ -311,14 +468,14 @@ mod tests {
 
         let response = service.oneshot(Request::new(Body::empty())).await.unwrap();
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        assert_eq!(control.semaphore.available_permits(), 1);
+        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
         assert_eq!(active_requests(), 0.0);
     }
 
     #[tokio::test]
     async fn http_and_grpc_share_capacity() {
         init_metrics();
-        let control = RequestControl::new(1, Duration::from_secs(5));
+        let control = RequestControl::new(Some(1), Some(Duration::from_secs(5)));
         let gate = Arc::new(Semaphore::new(0));
         let mut http = control
             .http_layer(http_error_response)
@@ -334,7 +491,7 @@ mod tests {
         // Idle connections must not reserve capacity by polling readiness.
         http.ready().await.unwrap();
         grpc.ready().await.unwrap();
-        assert_eq!(control.semaphore.available_permits(), 1);
+        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
         assert_eq!(active_requests(), 0.0);
 
         let mut processing = Box::pin(http.clone().oneshot(Request::new(Body::empty())));
@@ -367,7 +524,7 @@ mod tests {
         gate.add_permits(1);
         assert_eq!(processing.await.unwrap().status(), StatusCode::OK);
         assert_eq!(active_requests(), 0.0);
-        assert_eq!(control.semaphore.available_permits(), 1);
+        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
         let response = grpc.oneshot(Request::new(Body::empty())).await.unwrap();
         assert_eq!(response.headers()["grpc-status"], "0");
     }
@@ -375,7 +532,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn timeout_and_cancellation_release_capacity() {
         init_metrics();
-        let control = RequestControl::new(1, Duration::from_millis(20));
+        let control = RequestControl::new(Some(1), Some(Duration::from_millis(20)));
         let service =
             control
                 .http_layer(http_error_response)
@@ -398,21 +555,21 @@ mod tests {
             counter_value(CounterName::ComponentTimedOutRequestsTotal, "http"),
             1.0
         );
-        assert_eq!(control.semaphore.available_permits(), 1);
+        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
         assert_eq!(active_requests(), 0.0);
 
         let mut request = Box::pin(service.oneshot(Request::new(Body::empty())));
         assert!(futures::poll!(&mut request).is_pending());
         assert_eq!(active_requests(), 1.0);
         drop(request);
-        assert_eq!(control.semaphore.available_permits(), 1);
+        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
         assert_eq!(active_requests(), 0.0);
     }
 
     #[tokio::test(start_paused = true)]
     async fn timeout_includes_waiting_for_readiness() {
         init_metrics();
-        let control = RequestControl::new(1, Duration::from_secs(1));
+        let control = RequestControl::new(Some(1), Some(Duration::from_secs(1)));
         let service = control
             .http_layer(http_error_response)
             .layer(UnreadyService);
@@ -427,7 +584,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        assert_eq!(control.semaphore.available_permits(), 1);
+        assert_eq!(control.semaphore.as_ref().unwrap().available_permits(), 1);
         assert_eq!(active_requests(), 0.0);
         assert_eq!(
             counter_value(CounterName::ComponentTimedOutRequestsTotal, "http"),
@@ -438,7 +595,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn grpc_timeout_is_counted() {
         init_metrics();
-        let control = RequestControl::new(1, Duration::from_secs(1));
+        let control = RequestControl::new(Some(1), Some(Duration::from_secs(1)));
         let service =
             control
                 .grpc_layer(grpc_error_response)

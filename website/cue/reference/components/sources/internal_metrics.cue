@@ -71,7 +71,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		component_request_concurrency_limit: {
-			description:       "The maximum number of requests that can be processed concurrently by this component."
+			description:       "The maximum number of requests that can be processed concurrently by this component. The OpenTelemetry source emits this metric only when `max_concurrent_requests` is configured."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -107,13 +107,13 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		component_timed_out_requests_total: {
-			description:       "The total number of requests for which this source responded with a timeout error."
+			description:       "The total number of requests for which this source responded with a timeout error. The OpenTelemetry source emits this metric only when `request_timeout_secs` is configured."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _request_tags
 		}
 		component_load_shed_requests_total: {
-			description:       "The total number of requests rejected because the component's request concurrency limit was reached."
+			description:       "The total number of requests rejected because the component's request concurrency limit was reached. The OpenTelemetry source emits this metric only when `max_concurrent_requests` is configured."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _request_tags

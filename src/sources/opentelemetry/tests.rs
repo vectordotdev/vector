@@ -212,15 +212,43 @@ fn generate_config() {
 fn admission_config_defaults_and_rejects_invalid_values() {
     let yaml = "grpc:\n  address: 0.0.0.0:4317\nhttp:\n  address: 0.0.0.0:4318\n";
     let config: OpentelemetryConfig = serde_yaml::from_str(yaml).unwrap();
-    assert_eq!(config.max_concurrent_requests.get(), 100);
-    assert_eq!(config.request_timeout_secs.as_secs(), 30);
+    assert_eq!(config.max_concurrent_requests, None);
+    assert_eq!(config.request_timeout_secs, None);
+    let serialized = serde_json::to_value(&config).unwrap();
+    assert!(serialized.get("max_concurrent_requests").is_none());
+    assert!(serialized.get("request_timeout_secs").is_none());
 
     let configured: OpentelemetryConfig = serde_yaml::from_str(&format!(
         "{yaml}max_concurrent_requests: 7\nrequest_timeout_secs: 11\n"
     ))
     .unwrap();
-    assert_eq!(configured.max_concurrent_requests.get(), 7);
-    assert_eq!(configured.request_timeout_secs.as_secs(), 11);
+    assert_eq!(configured.max_concurrent_requests.unwrap().get(), 7);
+    assert_eq!(configured.request_timeout_secs, Some(11));
+    let round_trip: OpentelemetryConfig =
+        serde_json::from_value(serde_json::to_value(&configured).unwrap()).unwrap();
+    assert_eq!(
+        round_trip.max_concurrent_requests,
+        configured.max_concurrent_requests
+    );
+    assert_eq!(
+        round_trip.request_timeout_secs,
+        configured.request_timeout_secs
+    );
+
+    let limit_only: OpentelemetryConfig =
+        serde_yaml::from_str(&format!("{yaml}max_concurrent_requests: 7\n")).unwrap();
+    assert_eq!(limit_only.max_concurrent_requests.unwrap().get(), 7);
+    assert_eq!(limit_only.request_timeout_secs, None);
+    let timeout_only: OpentelemetryConfig =
+        serde_yaml::from_str(&format!("{yaml}request_timeout_secs: 11\n")).unwrap();
+    assert_eq!(timeout_only.max_concurrent_requests, None);
+    assert_eq!(timeout_only.request_timeout_secs, Some(11));
+    let nulls: OpentelemetryConfig = serde_yaml::from_str(&format!(
+        "{yaml}max_concurrent_requests: null\nrequest_timeout_secs: null\n"
+    ))
+    .unwrap();
+    assert_eq!(nulls.max_concurrent_requests, None);
+    assert_eq!(nulls.request_timeout_secs, None);
 
     for limit in [0, Semaphore::MAX_PERMITS + 1] {
         let yaml = format!("{yaml}max_concurrent_requests: {limit}\n");
@@ -254,12 +282,20 @@ fn config_grpc_keepalive() {
 
 #[tokio::test]
 async fn http_and_grpc_acknowledgement_waits_do_not_hold_admission_or_time_out() {
+    for concurrency_limit in [None, Some(1)] {
+        for timeout in [None, Some(1)] {
+            check_acknowledgement_waits(concurrency_limit, timeout).await;
+        }
+    }
+}
+
+async fn check_acknowledgement_waits(concurrency_limit: Option<usize>, timeout: Option<u64>) {
     let (_guard_0, grpc_addr) = next_addr();
     let (_guard_1, http_addr) = next_addr();
     let mut config = get_source_config_with_headers(grpc_addr, http_addr, false);
     config.acknowledgements = true.into();
-    config.max_concurrent_requests = 1.try_into().unwrap();
-    config.request_timeout_secs = std::time::Duration::from_secs(1);
+    config.max_concurrent_requests = concurrency_limit.map(|limit| limit.try_into().unwrap());
+    config.request_timeout_secs = timeout;
 
     let (sender, mut output) = new_unacknowledged_logs_source(&config);
     let server = config
@@ -1403,8 +1439,8 @@ fn get_source_config_with_headers(
             ],
         },
         acknowledgements: Default::default(),
-        max_concurrent_requests: 100.try_into().unwrap(),
-        request_timeout_secs: std::time::Duration::from_secs(30),
+        max_concurrent_requests: None,
+        request_timeout_secs: None,
         log_namespace: Default::default(),
         use_otlp_decoding: use_otlp_decoding.into(),
     }
@@ -1787,8 +1823,8 @@ async fn build_otlp_test_env_with(
             headers: Default::default(),
         },
         acknowledgements: Default::default(),
-        max_concurrent_requests: 100.try_into().unwrap(),
-        request_timeout_secs: std::time::Duration::from_secs(30),
+        max_concurrent_requests: None,
+        request_timeout_secs: None,
         log_namespace,
         use_otlp_decoding: use_otlp_decoding.into(),
     };
@@ -1886,8 +1922,8 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
             headers: Default::default(),
         },
         acknowledgements: Default::default(),
-        max_concurrent_requests: 100.try_into().unwrap(),
-        request_timeout_secs: std::time::Duration::from_secs(30),
+        max_concurrent_requests: None,
+        request_timeout_secs: None,
         log_namespace: None,
         use_otlp_decoding: true.into(),
     };
@@ -2115,8 +2151,8 @@ mod otlp_decoding_config_tests {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
-            max_concurrent_requests: 100.try_into().unwrap(),
-            request_timeout_secs: std::time::Duration::from_secs(30),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: true,
@@ -2158,8 +2194,8 @@ mod otlp_decoding_config_tests {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
-            max_concurrent_requests: 100.try_into().unwrap(),
-            request_timeout_secs: std::time::Duration::from_secs(30),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,
@@ -2204,8 +2240,8 @@ mod otlp_decoding_config_tests {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
-            max_concurrent_requests: 100.try_into().unwrap(),
-            request_timeout_secs: std::time::Duration::from_secs(30),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,

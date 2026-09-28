@@ -3,6 +3,6 @@ gRPC endpoints. The new `max_concurrent_requests` and `request_timeout_secs` opt
 requests immediately, return retryable responses when admitted requests cannot be handled in time,
 and expose active-request, concurrency-limit, timeout, and load-shedding metrics. The
 `component_load_shed_requests_total` counter tracks requests rejected at the concurrency limit,
-with a `protocol` label identifying HTTP or gRPC.
+with a `protocol` label identifying HTTP or gRPC. Both options are disabled when omitted.
 
 authors: ArunPiduguDD
