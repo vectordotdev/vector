@@ -408,8 +408,7 @@ async fn build_unit_test(
         graph_components(&config_builder),
         config_builder.schema,
         config_builder.global.wildcard_matching.unwrap_or_default(),
-    )
-    .expect("ambiguous outputs");
+    )?;
     let output_map = graph.output_map()?;
     let test = test.resolve_outputs(&output_map)?;
 
@@ -428,8 +427,7 @@ async fn build_unit_test(
         graph_components(&config_builder),
         config_builder.schema,
         config_builder.global.wildcard_matching.unwrap_or_default(),
-    )
-    .expect("ambiguous outputs");
+    )?;
 
     let mut valid_components = get_relevant_test_components(
         config_builder.sources.keys().collect::<Vec<_>>().as_ref(),
@@ -465,8 +463,7 @@ async fn build_unit_test(
         graph_components(&config_builder),
         config_builder.schema,
         config_builder.global.wildcard_matching.unwrap_or_default(),
-    )
-    .expect("ambiguous outputs");
+    )?;
     let valid_outputs = graph.output_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {
         let inputs = std::mem::take(&mut transform.inputs);
