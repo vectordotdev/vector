@@ -201,29 +201,22 @@ impl Config {
     /// Enrichment tables retain their configured identity here. Their derived
     /// sources and sinks are expanded separately when building the topology.
     pub fn components(&self) -> impl Iterator<Item = (&ComponentKey, Component<'_>)> {
-        self.sources()
-            .map(|(key, source)| (key, Component::Source(source)))
-            .chain(
-                self.transforms()
-                    .map(|(key, transform)| (key, Component::Transform(transform))),
-            )
-            .chain(self.sinks().map(|(key, sink)| (key, Component::Sink(sink))))
-            .chain(
-                self.enrichment_tables()
-                    .map(|(key, table)| (key, Component::EnrichmentTable(table))),
-            )
+        let sources = self.sources().map(|(key, c)| (key, Component::from(c)));
+        let transforms = self.transforms().map(|(key, c)| (key, Component::from(c)));
+        let sinks = self.sinks().map(|(key, c)| (key, Component::from(c)));
+        let tables = self
+            .enrichment_tables()
+            .map(|(key, c)| (key, Component::from(c)));
+
+        sources.chain(transforms).chain(sinks).chain(tables)
     }
 
     pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
         self.transforms
             .get(id)
-            .map(Component::Transform)
-            .or_else(|| self.sinks.get(id).map(Component::Sink))
-            .or_else(|| {
-                self.enrichment_tables
-                    .get(id)
-                    .map(Component::EnrichmentTable)
-            })
+            .map(Component::from)
+            .or_else(|| self.sinks.get(id).map(Component::from))
+            .or_else(|| self.enrichment_tables.get(id).map(Component::from))
             .and_then(|component| component.inputs())
     }
 

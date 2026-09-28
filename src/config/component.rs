@@ -24,6 +24,42 @@ where
     EnrichmentTable(&'a EnrichmentTableOuter<T>),
 }
 
+impl<'a, T> From<&'a SourceOuter> for Component<'a, T>
+where
+    T: Configurable + Serialize + ToValue + Clone + 'static,
+{
+    fn from(config: &'a SourceOuter) -> Self {
+        Self::Source(config)
+    }
+}
+
+impl<'a, T> From<&'a TransformOuter<T>> for Component<'a, T>
+where
+    T: Configurable + Serialize + ToValue + Clone + 'static,
+{
+    fn from(config: &'a TransformOuter<T>) -> Self {
+        Self::Transform(config)
+    }
+}
+
+impl<'a, T> From<&'a SinkOuter<T>> for Component<'a, T>
+where
+    T: Configurable + Serialize + ToValue + Clone + 'static,
+{
+    fn from(config: &'a SinkOuter<T>) -> Self {
+        Self::Sink(config)
+    }
+}
+
+impl<'a, T> From<&'a EnrichmentTableOuter<T>> for Component<'a, T>
+where
+    T: Configurable + Serialize + ToValue + Clone + 'static,
+{
+    fn from(config: &'a EnrichmentTableOuter<T>) -> Self {
+        Self::EnrichmentTable(config)
+    }
+}
+
 impl<'a, T> Component<'a, T>
 where
     T: Configurable + Serialize + ToValue + Clone + 'static,

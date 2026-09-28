@@ -172,15 +172,11 @@ impl Graph {
         let mut errors = Vec::new();
 
         let components = || {
-            sources
-                .iter()
-                .map(|(id, source)| (id, Component::Source(source)))
-                .chain(
-                    transforms
-                        .iter()
-                        .map(|(id, transform)| (id, Component::Transform(transform))),
-                )
-                .chain(sinks.iter().map(|(id, sink)| (id, Component::Sink(sink))))
+            let sources = sources.iter().map(|(id, c)| (id, Component::from(c)));
+            let transforms = transforms.iter().map(|(id, c)| (id, Component::from(c)));
+            let sinks = sinks.iter().map(|(id, c)| (id, Component::from(c)));
+
+            sources.chain(transforms).chain(sinks)
         };
 
         // Derive each node from its component before resolving any connections.
