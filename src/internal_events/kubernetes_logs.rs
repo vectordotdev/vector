@@ -14,13 +14,6 @@ use crate::event::Event;
 pub struct KubernetesLogsEventsReceived<'a> {
     pub file: &'a str,
     pub byte_size: JsonSize,
-    pub pod_info: Option<KubernetesLogsPodInfo>,
-}
-
-#[derive(Debug)]
-pub struct KubernetesLogsPodInfo {
-    pub name: String,
-    pub namespace: String,
 }
 
 impl InternalEvent for KubernetesLogsEventsReceived<'_> {
@@ -31,30 +24,6 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
             byte_size = %self.byte_size,
             file = %self.file,
         );
-        match self.pod_info {
-            Some(pod_info) => {
-                let pod_name = pod_info.name;
-                let pod_namespace = pod_info.namespace;
-
-                counter!(
-                    CounterName::ComponentReceivedEventsTotal,
-                    "pod_name" => pod_name.clone(),
-                    "pod_namespace" => pod_namespace.clone(),
-                )
-                .increment(1);
-                counter!(
-                    CounterName::ComponentReceivedEventBytesTotal,
-                    "pod_name" => pod_name,
-                    "pod_namespace" => pod_namespace,
-                )
-                .increment(self.byte_size.get() as u64);
-            }
-            None => {
-                counter!(CounterName::ComponentReceivedEventsTotal).increment(1);
-                counter!(CounterName::ComponentReceivedEventBytesTotal)
-                    .increment(self.byte_size.get() as u64);
-            }
-        }
     }
 }
 

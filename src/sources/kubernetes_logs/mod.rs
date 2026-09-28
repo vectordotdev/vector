@@ -4,7 +4,7 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-use std::{cmp::min, path::PathBuf, time::Duration};
+use std::{cmp::min, collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -32,7 +32,8 @@ use vector_lib::{
     file_source_common::{
         Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
     },
-    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    counter,
+    internal_event::{ByteSize, BytesReceived, CounterName, InternalEventHandle as _, Protocol},
     lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
 use vrl::value::{Kind, kind::Collection};
@@ -48,8 +49,7 @@ use crate::{
     internal_events::{
         FileInternalMetricsConfig, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
-        KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
-        KubernetesLogsPodInfo, StreamClosedError,
+        KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived, StreamClosedError,
     },
     kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
@@ -77,6 +77,93 @@ use self::{
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
+
+/// Upper bound on the number of pods whose counters are cached. Nodes rarely host more
+/// pods than this, and the cache is cheap to rebuild.
+const MAX_CACHED_PODS: usize = 10_000;
+
+/// Counter handles for `component_received_events_total` and
+/// `component_received_event_bytes_total`.
+///
+/// Both counters are labeled with the pod name and namespace. Building them for every log
+/// line rebuilds the metric key and its labels for every event, which is a large amount of
+/// short-lived allocation on a busy node, so one handle per pod is cached instead.
+struct PodCounters {
+    events: metrics::Counter,
+    bytes: metrics::Counter,
+}
+
+impl PodCounters {
+    fn labeled(pod_name: &str, pod_namespace: &str) -> Self {
+        Self {
+            events: counter!(
+                CounterName::ComponentReceivedEventsTotal,
+                "pod_name" => pod_name.to_owned(),
+                "pod_namespace" => pod_namespace.to_owned(),
+            ),
+            bytes: counter!(
+                CounterName::ComponentReceivedEventBytesTotal,
+                "pod_name" => pod_name.to_owned(),
+                "pod_namespace" => pod_namespace.to_owned(),
+            ),
+        }
+    }
+
+    fn unlabeled() -> Self {
+        Self {
+            events: counter!(CounterName::ComponentReceivedEventsTotal),
+            bytes: counter!(CounterName::ComponentReceivedEventBytesTotal),
+        }
+    }
+
+    fn increment(&self, bytes: u64) {
+        self.events.increment(1);
+        self.bytes.increment(bytes);
+    }
+}
+
+/// Cache of [`PodCounters`], keyed by namespace and then by pod name.
+#[derive(Default)]
+struct PodCountersCache {
+    unlabeled: Option<PodCounters>,
+    by_namespace: HashMap<Arc<str>, HashMap<Arc<str>, PodCounters>>,
+    cached_pods: usize,
+}
+
+impl PodCountersCache {
+    /// Increment the received-events counters for `pod`, or for the component as a whole
+    /// when the pod metadata is not available.
+    fn increment(&mut self, pod: Option<(&str, &str)>, bytes: u64) {
+        let Some((pod_name, pod_namespace)) = pod else {
+            self.unlabeled
+                .get_or_insert_with(PodCounters::unlabeled)
+                .increment(bytes);
+            return;
+        };
+
+        if let Some(counters) = self
+            .by_namespace
+            .get(pod_namespace)
+            .and_then(|by_name| by_name.get(pod_name))
+        {
+            counters.increment(bytes);
+            return;
+        }
+
+        if self.cached_pods >= MAX_CACHED_PODS {
+            self.by_namespace.clear();
+            self.cached_pods = 0;
+        }
+
+        let counters = PodCounters::labeled(pod_name, pod_namespace);
+        counters.increment(bytes);
+        self.by_namespace
+            .entry(Arc::from(pod_namespace))
+            .or_default()
+            .insert(Arc::from(pod_name), counters);
+        self.cached_pods += 1;
+    }
+}
 
 /// Configuration for the `kubernetes_logs` source.
 #[serde_as]
@@ -905,6 +992,7 @@ impl Source {
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+        let mut pod_counters = PodCountersCache::default();
         let events = events.map(move |line| {
             let byte_size = line.text.len();
             bytes_received.emit(ByteSize(byte_size));
@@ -918,13 +1006,17 @@ impl Source {
 
             let file_info = annotator.annotate(&mut event, &line.filename);
 
+            let event_json_size = event.estimated_json_encoded_size_of();
+            pod_counters.increment(
+                file_info
+                    .as_ref()
+                    .map(|info| (info.pod_name, info.pod_namespace)),
+                event_json_size.get() as u64,
+            );
+
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
-                byte_size: event.estimated_json_encoded_size_of(),
-                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
-                    name: info.pod_name.to_owned(),
-                    namespace: info.pod_namespace.to_owned(),
-                }),
+                byte_size: event_json_size,
             });
 
             if file_info.is_none() {
