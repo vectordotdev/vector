@@ -116,6 +116,8 @@ fn version_of(tag: &str) -> Result<Version> {
     Version::parse(bare).with_context(|| format!("release tag {tag} is not a semantic version"))
 }
 
+// `{:?}` quotes and escapes paths. Clippy prefers `Path::display`, which does neither.
+#[expect(clippy::unnecessary_debug_formatting)]
 fn copy_existing_files(source_root: &Path, dest_root: &Path) -> Result<()> {
     let mut prepared = Vec::new();
     let mut failures = Vec::new();
@@ -136,15 +138,14 @@ fn copy_existing_files(source_root: &Path, dest_root: &Path) -> Result<()> {
         failures.sort_by(|(left, _), (right, _)| left.cmp(right));
         let detail = failures
             .iter()
-            .map(|(path, error)| format!("{}: {error}", path.display()))
+            .map(|(path, error)| format!("{path:?}: {error}"))
             .collect::<Vec<_>>()
             .join("\n");
         bail!("Could not read vendored files:\n{detail}");
     }
     for (dest, contents) in prepared {
-        info!("Updating {}", dest.display());
-        fs::write(&dest, contents)
-            .with_context(|| format!("Could not write {}", dest.display()))?;
+        info!("Updating {dest:?}");
+        fs::write(&dest, contents).with_context(|| format!("Could not write {dest:?}"))?;
     }
     Ok(())
 }
@@ -167,12 +168,13 @@ fn warn_new_files(source_root: &Path, dest_root: &Path) -> Result<()> {
             continue;
         };
         if components.next().is_some() && !dest_root.join(dir).is_dir() {
-            if warned_dirs.insert(PathBuf::from(dir.as_os_str())) {
-                warn!("{} is not vendored", Path::new(dir.as_os_str()).display());
+            let dir = Path::new(dir.as_os_str());
+            if warned_dirs.insert(dir.to_path_buf()) {
+                warn!("{dir:?} is not vendored");
             }
             continue;
         }
-        warn!("{} is not vendored", relative.display());
+        warn!("{relative:?} is not vendored");
     }
     Ok(())
 }
