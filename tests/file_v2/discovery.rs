@@ -42,18 +42,12 @@ async fn configured_fingerprint_waits_for_the_full_prefix() -> vector::Result<()
         "*.log",
         json!({"fingerprint": {"strategy": "checksum", "bytes": 8}}),
     )?;
-    run.wait_for("small file is not opened", |seen| {
-        seen.open_files == Some(0.0)
-    })
-    .await?;
+    run.wait_open_files(0).await?;
     assert!(run.observed.messages.is_empty());
     let appended = vec!["abc".to_owned()];
     fixture.append("small.log", &appended)?;
-    run.wait_count(2).await?;
-    assert_eq!(
-        run.stop(Signal::SIGTERM).await?.messages,
-        [initial, appended].concat()
-    );
+    run.finish_with_messages(&[initial, appended].concat())
+        .await?;
     Ok(())
 }
 
@@ -69,9 +63,7 @@ async fn discovers_files_before_and_after_startup() -> vector::Result<()> {
     run.wait_count(2).await?;
     std::fs::create_dir(fixture.input.join("new-directory"))?;
     fixture.write("new-directory/new.log", &expected[2..])?;
-    run.wait_count(3).await?;
-    let seen = run.stop(Signal::SIGTERM).await?;
-    assert_eq!(seen.messages, expected);
+    let seen = run.finish_with_messages(&expected).await?;
     assert_eq!(seen.received_events, 3.0);
     Ok(())
 }
@@ -80,14 +72,10 @@ async fn discovers_files_before_and_after_startup() -> vector::Result<()> {
 async fn discovers_files_when_watch_directory_is_created_later() -> vector::Result<()> {
     let fixture = Fixture::new()?;
     let mut run = fixture.start("missing/*.log", json!({}))?;
-    run.wait_for("empty source readiness", |seen| {
-        seen.open_files == Some(0.0)
-    })
-    .await?;
+    run.wait_open_files(0).await?;
     std::fs::create_dir(fixture.input.join("missing"))?;
     let expected = records("late-directory", 3);
     fixture.write("missing/new.log", &expected)?;
-    run.wait_count(expected.len()).await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
+    run.finish_with_messages(&expected).await?;
     Ok(())
 }

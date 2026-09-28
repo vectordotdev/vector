@@ -11,8 +11,7 @@ async fn deletion_retains_small_files_until_they_can_be_fingerprinted() -> vecto
     fixture.write("small.log", &["small record".to_owned()])?;
     let path = fixture.input.join("small.log");
     let mut run = fixture.start("*.log", json!({"remove_after_secs": 1}))?;
-    run.wait_for("source readiness", |seen| seen.open_files == Some(0.0))
-        .await?;
+    run.wait_open_files(0).await?;
     tokio::time::sleep(Duration::from_secs(2)).await;
     assert!(path.exists(), "unread file was deleted");
     assert!(run.stop(Signal::SIGTERM).await?.messages.is_empty());
@@ -27,7 +26,7 @@ async fn deletion_retains_small_files_until_they_can_be_fingerprinted() -> vecto
     run.wait_count(1).await?;
     run.wait_for("acknowledged file deletion", |_| !path.exists())
         .await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, ["small record"]);
+    run.finish_with_messages(&["small record"]).await?;
     Ok(())
 }
 
@@ -49,10 +48,8 @@ async fn deletion_retains_unfinished_lines() -> vector::Result<()> {
     run.wait_count(2).await?;
     run.wait_for("completed file deletion", |_| !path.exists())
         .await?;
-    assert_eq!(
-        run.stop(Signal::SIGTERM).await?.messages,
-        ["first", "unfinished completed"]
-    );
+    run.finish_with_messages(&["first", "unfinished completed"])
+        .await?;
     Ok(())
 }
 
@@ -72,14 +69,13 @@ async fn deletion_waits_for_multiline_flush() -> vector::Result<()> {
             }
         }),
     )?;
-    run.wait_for("open file", |seen| seen.open_files == Some(1.0))
-        .await?;
+    run.wait_open_files(1).await?;
     tokio::time::sleep(Duration::from_secs(2)).await;
     assert!(path.exists(), "deleted before multiline flush");
     run.wait_count(1).await?;
     run.wait_for("flushed file deletion", |_| !path.exists())
         .await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, ["INFO pending"]);
+    run.finish_with_messages(&["INFO pending"]).await?;
     Ok(())
 }
 
@@ -106,7 +102,7 @@ async fn terminal_oversized_record_allows_checkpoint_and_deletion() -> vector::R
         run.wait_count(1).await?;
         run.wait_for("terminal discarded record deletion", |_| !path.exists())
             .await?;
-        assert_eq!(run.stop(Signal::SIGTERM).await?.messages, ["good"]);
+        run.finish_with_messages(&["good"]).await?;
         assert_eq!(fixture.checkpoint_position()?, input.len() as u64);
     }
     Ok(())
