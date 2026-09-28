@@ -453,12 +453,219 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::time::Duration;
+    use std::{future::ready, time::Duration};
 
-    use tokio::net::TcpListener;
+    use futures::stream;
+    use socket2::SockRef;
+    use stream_cancel::{StreamExt as _, Tripwire};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+        sync::oneshot,
+        time::timeout,
+    };
+    use vector_lib::{
+        codecs::encoding::Framer,
+        event::{BatchNotifier, BatchStatus, LogEvent, MetricValue},
+        metrics::Controller,
+    };
 
     use super::*;
     use crate::test_util::{addr::next_addr, trace_init};
+
+    const TEST_TIMEOUT: Duration = Duration::from_secs(5);
+
+    fn test_sink(addr: SocketAddr) -> Box<TcpSink<crate::codecs::Encoder<Framer>>> {
+        let mut connector = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
+        // Keep a large event in flight until the reset is observed, rather than allowing the
+        // entire event to fit in the kernel's send buffer before the server accepts it.
+        connector.send_buffer_bytes = Some(1_024);
+        Box::new(TcpSink::new(
+            connector,
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::default(),
+        ))
+    }
+
+    fn reset_connection(socket: TcpStream) {
+        SockRef::from(&socket)
+            .set_linger(Some(Duration::ZERO))
+            .unwrap();
+        drop(socket);
+    }
+
+    fn counter_value(name: &str) -> f64 {
+        Controller::get()
+            .unwrap()
+            .capture_metrics()
+            .iter()
+            .filter(|metric| metric.name() == name)
+            .filter_map(|metric| match metric.value() {
+                MetricValue::Counter { value } => Some(*value),
+                _ => None,
+            })
+            .sum()
+    }
+
+    #[tokio::test]
+    async fn half_closed_peer_receives_pending_event() {
+        trace_init();
+
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(addr).await.unwrap();
+        let connector = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
+        let (client, accepted) = tokio::join!(connector.connect(), listener.accept());
+        let mut client = client.unwrap();
+        let (mut peer, _) = accepted.unwrap();
+
+        // A collector can close its write half while continuing to receive events. Wait until
+        // the client's read side actually observes EOF before handing it to BytesSink.
+        peer.shutdown().await.unwrap();
+        assert_eq!(
+            timeout(TEST_TIMEOUT, client.read(&mut [0; 1]))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
+        // Verify the other direction is still usable on this exact connection.
+        client.write_all(b"probe\n").await.unwrap();
+        let mut probe = [0; 6];
+        timeout(TEST_TIMEOUT, peer.read_exact(&mut probe))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(&probe, b"probe\n");
+
+        let mut sink = BytesSink::new(
+            client,
+            TcpSink::<crate::codecs::Encoder<Framer>>::shutdown_check,
+            SocketMode::Tcp,
+        );
+        let result = sink
+            .send(EncodedEvent::new(
+                Bytes::from_static(b"event\n"),
+                0,
+                JsonSize::zero(),
+            ))
+            .await;
+        drop(sink);
+
+        let mut received = Vec::new();
+        timeout(TEST_TIMEOUT, peer.read_to_end(&mut received))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(received, b"event\n", "send result: {result:?}");
+    }
+
+    #[tokio::test]
+    async fn retrying_sink_observes_input_detachment() {
+        trace_init();
+
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(addr).await.unwrap();
+        let (retry_tx, retry_rx) = oneshot::channel();
+        let peer = tokio::spawn(async move {
+            reset_connection(listener.accept().await.unwrap().0);
+            // The second connection proves the first send failed and the batch is being retried.
+            reset_connection(listener.accept().await.unwrap().0);
+            retry_tx.send(()).unwrap();
+            loop {
+                reset_connection(listener.accept().await.unwrap().0);
+            }
+        });
+
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let event = Event::Log(LogEvent::from_str_legacy("x".repeat(4 * 1_024 * 1_024)))
+            .with_batch_notifier(&batch);
+        drop(batch);
+        let (trigger, tripwire) = Tripwire::new();
+        // This is the same detachment adapter used by topology::builder when reusing a buffer.
+        let input = stream::once(ready(event))
+            .chain(stream::pending())
+            .take_until_if(tripwire)
+            .boxed();
+        let mut task = tokio::spawn(test_sink(addr).run(input));
+        timeout(TEST_TIMEOUT, retry_rx).await.unwrap().unwrap();
+
+        trigger.cancel();
+        let detached = timeout(TEST_TIMEOUT, &mut task).await;
+        if detached.is_err() {
+            task.abort();
+            assert!(task.await.unwrap_err().is_cancelled());
+        }
+        peer.abort();
+        assert!(peer.await.unwrap_err().is_cancelled());
+
+        assert!(
+            detached.is_ok(),
+            "sink kept retrying the old destination after its input was detached"
+        );
+        detached.unwrap().unwrap().unwrap();
+        assert_eq!(receiver.await, BatchStatus::Errored);
+    }
+
+    #[tokio::test]
+    async fn successful_retry_does_not_report_discarded_events() {
+        trace_init();
+        Controller::get().unwrap().reset();
+
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(addr).await.unwrap();
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let payload = "x".repeat(4 * 1_024 * 1_024);
+        let event = Event::Log(LogEvent::from_str_legacy(&payload)).with_batch_notifier(&batch);
+        drop(batch);
+
+        let receive = async {
+            reset_connection(listener.accept().await.unwrap().0);
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut received = Vec::new();
+            socket.read_to_end(&mut received).await.unwrap();
+            received
+        };
+        let (result, received) = timeout(TEST_TIMEOUT, async {
+            tokio::join!(test_sink(addr).run(stream::iter([event]).boxed()), receive)
+        })
+        .await
+        .unwrap();
+
+        result.unwrap();
+        assert_eq!(received.len(), payload.len() + 1);
+        assert_eq!(&received[..payload.len()], payload.as_bytes());
+        assert_eq!(received.last(), Some(&b'\n'));
+        assert_eq!(receiver.await, BatchStatus::Delivered);
+        assert!(counter_value("component_errors_total") >= 1.0);
+        assert_eq!(counter_value("component_discarded_events_total"), 0.0);
+    }
+
+    #[tokio::test]
+    async fn flush_does_not_wait_for_peer_to_read() {
+        trace_init();
+
+        let (_guard, addr) = next_addr();
+        let listener = TcpListener::bind(addr).await.unwrap();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let event = Event::Log(LogEvent::from_str_legacy("event")).with_batch_notifier(&batch);
+        drop(batch);
+
+        let (result, accepted) = timeout(TEST_TIMEOUT, async {
+            tokio::join!(
+                test_sink(addr).run(stream::iter([event]).boxed()),
+                listener.accept()
+            )
+        })
+        .await
+        .unwrap();
+        result.unwrap();
+        let (peer, _) = accepted.unwrap();
+
+        // Nothing has read from the peer, yet the source already sees Delivered. Resetting
+        // this connection discards the unread data after the sink's retry queue has emptied.
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+        reset_connection(peer);
+    }
 
     #[tokio::test]
     async fn healthcheck() {
