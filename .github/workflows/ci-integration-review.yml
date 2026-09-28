@@ -50,7 +50,7 @@ env:
 jobs:
   prep-pr:
     name: (PR review) Signal pending to PR
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
     permissions:
@@ -253,7 +253,7 @@ jobs:
 
   update-pr-status:
     name: Signal result to PR
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     needs:
       - integration-tests

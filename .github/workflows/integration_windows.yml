@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
     outputs:
@@ -49,7 +49,7 @@ jobs:
 
   test-integration-windows:
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: run-test-integration-windows
     steps:
       - run: |

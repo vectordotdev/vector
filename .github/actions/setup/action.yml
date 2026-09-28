@@ -205,16 +205,16 @@ runs:
           ~/.cargo/bin/cargo-llvm-cov
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
-        key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-cargo-binaries-${{ hashFiles('scripts/environment/*.sh') }}
         restore-keys: |
-          ${{ runner.os }}-cargo-binaries-
+          ${{ runner.os }}-${{ runner.arch }}-cargo-binaries-
 
     - name: Cache npm tools
       id: cache-npm-tools
       uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: scripts/environment/npm-tools/node_modules
-        key: ${{ runner.os }}-npm-tools-${{ hashFiles('scripts/environment/npm-tools/*') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-npm-tools-${{ hashFiles('scripts/environment/npm-tools/*') }}
 
     - name: Run prepare.sh
       shell: bash

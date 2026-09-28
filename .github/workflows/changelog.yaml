@@ -25,7 +25,7 @@ jobs:
       contents: read
       pull-requests: none
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
 
     env:
       NO_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}

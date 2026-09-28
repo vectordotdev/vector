@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   validate-protos:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     steps:
       # Run `git checkout`
