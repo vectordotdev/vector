@@ -33,12 +33,7 @@ pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{
-    OutputId,
-    compiler::expand_globs,
-    graph::{Graph, component_output_map},
-    transform::get_transform_output_ids,
-};
+use super::{OutputId, compiler::expand_globs, graph::Graph, transform::get_transform_output_ids};
 use crate::{
     conditions::Condition,
     config::{
@@ -409,8 +404,13 @@ async fn build_unit_test(
     test: TestDefinition<String>,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
-    let output_map = component_output_map(graph_components(&config_builder), config_builder.schema)
-        .expect("ambiguous outputs");
+    let graph = Graph::new(
+        graph_components(&config_builder),
+        config_builder.schema,
+        config_builder.global.wildcard_matching.unwrap_or_default(),
+    )
+    .expect("ambiguous outputs");
+    let output_map = graph.output_map()?;
     let test = test.resolve_outputs(&output_map)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
@@ -461,14 +461,18 @@ async fn build_unit_test(
         .collect();
 
     // Sanitize the inputs of all relevant transforms
-    let valid_inputs =
-        component_output_map(graph_components(&config_builder), config_builder.schema)
-            .expect("ambiguous outputs");
+    let graph = Graph::new(
+        graph_components(&config_builder),
+        config_builder.schema,
+        config_builder.global.wildcard_matching.unwrap_or_default(),
+    )
+    .expect("ambiguous outputs");
+    let valid_outputs = graph.output_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {
         let inputs = std::mem::take(&mut transform.inputs);
         transform.inputs = inputs
             .into_iter()
-            .filter(|input| valid_inputs.contains_key(input))
+            .filter(|input| valid_outputs.contains_key(input))
             .collect();
     }
 

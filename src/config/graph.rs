@@ -151,15 +151,17 @@ impl Graph {
         wildcard_matching: WildcardMatching,
     ) -> Result<Self, Vec<String>> {
         // Derive each node from its component before resolving any connections.
-        let mut graph = Self {
-            nodes: component_nodes(components.clone(), schema),
-            ..Default::default()
-        };
+        let mut graph = Self::default();
+        for (id, component) in components.clone() {
+            graph
+                .nodes
+                .insert(id.clone(), Node::new(&component, id, schema));
+        }
 
-        let available_inputs = graph.input_map()?;
+        let available_outputs = graph.output_map()?;
         for (id, component) in components {
             for input in component.inputs().into_iter().flatten() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs, wildcard_matching) {
+                if let Err(e) = graph.add_input(input, id, &available_outputs, wildcard_matching) {
                     graph.input_errors.push(e);
                 }
             }
@@ -182,10 +184,10 @@ impl Graph {
         &mut self,
         from: &str,
         to: &ComponentKey,
-        available_inputs: &HashMap<String, OutputId>,
+        available_outputs: &HashMap<String, OutputId>,
         wildcard_matching: WildcardMatching,
     ) -> Result<(), String> {
-        if let Some(output_id) = available_inputs.get(from) {
+        if let Some(output_id) = available_outputs.get(from) {
             self.edges.push(Edge {
                 from: output_id.clone(),
                 to: to.clone(),
@@ -327,9 +329,36 @@ impl Graph {
         Ok(())
     }
 
-    /// Maps available outputs to the strings used to reference them in inputs.
-    pub fn input_map(&self) -> Result<HashMap<String, OutputId>, Vec<String>> {
-        output_map(&self.nodes)
+    /// Maps output names used in `inputs` to output IDs, rejecting ambiguous names.
+    ///
+    /// A dotted name such as `route.branch` can identify either an expanded
+    /// component or a named output. Distinct output IDs must therefore have
+    /// distinct string representations.
+    pub fn output_map(&self) -> Result<HashMap<String, OutputId>, Vec<String>> {
+        let outputs = self
+            .nodes
+            .iter()
+            .flat_map(|(key, node)| {
+                node.outputs.iter().map(|output| OutputId {
+                    component: key.clone(),
+                    port: output.port.clone(),
+                })
+            })
+            .collect::<HashSet<_>>();
+        let mut mapped = HashMap::new();
+        let mut errors = HashSet::new();
+
+        for id in outputs {
+            if let Some(_other) = mapped.insert(id.to_string(), id.clone()) {
+                errors.insert(format!("Input specifier {id} is ambiguous"));
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(mapped)
+        } else {
+            Err(errors.into_iter().collect())
+        }
     }
 
     pub fn inputs_for(&self, node: &ComponentKey) -> Vec<OutputId> {
@@ -385,66 +414,6 @@ impl Graph {
     }
 }
 
-/// Looks up component outputs without resolving connections between components.
-/// Enrichment tables must already be expanded into their sources and sinks.
-pub fn component_output_map<'a>(
-    components: impl Iterator<Item = (&'a ComponentKey, Component<'a, String>)>,
-    schema: schema::Options,
-) -> Result<HashMap<String, OutputId>, Vec<String>> {
-    output_map(&component_nodes(components, schema))
-}
-
-fn component_nodes<'a>(
-    components: impl Iterator<Item = (&'a ComponentKey, Component<'a, String>)>,
-    schema: schema::Options,
-) -> HashMap<ComponentKey, Node> {
-    components
-        .map(|(id, component)| (id.clone(), Node::new(&component, id, schema)))
-        .collect()
-}
-
-/// Produce a map of output IDs for the current set of nodes in the graph, keyed by their string
-/// representation. Returns errors for any nodes that have the same string representation,
-/// making input specifications ambiguous.
-///
-/// When we get a dotted path in the `inputs` section of a user's config, we need to determine
-/// which of a few things that represents:
-///
-///   1. A component that's part of an expanded macro (e.g. `route.branch`)
-///   2. A named output of a branching transform (e.g. `name.errors`)
-///
-/// A naive way to do that is to compare the string representation of all valid inputs to the
-/// provided string and pick the one that matches. This works better if you can assume that there
-/// are no conflicting string representations, so this function reports any ambiguity as an
-/// error when creating the lookup map.
-fn output_map(
-    nodes: &HashMap<ComponentKey, Node>,
-) -> Result<HashMap<String, OutputId>, Vec<String>> {
-    let outputs = nodes
-        .iter()
-        .flat_map(|(key, node)| {
-            node.outputs.iter().map(|output| OutputId {
-                component: key.clone(),
-                port: output.port.clone(),
-            })
-        })
-        .collect::<HashSet<_>>();
-    let mut mapped = HashMap::new();
-    let mut errors = HashSet::new();
-
-    for id in outputs {
-        if let Some(_other) = mapped.insert(id.to_string(), id.clone()) {
-            errors.insert(format!("Input specifier {id} is ambiguous"));
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(mapped)
-    } else {
-        Err(errors.into_iter().collect())
-    }
-}
-
 #[cfg(test)]
 mod test {
     use similar_asserts::assert_eq;
@@ -471,7 +440,8 @@ mod test {
             .iter()
             .map(|(key, transform)| (key, Component::from(transform)));
 
-        let outputs = component_output_map(components.clone(), config.schema).unwrap();
+        let graph = Graph::new(components, config.schema, WildcardMatching::Strict).unwrap();
+        let outputs = graph.output_map().unwrap();
         assert_eq!(
             outputs,
             HashMap::from([
@@ -480,7 +450,6 @@ mod test {
             ])
         );
 
-        let graph = Graph::new(components, config.schema, WildcardMatching::Strict).unwrap();
         assert_eq!(
             graph.inputs_for(&"second".into()),
             vec![OutputId::from("first")]
@@ -616,8 +585,8 @@ mod test {
             input: &str,
             wildcard_matching: WildcardMatching,
         ) -> Result<(), String> {
-            let available_inputs = self.input_map().unwrap();
-            self.add_input(input, &node.into(), &available_inputs, wildcard_matching)
+            let available_outputs = self.output_map().unwrap();
+            self.add_input(input, &node.into(), &available_outputs, wildcard_matching)
         }
     }
 
@@ -879,7 +848,7 @@ mod test {
             ),
         );
 
-        let mut errors = graph.input_map().unwrap_err();
+        let mut errors = graph.output_map().unwrap_err();
         errors.sort();
         assert_eq!(
             errors,

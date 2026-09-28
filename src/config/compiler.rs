@@ -124,7 +124,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             (key, table.with_inputs(inputs))
         })
         .collect();
-    let output_map = graph.input_map().expect("ambiguous outputs");
+    let output_map = graph.output_map().expect("ambiguous outputs");
     let tests = tests
         .into_iter()
         .map(|test| test.resolve_outputs(&output_map))
