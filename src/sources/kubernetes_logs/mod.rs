@@ -26,13 +26,13 @@ use vector_lib::{
     codecs::{BytesDeserializer, BytesDeserializerConfig, OversizedAction},
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
+    counter,
     file_source::file_server::{
         FileServer, Line, Shutdown as FileServerShutdown, calculate_ignore_before,
     },
     file_source_common::{
         Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
     },
-    counter,
     internal_event::{ByteSize, BytesReceived, CounterName, InternalEventHandle as _, Protocol},
     lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
