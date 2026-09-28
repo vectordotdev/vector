@@ -268,7 +268,7 @@ mod tests {
         fn emit_file_added(&self, _: &Path) {}
         fn emit_file_resumed(&self, _: &Path, _: u64) {}
         fn emit_file_watch_error(&self, _: &Path, _: Error) {}
-        fn emit_file_unwatched(&self, _: &Path, _: bool) {}
+        fn emit_file_unwatched(&self, _: &Path, _: bool, _: Option<u64>) {}
         fn emit_file_deleted(&self, _: &Path) {}
         fn emit_file_delete_error(&self, _: &Path, _: Error) {}
         fn emit_file_fingerprint_read_error(&self, _: &Path, _: Error) {}

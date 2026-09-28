@@ -269,11 +269,12 @@ mod source {
             });
         }
 
-        fn emit_file_unwatched(&self, file: &Path, reached_eof: bool) {
+        fn emit_file_unwatched(&self, file: &Path, reached_eof: bool, bytes_unread: Option<u64>) {
             emit!(FileUnwatched {
                 file,
                 include_file_metric_tag: self.include_file_metric_tag,
-                reached_eof
+                reached_eof,
+                bytes_unread,
             });
         }
 
