@@ -13,14 +13,12 @@ async fn graceful_restart_resumes_exactly() -> vector::Result<()> {
     let after = records("graceful-after", 10);
     fixture.write("active.log", &before)?;
     let options = json!({"checkpoint_interval": 3_600_000});
-    let mut run = fixture.start("*.log", options.clone())?;
-    run.wait_count(before.len()).await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, before);
+    let run = fixture.start("*.log", options.clone())?;
+    run.finish_with_messages(&before).await?;
     assert_eq!(fixture.checkpoint_position()?, lines(&before).len() as u64);
     fixture.append("active.log", &after)?;
-    let mut run = fixture.start("*.log", options)?;
-    run.wait_count(after.len()).await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, after);
+    let run = fixture.start("*.log", options)?;
+    run.finish_with_messages(&after).await?;
     assert_eq!(
         fixture.checkpoint_position()?,
         lines(&[before, after].concat()).len() as u64
@@ -36,9 +34,8 @@ async fn abrupt_restart_replays_only_since_checkpoint_without_loss() -> vector::
     let unread = records("after-crash", 10);
     let options = json!({"checkpoint_interval": 3_600_000, "max_read_bytes": 1});
     fixture.write("active.log", &committed)?;
-    let mut run = fixture.start("*.log", options.clone())?;
-    run.wait_count(committed.len()).await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, committed);
+    let run = fixture.start("*.log", options.clone())?;
+    run.finish_with_messages(&committed).await?;
     let offset = fixture.checkpoint_position()?;
     assert_eq!(offset, lines(&committed).len() as u64);
 
@@ -57,8 +54,7 @@ async fn abrupt_restart_replays_only_since_checkpoint_without_loss() -> vector::
 
     // Documented guarantee: an abrupt stop can replay uncheckpointed data.
     // Require every pending record, but no replay from before the durable checkpoint.
-    let mut run = fixture.start("*.log", options)?;
-    run.wait_count(expected.len()).await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
+    let run = fixture.start("*.log", options)?;
+    run.finish_with_messages(&expected).await?;
     Ok(())
 }

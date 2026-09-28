@@ -1,10 +1,9 @@
 //! Shared real-file fixtures, Vector process lifecycle, and output collection.
 
-use super::common::lines;
+use super::common::{append_lines, lines};
 
 use std::{
     fs::{File, OpenOptions},
-    io::Write,
     path::PathBuf,
     process::Stdio,
     time::Duration,
@@ -107,12 +106,13 @@ impl Fixture {
     }
 
     pub(super) fn append(&self, name: &str, records: &[String]) -> vector::Result<()> {
-        let mut file = OpenOptions::new()
+        append_lines(&mut self.open_append(name)?, records)
+    }
+
+    pub(super) fn open_append(&self, name: &str) -> vector::Result<File> {
+        Ok(OpenOptions::new()
             .append(true)
-            .open(self.input.join(name))?;
-        file.write_all(lines(records).as_bytes())?;
-        file.sync_all()?;
-        Ok(())
+            .open(self.input.join(name))?)
     }
 
     pub(super) fn checkpoint_position(&self) -> vector::Result<u64> {
@@ -246,6 +246,27 @@ impl Running {
             seen.messages.len() >= count && seen.received_events >= count as f64
         })
         .await
+    }
+
+    pub(super) async fn wait_open_files(&mut self, count: usize) -> vector::Result<()> {
+        self.wait_for(&format!("{count} open files"), |seen| {
+            seen.open_files == Some(count as f64)
+        })
+        .await
+    }
+
+    // Drain shutdown output before asserting, so late duplicates cannot pass.
+    pub(super) async fn finish_with_messages(
+        mut self,
+        expected: &[impl AsRef<str>],
+    ) -> vector::Result<Observed> {
+        self.wait_count(expected.len()).await?;
+        let seen = self.stop(Signal::SIGTERM).await?;
+        assert_eq!(
+            seen.messages.iter().map(String::as_str).collect::<Vec<_>>(),
+            expected.iter().map(AsRef::as_ref).collect::<Vec<_>>()
+        );
+        Ok(seen)
     }
 
     pub(super) fn pause(&self) -> vector::Result<()> {

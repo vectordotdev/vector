@@ -34,10 +34,7 @@ async fn shutdown_saves_final_acknowledged_offset_before_exit() -> vector::Resul
 async fn empty_source_shuts_down_on_single_worker() -> vector::Result<()> {
     let fixture = Fixture::new()?;
     let mut run = fixture.start("*.log", json!({}))?;
-    run.wait_for("empty source readiness", |seen| {
-        seen.open_files == Some(0.0)
-    })
-    .await?;
+    run.wait_open_files(0).await?;
     assert!(run.stop(Signal::SIGTERM).await?.messages.is_empty());
     Ok(())
 }
@@ -46,10 +43,7 @@ async fn empty_source_shuts_down_on_single_worker() -> vector::Result<()> {
 async fn notification_burst_preserves_output_and_allows_shutdown() -> vector::Result<()> {
     let fixture = Fixture::new()?;
     let mut run = fixture.start("*.log", json!({"max_read_bytes": 64}))?;
-    run.wait_for("empty source readiness", |seen| {
-        seen.open_files == Some(0.0)
-    })
-    .await?;
+    run.wait_open_files(0).await?;
     let mut expected = Vec::new();
     for index in 0..128 {
         let lines = records(&format!("burst-{index}"), 4);

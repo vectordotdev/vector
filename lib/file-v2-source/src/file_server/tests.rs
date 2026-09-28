@@ -5,6 +5,17 @@ use futures::{FutureExt, StreamExt};
 use std::{io::Error, num::NonZeroUsize, path::Path};
 use tokio::sync::{mpsc, oneshot};
 
+fn fingerprinter() -> Fingerprinter {
+    Fingerprinter::new(
+        FingerprintStrategy::FirstBytesChecksum {
+            ignored_header_bytes: 0,
+            bytes: NonZeroUsize::new(8).unwrap(),
+        },
+        128,
+        false,
+    )
+}
+
 struct ScriptedPaths {
     updates: mpsc::UnboundedReceiver<PathUpdates>,
     requests: mpsc::UnboundedSender<()>,
@@ -77,14 +88,7 @@ impl Server {
             ignore_before: None,
             max_line_bytes: 128,
             line_delimiter: Bytes::from_static(b"\n"),
-            fingerprinter: Fingerprinter::new(
-                FingerprintStrategy::FirstBytesChecksum {
-                    ignored_header_bytes: 0,
-                    bytes: NonZeroUsize::new(8).unwrap(),
-                },
-                128,
-                false,
-            ),
+            fingerprinter: fingerprinter(),
             remove_after: None,
             emitter: Events { small },
             reader_idle_timeout: Duration::ZERO,
@@ -207,17 +211,10 @@ async fn reopening_at_eof_keeps_the_checkpoint_past_retirement_expiry() {
     let contents = b"already read\n";
     fs::write(&path, contents).await.unwrap();
     let (small, _small_rx) = mpsc::unbounded_channel();
-    let fingerprint = Fingerprinter::new(
-        FingerprintStrategy::FirstBytesChecksum {
-            ignored_header_bytes: 0,
-            bytes: NonZeroUsize::new(8).unwrap(),
-        },
-        128,
-        false,
-    )
-    .fingerprint_or_emit(&path, &mut HashMap::new(), &Events { small })
-    .await
-    .unwrap();
+    let fingerprint = fingerprinter()
+        .fingerprint_or_emit(&path, &mut HashMap::new(), &Events { small })
+        .await
+        .unwrap();
     let mut server = Server::start();
     server.requested().await;
     server
@@ -327,17 +324,10 @@ async fn fingerprint_migration_preserves_early_and_late_acknowledgements() {
             );
         }
         let (small, _rx) = mpsc::unbounded_channel();
-        let new_id = Fingerprinter::new(
-            FingerprintStrategy::FirstBytesChecksum {
-                ignored_header_bytes: 0,
-                bytes: NonZeroUsize::new(8).unwrap(),
-            },
-            128,
-            false,
-        )
-        .fingerprint_or_emit(&path, &mut HashMap::new(), &Events { small })
-        .await
-        .unwrap();
+        let new_id = fingerprinter()
+            .fingerprint_or_emit(&path, &mut HashMap::new(), &Events { small })
+            .await
+            .unwrap();
         assert_ne!(new_id, first.file_id);
         server.snapshot(std::slice::from_ref(&path));
         server.requested().await;

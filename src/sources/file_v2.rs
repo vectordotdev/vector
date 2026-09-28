@@ -936,7 +936,7 @@ mod tests {
         fs::{self, File},
         io::{AsyncSeekExt, AsyncWriteExt},
         sync::mpsc::{self, UnboundedReceiver},
-        time::{Duration, sleep, timeout},
+        time::{Duration, Instant, sleep, timeout, timeout_at},
     };
     use vector_lib::schema::Definition;
     use vrl::value::kind::Collection;
@@ -971,31 +971,41 @@ mod tests {
             self.write_all(line.as_bytes()).await
         }
     }
+    async fn next_test_event(
+        rx: &mut UnboundedReceiver<TestEvent>,
+        deadline: Instant,
+        description: &str,
+    ) -> TestEvent {
+        timeout_at(deadline, rx.recv())
+            .await
+            .unwrap_or_else(|_| panic!("Timed out waiting for {description}"))
+            .unwrap_or_else(|| panic!("Test event channel closed while waiting for {description}"))
+    }
+
     async fn wait_for_n_reads(
         rx: &mut UnboundedReceiver<TestEvent>,
         count: usize,
         timeout_ms: u64,
     ) {
         let mut counter = 0;
-        let shutdown = sleep(Duration::from_millis(timeout_ms));
+        let deadline = Instant::now() + Duration::from_millis(timeout_ms);
 
-        tokio::select! {
-            _ = shutdown => {
-                error!("Timed out, reads = {counter}/{count}");
-                panic!("Timed out, reads = {counter}/{count}");
+        while counter != count {
+            let event = next_test_event(rx, deadline, &format!("reads = {counter}/{count}")).await;
+            if let TestEvent::Read(_, _) = event {
+                counter += 1;
             }
-            _ = async {
-                while let Some(ev) = rx.recv().await {
-                    // Wait for n * 2 read events
-                    if let TestEvent::Read(_, _) = ev {
-                        counter += 1;
-                    }
-                    if counter == count {
-                        break;
-                    }
-                }
-            } => {}
         }
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Test event channel closed")]
+    async fn wait_for_n_reads_rejects_early_channel_closure() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tx.send(TestEvent::Read(PathBuf::from("input.log"), Box::default()))
+            .unwrap();
+        drop(tx);
+        wait_for_n_reads(&mut rx, 2, 5000).await;
     }
 
     #[test]
@@ -1230,7 +1240,7 @@ mod tests {
         count: usize,
         timeout_ms: u64,
     ) {
-        let shutdown = sleep(Duration::from_millis(timeout_ms));
+        let deadline = Instant::now() + Duration::from_millis(timeout_ms);
         let mut files: HashSet<PathBuf> = HashSet::from_iter(
             original_files
                 .into_iter()
@@ -1240,34 +1250,43 @@ mod tests {
 
         let mut counter = 0;
 
-        tokio::select! {
-            _ = shutdown => {
-                let message = format!("Timed out, left to checkpoint = {files:#?} or not enough reads {counter}/{count}");
-                error!(message);
-                panic!("{}", message);
-            }
-            _ = async {
-                while let Some(ev) = rx.recv().await {
-                    trace!(?ev, "Test receiver got event.");
+        while !files.is_empty() || counter != count {
+            let event = next_test_event(
+                rx,
+                deadline,
+                &format!("checkpoints = {files:#?}, reads = {counter}/{count}"),
+            )
+            .await;
+            trace!(?event, "Test receiver got event.");
 
-                    match ev {
-                        TestEvent::Read(path, _) => {
-                            let path = path.canonicalize().unwrap();
-                            assert!(original_files.contains(&path));
-                            assert!(!files.contains(&path)); // Was already checkpointed
+            match event {
+                TestEvent::Read(path, _) => {
+                    let path = path.canonicalize().unwrap();
+                    assert!(original_files.contains(&path));
+                    assert!(!files.contains(&path)); // Was already checkpointed
 
-                            counter += 1;
-                        }
-                        TestEvent::Checkpointed(path) => {
-                            files.remove(&path);
-                        }
-                    };
-                    if files.is_empty() && counter == count {
-                        break;
-                    }
+                    counter += 1;
                 }
-            } => {}
+                TestEvent::Checkpointed(path) => {
+                    files.remove(&path);
+                }
+            }
         }
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "Test event channel closed")]
+    async fn wait_checkpoint_and_n_reads_rejects_early_channel_closure() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("input.log");
+        fs::write(&path, "record\n").await.unwrap();
+        let path = path.canonicalize().unwrap();
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tx.send(TestEvent::Checkpointed(path.clone())).unwrap();
+        tx.send(TestEvent::Read(path.clone(), Box::default()))
+            .unwrap();
+        drop(tx);
+        wait_checkpoint_and_n_reads(&mut rx, vec![&path], 2, 5000).await;
     }
 
     // Constants for test data

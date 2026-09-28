@@ -1,9 +1,9 @@
 use nix::sys::signal::Signal;
 use serde_json::{Value, json};
-use std::{fs::OpenOptions, io::Write};
+use std::io::Write;
 
 use super::{
-    common::{lines, records},
+    common::{append_lines, records},
     harness::Fixture,
 };
 
@@ -20,11 +20,7 @@ async fn rotation_rename_and_create() -> vector::Result<()> {
         fixture.input.join("rotated.1"),
     )?;
     fixture.write("active.log", &after)?;
-    run.wait_count(before.len() + after.len()).await?;
-    assert_eq!(
-        run.stop(Signal::SIGTERM).await?.messages,
-        [before, after].concat()
-    );
+    run.finish_with_messages(&[before, after].concat()).await?;
     Ok(())
 }
 
@@ -35,9 +31,7 @@ async fn rotation_reads_writes_through_old_handle() -> vector::Result<()> {
     let late = records("old-inode-after", 2);
     let replacement = records("new-inode", 2);
     fixture.write("active.log", &before)?;
-    let mut writer = OpenOptions::new()
-        .append(true)
-        .open(fixture.input.join("active.log"))?;
+    let mut writer = fixture.open_append("active.log")?;
     let mut run = fixture.start("*.log", json!({}))?;
     run.wait_count(2).await?;
     // The rotated name is intentionally outside the include glob.
@@ -47,13 +41,9 @@ async fn rotation_reads_writes_through_old_handle() -> vector::Result<()> {
     )?;
     fixture.write("active.log", &replacement)?;
     run.wait_count(4).await?;
-    writer.write_all(lines(&late).as_bytes())?;
-    writer.sync_all()?;
-    run.wait_count(6).await?;
-    assert_eq!(
-        run.stop(Signal::SIGTERM).await?.messages,
-        [before, replacement, late].concat()
-    );
+    append_lines(&mut writer, &late)?;
+    run.finish_with_messages(&[before, replacement, late].concat())
+        .await?;
     Ok(())
 }
 
@@ -80,11 +70,7 @@ async fn copy_truncate(options: Value) -> vector::Result<()> {
     )?;
     // Rewrites the same inode, with a length smaller than its previous read offset.
     fixture.write("active.log", &after)?;
-    run.wait_count(before.len() + after.len()).await?;
-    assert_eq!(
-        run.stop(Signal::SIGTERM).await?.messages,
-        [before, after].concat()
-    );
+    run.finish_with_messages(&[before, after].concat()).await?;
     Ok(())
 }
 
@@ -100,17 +86,12 @@ async fn rotation_copy_truncate_with_unchanged_fingerprint() -> vector::Result<(
     let mut run = fixture.start("*.log", json!({}))?;
     run.wait_count(before.len()).await?;
     fixture.write("active.log", &after)?;
-    run.wait_count(before.len() + after.len()).await?;
-    assert_eq!(
-        run.stop(Signal::SIGTERM).await?.messages,
-        [before, after].concat()
-    );
+    run.finish_with_messages(&[before, after].concat()).await?;
 
     let appended = records("after-restart", 1);
     fixture.append("active.log", &appended)?;
-    let mut run = fixture.start("*.log", json!({}))?;
-    run.wait_count(1).await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, appended);
+    let run = fixture.start("*.log", json!({}))?;
+    run.finish_with_messages(&appended).await?;
     Ok(())
 }
 
@@ -121,9 +102,7 @@ async fn rotation_discovers_replacement_while_draining_backlog() -> vector::Resu
     let replacement = records("replacement", 3);
     let late = records("old-handle-late", 2);
     fixture.write("active.log", &backlog)?;
-    let mut writer = OpenOptions::new()
-        .append(true)
-        .open(fixture.input.join("active.log"))?;
+    let mut writer = fixture.open_append("active.log")?;
     let mut run = fixture.start("*.log", json!({"max_read_bytes": 64}))?;
     run.wait_for("first backlog record", |seen| !seen.messages.is_empty())
         .await?;
@@ -132,8 +111,7 @@ async fn rotation_discovers_replacement_while_draining_backlog() -> vector::Resu
         fixture.input.join("active.log.1"),
     )?;
     fixture.write("active.log", &replacement)?;
-    writer.write_all(lines(&late).as_bytes())?;
-    writer.sync_all()?;
+    append_lines(&mut writer, &late)?;
     run.wait_count(backlog.len() + replacement.len() + late.len())
         .await?;
     let seen = run.stop(Signal::SIGTERM).await?;
@@ -175,7 +153,7 @@ async fn missing_readers_retire_after_late_writes_go_idle() -> vector::Result<()
         let mut expected = records("initial", 1);
         fixture.write("active.log", &expected)?;
         let path = fixture.input.join("active.log");
-        let mut writer = OpenOptions::new().append(true).open(&path)?;
+        let mut writer = fixture.open_append("active.log")?;
         let mut run = fixture.start("*.log", json!({"reader_idle_timeout_secs": 1}))?;
         run.wait_count(1).await?;
         if unlink {
@@ -188,17 +166,13 @@ async fn missing_readers_retire_after_late_writes_go_idle() -> vector::Result<()
         for index in 0..5 {
             tokio::time::sleep(std::time::Duration::from_millis(400)).await;
             let late = records(&format!("late-{index}"), 1);
-            writer.write_all(lines(&late).as_bytes())?;
-            writer.sync_all()?;
+            append_lines(&mut writer, &late)?;
             expected.extend(late);
             run.wait_count(expected.len()).await?;
         }
-        run.wait_for("idle missing reader released", |seen| {
-            seen.open_files == Some(0.0)
-        })
-        .await?;
+        run.wait_open_files(0).await?;
         // Keeping the writer open must not prevent Vector retiring its reader.
-        assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
+        run.finish_with_messages(&expected).await?;
     }
     Ok(())
 }
@@ -218,11 +192,8 @@ async fn zero_idle_timeout_drains_missing_backlog() -> vector::Result<()> {
         .await?;
     std::fs::remove_file(fixture.input.join("active.log"))?;
     run.wait_count(expected.len()).await?;
-    run.wait_for("drained reader released", |seen| {
-        seen.open_files == Some(0.0)
-    })
-    .await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
+    run.wait_open_files(0).await?;
+    run.finish_with_messages(&expected).await?;
     Ok(())
 }
 
@@ -230,23 +201,18 @@ async fn zero_idle_timeout_drains_missing_backlog() -> vector::Result<()> {
 async fn repeated_unlinks_release_readers_but_discoverable_files_stay_open() -> vector::Result<()> {
     let fixture = Fixture::new()?;
     let mut run = fixture.start("*.log", json!({"reader_idle_timeout_secs": 0}))?;
-    run.wait_for("empty source", |seen| seen.open_files == Some(0.0))
-        .await?;
+    run.wait_open_files(0).await?;
     let mut expected = Vec::new();
     for index in 0..5 {
         let added = records(&format!("cycle-{index}"), 1);
         fixture.write("active.log", &added)?;
         expected.extend(added);
         run.wait_count(expected.len()).await?;
-        run.wait_for("discoverable reader", |seen| seen.open_files == Some(1.0))
-            .await?;
+        run.wait_open_files(1).await?;
         std::fs::remove_file(fixture.input.join("active.log"))?;
-        run.wait_for("deleted reader released", |seen| {
-            seen.open_files == Some(0.0)
-        })
-        .await?;
+        run.wait_open_files(0).await?;
     }
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, expected);
+    run.finish_with_messages(&expected).await?;
     Ok(())
 }
 
@@ -261,15 +227,11 @@ async fn rewrite_regrown_past_offset_reads_new_prefix_and_checkpoints_it() -> ve
     run.pause()?;
     fixture.write("active.log", &["new first".into(), "new second".into()])?;
     run.resume()?;
-    run.wait_count(3).await?;
-    assert_eq!(
-        run.stop(Signal::SIGTERM).await?.messages,
-        ["old", "new first", "new second"]
-    );
+    run.finish_with_messages(&["old", "new first", "new second"])
+        .await?;
     fixture.append("active.log", &["after restart".into()])?;
-    let mut run = fixture.start("*.log", options)?;
-    run.wait_count(1).await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, ["after restart"]);
+    let run = fixture.start("*.log", options)?;
+    run.finish_with_messages(&["after restart"]).await?;
     Ok(())
 }
 
@@ -287,20 +249,16 @@ async fn tracked_file_below_prefix_survives_idle_retirement_and_growth() -> vect
     fixture.append("active.log", &["tiny".into()])?;
     run.wait_count(3).await?;
     fixture.append("active.log", &["grow past the fingerprint".into()])?;
-    run.wait_count(4).await?;
-    assert_eq!(
-        run.stop(Signal::SIGTERM).await?.messages,
-        [
-            "original contents",
-            "new",
-            "tiny",
-            "grow past the fingerprint"
-        ]
-    );
+    run.finish_with_messages(&[
+        "original contents",
+        "new",
+        "tiny",
+        "grow past the fingerprint",
+    ])
+    .await?;
     fixture.append("active.log", &["after restart".into()])?;
-    let mut run = fixture.start("*.log", options)?;
-    run.wait_count(1).await?;
-    assert_eq!(run.stop(Signal::SIGTERM).await?.messages, ["after restart"]);
+    let run = fixture.start("*.log", options)?;
+    run.finish_with_messages(&["after restart"]).await?;
     Ok(())
 }
 
@@ -308,9 +266,7 @@ async fn tracked_file_below_prefix_survives_idle_retirement_and_growth() -> vect
 async fn retirement_emits_unterminated_record_after_late_append() -> vector::Result<()> {
     let fixture = Fixture::new()?;
     std::fs::write(fixture.input.join("active.log"), "first\r\npartial")?;
-    let mut writer = OpenOptions::new()
-        .append(true)
-        .open(fixture.input.join("active.log"))?;
+    let mut writer = fixture.open_append("active.log")?;
     let mut run = fixture.start("*.log", json!({"fingerprint": {"strategy": "checksum", "bytes": 4}, "reader_idle_timeout_secs": 1, "line_delimiter": "\r\n"}))?;
     run.wait_count(1).await?;
     std::fs::rename(
@@ -320,13 +276,8 @@ async fn retirement_emits_unterminated_record_after_late_append() -> vector::Res
     writer.write_all(b" tail\r")?;
     writer.sync_all()?;
     run.wait_count(2).await?;
-    run.wait_for("retired partial reader", |seen| {
-        seen.open_files == Some(0.0)
-    })
-    .await?;
-    assert_eq!(
-        run.stop(Signal::SIGTERM).await?.messages,
-        ["first", "partial tail\r"]
-    );
+    run.wait_open_files(0).await?;
+    run.finish_with_messages(&["first", "partial tail\r"])
+        .await?;
     Ok(())
 }
