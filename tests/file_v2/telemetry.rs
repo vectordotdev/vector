@@ -58,3 +58,49 @@ async fn retiring_partial_delimiter_reports_an_oversized_tail() -> vector::Resul
     assert_eq!(run.stop(Signal::SIGTERM).await?.messages, ["first"]);
     Ok(())
 }
+
+#[tokio::test]
+async fn corrupt_gzip_reports_read_errors_and_keeps_other_files_running() -> vector::Result<()> {
+    use flate2::{Compression, write::GzEncoder};
+
+    let fixture = Fixture::new()?;
+    let path = fixture.input.join("corrupt.log");
+    // Fingerprinting and complete records succeed before the decoder reaches
+    // this member's invalid checksum and the unread member that follows it.
+    let mut first = GzEncoder::new(Vec::new(), Compression::default());
+    first.write_all(format!("{}\n", "x".repeat(1023)).repeat(8).as_bytes())?;
+    let mut archive = first.finish()?;
+    let checksum_start = archive.len() - 8;
+    archive[checksum_start] ^= 0xff;
+    let mut unread = GzEncoder::new(Vec::new(), Compression::default());
+    unread.write_all(b"unread later member\n")?;
+    archive.extend(unread.finish()?);
+    std::fs::write(&path, archive)?;
+    fixture.write("healthy.log", &["ready".into()])?;
+    let mut run = fixture.start(
+        "*.log",
+        json!({
+            "fingerprint": {"strategy": "checksum", "bytes": 4},
+            "remove_after_secs": 0
+        }),
+    )?;
+    run.wait_for("gzip read error reported", |seen| seen.read_errors >= 1.0)
+        .await?;
+    // A broken file must not prevent discovery and ingestion of other files.
+    fixture.write("later.log", &["still reading".into()])?;
+    run.wait_for("ingestion continues after read error", |seen| {
+        seen.messages.iter().any(|line| line == "still reading")
+    })
+    .await?;
+    let seen = run.stop(Signal::SIGTERM).await?;
+    assert!(seen.read_errors >= 1.0);
+    assert!(seen.messages.iter().any(|line| line == "ready"));
+    assert!(
+        !seen
+            .messages
+            .iter()
+            .any(|line| line == "unread later member")
+    );
+    assert!(path.exists(), "a failed archive must not be deleted");
+    Ok(())
+}

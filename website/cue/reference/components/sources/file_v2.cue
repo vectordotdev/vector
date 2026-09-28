@@ -17,7 +17,7 @@ components: sources: file_v2: {
 		auto_generated:   true
 		acknowledgements: true
 		collect: {
-			checkpoint: enabled: false
+			checkpoint: enabled: true
 			from: {
 				service: services.files
 
@@ -425,25 +425,7 @@ components: sources: file_v2: {
 				Plain files retain their open handles so Vector can continue reading writes after
 				a rename. The `reader_idle_timeout_secs` option controls retirement at EOF when
 				a file is no longer discoverable.
-				Compressed files retain their decoder and handle until the end of the stream.
-				"""
-		}
-
-		checkpointing: {
-			title: "Checkpointing"
-			body: """
-				The `file_v2` source introduces a new `checkpoint_interval` configuration option that
-				controls how frequently the current read position is saved to disk during normal operation.
-
-				Vector always saves the current read position before a proper shutdown (for example, when
-				receiving SIGINT), so data will not be reprocessed when Vector is gracefully restarted.
-
-				The `checkpoint_interval` setting only affects recovery after an abrupt termination
-				(such as SIGKILL or power loss). In such cases, Vector may reprocess up to `checkpoint_interval`
-				milliseconds worth of data from each file.
-
-				A lower value results in less data being reprocessed if Vector is terminated abruptly,
-				but increases the performance impact of checkpointing during normal operation.
+				Gzip readers retain their decoder and handle across temporary EOFs to read appended members.
 				"""
 		}
 	}

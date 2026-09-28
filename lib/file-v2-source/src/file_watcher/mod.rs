@@ -2,18 +2,22 @@ use std::{
     collections::VecDeque,
     io::{self, SeekFrom},
     path::PathBuf,
+    pin::Pin,
     sync::{Arc, Mutex},
+    task::{ready, Context, Poll},
     time::{Duration, Instant, SystemTime},
 };
 
+use async_compression::tokio::bufread::GzipDecoder;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use tokio::{
     fs::{self, File},
-    io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, BufReader},
+    io::{
+        AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncSeekExt, BufReader, ReadBuf,
+    },
 };
 use tracing::debug;
-use vector_common::compression::gzip_multiple_decoder;
 use vector_common::constants::GZIP_MAGIC;
 
 use crate::{CheckpointsView, FilePosition, ReadFrom};
@@ -185,8 +189,8 @@ pub(super) enum ReadResult {
 /// from a file path, transparently handling file rollovers as is common for logs.
 ///
 /// Plain files retain their handle so writes remain readable after a rename.
-/// Compressed files retain their decoder and handle until EOF so decompression
-/// can continue across read batches.
+/// Compressed files retain their decoder and handle across temporary EOFs so
+/// partially written members and later appended members remain readable.
 ///
 /// The `FileWatcher` is expected to live for the lifetime of the file
 /// path. `FileServer` is responsible for clearing away `FileWatchers` which no
@@ -217,8 +221,118 @@ pub struct FileWatcher {
 
 enum FileReader {
     Plain(BufReader<File>),
-    Gzip(Box<dyn AsyncBufRead + Send + Unpin>),
+    Gzip(Box<BufReader<GzipReader>>),
     Empty,
+}
+
+/// Keeps temporary file EOF away from the codec, which otherwise finalizes or
+/// errors permanently. Only `GzipReader` uses this adapter: it translates this
+/// specific Pending back into temporary EOF for the file server.
+struct GzipInput {
+    reader: BufReader<File>,
+    consumed: u64,
+    at_eof: bool,
+}
+
+impl AsyncBufRead for GzipInput {
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        let this = self.get_mut();
+        match Pin::new(&mut this.reader).poll_fill_buf(cx) {
+            Poll::Ready(Ok([])) => {
+                this.at_eof = true;
+                Poll::Pending
+            }
+            result => {
+                this.at_eof = false;
+                result
+            }
+        }
+    }
+
+    fn consume(self: Pin<&mut Self>, amount: usize) {
+        let this = self.get_mut();
+        Pin::new(&mut this.reader).consume(amount);
+        this.consumed += amount as u64;
+    }
+}
+
+impl AsyncRead for GzipInput {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        output: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        if output.remaining() == 0 {
+            return Poll::Ready(Ok(()));
+        }
+        let input = ready!(self.as_mut().poll_fill_buf(cx))?;
+        let count = input.len().min(output.remaining());
+        output.put_slice(&input[..count]);
+        self.consume(count);
+        Poll::Ready(Ok(()))
+    }
+}
+
+/// Decode one member at a time so clean member boundaries remain distinguishable
+/// from an unfinished header, body, or trailer when a growing file reaches EOF.
+struct GzipReader {
+    // Temporarily taken only while transferring the same input to the next member.
+    decoder: Option<GzipDecoder<GzipInput>>,
+    member_start: u64,
+}
+
+impl GzipReader {
+    fn new(reader: BufReader<File>) -> Self {
+        Self {
+            decoder: Some(Self::decoder(GzipInput {
+                reader,
+                consumed: 0,
+                at_eof: false,
+            })),
+            member_start: 0,
+        }
+    }
+
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "Member boundaries are required for safe deletion and resuming appended gzip data."
+    )]
+    fn decoder(input: GzipInput) -> GzipDecoder<GzipInput> {
+        GzipDecoder::new(input)
+    }
+
+    fn input(&self) -> &GzipInput {
+        self.decoder.as_ref().unwrap().get_ref()
+    }
+
+    fn at_member_boundary(&self) -> bool {
+        self.input().consumed == self.member_start
+    }
+}
+
+impl AsyncRead for GzipReader {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        output: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this = self.get_mut();
+        if output.remaining() == 0 {
+            return Poll::Ready(Ok(()));
+        }
+        loop {
+            let initial = output.filled().len();
+            match Pin::new(this.decoder.as_mut().unwrap()).poll_read(cx, output) {
+                Poll::Ready(Ok(())) if output.filled().len() == initial => {
+                    let input = this.decoder.take().unwrap().into_inner();
+                    this.member_start = input.consumed;
+                    this.decoder = Some(Self::decoder(input));
+                }
+                Poll::Pending if this.input().at_eof => return Poll::Ready(Ok(())),
+                result => return result,
+            }
+        }
+    }
 }
 
 impl FileWatcher {
@@ -285,7 +399,7 @@ impl FileWatcher {
                     (FileReader::Empty, 0)
                 }
                 (true, false, ReadFrom::Beginning) => (
-                    FileReader::Gzip(Box::new(BufReader::new(gzip_multiple_decoder(reader)))),
+                    FileReader::Gzip(Box::new(BufReader::new(GzipReader::new(reader)))),
                     0,
                 ),
                 (false, too_old, read_from) => {
@@ -403,8 +517,17 @@ impl FileWatcher {
             return Ok(false);
         }
         Ok(if self.compressed {
-            // Compressed byte lengths cannot be compared with decoded offsets.
-            metadata.len() == self.opened_length && Some(modified) == self.opened_modified
+            // Decoded offsets do not establish whether a compressed trailer is
+            // complete. Check the consumed compressed bytes at a clean boundary.
+            match &self.reader {
+                FileReader::Gzip(reader) => {
+                    reader.get_ref().at_member_boundary()
+                        && metadata.len() == reader.get_ref().input().consumed
+                        && metadata.len() == self.opened_length
+                        && Some(modified) == self.opened_modified
+                }
+                _ => false,
+            }
         } else {
             metadata.len() == self.file_position
         })
@@ -522,6 +645,10 @@ impl FileWatcher {
             return Ok(ReadResult::Yield);
         }
 
+        let compressed_start = match &self.reader {
+            FileReader::Gzip(reader) => reader.get_ref().input().consumed,
+            _ => 0,
+        };
         let reader: &mut (dyn AsyncBufRead + Send + Unpin) = match &mut self.reader {
             FileReader::Plain(reader) => reader,
             FileReader::Gzip(reader) => reader.as_mut(),
@@ -542,8 +669,10 @@ impl FileWatcher {
             .line_reader
             .read(reader, &mut self.file_position, &mut self.buf, budget)
             .await;
-        if self.file_position != initial_position {
-            // Partial and discarded records are activity too.
+        if self.file_position != initial_position
+            || matches!(&self.reader, FileReader::Gzip(reader) if reader.get_ref().input().consumed != compressed_start)
+        {
+            // Partial compressed members and discarded records are activity too.
             self.idle_since = None;
         }
         match result {
@@ -570,8 +699,15 @@ impl FileWatcher {
             }
             Ok(ReadOutcome::Yield) => Ok(ReadResult::Yield),
             Ok(ReadOutcome::Eof) => {
-                if matches!(self.reader, FileReader::Gzip(_)) {
-                    self.reader = FileReader::Empty;
+                if let FileReader::Gzip(reader) = &self.reader {
+                    let gzip = reader.get_ref();
+                    if gzip.at_member_boundary() && gzip.input().consumed > self.opened_length {
+                        let metadata = gzip.input().reader.get_ref().metadata().await?;
+                        if metadata.len() == gzip.input().consumed {
+                            self.opened_length = metadata.len();
+                            self.opened_modified = metadata.modified().ok();
+                        }
+                    }
                 }
                 // A renamed file can still receive writes through an open handle.
                 // FileServer retires missing readers after an idle timeout at EOF.
@@ -583,6 +719,9 @@ impl FileWatcher {
                 // Some decoders report EOF after an error without reading the
                 // remaining input. That is not proof the file can be deleted.
                 self.deletion_allowed = false;
+                if matches!(self.reader, FileReader::Gzip(_)) {
+                    self.reader = FileReader::Empty;
+                }
                 if let io::ErrorKind::NotFound = e.kind() {
                     self.set_dead();
                 }
@@ -842,6 +981,86 @@ mod tests {
                 (6 + delimiter.len() + 9 + delimiter.len()) as u64
             );
         }
+    }
+
+    #[tokio::test]
+    async fn gzip_appended_members_resume_after_eof_and_rename() {
+        use async_compression::tokio::bufread::GzipEncoder;
+        use tokio::io::AsyncWriteExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input.gz");
+        let mut initial = Vec::new();
+        GzipEncoder::new(b"first\npartial".as_slice())
+            .read_to_end(&mut initial)
+            .await
+            .unwrap();
+        fs::write(&path, initial).await.unwrap();
+        let mut writer = fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .await
+            .unwrap();
+        let mut watcher = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(watcher.read_line().await.unwrap().unwrap().bytes, "first");
+        assert!(watcher.read_line().await.unwrap().is_none());
+        assert!(watcher.reached_eof());
+
+        let rotated = dir.path().join("rotated.gz");
+        fs::rename(&path, &rotated).await.unwrap();
+        watcher.update_path(rotated).await.unwrap();
+        let mut member = Vec::new();
+        GzipEncoder::new(b"_tail\nsecond\n".as_slice())
+            .read_to_end(&mut member)
+            .await
+            .unwrap();
+        let mut start = 0;
+        let mut output = Vec::new();
+        // Pause in the header, compressed body, and trailer. Temporary physical
+        // EOF must neither finalize the decoder nor authorize deleting the file.
+        for end in [1, 10, member.len() - 8, member.len() - 1, member.len()] {
+            writer.write_all(&member[start..end]).await.unwrap();
+            writer.sync_all().await.unwrap();
+            while let Some(line) = watcher.read_line().await.unwrap() {
+                output.push((line.offset, line.bytes));
+            }
+            watcher.delivery_progress.delivered(watcher.file_position);
+            if end != member.len() {
+                assert!(!watcher.ready_to_delete(Duration::ZERO).await.unwrap());
+            }
+            start = end;
+        }
+        assert_eq!(
+            output,
+            [
+                (6, Bytes::from("partial_tail")),
+                (19, Bytes::from("second"))
+            ]
+        );
+        assert_eq!(watcher.file_position, 26);
+        assert!(watcher.ready_to_delete(Duration::ZERO).await.unwrap());
+
+        member.clear();
+        GzipEncoder::new(b"third\n".as_slice())
+            .read_to_end(&mut member)
+            .await
+            .unwrap();
+        writer.write_all(&member).await.unwrap();
+        writer.sync_all().await.unwrap();
+        assert!(!watcher.ready_to_delete(Duration::ZERO).await.unwrap());
+        let third = watcher.read_line().await.unwrap().unwrap();
+        assert_eq!((third.offset, third.bytes), (26, Bytes::from("third")));
+        assert!(watcher.read_line().await.unwrap().is_none());
+        watcher.delivery_progress.delivered(32);
+        assert!(watcher.ready_to_delete(Duration::ZERO).await.unwrap());
     }
 
     #[tokio::test]

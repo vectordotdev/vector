@@ -35,13 +35,15 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
         exclude_patterns: &[PathBuf],
         glob_match_options: MatchOptions,
         emitter: E,
-    ) -> Self {
+    ) -> Result<Self, glob::PatternError> {
         let compile_patterns = |paths: &[PathBuf]| {
             paths
                 .iter()
-                .map(|path| Pattern::new(&path.to_string_lossy()).expect("Invalid glob pattern"))
-                .collect()
+                .map(|path| Pattern::new(&path.to_string_lossy()))
+                .collect::<Result<Vec<_>, _>>()
         };
+        let include_patterns = compile_patterns(include_patterns)?;
+        let exclude_patterns = compile_patterns(exclude_patterns)?;
         let (send, events) = mpsc::channel(100);
         let needs_rescan = Arc::new(AtomicBool::new(false));
         let overflow = Arc::clone(&needs_rescan);
@@ -62,8 +64,8 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
             wake.notify_one();
         });
         let mut provider = Self {
-            include_patterns: compile_patterns(include_patterns),
-            exclude_patterns: compile_patterns(exclude_patterns),
+            include_patterns,
+            exclude_patterns,
             glob_match_options,
             discovered_files: HashSet::new(),
             watcher: None,
@@ -82,7 +84,7 @@ impl<E: FileSourceInternalEvents> NotifyPathsProvider<E> {
                 "Failed to initialize notify watcher, falling back to glob scanning"
             );
         }
-        provider
+        Ok(provider)
     }
 
     fn process_events(&mut self) -> (bool, HashSet<PathBuf>) {
@@ -268,6 +270,7 @@ mod tests {
         fn emit_file_added(&self, _: &Path) {}
         fn emit_file_resumed(&self, _: &Path, _: u64) {}
         fn emit_file_watch_error(&self, _: &Path, _: Error) {}
+        fn emit_file_read_error(&self, _: &Path, _: Error) {}
         fn emit_file_unwatched(&self, _: &Path, _: bool, _: Option<u64>) {}
         fn emit_file_deleted(&self, _: &Path) {}
         fn emit_file_delete_error(&self, _: &Path, _: Error) {}

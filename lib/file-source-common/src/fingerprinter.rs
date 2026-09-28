@@ -812,6 +812,10 @@ mod test {
             panic!();
         }
 
+        fn emit_file_read_error(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
         fn emit_file_unwatched(&self, _: &Path, _: bool, _: Option<u64>) {}
 
         fn emit_file_deleted(&self, _: &Path) {}
