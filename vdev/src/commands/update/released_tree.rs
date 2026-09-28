@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -130,6 +131,7 @@ fn copy_existing_files(source_root: &Path, dest_root: &Path) -> Result<()> {
             Err(error) => failures.push((relative.to_path_buf(), error)),
         }
     }
+    warn_new_files(source_root, dest_root)?;
     if !failures.is_empty() {
         failures.sort_by(|(left, _), (right, _)| left.cmp(right));
         let detail = failures
@@ -143,6 +145,34 @@ fn copy_existing_files(source_root: &Path, dest_root: &Path) -> Result<()> {
         info!("Updating {}", dest.display());
         fs::write(&dest, contents)
             .with_context(|| format!("Could not write {}", dest.display()))?;
+    }
+    Ok(())
+}
+
+/// Warn about release files that are not already vendored.
+///
+/// A file inside a directory we already vendor is named on its own. Files in a
+/// directory we do not vendor produce one warning for that top-level directory.
+fn warn_new_files(source_root: &Path, dest_root: &Path) -> Result<()> {
+    let mut warned_dirs = BTreeSet::new();
+    for path in files_in(source_root)? {
+        let relative = path
+            .strip_prefix(source_root)
+            .context("release path is outside the source")?;
+        if dest_root.join(relative).is_file() {
+            continue;
+        }
+        let mut components = relative.components();
+        let Some(dir) = components.next() else {
+            continue;
+        };
+        if components.next().is_some() && !dest_root.join(dir).is_dir() {
+            if warned_dirs.insert(PathBuf::from(dir.as_os_str())) {
+                warn!("{} is not vendored", Path::new(dir.as_os_str()).display());
+            }
+            continue;
+        }
+        warn!("{} is not vendored", relative.display());
     }
     Ok(())
 }
@@ -320,6 +350,35 @@ mod tests {
                 dest.to_str().unwrap(),
             ],
         );
+    }
+
+    #[test]
+    fn does_not_copy_new_release_files() {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        INIT.call_once(|| crate::app::set_global_verbosity(log::LevelFilter::Off));
+        let directory = TempDir::new().unwrap();
+        let source_root = directory.path().join("source");
+        let dest_root = directory.path().join("dest");
+        fs::create_dir_all(source_root.join("common/v1")).unwrap();
+        fs::create_dir_all(source_root.join("profiles/v1")).unwrap();
+        fs::create_dir_all(dest_root.join("common/v1")).unwrap();
+        fs::write(source_root.join("common/v1/common.proto"), b"new\n").unwrap();
+        fs::write(source_root.join("common/v1/extra.proto"), b"extra\n").unwrap();
+        fs::write(
+            source_root.join("profiles/v1/profiles.proto"),
+            b"profiles\n",
+        )
+        .unwrap();
+        fs::write(dest_root.join("common/v1/common.proto"), b"old\n").unwrap();
+
+        copy_existing_files(&source_root, &dest_root).unwrap();
+
+        assert_eq!(
+            fs::read(dest_root.join("common/v1/common.proto")).unwrap(),
+            b"new\n"
+        );
+        assert!(!dest_root.join("common/v1/extra.proto").exists());
+        assert!(!dest_root.join("profiles").exists());
     }
 
     #[test]
