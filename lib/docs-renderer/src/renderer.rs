@@ -267,12 +267,9 @@ where
             debug!("Cleared description for items schema from top-level array schema.");
         }
 
-        // Apply any necessary defaults, descriptions, and so on, to the rendered schema.
+        // Apply metadata and descriptions to the rendered schema.
         //
-        // This must happen here because there could be callsite-specific overrides to default
-        // values/descriptions/etc which must take precedence, so that must occur after any nested
-        // rendering in order to maintain that precedence.
-        apply_schema_default_value(&schema, &mut data);
+        // Callsite-specific metadata and descriptions take precedence over nested rendering.
         apply_schema_metadata(&schema, &mut data)?;
         apply_schema_description(&schema, &mut data)?;
 
@@ -362,8 +359,6 @@ fn render_bare_schema<T: QueryableSchema>(
 
     Ok(())
 }
-
-fn apply_schema_default_value<T: QueryableSchema>(_schema: T, _data: &mut RenderData) {}
 
 fn apply_schema_metadata<T: QueryableSchema>(
     schema: T,
