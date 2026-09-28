@@ -1069,7 +1069,7 @@ fn get_page_size(use_apiserver_cache: bool) -> Option<u32> {
 ///
 /// A held handle keeps its metric from expiring, and a pod keeps its handles for at most twice
 /// this interval after its last line. Use half the shortest configured expiry, clamped to at
-/// least one nanosecond so a small positive expiry never disables cleanup. Returns `None`
+/// least one millisecond to avoid excessive polling for very short expiries. Returns `None`
 /// when metrics never expire, since held handles then block nothing.
 fn pod_counters_sweep_interval(globals: &GlobalOptions) -> Option<Duration> {
     let per_metric_set = globals
@@ -1084,7 +1084,7 @@ fn pod_counters_sweep_interval(globals: &GlobalOptions) -> Option<Duration> {
         .min_by(f64::total_cmp)?;
     Duration::try_from_secs_f64(shortest / 2.0)
         .ok()
-        .map(|interval| interval.max(Duration::from_nanos(1)))
+        .map(|interval| interval.max(Duration::from_millis(1)))
 }
 
 fn create_event(
@@ -1313,13 +1313,21 @@ mod tests {
     }
 
     #[test]
-    fn pod_counters_sweep_interval_stays_enabled_for_subnanosecond_expiry() {
+    fn pod_counters_sweep_interval_has_millisecond_minimum() {
         let sweep_interval =
             |yaml: &str| super::pod_counters_sweep_interval(&serde_yaml::from_str(yaml).unwrap());
 
         assert_eq!(
             sweep_interval("expire_metrics_secs: 0.0000000001"),
-            Some(Duration::from_nanos(1))
+            Some(Duration::from_millis(1))
+        );
+        assert_eq!(
+            sweep_interval("expire_metrics_secs: 0.001"),
+            Some(Duration::from_millis(1))
+        );
+        assert_eq!(
+            sweep_interval("expire_metrics_secs: 0.004"),
+            Some(Duration::from_millis(2))
         );
         assert_eq!(
             sweep_interval(indoc! {"
@@ -1330,7 +1338,7 @@ mod tests {
                       value: unrelated_metric
                     expire_secs: 0.0000000001
             "}),
-            Some(Duration::from_nanos(1))
+            Some(Duration::from_millis(1))
         );
     }
 
