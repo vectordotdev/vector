@@ -48,6 +48,8 @@ pub(super) fn refresh(spec: &VendorSpec, tag: Option<&str>) -> Result<()> {
         .arg(checkout.path())
         .check_run()
         .with_context(|| format!("Could not clone {} at {tag}", spec.repo_url))?;
+    ensure_tag(checkout.path(), &tag)
+        .with_context(|| format!("{tag} is not a tag in {}", spec.repo_url))?;
 
     let source_root = checkout.path().join(spec.src_rel);
     let dest_root = PathBuf::from(spec.dest);
@@ -55,6 +57,21 @@ pub(super) fn refresh(spec: &VendorSpec, tag: Option<&str>) -> Result<()> {
 
     fs::write(dest_root.join("README.md"), readme(spec, &tag))?;
     Ok(())
+}
+
+fn ensure_tag(checkout: &Path, tag: &str) -> Result<()> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(checkout)
+        .args(["rev-parse", "--verify", "--quiet"])
+        .arg(format!("refs/tags/{tag}"))
+        .output()
+        .with_context(|| format!("Could not verify that {tag} is a tag"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        bail!("{tag} is not a tag")
+    }
 }
 
 fn highest_release_tag(repo: &str, pattern: &Regex) -> Result<String> {
@@ -234,6 +251,75 @@ mod tests {
         assert_eq!(normalize(b"proto"), b"proto\n");
         assert_eq!(normalize(b"proto\n"), b"proto\n");
         assert_eq!(normalize(b"kept \ntrimmed  \r\n"), b"kept\ntrimmed\n");
+    }
+
+    #[test]
+    fn rejects_a_branch_checkout() {
+        let directory = TempDir::new().unwrap();
+        let source = directory.path().join("source");
+        fs::create_dir(&source).unwrap();
+        git(&source, &["init", "-q"]);
+        fs::write(source.join("f"), "tag\n").unwrap();
+        git(&source, &["add", "f"]);
+        git(&source, &["commit", "-qm", "tagged"]);
+        git(
+            &source,
+            &[
+                "-c",
+                "tag.gpgSign=false",
+                "tag",
+                "-a",
+                "v1.0.0",
+                "-m",
+                "v1.0.0",
+            ],
+        );
+        fs::write(source.join("f"), "branch\n").unwrap();
+        git(&source, &["add", "f"]);
+        git(&source, &["commit", "-qm", "branched"]);
+        git(&source, &["branch", "develop"]);
+
+        let tag_checkout = directory.path().join("tag");
+        clone(directory.path(), "v1.0.0", &tag_checkout);
+        ensure_tag(&tag_checkout, "v1.0.0").unwrap();
+
+        let branch_checkout = directory.path().join("branch");
+        clone(directory.path(), "develop", &branch_checkout);
+        assert!(ensure_tag(&branch_checkout, "develop").is_err());
+    }
+
+    fn git(repo: &Path, args: &[&str]) {
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(args)
+            .env("GIT_AUTHOR_NAME", "test")
+            .env("GIT_AUTHOR_EMAIL", "test@example.com")
+            .env("GIT_COMMITTER_NAME", "test")
+            .env("GIT_COMMITTER_EMAIL", "test@example.com")
+            .status()
+            .unwrap();
+        assert!(status.success(), "{args:?}");
+    }
+
+    fn clone(directory: &Path, branch: &str, dest: &Path) {
+        let source = directory.join("source");
+        let url = format!("file://{}", source.display());
+        git(
+            directory,
+            &[
+                "-c",
+                "advice.detachedHead=false",
+                "clone",
+                "-q",
+                "--depth",
+                "1",
+                "--branch",
+                branch,
+                &url,
+                dest.to_str().unwrap(),
+            ],
+        );
     }
 
     #[test]
