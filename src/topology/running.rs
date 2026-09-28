@@ -1368,36 +1368,19 @@ impl RunningTopology {
     ) -> Option<(Self, ShutdownErrorReceiver)> {
         let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
-        let expire_metrics = match (
-            config.global.expire_metrics,
-            config.global.expire_metrics_secs,
-        ) {
-            (Some(e), None) => {
-                warn!(
-                    "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
-                );
-                if e < Duration::from_secs(0) {
-                    None
-                } else {
-                    Some(e.as_secs_f64())
-                }
-            }
-            (Some(_), Some(_)) => {
+        if config.global.expire_metrics.is_some() {
+            if config.global.expire_metrics_secs.is_some() {
                 error!(
                     message = "Cannot set both `expire_metrics` and `expire_metrics_secs`.",
                     internal_log_rate_limit = false
                 );
                 return None;
             }
-            (None, Some(e)) => {
-                if e < 0f64 {
-                    None
-                } else {
-                    Some(e)
-                }
-            }
-            (None, None) => Some(300f64),
-        };
+            warn!(
+                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+            );
+        }
+        let expire_metrics = config.global.effective_expire_metrics_secs();
 
         if let Err(error) = crate::metrics::Controller::get()
             .expect("Metrics must be initialized")
