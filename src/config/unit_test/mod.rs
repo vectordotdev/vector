@@ -38,7 +38,8 @@ use crate::{
     conditions::Condition,
     config::{
         self, Component, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestOutput, loading, loading::ConfigBuilderLoader,
+        TestDefinition, TestInput, TestOutput, enrichment_table_sinks, loading,
+        loading::ConfigBuilderLoader,
     },
     event::{Event, EventMetadata, LogEvent},
     signal,
@@ -447,11 +448,8 @@ async fn build_unit_test(
     // Enrichment tables consume inputs but are referenced dynamically in VRL transforms
     // (via get_enrichment_table_record). Since we can't statically analyze VRL usage,
     // we conservatively include all enrichment table inputs as valid components.
-    config_builder
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, c)| c.as_sink(key).map(|(_, sink)| sink.inputs))
-        .for_each(|i| valid_components.extend(i));
+    enrichment_table_sinks(&config_builder.enrichment_tables)
+        .for_each(|(_, sink)| valid_components.extend(sink.inputs));
 
     // Remove all transforms that are not relevant to the current test
     config_builder.transforms = config_builder

@@ -6,8 +6,8 @@ use indexmap::IndexMap;
 use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
 
 use super::{
-    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
-    transform::get_transform_output_ids,
+    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder, enrichment_table_sinks,
+    enrichment_table_sources, transform::get_transform_output_ids,
 };
 
 /// Minimum value (exclusive) for EWMA alpha options.
@@ -386,11 +386,7 @@ async fn process_partitions(partitions: Vec<Partition>) -> heim::Result<IndexMap
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
-    let table_sources = config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_source(key))
-        .collect::<Vec<_>>();
+    let table_sources = enrichment_table_sources(&config.enrichment_tables).collect::<Vec<_>>();
     let source_ids = config
         .sources
         .iter()
@@ -419,11 +415,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
         .collect::<Vec<_>>()
     });
 
-    let table_sinks = config
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, table)| table.as_sink(key))
-        .collect::<Vec<_>>();
+    let table_sinks = enrichment_table_sinks(&config.enrichment_tables).collect::<Vec<_>>();
     for (input_type, id) in transform_ids.chain(source_ids) {
         if !config
             .transforms

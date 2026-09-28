@@ -29,7 +29,10 @@ use super::{
     task::{Task, TaskOutput},
 };
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
+    config::{
+        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
+        enrichment_table_sinks,
+    },
     event::EventArray,
     extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
@@ -1060,10 +1063,7 @@ impl RunningTopology {
             }
         }
 
-        let unchanged_table_sinks = self
-            .config
-            .enrichment_tables()
-            .filter_map(|(key, table)| table.as_sink(key))
+        let unchanged_table_sinks = enrichment_table_sinks(&self.config.enrichment_tables)
             .filter(|(key, _)| !diff.enrichment_tables.sinks.contains(key))
             .collect::<Vec<_>>();
         let unchanged_sinks = self
@@ -1504,9 +1504,7 @@ fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<O
 }
 
 fn enrichment_table_sink_resources(config: &Config, sink_key: &ComponentKey) -> Vec<Resource> {
-    config
-        .enrichment_tables()
-        .filter_map(|(table_key, table)| table.as_sink(table_key))
+    enrichment_table_sinks(&config.enrichment_tables)
         .find(|(key, _)| key == sink_key)
         .map(|(key, sink)| sink.resources(&key))
         .unwrap_or_default()
@@ -1516,9 +1514,7 @@ fn enrichment_table_sink_buffer(
     config: &Config,
     sink_key: &ComponentKey,
 ) -> Option<vector_lib::buffers::BufferConfig> {
-    config
-        .enrichment_tables()
-        .filter_map(|(table_key, table)| table.as_sink(table_key))
+    enrichment_table_sinks(&config.enrichment_tables)
         .find(|(key, _)| key == sink_key)
         .map(|(_, sink)| sink.buffer)
 }
