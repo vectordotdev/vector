@@ -24,6 +24,37 @@ async fn gzip_exact_output_across_read_batches() -> vector::Result<()> {
 }
 
 #[tokio::test]
+async fn gzip_appended_members_after_eof_and_rename() -> vector::Result<()> {
+    let fixture = Fixture::new()?;
+    let path = fixture.input.join("compressed.log");
+    let mut first = GzEncoder::new(File::create(&path)?, Compression::default());
+    first.write_all(b"first\npartial")?;
+    first.finish()?.sync_all()?;
+    let mut writer = fixture.open_append("compressed.log")?;
+    let mut run = fixture.start(
+        "*.log",
+        json!({"fingerprint": {"strategy": "checksum", "bytes": 1}}),
+    )?;
+    // This tiny file fits in one read turn: the server reaches EOF before
+    // flushing its batch, so observing the record establishes the boundary.
+    run.wait_count(1).await?;
+    std::fs::rename(&path, fixture.input.join("rotated.gz"))?;
+
+    for (contents, count) in [("_tail\nsecond\n", 3), ("third\n", 4)] {
+        let mut member = GzEncoder::new(Vec::new(), Compression::default());
+        member.write_all(contents.as_bytes())?;
+        // Materialize each complete member before appending through the
+        // original handle, which remains valid after the rename.
+        writer.write_all(&member.finish()?)?;
+        writer.sync_all()?;
+        run.wait_count(count).await?;
+    }
+    run.finish_with_messages(&["first", "partial_tail", "second", "third"])
+        .await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn gzip_deletion_uses_delivery_of_decoded_records() -> vector::Result<()> {
     let fixture = Fixture::new()?;
     let expected = records("gzip-deletion", 3);

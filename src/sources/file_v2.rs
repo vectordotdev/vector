@@ -1,4 +1,4 @@
-use std::{convert::TryInto, future, num::NonZeroUsize, path::PathBuf, time::Duration};
+use std::{convert::TryInto, num::NonZeroUsize, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -136,15 +136,11 @@ pub struct FileConfig {
     #[configurable(metadata(docs::examples = "offset"))]
     pub offset_key: Option<OptionalValuePath>,
 
-    /// The interval between writing the current read position to disk during normal operation.
+    /// The interval between persisting file checkpoints to disk, in milliseconds.
     ///
-    /// This controls how frequently the current read position is saved to disk during normal operation.
-    /// Vector always saves the current read position before a proper shutdown (for example, when receiving
-    /// SIGINT), so data will not be reprocessed when Vector is gracefully restarted.
-    /// This setting only affects recovery after an abrupt termination (such as SIGKILL or power loss).
-    /// In such cases, Vector may reprocess up to `checkpoint_interval` seconds worth of data from each file.
-    /// A lower value results in less data being reprocessed if Vector is terminated abruptly,
-    /// but increases the performance impact of checkpointing during normal operation.
+    /// Checkpoints are also persisted during graceful shutdown.
+    /// When end-to-end acknowledgements are enabled, checkpoint progress waits for downstream acknowledgement.
+    /// A shorter interval reduces potential replay after an abrupt stop, at the cost of more frequent disk writes.
     #[serde(default = "default_checkpoint_interval")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::type_unit = "milliseconds"))]
@@ -394,7 +390,7 @@ impl SourceConfig for FileConfig {
 
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        Ok(file_v2_source(
+        file_v2_source(
             self,
             data_dir,
             cx.shutdown,
@@ -405,7 +401,7 @@ impl SourceConfig for FileConfig {
             },
             acknowledgements,
             log_namespace,
-        ))
+        )
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -472,11 +468,10 @@ pub fn file_v2_source(
     out: Senders,
     acknowledgements: bool,
     log_namespace: LogNamespace,
-) -> super::Source {
+) -> crate::Result<super::Source> {
     // the include option must be specified but also must contain at least one entry.
     if config.include.is_empty() {
-        error!(message = "`include` configuration option must contain at least one file pattern.");
-        return Box::pin(future::ready(Err(())));
+        return Err("`include` configuration option must contain at least one file pattern".into());
     }
 
     // Best-effort symlink resolution. This is done since `NotifyPathsProvider` notifies us with
@@ -541,7 +536,7 @@ pub fn file_v2_source(
         .flat_map(|path| [path.clone(), resolve_symlinks(path)])
         .unique()
         .collect::<Vec<PathBuf>>();
-    let ignore_before = calculate_ignore_before(config.ignore_older_secs);
+    let ignore_before = calculate_ignore_before(config.ignore_older_secs)?;
     let checkpoint_interval = config.checkpoint_interval;
     let ignore_checkpoints = config.ignore_checkpoints.unwrap_or(false);
     let read_from = config.read_from.into();
@@ -568,7 +563,7 @@ pub fn file_v2_source(
         &exclude_patterns,
         GlobMatchOptions::default(),
         emitter.clone(),
-    );
+    )?;
 
     let encoding_charset = config.encoding.clone().map(|e| e.charset);
 
@@ -654,7 +649,7 @@ pub fn file_v2_source(
     let checkpoints = checkpointer.view();
     let include_file_metric_tag = config.internal_metrics.include_file_tag;
     let track_handoff = config.remove_after_secs.is_some() && !acknowledgements;
-    Box::pin(async move {
+    Ok(Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
@@ -783,7 +778,7 @@ pub fn file_v2_source(
         )
         .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
         .await
-    })
+    }))
 }
 
 fn wrap_with_line_agg(
@@ -1133,7 +1128,8 @@ mod tests {
                     &[],
                     GlobMatchOptions::default(),
                     emitter.clone(),
-                ),
+                )
+                .unwrap(),
                 max_read_bytes: read_budget,
                 ignore_checkpoints: false,
                 read_from: vector_lib::file_v2_source::ReadFrom::Beginning,
@@ -1212,7 +1208,8 @@ mod tests {
             super::FileSourceInternalEventsEmitter {
                 include_file_metric_tag: false,
             },
-        );
+        )
+        .unwrap();
         std::fs::create_dir(&directory).unwrap();
         let path = directory.join("test.log");
         std::fs::write(&path, "hello\n").unwrap();
@@ -1360,6 +1357,70 @@ mod tests {
             "empty delimiters must fail source construction"
         );
         assert!(result.err().unwrap().to_string().contains("line_delimiter"));
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_glob_patterns() {
+        let dir = tempdir().unwrap();
+        for invalid_include in [true, false] {
+            let mut config = test_default_file_config(&dir);
+            if invalid_include {
+                config.include = vec![dir.path().join("[")];
+            } else {
+                config.exclude = vec![dir.path().join("[")];
+            }
+            let (sender, _receiver) = SourceSender::new_test();
+            let result = config.build(SourceContext::new_test(sender, None)).await;
+            assert!(
+                result.is_err(),
+                "invalid globs must fail source construction"
+            );
+            assert!(
+                result
+                    .err()
+                    .unwrap()
+                    .to_string()
+                    .contains("Pattern syntax error"),
+                "the build error must describe the invalid pattern"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_out_of_range_ignore_older_secs() {
+        let dir = tempdir().unwrap();
+        // Cover conversion overflow, Chrono duration overflow, and a valid
+        // duration whose subtraction would exceed the supported timestamp range.
+        for seconds in [u64::MAX, i64::MAX as u64, 10_000_000_000_000] {
+            let config = FileConfig {
+                ignore_older_secs: Some(seconds),
+                ..test_default_file_config(&dir)
+            };
+            let (sender, _receiver) = SourceSender::new_test();
+            let result = config.build(SourceContext::new_test(sender, None)).await;
+            assert!(result.is_err(), "{seconds} must fail source construction");
+            assert!(
+                result
+                    .err()
+                    .unwrap()
+                    .to_string()
+                    .contains("ignore_older_secs")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn accepts_representable_ignore_older_secs() {
+        let dir = tempdir().unwrap();
+        for seconds in [None, Some(0), Some(86_400), Some(4_000_000_000)] {
+            let config = FileConfig {
+                ignore_older_secs: seconds,
+                ..test_default_file_config(&dir)
+            };
+            let (sender, _receiver) = SourceSender::new_test();
+            let result = config.build(SourceContext::new_test(sender, None)).await;
+            assert!(result.is_ok(), "{seconds:?} must remain a valid age cutoff");
+        }
     }
 
     #[test]
@@ -2303,17 +2364,20 @@ mod tests {
             runtime.block_on(async move {
                 let (tx, mut rx) = SourceSender::new_test();
                 let (_stop, shutdown, _) = ShutdownSignal::new_wired();
-                tokio::spawn(file_v2_source(
-                    &first_config,
-                    first_config.data_dir.clone().unwrap(),
-                    shutdown,
-                    Senders {
-                        source_sender: tx,
-                        test_sender: None,
-                    },
-                    true,
-                    LogNamespace::Legacy,
-                ));
+                tokio::spawn(
+                    file_v2_source(
+                        &first_config,
+                        first_config.data_dir.clone().unwrap(),
+                        shutdown,
+                        Senders {
+                            source_sender: tx,
+                            test_sender: None,
+                        },
+                        true,
+                        LogNamespace::Legacy,
+                    )
+                    .unwrap(),
+                );
                 // Keep the event and its finalizers alive until after the
                 // runtime is gone. Dropping it earlier acknowledges delivery.
                 timeout(Duration::from_secs(5), rx.next())
@@ -3113,17 +3177,20 @@ mod tests {
         fs::write(&path, "P\nA\nB\n").await.unwrap();
         let (tx, mut rx) = SourceSender::new_test();
         let (stop, shutdown, _) = ShutdownSignal::new_wired();
-        let task = tokio::spawn(file_v2_source(
-            &config,
-            dir.path().to_path_buf(),
-            shutdown,
-            Senders {
-                source_sender: tx,
-                test_sender: None,
-            },
-            true,
-            LogNamespace::Legacy,
-        ));
+        let task = tokio::spawn(
+            file_v2_source(
+                &config,
+                dir.path().to_path_buf(),
+                shutdown,
+                Senders {
+                    source_sender: tx,
+                    test_sender: None,
+                },
+                true,
+                LogNamespace::Legacy,
+            )
+            .unwrap(),
+        );
         for (message, status) in [
             ("P", EventStatus::Delivered),
             ("A", EventStatus::Errored),
@@ -3182,17 +3249,20 @@ mod tests {
         healthy_file.sync_all().await.unwrap();
         let (tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let (stop, shutdown, _) = ShutdownSignal::new_wired();
-        let task = tokio::spawn(file_v2_source(
-            &config,
-            dir.path().to_path_buf(),
-            shutdown,
-            Senders {
-                source_sender: tx,
-                test_sender: None,
-            },
-            true,
-            LogNamespace::Legacy,
-        ));
+        let task = tokio::spawn(
+            file_v2_source(
+                &config,
+                dir.path().to_path_buf(),
+                shutdown,
+                Senders {
+                    source_sender: tx,
+                    test_sender: None,
+                },
+                true,
+                LogNamespace::Legacy,
+            )
+            .unwrap(),
+        );
         let mut replayed = Vec::new();
         let mut healthy_replayed = Vec::new();
         timeout(Duration::from_secs(5), async {
@@ -3255,17 +3325,20 @@ mod tests {
             fs::write(&path, "one\ntwo\n").await.unwrap();
             let (tx, mut rx) = SourceSender::new_test();
             let (stop, shutdown, _) = ShutdownSignal::new_wired();
-            let task = tokio::spawn(file_v2::file_v2_source(
-                &config,
-                config.data_dir.clone().unwrap(),
-                shutdown,
-                Senders {
-                    source_sender: tx,
-                    test_sender: None,
-                },
-                acknowledgements,
-                LogNamespace::Legacy,
-            ));
+            let task = tokio::spawn(
+                file_v2::file_v2_source(
+                    &config,
+                    config.data_dir.clone().unwrap(),
+                    shutdown,
+                    Senders {
+                        source_sender: tx,
+                        test_sender: None,
+                    },
+                    acknowledgements,
+                    LogNamespace::Legacy,
+                )
+                .unwrap(),
+            );
             let mut events = Vec::new();
             for _ in 0..2 {
                 events.push(
@@ -3340,17 +3413,20 @@ mod tests {
             .flat_map(vector_lib::event::into_event_stream);
         let (test_tx, mut test_rx) = mpsc::unbounded_channel();
         let (stop, shutdown, _) = ShutdownSignal::new_wired();
-        let task = tokio::spawn(file_v2::file_v2_source(
-            &config,
-            config.data_dir.clone().unwrap(),
-            shutdown,
-            Senders {
-                source_sender: tx,
-                test_sender: Some(test_tx),
-            },
-            false,
-            LogNamespace::Legacy,
-        ));
+        let task = tokio::spawn(
+            file_v2::file_v2_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                shutdown,
+                Senders {
+                    source_sender: tx,
+                    test_sender: Some(test_tx),
+                },
+                false,
+                LogNamespace::Legacy,
+            )
+            .unwrap(),
+        );
         wait_checkpoint_and_n_reads(&mut test_rx, vec![&path], 2000, 5000).await;
         sleep(Duration::from_secs(2)).await;
         assert!(path.exists(), "deleted while output was blocked");
@@ -3393,17 +3469,20 @@ mod tests {
             .flat_map(vector_lib::event::into_event_stream);
         let (test_tx, mut test_rx) = mpsc::unbounded_channel();
         let (stop, shutdown, _) = ShutdownSignal::new_wired();
-        let mut task = tokio::spawn(file_v2::file_v2_source(
-            &config,
-            config.data_dir.clone().unwrap(),
-            shutdown,
-            Senders {
-                source_sender: tx,
-                test_sender: Some(test_tx),
-            },
-            false,
-            LogNamespace::Legacy,
-        ));
+        let mut task = tokio::spawn(
+            file_v2::file_v2_source(
+                &config,
+                config.data_dir.clone().unwrap(),
+                shutdown,
+                Senders {
+                    source_sender: tx,
+                    test_sender: Some(test_tx),
+                },
+                false,
+                LogNamespace::Legacy,
+            )
+            .unwrap(),
+        );
         wait_checkpoint_and_n_reads(&mut test_rx, vec![&path], 2000, 5000).await;
         drop(stop);
         assert!(
@@ -3463,17 +3542,20 @@ mod tests {
             let data_dir = config.data_dir.clone().unwrap();
             let acks = !matches!(acking_mode, NoAcks);
 
-            tokio::spawn(file_v2::file_v2_source(
-                config,
-                data_dir,
-                shutdown,
-                Senders {
-                    source_sender: tx,
-                    test_sender,
-                },
-                acks,
-                log_namespace,
-            ));
+            tokio::spawn(
+                file_v2::file_v2_source(
+                    config,
+                    data_dir,
+                    shutdown,
+                    Senders {
+                        source_sender: tx,
+                        test_sender,
+                    },
+                    acks,
+                    log_namespace,
+                )
+                .unwrap(),
+            );
 
             inner.await;
 

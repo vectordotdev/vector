@@ -34,6 +34,7 @@ pub(super) struct Observed {
     pub(super) received_events: f64,
     pub(super) open_files: Option<f64>,
     pub(super) oversized_errors: f64,
+    pub(super) read_errors: f64,
     pub(super) discarded_events: f64,
 }
 
@@ -54,6 +55,15 @@ impl Observed {
                 self.oversized_errors = event["counter"]["value"]
                     .as_f64()
                     .ok_or("missing error count")?;
+            }
+            if event["name"] == "component_errors_total"
+                && event["tags"]["error_code"] == "reading_file"
+            {
+                assert_eq!(event["tags"]["error_type"], "reader_failed");
+                assert_eq!(event["tags"]["stage"], "receiving");
+                self.read_errors = event["counter"]["value"]
+                    .as_f64()
+                    .ok_or("missing read error count")?;
             }
             if event["name"] == "component_discarded_events_total" {
                 self.discarded_events = event["counter"]["value"]

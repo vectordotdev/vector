@@ -330,7 +330,14 @@ where
             for (&file_id, watcher) in &mut fp_map {
                 let mut bytes_read = 0;
                 let previous_position = watcher.get_file_position();
-                if watcher.check_for_truncation().await.is_ok() {
+                let ready = match watcher.check_for_truncation().await {
+                    Ok(()) => true,
+                    Err(error) => {
+                        self.emitter.emit_file_read_error(&watcher.path, error);
+                        false
+                    }
+                };
+                if ready {
                     if previous_position > 0 && watcher.get_file_position() == 0 {
                         checkpoints.update(file_id, 0);
                     }
@@ -358,7 +365,11 @@ where
                                 );
                                 continue;
                             }
-                            Ok(ReadResult::Yield | ReadResult::Eof) | Err(_) => break,
+                            Ok(ReadResult::Yield | ReadResult::Eof) => break,
+                            Err(error) => {
+                                self.emitter.emit_file_read_error(&watcher.path, error);
+                                break;
+                            }
                         };
                         let sz = line.bytes.len();
                         trace!(
@@ -610,8 +621,17 @@ async fn checkpoint_writer(
     checkpointer
 }
 
-pub fn calculate_ignore_before(ignore_older_secs: Option<u64>) -> Option<DateTime<Utc>> {
-    ignore_older_secs.map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64))
+pub fn calculate_ignore_before(
+    ignore_older_secs: Option<u64>,
+) -> Result<Option<DateTime<Utc>>, &'static str> {
+    ignore_older_secs
+        .map(|secs| {
+            chrono::Duration::from_std(Duration::from_secs(secs))
+                .ok()
+                .and_then(|duration| Utc::now().checked_sub_signed(duration))
+                .ok_or("`ignore_older_secs` exceeds the supported timestamp range")
+        })
+        .transpose()
 }
 
 /// A sentinel type to signal that file server was gracefully shut down.

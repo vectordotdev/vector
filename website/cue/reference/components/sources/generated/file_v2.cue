@@ -20,15 +20,11 @@ generated: components: sources: file_v2: configuration: {
 	}
 	checkpoint_interval: {
 		description: """
-			The interval between writing the current read position to disk during normal operation.
+			The interval between persisting file checkpoints to disk, in milliseconds.
 
-			This controls how frequently the current read position is saved to disk during normal operation.
-			Vector always saves the current read position before a proper shutdown (for example, when receiving
-			SIGINT), so data will not be reprocessed when Vector is gracefully restarted.
-			This setting only affects recovery after an abrupt termination (such as SIGKILL or power loss).
-			In such cases, Vector may reprocess up to `checkpoint_interval` seconds worth of data from each file.
-			A lower value results in less data being reprocessed if Vector is terminated abruptly,
-			but increases the performance impact of checkpointing during normal operation.
+			Checkpoints are also persisted during graceful shutdown.
+			When end-to-end acknowledgements are enabled, checkpoint progress waits for downstream acknowledgement.
+			A shorter interval reduces potential replay after an abrupt stop, at the cost of more frequent disk writes.
 			"""
 		required: false
 		type: uint: {

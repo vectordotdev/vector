@@ -77,6 +77,44 @@ impl InternalEvent for FileBytesSent<'_> {
 }
 
 #[derive(Debug, NamedInternalEvent)]
+pub struct FileReadError<'a> {
+    pub file: &'a std::path::Path,
+    pub error: std::io::Error,
+    pub include_file_metric_tag: bool,
+}
+
+impl InternalEvent for FileReadError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed reading file.",
+            file = %self.file.display(),
+            error = %self.error,
+            error_code = "reading_file",
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::RECEIVING,
+            internal_log_rate_limit = true,
+        );
+        if self.include_file_metric_tag {
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "reading_file",
+                "error_type" => error_type::READER_FAILED,
+                "stage" => error_stage::RECEIVING,
+                "file" => self.file.to_string_lossy().into_owned(),
+            )
+        } else {
+            counter!(
+                CounterName::ComponentErrorsTotal,
+                "error_code" => "reading_file",
+                "error_type" => error_type::READER_FAILED,
+                "stage" => error_stage::RECEIVING,
+            )
+        }
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct FileIoError<'a, P> {
     pub error: std::io::Error,
     pub code: &'static str,
@@ -160,7 +198,7 @@ mod source {
         json_size::JsonSize,
     };
 
-    use super::{FileOpen, InternalEvent};
+    use super::{FileOpen, FileReadError, InternalEvent};
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct FileBytesReceived<'a> {
@@ -627,6 +665,14 @@ mod source {
                 file,
                 error,
                 include_file_metric_tag: self.include_file_metric_tag
+            });
+        }
+
+        fn emit_file_read_error(&self, file: &Path, error: Error) {
+            emit!(FileReadError {
+                file,
+                error,
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 

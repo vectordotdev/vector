@@ -2,8 +2,8 @@ use vector_lib::{configurable::configurable_component, internal_event::InternalE
 
 pub use self::source::*;
 pub use super::file::{
-    FileAdded, FileCheckpointed, FileChecksumFailed, FileDeleted, FileOpen, FileResumed,
-    FileUnwatched,
+    FileAdded, FileCheckpointed, FileChecksumFailed, FileDeleted, FileOpen, FileReadError,
+    FileResumed, FileUnwatched,
 };
 
 /// Configuration of internal metrics for file-based components.
@@ -28,8 +28,8 @@ mod source {
     use crate::internal_events::FileLineTooBigError;
 
     use super::{
-        FileAdded, FileCheckpointed, FileChecksumFailed, FileDeleted, FileOpen, FileResumed,
-        FileUnwatched, InternalEvent,
+        FileAdded, FileCheckpointed, FileChecksumFailed, FileDeleted, FileOpen, FileReadError,
+        FileResumed, FileUnwatched, InternalEvent,
     };
     use vector_lib::emit;
     use vector_lib::internal_event::{error_stage, error_type};
@@ -266,6 +266,14 @@ mod source {
                 file,
                 error,
                 include_file_metric_tag: self.include_file_metric_tag
+            });
+        }
+
+        fn emit_file_read_error(&self, file: &Path, error: Error) {
+            emit!(FileReadError {
+                file,
+                error,
+                include_file_metric_tag: self.include_file_metric_tag,
             });
         }
 
