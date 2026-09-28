@@ -663,12 +663,47 @@ components: sources: internal_metrics: {
 			}
 		}
 		files_unwatched_total: {
-			description:       "The total number of times Vector has stopped watching a file."
+			description:       "The total number of times Vector has stopped watching a file, regardless of whether the unread-byte count is known. Emitted by the `file` and `kubernetes_logs` sources."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: _internal_metrics_tags & {
-				file: _file
+			tags: _component_tags & {
+				file: {
+					description: "The path of the file Vector stopped watching. Included when `internal_metrics.include_file_tag` is enabled."
+					required:    false
+				}
+				reached_eof: {
+					description: "Whether the reader had reached the end of the file when Vector stopped watching it. This does not indicate whether the unread-byte count is known."
+					required:    true
+					enum: {
+						"true":  "The reader had reached the end of the file."
+						"false": "The reader had not reached the end of the file."
+					}
+				}
 			}
+		}
+		files_unwatched_bytes_unread_total: {
+			description: """
+				The total known number of unread bytes remaining when the `file` or
+				`kubernetes_logs` source stops watching a file. A measured zero means no
+				bytes remained unread at measurement time. Unknown counts are excluded
+				and increment `files_unwatched_with_unknown_bytes_total` instead.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              files_unwatched_total.tags
+		}
+		files_unwatched_with_unknown_bytes_total: {
+			description: """
+				The total number of times the `file` or `kubernetes_logs` source stops
+				watching a file whose unread-byte count cannot be determined. This
+				includes metadata failures, gzipped files, and skipped gzip readers.
+				The counter increments by one per unwatch event; it does not measure
+				unread or lost bytes. Gzip files are not decompressed solely to calculate
+				this telemetry.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              files_unwatched_total.tags
 		}
 		open_files: {
 			description:       "The total number of open files."
