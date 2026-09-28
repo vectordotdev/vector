@@ -6,7 +6,8 @@ use chrono::{DateTime, Utc};
 use vector_common::byte_size_of::ByteSizeOf;
 
 use super::{
-    Attributes, DatadogSpanContext, SpanId, SpanKind, SpanStatus, TraceFlags, TraceId, TraceState,
+    Attributes, DatadogSpanContext, OtlpSpanFlags, SpanId, SpanKind, SpanStatus, TraceId,
+    TraceState,
 };
 
 /// In-band dropped-item count (`dropped_*_count` on OTLP and this model).
@@ -119,7 +120,7 @@ pub struct Span {
     /// Raw W3C `tracestate`.
     pub trace_state: TraceState,
     /// OTLP flags bitfield.
-    pub flags: TraceFlags,
+    pub flags: OtlpSpanFlags,
     /// Span name.
     pub name: String,
     /// Span kind.
@@ -154,7 +155,7 @@ impl Span {
             span_id,
             parent_span_id: None,
             trace_state: TraceState::default(),
-            flags: TraceFlags::none(),
+            flags: OtlpSpanFlags::none(),
             name: name.into(),
             kind: SpanKind::Unspecified,
             start_time: DateTime::<Utc>::UNIX_EPOCH,
@@ -212,7 +213,7 @@ pub struct SpanLink {
     /// Raw W3C `tracestate`.
     pub trace_state: TraceState,
     /// OTLP flags bitfield.
-    pub flags: TraceFlags,
+    pub flags: OtlpSpanFlags,
     /// Link attributes.
     pub attributes: Attributes,
     /// Dropped attributes.

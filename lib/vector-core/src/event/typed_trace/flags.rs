@@ -9,7 +9,7 @@ use vector_common::byte_size_of::ByteSizeOf;
 /// [`From<u32>`] keeps the raw word; [`Self::truncate`] drops bits that have no named flag.
 #[bitmask(u32)]
 #[derive(Default)]
-pub enum TraceFlags {
+pub enum OtlpSpanFlags {
     /// W3C sampled bit (`traceparent` flags low bit).
     SAMPLED = 0x0001,
     /// OTLP bit indicating that [`Self::CONTEXT_IS_REMOTE`] is meaningful.
@@ -18,7 +18,7 @@ pub enum TraceFlags {
     CONTEXT_IS_REMOTE = 0x0200,
 }
 
-impl TraceFlags {
+impl OtlpSpanFlags {
     /// Low 8 bits, the W3C trace-flags byte.
     #[must_use]
     #[allow(clippy::cast_possible_truncation)] // W3C flags occupy only the low byte.
@@ -37,7 +37,7 @@ impl TraceFlags {
     }
 }
 
-impl ByteSizeOf for TraceFlags {
+impl ByteSizeOf for OtlpSpanFlags {
     fn allocated_bytes(&self) -> usize {
         0
     }
@@ -197,31 +197,31 @@ fn append_unless_key(
 mod tests {
     use similar_asserts::assert_eq;
 
-    use super::{TraceFlags, TraceState};
+    use super::{OtlpSpanFlags, TraceState};
 
     #[test]
     fn trace_flags_retain_unknown_bits_and_remoteness() {
-        let flags = TraceFlags::from(0x8000_0001);
-        assert!(flags.contains(TraceFlags::SAMPLED));
+        let flags = OtlpSpanFlags::from(0x8000_0001);
+        assert!(flags.contains(OtlpSpanFlags::SAMPLED));
         assert_eq!(flags.bits() & 0x8000_0000, 0x8000_0000);
         assert_eq!(flags.w3c_byte(), 0x01);
         assert_eq!(flags.context_is_remote(), None);
 
-        let unknown = TraceFlags::from(0x0000_0004);
+        let unknown = OtlpSpanFlags::from(0x0000_0004);
         assert_eq!(unknown.w3c_byte(), 0x04);
-        assert!(!unknown.contains(TraceFlags::SAMPLED));
+        assert!(!unknown.contains(OtlpSpanFlags::SAMPLED));
 
-        let local = TraceFlags::CONTEXT_HAS_IS_REMOTE;
+        let local = OtlpSpanFlags::CONTEXT_HAS_IS_REMOTE;
         assert_eq!(local.context_is_remote(), Some(false));
 
-        let remote = TraceFlags::CONTEXT_HAS_IS_REMOTE | TraceFlags::CONTEXT_IS_REMOTE;
+        let remote = OtlpSpanFlags::CONTEXT_HAS_IS_REMOTE | OtlpSpanFlags::CONTEXT_IS_REMOTE;
         assert_eq!(remote.context_is_remote(), Some(true));
 
-        let remote_without_presence = TraceFlags::CONTEXT_IS_REMOTE;
+        let remote_without_presence = OtlpSpanFlags::CONTEXT_IS_REMOTE;
         assert_eq!(remote_without_presence.context_is_remote(), None);
         assert_eq!(
-            remote_without_presence.bits() & TraceFlags::CONTEXT_IS_REMOTE.bits(),
-            TraceFlags::CONTEXT_IS_REMOTE.bits()
+            remote_without_presence.bits() & OtlpSpanFlags::CONTEXT_IS_REMOTE.bits(),
+            OtlpSpanFlags::CONTEXT_IS_REMOTE.bits()
         );
     }
 
