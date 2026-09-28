@@ -83,11 +83,6 @@ use self::{
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
-/// How often the source releases the cached counters of the pods that stopped logging, so
-/// that their metrics can expire. A pod keeps its handles for at most twice this interval
-/// after its last line.
-const POD_COUNTERS_SWEEP_INTERVAL: Duration = Duration::from_secs(10);
-
 /// Configuration for the `kubernetes_logs` source.
 #[serde_as]
 #[configurable_component(source("kubernetes_logs", "Collect Pod logs from Kubernetes Nodes."))]
@@ -621,6 +616,7 @@ struct Source {
     delay_deletion: Duration,
     include_file_metric_tag: bool,
     rotate_wait: Duration,
+    pod_counters_sweep_interval: Option<Duration>,
 }
 
 impl Source {
@@ -711,6 +707,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
+            pod_counters_sweep_interval: pod_counters_sweep_interval(globals),
         })
     }
 
@@ -749,6 +746,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
+            pod_counters_sweep_interval,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -1025,12 +1023,12 @@ impl Source {
             });
             slot.bind(Box::pin(fut));
         }
-        {
+        if let Some(sweep_interval) = pod_counters_sweep_interval {
             let (slot, mut shutdown) = lifecycle.add();
             let fut = async move {
                 let mut sweeps = tokio::time::interval_at(
-                    tokio::time::Instant::now() + POD_COUNTERS_SWEEP_INTERVAL,
-                    POD_COUNTERS_SWEEP_INTERVAL,
+                    tokio::time::Instant::now() + sweep_interval,
+                    sweep_interval,
                 );
                 sweeps.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
                 loop {
@@ -1065,6 +1063,28 @@ fn get_page_size(use_apiserver_cache: bool) -> Option<u32> {
     } else {
         watcher::Config::default().page_size
     }
+}
+
+/// Returns how often the source releases the cached counters of the pods that stopped logging.
+///
+/// A held handle keeps its metric from expiring, and a pod keeps its handles for at most twice
+/// this interval after its last line. Half the shortest configured expiry therefore releases the
+/// handles before the metrics are due to expire. Returns `None` when metrics never expire, since
+/// held handles then block nothing.
+fn pod_counters_sweep_interval(globals: &GlobalOptions) -> Option<Duration> {
+    let per_metric_set = globals
+        .expire_metrics_per_metric_set
+        .iter()
+        .flatten()
+        .map(|set| set.expire_secs);
+    let shortest = globals
+        .effective_expire_metrics_secs()
+        .into_iter()
+        .chain(per_metric_set)
+        .min_by(f64::total_cmp)?;
+    Duration::try_from_secs_f64(shortest / 2.0)
+        .ok()
+        .filter(|interval| !interval.is_zero())
 }
 
 fn create_event(
@@ -1254,6 +1274,8 @@ fn resolve_max_line_bytes(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use indoc::indoc;
     use similar_asserts::assert_eq;
     use vector_lib::{
@@ -1270,6 +1292,24 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn pod_counters_sweep_interval_follows_shortest_metric_expiry() {
+        let sweep_interval =
+            |yaml: &str| super::pod_counters_sweep_interval(&serde_yaml::from_str(yaml).unwrap());
+
+        // Metrics expire after 300 seconds by default.
+        assert_eq!(sweep_interval(""), Some(Duration::from_secs(150)));
+        assert_eq!(sweep_interval("expire_metrics_secs: -1.0"), None);
+        assert_eq!(
+            sweep_interval(indoc! {"
+                expire_metrics_secs: 600.0
+                expire_metrics_per_metric_set:
+                  - expire_secs: 60.0
+            "}),
+            Some(Duration::from_secs(30))
+        );
     }
 
     #[test]
