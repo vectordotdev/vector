@@ -4,7 +4,12 @@
 //! running inside the cluster as a DaemonSet.
 
 #![deny(missing_docs)]
-use std::{cmp::min, path::PathBuf, time::Duration};
+use std::{
+    cmp::min,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -77,6 +82,11 @@ use self::{
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
+
+/// How often the source releases the cached counters of the pods that stopped logging, so
+/// that their metrics can expire. A pod keeps its handles for at most twice this interval
+/// after its last line.
+const POD_COUNTERS_SWEEP_INTERVAL: Duration = Duration::from_secs(10);
 
 /// Configuration for the `kubernetes_logs` source.
 #[serde_as]
@@ -905,7 +915,10 @@ impl Source {
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
-        let mut pod_counters = PodCountersCache::default();
+        // The line stream and the sweep below both run on this task, so the lock is never
+        // contended.
+        let pod_counters = Arc::new(Mutex::new(PodCountersCache::default()));
+        let swept_pod_counters = Arc::clone(&pod_counters);
         let events = events.map(move |line| {
             let byte_size = line.text.len();
             bytes_received.emit(ByteSize(byte_size));
@@ -927,7 +940,7 @@ impl Source {
                 pod: file_info
                     .as_ref()
                     .map(|info| (info.pod_name, info.pod_namespace)),
-                counters: &mut pod_counters,
+                counters: &mut pod_counters.lock().expect("Pod counters mutex is poisoned"),
             });
 
             if file_info.is_none() {
@@ -1010,6 +1023,28 @@ impl Source {
                     }),
                 };
             });
+            slot.bind(Box::pin(fut));
+        }
+        {
+            let (slot, mut shutdown) = lifecycle.add();
+            let fut = async move {
+                let mut sweeps = tokio::time::interval_at(
+                    tokio::time::Instant::now() + POD_COUNTERS_SWEEP_INTERVAL,
+                    POD_COUNTERS_SWEEP_INTERVAL,
+                );
+                sweeps.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                loop {
+                    tokio::select! {
+                        () = &mut shutdown => break,
+                        _ = sweeps.tick() => {
+                            swept_pod_counters
+                                .lock()
+                                .expect("Pod counters mutex is poisoned")
+                                .remove_idle();
+                        }
+                    }
+                }
+            };
             slot.bind(Box::pin(fut));
         }
 
