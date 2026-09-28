@@ -1068,9 +1068,9 @@ fn get_page_size(use_apiserver_cache: bool) -> Option<u32> {
 /// Returns how often the source releases the cached counters of the pods that stopped logging.
 ///
 /// A held handle keeps its metric from expiring, and a pod keeps its handles for at most twice
-/// this interval after its last line. Half the shortest configured expiry therefore releases the
-/// handles before the metrics are due to expire. Returns `None` when metrics never expire, since
-/// held handles then block nothing.
+/// this interval after its last line. Use half the shortest configured expiry, clamped to at
+/// least one nanosecond so a small positive expiry never disables cleanup. Returns `None`
+/// when metrics never expire, since held handles then block nothing.
 fn pod_counters_sweep_interval(globals: &GlobalOptions) -> Option<Duration> {
     let per_metric_set = globals
         .expire_metrics_per_metric_set
@@ -1084,7 +1084,7 @@ fn pod_counters_sweep_interval(globals: &GlobalOptions) -> Option<Duration> {
         .min_by(f64::total_cmp)?;
     Duration::try_from_secs_f64(shortest / 2.0)
         .ok()
-        .filter(|interval| !interval.is_zero())
+        .map(|interval| interval.max(Duration::from_nanos(1)))
 }
 
 fn create_event(
@@ -1309,6 +1309,28 @@ mod tests {
                   - expire_secs: 60.0
             "}),
             Some(Duration::from_secs(30))
+        );
+    }
+
+    #[test]
+    fn pod_counters_sweep_interval_stays_enabled_for_subnanosecond_expiry() {
+        let sweep_interval =
+            |yaml: &str| super::pod_counters_sweep_interval(&serde_yaml::from_str(yaml).unwrap());
+
+        assert_eq!(
+            sweep_interval("expire_metrics_secs: 0.0000000001"),
+            Some(Duration::from_nanos(1))
+        );
+        assert_eq!(
+            sweep_interval(indoc! {"
+                expire_metrics_secs: 600.0
+                expire_metrics_per_metric_set:
+                  - name:
+                      type: exact
+                      value: unrelated_metric
+                    expire_secs: 0.0000000001
+            "}),
+            Some(Duration::from_nanos(1))
         );
     }
 
