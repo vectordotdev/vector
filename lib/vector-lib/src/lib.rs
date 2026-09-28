@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 pub use codecs;
 pub use enrichment;
 #[cfg(feature = "file-source")]
