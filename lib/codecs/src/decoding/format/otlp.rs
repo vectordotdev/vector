@@ -300,6 +300,7 @@ mod tests {
                         span_id: TEST_SPAN_ID.to_vec(),
                         trace_state: String::new(),
                         parent_span_id: vec![],
+                        flags: 0,
                         name: "test_span".to_string(),
                         kind: 0,
                         start_time_unix_nano: 1234567890,

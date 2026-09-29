@@ -55,6 +55,9 @@ message ResourceMetrics {
   // A list of metrics that originate from a resource.
   repeated ScopeMetrics scope_metrics = 2;
 
+  // The Schema URL, if known. This is the identifier of the Schema that the resource data
+  // is recorded in. To learn more about Schema URL see
+  // https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
   // This schema_url applies to the data in the "resource" field. It does not apply
   // to the data in the "scope_metrics" field which have their own schema_url field.
   string schema_url = 3;
@@ -70,6 +73,9 @@ message ScopeMetrics {
   // A list of metrics that originate from an instrumentation library.
   repeated Metric metrics = 2;
 
+  // The Schema URL, if known. This is the identifier of the Schema that the metric data
+  // is recorded in. To learn more about Schema URL see
+  // https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
   // This schema_url applies to all metrics in the "metrics" field.
   string schema_url = 3;
 }
@@ -162,7 +168,7 @@ message ScopeMetrics {
 message Metric {
   reserved 4, 6, 8;
 
-  // name of the metric, including its DNS name prefix. It must be unique.
+  // name of the metric.
   string name = 1;
 
   // description of the metric, which can be used in documentation.

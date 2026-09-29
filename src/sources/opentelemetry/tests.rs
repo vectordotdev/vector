@@ -183,6 +183,7 @@ fn create_test_traces_request() -> ExportTraceServiceRequest {
                     trace_id: (1..17).collect::<Vec<u8>>(),
                     span_id: (1..9).collect::<Vec<u8>>(),
                     parent_span_id: (1..9).collect::<Vec<u8>>(),
+                    flags: 0,
                     name: "span".to_string(),
                     kind: 1,
                     start_time_unix_nano: 1713525203000000000,

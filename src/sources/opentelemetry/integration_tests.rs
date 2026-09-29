@@ -128,6 +128,7 @@ async fn receive_trace() {
                     trace_id: (1..17).collect_vec(),      //trace_id [u8;16]
                     span_id: (1..9).collect_vec(),        // span_id [u8;8]
                     parent_span_id: (1..9).collect_vec(), // parent_span_id [u8;8]
+                    flags: 0,
                     name: "span".to_string(),
                     kind: 1,
                     start_time_unix_nano: 1713525203000000000,
