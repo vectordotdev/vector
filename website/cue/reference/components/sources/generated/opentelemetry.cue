@@ -105,6 +105,25 @@ generated: components: sources: opentelemetry: configuration: {
 			}
 		}
 	}
+	max_concurrent_requests: {
+		description: """
+			Maximum number of requests processed concurrently across the HTTP and gRPC servers.
+
+			Requests beyond this limit are rejected. When omitted, no request concurrency limit is enforced.
+			"""
+		required: false
+		type: uint: {}
+	}
+	request_timeout_secs: {
+		description: """
+			Maximum time spent processing a request through submission to the source output.
+
+			When omitted, no request processing timeout is enforced. Downstream acknowledgement waiting
+			is not subject to this timeout.
+			"""
+		required: false
+		type: uint: unit: "seconds"
+	}
 	use_otlp_decoding: {
 		description: """
 			Configuration for OTLP decoding behavior.
