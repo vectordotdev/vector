@@ -76,6 +76,8 @@ const EVENT_CLASSES: &[(&str, EventClass)] = &[
 ];
 
 #[derive(Debug, Default, Clone)]
+// These are independent, source-controlled checker exemptions rather than states.
+#[allow(clippy::struct_excessive_bools)]
 struct SkipFlags {
     dropped_events: bool,
     dropped_events_name: bool,

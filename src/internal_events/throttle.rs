@@ -21,8 +21,9 @@ impl InternalEvent for ThrottleEventDiscarded {
             counter!(CounterName::EventsDiscardedTotal, "key" => self.key.clone()).increment(1); // Deprecated.
         }
 
+        let dropped_message = "Events dropped";
         debug!(
-            message = "Events dropped.",
+            message = dropped_message,
             intentional = true,
             count = 1,
             reason = message,
