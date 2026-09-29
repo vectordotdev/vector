@@ -128,8 +128,8 @@ generated: components: sinks: datadog_logs: configuration: {
 			to not set it above 5,000,000 (5 MB, the standard Datadog API limit). Increase
 			this when targeting a compatible endpoint that accepts larger payloads. The batch
 			goal is derived as `max_payload_bytes - 750,000` bytes; events larger than the
-			batch goal are sent alone in their batch. Events exceeding `max_payload_bytes` are
-			dropped.
+			batch goal are sent alone in their batch. Single events that still exceed
+			`max_payload_bytes` after optional truncation are dropped.
 			"""
 		required: false
 		type: uint: default: 5000000
@@ -158,5 +158,29 @@ generated: components: sinks: datadog_logs: configuration: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
 		type:        _schemaDefinitions["core::option::Option<vector_core::tls::settings::TlsEnableableConfig>"]
+	}
+	truncate_oversized_logs: {
+		description: """
+			Truncate logs whose encoded JSON exceeds `max_log_bytes`.
+
+			When a message is shortened, at most `max_message_bytes` raw bytes are retained and
+			`...TRUNCATED...` is appended. Every reduced log is tagged with `truncated:single_line`.
+			If the log remains oversized after the initial message cap, non-standard fields are removed
+			before the message is shortened further to account for JSON encoding. Logs that still
+			exceed the limit, or have no string message to truncate, are dropped.
+			"""
+		required: false
+		type: object: options: {
+			max_log_bytes: {
+				description: "Maximum encoded size, in bytes, of a log before truncation is applied."
+				required:    false
+				type: uint: default: 1000000
+			}
+			max_message_bytes: {
+				description: "Maximum number of message bytes to retain before appending the truncation marker."
+				required:    false
+				type: uint: default: 900000
+			}
+		}
 	}
 }

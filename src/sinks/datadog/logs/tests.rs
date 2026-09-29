@@ -19,6 +19,7 @@ use crate::{
     extra_context::ExtraContext,
     http::HttpError,
     sinks::{
+        VectorSink,
         datadog::test_utils::{ApiStatus, test_server},
         util::{
             retries::RetryLogic,
@@ -26,13 +27,13 @@ use crate::{
         },
     },
     test_util::{
-        addr::next_addr,
+        addr::{PortGuard, next_addr},
         components::{
             COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, SINK_TAGS,
             run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
             run_and_assert_sink_error,
         },
-        random_lines_with_stream,
+        generate_lines_with_stream, random_lines_with_stream,
     },
     tls::TlsError,
 };
@@ -50,6 +51,25 @@ enum TestType {
     Happy,
     Telemetry,
     Error,
+}
+
+async fn start_test_sink(
+    config: &str,
+    api_status: ApiStatus,
+) -> (
+    PortGuard,
+    stream_cancel::Trigger,
+    VectorSink,
+    Receiver<(Parts, Bytes)>,
+) {
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(config).unwrap();
+    let (guard, addr) = next_addr();
+    config.local_dd_common.endpoint = Some(format!("http://{addr}"));
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let (rx, trigger, server) = test_server(addr, api_status);
+    tokio::spawn(server);
+    (guard, trigger, sink, rx)
 }
 
 /// Starts a test sink with random lines running into it
@@ -82,18 +102,7 @@ async fn start_test_detail(
             default_api_key = "atoken"
             compression = "none"
         "#};
-    let (mut config, cx) = load_sink::<DatadogLogsConfig>(config).unwrap();
-
-    let (_guard, addr) = next_addr();
-    // Swap out the endpoint so we can force send it
-    // to our local server
-    let endpoint = format!("http://{addr}");
-    config.local_dd_common.endpoint = Some(endpoint.clone());
-
-    let (sink, _) = config.build(cx).await.unwrap();
-
-    let (rx, _trigger, server) = test_server(addr, api_status);
-    tokio::spawn(server);
+    let (_guard, _trigger, sink, rx) = start_test_sink(config, api_status).await;
 
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
@@ -174,6 +183,35 @@ async fn smoke() {
         let delta = Utc::now().timestamp_millis() - timestamp;
         assert!(delta > 0 && delta < 1000);
     }
+}
+
+#[tokio::test]
+async fn truncates_oversized_log_over_http() {
+    let config = indoc! {r#"
+        default_api_key = "atoken"
+        compression = "none"
+
+        [truncate_oversized_logs]
+        max_log_bytes = 1000
+        max_message_bytes = 900
+    "#};
+    let (_guard, _trigger, sink, rx) = start_test_sink(config, ApiStatus::OKv2).await;
+
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let (_, events) = generate_lines_with_stream(|_| "\"".repeat(600), 1, Some(batch));
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+
+    let output = rx.take(1).collect::<Vec<_>>().await;
+    let logs: Vec<serde_json::Value> =
+        serde_json::from_slice(&output[0].1).expect("request body should contain a JSON array");
+    assert_eq!(logs.len(), 1);
+    let message = logs[0]["message"]
+        .as_str()
+        .expect("message should be a string");
+    assert!(message.ends_with("...TRUNCATED..."));
+    assert_eq!(logs[0]["ddtags"], "truncated:single_line");
+    assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= 1000);
 }
 
 /// Assert the sink emits source and service tags when run with telemetry configured.

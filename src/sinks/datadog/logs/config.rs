@@ -34,6 +34,8 @@ use crate::{
 // of escaped double-quotes -- but we believe this should be very rare in
 // practice.
 pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
+pub(super) const DEFAULT_MAX_LOG_BYTES: usize = 1_000_000;
+pub(super) const DEFAULT_MAX_MESSAGE_BYTES: usize = 900_000;
 pub const BATCH_HEADROOM_BYTES: usize = 750_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 5.0;
@@ -46,6 +48,23 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     // No static default: validate() derives the goal from max_payload_bytes at runtime.
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
+}
+
+/// Options for truncating logs that exceed Datadog's per-log size limit.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
+#[serde(deny_unknown_fields)]
+pub struct DatadogLogsTruncationConfig {
+    /// Maximum encoded size, in bytes, of a log before truncation is applied.
+    #[derivative(Default(value = "default_max_log_bytes()"))]
+    #[serde(default = "default_max_log_bytes")]
+    pub max_log_bytes: usize,
+
+    /// Maximum number of message bytes to retain before appending the truncation marker.
+    #[derivative(Default(value = "default_max_message_bytes()"))]
+    #[serde(default = "default_max_message_bytes")]
+    pub max_message_bytes: usize,
 }
 
 /// Configuration for the `datadog_logs` sink.
@@ -81,15 +100,32 @@ pub struct DatadogLogsConfig {
     /// to not set it above 5,000,000 (5 MB, the standard Datadog API limit). Increase
     /// this when targeting a compatible endpoint that accepts larger payloads. The batch
     /// goal is derived as `max_payload_bytes - 750,000` bytes; events larger than the
-    /// batch goal are sent alone in their batch. Events exceeding `max_payload_bytes` are
-    /// dropped.
+    /// batch goal are sent alone in their batch. Single events that still exceed
+    /// `max_payload_bytes` after optional truncation are dropped.
     #[derivative(Default(value = "default_max_payload_bytes()"))]
     #[serde(default = "default_max_payload_bytes")]
     pub max_payload_bytes: Option<usize>,
+
+    /// Truncate logs whose encoded JSON exceeds `max_log_bytes`.
+    ///
+    /// When a message is shortened, at most `max_message_bytes` raw bytes are retained and
+    /// `...TRUNCATED...` is appended. Every reduced log is tagged with `truncated:single_line`.
+    /// If the log remains oversized after the initial message cap, non-standard fields are removed
+    /// before the message is shortened further to account for JSON encoding. Logs that still
+    /// exceed the limit, or have no string message to truncate, are dropped.
+    pub truncate_oversized_logs: Option<DatadogLogsTruncationConfig>,
 }
 
 const fn default_max_payload_bytes() -> Option<usize> {
     Some(MAX_PAYLOAD_BYTES)
+}
+
+const fn default_max_log_bytes() -> usize {
+    DEFAULT_MAX_LOG_BYTES
+}
+
+const fn default_max_message_bytes() -> usize {
+    DEFAULT_MAX_MESSAGE_BYTES
 }
 
 const fn default_compression() -> Option<Compression> {
@@ -175,6 +211,7 @@ impl DatadogLogsConfig {
             self.max_payload_bytes.unwrap_or(MAX_PAYLOAD_BYTES),
         )
         .compression(self.compression.or_else(default_compression).unwrap())
+        .truncation(self.truncate_oversized_logs)
         .build();
 
         Ok(VectorSink::from_event_streamsink(sink))
@@ -253,6 +290,27 @@ impl ValidatedSink for DatadogLogsConfig {
             .into());
         }
 
+        if let Some(truncation) = self.truncate_oversized_logs {
+            let max_payload_bytes = self.max_payload_bytes.unwrap_or(MAX_PAYLOAD_BYTES);
+            // A single log is wrapped in `[` and `]`, so leave two bytes for the JSON array.
+            let maximum_log_bytes = max_payload_bytes - 2;
+            if !(1..=maximum_log_bytes).contains(&truncation.max_log_bytes) {
+                return Err(format!(
+                    "truncate_oversized_logs.max_log_bytes ({}) must be between 1 and {}",
+                    truncation.max_log_bytes, maximum_log_bytes
+                )
+                .into());
+            }
+            let maximum_message_bytes = truncation.max_log_bytes - 1;
+            if !(1..=maximum_message_bytes).contains(&truncation.max_message_bytes) {
+                return Err(format!(
+                    "truncate_oversized_logs.max_message_bytes ({}) must be between 1 and {}",
+                    truncation.max_message_bytes, maximum_message_bytes
+                )
+                .into());
+            }
+        }
+
         let batch_goal_bytes =
             self.max_payload_bytes.unwrap_or(MAX_PAYLOAD_BYTES) - BATCH_HEADROOM_BYTES;
 
@@ -307,6 +365,65 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
+    }
+
+    #[test]
+    fn truncate_oversized_logs_accepts_empty_configuration() {
+        let config = serde_yaml::from_str::<DatadogLogsConfig>(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            truncate_oversized_logs: {}
+        "#})
+        .expect("truncation configuration should deserialize");
+
+        let truncation = config
+            .truncate_oversized_logs
+            .expect("truncation should be enabled");
+        assert_eq!(truncation.max_log_bytes, 1_000_000);
+        assert_eq!(truncation.max_message_bytes, 900_000);
+    }
+
+    #[test]
+    fn validate_rejects_invalid_truncation_limits() {
+        for max_message_bytes in [0, DEFAULT_MAX_LOG_BYTES] {
+            let config: DatadogLogsConfig = serde_yaml::from_str(&format!(
+                r#"
+                default_api_key: "test_key"
+                truncate_oversized_logs:
+                  max_message_bytes: {max_message_bytes}
+                "#
+            ))
+            .unwrap();
+
+            assert!(config.validate().is_err());
+        }
+    }
+
+    #[test]
+    fn validate_rejects_truncation_limit_without_array_wrapper_room() {
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 800000
+            truncate_oversized_logs:
+              max_log_bytes: 799999
+              max_message_bytes: 700000
+        "#})
+        .unwrap();
+
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_custom_log_limit_above_datadog_default() {
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 3000000
+            truncate_oversized_logs:
+              max_log_bytes: 2000000
+              max_message_bytes: 1800000
+        "#})
+        .unwrap();
+
+        assert!(config.validate().is_ok());
     }
 
     #[test]
