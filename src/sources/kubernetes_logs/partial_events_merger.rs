@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     time::{Duration, Instant},
 };
@@ -88,6 +89,10 @@ impl PartialEventMergeState {
                             configured_limit: max_merged_line_bytes,
                             encountered_size_so_far: message.len(),
                         });
+                        // Return before the accumulator is stored: the previous behaviour
+                        // emptied the bucket's message here, and keeping the over-limit
+                        // buffer would retain it until the bucket is removed or expires.
+                        return;
                     }
                     OversizedAction::Truncate => {
                         let original_size = message.len();
@@ -285,12 +290,17 @@ fn merge_partial_events_with_custom_expiration(
                 .and_then(|x| x.as_boolean())
                 .unwrap_or(false);
 
-            // Cloning the `Bytes` behind the `file` field only bumps a reference count.
-            // Converting the field to a `String` for every event allocates on every line.
+            // Buckets stay keyed by the lossy UTF-8 rendering of the `file` field, as
+            // before, so that values which rendered identically still share a bucket. Use
+            // the field's own bytes when they are already valid UTF-8 (no allocation) and
+            // only allocate when the lossy conversion changes the bytes.
             let file = event
                 .get(&file_path)
-                .and_then(|x| x.as_bytes())
-                .cloned()
+                .and_then(|value| match (value.as_bytes(), value.as_str()) {
+                    (Some(bytes), Some(Cow::Borrowed(_))) => Some(bytes.clone()),
+                    (_, Some(Cow::Owned(lossy))) => Some(Bytes::from(lossy)),
+                    _ => None,
+                })
                 .unwrap_or_default();
 
             state.add_event(event, &file, &message_path, expiration_time);
@@ -726,6 +736,67 @@ mod test {
         assert_eq!(
             output[0].as_log().get(event_path!("message")),
             Some(&value!("test mess..TRUNCATED"))
+        );
+    }
+
+    /// In Drop mode the over-limit accumulator must not be stored back into the bucket:
+    /// it would stay alive until the bucket is removed or expires.
+    #[test]
+    fn drop_mode_releases_the_oversized_accumulator() {
+        let file = Bytes::from("file");
+        let message_path = get_message_path(LogNamespace::Legacy);
+        let mut state = PartialEventMergeState {
+            buckets: HashMap::new(),
+            maybe_max_merged_line_bytes: Some(6),
+            oversized_action: OversizedAction::Drop,
+        };
+
+        let mut e_1 = LogEvent::from("aaaa");
+        e_1.insert(event_path!(FILE_KEY), file.clone());
+        e_1.insert(event_path!("_partial"), true);
+        state.add_event(e_1, &file, &message_path, EXPIRATION_TIME);
+
+        let mut e_2 = LogEvent::from("bbbb");
+        e_2.insert(event_path!(FILE_KEY), file.clone());
+        e_2.insert(event_path!("_partial"), true);
+        state.add_event(e_2, &file, &message_path, EXPIRATION_TIME);
+
+        let bucket = state.buckets.get(&file).expect("bucket exists");
+        assert!(bucket.exceeds_max_merged_line_limit);
+        assert!(
+            bucket.message.is_none(),
+            "the over-limit accumulator must be released"
+        );
+    }
+
+    /// A partial run that expires is emitted as one event with the merged message.
+    #[tokio::test]
+    async fn merged_partials_expire_as_single_event_legacy() {
+        let mut e_1 = LogEvent::from("hello ");
+        e_1.insert(event_path!(FILE_KEY), "file");
+        e_1.insert(event_path!("_partial"), true);
+
+        let mut e_2 = LogEvent::from("world");
+        e_2.insert(event_path!(FILE_KEY), "file");
+        e_2.insert(event_path!("_partial"), true);
+
+        // and input stream that never ends
+        let input_stream =
+            futures::stream::iter([e_1.into(), e_2.into()]).chain(futures::stream::pending());
+
+        let output_stream = merge_partial_events_with_custom_expiration(
+            input_stream,
+            LogNamespace::Legacy,
+            Duration::from_secs(1),
+            None,
+            OversizedAction::Drop,
+        );
+
+        let output: Vec<Event> = output_stream.take(1).collect().await;
+        assert_eq!(output.len(), 1);
+        assert_eq!(
+            output[0].as_log().get(event_path!("message")),
+            Some(&value!("hello world"))
         );
     }
 }
