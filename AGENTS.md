@@ -138,6 +138,9 @@ Requires `dd-rust-license-tool`
 make build-licenses
 ```
 
+#### If editing any GitHub Actions workflows or embedded scripts
+
+Run `make check-actionlint`.
 
 #### Before committing (recommended checks)
 
@@ -147,6 +150,7 @@ make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
 make check-markdown           # Check markdown files
 make check-generated-docs     # Check generated documentation
+make check-actionlint         # Lint GitHub Actions workflows
 make check-changelog-fragments  # Verify changelog
 ```
 
@@ -170,6 +174,8 @@ cargo vdev int test <name>    # Integration tests
 cargo vdev fmt                # Format code
 ```
 
+For new tooling that will be used by future developers, add a `vdev` subcommand instead of a shell or Python script. Do not introduce new top-level subcommands unless none of the existing ones are appropriate.
+
 ### Pre-Push Hook (Optional but Recommended)
 
 Create `.git/hooks/pre-push` with:
@@ -185,6 +191,7 @@ echo "Running pre-push checks..."
 make check-licenses
 make check-fmt
 make check-clippy
+make check-actionlint
 make check-markdown
 make check-generated-docs
 make check-changelog-fragments

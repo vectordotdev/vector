@@ -56,6 +56,8 @@ pub enum MetricValue {
         count: u64,
 
         /// The sum of all observations contained within this histogram.
+        // Tolerate payloads that omit an unreported sum, reading it as zero.
+        #[serde(default)]
         sum: f64,
     },
 

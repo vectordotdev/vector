@@ -66,7 +66,7 @@ impl Default for StdinConfig {
     fn default() -> Self {
         StdinConfig {
             max_length: crate::serde::default_max_length(),
-            host_key: Default::default(),
+            host_key: Option::default(),
             framing: None,
             decoding: default_decoding(),
             log_namespace: None,
@@ -92,7 +92,12 @@ impl SourceConfig for StdinConfig {
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
         let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-        outputs(log_namespace, &self.host_key, &self.decoding, Self::NAME)
+        outputs(
+            log_namespace,
+            self.host_key.as_ref(),
+            &self.decoding,
+            Self::NAME,
+        )
     }
 
     fn resources(&self) -> Vec<Resource> {

@@ -26,6 +26,11 @@ impl<W: io::Write> SnappyEncoder<W> {
         }
     }
 
+    /// Compresses the buffered data and returns the writer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if compression or writing fails.
     pub fn finish(mut self) -> io::Result<W> {
         let mut encoder = Encoder::new();
         let compressed = encoder.compress_vec(&self.buffer)?;

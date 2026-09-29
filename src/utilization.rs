@@ -476,7 +476,7 @@ mod tests {
     }
 
     /// Mock task transform that passes events through unchanged, simulating
-    /// a configurable processing delay by advancing MockClock per item.
+    /// a configurable processing delay by advancing `MockClock` per item.
     struct MockTaskTransform {
         processing_time: Duration,
     }
@@ -499,10 +499,10 @@ mod tests {
     }
 
     /// End-to-end test exercising the Utilization (input) and
-    /// OutputUtilization (output) stream wrappers with a mock TaskTransform,
+    /// `OutputUtilization` (output) stream wrappers with a mock `TaskTransform`,
     /// wired up the same way `build_task_transform` does in the builder.
     ///
-    /// Pipeline: channel → Utilization(input) → TaskTransform → OutputUtilization(output)
+    /// Pipeline: channel → Utilization(input) → `TaskTransform` → OutputUtilization(output)
     ///
     /// Timeline (10s):
     ///   T=100..103  waiting for input       (3s wait)

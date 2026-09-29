@@ -10,7 +10,7 @@ generated: components: sinks: influxdb_metrics: configuration: {
 			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
-		type:     _schemaDefinitions["vector_core::config::AcknowledgementsConfig"]
+		type:     _schemaDefinitions["bool_or_struct::vector_core::config::AcknowledgementsConfig"]
 	}
 	batch: {
 		description: "Event batching behavior."
@@ -18,39 +18,22 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		type:        _schemaDefinitions["vector::sinks::util::batch::BatchConfig<vector::sinks::greptimedb::GreptimeDBDefaultBatchSettings>"]
 	}
 	bucket: {
-		description: """
-			The name of the bucket to write into.
-
-			Only relevant when using InfluxDB v2.x and above.
-			"""
-		minimal:       true
+		description:   "The name of the bucket to write into."
 		relevant_when: "version = \"2\""
-		required:      false
-		required_when: "version = \"2\""
-		type: string: examples: ["vector-bucket"]
+		required:      true
+		type: string: examples: ["vector-bucket", "4d2225e4d3d49f75"]
 	}
 	consistency: {
-		description: """
-			The consistency level to use for writes.
-
-			Only relevant when using InfluxDB v0.x/v1.x.
-			"""
+		description:   "The consistency level to use for writes."
 		relevant_when: "version = \"1\""
 		required:      false
-		type: string: examples: [
-			"any"
-		]
+		type: string: examples: ["any", "one", "quorum", "all"]
 	}
 	database: {
-		description: """
-			The name of the database to write into.
-
-			Only relevant when using InfluxDB v0.x/v1.x.
-			"""
+		description:   "The name of the database to write into."
 		relevant_when: "version = \"1\""
-		required:      false
-		required_when: "version = \"1\""
-		type: string: examples: ["vector-database"]
+		required:      true
+		type: string: examples: ["vector-database", "iot-store"]
 	}
 	default_namespace: {
 		description: """
@@ -72,28 +55,16 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		type: string: examples: ["http://localhost:8086/"]
 	}
 	org: {
-		description: """
-			The name of the organization to write into.
-
-			Only relevant when using InfluxDB v2.x and above.
-			"""
-		minimal:       true
+		description:   "The name of the organization to write into."
 		relevant_when: "version = \"2\""
-		required:      false
-		required_when: "version = \"2\""
-		type: string: examples: [
-			"my-org"
-		]
+		required:      true
+		type: string: examples: ["my-org", "33f2cff0a28e5b63"]
 	}
 	password: {
-		description: """
-			The password to authenticate with.
-
-			Only relevant when using InfluxDB v0.x/v1.x.
-			"""
+		description:   "The password to authenticate with."
 		relevant_when: "version = \"1\""
 		required:      false
-		type: string: examples: ["${INFLUXDB_PASSWORD}"]
+		type: string: examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 	}
 	quantiles: {
 		description: "The list of quantiles to calculate when sending distribution metrics."
@@ -115,14 +86,10 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		type:     _schemaDefinitions["vector::sinks::util::service::TowerRequestConfig"]
 	}
 	retention_policy_name: {
-		description: """
-			The target retention policy for writes.
-
-			Only relevant when using InfluxDB v0.x/v1.x.
-			"""
+		description:   "The target retention policy for writes."
 		relevant_when: "version = \"1\""
 		required:      false
-		type: string: examples: ["autogen"]
+		type: string: examples: ["autogen", "one_day_only"]
 	}
 	tags: {
 		description: "A map of additional tags, in the key/value pair format, to add to each measurement."
@@ -147,43 +114,24 @@ generated: components: sinks: influxdb_metrics: configuration: {
 		description: """
 			The [token][token_docs] to authenticate with.
 
-			Only relevant when using InfluxDB v2.x and above.
-
 			[token_docs]: https://v2.docs.influxdata.com/v2.0/security/tokens/
 			"""
-		minimal:       true
 		relevant_when: "version = \"2\""
-		required:      false
-		required_when: "version = \"2\""
-		type: string: examples: ["${INFLUXDB_TOKEN}"]
+		required:      true
+		type: string: examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
 	}
 	username: {
-		description: """
-			The username to authenticate with.
-
-			Only relevant when using InfluxDB v0.x/v1.x.
-			"""
+		description:   "The username to authenticate with."
 		relevant_when: "version = \"1\""
 		required:      false
-		type: string: examples: [
-			"todd"
-		]
+		type: string: examples: ["todd", "vector-source"]
 	}
 	version: {
-		description: """
-			The InfluxDB API version to use.
-
-			Omitting this option is deprecated and it will be required in a future release. When
-			unset, the version is temporarily inferred from the configured settings.
-			"""
-		minimal:  true
-		required: false
-		type: string: {
-			enum: {
-				"1": "InfluxDB v0.x/v1.x."
-				"2": "InfluxDB v2.x."
-			}
-			examples: ["2", "1"]
+		description: "The InfluxDB API version to use."
+		required:    true
+		type: string: enum: {
+			"1": "InfluxDB v0.x/v1.x."
+			"2": "InfluxDB v2.x."
 		}
 	}
 }

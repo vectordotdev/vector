@@ -17,6 +17,7 @@ pub struct DecodingConfig {
 impl DecodingConfig {
     /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
     /// `DeserializerConfig`.
+    #[must_use]
     pub const fn new(
         framing: FramingConfig,
         decoding: DeserializerConfig,
@@ -30,16 +31,23 @@ impl DecodingConfig {
     }
 
     /// Get the decoding configuration.
+    #[must_use]
     pub const fn config(&self) -> &DeserializerConfig {
         &self.decoding
     }
 
     /// Get the framing configuration.
+    #[must_use]
     pub const fn framing(&self) -> &FramingConfig {
         &self.framing
     }
 
     /// Builds a `Decoder` from the provided configuration.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> vector_common::Result<Decoder> {
         // Build the framer.
         let framer = self.framing.build();

@@ -29,6 +29,11 @@ fn component_matches_patterns(component_id: &str, components_patterns: &[Pattern
 /// Component polling task
 ///
 /// Polls for component changes every interval and diffs to detect adds/removes.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_sign_loss,
+    reason = "Preserve the existing conversion of the polling interval."
+)]
 async fn poll_components(
     mut client: Client,
     tx: state::EventTx,
@@ -36,10 +41,11 @@ async fn poll_components(
     components_patterns: Arc<[Pattern]>,
     initial_components: HashSet<String>,
 ) {
+    const MAX_CONSECUTIVE_ERRORS: u32 = 3;
+
     let mut known_components = initial_components;
     let poll_interval = Duration::from_millis(interval_ms as u64);
     let mut consecutive_errors = 0;
-    const MAX_CONSECUTIVE_ERRORS: u32 = 3;
 
     loop {
         tokio::time::sleep(poll_interval).await;
@@ -126,6 +132,11 @@ fn component_to_row(component: &Component) -> state::ComponentRow {
 
 /// Allocated bytes per component
 #[cfg(unix)]
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn allocated_bytes(
     mut client: Client,
     tx: state::EventTx,
@@ -155,6 +166,11 @@ async fn allocated_bytes(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn received_bytes_totals(
     mut client: Client,
     tx: state::EventTx,
@@ -184,6 +200,11 @@ async fn received_bytes_totals(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn received_bytes_throughputs(
     mut client: Client,
     tx: state::EventTx,
@@ -213,6 +234,11 @@ async fn received_bytes_throughputs(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn received_events_totals(
     mut client: Client,
     tx: state::EventTx,
@@ -242,6 +268,11 @@ async fn received_events_totals(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn received_events_throughputs(
     mut client: Client,
     tx: state::EventTx,
@@ -271,6 +302,11 @@ async fn received_events_throughputs(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn sent_bytes_totals(
     mut client: Client,
     tx: state::EventTx,
@@ -300,6 +336,11 @@ async fn sent_bytes_totals(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn sent_bytes_throughputs(
     mut client: Client,
     tx: state::EventTx,
@@ -329,6 +370,11 @@ async fn sent_bytes_throughputs(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn sent_events_totals(
     mut client: Client,
     tx: state::EventTx,
@@ -359,6 +405,11 @@ async fn sent_events_totals(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn sent_events_throughputs(
     mut client: Client,
     tx: state::EventTx,
@@ -395,6 +446,11 @@ async fn sent_events_throughputs(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
 async fn errors_totals(
     mut client: Client,
     tx: state::EventTx,
@@ -424,6 +480,15 @@ async fn errors_totals(
     }
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Preserve the existing metric interval and throughput conversions."
+)]
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Keep the existing approximate display of large metric values."
+)]
 async fn uptime_changed(mut client: Client, tx: state::EventTx, interval: i64) {
     let Ok(mut stream) = client.stream_uptime(interval as i32).await else {
         return;
@@ -452,6 +517,14 @@ pub struct SubscribeHandles {
 /// Subscribe to each metrics stream, all sharing a single underlying gRPC connection.
 /// HTTP/2 multiplexes the concurrent streams — cloning a connected `Client` is cheap
 /// (the tonic `Channel` is Arc-backed) and avoids redundant TCP/HTTP2 handshakes.
+///
+/// # Errors
+/// Returns an error if the API connection cannot be established.
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::implicit_hasher,
+    reason = "Keep the concrete set type used by the component polling task."
+)]
 pub async fn subscribe(
     uri: Uri,
     tx: state::EventTx,
@@ -547,6 +620,9 @@ pub async fn subscribe(
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
 /// will be handled by subscriptions.
+///
+/// # Errors
+/// Returns an error if fetching the initial component list fails.
 pub async fn init_components(
     uri: Uri,
     components_patterns: &[Pattern],
@@ -580,8 +656,7 @@ pub async fn init_components(
         state.allocation_tracing_active = client
             .get_allocation_tracing_status()
             .await
-            .map(|r| r.enabled)
-            .unwrap_or(false);
+            .is_ok_and(|r| r.enabled);
         Ok(state)
     }
 

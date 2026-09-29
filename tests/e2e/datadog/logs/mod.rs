@@ -11,13 +11,11 @@ const MAX_RETRIES: usize = 10;
 const WAIT_INTERVAL: Duration = Duration::from_secs(1);
 
 fn expected_log_events() -> usize {
-    std::env::var("EXPECTED_LOG_EVENTS")
-        .map(|n_expected| {
-            n_expected
-                .parse::<usize>()
-                .expect("EXPECTED_LOG_EVENTS should be an unsigned integer.")
-        })
-        .unwrap_or(1000)
+    std::env::var("EXPECTED_LOG_EVENTS").map_or(1000, |n_expected| {
+        n_expected
+            .parse::<usize>()
+            .expect("EXPECTED_LOG_EVENTS should be an unsigned integer.")
+    })
 }
 
 // Asserts that each log event has the hostname and timestamp fields, and
@@ -26,25 +24,21 @@ fn expected_log_events() -> usize {
 fn assert_timestamp_hostname(payloads: &mut [Value]) -> usize {
     let mut n_log_events = 0;
 
-    payloads.iter_mut().for_each(|payload_array| {
-        payload_array
-            .as_array_mut()
-            .expect("should be array")
-            .iter_mut()
-            .for_each(|log_val| {
-                n_log_events += 1;
+    for payload_array in payloads {
+        for log_val in payload_array.as_array_mut().expect("should be array") {
+            n_log_events += 1;
 
-                let log = log_val
-                    .as_object_mut()
-                    .expect("log entries should be objects");
+            let log = log_val
+                .as_object_mut()
+                .expect("log entries should be objects");
 
-                // timestamp is available in the flog generated logs as a datetime but
-                // there does not appear to be a way to add a custom parser in the Agent
-                // to handle it.
-                assert!(log.remove("timestamp").is_some());
-                assert!(log.remove("hostname").is_some());
-            })
-    });
+            // timestamp is available in the flog generated logs as a datetime but
+            // there does not appear to be a way to add a custom parser in the Agent
+            // to handle it.
+            assert!(log.remove("timestamp").is_some());
+            assert!(log.remove("hostname").is_some());
+        }
+    }
 
     n_log_events
 }

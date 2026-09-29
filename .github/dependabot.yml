@@ -20,6 +20,12 @@ updates:
           - "bytecheck"
           - "rkyv"
 
+      kube:
+        applies-to: version-updates
+        patterns:
+          - "kube"
+          - "k8s-openapi"
+
       patches:
         applies-to: version-updates
         patterns:
@@ -250,7 +256,7 @@ updates:
       time: "05:00" # UTC
     labels:
       - "dependencies"
-      - "javascript"
+      - "domain: website"
       - "no-changelog"
     commit-message:
       prefix: "chore(website deps)"

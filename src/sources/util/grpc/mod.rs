@@ -353,6 +353,14 @@ where
     }
 }
 
+///
+/// # Errors
+///
+/// Returns an error if the listener cannot be bound or the gRPC server fails.
+///
+/// # Panics
+///
+/// Panics if the shutdown token receiver is dropped before shutdown.
 pub async fn run_grpc_server<S>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
@@ -403,14 +411,29 @@ where
 
 // This is a bit of a ugly hack to allow us to run two services on the same port.
 // I just don't know how to convert the generic type with associated types into a Vec<Box<trait object>>.
-pub async fn run_grpc_server_with_routes(
+///
+/// # Errors
+///
+/// Returns an error if the listener cannot be bound or the gRPC server fails.
+///
+/// # Panics
+///
+/// Panics if the shutdown token receiver is dropped before shutdown.
+pub async fn run_grpc_server_with_routes<L>(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
     tls_reloader: Option<TlsAcceptorReloader>,
     routes: Routes,
     keepalive: GrpcKeepaliveConfig,
     shutdown: ShutdownSignal,
-) -> crate::Result<()> {
+    request_layer: L,
+) -> crate::Result<()>
+where
+    L: Layer<DecompressionAndMetrics<Routes>> + Clone + Send + 'static,
+    L::Service: Service<Request<Body>, Response = Response<BoxBody>> + Clone + Send + 'static,
+    <L::Service as Service<Request<Body>>>::Future: Send + 'static,
+    <L::Service as Service<Request<Body>>>::Error: Into<tower::BoxError> + std::fmt::Display + Send,
+{
     let span = Span::current();
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
     let listener = tls_settings.bind_reloadable(&address, tls_reloader).await?;
@@ -424,6 +447,8 @@ pub async fn run_grpc_server_with_routes(
     Server::builder()
         .layer(MaxConnectionAgeLayer::new())
         .layer(build_grpc_trace_layer(span.clone()))
+        // Request admission must see each HTTP/2 stream before its body is decompressed.
+        .layer(request_layer)
         .layer(DecompressionAndMetricsLayer)
         .add_routes(routes)
         .serve_with_incoming_shutdown(stream, shutdown.map(|token| tx.send(token).unwrap()))
@@ -434,9 +459,10 @@ pub async fn run_grpc_server_with_routes(
     Ok(())
 }
 
-/// Builds a [TraceLayer] configured for a gRPC server.
+/// Builds a [`TraceLayer`] configured for a gRPC server.
 ///
 /// This layer emits gPRC specific telemetry for messages received/sent and handler duration.
+#[must_use]
 pub fn build_grpc_trace_layer(
     span: Span,
 ) -> TraceLayer<

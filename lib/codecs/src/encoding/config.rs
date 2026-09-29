@@ -24,6 +24,7 @@ pub struct EncodingConfig {
 
 impl EncodingConfig {
     /// Creates a new `EncodingConfig` with the provided `SerializerConfig` and `Transformer`.
+    #[must_use]
     pub const fn new(encoding: SerializerConfig, transformer: Transformer) -> Self {
         Self {
             encoding,
@@ -32,16 +33,23 @@ impl EncodingConfig {
     }
 
     /// Build a `Transformer` that applies the encoding rules to an event before serialization.
+    #[must_use]
     pub fn transformer(&self) -> Transformer {
         self.transformer.clone()
     }
 
     /// Get the encoding configuration.
+    #[must_use]
     pub const fn config(&self) -> &SerializerConfig {
         &self.encoding
     }
 
     /// Build the `Serializer` for this config.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build(&self) -> vector_common::Result<Serializer> {
         self.encoding.build()
     }
@@ -56,6 +64,11 @@ impl EncodingConfig {
     /// filesystem-free (it runs under `vector validate --no-environment`).
     /// A protobuf descriptor that can't be loaded is caught by the
     /// environment-dependent `build()` phase instead.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn validate(&self) -> vector_common::Result<()> {
         match self.config() {
             SerializerConfig::Protobuf(_) => Ok(()),
@@ -74,7 +87,7 @@ where
     fn from(encoding: T) -> Self {
         Self {
             encoding: encoding.into(),
-            transformer: Default::default(),
+            transformer: Transformer::default(),
         }
     }
 }
@@ -92,6 +105,7 @@ pub struct EncodingConfigWithFraming {
 impl EncodingConfigWithFraming {
     /// Creates a new `EncodingConfigWithFraming` with the provided `FramingConfig`,
     /// `SerializerConfig` and `Transformer`.
+    #[must_use]
     pub const fn new(
         framing: Option<FramingConfig>,
         encoding: SerializerConfig,
@@ -107,18 +121,29 @@ impl EncodingConfigWithFraming {
     }
 
     /// Build a `Transformer` that applies the encoding rules to an event before serialization.
+    #[must_use]
     pub fn transformer(&self) -> Transformer {
         self.encoding.transformer.clone()
     }
 
     /// Get the encoding configuration.
+    #[must_use]
     pub const fn config(&self) -> (&Option<FramingConfig>, &SerializerConfig) {
         (&self.framing, &self.encoding.encoding)
     }
 
     /// Build the `Framer` and `Serializer` for this config.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Keep the existing owned-argument API during the lint rollout."
+    )]
     pub fn build(&self, sink_type: SinkType) -> vector_common::Result<(Framer, Serializer)> {
-        let framer = self.framing.as_ref().map(|framing| framing.build());
+        let framer = self.framing.as_ref().map(FramingConfig::build);
         let serializer = self.encoding.build()?;
 
         let framer = match (framer, &serializer) {
@@ -159,6 +184,11 @@ impl EncodingConfigWithFraming {
     }
 
     /// Build the `Transformer` and `EncoderKind` for this config.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn build_encoder(
         &self,
         sink_type: SinkType,
@@ -176,6 +206,11 @@ impl EncodingConfigWithFraming {
     /// filesystem-free (it runs under `vector validate --no-environment`).
     /// Building the framer is infallible, so there is nothing to validate on
     /// the framing side.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::missing_errors_doc,
+        reason = "The codec API error documentation needs a separate audit."
+    )]
     pub fn validate(&self) -> vector_common::Result<()> {
         self.encoding.validate()
     }
@@ -313,7 +348,7 @@ mod test {
                     use_json_names: false,
                 },
             }),
-            Default::default(),
+            Transformer::default(),
         );
 
         assert!(encoding.validate().is_ok());
@@ -329,7 +364,7 @@ mod test {
                     schema: "not a valid avro schema".into(),
                 },
             },
-            Default::default(),
+            Transformer::default(),
         );
 
         let error = encoding.validate().unwrap_err();
@@ -345,7 +380,7 @@ mod test {
     fn validate_accepts_buildable_encoding() {
         let encoding = EncodingConfig::new(
             SerializerConfig::Json(JsonSerializerConfig::default()),
-            Default::default(),
+            Transformer::default(),
         );
 
         assert!(encoding.validate().is_ok());
@@ -360,7 +395,7 @@ mod test {
                     schema: "not a valid avro schema".into(),
                 },
             },
-            Default::default(),
+            Transformer::default(),
         );
 
         let error = encoding.validate().unwrap_err();
@@ -383,7 +418,7 @@ mod test {
                     use_json_names: false,
                 },
             }),
-            Default::default(),
+            Transformer::default(),
         );
 
         assert!(encoding.validate().is_ok());

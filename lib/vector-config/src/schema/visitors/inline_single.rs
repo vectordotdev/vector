@@ -2,7 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 use tracing::debug;
-use vector_config_common::schema::{visit::Visitor, *};
+use vector_config_common::schema::{
+    Map, RootSchema, Schema, SchemaObject, SchemaSettings, get_cleaned_schema_reference, visit,
+    visit::Visitor,
+};
 
 use super::scoped_visit::{
     SchemaReference, SchemaScopeStack, ScopedVisitor, visit_schema_object_scoped,
@@ -27,6 +30,7 @@ pub struct InlineSingleUseReferencesVisitor {
 }
 
 impl InlineSingleUseReferencesVisitor {
+    #[must_use]
     pub fn from_settings(_: &SchemaSettings) -> Self {
         Self {
             eligible_to_inline: HashSet::new(),
@@ -105,7 +109,7 @@ impl Visitor for InlineSingleUseReferencesVisitor {
         // If this schema has a schema reference, see if it's in our inline eligibility map. If so,
         // we remove the referenced schema from the definitions, and then merge it into the current
         // schema, after removing the `$ref` field.
-        if let Some(schema_ref) = schema.reference.as_ref().cloned() {
+        if let Some(schema_ref) = schema.reference.clone() {
             let schema_ref = get_cleaned_schema_reference(&schema_ref);
             if self.eligible_to_inline.contains(schema_ref) {
                 let referenced_schema = definitions

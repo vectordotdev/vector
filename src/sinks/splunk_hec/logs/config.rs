@@ -170,7 +170,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
             timestamp_nanos_key: None,
             timestamp_key: None,
             auto_extract_timestamp: None,
@@ -286,6 +286,10 @@ impl ValidatedSink for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
+    /// Builds the sink processor.
+    ///
+    /// # Errors
+    /// Returns an error if the encoding configuration is invalid.
     pub fn build_processor(
         &self,
         client: HttpClient,
@@ -386,15 +390,15 @@ mod tests {
             source: None,
             encoding: JsonSerializerConfig::default().into(),
             compression: Compression::default(),
-            batch: Default::default(),
-            request: Default::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
             tls: None,
-            acknowledgements: Default::default(),
+            acknowledgements: HecClientAcknowledgementsConfig::default(),
             timestamp_nanos_key: None,
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
-            confinement: Default::default(),
+            confinement: ConfinementConfig::default(),
         };
 
         let validated = config.validate().expect("validation should succeed");
