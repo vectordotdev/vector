@@ -389,7 +389,7 @@ impl FunctionTransform for Sample {
             output.push(event);
         } else {
             emit!(SampleEventDiscarded {
-                group: discarded_group.unwrap_or_else(|| "None".to_string()),
+                group: discarded_group,
                 include_group_tag: self.include_group_tag,
             });
         }

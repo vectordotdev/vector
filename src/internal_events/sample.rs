@@ -1,4 +1,4 @@
-// ## skip check-dropped-events ##
+// ## skip check-dropped-events-name ##
 
 use vector_lib::{
     NamedInternalEvent, counter,
@@ -7,7 +7,7 @@ use vector_lib::{
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct SampleEventDiscarded {
-    pub group: String,
+    pub group: Option<String>,
     pub include_group_tag: bool,
 }
 
@@ -22,7 +22,7 @@ impl InternalEvent for SampleEventDiscarded {
             counter!(
                 CounterName::ComponentDiscardedEventsTotal,
                 "intentional" => "true",
-                "group" => self.group,
+                "group" => self.group.unwrap_or_else(|| "None".to_string()),
             )
         } else {
             counter!(
@@ -64,13 +64,18 @@ mod tests {
     #[serial]
     fn emits_component_discarded_events_with_group_tag() {
         vector_lib::metrics::init_test();
-        for group in ["group-a", "group-b", "None"] {
+        for group in ["group-a", "group-b"] {
             SampleEventDiscarded {
-                group: group.to_string(),
+                group: Some(group.to_string()),
                 include_group_tag: true,
             }
             .emit();
         }
+        SampleEventDiscarded {
+            group: None,
+            include_group_tag: true,
+        }
+        .emit();
 
         for group in ["group-a", "group-b", "None"] {
             assert_eq!(
@@ -85,7 +90,7 @@ mod tests {
     fn emits_component_discarded_events_without_group_tag_by_default() {
         vector_lib::metrics::init_test();
         SampleEventDiscarded {
-            group: "group-a".to_string(),
+            group: None,
             include_group_tag: false,
         }
         .emit();
