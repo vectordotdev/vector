@@ -12,6 +12,7 @@ use super::{
 pub struct Variant<'a> {
     original: &'a syn::Variant,
     name: String,
+    aliases: Vec<String>,
     attrs: Attributes,
     fields: Vec<Field<'a>>,
     style: Style,
@@ -26,6 +27,13 @@ impl<'a> Variant<'a> {
     ) -> darling::Result<Variant<'a>> {
         let original = serde.original;
         let name = serde.attrs.name().deserialize_name().to_string();
+        let aliases = serde
+            .attrs
+            .aliases()
+            .iter()
+            .map(ToString::to_string)
+            .filter(|alias| alias != &name)
+            .collect();
         let style = serde.style.into();
         let is_newtype_wrapper_field = style == Style::Newtype;
 
@@ -51,6 +59,7 @@ impl<'a> Variant<'a> {
         let variant = Variant {
             original,
             name,
+            aliases,
             attrs,
             fields,
             style,
@@ -93,6 +102,11 @@ impl<'a> Variant<'a> {
     /// altered with `serde` helper attributes i.e. `#[serde(rename = "...")]`.
     pub fn name(&self) -> &str {
         self.name.as_str()
+    }
+
+    /// Alternative names accepted when deserializing this variant.
+    pub fn aliases(&self) -> &[String] {
+        &self.aliases
     }
 
     /// Title of the variant, if any.

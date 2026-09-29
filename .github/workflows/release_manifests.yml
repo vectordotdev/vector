@@ -1,8 +1,8 @@
 # Regenerate distribution/kubernetes manifests from the published Helm chart and
 # push them directly to master as the vectordotdev-bot. The direct push is
 # authorized by the release freeze window and the temporary bot bypasses on the
-# master rulesets. Release preparation opens this window; the release checklists
-# describe how to close it.
+# master rulesets. Release preparation opens this window and the "Unfreeze
+# master" workflow closes it.
 # The Helm chart release workflow dispatches this after publishing a new chart.
 # This replaces the manual `cargo vdev build manifests` step from the release
 # checklists.

@@ -1,6 +1,7 @@
 use std::{any::Any, sync::Arc};
 
 use enum_dispatch::enum_dispatch;
+use indexmap::IndexMap;
 use serde::Serialize;
 use vector_lib::{
     config::GlobalOptions,
@@ -119,6 +120,28 @@ where
             validated: self.validated,
         }
     }
+}
+
+/// Derives source components in table order, retaining their configured source keys.
+pub(crate) fn enrichment_table_sources<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SourceOuter)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+}
+
+/// Derives sink components in table order, retaining their inputs and validated state.
+pub(crate) fn enrichment_table_sinks<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SinkOuter<T>)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables.iter().filter_map(|(key, table)| table.as_sink(key))
 }
 
 /// Generalized interface for describing and building enrichment table components.
