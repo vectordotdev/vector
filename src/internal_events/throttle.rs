@@ -1,4 +1,4 @@
-// ## skip check-dropped-events ##
+// ## skip check-dropped-events-name ##
 
 use vector_lib::{
     NamedInternalEvent, counter,

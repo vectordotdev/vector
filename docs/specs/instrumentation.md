@@ -153,8 +153,13 @@ know if the client will retry them.
 - Metrics
   - MUST increment the `<namespace>_discarded_events_total` counter by the
     number of events discarded.
-  - MUST only include the `intentional` property and component properties that
-    are inherited implicitly (e.g. `component_type`).
+  - MUST include the `intentional` property and component properties that are
+    inherited implicitly (e.g. `component_type`).
+  - MAY include a `group` tag identifying the group that the discarded events
+    belonged to, based on the component's grouping configuration. Because group
+    values can be unbounded, components MUST require users to explicitly opt in
+    to this tag, and the option MUST default to disabled. The metric MUST NOT
+    include other event properties.
 - Logs
   - MUST log a `Events dropped` message.
   - MUST include the defined properties as key-value pairs.

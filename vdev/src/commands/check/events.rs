@@ -78,6 +78,7 @@ const EVENT_CLASSES: &[(&str, EventClass)] = &[
 #[derive(Debug, Default, Clone)]
 struct SkipFlags {
     dropped_events: bool,
+    dropped_events_name: bool,
     duplicate_check: bool,
     validity_check: bool,
 }
@@ -287,7 +288,7 @@ fn check_events_dropped(reports: &mut Vec<String>, name: &str, event: &Event, ha
         }
         return;
     }
-    if !name.ends_with("EventsDropped") {
+    if !name.ends_with("EventsDropped") && !event.skip.dropped_events_name {
         reports.push("EventsDropped events MUST be named \"___EventsDropped\".".to_string());
     }
     log_level_one_of(reports, &handle.logs, &["error", "debug"]);
@@ -667,6 +668,7 @@ struct Scanner<'a> {
     path_str: String,
     in_internal_events_dir: bool,
     skip_dropped_for_file: bool,
+    skip_dropped_name_for_file: bool,
     text: &'a str,
     impl_stack: Vec<ImplCtx>,
 }
@@ -678,6 +680,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
             let event = self.events.entry(name).or_default();
             event.path = Some(self.path_str.clone());
             event.skip.dropped_events = self.skip_dropped_for_file;
+            event.skip.dropped_events_name = self.skip_dropped_name_for_file;
             for field in &node.fields {
                 if let Some(ident) = &field.ident {
                     let ty = field.ty.to_token_stream().to_string();
@@ -1109,6 +1112,7 @@ fn scan_file(path: &PathBuf, events: &mut HashMap<String, Event>) -> Result<usiz
         || path_str.starts_with("lib/vector-common/src/internal_event/");
     let in_src = path_str.starts_with("src/");
     let skip_dropped = lower.contains("## skip check-dropped-events ##");
+    let skip_dropped_name = lower.contains("## skip check-dropped-events-name ##");
 
     for caps in RE_USES.captures_iter(&text) {
         let name = caps[1].to_string();
@@ -1139,6 +1143,7 @@ fn scan_file(path: &PathBuf, events: &mut HashMap<String, Event>) -> Result<usiz
         path_str,
         in_internal_events_dir: in_internal_events,
         skip_dropped_for_file: skip_dropped,
+        skip_dropped_name_for_file: skip_dropped_name,
         text: &text,
         impl_stack: Vec::new(),
     };
@@ -1665,6 +1670,24 @@ mod tests {
             r.iter()
                 .any(|m| m == "EventsDropped events MUST be named \"___EventsDropped\".")
         );
+    }
+
+    #[test]
+    fn validate_events_dropped_name_check_can_be_skipped_independently() {
+        let mut e = mk_event();
+        e.skip.dropped_events_name = true;
+        e.logs = one_log(
+            "debug",
+            "Events dropped.",
+            &["count", "intentional", "reason"],
+        );
+        e.counters.insert(
+            METRIC_NAME_EVENTS_DROPPED.to_string(),
+            counter(&[("intentional", "true"), ("group", "self.group")]),
+        );
+
+        let r = run("EstablishedEventName", e);
+        assert!(r.is_empty(), "expected no reports, got: {r:?}");
     }
 
     #[test]
