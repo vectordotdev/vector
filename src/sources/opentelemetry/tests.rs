@@ -130,6 +130,7 @@ fn create_test_metrics_request() -> ExportMetricsServiceRequest {
                     name: "some.random.metric".to_string(),
                     description: "Some random metric we use for test".to_string(),
                     unit: "1".to_string(),
+                    metadata: vec![],
                     data: Some(Data::Summary(Summary {
                         data_points: vec![SummaryDataPoint {
                             attributes: vec![
@@ -655,6 +656,7 @@ async fn receive_sum_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Sum(Sum {
                             data_points: vec![NumberDataPoint {
                                 attributes: vec![
@@ -747,6 +749,7 @@ async fn receive_sum_non_monotonic_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Sum(Sum {
                             data_points: vec![NumberDataPoint {
                                 attributes: vec![
@@ -839,6 +842,7 @@ async fn receive_gauge_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Gauge(Gauge {
                             data_points: vec![NumberDataPoint {
                                 attributes: vec![
@@ -928,6 +932,7 @@ async fn receive_histogram_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Histogram(Histogram {
                             aggregation_temporality: AggregationTemporality::Cumulative as i32,
                             data_points: vec![HistogramDataPoint {
@@ -1055,6 +1060,7 @@ async fn receive_histogram_delta_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Histogram(Histogram {
                             aggregation_temporality: AggregationTemporality::Delta as i32,
                             data_points: vec![HistogramDataPoint {
@@ -1182,6 +1188,7 @@ async fn receive_exponential_histogram_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::ExponentialHistogram(ExponentialHistogram {
                             aggregation_temporality: AggregationTemporality::Cumulative as i32,
                             data_points: vec![ExponentialHistogramDataPoint {
@@ -1322,6 +1329,7 @@ async fn receive_summary_metric() {
                         name: "some.random.metric".to_string(),
                         description: "Some random metric we use for test".to_string(),
                         unit: "1".to_string(),
+                        metadata: vec![],
                         data: Some(Data::Summary(Summary {
                             data_points: vec![SummaryDataPoint {
                                 attributes: vec![

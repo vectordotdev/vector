@@ -188,6 +188,15 @@ message Metric {
     ExponentialHistogram exponential_histogram = 10;
     Summary summary = 11;
   }
+
+  // Additional metadata attributes that describe the metric. [Optional].
+  // Attributes are non-identifying.
+  // Consumers SHOULD NOT need to be aware of these attributes.
+  // These attributes MAY be used to encode information allowing
+  // for lossless roundtrip translation to / from another data model.
+  // Attribute keys MUST be unique (it is not allowed to have more than one
+  // attribute with the same key).
+  repeated opentelemetry.proto.common.v1.KeyValue metadata = 12;
 }
 
 // Gauge represents the type of a scalar metric that always exports the

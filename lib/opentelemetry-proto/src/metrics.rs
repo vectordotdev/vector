@@ -882,6 +882,7 @@ pub fn metric_event_to_export_request(
                     name,
                     description: String::new(),
                     unit: String::new(),
+                    metadata: vec![],
                     data: Some(data),
                 }],
                 schema_url: String::new(),

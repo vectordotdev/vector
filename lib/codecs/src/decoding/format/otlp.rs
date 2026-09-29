@@ -275,6 +275,7 @@ mod tests {
                         name: "test_metric".to_string(),
                         description: String::new(),
                         unit: String::new(),
+                        metadata: vec![],
                         data: None,
                     }],
                     schema_url: String::new(),

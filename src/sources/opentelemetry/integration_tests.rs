@@ -224,6 +224,7 @@ async fn receive_metric() {
                     name: "some.random.metric".to_string(),
                     description: "Some random metric we use for test".to_string(),
                     unit: "1".to_string(),
+                    metadata: vec![],
                     data: Some(Data::Gauge(Gauge {
                         data_points: vec![NumberDataPoint {
                             attributes: vec![
