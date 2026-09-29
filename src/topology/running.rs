@@ -29,7 +29,10 @@ use super::{
     task::{Task, TaskOutput},
 };
 use crate::{
-    config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
+    config::{
+        ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource,
+        enrichment_table_sinks,
+    },
     event::EventArray,
     extra_context::ExtraContext,
     shutdown::SourceShutdownCoordinator,
@@ -1060,10 +1063,7 @@ impl RunningTopology {
             }
         }
 
-        let unchanged_table_sinks = self
-            .config
-            .enrichment_tables()
-            .filter_map(|(key, table)| table.as_sink(key))
+        let unchanged_table_sinks = enrichment_table_sinks(&self.config.enrichment_tables)
             .filter(|(key, _)| !diff.enrichment_tables.sinks.contains(key))
             .collect::<Vec<_>>();
         let unchanged_sinks = self
@@ -1368,36 +1368,19 @@ impl RunningTopology {
     ) -> Option<(Self, ShutdownErrorReceiver)> {
         let (abort_tx, abort_rx) = mpsc::unbounded_channel();
 
-        let expire_metrics = match (
-            config.global.expire_metrics,
-            config.global.expire_metrics_secs,
-        ) {
-            (Some(e), None) => {
-                warn!(
-                    "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
-                );
-                if e < Duration::from_secs(0) {
-                    None
-                } else {
-                    Some(e.as_secs_f64())
-                }
-            }
-            (Some(_), Some(_)) => {
+        if config.global.expire_metrics.is_some() {
+            if config.global.expire_metrics_secs.is_some() {
                 error!(
                     message = "Cannot set both `expire_metrics` and `expire_metrics_secs`.",
                     internal_log_rate_limit = false
                 );
                 return None;
             }
-            (None, Some(e)) => {
-                if e < 0f64 {
-                    None
-                } else {
-                    Some(e)
-                }
-            }
-            (None, None) => Some(300f64),
-        };
+            warn!(
+                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+            );
+        }
+        let expire_metrics = config.global.effective_expire_metrics_secs();
 
         if let Err(error) = crate::metrics::Controller::get()
             .expect("Metrics must be initialized")
@@ -1504,9 +1487,7 @@ fn get_changed_outputs(diff: &ConfigDiff, output_ids: Inputs<OutputId>) -> Vec<O
 }
 
 fn enrichment_table_sink_resources(config: &Config, sink_key: &ComponentKey) -> Vec<Resource> {
-    config
-        .enrichment_tables()
-        .filter_map(|(table_key, table)| table.as_sink(table_key))
+    enrichment_table_sinks(&config.enrichment_tables)
         .find(|(key, _)| key == sink_key)
         .map(|(key, sink)| sink.resources(&key))
         .unwrap_or_default()
@@ -1516,9 +1497,7 @@ fn enrichment_table_sink_buffer(
     config: &Config,
     sink_key: &ComponentKey,
 ) -> Option<vector_lib::buffers::BufferConfig> {
-    config
-        .enrichment_tables()
-        .filter_map(|(table_key, table)| table.as_sink(table_key))
+    enrichment_table_sinks(&config.enrichment_tables)
         .find(|(key, _)| key == sink_key)
         .map(|(_, sink)| sink.buffer)
 }

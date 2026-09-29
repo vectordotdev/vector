@@ -26,6 +26,7 @@ use futures::Stream;
 use futures_util::StreamExt;
 use prost::Message;
 use similar_asserts::assert_eq;
+use tokio::sync::Semaphore;
 use tonic::Request;
 use vector_lib::opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 use vector_lib::opentelemetry::proto::trace::v1::{ResourceSpans, ScopeSpans, Span};
@@ -208,6 +209,54 @@ fn generate_config() {
 }
 
 #[test]
+fn admission_config_defaults_and_rejects_invalid_values() {
+    let yaml = "grpc:\n  address: 0.0.0.0:4317\nhttp:\n  address: 0.0.0.0:4318\n";
+    let config: OpentelemetryConfig = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(config.max_concurrent_requests, None);
+    assert_eq!(config.request_timeout_secs, None);
+    let serialized = serde_json::to_value(&config).unwrap();
+    assert!(serialized.get("max_concurrent_requests").is_none());
+    assert!(serialized.get("request_timeout_secs").is_none());
+
+    let configured: OpentelemetryConfig = serde_yaml::from_str(&format!(
+        "{yaml}max_concurrent_requests: 7\nrequest_timeout_secs: 11\n"
+    ))
+    .unwrap();
+    assert_eq!(configured.max_concurrent_requests.unwrap().get(), 7);
+    assert_eq!(configured.request_timeout_secs, Some(11));
+    let round_trip: OpentelemetryConfig =
+        serde_json::from_value(serde_json::to_value(&configured).unwrap()).unwrap();
+    assert_eq!(
+        round_trip.max_concurrent_requests,
+        configured.max_concurrent_requests
+    );
+    assert_eq!(
+        round_trip.request_timeout_secs,
+        configured.request_timeout_secs
+    );
+
+    let limit_only: OpentelemetryConfig =
+        serde_yaml::from_str(&format!("{yaml}max_concurrent_requests: 7\n")).unwrap();
+    assert_eq!(limit_only.max_concurrent_requests.unwrap().get(), 7);
+    assert_eq!(limit_only.request_timeout_secs, None);
+    let timeout_only: OpentelemetryConfig =
+        serde_yaml::from_str(&format!("{yaml}request_timeout_secs: 11\n")).unwrap();
+    assert_eq!(timeout_only.max_concurrent_requests, None);
+    assert_eq!(timeout_only.request_timeout_secs, Some(11));
+    let nulls: OpentelemetryConfig = serde_yaml::from_str(&format!(
+        "{yaml}max_concurrent_requests: null\nrequest_timeout_secs: null\n"
+    ))
+    .unwrap();
+    assert_eq!(nulls.max_concurrent_requests, None);
+    assert_eq!(nulls.request_timeout_secs, None);
+
+    for limit in [0, Semaphore::MAX_PERMITS + 1] {
+        let yaml = format!("{yaml}max_concurrent_requests: {limit}\n");
+        assert!(serde_yaml::from_str::<OpentelemetryConfig>(&yaml).is_err());
+    }
+}
+
+#[test]
 fn config_grpc_keepalive() {
     let config: OpentelemetryConfig = toml::from_str(
         r#"
@@ -229,6 +278,180 @@ fn config_grpc_keepalive() {
         config.grpc.keepalive.max_connection_age_grace_secs,
         Some(30)
     );
+}
+
+#[tokio::test]
+async fn http_and_grpc_acknowledgement_waits_do_not_hold_admission_or_time_out() {
+    for concurrency_limit in [None, Some(1)] {
+        for timeout in [None, Some(1)] {
+            check_acknowledgement_waits(concurrency_limit, timeout).await;
+        }
+    }
+}
+
+async fn check_acknowledgement_waits(concurrency_limit: Option<usize>, timeout: Option<u64>) {
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+    let mut config = get_source_config_with_headers(grpc_addr, http_addr, false);
+    config.acknowledgements = true.into();
+    config.max_concurrent_requests = concurrency_limit.map(|limit| limit.try_into().unwrap());
+    config.request_timeout_secs = timeout;
+
+    let (sender, mut output) = new_unacknowledged_logs_source(&config);
+    let server = config
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(server);
+    test_util::wait_for_tcp(http_addr).await;
+    test_util::wait_for_tcp(grpc_addr).await;
+
+    let deadline = std::time::Duration::from_secs(5);
+    let mut requests = Vec::new();
+    let mut events = Vec::new();
+    let http_client = reqwest::Client::new();
+    for _ in 0..2 {
+        let request = http_client
+            .post(format!("http://{http_addr}/v1/logs"))
+            .header("Content-Type", "application/x-protobuf")
+            .body(create_test_logs_request().into_inner().encode_to_vec());
+        requests.push(tokio::spawn(async move {
+            assert_eq!(
+                request.send().await.unwrap().status(),
+                reqwest::StatusCode::OK
+            );
+        }));
+        // Retaining the event's finalizer keeps the request waiting for acknowledgement.
+        events.push(
+            tokio::time::timeout(deadline, output.next())
+                .await
+                .unwrap()
+                .unwrap(),
+        );
+    }
+
+    let grpc_client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
+        .await
+        .unwrap();
+    // Cloned clients multiplex exports over the same HTTP/2 connection.
+    for _ in 0..2 {
+        let mut client = grpc_client.clone();
+        requests.push(tokio::spawn(async move {
+            client.export(create_test_logs_request()).await.unwrap();
+        }));
+        events.push(
+            tokio::time::timeout(deadline, output.next())
+                .await
+                .unwrap()
+                .unwrap(),
+        );
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+    assert!(requests.iter().all(|request| !request.is_finished()));
+
+    for event in events {
+        event
+            .metadata()
+            .finalizers()
+            .update_status(EventStatus::Delivered);
+    }
+    for request in requests {
+        tokio::time::timeout(deadline, request)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn acknowledgement_status_is_reported_over_http_and_grpc() {
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+    let mut config = get_source_config_with_headers(grpc_addr, http_addr, false);
+    config.acknowledgements = true.into();
+
+    let (sender, mut output) = new_unacknowledged_logs_source(&config);
+    let server = config
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(server);
+    test_util::wait_for_tcp(http_addr).await;
+    test_util::wait_for_tcp(grpc_addr).await;
+
+    let client = reqwest::Client::new();
+    let grpc_client = LogsServiceClient::connect(format!("http://{grpc_addr}"))
+        .await
+        .unwrap();
+    let deadline = std::time::Duration::from_secs(5);
+    for (status, expected_code, expected_message) in [
+        (EventStatus::Delivered, tonic::Code::Ok, ""),
+        (
+            EventStatus::Errored,
+            tonic::Code::Internal,
+            "Error delivering contents to sink",
+        ),
+        (
+            EventStatus::Rejected,
+            tonic::Code::DataLoss,
+            "Contents failed to deliver to sink",
+        ),
+    ] {
+        let http_request = tokio::spawn({
+            let client = client.clone();
+            async move {
+                client
+                    .post(format!("http://{http_addr}/v1/logs"))
+                    .header("Content-Type", "application/x-protobuf")
+                    .body(create_test_logs_request().into_inner().encode_to_vec())
+                    .send()
+                    .await
+                    .unwrap()
+            }
+        });
+        let event = tokio::time::timeout(deadline, output.next())
+            .await
+            .unwrap()
+            .unwrap();
+        event.metadata().finalizers().update_status(status);
+        drop(event);
+        let response = tokio::time::timeout(deadline, http_request)
+            .await
+            .unwrap()
+            .unwrap();
+        if expected_code == tonic::Code::Ok {
+            assert_eq!(response.status(), reqwest::StatusCode::OK);
+        } else {
+            assert_eq!(
+                response.status(),
+                reqwest::StatusCode::INTERNAL_SERVER_ERROR
+            );
+            let status = super::status::Status::decode(response.bytes().await.unwrap()).unwrap();
+            assert_eq!(status.code, tonic::Code::Unknown as i32);
+            assert_eq!(status.message, expected_message);
+        }
+
+        let grpc_request = tokio::spawn({
+            let mut client = grpc_client.clone();
+            async move { client.export(create_test_logs_request()).await }
+        });
+        let event = tokio::time::timeout(deadline, output.next())
+            .await
+            .unwrap()
+            .unwrap();
+        event.metadata().finalizers().update_status(status);
+        drop(event);
+        let response = tokio::time::timeout(deadline, grpc_request)
+            .await
+            .unwrap()
+            .unwrap();
+        if expected_code == tonic::Code::Ok {
+            response.unwrap();
+        } else {
+            assert_eq!(response.unwrap_err().code(), expected_code);
+        }
+    }
 }
 
 #[tokio::test]
@@ -1216,6 +1439,8 @@ fn get_source_config_with_headers(
             ],
         },
         acknowledgements: Default::default(),
+        max_concurrent_requests: None,
+        request_timeout_secs: None,
         log_namespace: Default::default(),
         use_otlp_decoding: use_otlp_decoding.into(),
     }
@@ -1598,6 +1823,8 @@ async fn build_otlp_test_env_with(
             headers: Default::default(),
         },
         acknowledgements: Default::default(),
+        max_concurrent_requests: None,
+        request_timeout_secs: None,
         log_namespace,
         use_otlp_decoding: use_otlp_decoding.into(),
     };
@@ -1617,6 +1844,23 @@ async fn build_otlp_test_env_with(
         config,
         output: Box::new(output),
     }
+}
+
+// Unlike `new_source`, receiving an event does not automatically finalize its acknowledgement.
+fn new_unacknowledged_logs_source(
+    config: &OpentelemetryConfig,
+) -> (SourceSender, impl Stream<Item = Event> + Unpin) {
+    let mut builder = SourceSender::builder();
+    let logs_output = config
+        .outputs(LogNamespace::Legacy)
+        .into_iter()
+        .find(|output| output.port.as_deref() == Some(LOGS))
+        .unwrap();
+    let output = builder
+        .add_source_output(logs_output, "test".into())
+        .into_stream()
+        .flat_map(into_event_stream);
+    (builder.build(), output)
 }
 
 pub(super) fn new_source(
@@ -1678,6 +1922,8 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
             headers: Default::default(),
         },
         acknowledgements: Default::default(),
+        max_concurrent_requests: None,
+        request_timeout_secs: None,
         log_namespace: None,
         use_otlp_decoding: true.into(),
     };
@@ -1905,6 +2151,8 @@ mod otlp_decoding_config_tests {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: true,
@@ -1946,6 +2194,8 @@ mod otlp_decoding_config_tests {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,
@@ -1990,6 +2240,8 @@ mod otlp_decoding_config_tests {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig {
                 logs: false,

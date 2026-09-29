@@ -44,6 +44,8 @@ mod ser;
 #[cfg(test)]
 mod test;
 mod trace;
+#[cfg(any(test, feature = "typed-trace"))]
+pub mod typed_trace;
 pub mod util;
 mod vrl_target;
 

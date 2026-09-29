@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! Generated Datadog Agent protobuf types.
 //!
 //! This crate owns the wire types for Datadog traces (`datadog.trace` and

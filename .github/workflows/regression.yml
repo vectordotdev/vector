@@ -107,18 +107,20 @@ jobs:
           BASELINE_TAG="workflow_dispatch-${COMPARISON_SHA}-${BASELINE_SHA}"
           COMPARISON_TAG="workflow_dispatch-${COMPARISON_SHA}-${COMPARISON_SHA}"
 
-          echo "BASELINE_SHA=${BASELINE_SHA}" >> $GITHUB_OUTPUT
-          echo "COMPARISON_SHA=${COMPARISON_SHA}" >> $GITHUB_OUTPUT
+          {
+            echo "BASELINE_SHA=${BASELINE_SHA}"
+            echo "COMPARISON_SHA=${COMPARISON_SHA}"
 
-          echo "BASELINE_TAG=${BASELINE_TAG}" >> $GITHUB_OUTPUT
-          echo "COMPARISON_TAG=${COMPARISON_TAG}" >> $GITHUB_OUTPUT
+            echo "BASELINE_TAG=${BASELINE_TAG}"
+            echo "COMPARISON_TAG=${COMPARISON_TAG}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set SMP version
         id: experimental-meta
         run: |
           export SMP_CRATE_VERSION="0.28.0"
           echo "smp crate version: ${SMP_CRATE_VERSION}"
-          echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> $GITHUB_OUTPUT
+          echo "SMP_CRATE_VERSION=${SMP_CRATE_VERSION}" >> "$GITHUB_OUTPUT"
 
   # Only run this workflow if files changed in areas that could possibly introduce a regression.
   check-source-changed:
@@ -168,7 +170,7 @@ jobs:
         run: |
           echo "ALL='${{ env.ALL }}'"
           echo "IGNORE='${{ env.IGNORE }}'"
-          export SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
+          SOURCE_CHANGED=$(comm -2 -3 <(printf "%s\n" "${{ env.ALL }}") <(printf "%s\n" "${{ env.IGNORE }}"))
           echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
 
           if [ "${SOURCE_CHANGED}" == "" ]; then
@@ -178,7 +180,7 @@ jobs:
           fi
 
           echo "SOURCE_CHANGED='${SOURCE_CHANGED}'"
-          echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> $GITHUB_OUTPUT
+          echo "SOURCE_CHANGED=${SOURCE_CHANGED}" >> "$GITHUB_OUTPUT"
 
   should-run-gate:
     runs-on: ubuntu-24.04
@@ -585,7 +587,7 @@ jobs:
         run: |
           REPORT_MD=report.md
           if [ -f ${REPORT_MD} ]; then
-            cat ${REPORT_MD} >> $GITHUB_STEP_SUMMARY
+            cat ${REPORT_MD} >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Did not find ${REPORT_MD} file."
           fi

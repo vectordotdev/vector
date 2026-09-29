@@ -4,8 +4,9 @@ use vector_lib::config::ComponentKey;
 use vector_lib::id::Inputs;
 
 use super::{
-    Config, DynValidatedSink, OutputId, builder::ConfigBuilder, graph::Graph, sink::SinkOuter,
-    transform::get_transform_output_ids, validation,
+    Component, Config, DynValidatedSink, OutputId, builder::ConfigBuilder, enrichment_table_sinks,
+    enrichment_table_sources, graph::Graph, sink::SinkOuter, transform::get_transform_output_ids,
+    validation,
 };
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
@@ -61,26 +62,22 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     let all_sinks = sinks
         .clone()
         .into_iter()
-        .chain(
-            enrichment_tables
-                .iter()
-                .filter_map(|(key, table)| table.as_sink(key)),
-        )
+        .chain(enrichment_table_sinks(&enrichment_tables))
         .collect::<IndexMap<_, _>>();
     let sources_and_table_sources = sources
         .clone()
         .into_iter()
-        .chain(
-            enrichment_tables
-                .iter()
-                .filter_map(|(key, table)| table.as_source(key)),
-        )
+        .chain(enrichment_table_sources(&enrichment_tables))
         .collect::<IndexMap<_, _>>();
 
+    let graph_sources = sources_and_table_sources
+        .iter()
+        .map(|(key, c)| (key, Component::from(c)));
+    let graph_transforms = transforms.iter().map(|(key, c)| (key, Component::from(c)));
+    let graph_sinks = all_sinks.iter().map(|(key, c)| (key, Component::from(c)));
+
     let graph = match Graph::new(
-        &sources_and_table_sources,
-        &transforms,
-        &all_sinks,
+        graph_sources.chain(graph_transforms).chain(graph_sinks),
         schema,
         global.wildcard_matching.unwrap_or_default(),
     ) {
@@ -90,6 +87,11 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             return Err(errors);
         }
     };
+
+    if let Err(input_errors) = graph.check_inputs() {
+        errors.extend(input_errors);
+        return Err(errors);
+    }
 
     if let Err(type_errors) = graph.typecheck() {
         errors.extend(type_errors);
@@ -122,9 +124,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             (key, table.with_inputs(inputs))
         })
         .collect();
+    let output_map = graph.output_map().expect("ambiguous outputs");
     let tests = tests
         .into_iter()
-        .map(|test| test.resolve_outputs(&graph))
+        .map(|test| test.resolve_outputs(&output_map))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
