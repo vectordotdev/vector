@@ -426,7 +426,7 @@ where
 }
 
 pub trait VrlRunner {
-    /// Creates a runner using the transform's build context.
+    /// Creates a runner. Pass the transform build context for runner implementations that require it.
     fn new(context: &TransformContext) -> Self;
 
     fn run(
