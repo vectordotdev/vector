@@ -8,9 +8,9 @@ in place, buckets are keyed by the bytes of the `file` field, and expired bucket
 moved instead of cloned.
 
 On a synthetic all-partial backlog (20 files, 150k partial lines, 10.4 MB, both revisions
-emitting the same merged events) this lowers the bytes allocated by the source from 12.6 GB
-to 0.15 GB, and peak memory usage from 201 MiB to 191 MiB, compared with the previous
-revision.
+emitting the same merged events) this lowers the cumulative bytes allocated by the source
+from 12.6 GB to 0.15 GB, and whole-process peak memory usage from 201 MiB to 191 MiB,
+compared with the previous revision.
 
 The events emitted by the merger, including truncated and oversized ones, are unchanged.
 
