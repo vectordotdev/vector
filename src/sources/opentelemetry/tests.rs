@@ -1784,18 +1784,23 @@ async fn http_rejections_return_client_error_status_codes() {
     let (status, _) = send_http_request(client.post(&logs_url)).await;
     assert_eq!(status, reqwest::StatusCode::UNSUPPORTED_MEDIA_TYPE);
 
+    // Other rejections are mapped by warp, which replies with a plain-text body.
     // Only `POST` is routed.
-    let (status, _) = send_http_request(client.get(&logs_url)).await;
-    assert_eq!(status, reqwest::StatusCode::METHOD_NOT_ALLOWED);
+    let response = client
+        .get(&logs_url)
+        .send()
+        .await
+        .expect("Failed to send request.");
+    assert_eq!(response.status(), reqwest::StatusCode::METHOD_NOT_ALLOWED);
 
     // Unknown paths are not found.
-    let (status, _) = send_http_request(
-        client
-            .post(format!("http://{http_addr}/v1/unknown"))
-            .header("Content-Type", "application/x-protobuf"),
-    )
-    .await;
-    assert_eq!(status, reqwest::StatusCode::NOT_FOUND);
+    let response = client
+        .post(format!("http://{http_addr}/v1/unknown"))
+        .header("Content-Type", "application/x-protobuf")
+        .send()
+        .await
+        .expect("Failed to send request.");
+    assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
 
     // The supported content type is still accepted.
     let response = client

@@ -451,25 +451,21 @@ async fn handle_request(
     }
 }
 
-async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {
+async fn handle_rejection(err: Rejection) -> Result<impl Reply, Rejection> {
     let (message, status) = if let Some(err_msg) = err.find::<ErrorMessage>() {
         (err_msg.message().into(), err_msg.status_code())
     } else if is_content_type_rejection(&err) {
         // The route only matches `Content-Type: application/x-protobuf`, so any other (or a
-        // missing) content type is a client error rather than an internal one.
+        // missing) content type is a client error rather than an internal one. warp would
+        // report this as `400 Bad Request`, so it is handled here.
         (
             "Unsupported content type; this endpoint requires `application/x-protobuf`.".into(),
             StatusCode::UNSUPPORTED_MEDIA_TYPE,
         )
-    } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
-        (
-            "Method not allowed; this endpoint requires `POST`.".into(),
-            StatusCode::METHOD_NOT_ALLOWED,
-        )
-    } else if err.is_not_found() {
-        ("Not found.".into(), StatusCode::NOT_FOUND)
-    } else {
+    } else if err.find::<Status>().is_some() || err.find::<ApiError>().is_some() {
         (format!("{err:?}"), StatusCode::INTERNAL_SERVER_ERROR)
+    } else {
+        return Err(err);
     };
 
     let reply = protobuf(Status {
