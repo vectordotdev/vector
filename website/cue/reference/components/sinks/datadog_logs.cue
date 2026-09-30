@@ -85,13 +85,10 @@ components: sinks: datadog_logs: {
 				that still exceeds `max_payload_bytes` after optional truncation is dropped.
 
 				Set `truncate_oversized_logs` to opt in to reducing individual logs whose encoded JSON
-				exceeds `truncate_oversized_logs.max_log_bytes` (default 1,000,000). When the message
-				is shortened, at most `truncate_oversized_logs.max_message_bytes` raw bytes (default
-				900,000) are retained and `...TRUNCATED...` is appended. Every reduced log is tagged
-				`truncated:single_line`. If the log remains oversized after the initial message cap,
-				non-standard fields are removed before the message is shortened further to account for
-				JSON encoding. Logs that still exceed the limit, or have no string message to truncate,
-				are dropped.
+				exceeds `truncate_oversized_logs.max_log_bytes` (default 1,000,000). The message is
+				shortened to the largest size that fits and `...TRUNCATED...` is appended. Every reduced
+				log is tagged `truncated:single_line`. Logs whose non-message fields leave no room for
+				a truncated message, or have no string message to truncate, are dropped.
 				"""
 		}
 	}

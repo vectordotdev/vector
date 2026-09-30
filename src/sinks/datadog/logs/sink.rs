@@ -335,7 +335,6 @@ impl LogRequestBuilder {
                 &mut event,
                 !events_serialized.is_empty(),
                 self.truncation,
-                self.conforms_as_agent,
             )? {
                 LogEncoding::Unchanged => {}
                 LogEncoding::Truncated => {
@@ -407,7 +406,6 @@ fn encode_log(
     event: &mut Event,
     include_comma: bool,
     truncation: Option<DatadogLogsTruncationConfig>,
-    conforms_as_agent: bool,
 ) -> Result<LogEncoding, io::Error> {
     let existing_len = buf.len();
     let original_encoded_size = write_log(buf, event, include_comma)?;
@@ -428,22 +426,14 @@ fn encode_log(
     let tagged_encoded_size = ensure_truncated_tag(event.as_mut_log(), original_encoded_size)?;
     // The encoded event consists of a fixed non-message portion and the message value. Size them
     // separately so the final message can be selected without repeatedly encoding the whole event.
-    let mut non_message_encoded_size = tagged_encoded_size - message_encoded_size;
+    let non_message_encoded_size = tagged_encoded_size - message_encoded_size;
     let select_message_body_len = |non_message_encoded_size| {
         truncation
             .max_log_bytes
             .checked_sub(non_message_encoded_size)
             .and_then(|budget| select_message_body_len(&message, message_encoded_size, budget))
     };
-    let mut body_len = select_message_body_len(non_message_encoded_size);
-
-    if body_len.is_none() {
-        let stripped_size = strip_non_standard_fields(event.as_mut_log(), conforms_as_agent)?;
-        non_message_encoded_size -= stripped_size;
-        body_len = select_message_body_len(non_message_encoded_size);
-    }
-
-    let Some(body_len) = body_len else {
+    let Some(body_len) = select_message_body_len(non_message_encoded_size) else {
         buf.truncate(existing_len);
         return Ok(LogEncoding::Dropped {
             reason: "Event remains too large after truncation.",
@@ -559,45 +549,6 @@ fn message_bytes_mut(log: &mut LogEvent) -> Option<&mut Bytes> {
         },
         _ => None,
     }
-}
-
-fn strip_non_standard_fields(
-    log: &mut LogEvent,
-    conforms_as_agent: bool,
-) -> Result<usize, io::Error> {
-    let Some(fields) = log.as_map_mut() else {
-        return Ok(0);
-    };
-    let mut stripped_size = strip_fields(fields, |field| {
-        is_reserved_attribute(field) || field == MESSAGE
-    })?;
-    if conforms_as_agent && let Some(Value::Object(nested)) = fields.get_mut(MESSAGE) {
-        stripped_size += strip_fields(nested, |field| field == MESSAGE)?;
-    }
-    Ok(stripped_size)
-}
-
-// Calculate the exact encoded size removed rather than using `retain`, so the message budget can
-// be recomputed without encoding the entire log again.
-fn strip_fields(fields: &mut ObjectMap, retain: impl Fn(&str) -> bool) -> Result<usize, io::Error> {
-    let fields_to_strip = fields
-        .iter()
-        .filter(|(field, _)| !retain(field.as_str()))
-        .map(|(field, value)| {
-            Ok((
-                field.clone(),
-                json_string_encoded_size(field.as_str()) + 1 + json_value_encoded_size(value)?,
-            ))
-        })
-        .collect::<Result<Vec<_>, io::Error>>()?;
-    debug_assert!(fields.len() > fields_to_strip.len());
-    // At least one field remains, so removing each member also removes one separating comma.
-    let mut stripped_size = fields_to_strip.len();
-    for (field, member_size) in fields_to_strip {
-        let _ = fields.remove(field.as_str());
-        stripped_size += member_size;
-    }
-    Ok(stripped_size)
 }
 
 fn json_string_encoded_size(value: &str) -> usize {
@@ -881,17 +832,14 @@ mod tests {
     }
 
     #[test]
-    fn leaves_short_message_unmarked_when_only_custom_fields_are_removed() {
+    fn drops_log_when_custom_fields_leave_no_room_for_message() {
         let mut log = LogEvent::from("hello");
         log.insert(event_path!("service"), "payments");
         log.insert(event_path!("custom"), "\u{0001}".repeat(200_000));
 
         let logs = encode_logs(vec![Event::Log(log)], true, false);
 
-        assert_eq!(logs.len(), 1);
-        assert_eq!(logs[0]["message"], "hello");
-        assert!(logs[0].get("custom").is_none());
-        assert_eq!(logs[0]["ddtags"], TRUNCATED_TAG);
+        assert!(logs.is_empty());
     }
 
     #[test]
@@ -923,16 +871,6 @@ mod tests {
         assert_eq!(logs[0]["service"], "payments");
         assert_eq!(logs[0]["ddtags"], TRUNCATED_TAG);
         assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= MAX_LOG_BYTES);
-    }
-
-    #[test]
-    fn drops_log_that_remains_oversized_after_reduction() {
-        let mut log = LogEvent::from("e".repeat(MAX_LOG_BYTES + 1));
-        log.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
-
-        let logs = encode_logs(vec![Event::Log(log)], true, false);
-
-        assert!(logs.is_empty());
     }
 
     #[test]
@@ -1005,7 +943,7 @@ mod tests {
     }
 
     #[test]
-    fn drops_oversized_log_without_string_message_before_removing_fields() {
+    fn drops_oversized_log_without_string_message() {
         for conforms_as_agent in [false, true] {
             let mut log = LogEvent::default();
             log.insert(event_path!("custom"), "f".repeat(MAX_LOG_BYTES + 1));
