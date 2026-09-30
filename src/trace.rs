@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use futures_util::{Stream, StreamExt};
+use futures_util::{Stream, StreamExt, future::ready};
 use metrics_tracing_context::MetricsLayer;
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
@@ -304,13 +304,25 @@ impl TraceSubscription {
 
     /// Converts this subscription into a raw stream of log events.
     ///
-    /// `Err(n)` items signal that the underlying broadcast receiver lagged and `n` events were
-    /// dropped before the next successful receive. Callers are expected to surface this via a
-    /// metric. They MUST NOT log it through `tracing`, since that would feed back into this
-    /// broadcast and can amplify the lag.
-    pub fn into_stream(self) -> impl Stream<Item = Result<LogEvent, u64>> + Unpin {
+    /// Each item pairs a log event with the number of events dropped just before it because the
+    /// underlying broadcast receiver lagged. The count is reported with the next received event,
+    /// not when the lag is detected. After a lag, the receiver points at the oldest slot of a
+    /// full buffer, so any log emitted before the next receive (for example the
+    /// `ComponentEventsDropped` error for the lag itself) overwrites that slot and lags the
+    /// receiver again, indefinitely. Once an event has been received, that slot is consumed and
+    /// callers can log about the drop.
+    pub fn into_stream(self) -> impl Stream<Item = (LogEvent, u64)> + Unpin {
         BroadcastStream::new(self.trace_rx)
-            .map(|event| event.map_err(|BroadcastStreamRecvError::Lagged(n)| n))
+            .scan(0u64, |dropped, event| {
+                ready(Some(match event {
+                    Ok(log) => Some((log, std::mem::take(dropped))),
+                    Err(BroadcastStreamRecvError::Lagged(n)) => {
+                        *dropped += n;
+                        None
+                    }
+                }))
+            })
+            .filter_map(ready)
     }
 }
 
@@ -484,13 +496,10 @@ mod tests {
         let messages: Vec<String> = tokio::time::timeout(Duration::from_secs(5), async {
             let mut collected = Vec::with_capacity(EXPECTED);
             loop {
-                let Ok(event) = stream
+                let (event, _dropped) = stream
                     .next()
                     .await
-                    .expect("broadcast stream ended unexpectedly")
-                else {
-                    continue;
-                };
+                    .expect("broadcast stream ended unexpectedly");
                 if let Some(msg) = event.get(event_path!("message")) {
                     let msg = msg.to_string_lossy().into_owned();
                     if msg.contains("Rate limited broadcast message") {

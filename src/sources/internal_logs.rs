@@ -151,31 +151,27 @@ async fn run(
     let pid = std::process::id();
 
     // Chain any log events that were captured during early buffering to the front,
-    // and then continue with the normal stream of internal log events. Buffered events are
-    // wrapped in `Ok` to match the `Result<LogEvent, u64>` items produced by the live
-    // subscription, where `Err(n)` indicates that `n` events were dropped due to broadcast lag.
+    // and then continue with the normal stream of internal log events. Each item carries the
+    // number of events dropped just before it due to broadcast lag; buffered events have none.
     let buffered_events = subscription.buffered_events().await;
-    let mut rx = stream::iter(buffered_events.into_iter().flatten().map(Ok))
+    let mut rx = stream::iter(buffered_events.into_iter().flatten().map(|log| (log, 0)))
         .chain(subscription.into_stream())
         .take_until(shutdown);
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs. The one exception is
-    // `ComponentEventsDropped` below, which is only emitted in response to
-    // an already-observed lag and therefore produces at most one extra log
-    // per lag incident (bounded amplification, not recursion).
-    while let Some(item) = rx.next().await {
-        let mut log = match item {
-            Ok(log) => log,
-            Err(skipped) => {
-                emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                    count: skipped as usize,
-                    reason: "Internal logs broadcast receiver lagged.",
-                });
-                continue;
-            }
-        };
+    // `ComponentEventsDropped` below. It is only emitted after an event has
+    // been received following a lag (see `TraceSubscription::into_stream`),
+    // so its log cannot lag the receiver again, and it adds at most one log
+    // per received event.
+    while let Some((mut log, dropped)) = rx.next().await {
+        if dropped > 0 {
+            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                count: dropped as usize,
+                reason: "Internal logs broadcast receiver lagged.",
+            });
+        }
         // TODO: Should this actually be in memory size?
         let byte_size = log.estimated_json_encoded_size_of().get();
         let json_byte_size = log.estimated_json_encoded_size_of();
@@ -574,6 +570,43 @@ mod tests {
         assert!(
             discarded_any,
             "expected component_discarded_events_total to be emitted when broadcast lags"
+        );
+    }
+
+    // After a lag, the broadcast receiver points at the oldest slot of a full buffer. Any log
+    // emitted before the next receive, such as the `ComponentEventsDropped` error, overwrites
+    // that slot and lags the receiver again. Verify the source still delivers the newest event of
+    // the burst instead of repeating that cycle.
+    #[tokio::test]
+    #[serial]
+    async fn recovers_after_broadcast_lag() {
+        trace::init(false, false, "error", 10, None);
+        trace::reset_early_buffer();
+
+        let mut rx = start_source().await;
+
+        // Overflow the broadcast (capacity 99) without yielding, so the source lags on its next
+        // receive. The last event is the newest one retained by the broadcast.
+        for i in 0usize..200 {
+            error!(message = "Broadcast lag test.", i);
+        }
+        error!(message = "Last event after lag.");
+
+        let last = Value::from("Last event after lag.");
+        let delivered = tokio::time::timeout(Duration::from_secs(5), async {
+            while let Some(event) = rx.next().await {
+                if event.as_log().get(event_path!("message")) == Some(&last) {
+                    return true;
+                }
+            }
+            false
+        })
+        .await
+        .unwrap_or(false);
+
+        assert!(
+            delivered,
+            "source did not deliver events after broadcast lag"
         );
     }
 }
