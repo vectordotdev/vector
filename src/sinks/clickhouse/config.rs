@@ -815,4 +815,53 @@ mod tests {
             "Error should mention confinement/prefix: {err}"
         );
     }
+
+    fn config_with_compression(
+        http: Compression,
+        ipc: Option<ArrowIpcCompression>,
+    ) -> ClickhouseConfig {
+        ClickhouseConfig {
+            compression: http,
+            format: if ipc.is_some() {
+                Format::ArrowStream
+            } else {
+                Format::JsonEachRow
+            },
+            batch_encoding: ipc.map(|compression| {
+                ClickhouseBatchEncoding::ArrowStream(ArrowStreamSerializerConfig {
+                    compression,
+                    ..Default::default()
+                })
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn ipc_compression_disables_http_compression() {
+        for ipc in [ArrowIpcCompression::Zstd, ArrowIpcCompression::Lz4Frame] {
+            for http in [Compression::gzip_default(), Compression::zstd_default()] {
+                let config = config_with_compression(http, Some(ipc));
+                assert_eq!(
+                    config.effective_http_compression(),
+                    Compression::None,
+                    "IPC {ipc:?} should disable HTTP {http:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn http_compression_kept_without_ipc_compression() {
+        let gzip = Compression::gzip_default();
+        // Arrow encoding with IPC compression off, and no batch encoding at all.
+        for ipc in [Some(ArrowIpcCompression::None), None] {
+            let config = config_with_compression(gzip, ipc);
+            assert_eq!(
+                config.effective_http_compression(),
+                gzip,
+                "HTTP compression should be kept with IPC {ipc:?}"
+            );
+        }
+    }
 }
