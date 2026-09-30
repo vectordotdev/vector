@@ -24,13 +24,11 @@ impl InternalEvent for ThrottleEventDiscarded {
         let group_tag = self
             .include_group_tag
             .then(|| Label::new("group", self.key));
-        emit!(
-            ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: message,
-            }
-            .with_tags(group_tag)
-        );
+        ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason: message,
+        }
+        .emit_with_tags(group_tag);
     }
 }
 
