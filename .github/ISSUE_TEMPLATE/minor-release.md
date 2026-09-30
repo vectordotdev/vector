@@ -53,7 +53,9 @@ The tag starts the release workflow; do not create the tag or release branch man
   - The Vector release workflow starts [Helm release preparation](https://github.com/vectordotdev/helm-charts/actions/workflows/release-prepare.yml)
     automatically for the latest stable Vector release.
   - See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md) for the review steps.
-- [ ] Release Homebrew. Refer to the internal releasing doc.
+- [ ] Wait for the [Homebrew release](https://github.com/vectordotdev/homebrew-brew/actions/workflows/release.yml) to complete.
+  - The Vector release workflow starts it automatically after publishing a stable release.
+    It updates the ARM64 formula and commits directly to the tap's default branch, without a PR.
 - [ ] Update the latest [release tag](https://github.com/vectordotdev/vector/releases) description with the release announcement.
 
 # Post-release housekeeping
