@@ -294,8 +294,7 @@ impl LogRequestBuilder {
             let (events_serialized, body, byte_size) =
                 self.serialize_with_capacity(&mut events_with_estimated_size)?;
             if events_serialized.is_empty() {
-                if let Some((event, _)) = events_with_estimated_size.pop_front() {
-                    event.metadata().update_status(EventStatus::Rejected);
+                if events_with_estimated_size.pop_front().is_some() {
                     emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                         count: 1,
                         reason: "Event too large to encode."
@@ -341,7 +340,6 @@ impl LogRequestBuilder {
                     estimated_json_size = event.estimated_json_encoded_size_of();
                 }
                 LogEncoding::Dropped { reason } => {
-                    event.metadata().update_status(EventStatus::Rejected);
                     emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
                     continue;
                 }
@@ -874,7 +872,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_log_that_remains_oversized_after_reduction() {
+    fn drops_log_that_remains_oversized_after_reduction() {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let mut log = LogEvent::from("e".repeat(MAX_LOG_BYTES + 1)).with_batch_notifier(&batch);
         log.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
@@ -890,11 +888,11 @@ mod tests {
         );
 
         assert!(requests.is_empty());
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
     #[test]
-    fn rejects_log_that_exceeds_payload_limit() {
+    fn drops_log_that_exceeds_payload_limit() {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let log = LogEvent::from("oversized").with_batch_notifier(&batch);
         drop(batch);
@@ -902,7 +900,7 @@ mod tests {
         let requests = build_requests(vec![Event::Log(log)], None, false, 2);
 
         assert!(requests.is_empty());
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
     #[test]
