@@ -1,0 +1,42 @@
+transforms:
+  lua_unversioned:
+    inputs: []
+    type: "lua"
+    source: |
+      event["a"], event["b"] = nil, event["a"]
+
+  lua_v1:
+    inputs: []
+    type: "lua"
+    version: "1"
+    source: |
+      event["a"], event["b"] = nil, event["a"]
+
+tests:
+  - name: "lua_unversioned"
+    input:
+      insert_at: "lua_unversioned"
+      type: "log"
+      log_fields:
+        a: "example value"
+    outputs:
+      - extract_from: "lua_unversioned"
+        conditions:
+          - type: "vrl"
+            source: |
+              !exists(.a) &&
+              .b == "example value"
+
+  - name: "lua_v1"
+    input:
+      insert_at: "lua_v1"
+      type: "log"
+      log_fields:
+        a: "example value"
+    outputs:
+      - extract_from: "lua_v1"
+        conditions:
+          - type: "vrl"
+            source: |
+              !exists(.a) &&
+              .b == "example value"

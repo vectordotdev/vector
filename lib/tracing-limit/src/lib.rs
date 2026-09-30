@@ -1,4 +1,6 @@
 #![deny(warnings)]
+#![warn(clippy::pedantic)]
+#![deny(clippy::unwrap_used)]
 //! Rate limiting for tracing events.
 //!
 //! This crate provides a tracing-subscriber layer that rate limits log events to prevent
@@ -12,6 +14,10 @@
 //! - **2nd occurrence**: Emits a "suppressing" warning
 //! - **3rd+ occurrences**: Silent until window expires
 //! - **After window**: Emits a summary of suppressed count, then next event normally
+//!
+//! Note: the suppressed-count summary and the resumption of normal emission are both
+//! triggered by the *next arriving event* after the window has elapsed, not by the
+//! window expiry itself. If the event stops firing, no summary is ever emitted.
 //!
 //! # Rate limit grouping
 //!
@@ -149,7 +155,7 @@ where
 {
     pub fn new(layer: L) -> Self {
         RateLimitedLayer {
-            events: Default::default(),
+            events: DashMap::default(),
             internal_log_rate_limit: 10,
             inner: layer,
             _subscriber: std::marker::PhantomData,
@@ -163,6 +169,8 @@ where
     /// - 1st occurrence: Emitted normally
     /// - 2nd occurrence: Shows "suppressing" warning
     /// - 3rd+ occurrences: Silent until window expires
+    /// - After window: Summary and next event emitted on next arrival (see module-level note)
+    #[must_use]
     pub fn with_default_limit(mut self, internal_log_rate_limit: u64) -> Self {
         self.internal_log_rate_limit = internal_log_rate_limit;
         self
@@ -194,7 +202,7 @@ where
                 let mut fields = RateLimitedSpanKeys::default();
                 attrs.record(&mut fields);
                 extensions.insert(fields);
-            };
+            }
         }
         self.inner.on_new_span(attrs, id, ctx);
     }
@@ -205,16 +213,13 @@ where
             let span = ctx.span(id).expect("Span not found, this is a bug");
             let mut extensions = span.extensions_mut();
 
-            match extensions.get_mut::<RateLimitedSpanKeys>() {
-                Some(fields) => {
-                    values.record(fields);
-                }
-                None => {
-                    let mut fields = RateLimitedSpanKeys::default();
-                    values.record(&mut fields);
-                    extensions.insert(fields);
-                }
-            };
+            if let Some(fields) = extensions.get_mut::<RateLimitedSpanKeys>() {
+                values.record(fields);
+            } else {
+                let mut fields = RateLimitedSpanKeys::default();
+                values.record(&mut fields);
+                extensions.insert(fields);
+            }
         }
         self.inner.on_record(id, values, ctx);
     }
@@ -438,10 +443,10 @@ enum TraceValue {
 impl fmt::Display for TraceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TraceValue::String(s) => write!(f, "{}", s),
-            TraceValue::Int(i) => write!(f, "{}", i),
-            TraceValue::Uint(u) => write!(f, "{}", u),
-            TraceValue::Bool(b) => write!(f, "{}", b),
+            TraceValue::String(s) => write!(f, "{s}"),
+            TraceValue::Int(i) => write!(f, "{i}"),
+            TraceValue::Uint(u) => write!(f, "{u}"),
+            TraceValue::Bool(b) => write!(f, "{b}"),
         }
     }
 }
@@ -470,7 +475,7 @@ impl From<String> for TraceValue {
     }
 }
 
-/// RateLimitedSpanKeys records span and event fields that differentiate rate limit groups.
+/// `RateLimitedSpanKeys` records span and event fields that differentiate rate limit groups.
 ///
 /// This struct is used to build a composite key that uniquely identifies a rate limit bucket.
 /// Events with different field values will be rate limited independently, even if they come
@@ -607,7 +612,7 @@ mod test {
         }
     }
 
-    /// Macro to create RecordedEvent with optional fields
+    /// Macro to create `RecordedEvent` with optional fields
     /// Usage:
     /// - `event!("message")` - just message
     /// - `event!("message", key1: "value1")` - message with one field
@@ -660,7 +665,7 @@ mod test {
                 .fields
                 .get("message")
                 .cloned()
-                .unwrap_or_else(|| String::from(""));
+                .unwrap_or_else(String::new);
 
             let mut fields = BTreeMap::new();
             for (key, value) in self.fields {
@@ -735,7 +740,7 @@ mod test {
         Arc<Mutex<Vec<RecordedEvent>>>,
         impl Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
     ) {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
+        let events: Arc<Mutex<Vec<RecordedEvent>>> = Arc::default();
         let recorder = RecordingLayer::new(Arc::clone(&events));
         let sub = tracing_subscriber::registry::Registry::default()
             .with(RateLimitedLayer::new(recorder).with_default_limit(default_limit));
@@ -910,9 +915,9 @@ mod test {
             for _ in 0..21 {
                 // Inner span with different component_id should take precedence
                 let inner = info_span!("inner", component_id = "child");
-                let _inner_guard = inner.enter();
+                let inner_guard = inner.enter();
                 info!(message = "Nested event");
-                drop(_inner_guard);
+                drop(inner_guard);
 
                 MockClock::advance(Duration::from_millis(100));
             }
@@ -947,9 +952,9 @@ mod test {
 
             for _ in 0..21 {
                 let inner = info_span!("inner", some_field = "value");
-                let _inner_guard = inner.enter();
+                let inner_guard = inner.enter();
                 info!(message = "Event message");
-                drop(_inner_guard);
+                drop(inner_guard);
 
                 MockClock::advance(Duration::from_millis(100));
             }
@@ -1034,7 +1039,7 @@ mod test {
             }
 
             // Advance to the next window
-            MockClock::advance(Duration::from_millis(1000));
+            MockClock::advance(Duration::from_secs(1));
 
             // Second window: this event should be logged
             emit_event();

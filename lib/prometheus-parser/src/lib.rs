@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![warn(clippy::pedantic)]
 
 use std::{collections::BTreeMap, convert::TryFrom};
 
@@ -157,6 +158,10 @@ impl GroupKind {
         prefix_len: usize,
         metric: Metric,
     ) -> Result<Option<Metric>, ParserError> {
+        #[expect(
+            clippy::string_slice,
+            reason = "prefix_len is always self.name.len(), a valid UTF-8 boundary"
+        )]
         let suffix = &metric.name[prefix_len..];
         let mut key = GroupKey {
             timestamp: metric.timestamp,
@@ -246,6 +251,13 @@ pub struct MetricGroup {
     pub metrics: GroupKind,
 }
 
+// https://github.com/vectordotdev/vector/issues/23659
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Preserve existing range checks and truncation semantics pending numeric-boundary review"
+)]
 fn try_f64_to_u64(f: f64) -> Result<u64, ParserError> {
     if 0.0 <= f && f <= u64::MAX as f64 {
         Ok(f as u64)
@@ -295,6 +307,11 @@ fn matching_group<T: Default>(values: &mut MetricMap<T>, group: GroupKey) -> &mu
 
 /// Parse the given text input, and group the result into higher-level
 /// metric types based on the declared types in the text.
+///
+/// # Errors
+///
+/// Returns an error if a line is malformed or a metric cannot be grouped, including
+/// missing histogram or summary labels and counts outside the supported range.
 pub fn parse_text(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = Vec::new();
 
@@ -328,15 +345,23 @@ struct MetricGroupSet(IndexMap<String, GroupKind>);
 
 impl MetricGroupSet {
     fn get_group<'a>(&'a mut self, name: &str) -> (usize, &'a String, &'a mut GroupKind) {
-        let len = name.len();
         let name = if self.0.contains_key(name) {
             name
-        } else if name.ends_with("_bucket") && self.0.contains_key(&name[..len - 7]) {
-            &name[..len - 7]
-        } else if name.ends_with("_sum") && self.0.contains_key(&name[..len - 4]) {
-            &name[..len - 4]
-        } else if name.ends_with("_count") && self.0.contains_key(&name[..len - 6]) {
-            &name[..len - 6]
+        } else if let Some(base) = name
+            .strip_suffix("_bucket")
+            .filter(|b| self.0.contains_key(*b))
+        {
+            base
+        } else if let Some(base) = name
+            .strip_suffix("_sum")
+            .filter(|b| self.0.contains_key(*b))
+        {
+            base
+        } else if let Some(base) = name
+            .strip_suffix("_count")
+            .filter(|b| self.0.contains_key(*b))
+        {
+            base
         } else {
             self.0
                 .insert(name.into(), GroupKind::new(MetricKind::Untyped));
@@ -371,7 +396,7 @@ impl MetricGroupSet {
         &mut self,
         name: &str,
         labels: &BTreeMap<String, String>,
-        sample: proto::Sample,
+        sample: &proto::Sample,
     ) -> Result<(), ParserError> {
         let (_, basename, group) = self.get_group(name);
         if let Some(metric) = group.try_push(
@@ -401,8 +426,13 @@ impl MetricGroupSet {
     }
 }
 
-/// Parse the given remote_write request, grouping the metrics into
+/// Parse the given `remote_write` request, grouping the metrics into
 /// higher-level metric types based on the metadata.
+///
+/// # Errors
+///
+/// Returns an error for rejected metadata conflicts, missing metric names, or
+/// invalid metric labels or counts.
 pub fn parse_request(
     request: proto::WriteRequest,
     metadata_conflict_strategy: MetadataConflictStrategy,
@@ -423,13 +453,12 @@ pub fn parse_request(
             .into_iter()
             .map(|label| (label.name, label.value))
             .collect();
-        let name = match labels.remove(METRIC_NAME_LABEL) {
-            Some(name) => name,
-            None => return Err(ParserError::RequestNoNameLabel),
+        let Some(name) = labels.remove(METRIC_NAME_LABEL) else {
+            return Err(ParserError::RequestNoNameLabel);
         };
 
         for sample in timeseries.samples {
-            groups.insert_sample(&name, &labels, sample)?;
+            groups.insert_sample(&name, &labels, &sample)?;
         }
     }
 
@@ -438,12 +467,11 @@ pub fn parse_request(
 
 impl From<proto::MetricType> for MetricKind {
     fn from(kind: proto::MetricType) -> Self {
-        use proto::MetricType::*;
+        use proto::MetricType::{Counter, Gauge, Gaugehistogram, Histogram, Summary};
         match kind {
             Counter => MetricKind::Counter,
             Gauge => MetricKind::Gauge,
-            Histogram => MetricKind::Histogram,
-            Gaugehistogram => MetricKind::Histogram,
+            Histogram | Gaugehistogram => MetricKind::Histogram,
             Summary => MetricKind::Summary,
             _ => MetricKind::Untyped,
         }
@@ -487,6 +515,11 @@ mod test {
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep the existing multi-metric fixture and its assertions together"
+    )]
     fn test_parse_text() {
         let input = r#"
             # HELP http_requests_total The total number of HTTP requests.
@@ -539,11 +572,11 @@ mod test {
             assert_eq!(metrics.len(), 2);
             assert_eq!(
                 metrics.get_index(0).unwrap(),
-                simple_metric!(Some(1395066363000), labels!(method => "post", code => 200), 1027.0)
+                simple_metric!(Some(1_395_066_363_000), labels!(method => "post", code => 200), 1027.0)
             );
             assert_eq!(
                 metrics.get_index(1).unwrap(),
-                simple_metric!(Some(1395066363000), labels!(method => "post", code => 400), 3.0)
+                simple_metric!(Some(1_395_066_363_000), labels!(method => "post", code => 400), 3.0)
             );
         });
         match_group!(output[1], "msdos_file_access_time_seconds", Untyped => |metrics: &MetricMap<SimpleMetric>| {
@@ -551,7 +584,7 @@ mod test {
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(
                 None,
                 labels!(path => "C:\\DIR\\FILE.TXT", error => "Cannot find file:\n\"FILE.TXT\""),
-                1.458255915e9
+                1.458_255_915e9
             ));
         });
         match_group!(output[2], "metric_without_timestamp_and_labels", Untyped => |metrics: &MetricMap<SimpleMetric>| {
@@ -562,7 +595,7 @@ mod test {
             assert_eq!(metrics.len(), 1);
             assert_eq!(
                 metrics.get_index(0).unwrap(),
-                simple_metric!(Some(-3982045), labels!(problem => "division by zero"), f64::INFINITY)
+                simple_metric!(Some(-3_982_045), labels!(problem => "division by zero"), f64::INFINITY)
             );
         });
         match_group!(output[4], "http_request_duration_seconds", Histogram => |metrics: &MetricMap<HistogramMetric>| {
@@ -576,12 +609,12 @@ mod test {
                     buckets: vec![
                         HistogramBucket { bucket: 0.05, count: 24054 },
                         HistogramBucket { bucket: 0.1, count: 33444 },
-                        HistogramBucket { bucket: 0.2, count: 100392 },
-                        HistogramBucket { bucket: 0.5, count: 129389 },
-                        HistogramBucket { bucket: 1.0, count: 133988 },
-                        HistogramBucket { bucket: f64::INFINITY, count: 144320 },
+                        HistogramBucket { bucket: 0.2, count: 100_392 },
+                        HistogramBucket { bucket: 0.5, count: 129_389 },
+                        HistogramBucket { bucket: 1.0, count: 133_988 },
+                        HistogramBucket { bucket: f64::INFINITY, count: 144_320 },
                     ],
-                    count: 144320,
+                    count: 144_320,
                     sum: 53423.0,
                 },
             ));
@@ -595,7 +628,7 @@ mod test {
                 },
                 &HistogramMetric {
                     buckets: vec![
-                        HistogramBucket { bucket: 24.999999999999996, count: 18_939_392_877},
+                        HistogramBucket { bucket: 24.999_999_999_999_996, count: 18_939_392_877},
                     ],
                     count: 10,
                     sum: 5.0,
@@ -617,14 +650,19 @@ mod test {
                         SummaryQuantile { quantile: 0.9, value: 9001.0 },
                         SummaryQuantile { quantile: 0.99, value: 76656.0 },
                     ],
-                    count: 4588206224,
-                    sum: 1.7560473e+07,
+                    count: 4_588_206_224,
+                    sum: 1.756_047_3e+07,
                 },
             ));
         });
     }
 
     #[test]
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Exercise the existing rounded u64 maximum conversion boundary"
+    )]
     fn test_f64_to_u64() {
         let value = -1.0;
         let error = try_f64_to_u64(value).unwrap_err();
@@ -681,7 +719,7 @@ mod test {
             }
         ));
 
-        let input = r##"# TYPE a counte"##;
+        let input = r"# TYPE a counte";
         let error = parse_text(input).unwrap_err();
         assert!(matches!(
             error,
@@ -691,7 +729,7 @@ mod test {
             }
         ));
 
-        let input = r##"# TYPEabcd asdf"##;
+        let input = r"# TYPEabcd asdf";
         let error = parse_text(input).unwrap_err();
         assert!(matches!(
             error,
@@ -711,7 +749,7 @@ mod test {
             }
         ));
 
-        let input = r##"name{registry=} 1890"##;
+        let input = r"name{registry=} 1890";
         let error = parse_text(input).unwrap_err();
         assert!(matches!(
             error,
@@ -721,7 +759,7 @@ mod test {
             }
         ));
 
-        let input = r##"name abcd"##;
+        let input = r"name abcd";
         let error = parse_text(input).unwrap_err();
         assert!(matches!(
             error,
@@ -754,7 +792,7 @@ mod test {
                         value: $value.to_string(),
                     }, )* ],
                     samples: vec![
-                        $( proto::Sample { value: $sample as f64, timestamp: $timestamp as i64 }, )*
+                        $( proto::Sample { value: f64::from($sample), timestamp: $timestamp as i64 }, )*
                     ],
                 }, )* ],
             }
@@ -787,7 +825,7 @@ mod test {
     #[test]
     fn parse_request_untyped() {
         let parsed = parse_request(
-            write_request!([], [ [__name__ => "one", big => "small"] => [123 @ 1395066367500] ]),
+            write_request!([], [ [__name__ => "one", big => "small"] => [123 @ 1_395_066_367_500] ]),
             MetadataConflictStrategy::Ignore,
         )
         .unwrap();
@@ -797,7 +835,7 @@ mod test {
             assert_eq!(metrics.len(), 1);
             assert_eq!(
                 metrics.get_index(0).unwrap(),
-                simple_metric!(Some(1395066367500), labels!(big => "small"), 123.0)
+                simple_metric!(Some(1_395_066_367_500), labels!(big => "small"), 123.0)
             );
         });
     }
@@ -808,8 +846,8 @@ mod test {
             write_request!(
                 ["one" = Gauge],
                 [
-                    [__name__ => "one"] => [ 12 @ 1395066367600, 14 @ 1395066367800 ],
-                    [__name__ => "two"] => [ 13 @ 1395066367700 ]
+                    [__name__ => "one"] => [ 12 @ 1_395_066_367_600, 14 @ 1_395_066_367_800 ],
+                    [__name__ => "two"] => [ 13 @ 1_395_066_367_700 ]
                 ]
             ),
             MetadataConflictStrategy::Ignore,
@@ -821,18 +859,18 @@ mod test {
             assert_eq!(metrics.len(), 2);
             assert_eq!(
                 metrics.get_index(0).unwrap(),
-                simple_metric!(Some(1395066367600), labels!(), 12.0)
+                simple_metric!(Some(1_395_066_367_600), labels!(), 12.0)
             );
             assert_eq!(
                 metrics.get_index(1).unwrap(),
-                simple_metric!(Some(1395066367800), labels!(), 14.0)
+                simple_metric!(Some(1_395_066_367_800), labels!(), 14.0)
             );
         });
         match_group!(parsed[1], "two", Untyped => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
             assert_eq!(
                 metrics.get_index(0).unwrap(),
-                simple_metric!(Some(1395066367700), labels!(), 13.0)
+                simple_metric!(Some(1_395_066_367_700), labels!(), 13.0)
             );
         });
     }
@@ -843,11 +881,11 @@ mod test {
             write_request!(
                 ["one" = Histogram],
                 [
-                    [__name__ => "one_bucket", le => "1"] => [ 15 @ 1395066367700 ],
-                    [__name__ => "one_bucket", le => "+Inf"] => [ 19 @ 1395066367700 ],
-                    [__name__ => "one_count"] => [ 19 @ 1395066367700 ],
-                    [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
-                    [__name__ => "one_total"] => [24 @ 1395066367700]
+                    [__name__ => "one_bucket", le => "1"] => [ 15 @ 1_395_066_367_700 ],
+                    [__name__ => "one_bucket", le => "+Inf"] => [ 19 @ 1_395_066_367_700 ],
+                    [__name__ => "one_count"] => [ 19 @ 1_395_066_367_700 ],
+                    [__name__ => "one_sum"] => [ 12 @ 1_395_066_367_700 ],
+                    [__name__ => "one_total"] => [24 @ 1_395_066_367_700]
                 ]
             ),
             MetadataConflictStrategy::Ignore,
@@ -860,7 +898,7 @@ mod test {
             assert_eq!(
                 metrics.get_index(0).unwrap(), (
                     &GroupKey {
-                        timestamp: Some(1395066367700),
+                        timestamp: Some(1_395_066_367_700),
                         labels: labels!(),
                     },
                     &HistogramMetric {
@@ -875,7 +913,7 @@ mod test {
         });
         match_group!(parsed[1], "one_total", Untyped => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
-            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
+            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1_395_066_367_700), labels!(), 24.0));
         });
     }
 
@@ -885,11 +923,11 @@ mod test {
             write_request!(
                 ["one" = Summary],
                 [
-                    [__name__ => "one", quantile => "0.5"] => [ 15 @ 1395066367700 ],
-                    [__name__ => "one", quantile => "0.9"] => [ 19 @ 1395066367700 ],
-                    [__name__ => "one_count"] => [ 21 @ 1395066367700 ],
-                    [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
-                    [__name__ => "one_total"] => [24 @ 1395066367700]
+                    [__name__ => "one", quantile => "0.5"] => [ 15 @ 1_395_066_367_700 ],
+                    [__name__ => "one", quantile => "0.9"] => [ 19 @ 1_395_066_367_700 ],
+                    [__name__ => "one_count"] => [ 21 @ 1_395_066_367_700 ],
+                    [__name__ => "one_sum"] => [ 12 @ 1_395_066_367_700 ],
+                    [__name__ => "one_total"] => [24 @ 1_395_066_367_700]
                 ]
             ),
             MetadataConflictStrategy::Ignore,
@@ -902,7 +940,7 @@ mod test {
             assert_eq!(
                 metrics.get_index(0).unwrap(), (
                     &GroupKey {
-                        timestamp: Some(1395066367700),
+                        timestamp: Some(1_395_066_367_700),
                         labels: labels!(),
                     },
                     &SummaryMetric {
@@ -917,7 +955,7 @@ mod test {
         });
         match_group!(parsed[1], "one_total", Untyped => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
-            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
+            assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1_395_066_367_700), labels!(), 24.0));
         });
     }
 
@@ -945,7 +983,7 @@ mod test {
                 }],
                 samples: vec![proto::Sample {
                     value: 12345.0,
-                    timestamp: 1395066367500,
+                    timestamp: 1_395_066_367_500,
                 }],
             }],
         };
@@ -957,7 +995,7 @@ mod test {
             assert_eq!(metrics.len(), 1);
             assert_eq!(
                 metrics.get_index(0).unwrap(),
-                simple_metric!(Some(1395066367500), labels!(), 12345.0)
+                simple_metric!(Some(1_395_066_367_500), labels!(), 12345.0)
             );
         });
 

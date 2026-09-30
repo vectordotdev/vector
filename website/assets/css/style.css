@@ -1,6 +1,231 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/typography";
+
+/* postcss.config.js writes .hugo-classes from hugo_stats.json at build time.
+   This captures dynamically-constructed class names (e.g. text-[color]) that
+   static file scanning misses. The source is stored at the website/ project
+   root, two directories above this stylesheet. */
+@source "../../.hugo-classes";
+
+/* Classes injected by JS at runtime, absent from hugo_stats.json */
+@source inline("search-input search-results-list search-result code-sample-filename type block border-gray-200 border-gray-300 border-r border-t font-medium h-2 h-3 h-full inline leading-relaxed mb-1 ml-1 mr-1 p-2 p-4 pl-2 py-4 text-gray-600 text-gray-800 text-sm w-2 w-3");
+
+/* Render-time colors must be available before Hugo writes stats. */
+@source inline("border-blue-400 text-blue-400 border-green-400 text-green-400 border-red-400 text-red-400 border-yellow-400 text-yellow-400 border-violet-400 text-violet-400 border-gray-400 text-gray-400 bg-red-500 bg-yellow-500 bg-green-500 border-blue-500 border-fuchsia-500 border-green-500 border-orange-500 border-red-500 border-violet-500 border-yellow-500 border-primary border-secondary border-dark hover:border-primary hover:border-secondary hover:border-dark dark:hover:border-primary dark:hover:border-secondary");
+
+/* Social-link colors are assembled from menu data at render time. */
+@source inline("text-black text-gray-300 text-discord-purple text-rss-orange dark:text-white hover:text-black hover:text-discord-purple hover:text-gray-500 hover:text-rss-orange dark:hover:text-black dark:hover:text-gray-500");
+
+/* Class-based dark mode via Alpine JS toggling .dark on <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-dark: var(--dark);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-secondary: var(--secondary);
+  --color-purple-v: var(--purple-v);
+  /* Brand colors */
+  --color-discord-purple: #7289DA;
+  --color-rss-orange: #f26522;
+
+  /* Custom font family (Segoe UI as primary sans) */
+  --font-sans: "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* Custom font sizes (non-standard steps) */
+  --text-2\.5xl: 1.75rem;
+  --text-2\.5xl--line-height: 2.15rem;
+  --text-4\.5xl: 2.5rem;
+  --text-4\.5xl--line-height: 2.75rem;
+  --text-5\.5xl: 3.375rem;
+  --text-5\.5xl--line-height: 1;
+
+  /* Custom border widths */
+  --border-width-2\.5: 2.5px;
+
+  /* Custom max-widths */
+  --container-xxs: 16rem;
+  --container-1\/4: 25%;
+
+  /* Custom grid template columns */
+  --grid-template-columns-16: repeat(16, minmax(0, 1fr));
+}
+
+@layer base {
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Custom typography overrides migrated from the v3 configuration.
+
+   -------------------------------------------------------------------------- */
+
+@layer prose;
+
+@layer prose {
+
+.prose a {
+  color: var(--color-primary-dark);
+  text-decoration: none;
+}
+.prose a:hover {
+  color: var(--color-secondary);
+}
+.prose code {
+  color: var(--color-primary-dark);
+}
+.prose code:not([class^="language-"]) {
+  color: var(--color-dark);
+  background-color: var(--color-gray-100);
+  border-radius: 4px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+}
+.prose a code:not([class^="language-"]) {
+  color: inherit;
+}
+.prose code::before,
+.prose code::after {
+  display: none;
+}
+/* Code chip inside a badge — mostly transparent so the badge color shows through.
+   Overrides the solid `.prose code` background for this specific case. */
+.prose code.badge-code {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+.dark .prose code.badge-code {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+.prose ul > li::marker {
+  color: var(--color-gray-700);
+}
+.prose ol > li::marker {
+  color: var(--color-gray-700);
+}
+.prose ul > li > :first-child,
+.prose ul > li > :last-child,
+.prose ol > li > :first-child,
+.prose ol > li > :last-child {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.prose .admonition + .tabs,
+.prose .svg + .admonition,
+.prose .highlight + p {
+  margin-top: 1rem;
+}
+.prose .no-prose a {
+  color: var(--color-primary-dark);
+}
+.prose .no-prose a:hover {
+  color: var(--color-secondary);
+}
+.prose .no-prose p + .highlight {
+  margin-top: 0.75rem;
+}
+.prose .no-prose h1,
+.prose .no-prose h2,
+.prose .no-prose h3,
+.prose .no-prose h4,
+.prose .no-prose h5,
+.prose .no-prose h6 {
+  margin: 0;
+  padding: 0;
+}
+.prose .no-prose .highlight,
+.prose .no-prose pre.chroma {
+  margin: 0;
+}
+
+/* VRL release entries end with a paragraph linking both the author and PR. */
+.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
+  @apply mb-0 mt-4 min-w-0 list-none rounded-t-lg border border-b-0 border-gray-200 bg-gray-50/50 px-4 py-4 shadow-sm md:px-5;
+}
+.vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])) > li,
+.vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) > li {
+  @apply m-0;
+}
+.vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
+  @apply mt-0 rounded-b-lg border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm italic shadow-sm md:px-5;
+}
+.dark .vrl-changelog > ul:has(+ p a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.dark .vrl-changelog > ul:has(+ p a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]),
+.dark .vrl-changelog > ul + p:has(a[href*="github.com/vectordotdev/vrl/pull/"] ~ a[href^="https://github.com/"]:not([href*="/pull/"])),
+.dark .vrl-changelog > ul + p:has(a[href^="https://github.com/"]:not([href*="/pull/"]) ~ a[href*="github.com/vectordotdev/vrl/pull/"]) {
+  @apply border-gray-700 bg-gray-800/40;
+}
+
+/* Dark mode prose overrides */
+.dark .prose table th,
+.dark .prose table td {
+  color: var(--color-gray-200);
+}
+.dark .prose table tr,
+.dark .prose table th,
+.dark .prose table thead,
+.dark .prose table tbody {
+  border-top-color: var(--color-gray-700);
+  border-bottom-color: var(--color-gray-700);
+}
+.dark .prose code {
+  color: var(--color-gray-100);
+}
+.dark .prose code:not([class^="language-"]) {
+  background-color: var(--color-gray-700);
+}
+.dark .prose {
+  color: var(--color-gray-200);
+}
+.dark .prose p,
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6,
+.dark .prose li {
+  color: var(--color-gray-100);
+}
+.dark .prose ul > li::marker {
+  color: var(--color-gray-100);
+}
+.dark .prose ol > li::marker {
+  color: var(--color-gray-100);
+}
+.dark .prose a,
+.dark .prose a code,
+.dark .prose a code:not([class^="language-"]) {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.dark .prose a:hover,
+.dark .prose a:active {
+  color: var(--color-secondary);
+}
+.dark .prose strong {
+  color: var(--color-gray-100);
+}
+}
 
 :root {
   --dark: #191927; /* Vector Dark */
@@ -34,10 +259,17 @@
   border-bottom: 1px solid transparent;
 }
 
-@variants hover {
-  .underline {
-    text-decoration: none;
-    border-bottom: 1px solid #f44af5;
+.hover\:underline:hover {
+  text-decoration: none;
+  border-bottom: 1px solid var(--secondary);
+}
+
+@layer utilities {
+  .text-discord-purple {
+    color: var(--color-discord-purple, #7289da);
+  }
+  .text-rss-orange {
+    color: var(--color-rss-orange, #f26522);
   }
 }
 
@@ -45,7 +277,6 @@
   display: none !important;
 }
 
-/* Some rules that Tailwind can't really cover */
 .jump + .jump,
 .admonition + .admonition {
   margin-top: 0.5rem;

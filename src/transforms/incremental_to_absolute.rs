@@ -24,7 +24,6 @@ pub struct IncrementalToAbsoluteConfig {
     ///
     /// By default, incremental metrics are evicted after 5 minutes of not being updated. The next
     /// incremental value will be reset.
-    #[configurable(derived)]
     #[serde(default)]
     pub cache: NormalizerConfig<IncrementalToAbsoluteDefaultNormalizerSettings>,
 }
@@ -100,6 +99,7 @@ mod tests {
     use std::sync::Arc;
 
     use futures_util::SinkExt;
+    use indoc::indoc;
     use similar_asserts::assert_eq;
     use vector_lib::config::ComponentKey;
 
@@ -136,12 +136,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_incremental_to_absolute() {
-        let config = toml::from_str::<IncrementalToAbsoluteConfig>(
-            r#"
-[cache]
-max_events = 100
-"#,
-        )
+        let config = serde_yaml::from_str::<IncrementalToAbsoluteConfig>(indoc! {"
+            cache:
+              max_events: 100
+        "})
         .unwrap();
         let incremental_to_absolute = IncrementalToAbsolute::new(&config)
             .map(Transform::event_task)

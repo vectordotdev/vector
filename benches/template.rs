@@ -8,12 +8,12 @@ use vector::{
 };
 
 fn bench_elasticsearch_index(c: &mut Criterion) {
-    use vector::template::Template;
+    use vector::template::UnconfinedTemplate;
 
     let mut group = c.benchmark_group("template");
 
     group.bench_function("dynamic", |b| {
-        let index = Template::try_from("index-%Y.%m.%d").unwrap();
+        let index = UnconfinedTemplate::try_from("index-%Y.%m.%d").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(
             log_schema().timestamp_key_target_path().unwrap(),
@@ -28,7 +28,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
     });
 
     group.bench_function("static", |b| {
-        let index = Template::try_from("index").unwrap();
+        let index = UnconfinedTemplate::try_from("index").unwrap();
         let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(
             log_schema().timestamp_key_target_path().unwrap(),

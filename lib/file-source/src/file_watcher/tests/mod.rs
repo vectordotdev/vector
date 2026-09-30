@@ -1,3 +1,4 @@
+mod bytes_unread;
 mod experiment;
 mod experiment_no_truncations;
 
@@ -7,7 +8,7 @@ use bytes::{Bytes, BytesMut};
 use quickcheck::{Arbitrary, Gen};
 use tokio::time::Instant;
 
-use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileWatcher, null_reader};
+use super::{EOF_READ_BACKOFF_MAX, EOF_READ_BACKOFF_MIN, FileReader, FileWatcher};
 
 // Welcome.
 //
@@ -175,13 +176,58 @@ impl Arbitrary for FileWatcherAction {
     }
 }
 
+#[tokio::test]
+async fn gzip_multi_stream_reads_all_members() {
+    use async_compression::tokio::bufread::GzipEncoder;
+    use std::fs;
+    use tokio::io::AsyncReadExt as _;
+
+    let dir = tempfile::TempDir::new().expect("could not create tempdir");
+    let path = dir.path().join("multi.gz");
+
+    async fn encode(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        GzipEncoder::new(data).read_to_end(&mut out).await.unwrap();
+        out
+    }
+
+    // Write two separate gzip members into one file — the bug dropped the second.
+    let mut bytes = encode(b"first\n").await;
+    bytes.extend(encode(b"second\n").await);
+    fs::write(&path, &bytes).unwrap();
+
+    let mut fw = FileWatcher::new(
+        path,
+        file_source_common::ReadFrom::Beginning,
+        None,
+        100_000,
+        Bytes::from("\n"),
+    )
+    .await
+    .expect("FileWatcher::new failed");
+
+    let mut lines = Vec::new();
+    for _ in 0..10 {
+        fw.track_read_attempt();
+        let result = fw.read_line().await.expect("read_line error");
+        if let Some(raw) = result.raw_line {
+            lines.push(String::from_utf8(raw.bytes.to_vec()).unwrap());
+        }
+        if lines.len() == 2 {
+            break;
+        }
+    }
+
+    assert_eq!(lines, vec!["first", "second"]);
+}
+
 fn watcher_for_timing() -> FileWatcher {
     let now = Instant::now();
 
     FileWatcher {
         path: PathBuf::new(),
         findable: true,
-        reader: Box::new(null_reader()),
+        reader: FileReader::Null(std::io::Cursor::new(Vec::new())),
         file_position: 0,
         devno: 0,
         inode: 0,
@@ -235,6 +281,46 @@ fn caps_and_resets_eof_backoff() {
 
     assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
     assert!(!watcher.reached_eof());
+}
+
+#[tokio::test]
+async fn updating_path_resets_eof_backoff() {
+    for replace_file in [false, true] {
+        let dir = tempfile::TempDir::new().unwrap();
+        let old_path = dir.path().join("old.log");
+        let new_path = dir.path().join("new.log");
+        std::fs::write(&old_path, b"first\n").unwrap();
+        let mut watcher = FileWatcher::new(
+            old_path.clone(),
+            file_source_common::ReadFrom::Beginning,
+            None,
+            1024,
+            Bytes::from_static(b"\n"),
+        )
+        .await
+        .unwrap();
+        for _ in 0..16 {
+            watcher.track_read_attempt();
+            watcher.track_read_eof();
+        }
+        assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MAX);
+
+        if replace_file {
+            std::fs::write(&new_path, b"second\n").unwrap();
+        } else {
+            std::fs::rename(&old_path, &new_path).unwrap();
+        }
+        let old_info = watcher.update_path(new_path).await.unwrap();
+        assert_eq!(old_info.is_some(), replace_file);
+        if let Some(old_info) = old_info {
+            assert!(old_info.reached_eof);
+        }
+        assert!(!watcher.reached_eof());
+        assert_eq!(watcher.read_retry_delay, EOF_READ_BACKOFF_MIN);
+        let line = watcher.read_line().await.unwrap().raw_line.unwrap();
+        let expected: &[u8] = if replace_file { b"second" } else { b"first" };
+        assert_eq!(line.bytes.as_ref(), expected);
+    }
 }
 
 #[inline]

@@ -192,7 +192,10 @@ sinks:
   webhook:
     type: http_server
     address: "0.0.0.0:8080"
-    encoding: json
+    decoding:
+      codec: json
+    framing:
+      method: bytes
 
 # Transform: Validate webhook signature
   validate_webhook:

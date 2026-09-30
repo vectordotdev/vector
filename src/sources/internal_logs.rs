@@ -32,13 +32,6 @@ const MAX_BATCH_SIZE: usize = 1024;
 /// drops in benchmarks and only raise worst-case memory, since `LogEvent` sizes vary widely.
 const INTERMEDIATE_QUEUE_CAPACITY: usize = MAX_BATCH_SIZE;
 
-/// Item flowing from the drain task to the main task.
-enum DrainItem {
-    Log(LogEvent),
-    /// `n` events were dropped at the broadcast layer (receiver lagged) before the next event.
-    Lagged(u64),
-}
-
 /// Configuration for the `internal_logs` source.
 #[configurable_component(source(
     "internal_logs",
@@ -171,9 +164,8 @@ async fn run(
     let pid = std::process::id();
 
     // Chain any log events that were captured during early buffering to the front,
-    // and then continue with the normal stream of internal log events. Buffered events are
-    // wrapped in `Ok` to match the `Result<LogEvent, u64>` items produced by the live
-    // subscription, where `Err(n)` indicates that `n` events were dropped due to broadcast lag.
+    // and then continue with the normal stream of internal log events. Each item carries the
+    // number of events dropped just before it due to broadcast lag; buffered events have none.
     //
     // `shutdown` is cloned so the drain task can terminate its stream via `take_until`, while
     // the main task still holds a live handle. The `ShutdownSignalToken` must outlive the
@@ -182,7 +174,7 @@ async fn run(
     // in-flight batches still being processed by the main task.
     let buffered_events = subscription.buffered_events().await;
     let _shutdown_guard = shutdown.clone();
-    let rx = stream::iter(buffered_events.into_iter().flatten().map(Ok))
+    let rx = stream::iter(buffered_events.into_iter().flatten().map(|log| (log, 0)))
         .chain(subscription.into_stream())
         .take_until(shutdown);
 
@@ -191,73 +183,67 @@ async fn run(
     // the main task enriches and `send_batch`es them downstream. When the main task is blocked
     // on sink backpressure, the drain task can still empty short bursts into the queue, which
     // keeps the broadcast receiver from lagging. Under sustained overload the queue fills, the
-    // drain task backpressures, and broadcast lag is eventually surfaced via `Lagged(n)` items.
-    let (queue_tx, mut queue_rx) = mpsc::channel::<DrainItem>(INTERMEDIATE_QUEUE_CAPACITY);
+    // drain task backpressures, and broadcast lag is eventually reported with the next event.
+    let (queue_tx, mut queue_rx) = mpsc::channel(INTERMEDIATE_QUEUE_CAPACITY);
     let drain_task = tokio::spawn(drain_broadcast(rx, queue_tx));
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs. The one exception is
-    // `ComponentEventsDropped` below, which is only emitted in response to
-    // an already-observed lag and therefore produces at most one extra log
-    // per lag incident (bounded amplification, not recursion).
-    let mut batch: Vec<DrainItem> = Vec::with_capacity(MAX_BATCH_SIZE);
+    // `ComponentEventsDropped` below. Its count arrives with an event the
+    // drain task has already received (see `TraceSubscription::into_stream`),
+    // so its log cannot lag the receiver again, and it adds at most one log
+    // per batch.
+    let mut batch: Vec<(LogEvent, u64)> = Vec::with_capacity(MAX_BATCH_SIZE);
     while queue_rx.recv_many(&mut batch, MAX_BATCH_SIZE).await > 0 {
         let mut events: Vec<Event> = Vec::with_capacity(batch.len());
         let mut byte_size_total: usize = 0;
         let mut json_byte_size_total = vector_lib::json_size::JsonSize::zero();
-        let mut lagged_total: u64 = 0;
+        let mut dropped_total: u64 = 0;
 
         let now = Utc::now();
-        for item in batch.drain(..) {
-            match item {
-                DrainItem::Lagged(n) => lagged_total += n,
-                DrainItem::Log(mut log) => {
-                    let byte_size = log.estimated_json_encoded_size_of().get();
-                    let json_byte_size = log.estimated_json_encoded_size_of();
-                    byte_size_total += byte_size;
-                    json_byte_size_total += json_byte_size;
+        for (mut log, dropped) in batch.drain(..) {
+            dropped_total += dropped;
 
-                    if let Ok(hostname) = &hostname {
-                        let legacy_host_key = host_key.as_ref().map(LegacyKey::Overwrite);
-                        log_namespace.insert_source_metadata(
-                            InternalLogsConfig::NAME,
-                            &mut log,
-                            legacy_host_key,
-                            path!("host"),
-                            hostname.to_owned(),
-                        );
-                    }
+            let byte_size = log.estimated_json_encoded_size_of().get();
+            let json_byte_size = log.estimated_json_encoded_size_of();
+            byte_size_total += byte_size;
+            json_byte_size_total += json_byte_size;
 
-                    let legacy_pid_key = pid_key.as_ref().map(LegacyKey::Overwrite);
-                    log_namespace.insert_source_metadata(
-                        InternalLogsConfig::NAME,
-                        &mut log,
-                        legacy_pid_key,
-                        path!("pid"),
-                        pid,
-                    );
-
-                    log_namespace.insert_standard_vector_source_metadata(
-                        &mut log,
-                        InternalLogsConfig::NAME,
-                        now,
-                    );
-
-                    events.push(Event::from(log));
-                }
+            if let Ok(hostname) = &hostname {
+                let legacy_host_key = host_key.as_ref().map(LegacyKey::Overwrite);
+                log_namespace.insert_source_metadata(
+                    InternalLogsConfig::NAME,
+                    &mut log,
+                    legacy_host_key,
+                    path!("host"),
+                    hostname.to_owned(),
+                );
             }
+
+            let legacy_pid_key = pid_key.as_ref().map(LegacyKey::Overwrite);
+            log_namespace.insert_source_metadata(
+                InternalLogsConfig::NAME,
+                &mut log,
+                legacy_pid_key,
+                path!("pid"),
+                pid,
+            );
+
+            log_namespace.insert_standard_vector_source_metadata(
+                &mut log,
+                InternalLogsConfig::NAME,
+                now,
+            );
+
+            events.push(Event::from(log));
         }
 
-        if lagged_total > 0 {
+        if dropped_total > 0 {
             emit!(ComponentEventsDropped::<UNINTENTIONAL> {
-                count: lagged_total as usize,
+                count: dropped_total as usize,
                 reason: "Internal logs broadcast receiver lagged.",
             });
-        }
-
-        if events.is_empty() {
-            continue;
         }
 
         emit!(InternalLogsBytesReceived {
@@ -280,22 +266,18 @@ async fn run(
     }
 
     // Wait for the drain task to exit cleanly after shutdown.
-    let _ = drain_task.await;
+    _ = drain_task.await;
     Ok(())
 }
 
 /// Drains `rx` into `queue_tx` as fast as possible. Runs in a spawned task so broadcast
 /// consumption is decoupled from the main task's downstream send latency.
-async fn drain_broadcast<S>(mut rx: S, queue_tx: mpsc::Sender<DrainItem>)
+async fn drain_broadcast<S>(mut rx: S, queue_tx: mpsc::Sender<(LogEvent, u64)>)
 where
-    S: futures::Stream<Item = Result<LogEvent, u64>> + Unpin,
+    S: futures::Stream<Item = (LogEvent, u64)> + Unpin,
 {
     while let Some(item) = rx.next().await {
-        let drain_item = match item {
-            Ok(log) => DrainItem::Log(log),
-            Err(n) => DrainItem::Lagged(n),
-        };
-        if queue_tx.send(drain_item).await.is_err() {
+        if queue_tx.send(item).await.is_err() {
             break;
         }
     }
@@ -305,10 +287,11 @@ where
 mod tests {
     use futures::Stream;
     use tokio::time::{Duration, sleep};
-    use vector_lib::{event::Value, lookup::OwnedTargetPath};
+    use vector_lib::{SpanField, event::Value, lookup::OwnedTargetPath};
     use vrl::value::kind::Collection;
 
     use serial_test::serial;
+    use vrl::event_path;
 
     use super::*;
     use crate::{
@@ -333,11 +316,15 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn receives_logs() {
-        trace::init(false, false, "debug", 10);
+        trace::init(false, false, "debug", 10, None);
         trace::reset_early_buffer();
 
         assert_source_compliance(&SOURCE_TAGS, run_test()).await;
     }
+
+    // Register test-specific span fields so they appear in the SPAN_FIELDS allowlist.
+    inventory::submit!(SpanField("component_new_field"));
+    inventory::submit!(SpanField("component_numerical_field"));
 
     async fn run_test() {
         let test_id: u8 = rand::random();
@@ -351,11 +338,15 @@ mod tests {
             component_id = "foo",
             component_type = "internal_logs",
         );
-        let _enter = span.enter();
+        let enter = span.enter();
 
         error!(message = "Before source started.", %test_id);
 
+        drop(enter); // don't hold the span guard across an await point
+
         let rx = start_source().await;
+
+        let enter = span.enter();
 
         error!(message = "After source started.", %test_id);
 
@@ -371,10 +362,12 @@ mod tests {
             error!(message = "In a nested span.", %test_id);
         }
 
+        drop(enter);
+
         sleep(Duration::from_millis(1)).await;
-        let mut events = collect_ready(rx).await;
+        let mut events = collect_ready(rx);
         let test_id = Value::from(test_id.to_string());
-        events.retain(|event| event.as_log().get("test_id") == Some(&test_id));
+        events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id));
 
         let end = chrono::Utc::now();
 
@@ -405,9 +398,9 @@ mod tests {
             assert_eq!(log["metadata.level"], "ERROR".into());
             // The first log event occurs outside our custom span
             if i == 0 {
-                assert!(log.get("vector.component_id").is_none());
-                assert!(log.get("vector.component_kind").is_none());
-                assert!(log.get("vector.component_type").is_none());
+                assert!(log.get(event_path!("vector", "component_id")).is_none());
+                assert!(log.get(event_path!("vector", "component_kind")).is_none());
+                assert!(log.get(event_path!("vector", "component_type")).is_none());
             } else if i < 3 {
                 assert_eq!(log["vector.component_id"], "foo".into());
                 assert_eq!(log["vector.component_kind"], "source".into());
@@ -421,7 +414,7 @@ mod tests {
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
                 assert_eq!(log["vector.component_new_field"], "baz".into());
                 assert_eq!(log["vector.component_numerical_field"], 1.into());
-                assert!(log.get("vector.ignored_field").is_none());
+                assert!(log.get(event_path!("vector", "ignored_field")).is_none());
             }
         }
     }
@@ -439,12 +432,53 @@ mod tests {
         rx
     }
 
+    // Register a span field through the same macro downstream crates would use, then verify
+    // that emitting a log inside a span carrying that field captures it onto the log event.
+    // This is the regression check for `register_extra_span_field!` extending the
+    // `SpanFields::record` allowlist beyond the built-in `component_*` prefix.
+    vector_lib::register_extra_span_field!("internal_logs_test_extra_field");
+
+    #[tokio::test]
+    #[serial]
+    async fn registered_extra_span_field_is_captured() {
+        trace::init(false, false, "info", 10, None);
+        trace::reset_early_buffer();
+
+        let test_id: u8 = rand::random();
+        let rx = start_source().await;
+
+        {
+            let span = error_span!(
+                "extras",
+                component_id = "foo",
+                internal_logs_test_extra_field = "captured",
+                some_other_field = "dropped",
+            );
+            let _enter = span.enter();
+            error!(message = "With extra field.", %test_id);
+        }
+
+        sleep(Duration::from_millis(1)).await;
+        let mut events = collect_ready(rx);
+        let test_id_value = Value::from(test_id.to_string());
+        events.retain(|event| event.as_log().get(event_path!("test_id")) == Some(&test_id_value));
+
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(
+            log["vector.internal_logs_test_extra_field"],
+            "captured".into()
+        );
+        // The unregistered span field is still filtered out.
+        assert!(log.get(event_path!("vector", "some_other_field")).is_none());
+    }
+
     // NOTE: This test requires #[serial] because it directly interacts with global tracing state.
     // This is a pre-existing limitation around tracing initialization in tests.
     #[tokio::test]
     #[serial]
     async fn repeated_logs_are_not_rate_limited() {
-        trace::init(false, false, "info", 10);
+        trace::init(false, false, "info", 10, None);
         trace::reset_early_buffer();
 
         let rx = start_source().await;
@@ -455,14 +489,14 @@ mod tests {
         }
 
         sleep(Duration::from_millis(50)).await;
-        let events = collect_ready(rx).await;
+        let events = collect_ready(rx);
 
         // Filter to only our test messages
         let test_events: Vec<_> = events
             .iter()
             .filter(|e| {
                 e.as_log()
-                    .get("message")
+                    .get(event_path!("message"))
                     .map(|m| m.to_string_lossy() == "Repeated test message.")
                     .unwrap_or(false)
             })
@@ -553,13 +587,14 @@ mod tests {
     // While the current task holds the CPU without yielding, no other tokio tasks are scheduled.
     // We flood the broadcast channel (capacity 99) with more events than it can hold. The drain
     // task hasn't polled yet, so the broadcast overflows and records a lag count. After we yield,
-    // the drain task observes `Lagged(n)` and the main task emits `ComponentEventsDropped`.
+    // the drain task forwards the lag count with the next event and the main task emits
+    // `ComponentEventsDropped`.
     // We use a non-consuming downstream receiver to ensure `send_batch` eventually blocks,
     // preventing any events from being silently drained before we check the metric.
     #[tokio::test]
     #[serial]
     async fn broadcast_lag_increments_discarded_metric() {
-        trace::init(false, false, "error", 10);
+        trace::init(false, false, "error", 10, None);
         vector_lib::metrics::init_test();
         trace::reset_early_buffer();
 
@@ -590,8 +625,8 @@ mod tests {
             error!(message = "Broadcast lag test.", i);
         }
 
-        // Yield enough times for the drain task to observe the Lagged error and the main
-        // task to emit ComponentEventsDropped.
+        // Yield enough times for the drain task to receive past the lag and the main task to
+        // emit ComponentEventsDropped.
         for _ in 0..20 {
             tokio::task::yield_now().await;
         }
@@ -604,6 +639,43 @@ mod tests {
         assert!(
             discarded_any,
             "expected component_discarded_events_total to be emitted when broadcast lags"
+        );
+    }
+
+    // After a lag, the broadcast receiver points at the oldest slot of a full buffer. Any log
+    // emitted before the next receive, such as the `ComponentEventsDropped` error, overwrites
+    // that slot and lags the receiver again. Verify the source still delivers the newest event of
+    // the burst instead of repeating that cycle.
+    #[tokio::test]
+    #[serial]
+    async fn recovers_after_broadcast_lag() {
+        trace::init(false, false, "error", 10, None);
+        trace::reset_early_buffer();
+
+        let mut rx = start_source().await;
+
+        // Overflow the broadcast (capacity 99) without yielding, so the source lags on its next
+        // receive. The last event is the newest one retained by the broadcast.
+        for i in 0usize..200 {
+            error!(message = "Broadcast lag test.", i);
+        }
+        error!(message = "Last event after lag.");
+
+        let last = Value::from("Last event after lag.");
+        let delivered = tokio::time::timeout(Duration::from_secs(5), async {
+            while let Some(event) = rx.next().await {
+                if event.as_log().get(event_path!("message")) == Some(&last) {
+                    return true;
+                }
+            }
+            false
+        })
+        .await
+        .unwrap_or(false);
+
+        assert!(
+            delivered,
+            "source did not deliver events after broadcast lag"
         );
     }
 }

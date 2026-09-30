@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: clickhouse
+    inputs:
+      - my-source-or-transform-id
+    endpoint: http://localhost:8123
+    table: mytable
