@@ -228,7 +228,7 @@ impl ComposeTestConfig {
         let config_dir = if use_config_subdir {
             test_dir.join(CONFIG_SUBDIR)
         } else {
-            test_dir.clone()
+            test_dir
         };
         let config = Self::parse_file(&config_dir.join(FILE_NAME))?;
         Ok((config_dir, config))

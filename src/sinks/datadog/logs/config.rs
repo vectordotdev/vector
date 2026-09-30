@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 use indoc::indoc;
 use tower::ServiceBuilder;
@@ -7,7 +7,10 @@ use vector_lib::{
 };
 use vrl::value::Kind;
 
+use hyper::{Body, client::connect::Connect};
+
 use super::{service::LogApiRetry, sink::LogSinkBuilder};
+use crate::config::ValidatedSink;
 use crate::{
     common::datadog,
     http::HttpClient,
@@ -15,7 +18,10 @@ use crate::{
     sinks::{
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig, logs::service::LogApiService},
         prelude::*,
-        util::http::RequestConfig,
+        util::{
+            HttpEndpoint,
+            http::{RequestConfig, validate_headers},
+        },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -28,7 +34,7 @@ use crate::{
 // of escaped double-quotes -- but we believe this should be very rare in
 // practice.
 pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
-pub const BATCH_GOAL_BYTES: usize = 4_250_000;
+pub const BATCH_HEADROOM_BYTES: usize = 750_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
@@ -37,7 +43,8 @@ pub struct DatadogLogsDefaultBatchSettings;
 
 impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
-    const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
+    // No static default: validate() derives the goal from max_payload_bytes at runtime.
+    const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
@@ -50,20 +57,16 @@ pub struct DatadogLogsConfig {
     #[serde(flatten)]
     pub local_dd_common: LocalDatadogCommonConfig,
 
-    #[configurable(derived)]
     #[derivative(Default(value = "default_compression()"))]
     #[serde(default = "default_compression")]
     pub compression: Option<Compression>,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
 
@@ -73,6 +76,20 @@ pub struct DatadogLogsConfig {
     /// configuration setting.
     #[serde(default)]
     pub conforms_as_agent: bool,
+
+    /// Maximum uncompressed payload size in bytes sent to the endpoint. It is recommended
+    /// to not set it above 5,000,000 (5 MB, the standard Datadog API limit). Increase
+    /// this when targeting a compatible endpoint that accepts larger payloads. The batch
+    /// goal is derived as `max_payload_bytes - 750,000` bytes; events larger than the
+    /// batch goal are sent alone in their batch. Events exceeding `max_payload_bytes` are
+    /// dropped.
+    #[derivative(Default(value = "default_max_payload_bytes()"))]
+    #[serde(default = "default_max_payload_bytes")]
+    pub max_payload_bytes: Option<usize>,
+}
+
+const fn default_max_payload_bytes() -> Option<usize> {
+    Some(MAX_PAYLOAD_BYTES)
 }
 
 const fn default_compression() -> Option<Compression> {
@@ -80,9 +97,9 @@ const fn default_compression() -> Option<Compression> {
 }
 
 impl GenerateConfig for DatadogLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(indoc! {r#"
-            default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc! {r#"
+            default_api_key: ${DATADOG_API_KEY_ENV_VAR}
         "#})
         .unwrap()
     }
@@ -91,39 +108,32 @@ impl GenerateConfig for DatadogLogsConfig {
 impl DatadogLogsConfig {
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
-    fn get_uri(&self, dd_common: &DatadogCommonConfig) -> http::Uri {
-        let base_url = dd_common
-            .endpoint
-            .clone()
-            .unwrap_or_else(|| format!("https://http-intake.logs.{}", dd_common.site));
+    /// Resolve the logs API endpoint from the given endpoint/site.
+    fn logs_endpoint(endpoint: Option<&str>, site: &str) -> crate::Result<HttpEndpoint> {
+        let base_url = endpoint.map_or_else(
+            || format!("https://http-intake.logs.{site}"),
+            |endpoint| endpoint.to_string(),
+        );
 
-        http::Uri::try_from(format!("{base_url}/api/v2/logs")).expect("URI not valid")
+        Ok(HttpEndpoint::parse(&base_url)?.append_path("/api/v2/logs")?)
     }
 
-    pub fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
-        self.get_uri(dd_common)
-            .scheme_str()
-            .unwrap_or("http")
-            .to_string()
+    fn get_uri(&self, dd_common: &DatadogCommonConfig) -> crate::Result<HttpEndpoint> {
+        Self::logs_endpoint(dd_common.endpoint.as_deref(), &dd_common.site)
     }
 
-    pub fn build_processor(
+    pub fn build_processor<C>(
         &self,
         dd_common: &DatadogCommonConfig,
-        client: HttpClient,
+        client: HttpClient<Body, C>,
         dd_evp_origin: String,
-    ) -> crate::Result<VectorSink> {
+        batch: BatcherSettings,
+    ) -> crate::Result<VectorSink>
+    where
+        C: Connect + Clone + Send + Sync + 'static,
+    {
         let default_api_key: Arc<str> = Arc::from(dd_common.default_api_key.inner());
         let request_limits = self.request.tower.into_settings();
-
-        // We forcefully cap the provided batch configuration to the size/log line limits imposed by
-        // the Datadog Logs API, but we still allow them to be lowered if need be.
-        let batch = self
-            .batch
-            .validate()?
-            .limit_max_bytes(BATCH_GOAL_BYTES)?
-            .limit_max_events(BATCH_MAX_EVENTS)?
-            .into_batcher_settings()?;
 
         let headers = {
             let mut request_headers = self.request.headers.clone();
@@ -141,17 +151,19 @@ impl DatadogLogsConfig {
             false
         };
 
+        let endpoint = self.get_uri(dd_common)?;
+        let protocol = endpoint.protocol().to_string();
+
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(
                 client,
-                self.get_uri(dd_common),
+                endpoint.into_uri(),
                 headers,
                 dd_evp_origin,
             )?);
 
         let encoding = self.encoding.clone();
-        let protocol = self.get_protocol(dd_common);
 
         let sink = LogSinkBuilder::new(
             encoding,
@@ -160,6 +172,7 @@ impl DatadogLogsConfig {
             batch,
             protocol,
             conforms_as_agent,
+            self.max_payload_bytes.unwrap_or(MAX_PAYLOAD_BYTES),
         )
         .compression(self.compression.or_else(default_compression).unwrap())
         .build();
@@ -187,18 +200,6 @@ impl DatadogLogsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = self.create_client(&cx.proxy)?;
-        let global = cx.extra_context.get_or_default::<datadog::Options>();
-        let dd_common = self.local_dd_common.with_globals(global)?;
-
-        let healthcheck = dd_common.build_healthcheck(client.clone())?;
-
-        let sink = self.build_processor(&dd_common, client, cx.app_name_slug)?;
-
-        Ok((sink, healthcheck))
-    }
-
     fn input(&self) -> Input {
         let requirement = schema::Requirement::empty()
             .optional_meaning(meaning::MESSAGE, Kind::bytes())
@@ -217,19 +218,269 @@ impl SinkConfig for DatadogLogsConfig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ValidatedLogs {
+    batch: BatcherSettings,
+}
+
+#[async_trait::async_trait]
+impl ValidatedSink for DatadogLogsConfig {
+    type Validated = ValidatedLogs;
+
+    fn validate(&self) -> crate::Result<ValidatedLogs> {
+        let site = self
+            .local_dd_common
+            .site
+            .clone()
+            .unwrap_or_else(|| datadog::DD_US_SITE.to_owned());
+        Self::logs_endpoint(self.local_dd_common.endpoint.as_deref(), &site)?;
+
+        let request_headers = {
+            let mut request_headers = self.request.headers.clone();
+            if self.conforms_as_agent {
+                request_headers.insert(String::from("DD-PROTOCOL"), String::from("agent-json"));
+            }
+            request_headers
+        };
+        validate_headers(&request_headers)?;
+
+        if let Some(max_payload_bytes) = self.max_payload_bytes
+            && max_payload_bytes <= BATCH_HEADROOM_BYTES
+        {
+            return Err(format!(
+                "max_payload_bytes ({max_payload_bytes}) must be greater than the batch headroom ({BATCH_HEADROOM_BYTES})"
+            )
+            .into());
+        }
+
+        let batch_goal_bytes =
+            self.max_payload_bytes.unwrap_or(MAX_PAYLOAD_BYTES) - BATCH_HEADROOM_BYTES;
+
+        // When the user has not set batch.max_bytes, derive it from max_payload_bytes so that
+        // raising the payload limit automatically scales the batch goal.
+        let mut batch_config = self.batch;
+        if batch_config.max_bytes.is_none() {
+            batch_config.max_bytes = Some(batch_goal_bytes);
+        }
+
+        let batch = batch_config
+            .validate()?
+            .limit_max_bytes(batch_goal_bytes)?
+            .limit_max_events(BATCH_MAX_EVENTS)?
+            .into_batcher_settings()?;
+
+        Ok(ValidatedLogs { batch })
+    }
+
+    async fn build(
+        &self,
+        validated: &ValidatedLogs,
+        cx: SinkContext,
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        let client = self.create_client(&cx.proxy)?;
+        let global = cx.extra_context.get_or_default::<datadog::Options>();
+        let dd_common = self.local_dd_common.with_globals(global)?;
+
+        let healthcheck = dd_common.build_healthcheck(client.clone())?;
+
+        let sink = self.build_processor(&dd_common, client, cx.app_name_slug, validated.batch)?;
+
+        Ok((sink, healthcheck))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use vector_lib::{
         codecs::{JsonSerializerConfig, MetricTagValues, encoding::format::JsonSerializerOptions},
         config::LogNamespace,
+        sensitive_string::SensitiveString,
     };
 
     use super::*;
-    use crate::{codecs::EncodingConfigWithFraming, components::validation::prelude::*};
+    use crate::{
+        assert_downcast_matches, codecs::EncodingConfigWithFraming,
+        components::validation::prelude::*, config::ValidatedSink,
+        sinks::util::http::HeaderValidationError,
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
+    }
+
+    #[test]
+    fn validate_produces_usable_batch_settings() {
+        let config = DatadogLogsConfig::default();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.batch.size_limit,
+            MAX_PAYLOAD_BYTES - BATCH_HEADROOM_BYTES
+        );
+        assert_eq!(validated.batch.item_limit, BATCH_MAX_EVENTS);
+    }
+
+    #[test]
+    fn validate_rejects_max_payload_bytes_below_headroom() {
+        // Any value <= BATCH_HEADROOM_BYTES would underflow the derived batch goal.
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 750000
+        "#})
+        .unwrap();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_max_payload_bytes_below_default() {
+        // Values below the standard 5 MB DD limit are allowed (conservative configuration).
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 1000000
+        "#})
+        .unwrap();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_derives_batch_goal_from_max_payload_bytes() {
+        // When batch.max_bytes is omitted the goal should be derived automatically.
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 10000000
+        "#})
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.batch.size_limit,
+            10_000_000 - BATCH_HEADROOM_BYTES
+        );
+    }
+
+    #[test]
+    fn validate_accepts_explicit_batch_max_bytes_within_payload_limit() {
+        // An explicit batch.max_bytes below the cap should be respected as-is.
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 10000000
+            batch:
+              max_bytes: 7000000
+        "#})
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.batch.size_limit, 7_000_000);
+    }
+
+    #[test]
+    fn validate_rejects_batch_max_bytes_above_payload_limit() {
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 10000000
+            batch:
+              max_bytes: 11000000
+        "#})
+        .unwrap();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_malformed_endpoint() {
+        let config = DatadogLogsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("not a uri".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_defaults_missing_scheme_to_https() {
+        let config = DatadogLogsConfig {
+            local_dd_common: LocalDatadogCommonConfig::new(
+                Some("localhost:8080".to_string()),
+                None,
+                None,
+            ),
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_accepts_valid_headers() {
+        let config = indoc::indoc! {r#"
+            default_api_key: "test_key"
+            request:
+              headers:
+                Auth: "token:thing_and-stuff"
+                X-Custom-Nonsense: "_%_{}_-_&_._`_|_~_!_#_&_$_"
+        "#};
+        let config: DatadogLogsConfig = serde_yaml::from_str(config).unwrap();
+
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_catches_bad_header_names() {
+        let config = indoc::indoc! {r#"
+            default_api_key: "test_key"
+            request:
+              headers:
+                "\x01": "bad"
+        "#};
+        let config: DatadogLogsConfig = serde_yaml::from_str(config).unwrap();
+
+        assert_downcast_matches!(
+            config.validate().unwrap_err(),
+            HeaderValidationError,
+            HeaderValidationError::InvalidHeaderName { .. }
+        );
+    }
+
+    #[test]
+    fn validate_catches_bad_header_values() {
+        let config = indoc::indoc! {r#"
+            default_api_key: "test_key"
+            request:
+              headers:
+                "X-Custom-Nonsense": "a\nb"
+        "#};
+        let config: DatadogLogsConfig = serde_yaml::from_str(config).unwrap();
+
+        assert_downcast_matches!(
+            config.validate().unwrap_err(),
+            HeaderValidationError,
+            HeaderValidationError::InvalidHeaderValue { .. }
+        );
+    }
+
+    #[test]
+    fn get_uri_defaults_missing_scheme_to_https() {
+        let config = DatadogLogsConfig::default();
+        let custom = DatadogCommonConfig {
+            endpoint: Some("localhost:8080".to_string()),
+            site: "datadoghq.com".to_string(),
+            default_api_key: SensitiveString::from("key".to_string()),
+            acknowledgements: Default::default(),
+        };
+        assert_eq!(
+            config.get_uri(&custom).unwrap().to_string(),
+            "https://localhost:8080/api/v2/logs"
+        );
+        // The default site-based endpoint keeps its scheme.
+        let default = DatadogCommonConfig {
+            endpoint: None,
+            site: "datadoghq.com".to_string(),
+            default_api_key: SensitiveString::from("key".to_string()),
+            acknowledgements: Default::default(),
+        };
+        assert_eq!(
+            config.get_uri(&default).unwrap().to_string(),
+            "https://http-intake.logs.datadoghq.com/api/v2/logs"
+        );
     }
 
     #[test]

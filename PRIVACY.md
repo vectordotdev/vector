@@ -40,16 +40,15 @@ derived from backend server logs which are anonymized.
 
 ### Vector Repository
 
-The Vector repository is hosted on GitHub. You can review their privacy policy
-[here][github_pp]. Additionally, Vector will not attempt to mine information
+The Vector repository is hosted on GitHub. You can review the [GitHub privacy policy][github_pp]. Additionally, Vector will not attempt to mine information
 about users that interact with Vector on GitHub. Vector team members will
 occasionally reach out to active users offer help debugging or learn about
 ways Vector can improve.
 
 ### Vector Chat
 
-The Vector chat uses Discord; you can review their
-privacy policy [here][discord_pp].
+The Vector chat uses Discord; you can review the
+[Discord privacy policy][discord_pp].
 
 [github_pp]: https://help.github.com/en/github/site-policy/github-privacy-statement
 [discord_pp]: https://discord.com/privacy/

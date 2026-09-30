@@ -15,6 +15,12 @@ Pull the Vector image:
 docker pull timberio/vector:{{< version >}}-debian
 ```
 
+Vector images are also available from the [GitHub Container Registry]:
+
+```shell
+docker pull ghcr.io/vectordotdev/vector:{{< version >}}-debian
+```
+
 {{< success >}}
 Other available distributions (beyond `debian`):
 
@@ -108,3 +114,4 @@ docker rm vector
 ```
 
 [docker]: https://docker.com
+[GitHub Container Registry]: https://github.com/vectordotdev/vector/pkgs/container/vector

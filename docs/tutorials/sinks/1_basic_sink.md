@@ -2,7 +2,7 @@ Let's write a basic sink for Vector. Currently, there are two styles of sink in
 Vector - 'event' and 'event streams'. The 'event' style sinks are deprecated,
 but currently a significant portion of Vector's sinks are still developed in
 this style. A tracking issue that covers which sinks have been converted to
-'event streams' can be found [here][event_streams_tracking].
+'event streams' can be found in the [event streams tracking issue][event_streams_tracking].
 
 This tutorial covers writing an 'event stream' Sink.
 
@@ -40,7 +40,6 @@ sink's behaviour.
 #[derive(Clone, Debug)]
 /// A basic sink that dumps its output to stdout.
 pub struct BasicConfig {
-    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -66,8 +65,8 @@ our struct:
 
 ```rust
 impl GenerateConfig for BasicConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str("").unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str("{}").unwrap()
     }
 }
 ```
@@ -178,7 +177,7 @@ build with just the components required. We need to add this feature to the
 
 ```diff
   sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
-  sinks-azure_monitor_logs = []
+  sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
 + sinks-basic = []
   sinks-blackhole = []
   sinks-chronicle = []
@@ -197,7 +196,7 @@ sinks-logs = [
   "sinks-aws_sqs",
   "sinks-axiom",
   "sinks-azure_blob",
-  "sinks-azure_monitor_logs",
+  "sinks-azure_logs_ingestion",
 + "sinks-basic",
   "sinks-blackhole",
   "sinks-chronicle",
@@ -300,8 +299,8 @@ Change the body of `run_inner` to look like the following:
     }
 ```
 
-More details about instrumenting Vector can be found
-[here](https://github.com/vectordotdev/vector/blob/master/docs/specs/instrumentation.md).
+More details about instrumenting Vector can be found in the
+[instrumentation specification](https://github.com/vectordotdev/vector/blob/master/docs/specs/instrumentation.md).
 
 # Running our sink
 
@@ -324,7 +323,7 @@ This simply connects a `stdin` source to our `basic` sink.
 ## vdev
 
 Vector provides a build tool `vdev` that simplifies the task of building Vector. Install
-`vdev` using the instructions [here][vdev_install].
+`vdev` using the [installation instructions][vdev_install].
 
 With `vdev` installed we can run Vector using:
 
@@ -349,16 +348,15 @@ Our sink works!
 [event_streams_tracking]: https://github.com/vectordotdev/vector/issues/9261
 [vdev_install]: https://github.com/vectordotdev/vector/tree/master/vdev#installation
 [acknowledgements]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
-[configurable_component]: https://rust-doc.vector.dev/vector_config/attr.configurable_component.html
-[generate_config]: https://rust-doc.vector.dev/vector/config/trait.generateconfig
-[sink_config]: https://rust-doc.vector.dev/vector/config/trait.sinkconfig
-[sink_config_build]: https://rust-doc.vector.dev/vector/config/trait.sinkconfig#tymethod.build
-[from_eventstreamsink]: https://rust-doc.vector.dev/vector/sinks/enum.vectorsink#method.from_event_streamsink
-[vector_sink]: https://rust-doc.vector.dev/vector/sinks/enum.vectorsink
-[stream_sink]: https://rust-doc.vector.dev/vector/sinks/util/trait.streamsink
-[sinks_enum]: https://rust-doc.vector.dev/vector/sinks/enum.sinks
-[event_status_delivered]: https://rust-doc.vector.dev/vector/event/enum.eventstatus#variant.Delivered
-[event_status_errored]: https://rust-doc.vector.dev/vector/event/enum.eventstatus#variant.Errored
-[event_status_rejected]: https://rust-doc.vector.dev/vector/event/enum.eventstatus#variant.Rejected
-[bytes_sent]: https://rust-doc.vector.dev/vector_common/internal_event/struct.bytessent
-[events_sent]: https://rust-doc.vector.dev/vector_common/internal_event/struct.eventssent
+[configurable_component]: ../../../lib/vector-config-macros/src/lib.rs
+[generate_config]: ../../../lib/vector-config/src/component/generate.rs
+[sink_config]: ../../../src/config/sink.rs
+[sink_config_build]: ../../../src/config/sink.rs
+[from_eventstreamsink]: ../../../lib/vector-core/src/sink.rs
+[vector_sink]: ../../../lib/vector-core/src/sink.rs
+[stream_sink]: ../../../lib/vector-core/src/sink.rs
+[event_status_delivered]: ../../../lib/vector-common/src/finalization.rs
+[event_status_errored]: ../../../lib/vector-common/src/finalization.rs
+[event_status_rejected]: ../../../lib/vector-common/src/finalization.rs
+[bytes_sent]: ../../../lib/vector-common/src/internal_event/bytes_sent.rs
+[events_sent]: ../../../lib/vector-common/src/internal_event/events_sent.rs

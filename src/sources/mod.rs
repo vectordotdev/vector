@@ -17,7 +17,7 @@ pub mod aws_sqs;
 pub mod datadog_agent;
 #[cfg(feature = "sources-demo_logs")]
 pub mod demo_logs;
-#[cfg(feature = "sources-dnstap")]
+#[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
@@ -71,9 +71,9 @@ pub mod opentelemetry;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub mod postgresql_metrics;
 #[cfg(any(
-    feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-remote-write",
-    feature = "sources-prometheus-pushgateway"
+    feature = "sources-prometheus_scrape",
+    feature = "sources-prometheus_remote_write",
+    feature = "sources-prometheus_pushgateway"
 ))]
 pub mod prometheus;
 #[cfg(feature = "sources-pulsar")]

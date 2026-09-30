@@ -5,25 +5,45 @@ use vector_core::event::Event;
 
 #[cfg(feature = "arrow")]
 use crate::encoding::ArrowStreamSerializer;
+#[cfg(feature = "parquet")]
+use crate::encoding::ParquetSerializer;
 use crate::{
     encoding::{Error, Framer, Serializer},
     internal_events::{EncoderFramingError, EncoderSerializeError},
 };
 
+/// The output of a batch encoding operation.
+///
+/// Only available when the `arrow` feature is enabled.
+#[cfg(feature = "arrow")]
+#[derive(Debug)]
+pub enum BatchOutput {
+    /// An Arrow RecordBatch containing all events encoded as columnar data.
+    Arrow(arrow::record_batch::RecordBatch),
+}
+
 /// Serializers that support batch encoding (encoding all events at once).
+///
+/// Only available when the `arrow` feature is enabled (the `parquet` feature
+/// implies `arrow`).
+#[cfg(feature = "arrow")]
 #[derive(Debug, Clone)]
 pub enum BatchSerializer {
     /// Arrow IPC stream format serializer.
-    #[cfg(feature = "arrow")]
     Arrow(ArrowStreamSerializer),
+    /// Parquet format serializer.
+    #[cfg(feature = "parquet")]
+    Parquet(Box<ParquetSerializer>),
 }
 
 /// An encoder that encodes batches of events.
+#[cfg(feature = "arrow")]
 #[derive(Debug, Clone)]
 pub struct BatchEncoder {
     serializer: BatchSerializer,
 }
 
+#[cfg(feature = "arrow")]
 impl BatchEncoder {
     /// Creates a new `BatchEncoder` with the specified batch serializer.
     pub const fn new(serializer: BatchSerializer) -> Self {
@@ -36,22 +56,43 @@ impl BatchEncoder {
     }
 
     /// Get the HTTP content type.
-    #[cfg(feature = "arrow")]
-    pub const fn content_type(&self) -> &'static str {
+    pub const fn content_type(&self) -> Option<&'static str> {
         match &self.serializer {
-            BatchSerializer::Arrow(_) => "application/vnd.apache.arrow.stream",
+            BatchSerializer::Arrow(_) => Some("application/vnd.apache.arrow.stream"),
+            #[cfg(feature = "parquet")]
+            BatchSerializer::Parquet(_) => Some("application/vnd.apache.parquet"),
+        }
+    }
+
+    /// Encode a batch of events into a `BatchOutput`.
+    pub fn encode_batch(&self, events: &[Event]) -> Result<BatchOutput, Error> {
+        match &self.serializer {
+            BatchSerializer::Arrow(serializer) => {
+                let record_batch = serializer.encode_to_record_batch(events).map_err(|err| {
+                    use crate::encoding::ArrowEncodingError;
+                    match err {
+                        ArrowEncodingError::NullConstraint { .. } => {
+                            Error::SchemaConstraintViolation(Box::new(err))
+                        }
+                        _ => Error::SerializingError(Box::new(err)),
+                    }
+                })?;
+                Ok(BatchOutput::Arrow(record_batch))
+            }
+            #[cfg(feature = "parquet")]
+            BatchSerializer::Parquet(_) => Err(Error::SerializingError(Box::from(
+                "Parquet serializer does not support encode_batch; use the tokio Encoder interface instead",
+            ))),
         }
     }
 }
 
+#[cfg(feature = "arrow")]
 impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
     type Error = Error;
 
-    #[allow(unused_variables)]
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        #[allow(unreachable_patterns)]
         match &mut self.serializer {
-            #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
                 serializer.encode(events, buffer).map_err(|err| {
                     use crate::encoding::ArrowEncodingError;
@@ -63,12 +104,15 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
                     }
                 })
             }
-            _ => unreachable!("BatchSerializer cannot be constructed without encode()"),
+            #[cfg(feature = "parquet")]
+            BatchSerializer::Parquet(serializer) => serializer
+                .encode(events, buffer)
+                .map_err(Error::SerializingError),
         }
     }
 }
 
-/// An wrapper that supports both framed and batch encoding modes.
+/// A wrapper that supports both framed and batch encoding modes.
 #[derive(Debug, Clone)]
 pub enum EncoderKind {
     /// Uses framing to encode individual events

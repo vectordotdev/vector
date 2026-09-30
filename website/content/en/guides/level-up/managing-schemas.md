@@ -41,13 +41,13 @@ By default, Vector primarily operates on three fields: `host`, `message`, and `t
 
 Vector sets these fields on logs as it ingests data (from a [source][docs.sources]). It may be that your data does not
 follow this convention. In this case you can modify the global defaults for all incoming data in the `log_schema`
-section of your `vector.toml`.
+section of your `vector.yaml`.
 
-```toml title="vector.toml"
-[log_schema]
-host_key = "instance" # default "host"
-message_key = "info" # default "message"
-timestamp_key = "datetime" # default "timestamp"
+```yaml title="vector.yaml"
+log_schema:
+  host_key: "instance" # default "host"
+  message_key: "info" # default "message"
+  timestamp_key: "datetime" # default "timestamp"
 
 # Sources, transforms, and sinks...
 ```
@@ -65,15 +65,16 @@ and you'll likely need to configure this at a more fine-grained level.
 Some services will produce logs with the timestamp field mapped to `@timestamp` or some other value.
 
 If your vector pipeline is only working with data passing through these systems, you can add the following to your
-`vector.toml`:
+`vector.yaml`:
 
-```toml title="vector.toml"
-[log_schema]
-  timestamp_key = "@timestamp"  # Applies to all sources, sinks, and transforms!
+```yaml title="vector.yaml"
+log_schema:
+  timestamp_key: "@timestamp" # Applies to all sources, sinks, and transforms!
 
-[sources.my_naming_confused_source]
-  type = "logplex"
-  address = "0.0.0.0:8088"
+sources:
+  my_naming_confused_source:
+    type: "logplex"
+    address: "0.0.0.0:8088"
 ```
 
 
@@ -91,24 +92,24 @@ Commonly you'll want to do this near either the source or sink of your pipeline.
 
 A transform of this type looks like this:
 
-```toml title="vector.toml"
-[transforms.strip_personal_details]
-type = "remap"
-inputs = ["my-source-id"]
-source = '''
-  del(.email, .passport_number)
-'''
+```yaml title="vector.yaml"
+transforms:
+  strip_personal_details:
+    type: "remap"
+    inputs: ["my-source-id"]
+    source: |
+      del(.email, .passport_number)
 ```
 
 The `remap` transform has a wealth of mapping functions, and in cases where we wish to flip this concept and drop all fields except for a list of exceptions we can do that with the `only_fields` function:
 
-```toml title="vector.toml"
-[transforms.strip_personal_details]
-type = "remap"
-inputs = ["my-source-id"]
-source = '''
-  only_fields(.timestamp, .message, .host, .user_id)
-'''
+```yaml title="vector.yaml"
+transforms:
+  strip_personal_details:
+    type: "remap"
+    inputs: ["my-source-id"]
+    source: |
+      only_fields(.timestamp, .message, .host, .user_id)
 ```
 
 ### Example: Filtering data for GDPR compliance
@@ -127,51 +128,54 @@ config, just a little example!)
 
 We can build a config that will do the first part of this, but we'll just output to console for ease of this example.
 
-```toml title="vector.toml"
-data_dir = "./data"
-dns_servers = []
+```yaml title="vector.yaml"
+data_dir: "./data"
+dns_servers: []
 
-[sources.application]
-max_length = 102400
-type = "stdin"
+sources:
+  application:
+    max_length: 102400
+    type: "stdin"
 
-[transforms.parse]
-inputs = ["application"]
-type = "remap"
-source = '''
-. = parse_json!(.message)
-'''
+transforms:
+  parse:
+    inputs: ["application"]
+    type: "remap"
+    source: |
+      . = parse_json!(.message)
 
-[transforms.not_gdpr]
-type = "filter"
-inputs = ["parse"]
-condition = ".gdpr == false"
+  not_gdpr:
+    type: "filter"
+    inputs: ["parse"]
+    condition: ".gdpr == false"
 
-[transforms.gdpr_to_strip]
-type = "filter"
-inputs = ["parse"]
-condition = ".gdpr == true"
+  gdpr_to_strip:
+    type: "filter"
+    inputs: ["parse"]
+    condition: ".gdpr == true"
 
-[transforms.gdpr_stripped]
-type = "remap"
-inputs = ["gdpr_to_strip"]
-source = "del(.email)"
+  gdpr_stripped:
+    type: "remap"
+    inputs: ["gdpr_to_strip"]
+    source: "del(.email)"
 
-[sinks.console]
-healthcheck = true
-inputs = ["not_gdpr", "gdpr_stripped"]
-type = "console"
-encoding.codec = "json"
-[sinks.console.buffer]
-type = "memory"
-max_events = 500
-when_full = "block"
+sinks:
+  console:
+    healthcheck: true
+    inputs: ["not_gdpr", "gdpr_stripped"]
+    type: "console"
+    encoding:
+      codec: "json"
+    buffer:
+      type: "memory"
+      max_events: 500
+      when_full: "block"
 ```
 
 Let's have a look:
 
 ```bash
-$ cat <<-EOF | cargo run -- --config test.toml
+$ cat <<-EOF | cargo run -- --config test.yaml
 { "id": "user1", "gdpr": false, "email": "us-user1@datadoghq.com" }
 { "id": "user2", "gdpr": false, "email": "us-user2@datadoghq.com" }
 { "id": "user3", "gdpr": true, "email": "eu-user3@datadoghq.com" }
@@ -202,15 +206,17 @@ The applications for this include some of the reasons discussed in
 
 Lets take a look at what that might look like:
 
-```toml title="vector.toml"
-[sinks.output]
-  inputs = ["demo_logs"]
-  type = "kafka"
+```yaml title="vector.yaml"
+sinks:
+  output:
+    inputs: ["demo_logs"]
+    type: "kafka"
 
-  # Put events in the host specific topic.
-  topic = "{{service}}"
-  encoding.except_fields = ["service"] # Remove this field now and save some bytes
-  # ...
+    # Put events in the host specific topic.
+    topic: "{{service}}"
+    encoding:
+      except_fields: ["service"] # Remove this field now and save some bytes
+    # ...
 ```
 
 {{< warning >}}
@@ -222,14 +228,14 @@ a field which you want templatable open an issue and let us know.
 
 It's fairly common for one part of your pipeline to expect a field to be named differently than another part! The `remap` transform can also be used to slide data around for you.
 
-```toml title="vector.toml"
-[transforms.rename_timestamp]
-  type = "remap"
-  inputs = ["source0"]
-  source = '''
-    ."@timestamp" = .timestamp
-    del(.timestamp)
-  '''
+```yaml title="vector.yaml"
+transforms:
+  rename_timestamp:
+    type: "remap"
+    inputs: ["source0"]
+    source: |
+      ."@timestamp" = .timestamp
+      del(.timestamp)
 ```
 
 Other times you might need to concatenate fields together, or perform arithmetic on their numerical values, the [`remap`][docs.transforms.remap] transform can be used to do all of these things.
@@ -246,14 +252,14 @@ It's useful for when:
 Let's pretend one of your teammates falsely assumed folks always have first and last names, so we have a `first_name`
 and a `last_name` field coming from a source, and we'd like to output a `name` field to a sink.
 
-```toml title="vector.toml"
-[transforms.moosh_names]
-  type = "remap"
-  inputs = ["source0"]
-  source = '''
-    .name = .first_name + " " + .last_name
-    del(.first_name, .last_name)
-  '''
+```yaml title="vector.yaml"
+transforms:
+  moosh_names:
+    type: "remap"
+    inputs: ["source0"]
+    source: |
+      .name = .first_name + " " + .last_name
+      del(.first_name, .last_name)
 ```
 
 ## Coercing Data Types
@@ -263,14 +269,14 @@ should be a number, or vice versa.
 
 Gadzooks! The [`remap`][docs.transforms.remap] transform is also the correct tool for this job!
 
-```toml title="vector.toml"
-[transforms.correct_source_types]
-  type = "remap"
-  inputs = ["source0"]
-  source = '''
-    .count = int(.count)
-    .date = timestamp(.date, "%F")
-  '''
+```yaml title="vector.yaml"
+transforms:
+  correct_source_types:
+    type: "remap"
+    inputs: ["source0"]
+    source: |
+      .count = int(.count)
+      .date = timestamp(.date, "%F")
 ```
 
 Remember that you can follow the coercion mappings with `del` or `only_fields` functions, empowering it to drop
@@ -286,12 +292,12 @@ To do this we'll use the `timestamp` function with a format string argument. To 
 [`strftime`](https://docs.rs/chrono/0.4.10/chrono/format/strftime/index.html) documentation. Let's ship some Canadian
 friendly logs up to the great white north!
 
-```toml title="vector.toml"
-[transforms.format_timestamp]
-  type = "remap"
-  source = '''
-    .timestamp = timestamp(.timestamp, "%Y/%m/%d:%H:%M:%S %z")
-  '''
+```yaml title="vector.yaml"
+transforms:
+  format_timestamp:
+    type: "remap"
+    source: |
+      .timestamp = timestamp(.timestamp, "%Y/%m/%d:%H:%M:%S %z")
 ```
 
 ## Working with data formats
@@ -305,12 +311,14 @@ supported. In these cases, you can use the `encoding` option.
 The [`console`][docs.sinks.console] sink supports both `json` and `text` as its
 output format
 
-```toml title="vector.toml"
-[sinks.print]
-  type = "console"
-  inputs = ["source0"]
-  target = "stdout"
-  encoding.codec = "json"
+```yaml title="vector.yaml"
+sinks:
+  print:
+    type: "console"
+    inputs: ["source0"]
+    target: "stdout"
+    encoding:
+      codec: "json"
 ```
 
 You can also use a transform like [`remap`][docs.transforms.remap] or to parse out

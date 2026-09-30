@@ -25,7 +25,6 @@ components: sources: nats: {
 	}
 
 	classes: {
-		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "best_effort"
 		development:   "stable"

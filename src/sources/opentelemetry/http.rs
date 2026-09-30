@@ -7,13 +7,13 @@ use hyper::{Server, service::make_service_fn};
 use prost::Message;
 use snafu::Snafu;
 use tokio::net::TcpStream;
-use tower::ServiceBuilder;
+use tower::{Layer, ServiceBuilder};
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
-    event::{BatchNotifier, BatchStatus},
+    event::BatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
@@ -38,10 +38,16 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         http_server::HttpConfigParamKind,
-        opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
-        util::{add_headers, decompress_body},
+        opentelemetry::{
+            config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
+            request_control::{
+                AcknowledgementFailure, MiddlewareError, PendingAcknowledgement,
+                RequestControlLayer,
+            },
+        },
+        util::{add_headers, decompress_body, http::capped_body},
     },
-    tls::MaybeTlsSettings,
+    tls::{MaybeTlsSettings, TlsAcceptorReloader},
 };
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -51,19 +57,42 @@ pub(crate) enum ApiError {
 
 impl warp::reject::Reject for ApiError {}
 
+pub(crate) fn middleware_error_response(error: MiddlewareError) -> Response {
+    let status = match error {
+        MiddlewareError::LoadShed => StatusCode::TOO_MANY_REQUESTS,
+        MiddlewareError::TimedOut | MiddlewareError::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
+    };
+
+    let response = protobuf(Status {
+        code: tonic::Code::Unavailable as i32,
+        message: error.message().to_owned(),
+        ..Default::default()
+    });
+    warp::reply::with_status(response, status).into_response()
+}
+
 pub(crate) async fn run_http_server(
     address: SocketAddr,
     tls_settings: MaybeTlsSettings,
+    tls_reloader: Option<TlsAcceptorReloader>,
     filters: BoxedFilter<(Response,)>,
     shutdown: ShutdownSignal,
     keepalive_settings: KeepaliveConfig,
+    request_control: RequestControlLayer<
+        impl Fn(MiddlewareError) -> Response + Clone + Send + 'static,
+    >,
 ) -> crate::Result<()> {
-    let listener = tls_settings.bind(&address).await?;
+    let listener = tls_settings
+        .bind_reloadable(&address, tls_reloader)
+        .await?
+        .with_keepalive(keepalive_settings.tcp_keepalive);
     let routes = filters.recover(handle_rejection);
 
     info!(message = "Building HTTP server.", address = %address);
 
     let span = Span::current();
+    // Admission wraps the Warp service, so rejected requests cannot reach `capped_body`.
+    let admitted = request_control.layer(warp::service(routes));
     let make_svc = make_service_fn(move |conn: &MaybeTlsIncomingStream<TcpStream>| {
         let svc = ServiceBuilder::new()
             .layer(build_http_trace_layer(span.clone()))
@@ -74,7 +103,7 @@ pub(crate) async fn run_http_server(
                     conn.peer_addr(),
                 )
             }))
-            .service(warp::service(routes.clone()));
+            .service(admitted.clone());
         futures_util::future::ok::<_, Infallible>(svc)
     });
 
@@ -109,16 +138,19 @@ pub(crate) fn build_warp_filter(
     );
     let metrics_filters = build_warp_metrics_filter(
         acknowledgements,
+        log_namespace,
         out.clone(),
         bytes_received.clone(),
         events_received.clone(),
+        headers.clone(),
         metrics_deserializer,
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
-        out.clone(),
+        out,
         bytes_received,
         events_received,
+        headers,
         traces_deserializer,
     );
     log_filters
@@ -188,6 +220,8 @@ where
         + 'static
         + Fn(Option<String>, HeaderMap, Bytes) -> Result<Vec<Event>, ErrorMessage>,
 {
+    let body_filter = capped_body();
+
     warp::post()
         .and(warp::path("v1"))
         .and(warp::path(telemetry_type))
@@ -198,7 +232,7 @@ where
         ))
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::headers_cloned())
-        .and(warp::body::bytes())
+        .and(body_filter)
         .and_then(
             move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
                 let events = make_events(encoding_header, headers, body);
@@ -257,12 +291,14 @@ fn build_warp_log_filter(
 }
 fn build_warp_metrics_filter(
     acknowledgements: bool,
+    log_namespace: LogNamespace,
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    headers_cfg: Vec<HttpConfigParamKind>,
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
-    let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
+    let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
@@ -276,15 +312,14 @@ fn build_warp_metrics_filter(
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
                 if let Some(d) = deserializer.as_ref() {
-                    parse_with_deserializer(
-                        d,
-                        decoded_body,
-                        LogNamespace::default(),
-                        &events_received,
-                    )
+                    parse_with_deserializer(d, decoded_body, log_namespace, &events_received)
                 } else {
                     decode_metrics_body(decoded_body, &events_received)
                 }
+                .map(|mut events| {
+                    enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
+                    events
+                })
             })
     };
 
@@ -301,9 +336,10 @@ fn build_warp_trace_filter(
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    headers_cfg: Vec<HttpConfigParamKind>,
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
-    let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
+    let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
@@ -326,6 +362,10 @@ fn build_warp_trace_filter(
                 } else {
                     decode_trace_body(decoded_body, &events_received)
                 }
+                .map(|mut events| {
+                    enrich_events(&mut events, &headers_cfg, &headers, LogNamespace::default());
+                    events
+                })
             })
     };
 
@@ -414,26 +454,32 @@ async fn handle_request(
                 emit!(StreamClosedError { count });
                 warp::reject::custom(ApiError::ServerShutdown)
             })?;
-
-            match receiver {
-                None => Ok(protobuf(resp).into_response()),
-                Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(protobuf(resp).into_response()),
-                    BatchStatus::Errored => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Error delivering contents to sink".into(),
-                        ..Default::default()
-                    })),
-                    BatchStatus::Rejected => Err(warp::reject::custom(Status {
-                        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-                        message: "Contents failed to deliver to sink".into(),
-                        ..Default::default()
-                    })),
-                },
+            let mut response = protobuf(resp).into_response();
+            if let Some(receiver) = receiver {
+                response
+                    .extensions_mut()
+                    .insert(PendingAcknowledgement::new(
+                        receiver,
+                        acknowledgement_failure_response,
+                    ));
             }
+            Ok(response)
         }
         Err(err) => Err(warp::reject::custom(err)),
     }
+}
+
+fn acknowledgement_failure_response(status: AcknowledgementFailure) -> Response {
+    let message = match status {
+        AcknowledgementFailure::Errored => "Error delivering contents to sink",
+        AcknowledgementFailure::Rejected => "Contents failed to deliver to sink",
+    };
+    let response = protobuf(Status {
+        code: tonic::Code::Unknown as i32,
+        message: message.to_owned(),
+        ..Default::default()
+    });
+    warp::reply::with_status(response, StatusCode::INTERNAL_SERVER_ERROR).into_response()
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {

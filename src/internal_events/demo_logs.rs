@@ -1,5 +1,4 @@
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct DemoLogsEventProcessed;

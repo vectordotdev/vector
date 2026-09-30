@@ -1,8 +1,7 @@
 package metadata
 
 releases: "0.20.0": {
-	date:     "2022-02-08"
-	codename: ""
+	date: "2022-02-08"
 
 	known_issues: [
 		"When unit testing targets that have multiple outputs, Vector logs a warning for untested outputs. Will be fixed in `0.20.1`.",
@@ -496,7 +495,7 @@ releases: "0.20.0": {
 		{sha: "f238b79467207df746c61ea2b34d502969061696", date: "2022-01-12 03:56:14 UTC", description: "Address sources of non-vector variability", pr_number: 10730, scopes: [], type: "chore", breaking_change: false, author: "Brian L. Troutwine", files_count: 56, insertions_count: 508, deletions_count: 377},
 		{sha: "904431d30dc00229d07e13f21d8e2d502f75fe62", date: "2022-01-12 04:18:36 UTC", description: "bump clap from 3.0.5 to 3.0.6", pr_number: 10789, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 2, insertions_count: 4, deletions_count: 4},
 		{sha: "426ff2950aa7740700c0dc75870e8ce0b48620d2", date: "2022-01-12 04:18:52 UTC", description: "bump async-graphql from 3.0.20 to 3.0.21", pr_number: 10790, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 3, insertions_count: 10, deletions_count: 10},
-		{sha: "6dbcbc51b13cb9d76cdad194aa2ce81ea8fa33e5", date: "2022-01-12 07:27:17 UTC", description: "Fix type in nginx_metrics source documenatation", pr_number: 10799, scopes: [], type: "chore", breaking_change: false, author: "Spencer Gilbert", files_count: 1, insertions_count: 1, deletions_count: 1},
+		{sha: "6dbcbc51b13cb9d76cdad194aa2ce81ea8fa33e5", date: "2022-01-12 07:27:17 UTC", description: "Fix type in nginx_metrics source documentation", pr_number: 10799, scopes: [], type: "chore", breaking_change: false, author: "Spencer Gilbert", files_count: 1, insertions_count: 1, deletions_count: 1},
 		{sha: "e936db348a5e5bac32a070c423637b88db04e8ed", date: "2022-01-12 07:54:10 UTC", description: "Fix get_gnu_musl_glibc function", pr_number: 10804, scopes: ["setup"], type: "fix", breaking_change: false, author: "Spencer Gilbert", files_count: 1, insertions_count: 11, deletions_count: 9},
 		{sha: "9c136c7cddd48f0768c1e0134411a55607457333", date: "2022-01-12 08:08:22 UTC", description: "lint/fmt/clippy issues due to a bad merge", pr_number: 10805, scopes: ["prometheus_exporter sink"], type: "fix", breaking_change: false, author: "Toby Lawrence", files_count: 2, insertions_count: 56, deletions_count: 57},
 		{sha: "95bdb12745415cf4a8f0e3ecc3aae722bbc93dde", date: "2022-01-12 09:43:04 UTC", description: "Add script to regenerate Kubernetes manifests based on latest Helm chart", pr_number: 10744, scopes: [], type: "chore", breaking_change: false, author: "Spencer Gilbert", files_count: 26, insertions_count: 697, deletions_count: 355},
@@ -689,7 +688,7 @@ releases: "0.20.0": {
 		{sha: "ae93d9cfb302dc290adada9283ec1509560d31f3", date: "2022-02-04 15:12:49 UTC", description: "comply with component spec", pr_number: 11121, scopes: ["nginx_metrics source"], type: "enhancement", breaking_change: false, author: "Jérémie Drouet", files_count: 2, insertions_count: 57, deletions_count: 5},
 		{sha: "ec0e91bc98bc4111092d03e3f511adfd85932dc7", date: "2022-02-04 06:21:17 UTC", description: "bump trust-dns-proto from 0.20.3 to 0.20.4", pr_number: 11158, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 1, insertions_count: 2, deletions_count: 2},
 		{sha: "f1400d99cdbdab1dd68d1216b952a235c1dc4b21", date: "2022-02-04 14:26:38 UTC", description: "bump libc from 0.2.116 to 0.2.117", pr_number: 11163, scopes: ["deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 2, insertions_count: 3, deletions_count: 3},
-		{sha: "b736aee48ba00cc8f2225858c30b3809e12bccc2", date: "2022-02-05 01:56:42 UTC", description: "update sources to comply with intrumentation", pr_number: 11171, scopes: ["sources"], type: "fix", breaking_change: false, author: "Jérémie Drouet", files_count: 10, insertions_count: 58, deletions_count: 27},
+		{sha: "b736aee48ba00cc8f2225858c30b3809e12bccc2", date: "2022-02-05 01:56:42 UTC", description: "update sources to comply with instrumentation", pr_number: 11171, scopes: ["sources"], type: "fix", breaking_change: false, author: "Jérémie Drouet", files_count: 10, insertions_count: 58, deletions_count: 27},
 		{sha: "5f8a3a76003bdf44bebd6c5e78bfb34d12313518", date: "2022-02-05 03:34:12 UTC", description: "comply with component spec", pr_number: 11123, scopes: ["prometheus_scrape source"], type: "enhancement", breaking_change: false, author: "Jérémie Drouet", files_count: 3, insertions_count: 76, deletions_count: 33},
 		{sha: "eb8df46cb51b8f4ff231730af034bae0e1cca2a9", date: "2022-02-05 02:10:19 UTC", description: "Fix flakey vector tap integration test", pr_number: 11186, scopes: ["api"], type: "chore", breaking_change: false, author: "Will", files_count: 1, insertions_count: 30, deletions_count: 11},
 		{sha: "11e85d30aca4de1628cc57bfb777ed0280f424e1", date: "2022-02-05 07:24:05 UTC", description: "fallible predicates should error at compile time.", pr_number: 11172, scopes: ["vrl"], type: "fix", breaking_change: true, author: "Stephen Wakely", files_count: 4, insertions_count: 91, deletions_count: 0},

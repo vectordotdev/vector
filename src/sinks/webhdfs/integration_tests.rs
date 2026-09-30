@@ -13,8 +13,8 @@ use vector_lib::{
 
 use super::WebHdfsConfig;
 use crate::{
-    config::{SinkConfig, SinkContext},
-    sinks::util::{BatchConfig, Compression},
+    config::{SinkConfig, SinkContext, ValidatedSink},
+    sinks::util::{BatchConfig, Compression, HttpEndpoint},
     test_util::{
         components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
@@ -25,8 +25,7 @@ use crate::{
 async fn hdfs_healthchecks_invalid_node_node() {
     // Point to an invalid endpoint
     let config = config("http://127.0.0.1:1", 10);
-    let (_, health_check) = config
-        .build(SinkContext::default())
+    let (_, health_check) = SinkConfig::build(&config, SinkContext::default())
         .await
         .expect("config build must with success");
     let result = health_check.await;
@@ -37,8 +36,7 @@ async fn hdfs_healthchecks_invalid_node_node() {
 #[tokio::test]
 async fn hdfs_healthchecks_valid_node_node() {
     let config = config(&webhdfs_endpoint(), 10);
-    let (_, health_check) = config
-        .build(SinkContext::default())
+    let (_, health_check) = SinkConfig::build(&config, SinkContext::default())
         .await
         .expect("config build must with success");
     let result = health_check.await;
@@ -51,10 +49,11 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
     let mut config = config(&webhdfs_endpoint(), 10);
     // Include event batch id in prefix to make sure the generated files are
     // in order.
-    config.prefix = "%F-{{ .i }}-".to_string();
+    config.prefix = "logs/%F-{{ .i }}-".to_string();
 
     let op = config.build_operator().unwrap();
-    let sink = config.build_processor(op.clone()).unwrap();
+    let validated = config.validate().unwrap();
+    let sink = config.build_processor(op.clone(), &validated).unwrap();
 
     let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -67,7 +66,7 @@ async fn hdfs_rotate_files_after_the_buffer_size_is_reached() {
         } else {
             3
         };
-        e.insert("i", i.to_string());
+        e.insert(vrl::event_path!("i"), i.to_string());
         Event::from(e)
     });
 
@@ -116,11 +115,12 @@ fn config(endpoint: &str, batch_size: usize) -> WebHdfsConfig {
         // Write test file in local with random_string.
         root: format!("/tmp/{}/", random_string(10)),
         prefix: "%F-".to_string(),
-        endpoint: endpoint.to_string(),
+        endpoint: HttpEndpoint::parse(endpoint).unwrap(),
 
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
         compression: Compression::None,
         batch,
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     }
 }

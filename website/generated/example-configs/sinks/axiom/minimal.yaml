@@ -1,0 +1,7 @@
+sinks:
+  my_sink_id:
+    type: axiom
+    inputs:
+      - my-source-or-transform-id
+    dataset: ${AXIOM_DATASET}
+    token: ${AXIOM_TOKEN}

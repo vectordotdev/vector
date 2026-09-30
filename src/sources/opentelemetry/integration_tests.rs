@@ -53,6 +53,7 @@ async fn receive_logs_legacy_namespace() {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
@@ -61,6 +62,8 @@ async fn receive_logs_legacy_namespace() {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: Default::default(),
             use_otlp_decoding: false.into(),
         };
@@ -152,6 +155,7 @@ async fn receive_trace() {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
@@ -160,6 +164,8 @@ async fn receive_trace() {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: Default::default(),
             use_otlp_decoding: false.into(),
         };
@@ -257,6 +263,7 @@ async fn receive_metric() {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
@@ -265,6 +272,8 @@ async fn receive_metric() {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: Default::default(),
             use_otlp_decoding: false.into(),
         };

@@ -23,6 +23,7 @@ impl SchemaSettings {
     /// Creates `SchemaSettings` that conform to [JSON Schema 2019-09][json_schema_2019_09].
     ///
     /// [json_schema_2019_09]: https://json-schema.org/specification-links.html#2019-09-formerly-known-as-draft-8
+    #[must_use]
     pub fn new() -> SchemaSettings {
         SchemaSettings {
             definitions_path: DEFINITIONS_PREFIX.to_owned(),
@@ -32,6 +33,7 @@ impl SchemaSettings {
     }
 
     /// Gets the definitions path used by this generator.
+    #[must_use]
     pub fn definitions_path(&self) -> &str {
         &self.definitions_path
     }
@@ -39,6 +41,7 @@ impl SchemaSettings {
     /// Creates a `Visitor` from the given closure and appends it to the list of
     /// [visitors](SchemaSettings::visitors) for these `SchemaSettings`.
     #[allow(rustdoc::private_intra_doc_links)]
+    #[must_use]
     pub fn with_visitor<F, V>(mut self, visitor_fn: F) -> Self
     where
         F: FnOnce(&Self) -> V,
@@ -50,6 +53,7 @@ impl SchemaSettings {
     }
 
     /// Creates a new [`SchemaGenerator`] using these settings.
+    #[must_use]
     pub fn into_generator(self) -> SchemaGenerator {
         SchemaGenerator::new(self)
     }
@@ -73,6 +77,7 @@ impl From<SchemaSettings> for SchemaGenerator {
 
 impl SchemaGenerator {
     /// Creates a new `SchemaGenerator` using the given settings.
+    #[must_use]
     pub fn new(settings: SchemaSettings) -> SchemaGenerator {
         SchemaGenerator {
             settings,
@@ -81,6 +86,7 @@ impl SchemaGenerator {
     }
 
     /// Gets the [`SchemaSettings`] being used by this `SchemaGenerator`.
+    #[must_use]
     pub fn settings(&self) -> &SchemaSettings {
         &self.settings
     }
@@ -91,6 +97,7 @@ impl SchemaGenerator {
     /// The keys of the returned `Map` are the [schema names](JsonSchema::schema_name), and the
     /// values are the schemas themselves.
     #[allow(rustdoc::broken_intra_doc_links)]
+    #[must_use]
     pub fn definitions(&self) -> &Map<String, Schema> {
         &self.definitions
     }
@@ -110,6 +117,7 @@ impl SchemaGenerator {
     /// If the given `schema` has a [`$ref`](../schema/struct.SchemaObject.html#structfield.reference)
     /// property which refers to another schema in `self`'s schema definitions, the referenced
     /// schema will be returned.  Otherwise, returns `None`.
+    #[must_use]
     pub fn dereference<'a>(&'a self, schema: &Schema) -> Option<&'a Schema> {
         match schema {
             Schema::Object(SchemaObject {
@@ -117,12 +125,9 @@ impl SchemaGenerator {
                 ..
             }) => {
                 let definitions_path = &self.settings().definitions_path;
-                if schema_ref.starts_with(definitions_path) {
-                    let name = &schema_ref[definitions_path.len()..];
-                    self.definitions.get(name)
-                } else {
-                    None
-                }
+                schema_ref
+                    .strip_prefix(definitions_path.as_str())
+                    .and_then(|name| self.definitions.get(name))
             }
             _ => None,
         }
@@ -135,6 +140,7 @@ impl SchemaGenerator {
     /// definitions referenced by `root_schema` refer to this generator.
     ///
     /// All other relevant settings (i.e. meta-schema) are carried over.
+    #[must_use]
     pub fn into_root_schema(mut self, root_schema: SchemaObject) -> RootSchema {
         let mut root_schema = RootSchema {
             meta_schema: Some(self.settings.meta_schema),
@@ -142,7 +148,7 @@ impl SchemaGenerator {
             definitions: self.definitions,
         };
 
-        for visitor in self.settings.visitors.iter_mut() {
+        for visitor in &mut self.settings.visitors {
             visitor.visit_root_schema(&mut root_schema);
         }
 

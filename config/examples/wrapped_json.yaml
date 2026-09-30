@@ -12,14 +12,14 @@ data_dir: "/var/lib/vector"
 sources:
   logs:
     type: "file"
-    include: [ "/var/log/*.log" ]
+    include: ["/var/log/*.log"]
     ignore_older_secs: 86400 # 1 day
 
 # Parse the data as JSON
 # Docs: https://vector.dev/docs/reference/configuration/transforms/remap
 transforms:
   parse_json:
-    inputs: [ "logs" ]
+    inputs: ["logs"]
     type: "remap"
     drop_on_error: false
     source: |
@@ -36,7 +36,7 @@ transforms:
 # Docs: https://vector.dev/docs/reference/configuration/sinks/console
 sinks:
   out:
-    inputs: [ "parse_json" ]
+    inputs: ["parse_json"]
     type: "console"
     encoding:
       codec: "json"

@@ -1,30 +1,41 @@
 mod channel;
+mod generate_cue;
 mod github;
 mod homebrew;
 mod prepare;
-mod push;
+mod workflow;
+
+use anyhow::{Result, ensure};
+use semver::Version;
+
+fn ensure_stable(version: &Version, label: &str) -> Result<()> {
+    ensure!(
+        version.pre.is_empty() && version.build.is_empty(),
+        "{label} must be a stable semantic version"
+    );
+    Ok(())
+}
+
+fn preparation_branch(version: &Version) -> String {
+    // Keep the documented, website-preview-compatible branch format.
+    format!(
+        "prepare-v-{}-{}-{}-website",
+        version.major, version.minor, version.patch
+    )
+}
 
 crate::cli_subcommands! {
     "Manage the release process..."
-    generate_cue,
     channel,
-    commit,
     docker,
+    generate_cue,
     github,
     homebrew,
     prepare,
-    push,
+    workflow,
     s3,
 }
 
-crate::script_wrapper! {
-    generate_cue = "Generate the release documentation files"
-        => "generate-release-cue.rb"
-}
-crate::script_wrapper! {
-    commit = "Commits and tags the pending release"
-        => "release-commit.rb"
-}
 crate::script_wrapper! {
     docker = "Build the Vector docker images and optionally push it to the registry"
         => "build-docker.sh"

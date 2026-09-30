@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, num::NonZeroUsize, time::Duration};
 
 use crate::{
     config::{
@@ -11,15 +11,24 @@ use crate::{
         Source,
         http_server::{build_param_matcher, remove_duplicates},
         opentelemetry::{
-            grpc::Service,
-            http::{build_warp_filter, run_http_server},
+            grpc::{Service, middleware_error_response as grpc_error_response},
+            http::{
+                build_warp_filter, middleware_error_response as http_error_response,
+                run_http_server,
+            },
+            request_control::RequestControl,
         },
-        util::grpc::run_grpc_server_with_routes,
+        util::{
+            decompression::max_decompressed_size_bytes,
+            grpc::{GrpcKeepaliveConfig, run_grpc_server_with_routes},
+        },
     },
 };
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
-use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
+use serde::{Deserialize, Deserializer, de};
+use tokio::sync::Semaphore;
+use tonic::transport::server::RoutesBuilder;
 use vector_config::indexmap::IndexSet;
 use vector_lib::{
     codecs::decoding::{OtlpDeserializer, OtlpSignalType},
@@ -39,7 +48,7 @@ use vector_lib::{
         },
     },
     schema::Definition,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig},
 };
 use vrl::value::{Kind, kind::Collection};
 
@@ -111,15 +120,30 @@ impl OtlpDecodingConfig {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
-    #[configurable(derived)]
     pub grpc: GrpcConfig,
 
-    #[configurable(derived)]
     pub http: HttpConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: SourceAcknowledgementsConfig,
+
+    /// Maximum number of requests processed concurrently across the HTTP and gRPC servers.
+    ///
+    /// Requests beyond this limit are rejected. When omitted, no request concurrency limit is enforced.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_max_concurrent_requests"
+    )]
+    pub max_concurrent_requests: Option<NonZeroUsize>,
+
+    /// Maximum time spent processing a request through submission to the source output.
+    ///
+    /// When omitted, no request processing timeout is enforced. Downstream acknowledgement waiting
+    /// is not subject to this timeout.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    pub request_timeout_secs: Option<u64>,
 
     /// The namespace to use for logs. This overrides the global setting.
     #[configurable(metadata(docs::hidden))]
@@ -158,6 +182,22 @@ pub struct OpentelemetryConfig {
     pub use_otlp_decoding: OtlpDecodingConfig,
 }
 
+fn deserialize_max_concurrent_requests<'de, D>(
+    deserializer: D,
+) -> Result<Option<NonZeroUsize>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Option::<NonZeroUsize>::deserialize(deserializer)?;
+    if value.is_some_and(|limit| limit.get() > Semaphore::MAX_PERMITS) {
+        return Err(de::Error::custom(format!(
+            "max_concurrent_requests must not exceed {}",
+            Semaphore::MAX_PERMITS
+        )));
+    }
+    Ok(value)
+}
+
 /// Configuration for the `opentelemetry` gRPC server.
 #[configurable_component]
 #[configurable(metadata(docs::examples = "example_grpc_config()"))]
@@ -170,15 +210,18 @@ pub struct GrpcConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:4317", docs::examples = "localhost:4317"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
+
+    #[serde(default)]
+    pub keepalive: GrpcKeepaliveConfig,
 }
 
 fn example_grpc_config() -> GrpcConfig {
     GrpcConfig {
         address: "0.0.0.0:4317".parse().unwrap(),
         tls: None,
+        keepalive: GrpcKeepaliveConfig::default(),
     }
 }
 
@@ -194,21 +237,20 @@ pub struct HttpConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:4318", docs::examples = "localhost:4318"))]
     pub address: SocketAddr,
 
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub keepalive: KeepaliveConfig,
 
-    /// A list of HTTP headers to include in the log event.
+    /// A list of HTTP headers to include in the event.
     ///
     /// Accepts the wildcard (`*`) character for headers matching a specified pattern.
     ///
-    /// Specifying "*" results in all headers included in the log event.
+    /// Specifying "*" results in all headers included in the event.
     ///
-    /// These headers are not included in the JSON payload if a field with a conflicting name exists.
+    /// For log events in legacy namespace mode, headers are not included if a field with a conflicting name exists.
+    /// For metrics and traces, headers are always added to event metadata.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "User-Agent"))]
     #[configurable(metadata(docs::examples = "X-My-Custom-Header"))]
@@ -227,11 +269,13 @@ fn example_http_config() -> HttpConfig {
 }
 
 impl GenerateConfig for OpentelemetryConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             grpc: example_grpc_config(),
             http: example_http_config(),
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: None,
             use_otlp_decoding: OtlpDecodingConfig::default(),
         })
@@ -260,12 +304,20 @@ impl OpentelemetryConfig {
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "opentelemetry")]
-impl SourceConfig for OpentelemetryConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+impl OpentelemetryConfig {
+    /// Build the source serving runtime-swappable TLS acceptors for the gRPC and/or HTTP listeners.
+    pub fn build_with_tls_reloaders(
+        &self,
+        cx: SourceContext,
+        grpc_tls_reloader: Option<TlsAcceptorReloader>,
+        http_tls_reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::Result<Source> {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let events_received = register!(EventsReceived);
+        let request_control = RequestControl::new(
+            self.max_concurrent_requests.map(NonZeroUsize::get),
+            self.request_timeout_secs.map(Duration::from_secs),
+        );
         let log_namespace = cx.log_namespace(self.log_namespace);
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
@@ -284,6 +336,9 @@ impl SourceConfig for OpentelemetryConfig {
         let metrics_deserializer = self.get_signal_deserializer(OtlpSignalType::Metrics)?;
         let traces_deserializer = self.get_signal_deserializer(OtlpSignalType::Traces)?;
 
+        // Compression negotiation (gzip, zstd) is handled centrally by
+        // `DecompressionAndMetricsLayer` in `sources::util::grpc`, so these
+        // services deliberately do not call `.accept_compressed(..)`.
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
@@ -291,8 +346,7 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: logs_deserializer.clone(),
         })
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(usize::MAX);
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         let metrics_service = MetricsServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -301,8 +355,7 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: metrics_deserializer.clone(),
         })
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(usize::MAX);
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         let trace_service = TraceServiceServer::new(Service {
             pipeline: cx.out.clone(),
@@ -311,8 +364,7 @@ impl SourceConfig for OpentelemetryConfig {
             events_received: events_received.clone(),
             deserializer: traces_deserializer.clone(),
         })
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(usize::MAX);
+        .max_decoding_message_size(max_decompressed_size_bytes());
 
         let mut builder = RoutesBuilder::default();
         builder
@@ -323,11 +375,14 @@ impl SourceConfig for OpentelemetryConfig {
         let grpc_source = run_grpc_server_with_routes(
             self.grpc.address,
             grpc_tls_settings,
+            grpc_tls_reloader,
             builder.routes(),
+            self.grpc.keepalive.clone(),
             cx.shutdown.clone(),
+            request_control.grpc_layer(grpc_error_response),
         )
         .map_err(|error| {
-            error!(message = "Source future failed.", %error);
+            error!(message = "OpenTelemetry source gRPC server failed.", %error);
         });
 
         let http_tls_settings = MaybeTlsSettings::from_config(self.http.tls.as_ref(), true)?;
@@ -351,12 +406,25 @@ impl SourceConfig for OpentelemetryConfig {
         let http_source = run_http_server(
             self.http.address,
             http_tls_settings,
+            http_tls_reloader,
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
-        );
+            request_control.http_layer(http_error_response),
+        )
+        .map_err(|error| {
+            error!(message = "OpenTelemetry source HTTP server failed.", %error);
+        });
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "opentelemetry")]
+impl SourceConfig for OpentelemetryConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        self.build_with_tls_reloaders(cx, None, None)
     }
 
     // TODO: appropriately handle "severity" meaning across both "severity_text" and "severity_number",

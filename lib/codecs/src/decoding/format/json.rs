@@ -10,7 +10,7 @@ use vector_core::{
     schema,
 };
 use vrl::core::Value;
-use vrl::value::Kind;
+use vrl::value::{Kind, value::simdutf_bytes_utf8_lossy};
 
 use super::{Deserializer, default_lossy};
 
@@ -136,8 +136,7 @@ impl JsonDeserializer {
         bytes: &[u8],
     ) -> vector_common::Result<T> {
         if self.lossy {
-            let s = String::from_utf8_lossy(bytes);
-            serde_json::from_str(&s)
+            serde_json::from_str(&simdutf_bytes_utf8_lossy(bytes))
         } else {
             serde_json::from_slice(bytes)
         }
@@ -251,7 +250,7 @@ mod tests {
         let deserializer = JsonDeserializer::default();
 
         let namespace = LogNamespace::Vector;
-        let events = deserializer.parse(input.clone(), namespace).unwrap();
+        let events = deserializer.parse(input, namespace).unwrap();
         let mut events = events.into_iter();
 
         let event = events.next().unwrap();
