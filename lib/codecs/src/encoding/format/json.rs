@@ -1,7 +1,13 @@
+use base64::{display::Base64Display, engine::general_purpose::STANDARD};
 use bytes::{BufMut, BytesMut};
+use serde::{Serialize, Serializer};
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
-use vector_core::{config::DataType, event::Event, schema};
+use vector_core::{
+    config::DataType,
+    event::{Event, Value},
+    schema,
+};
 
 use crate::MetricTagValues;
 
@@ -29,6 +35,28 @@ pub struct JsonSerializerOptions {
     /// Whether to use pretty JSON formatting.
     #[serde(default)]
     pub pretty: bool,
+
+    /// How byte values are written.
+    ///
+    /// Events store string values as bytes, so this applies to every string value, not only to
+    /// values that hold binary data. Object keys, timestamps, and metric events are not affected.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    pub bytes: JsonBytesEncoding,
+}
+
+/// How the `JsonSerializer` writes byte values.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum JsonBytesEncoding {
+    /// Writes byte values as UTF-8 strings, replacing each invalid UTF-8 sequence with the
+    /// Unicode replacement character (U+FFFD). Binary data is not preserved.
+    #[default]
+    LossyUtf8,
+
+    /// Writes byte values as base64 strings, using the standard alphabet with padding
+    /// (RFC 4648). Binary data is preserved.
+    Base64,
 }
 
 impl JsonSerializerConfig {
@@ -77,11 +105,44 @@ impl JsonSerializer {
     /// Encode event and represent it as JSON value.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         match event {
-            Event::Log(log) => serde_json::to_value(&log),
+            Event::Log(log) => serde_json::to_value(self.encoded(log.value())),
             Event::Metric(metric) => serde_json::to_value(&metric),
-            Event::Trace(trace) => serde_json::to_value(&trace),
+            Event::Trace(trace) => serde_json::to_value(self.encoded(trace.value())),
         }
         .map_err(|e| e.to_string().into())
+    }
+
+    const fn encoded<'a>(&self, value: &'a Value) -> EncodedValue<'a> {
+        EncodedValue {
+            value,
+            bytes: self.options.bytes,
+        }
+    }
+}
+
+/// Serializes a log or trace event value, writing byte values as set by
+/// [`JsonSerializerOptions::bytes`].
+#[derive(Clone, Copy)]
+struct EncodedValue<'a> {
+    value: &'a Value,
+    bytes: JsonBytesEncoding,
+}
+
+impl Serialize for EncodedValue<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match (self.bytes, self.value) {
+            (JsonBytesEncoding::Base64, Value::Bytes(bytes)) => {
+                serializer.collect_str(&Base64Display::new(bytes, &STANDARD))
+            }
+            (JsonBytesEncoding::Base64, Value::Object(map)) => serializer.collect_map(
+                map.iter()
+                    .map(|(key, value)| (key, EncodedValue { value, ..*self })),
+            ),
+            (JsonBytesEncoding::Base64, Value::Array(array)) => {
+                serializer.collect_seq(array.iter().map(|value| EncodedValue { value, ..*self }))
+            }
+            (_, value) => value.serialize(serializer),
+        }
     }
 }
 
@@ -92,25 +153,27 @@ impl Encoder<Event> for JsonSerializer {
         let writer = buffer.writer();
         if self.options.pretty {
             match event {
-                Event::Log(log) => serde_json::to_writer_pretty(writer, &log),
+                Event::Log(log) => serde_json::to_writer_pretty(writer, &self.encoded(log.value())),
                 Event::Metric(mut metric) => {
                     if self.metric_tag_values == MetricTagValues::Single {
                         metric.reduce_tags_to_single();
                     }
                     serde_json::to_writer_pretty(writer, &metric)
                 }
-                Event::Trace(trace) => serde_json::to_writer_pretty(writer, &trace),
+                Event::Trace(trace) => {
+                    serde_json::to_writer_pretty(writer, &self.encoded(trace.value()))
+                }
             }
         } else {
             match event {
-                Event::Log(log) => serde_json::to_writer(writer, &log),
+                Event::Log(log) => serde_json::to_writer(writer, &self.encoded(log.value())),
                 Event::Metric(mut metric) => {
                     if self.metric_tag_values == MetricTagValues::Single {
                         metric.reduce_tags_to_single();
                     }
                     serde_json::to_writer(writer, &metric)
                 }
-                Event::Trace(trace) => serde_json::to_writer(writer, &trace),
+                Event::Trace(trace) => serde_json::to_writer(writer, &self.encoded(trace.value())),
             }
         }
         .map_err(Into::into)
@@ -289,7 +352,10 @@ mod tests {
 
         fn get_pretty_json_config() -> JsonSerializerConfig {
             JsonSerializerConfig {
-                options: JsonSerializerOptions { pretty: true },
+                options: JsonSerializerOptions {
+                    pretty: true,
+                    ..Default::default()
+                },
                 ..Default::default()
             }
         }
@@ -412,7 +478,10 @@ mod tests {
             let bytes = serialize(
                 JsonSerializerConfig {
                     metric_tag_values: MetricTagValues::Full,
-                    options: JsonSerializerOptions { pretty: true },
+                    options: JsonSerializerOptions {
+                        pretty: true,
+                        ..Default::default()
+                    },
                 },
                 metric2(),
             );
@@ -439,7 +508,10 @@ mod tests {
             let bytes = serialize(
                 JsonSerializerConfig {
                     metric_tag_values: MetricTagValues::Single,
-                    options: JsonSerializerOptions { pretty: true },
+                    options: JsonSerializerOptions {
+                        pretty: true,
+                        ..Default::default()
+                    },
                 },
                 metric2(),
             );
@@ -473,6 +545,175 @@ mod tests {
             let mut buffer = BytesMut::new();
             config.build().encode(input, &mut buffer).unwrap();
             buffer.freeze()
+        }
+    }
+
+    mod base64_bytes {
+        use base64::Engine;
+        use bytes::{Bytes, BytesMut};
+        use chrono::{TimeZone, Utc};
+        use vector_core::event::{LogEvent, ObjectMap, TraceEvent, Value};
+        use vrl::btreemap;
+
+        use super::*;
+
+        /// The start of an RTCM 3 frame, which is not valid UTF-8.
+        const BINARY: &[u8] = &[0xd3, 0x00, 0x04, 0x3e, 0xd0, 0x80, 0xff];
+
+        fn base64_config(pretty: bool) -> JsonSerializerConfig {
+            JsonSerializerConfig {
+                options: JsonSerializerOptions {
+                    pretty,
+                    bytes: JsonBytesEncoding::Base64,
+                },
+                ..Default::default()
+            }
+        }
+
+        fn binary_log() -> Event {
+            Event::Log(LogEvent::from(btreemap! {
+                "message" => Value::Bytes(Bytes::from_static(BINARY)),
+            }))
+        }
+
+        #[test]
+        fn lossy_utf8_is_the_default() {
+            let bytes = serialize(JsonSerializerConfig::default(), binary_log());
+
+            assert_eq!(
+                bytes,
+                "{\"message\":\"\u{fffd}\\u0000\\u0004>\u{400}\u{fffd}\"}"
+            );
+        }
+
+        #[test]
+        fn serialize_top_level_bytes() {
+            let bytes = serialize(base64_config(false), binary_log());
+
+            assert_eq!(bytes, r#"{"message":"0wAEPtCA/w=="}"#);
+        }
+
+        #[test]
+        fn serialize_nested_bytes() {
+            let event = Event::Log(LogEvent::from(btreemap! {
+                "array" => Value::from(vec![
+                    Value::from("abc"),
+                    Value::from(btreemap! { "inner" => Value::from("abc") }),
+                ]),
+                "object" => Value::from(btreemap! {
+                    "array" => Value::from(vec![Value::from("abc")]),
+                    "inner" => Value::from("abc"),
+                }),
+            }));
+            let bytes = serialize(base64_config(false), event);
+
+            assert_eq!(
+                bytes,
+                r#"{"array":["YWJj",{"inner":"YWJj"}],"object":{"array":["YWJj"],"inner":"YWJj"}}"#
+            );
+        }
+
+        #[test]
+        fn serialize_empty_bytes() {
+            let event = Event::Log(LogEvent::from(btreemap! {
+                "message" => Value::from(""),
+            }));
+            let bytes = serialize(base64_config(false), event);
+
+            assert_eq!(bytes, r#"{"message":""}"#);
+        }
+
+        #[test]
+        fn round_trip_every_byte_value() {
+            let binary: Vec<u8> = (0..=u8::MAX).collect();
+            let event = Event::Log(LogEvent::from(btreemap! {
+                "message" => Value::Bytes(Bytes::from(binary.clone())),
+            }));
+            let bytes = serialize(base64_config(false), event);
+
+            let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            let decoded = STANDARD.decode(json["message"].as_str().unwrap()).unwrap();
+            assert_eq!(decoded, binary);
+        }
+
+        #[test]
+        fn serialize_other_values_unchanged() {
+            let event = Event::Log(LogEvent::from(btreemap! {
+                "boolean" => Value::from(true),
+                "empty_array" => Value::Array(Vec::new()),
+                "empty_object" => Value::Object(ObjectMap::new()),
+                "float" => Value::from(1.5),
+                "integer" => Value::from(25),
+                "null" => Value::Null,
+                "timestamp" => Value::from(Utc.with_ymd_and_hms(2018, 11, 14, 8, 9, 10).unwrap()),
+            }));
+            let bytes = serialize(base64_config(false), event);
+
+            assert_eq!(
+                bytes,
+                r#"{"boolean":true,"empty_array":[],"empty_object":{},"float":1.5,"integer":25,"null":null,"timestamp":"2018-11-14T08:09:10Z"}"#
+            );
+        }
+
+        #[test]
+        fn serialize_trace_bytes() {
+            let event = Event::Trace(TraceEvent::from(LogEvent::from(btreemap! {
+                "span_id" => Value::Bytes(Bytes::from_static(BINARY)),
+            })));
+            let bytes = serialize(base64_config(false), event);
+
+            assert_eq!(bytes, r#"{"span_id":"0wAEPtCA/w=="}"#);
+        }
+
+        #[test]
+        fn serialize_metric_unchanged() {
+            assert_eq!(
+                serialize(base64_config(false), metric2()),
+                serialize(JsonSerializerConfig::default(), metric2())
+            );
+        }
+
+        #[test]
+        fn serialize_pretty() {
+            let event = Event::Log(LogEvent::from(btreemap! {
+                "array" => Value::from(vec![Value::Bytes(Bytes::from_static(BINARY))]),
+                "message" => Value::Bytes(Bytes::from_static(BINARY)),
+            }));
+            let bytes = serialize(base64_config(true), event);
+
+            assert_eq!(
+                bytes,
+                r#"{
+  "array": [
+    "0wAEPtCA/w=="
+  ],
+  "message": "0wAEPtCA/w=="
+}"#
+            );
+        }
+
+        #[test]
+        fn serialize_equals_to_json_value() {
+            let mut serializer = base64_config(false).build();
+            let mut bytes = BytesMut::new();
+
+            serializer.encode(binary_log(), &mut bytes).unwrap();
+
+            let json = serializer.to_json_value(binary_log()).unwrap();
+
+            assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
+        }
+
+        #[test]
+        fn deserialize_bytes_option() {
+            let options: JsonSerializerOptions = toml::from_str(r#"bytes = "base64""#).unwrap();
+            assert_eq!(options.bytes, JsonBytesEncoding::Base64);
+
+            let options: JsonSerializerOptions = toml::from_str(r#"bytes = "lossy_utf8""#).unwrap();
+            assert_eq!(options.bytes, JsonBytesEncoding::LossyUtf8);
+
+            let options: JsonSerializerOptions = toml::from_str("").unwrap();
+            assert_eq!(options.bytes, JsonBytesEncoding::LossyUtf8);
         }
     }
 }
