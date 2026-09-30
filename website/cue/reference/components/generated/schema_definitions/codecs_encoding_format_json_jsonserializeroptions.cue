@@ -3,22 +3,31 @@ package metadata
 _schemaDefinitions: "codecs::encoding::format::json::JsonSerializerOptions": object: options: {
 	bytes: {
 		description: """
-			How byte values are written.
+			Controls how binary data in string values is encoded.
 
-			Events store string values as bytes, so this applies to every string value, not only to
-			values that hold binary data. Object keys, timestamps, and metric events are not affected.
+			String values can hold arbitrary bytes that are not valid UTF-8, such as binary WebSocket
+			frames. This option applies to every string value in log and trace events, including
+			fields such as `host` and `source_type`, not only to those that hold binary data. Object
+			keys, timestamps, and metric events are not affected, and neither are fields that a sink
+			writes outside the encoded event, such as the Splunk HEC `fields`.
 			"""
 		required: false
 		type: string: {
 			default: "lossy_utf8"
 			enum: {
 				base64: """
-					Writes byte values as base64 strings, using the standard alphabet with padding
-					(RFC 4648). Binary data is preserved.
+					Encode strings as [standard padded base64][rfc4648], the same output as the VRL
+					`encode_base64` function with its default options. All bytes are preserved, so consumers
+					must base64-decode every string value. Encoded strings are about a third larger.
+
+					[rfc4648]: https://datatracker.ietf.org/doc/html/rfc4648#section-4
 					"""
 				lossy_utf8: """
-					Writes byte values as UTF-8 strings, replacing each invalid UTF-8 sequence with the
-					Unicode replacement character (U+FFFD). Binary data is not preserved.
+					Encode strings as UTF-8, replacing invalid UTF-8 sequences with the
+					[`U+FFFD REPLACEMENT CHARACTER`][U+FFFD]. Bytes that are not valid UTF-8 cannot be
+					recovered.
+
+					[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 					"""
 			}
 		}

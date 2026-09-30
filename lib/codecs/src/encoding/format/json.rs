@@ -36,26 +36,35 @@ pub struct JsonSerializerOptions {
     #[serde(default)]
     pub pretty: bool,
 
-    /// How byte values are written.
+    /// Controls how binary data in string values is encoded.
     ///
-    /// Events store string values as bytes, so this applies to every string value, not only to
-    /// values that hold binary data. Object keys, timestamps, and metric events are not affected.
+    /// String values can hold arbitrary bytes that are not valid UTF-8, such as binary WebSocket
+    /// frames. This option applies to every string value in log and trace events, including
+    /// fields such as `host` and `source_type`, not only to those that hold binary data. Object
+    /// keys, timestamps, and metric events are not affected, and neither are fields that a sink
+    /// writes outside the encoded event, such as the Splunk HEC `fields`.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub bytes: JsonBytesEncoding,
 }
 
-/// How the `JsonSerializer` writes byte values.
+/// How the `JsonSerializer` encodes binary data in string values.
 #[configurable_component]
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum JsonBytesEncoding {
-    /// Writes byte values as UTF-8 strings, replacing each invalid UTF-8 sequence with the
-    /// Unicode replacement character (U+FFFD). Binary data is not preserved.
+    /// Encode strings as UTF-8, replacing invalid UTF-8 sequences with the
+    /// [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD]. Bytes that are not valid UTF-8 cannot be
+    /// recovered.
+    ///
+    /// [U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
     #[default]
     LossyUtf8,
 
-    /// Writes byte values as base64 strings, using the standard alphabet with padding
-    /// (RFC 4648). Binary data is preserved.
+    /// Encode strings as [standard padded base64][rfc4648], the same output as the VRL
+    /// `encode_base64` function with its default options. All bytes are preserved, so consumers
+    /// must base64-decode every string value. Encoded strings are about a third larger.
+    ///
+    /// [rfc4648]: https://datatracker.ietf.org/doc/html/rfc4648#section-4
     Base64,
 }
 
@@ -104,44 +113,52 @@ impl JsonSerializer {
 
     /// Encode event and represent it as JSON value.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
+        let bytes = self.options.bytes;
         match event {
-            Event::Log(log) => serde_json::to_value(self.encoded(log.value())),
+            Event::Log(log) => serde_json::to_value(EncodedValue::new(log.value(), bytes)),
             Event::Metric(metric) => serde_json::to_value(&metric),
-            Event::Trace(trace) => serde_json::to_value(self.encoded(trace.value())),
+            Event::Trace(trace) => serde_json::to_value(EncodedValue::new(trace.value(), bytes)),
         }
         .map_err(|e| e.to_string().into())
     }
-
-    const fn encoded<'a>(&self, value: &'a Value) -> EncodedValue<'a> {
-        EncodedValue {
-            value,
-            bytes: self.options.bytes,
-        }
-    }
 }
 
-/// Serializes a log or trace event value, writing byte values as set by
-/// [`JsonSerializerOptions::bytes`].
-#[derive(Clone, Copy)]
+/// Serializes a log or trace event value with the configured [`JsonBytesEncoding`].
+///
+/// `Value`'s own `Serialize` impl (from VRL) always writes bytes as lossy UTF-8 and serializes
+/// nested values with itself, with no way to pass an option down. So for `base64` this walks
+/// objects and arrays itself and writes each byte value straight into the output, instead of
+/// copying the event.
 struct EncodedValue<'a> {
     value: &'a Value,
     bytes: JsonBytesEncoding,
 }
 
+impl<'a> EncodedValue<'a> {
+    const fn new(value: &'a Value, bytes: JsonBytesEncoding) -> Self {
+        Self { value, bytes }
+    }
+}
+
 impl Serialize for EncodedValue<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match (self.bytes, self.value) {
-            (JsonBytesEncoding::Base64, Value::Bytes(bytes)) => {
-                serializer.collect_str(&Base64Display::new(bytes, &STANDARD))
-            }
-            (JsonBytesEncoding::Base64, Value::Object(map)) => serializer.collect_map(
-                map.iter()
-                    .map(|(key, value)| (key, EncodedValue { value, ..*self })),
-            ),
-            (JsonBytesEncoding::Base64, Value::Array(array)) => {
-                serializer.collect_seq(array.iter().map(|value| EncodedValue { value, ..*self }))
-            }
-            (_, value) => value.serialize(serializer),
+        match self.bytes {
+            JsonBytesEncoding::LossyUtf8 => self.value.serialize(serializer),
+            JsonBytesEncoding::Base64 => match self.value {
+                Value::Bytes(bytes) => {
+                    serializer.collect_str(&Base64Display::new(bytes, &STANDARD))
+                }
+                Value::Object(map) => serializer.collect_map(
+                    map.iter()
+                        .map(|(key, value)| (key, EncodedValue::new(value, self.bytes))),
+                ),
+                Value::Array(array) => serializer.collect_seq(
+                    array
+                        .iter()
+                        .map(|value| EncodedValue::new(value, self.bytes)),
+                ),
+                value => value.serialize(serializer),
+            },
         }
     }
 }
@@ -151,9 +168,12 @@ impl Encoder<Event> for JsonSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();
+        let bytes = self.options.bytes;
         if self.options.pretty {
             match event {
-                Event::Log(log) => serde_json::to_writer_pretty(writer, &self.encoded(log.value())),
+                Event::Log(log) => {
+                    serde_json::to_writer_pretty(writer, &EncodedValue::new(log.value(), bytes))
+                }
                 Event::Metric(mut metric) => {
                     if self.metric_tag_values == MetricTagValues::Single {
                         metric.reduce_tags_to_single();
@@ -161,19 +181,23 @@ impl Encoder<Event> for JsonSerializer {
                     serde_json::to_writer_pretty(writer, &metric)
                 }
                 Event::Trace(trace) => {
-                    serde_json::to_writer_pretty(writer, &self.encoded(trace.value()))
+                    serde_json::to_writer_pretty(writer, &EncodedValue::new(trace.value(), bytes))
                 }
             }
         } else {
             match event {
-                Event::Log(log) => serde_json::to_writer(writer, &self.encoded(log.value())),
+                Event::Log(log) => {
+                    serde_json::to_writer(writer, &EncodedValue::new(log.value(), bytes))
+                }
                 Event::Metric(mut metric) => {
                     if self.metric_tag_values == MetricTagValues::Single {
                         metric.reduce_tags_to_single();
                     }
                     serde_json::to_writer(writer, &metric)
                 }
-                Event::Trace(trace) => serde_json::to_writer(writer, &self.encoded(trace.value())),
+                Event::Trace(trace) => {
+                    serde_json::to_writer(writer, &EncodedValue::new(trace.value(), bytes))
+                }
             }
         }
         .map_err(Into::into)
@@ -185,7 +209,7 @@ mod tests {
     use bytes::{Bytes, BytesMut};
     use chrono::{TimeZone, Timelike, Utc};
     use vector_core::{
-        event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value},
+        event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent, Value},
         metric_tags,
     };
     use vrl::btreemap;
@@ -316,6 +340,72 @@ mod tests {
             bytes,
             r#"{"name":"counter","tags":{"a":"second"},"kind":"incremental","counter":{"value":1.0}}"#
         );
+    }
+
+    #[test]
+    fn serialize_invalid_utf8_lossy_by_default() {
+        let bytes = serialize(JsonSerializerConfig::default(), binary_log());
+
+        assert_eq!(
+            bytes,
+            "{\"message\":\"\u{fffd}\\u0000\\u0004>\u{400}\u{fffd}\"}"
+        );
+    }
+
+    #[test]
+    fn default_output_matches_plain_serde_json() {
+        let log = LogEvent::from(btreemap! {
+            "message" => Value::Bytes(Bytes::from_static(BINARY)),
+            "nested" => Value::from(btreemap! {
+                "array" => Value::from(vec![Value::Bytes(Bytes::from_static(BINARY))]),
+            }),
+        });
+        let trace = TraceEvent::from(log.clone());
+        let pretty = JsonSerializerConfig::new(
+            MetricTagValues::default(),
+            JsonSerializerOptions {
+                pretty: true,
+                ..Default::default()
+            },
+        );
+
+        let serializer = JsonSerializerConfig::default().build();
+        assert_eq!(
+            serialize(JsonSerializerConfig::default(), Event::Log(log.clone())),
+            serde_json::to_vec(&log).unwrap()
+        );
+        assert_eq!(
+            serialize(JsonSerializerConfig::default(), Event::Trace(trace.clone())),
+            serde_json::to_vec(&trace).unwrap()
+        );
+        assert_eq!(
+            serialize(pretty.clone(), Event::Log(log.clone())),
+            serde_json::to_vec_pretty(&log).unwrap()
+        );
+        assert_eq!(
+            serialize(pretty, Event::Trace(trace.clone())),
+            serde_json::to_vec_pretty(&trace).unwrap()
+        );
+        assert_eq!(
+            serializer.to_json_value(Event::Log(log.clone())).unwrap(),
+            serde_json::to_value(&log).unwrap()
+        );
+        assert_eq!(
+            serializer
+                .to_json_value(Event::Trace(trace.clone()))
+                .unwrap(),
+            serde_json::to_value(&trace).unwrap()
+        );
+    }
+
+    /// Bytes that are not valid UTF-8: `0xd3` is not followed by a continuation byte, and `0xff`
+    /// never occurs in UTF-8.
+    const BINARY: &[u8] = &[0xd3, 0x00, 0x04, 0x3e, 0xd0, 0x80, 0xff];
+
+    fn binary_log() -> Event {
+        Event::Log(LogEvent::from(btreemap! {
+            "message" => Value::Bytes(Bytes::from_static(BINARY)),
+        }))
     }
 
     fn metric2() -> Event {
@@ -550,15 +640,10 @@ mod tests {
 
     mod base64_bytes {
         use base64::Engine;
-        use bytes::{Bytes, BytesMut};
-        use chrono::{TimeZone, Utc};
-        use vector_core::event::{LogEvent, ObjectMap, TraceEvent, Value};
-        use vrl::btreemap;
+        use vector_core::event::ObjectMap;
 
         use super::*;
-
-        /// The start of an RTCM 3 frame, which is not valid UTF-8.
-        const BINARY: &[u8] = &[0xd3, 0x00, 0x04, 0x3e, 0xd0, 0x80, 0xff];
+        use crate::encoding::{EncodingConfig, SerializerConfig};
 
         fn base64_config(pretty: bool) -> JsonSerializerConfig {
             JsonSerializerConfig {
@@ -570,27 +655,21 @@ mod tests {
             }
         }
 
-        fn binary_log() -> Event {
-            Event::Log(LogEvent::from(btreemap! {
-                "message" => Value::Bytes(Bytes::from_static(BINARY)),
-            }))
-        }
-
         #[test]
-        fn lossy_utf8_is_the_default() {
-            let bytes = serialize(JsonSerializerConfig::default(), binary_log());
-
-            assert_eq!(
-                bytes,
-                "{\"message\":\"\u{fffd}\\u0000\\u0004>\u{400}\u{fffd}\"}"
-            );
-        }
-
-        #[test]
-        fn serialize_top_level_bytes() {
+        fn serialize_bytes_field() {
             let bytes = serialize(base64_config(false), binary_log());
 
             assert_eq!(bytes, r#"{"message":"0wAEPtCA/w=="}"#);
+        }
+
+        #[test]
+        fn serialize_bytes_root() {
+            // With the Vector log namespace, sources such as `websocket` emit the raw bytes as
+            // the event itself.
+            let event = Event::Log(LogEvent::from(Value::Bytes(Bytes::from_static(BINARY))));
+            let bytes = serialize(base64_config(false), event);
+
+            assert_eq!(bytes, r#""0wAEPtCA/w==""#);
         }
 
         #[test]
@@ -705,15 +784,25 @@ mod tests {
         }
 
         #[test]
-        fn deserialize_bytes_option() {
-            let options: JsonSerializerOptions = toml::from_str(r#"bytes = "base64""#).unwrap();
-            assert_eq!(options.bytes, JsonBytesEncoding::Base64);
+        fn deserialize_encoding_config() {
+            let config: EncodingConfig =
+                serde_json::from_str(r#"{"codec":"json","json":{"bytes":"base64"}}"#).unwrap();
+            let mut serializer = config.build().unwrap();
+            let mut bytes = BytesMut::new();
+            serializer.encode(binary_log(), &mut bytes).unwrap();
+            assert_eq!(bytes.freeze(), r#"{"message":"0wAEPtCA/w=="}"#);
 
-            let options: JsonSerializerOptions = toml::from_str(r#"bytes = "lossy_utf8""#).unwrap();
-            assert_eq!(options.bytes, JsonBytesEncoding::LossyUtf8);
+            let config: EncodingConfig = serde_json::from_str(r#"{"codec":"json"}"#).unwrap();
+            assert!(matches!(
+                config.config(),
+                SerializerConfig::Json(json) if json.options.bytes == JsonBytesEncoding::LossyUtf8
+            ));
 
-            let options: JsonSerializerOptions = toml::from_str("").unwrap();
-            assert_eq!(options.bytes, JsonBytesEncoding::LossyUtf8);
+            let error = serde_json::from_str::<EncodingConfig>(
+                r#"{"codec":"json","json":{"bytes":"hex"}}"#,
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains("hex"), "{error}");
         }
     }
 }
