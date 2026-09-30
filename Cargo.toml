@@ -223,6 +223,7 @@ serde_json = { version = "1.0.150", default-features = false, features = ["prese
 serde_path_to_error = "0.1.14"
 serde_with = { version = "3.21.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_yaml = { version = "0.9.34", default-features = false }
+simdutf8 = { version = "0.1.5", default-features = false }
 snafu = { version = "0.9.0", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.6.3", default-features = false }
 tempfile = "3.27.0"
@@ -361,6 +362,7 @@ serde_json.workspace = true
 serde_path_to_error.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["macros", "std"] }
 serde_yaml.workspace = true
+simdutf8 = { workspace = true, optional = true }
 
 # Messagepack
 rmp-serde = { version = "1.3.0", default-features = false, optional = true }
@@ -977,7 +979,7 @@ sinks-console = []
 sinks-databend = ["dep:databend-client"]
 sinks-databricks_zerobus = ["dep:databricks-zerobus-ingest-sdk", "codecs-arrow", "arrow/ipc_compression"]
 sinks-datadog_events = []
-sinks-datadog_logs = []
+sinks-datadog_logs = ["dep:simdutf8"]
 sinks-datadog_metrics = ["dep:datadog-proto", "dep:prost", "dep:prost-reflect", "dep:datadog-agent-metrics-v3", "dep:protobuf"]
 sinks-datadog_traces = ["protobuf-build", "dep:datadog-proto", "dep:prost", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
 sinks-doris = ["sqlx/mysql"]

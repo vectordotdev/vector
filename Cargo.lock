@@ -13532,6 +13532,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "serial_test",
+ "simdutf8",
  "similar-asserts",
  "smallvec",
  "smpl_jwt",

@@ -165,9 +165,10 @@ generated: components: sinks: datadog_logs: configuration: {
 
 			When a message is shortened, at most `max_message_bytes` raw bytes are retained and
 			`...TRUNCATED...` is appended. Every reduced log is tagged with `truncated:single_line`.
-			If the log remains oversized after the initial message cap, non-standard fields are removed
-			before the message is shortened further to account for JSON encoding. Logs that still
-			exceed the limit, or have no string message to truncate, are dropped.
+			The message is sized to account for JSON encoding while preserving non-standard fields when
+			possible. If the non-message fields leave no room for a truncated message, non-standard
+			fields are removed and the message is sized again. Logs that still exceed the limit, or have
+			no string message to truncate, are dropped.
 			"""
 		required: false
 		type: object: options: {

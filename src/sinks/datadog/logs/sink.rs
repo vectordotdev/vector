@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
+use std::{borrow::Cow, collections::VecDeque, fmt::Debug, io, sync::Arc};
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -423,26 +423,45 @@ fn encode_log(
             reason: "Oversized event has no string message to truncate.",
         });
     };
-    let mut body_len =
-        floor_char_boundary(&message, message.len().min(truncation.max_message_bytes));
+    let message = simdutf8_lossy(&message);
+    let message_encoded_size = json_string_encoded_size(&message);
+    let tagged_encoded_size = ensure_truncated_tag(event.as_mut_log(), original_encoded_size)?;
+    // The encoded event consists of a fixed non-message portion and the message value. Size them
+    // separately so the final message can be selected without repeatedly encoding the whole event.
+    let mut non_message_encoded_size = tagged_encoded_size - message_encoded_size;
+    let select_rewrite = |non_message_encoded_size| {
+        truncation
+            .max_log_bytes
+            .checked_sub(non_message_encoded_size)
+            .and_then(|budget| {
+                select_message_rewrite(
+                    &message,
+                    message_encoded_size,
+                    truncation.max_message_bytes,
+                    budget,
+                )
+            })
+    };
+    let mut rewrite = select_rewrite(non_message_encoded_size);
+
+    if rewrite.is_none() {
+        let stripped_size = strip_non_standard_fields(event.as_mut_log(), conforms_as_agent)?;
+        non_message_encoded_size -= stripped_size;
+        rewrite = select_rewrite(non_message_encoded_size);
+    }
+
+    let Some(body_len) = rewrite else {
+        buf.truncate(existing_len);
+        return Ok(LogEncoding::Dropped {
+            reason: "Event remains too large after truncation.",
+        });
+    };
     if body_len < message.len() {
         set_truncated_message(event.as_mut_log(), &message, body_len);
     }
-    ensure_truncated_tag(event.as_mut_log());
 
-    let mut encoded_size = rewrite_log(buf, existing_len, event, include_comma)?;
-    if encoded_size > truncation.max_log_bytes {
-        strip_non_standard_fields(event.as_mut_log(), conforms_as_agent);
-        encoded_size = rewrite_log(buf, existing_len, event, include_comma)?;
-    }
-
-    if encoded_size > truncation.max_log_bytes {
-        let marker_bytes_to_add = TRUNCATION_MARKER.len() * usize::from(body_len == message.len());
-        let bytes_to_remove = (encoded_size - truncation.max_log_bytes) + marker_bytes_to_add;
-        body_len = floor_char_boundary(&message, body_len.saturating_sub(bytes_to_remove));
-        set_truncated_message(event.as_mut_log(), &message, body_len);
-        encoded_size = rewrite_log(buf, existing_len, event, include_comma)?;
-    }
+    buf.truncate(existing_len);
+    let encoded_size = write_log(buf, event, include_comma)?;
 
     if encoded_size > truncation.max_log_bytes {
         buf.truncate(existing_len);
@@ -458,6 +477,40 @@ fn encode_log(
     Ok(LogEncoding::Truncated)
 }
 
+fn simdutf8_lossy(bytes: &[u8]) -> Cow<'_, str> {
+    match simdutf8::basic::from_utf8(bytes) {
+        Ok(value) => Cow::Borrowed(value),
+        Err(_) => String::from_utf8_lossy(bytes),
+    }
+}
+
+fn select_message_rewrite(
+    message: &str,
+    message_encoded_size: usize,
+    max_message_bytes: usize,
+    encoded_budget: usize,
+) -> Option<usize> {
+    if message.len() <= max_message_bytes && message_encoded_size <= encoded_budget {
+        Some(message.len())
+    } else {
+        let content_budget =
+            encoded_budget.checked_sub(2 + json_string_content_size(TRUNCATION_MARKER))?;
+        let mut body_len = 0;
+        let mut encoded_size = 0;
+        for (index, character) in message.char_indices() {
+            let next_body_len = index + character.len_utf8();
+            let next_encoded_size = encoded_size + json_character_encoded_size(character);
+            if next_body_len > max_message_bytes || next_encoded_size > content_budget {
+                break;
+            }
+            body_len = next_body_len;
+            encoded_size = next_encoded_size;
+        }
+
+        (body_len < message.len()).then_some(body_len)
+    }
+}
+
 fn write_log(buf: &mut Vec<u8>, event: &Event, include_comma: bool) -> Result<usize, io::Error> {
     if include_comma {
         buf.push(b',');
@@ -467,40 +520,43 @@ fn write_log(buf: &mut Vec<u8>, event: &Event, include_comma: bool) -> Result<us
     Ok(buf.len() - object_start)
 }
 
-fn rewrite_log(
-    buf: &mut Vec<u8>,
-    existing_len: usize,
-    event: &Event,
-    include_comma: bool,
-) -> Result<usize, io::Error> {
-    buf.truncate(existing_len);
-    write_log(buf, event, include_comma)
-}
-
 const TRUNCATION_MARKER: &str = "...TRUNCATED...";
 const TRUNCATED_TAG: &str = "truncated:single_line";
 
-fn set_truncated_message(log: &mut LogEvent, message: &Bytes, body_len: usize) {
+fn set_truncated_message(log: &mut LogEvent, message: &str, body_len: usize) {
     let marker = TRUNCATION_MARKER.as_bytes();
     let mut truncated = Vec::with_capacity(body_len + marker.len());
-    truncated.extend_from_slice(&message[..body_len]);
+    truncated.extend_from_slice(&message.as_bytes()[..body_len]);
     truncated.extend_from_slice(marker);
     *message_bytes_mut(log).expect("the message was previously found") = Bytes::from(truncated);
 }
 
-fn ensure_truncated_tag(log: &mut LogEvent) {
+fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> Result<usize, io::Error> {
     let tags_path = event_path!(DDTAGS);
+    let previous_size = log
+        .get(tags_path)
+        .map(json_value_encoded_size)
+        .transpose()?;
     if let Some(tags) = log.get(tags_path).and_then(Value::as_bytes)
         && !tags.is_empty()
     {
         let tags = String::from_utf8_lossy(tags);
         if tags.split(',').any(|tag| tag.trim() == TRUNCATED_TAG) {
-            return;
+            return Ok(encoded_size);
         }
         log.insert(tags_path, format!("{tags},{TRUNCATED_TAG}"));
     } else {
         log.insert(tags_path, TRUNCATED_TAG);
     }
+    let new_size =
+        json_value_encoded_size(log.get(tags_path).expect("the truncation tag was inserted"))?;
+
+    Ok(if let Some(previous_size) = previous_size {
+        encoded_size - previous_size + new_size
+    } else {
+        // The log already contains the message field, so adding ddtags also adds one comma.
+        encoded_size + json_string_encoded_size(DDTAGS) + 1 + new_size + 1
+    })
 }
 
 fn message_bytes_mut(log: &mut LogEvent) -> Option<&mut Bytes> {
@@ -514,24 +570,66 @@ fn message_bytes_mut(log: &mut LogEvent) -> Option<&mut Bytes> {
     }
 }
 
-fn strip_non_standard_fields(log: &mut LogEvent, conforms_as_agent: bool) {
+fn strip_non_standard_fields(
+    log: &mut LogEvent,
+    conforms_as_agent: bool,
+) -> Result<usize, io::Error> {
     let Some(fields) = log.as_map_mut() else {
-        return;
+        return Ok(0);
     };
-    fields.retain(|field, _| is_reserved_attribute(field.as_str()) || field.as_str() == MESSAGE);
+    let mut stripped_size = strip_fields(fields, |field| {
+        is_reserved_attribute(field) || field == MESSAGE
+    })?;
     if conforms_as_agent && let Some(Value::Object(nested)) = fields.get_mut(MESSAGE) {
-        nested.retain(|field, _| field.as_str() == MESSAGE);
+        stripped_size += strip_fields(nested, |field| field == MESSAGE)?;
+    }
+    Ok(stripped_size)
+}
+
+// Calculate the exact encoded size removed rather than using `retain`, so the message budget can
+// be recomputed without encoding the entire log again.
+fn strip_fields(fields: &mut ObjectMap, retain: impl Fn(&str) -> bool) -> Result<usize, io::Error> {
+    let fields_to_strip = fields
+        .iter()
+        .filter(|(field, _)| !retain(field.as_str()))
+        .map(|(field, value)| {
+            Ok((
+                field.clone(),
+                json_string_encoded_size(field.as_str()) + 1 + json_value_encoded_size(value)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, io::Error>>()?;
+    debug_assert!(fields.len() > fields_to_strip.len());
+    // At least one field remains, so removing each member also removes one separating comma.
+    let mut stripped_size = fields_to_strip.len();
+    for (field, member_size) in fields_to_strip {
+        let _ = fields.remove(field.as_str());
+        stripped_size += member_size;
+    }
+    Ok(stripped_size)
+}
+
+fn json_string_encoded_size(value: &str) -> usize {
+    2 + json_string_content_size(value)
+}
+
+fn json_string_content_size(value: &str) -> usize {
+    value.chars().map(json_character_encoded_size).sum()
+}
+
+const fn json_character_encoded_size(character: char) -> usize {
+    match character {
+        '"' | '\\' | '\u{0008}' | '\t' | '\n' | '\u{000c}' | '\r' => 2,
+        '\u{0000}'..='\u{001f}' => 6,
+        _ => character.len_utf8(),
     }
 }
 
-fn floor_char_boundary(bytes: &[u8], mut index: usize) -> usize {
-    if index >= bytes.len() {
-        return bytes.len();
-    }
-    while index > 0 && (bytes[index] & 0b1100_0000) == 0b1000_0000 {
-        index -= 1;
-    }
-    index
+fn json_value_encoded_size(value: &Value) -> Result<usize, io::Error> {
+    let mut sink = io::sink();
+    encoding::as_tracked_write(&mut sink, value, |writer, value| {
+        serde_json::to_writer(writer, value)
+    })
 }
 
 impl<S> LogSink<S>
@@ -624,7 +722,10 @@ mod tests {
         value::{Kind, kind::Collection},
     };
 
-    use super::{LogRequestBuilder, normalize_as_agent_event, normalize_event};
+    use super::{
+        LogRequestBuilder, json_string_encoded_size, normalize_as_agent_event, normalize_event,
+        simdutf8_lossy,
+    };
     use crate::{
         common::datadog::DD_RESERVED_SEMANTIC_ATTRS,
         sinks::{
@@ -637,6 +738,27 @@ mod tests {
 
     const TRUNCATION_MARKER: &str = "...TRUNCATED...";
     const TRUNCATED_TAG: &str = "truncated:single_line";
+
+    #[test]
+    fn calculates_exact_json_string_size() {
+        for value in [
+            "plain text",
+            "\"quoted\\text\"",
+            "\0\u{0001}\u{0008}\t\n\u{000c}\r",
+            "multibyte 😀 text",
+        ] {
+            assert_eq!(
+                json_string_encoded_size(value),
+                serde_json::to_vec(value).unwrap().len()
+            );
+        }
+
+        let invalid = bytes::Bytes::from_static(&[b'a', 0xff, b'b']);
+        assert_eq!(
+            json_string_encoded_size(&simdutf8_lossy(&invalid)),
+            serde_json::to_vec(&Value::Bytes(invalid)).unwrap().len()
+        );
+    }
 
     fn encode_logs(
         events: Vec<Event>,
@@ -753,7 +875,7 @@ mod tests {
     }
 
     #[test]
-    fn removes_non_standard_fields_if_truncated_log_is_still_oversized() {
+    fn preserves_non_standard_fields_if_message_can_be_shortened_further() {
         let mut log = LogEvent::from("c".repeat(MAX_LOG_BYTES + 1));
         log.insert(event_path!("service"), "payments");
         log.insert(event_path!("custom"), "x".repeat(200_000));
@@ -761,9 +883,14 @@ mod tests {
         let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
 
         assert_eq!(logs.len(), 1);
-        assert!(logs[0].get("custom").is_none());
+        assert_eq!(logs[0]["custom"], "x".repeat(200_000));
         assert_eq!(logs[0]["service"], "payments");
         assert_eq!(logs[0]["ddtags"], TRUNCATED_TAG);
+        let message = logs[0]["message"]
+            .as_str()
+            .expect("message should be a string");
+        assert!(message.ends_with(TRUNCATION_MARKER));
+        assert!(message.len() < 900_000 + TRUNCATION_MARKER.len());
         assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= MAX_LOG_BYTES);
     }
 
@@ -771,7 +898,7 @@ mod tests {
     fn leaves_short_message_unmarked_when_only_custom_fields_are_removed() {
         let mut log = LogEvent::from("hello");
         log.insert(event_path!("service"), "payments");
-        log.insert(event_path!("custom"), "x".repeat(MAX_LOG_BYTES + 1));
+        log.insert(event_path!("custom"), "\u{0001}".repeat(200_000));
 
         let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
 
@@ -782,7 +909,7 @@ mod tests {
     }
 
     #[test]
-    fn removes_nested_non_standard_fields_from_agent_normalized_log() {
+    fn preserves_nested_non_standard_fields_if_message_can_be_shortened_further() {
         let mut log = LogEvent::from("d".repeat(MAX_LOG_BYTES + 1));
         log.insert(event_path!("service"), "payments");
         log.insert(event_path!("custom"), "x".repeat(200_000));
@@ -793,12 +920,19 @@ mod tests {
         let nested = logs[0]["message"]
             .as_object()
             .expect("agent message should be an object");
-        assert!(nested.get("custom").is_none());
+        assert_eq!(nested["custom"], "x".repeat(200_000));
         assert!(
             nested["message"]
                 .as_str()
                 .expect("message should be a string")
                 .ends_with(TRUNCATION_MARKER)
+        );
+        assert!(
+            nested["message"]
+                .as_str()
+                .expect("message should be a string")
+                .len()
+                < 900_000 + TRUNCATION_MARKER.len()
         );
         assert_eq!(logs[0]["service"], "payments");
         assert_eq!(logs[0]["ddtags"], TRUNCATED_TAG);
