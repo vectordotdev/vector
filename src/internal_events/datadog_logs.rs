@@ -12,7 +12,7 @@ pub struct DatadogLogsEventTruncated {
 
 impl InternalEvent for DatadogLogsEventTruncated {
     fn emit(self) {
-        warn!(
+        debug!(
             message = "Truncated a Datadog log event that exceeded the per-log size limit.",
             max_log_bytes = self.max_log_bytes,
             original_encoded_size = self.original_encoded_size,

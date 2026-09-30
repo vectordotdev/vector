@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::VecDeque, fmt::Debug, io, sync::Arc};
+use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -9,7 +9,10 @@ use vector_lib::{
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
-use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
+use vrl::{
+    path::{OwnedSegment, OwnedTargetPath, PathPrefix},
+    value::value::simdutf_bytes_utf8_lossy,
+};
 
 use super::{config::DatadogLogsTruncationConfig, service::LogApiRequest};
 use crate::{
@@ -419,19 +422,17 @@ fn encode_log(
             reason: "Oversized event has no string message to truncate.",
         });
     };
-    let message = simdutf8_lossy(&message);
+    let message = simdutf_bytes_utf8_lossy(&message);
     let message_encoded_size = json_string_encoded_size(&message);
     let tagged_encoded_size = ensure_truncated_tag(event.as_mut_log(), original_encoded_size)?;
     // The encoded event consists of a fixed non-message portion and the message value. Size them
     // separately so the final message can be selected without repeatedly encoding the whole event.
     let non_message_encoded_size = tagged_encoded_size - message_encoded_size;
-    let select_message_body_len = |non_message_encoded_size| {
-        truncation
-            .max_log_bytes
-            .checked_sub(non_message_encoded_size)
-            .and_then(|budget| select_message_body_len(&message, message_encoded_size, budget))
-    };
-    let Some(body_len) = select_message_body_len(non_message_encoded_size) else {
+    let Some(body_len) = truncation
+        .max_log_bytes
+        .checked_sub(non_message_encoded_size)
+        .and_then(|budget| select_message_body_len(&message, message_encoded_size, budget))
+    else {
         buf.truncate(existing_len);
         return Ok(LogEncoding::Dropped {
             reason: "Event remains too large after truncation.",
@@ -455,13 +456,6 @@ fn encode_log(
         original_encoded_size,
     });
     Ok(LogEncoding::Truncated)
-}
-
-fn simdutf8_lossy(bytes: &[u8]) -> Cow<'_, str> {
-    match simdutf8::basic::from_utf8(bytes) {
-        Ok(value) => Cow::Borrowed(value),
-        Err(_) => String::from_utf8_lossy(bytes),
-    }
 }
 
 fn select_message_body_len(
@@ -664,7 +658,7 @@ mod tests {
 
     use super::{
         LogRequestBuilder, json_string_encoded_size, normalize_as_agent_event, normalize_event,
-        simdutf8_lossy,
+        simdutf_bytes_utf8_lossy,
     };
     use crate::{
         common::datadog::DD_RESERVED_SEMANTIC_ATTRS,
@@ -695,7 +689,7 @@ mod tests {
 
         let invalid = bytes::Bytes::from_static(&[b'a', 0xff, b'b']);
         assert_eq!(
-            json_string_encoded_size(&simdutf8_lossy(&invalid)),
+            json_string_encoded_size(&simdutf_bytes_utf8_lossy(&invalid)),
             serde_json::to_vec(&Value::Bytes(invalid)).unwrap().len()
         );
     }
@@ -974,7 +968,7 @@ mod tests {
     }
 
     #[test]
-    fn second_message_shrink_reserves_space_for_new_marker() {
+    fn truncates_escaped_message_with_plain_suffix_to_fit() {
         let message = format!("{}{}", "\"".repeat(450_000), "a".repeat(110_000));
         let log = LogEvent::from(message);
 
