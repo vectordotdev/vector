@@ -21,15 +21,16 @@ use crate::{
     trace::TraceSubscription,
 };
 
-/// Capacity of the intermediate queue that decouples broadcast consumption from downstream
-/// sending. The drain task pushes into this queue as fast as it can receive from the broadcast
-/// channel; the main task pulls in batches to `send_batch`. Sized to absorb short bursts while
-/// downstream is backpressured without further growing memory.
-const INTERMEDIATE_QUEUE_CAPACITY: usize = 10_000;
-
 /// Maximum number of events the main task will gather into a single batch before calling
 /// `send_batch`. Amortizes per-call overhead (timestamp capture, metrics, chunking).
 const MAX_BATCH_SIZE: usize = 1024;
+
+/// Capacity of the intermediate queue that decouples broadcast consumption from downstream
+/// sending. The drain task pushes into this queue as fast as it can receive from the broadcast
+/// channel; the main task pulls in batches to `send_batch`. One batch worth of events lets the
+/// drain task fill the next batch while the current one is sent. Larger values did not reduce
+/// drops in benchmarks and only raise worst-case memory, since `LogEvent` sizes vary widely.
+const INTERMEDIATE_QUEUE_CAPACITY: usize = MAX_BATCH_SIZE;
 
 /// Item flowing from the drain task to the main task.
 enum DrainItem {
@@ -269,6 +270,9 @@ async fn run(
 
         let event_count = events.len();
         if out.send_batch(events).await.is_err() {
+            // The drain task may be parked on the broadcast receiver and would otherwise keep
+            // its `ShutdownSignal` clone alive until the next internal log arrives.
+            drain_task.abort();
             // this wont trigger any infinite loop considering it stops the component
             emit!(StreamClosedError { count: event_count });
             return Err(());
