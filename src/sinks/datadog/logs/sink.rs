@@ -294,7 +294,8 @@ impl LogRequestBuilder {
             let (events_serialized, body, byte_size) =
                 self.serialize_with_capacity(&mut events_with_estimated_size)?;
             if events_serialized.is_empty() {
-                if events_with_estimated_size.pop_front().is_some() {
+                if let Some((event, _)) = events_with_estimated_size.pop_front() {
+                    event.metadata().update_status(EventStatus::Rejected);
                     emit!(ComponentEventsDropped::<UNINTENTIONAL> {
                         count: 1,
                         reason: "Event too large to encode."
@@ -310,6 +311,12 @@ impl LogRequestBuilder {
         Ok(requests)
     }
 
+    /// Serialize events into a buffer as a JSON array that has a maximum size of
+    /// `max_payload_bytes`.
+    ///
+    /// Returns the serialized events, the buffer, and the byte size of the events. Events that do
+    /// not fit remain in the `events` parameter. Events rejected during encoding are removed.
+    #[doc(hidden)]
     fn serialize_with_capacity(
         &self,
         events: &mut VecDeque<(Event, JsonSize)>,
@@ -335,6 +342,7 @@ impl LogRequestBuilder {
                     estimated_json_size = event.estimated_json_encoded_size_of();
                 }
                 LogEncoding::Dropped { reason } => {
+                    event.metadata().update_status(EventStatus::Rejected);
                     emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
                     continue;
                 }
@@ -607,6 +615,7 @@ mod tests {
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
         event::{Event, EventMetadata, LogEvent},
+        finalization::{BatchNotifier, BatchStatus},
         schema::{Definition, meaning},
     };
     use vrl::{
@@ -649,16 +658,7 @@ mod tests {
         truncation: Option<DatadogLogsTruncationConfig>,
         conforms_as_agent: bool,
     ) -> Vec<serde_json::Value> {
-        let requests = LogRequestBuilder {
-            default_api_key: Arc::from("unused"),
-            transformer: Default::default(),
-            compression: Compression::None,
-            conforms_as_agent,
-            max_payload_bytes: 5_000_000,
-            truncation,
-        }
-        .build_request(events, Arc::from("api-key"))
-        .expect("request should build");
+        let requests = build_requests(events, truncation, conforms_as_agent, 5_000_000);
 
         requests
             .into_iter()
@@ -667,6 +667,24 @@ mod tests {
                     .expect("payload should be a JSON array")
             })
             .collect()
+    }
+
+    fn build_requests(
+        events: Vec<Event>,
+        truncation: Option<DatadogLogsTruncationConfig>,
+        conforms_as_agent: bool,
+        max_payload_bytes: usize,
+    ) -> Vec<super::LogApiRequest> {
+        LogRequestBuilder {
+            default_api_key: Arc::from("unused"),
+            transformer: Default::default(),
+            compression: Compression::None,
+            conforms_as_agent,
+            max_payload_bytes,
+            truncation,
+        }
+        .build_request(events, Arc::from("api-key"))
+        .expect("request should build")
     }
 
     #[test]
@@ -795,6 +813,39 @@ mod tests {
         let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
 
         assert!(logs.is_empty());
+    }
+
+    #[test]
+    fn rejects_log_that_remains_oversized_after_reduction() {
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let mut log = LogEvent::from("e".repeat(MAX_LOG_BYTES + 1)).with_batch_notifier(&batch);
+        log.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
+        drop(batch);
+
+        let requests = build_requests(
+            vec![Event::Log(log)],
+            Some(DatadogLogsTruncationConfig {
+                max_log_bytes: MAX_LOG_BYTES,
+                max_message_bytes: 900_000,
+            }),
+            false,
+            5_000_000,
+        );
+
+        assert!(requests.is_empty());
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+    }
+
+    #[test]
+    fn rejects_log_that_exceeds_payload_limit() {
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let log = LogEvent::from("oversized").with_batch_notifier(&batch);
+        drop(batch);
+
+        let requests = build_requests(vec![Event::Log(log)], None, false, 2);
+
+        assert!(requests.is_empty());
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }
 
     #[test]
