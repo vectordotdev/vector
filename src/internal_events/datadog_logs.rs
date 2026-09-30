@@ -7,7 +7,6 @@ use vrl::path::OwnedTargetPath;
 #[derive(Debug, NamedInternalEvent)]
 pub struct DatadogLogsEventTruncated {
     pub max_log_bytes: usize,
-    pub max_message_bytes: usize,
     pub original_encoded_size: usize,
 }
 
@@ -16,7 +15,6 @@ impl InternalEvent for DatadogLogsEventTruncated {
         warn!(
             message = "Truncated a Datadog log event that exceeded the per-log size limit.",
             max_log_bytes = self.max_log_bytes,
-            max_message_bytes = self.max_message_bytes,
             original_encoded_size = self.original_encoded_size,
             internal_log_rate_limit = true,
         );

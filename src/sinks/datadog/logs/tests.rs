@@ -193,7 +193,6 @@ async fn truncates_oversized_log_over_http() {
 
         [truncate_oversized_logs]
         max_log_bytes = 1000
-        max_message_bytes = 900
     "#};
     let (_guard, _trigger, sink, rx) = start_test_sink(config, ApiStatus::OKv2).await;
 

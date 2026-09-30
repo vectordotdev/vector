@@ -429,28 +429,21 @@ fn encode_log(
     // The encoded event consists of a fixed non-message portion and the message value. Size them
     // separately so the final message can be selected without repeatedly encoding the whole event.
     let mut non_message_encoded_size = tagged_encoded_size - message_encoded_size;
-    let select_rewrite = |non_message_encoded_size| {
+    let select_message_body_len = |non_message_encoded_size| {
         truncation
             .max_log_bytes
             .checked_sub(non_message_encoded_size)
-            .and_then(|budget| {
-                select_message_rewrite(
-                    &message,
-                    message_encoded_size,
-                    truncation.max_message_bytes,
-                    budget,
-                )
-            })
+            .and_then(|budget| select_message_body_len(&message, message_encoded_size, budget))
     };
-    let mut rewrite = select_rewrite(non_message_encoded_size);
+    let mut body_len = select_message_body_len(non_message_encoded_size);
 
-    if rewrite.is_none() {
+    if body_len.is_none() {
         let stripped_size = strip_non_standard_fields(event.as_mut_log(), conforms_as_agent)?;
         non_message_encoded_size -= stripped_size;
-        rewrite = select_rewrite(non_message_encoded_size);
+        body_len = select_message_body_len(non_message_encoded_size);
     }
 
-    let Some(body_len) = rewrite else {
+    let Some(body_len) = body_len else {
         buf.truncate(existing_len);
         return Ok(LogEncoding::Dropped {
             reason: "Event remains too large after truncation.",
@@ -471,7 +464,6 @@ fn encode_log(
     }
     emit!(DatadogLogsEventTruncated {
         max_log_bytes: truncation.max_log_bytes,
-        max_message_bytes: truncation.max_message_bytes,
         original_encoded_size,
     });
     Ok(LogEncoding::Truncated)
@@ -484,13 +476,12 @@ fn simdutf8_lossy(bytes: &[u8]) -> Cow<'_, str> {
     }
 }
 
-fn select_message_rewrite(
+fn select_message_body_len(
     message: &str,
     message_encoded_size: usize,
-    max_message_bytes: usize,
     encoded_budget: usize,
 ) -> Option<usize> {
-    if message.len() <= max_message_bytes && message_encoded_size <= encoded_budget {
+    if message_encoded_size <= encoded_budget {
         Some(message.len())
     } else {
         let content_budget =
@@ -500,7 +491,7 @@ fn select_message_rewrite(
         for (index, character) in message.char_indices() {
             let next_body_len = index + character.len_utf8();
             let next_encoded_size = encoded_size + json_character_encoded_size(character);
-            if next_body_len > max_message_bytes || next_encoded_size > content_budget {
+            if next_encoded_size > content_budget {
                 break;
             }
             body_len = next_body_len;
@@ -762,14 +753,13 @@ mod tests {
 
     fn encode_logs(
         events: Vec<Event>,
-        max_message_bytes: Option<usize>,
+        truncate_oversized_logs: bool,
         conforms_as_agent: bool,
     ) -> Vec<serde_json::Value> {
         encode_logs_with_limits(
             events,
-            max_message_bytes.map(|max_message_bytes| DatadogLogsTruncationConfig {
+            truncate_oversized_logs.then_some(DatadogLogsTruncationConfig {
                 max_log_bytes: MAX_LOG_BYTES,
-                max_message_bytes,
             }),
             conforms_as_agent,
         )
@@ -815,17 +805,14 @@ mod tests {
 
         let logs = encode_logs_with_limits(
             vec![Event::Log(log)],
-            Some(DatadogLogsTruncationConfig {
-                max_log_bytes: 500,
-                max_message_bytes: 400,
-            }),
+            Some(DatadogLogsTruncationConfig { max_log_bytes: 500 }),
             false,
         );
 
         let message = logs[0]["message"]
             .as_str()
             .expect("message should be a string");
-        assert_eq!(message.len(), 400 + TRUNCATION_MARKER.len());
+        assert!(message.ends_with(TRUNCATION_MARKER));
         assert!(serde_json::to_vec(&logs[0]).unwrap().len() <= 500);
     }
 
@@ -836,14 +823,14 @@ mod tests {
         log.insert(event_path!("service"), "payments");
         log.insert(event_path!("custom"), "keep-me");
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert_eq!(logs.len(), 1);
-        assert_eq!(
+        assert!(
             logs[0]["message"]
                 .as_str()
-                .expect("message should be a string"),
-            format!("{}{TRUNCATION_MARKER}", "a".repeat(900_000))
+                .expect("message should be a string")
+                .ends_with(TRUNCATION_MARKER)
         );
         assert_eq!(logs[0]["service"], "payments");
         assert_eq!(logs[0]["custom"], "keep-me");
@@ -858,7 +845,7 @@ mod tests {
         log.insert(event_path!("service"), "payments");
         log.insert(event_path!("custom"), "keep-me");
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), true);
+        let logs = encode_logs(vec![Event::Log(log)], true, true);
 
         let nested = logs[0]["message"]
             .as_object()
@@ -866,7 +853,6 @@ mod tests {
         let message = nested["message"]
             .as_str()
             .expect("nested message should be a string");
-        assert_eq!(message.len(), 900_000 + TRUNCATION_MARKER.len());
         assert!(message.ends_with(TRUNCATION_MARKER));
         assert_eq!(nested["custom"], "keep-me");
         assert_eq!(logs[0]["service"], "payments");
@@ -880,7 +866,7 @@ mod tests {
         log.insert(event_path!("service"), "payments");
         log.insert(event_path!("custom"), "x".repeat(200_000));
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0]["custom"], "x".repeat(200_000));
@@ -900,7 +886,7 @@ mod tests {
         log.insert(event_path!("service"), "payments");
         log.insert(event_path!("custom"), "\u{0001}".repeat(200_000));
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0]["message"], "hello");
@@ -914,7 +900,7 @@ mod tests {
         log.insert(event_path!("service"), "payments");
         log.insert(event_path!("custom"), "x".repeat(200_000));
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), true);
+        let logs = encode_logs(vec![Event::Log(log)], true, true);
 
         assert_eq!(logs.len(), 1);
         let nested = logs[0]["message"]
@@ -944,7 +930,7 @@ mod tests {
         let mut log = LogEvent::from("e".repeat(MAX_LOG_BYTES + 1));
         log.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert!(logs.is_empty());
     }
@@ -960,7 +946,6 @@ mod tests {
             vec![Event::Log(log)],
             Some(DatadogLogsTruncationConfig {
                 max_log_bytes: MAX_LOG_BYTES,
-                max_message_bytes: 900_000,
             }),
             false,
             5_000_000,
@@ -991,7 +976,7 @@ mod tests {
         let mut log = LogEvent::from("e".repeat(MAX_LOG_BYTES + 1));
         log.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert!(logs.is_empty());
         let discarded_events = controller
@@ -1014,7 +999,7 @@ mod tests {
             value!({ "body": ("f".repeat(MAX_LOG_BYTES + 1)) }),
         );
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert!(logs.is_empty());
     }
@@ -1025,7 +1010,7 @@ mod tests {
             let mut log = LogEvent::default();
             log.insert(event_path!("custom"), "f".repeat(MAX_LOG_BYTES + 1));
 
-            let logs = encode_logs(vec![Event::Log(log)], Some(900_000), conforms_as_agent);
+            let logs = encode_logs(vec![Event::Log(log)], true, conforms_as_agent);
 
             assert!(logs.is_empty());
         }
@@ -1036,7 +1021,7 @@ mod tests {
         for conforms_as_agent in [false, true] {
             let log = LogEvent::from("\"".repeat(600_000));
 
-            let logs = encode_logs(vec![Event::Log(log)], Some(900_000), conforms_as_agent);
+            let logs = encode_logs(vec![Event::Log(log)], true, conforms_as_agent);
 
             assert_eq!(logs.len(), 1);
             let message = if conforms_as_agent {
@@ -1057,7 +1042,7 @@ mod tests {
         let message = format!("{}{}", "\"".repeat(450_000), "a".repeat(110_000));
         let log = LogEvent::from(message);
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert_eq!(logs.len(), 1);
         assert!(
@@ -1074,7 +1059,7 @@ mod tests {
         let mut log = LogEvent::from("g".repeat(MAX_LOG_BYTES + 1));
         log.insert(event_path!("ddtags"), format!("env:test,{TRUNCATED_TAG}"));
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert_eq!(logs[0]["ddtags"], format!("env:test,{TRUNCATED_TAG}"));
     }
@@ -1084,7 +1069,7 @@ mod tests {
         let mut log = LogEvent::from("g".repeat(MAX_LOG_BYTES + 1));
         log.insert(event_path!("ddtags"), "env:test");
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert_eq!(logs[0]["ddtags"], format!("env:test,{TRUNCATED_TAG}"));
     }
@@ -1094,7 +1079,7 @@ mod tests {
         let original = "h".repeat(MAX_LOG_BYTES + 1);
         let log = LogEvent::from(original.clone());
 
-        let logs = encode_logs(vec![Event::Log(log)], None, false);
+        let logs = encode_logs(vec![Event::Log(log)], false, false);
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0]["message"].as_str(), Some(original.as_str()));
@@ -1108,7 +1093,7 @@ mod tests {
         let mut log = LogEvent::default();
         log.insert(event_path!("message"), original.clone());
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_000), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         assert_eq!(serde_json::to_vec(&logs[0]).unwrap().len(), MAX_LOG_BYTES);
         assert_eq!(logs[0]["message"].as_str(), Some(original.as_str()));
@@ -1120,7 +1105,7 @@ mod tests {
         let original = "😀".repeat(300_000);
         let log = LogEvent::from(original.clone());
 
-        let logs = encode_logs(vec![Event::Log(log)], Some(900_001), false);
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
 
         let message = logs[0]["message"]
             .as_str()
@@ -1129,7 +1114,7 @@ mod tests {
             .strip_suffix(TRUNCATION_MARKER)
             .expect("message should have truncation marker");
         assert!(original.starts_with(body));
-        assert_eq!(body.len(), 900_000);
+        assert!(body.len() < MAX_LOG_BYTES);
     }
 
     #[test]
@@ -1138,11 +1123,7 @@ mod tests {
         oversized.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
         let small = LogEvent::from("ok");
 
-        let logs = encode_logs(
-            vec![Event::Log(oversized), Event::Log(small)],
-            Some(900_000),
-            false,
-        );
+        let logs = encode_logs(vec![Event::Log(oversized), Event::Log(small)], true, false);
 
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0]["message"], "ok");

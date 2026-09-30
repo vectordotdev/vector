@@ -35,7 +35,6 @@ use crate::{
 // practice.
 pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
 pub(super) const DEFAULT_MAX_LOG_BYTES: usize = 1_000_000;
-pub(super) const DEFAULT_MAX_MESSAGE_BYTES: usize = 900_000;
 pub const BATCH_HEADROOM_BYTES: usize = 750_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 5.0;
@@ -60,11 +59,6 @@ pub struct DatadogLogsTruncationConfig {
     #[derivative(Default(value = "default_max_log_bytes()"))]
     #[serde(default = "default_max_log_bytes")]
     pub max_log_bytes: usize,
-
-    /// Maximum number of message bytes to retain before appending the truncation marker.
-    #[derivative(Default(value = "default_max_message_bytes()"))]
-    #[serde(default = "default_max_message_bytes")]
-    pub max_message_bytes: usize,
 }
 
 /// Configuration for the `datadog_logs` sink.
@@ -108,12 +102,10 @@ pub struct DatadogLogsConfig {
 
     /// Truncate logs whose encoded JSON exceeds `max_log_bytes`.
     ///
-    /// When a message is shortened, at most `max_message_bytes` raw bytes are retained and
-    /// `...TRUNCATED...` is appended. Every reduced log is tagged with `truncated:single_line`.
-    /// The message is sized to account for JSON encoding while preserving non-standard fields when
-    /// possible. If the non-message fields leave no room for a truncated message, non-standard
-    /// fields are removed and the message is sized again. Logs that still exceed the limit, or have
-    /// no string message to truncate, are dropped.
+    /// The message is shortened to the largest size that fits and `...TRUNCATED...` is appended.
+    /// Every reduced log is tagged with `truncated:single_line`. Non-standard fields are preserved
+    /// when possible, but removed when they leave no room for a truncated message. Logs that still
+    /// exceed the limit, or have no string message to truncate, are dropped.
     pub truncate_oversized_logs: Option<DatadogLogsTruncationConfig>,
 }
 
@@ -123,10 +115,6 @@ const fn default_max_payload_bytes() -> Option<usize> {
 
 const fn default_max_log_bytes() -> usize {
     DEFAULT_MAX_LOG_BYTES
-}
-
-const fn default_max_message_bytes() -> usize {
-    DEFAULT_MAX_MESSAGE_BYTES
 }
 
 const fn default_compression() -> Option<Compression> {
@@ -302,14 +290,6 @@ impl ValidatedSink for DatadogLogsConfig {
                 )
                 .into());
             }
-            let maximum_message_bytes = truncation.max_log_bytes - 1;
-            if !(1..=maximum_message_bytes).contains(&truncation.max_message_bytes) {
-                return Err(format!(
-                    "truncate_oversized_logs.max_message_bytes ({}) must be between 1 and {}",
-                    truncation.max_message_bytes, maximum_message_bytes
-                )
-                .into());
-            }
         }
 
         let batch_goal_bytes =
@@ -380,23 +360,6 @@ mod test {
             .truncate_oversized_logs
             .expect("truncation should be enabled");
         assert_eq!(truncation.max_log_bytes, 1_000_000);
-        assert_eq!(truncation.max_message_bytes, 900_000);
-    }
-
-    #[test]
-    fn validate_rejects_invalid_truncation_limits() {
-        for max_message_bytes in [0, DEFAULT_MAX_LOG_BYTES] {
-            let config: DatadogLogsConfig = serde_yaml::from_str(&format!(
-                r#"
-                default_api_key: "test_key"
-                truncate_oversized_logs:
-                  max_message_bytes: {max_message_bytes}
-                "#
-            ))
-            .unwrap();
-
-            assert!(config.validate().is_err());
-        }
     }
 
     #[test]
@@ -406,7 +369,6 @@ mod test {
             max_payload_bytes: 800000
             truncate_oversized_logs:
               max_log_bytes: 799999
-              max_message_bytes: 700000
         "#})
         .unwrap();
 
@@ -420,7 +382,6 @@ mod test {
             max_payload_bytes: 3000000
             truncate_oversized_logs:
               max_log_bytes: 2000000
-              max_message_bytes: 1800000
         "#})
         .unwrap();
 
