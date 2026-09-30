@@ -1,8 +1,7 @@
-// ## skip check-dropped-events-name ##
-
+use metrics::Label;
 use vector_lib::{
-    NamedInternalEvent, counter,
-    internal_event::{CounterName, InternalEvent},
+    NamedInternalEvent,
+    internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -13,24 +12,14 @@ pub struct SampleEventDiscarded {
 
 impl InternalEvent for SampleEventDiscarded {
     fn emit(self) {
-        let reason = "Sample discarded.";
-        let message = "Events dropped";
-
-        debug!(message, intentional = true, count = 1, reason);
-
-        if self.include_group_tag {
-            counter!(
-                CounterName::ComponentDiscardedEventsTotal,
-                "intentional" => "true",
-                "group" => self.group.unwrap_or_else(|| "None".to_string()),
-            )
-        } else {
-            counter!(
-                CounterName::ComponentDiscardedEventsTotal,
-                "intentional" => "true",
-            )
+        let group_tag = self
+            .include_group_tag
+            .then(|| Label::new("group", self.group.unwrap_or_else(|| "None".to_string())));
+        ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason: "Sample discarded.",
         }
-        .increment(1);
+        .emit_with_tags(group_tag);
     }
 }
 
