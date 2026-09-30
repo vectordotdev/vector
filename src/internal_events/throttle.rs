@@ -1,8 +1,7 @@
-// ## skip check-dropped-events-name ##
-
+use metrics::Label;
 use vector_lib::{
     NamedInternalEvent, counter,
-    internal_event::{CounterName, InternalEvent},
+    internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
 };
 
 #[derive(Debug, NamedInternalEvent)]
@@ -18,30 +17,20 @@ impl InternalEvent for ThrottleEventDiscarded {
 
         debug!(message, key = %self.key);
         if self.emit_events_discarded_per_key {
-            counter!(CounterName::EventsDiscardedTotal, "key" => self.key.clone()).increment(1); // Deprecated.
+            // Deprecated.
+            counter!(CounterName::EventsDiscardedTotal, "key" => self.key.clone()).increment(1);
         }
 
-        let dropped_message = "Events dropped";
-        debug!(
-            message = dropped_message,
-            intentional = true,
-            count = 1,
-            reason = message,
+        let group_tag = self
+            .include_group_tag
+            .then(|| Label::new("group", self.key));
+        emit!(
+            ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: message,
+            }
+            .with_tags(group_tag)
         );
-
-        if self.include_group_tag {
-            counter!(
-                CounterName::ComponentDiscardedEventsTotal,
-                "intentional" => "true",
-                "group" => self.key,
-            )
-        } else {
-            counter!(
-                CounterName::ComponentDiscardedEventsTotal,
-                "intentional" => "true",
-            )
-        }
-        .increment(1);
     }
 }
 
