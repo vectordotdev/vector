@@ -1,4 +1,4 @@
-//! `encoding.json.bytes: base64` combined with every encoding option a sink can be configured
+//! `encoding.json.bytes_format: base64` combined with every encoding option a sink can be configured
 //! with.
 //!
 //! With `base64`, the output must be byte-identical to the default output for the same event
@@ -151,7 +151,7 @@ fn transformers() -> Vec<serde_json::Value> {
 }
 
 fn config(
-    bytes: &str,
+    bytes_format: &str,
     pretty: bool,
     metric_tag_values: &str,
     transformer: &serde_json::Value,
@@ -159,7 +159,7 @@ fn config(
 ) -> EncodingConfigWithFraming {
     let mut encoding = json!({
         "codec": "json",
-        "json": { "pretty": pretty, "bytes": bytes },
+        "json": { "pretty": pretty, "bytes_format": bytes_format },
         "metric_tag_values": metric_tag_values,
     });
     let encoding_options = encoding.as_object_mut().unwrap();

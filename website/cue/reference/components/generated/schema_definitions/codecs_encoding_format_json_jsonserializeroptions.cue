@@ -1,7 +1,7 @@
 package metadata
 
 _schemaDefinitions: "codecs::encoding::format::json::JsonSerializerOptions": object: options: {
-	bytes: {
+	bytes_format: {
 		description: """
 			Controls how binary data in string values is encoded.
 

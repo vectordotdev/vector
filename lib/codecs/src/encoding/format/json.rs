@@ -44,14 +44,14 @@ pub struct JsonSerializerOptions {
     /// keys, timestamps, and metric events are not affected, and neither are fields that a sink
     /// writes outside the encoded event, such as the Splunk HEC `fields`.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
-    pub bytes: JsonBytesEncoding,
+    pub bytes_format: JsonBytesFormat,
 }
 
 /// How the `JsonSerializer` encodes binary data in string values.
 #[configurable_component]
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum JsonBytesEncoding {
+pub enum JsonBytesFormat {
     /// Encode strings as UTF-8, replacing invalid UTF-8 sequences with the
     /// [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD]. Bytes that are not valid UTF-8 cannot be
     /// recovered.
@@ -113,17 +113,17 @@ impl JsonSerializer {
 
     /// Encode event and represent it as JSON value.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
-        let bytes = self.options.bytes;
+        let format = self.options.bytes_format;
         match event {
-            Event::Log(log) => serde_json::to_value(EncodedValue::new(log.value(), bytes)),
+            Event::Log(log) => serde_json::to_value(EncodedValue::new(log.value(), format)),
             Event::Metric(metric) => serde_json::to_value(&metric),
-            Event::Trace(trace) => serde_json::to_value(EncodedValue::new(trace.value(), bytes)),
+            Event::Trace(trace) => serde_json::to_value(EncodedValue::new(trace.value(), format)),
         }
         .map_err(|e| e.to_string().into())
     }
 }
 
-/// Serializes a log or trace event value with the configured [`JsonBytesEncoding`].
+/// Serializes a log or trace event value with the configured [`JsonBytesFormat`].
 ///
 /// `Value`'s own `Serialize` impl (from VRL) always writes bytes as lossy UTF-8 and serializes
 /// nested values with itself, with no way to pass an option down. So for `base64` this walks
@@ -131,31 +131,31 @@ impl JsonSerializer {
 /// copying the event.
 struct EncodedValue<'a> {
     value: &'a Value,
-    bytes: JsonBytesEncoding,
+    format: JsonBytesFormat,
 }
 
 impl<'a> EncodedValue<'a> {
-    const fn new(value: &'a Value, bytes: JsonBytesEncoding) -> Self {
-        Self { value, bytes }
+    const fn new(value: &'a Value, format: JsonBytesFormat) -> Self {
+        Self { value, format }
     }
 }
 
 impl Serialize for EncodedValue<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self.bytes {
-            JsonBytesEncoding::LossyUtf8 => self.value.serialize(serializer),
-            JsonBytesEncoding::Base64 => match self.value {
+        match self.format {
+            JsonBytesFormat::LossyUtf8 => self.value.serialize(serializer),
+            JsonBytesFormat::Base64 => match self.value {
                 Value::Bytes(bytes) => {
                     serializer.collect_str(&Base64Display::new(bytes, &STANDARD))
                 }
                 Value::Object(map) => serializer.collect_map(
                     map.iter()
-                        .map(|(key, value)| (key, EncodedValue::new(value, self.bytes))),
+                        .map(|(key, value)| (key, EncodedValue::new(value, self.format))),
                 ),
                 Value::Array(array) => serializer.collect_seq(
                     array
                         .iter()
-                        .map(|value| EncodedValue::new(value, self.bytes)),
+                        .map(|value| EncodedValue::new(value, self.format)),
                 ),
                 value => value.serialize(serializer),
             },
@@ -168,11 +168,11 @@ impl Encoder<Event> for JsonSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();
-        let bytes = self.options.bytes;
+        let format = self.options.bytes_format;
         if self.options.pretty {
             match event {
                 Event::Log(log) => {
-                    serde_json::to_writer_pretty(writer, &EncodedValue::new(log.value(), bytes))
+                    serde_json::to_writer_pretty(writer, &EncodedValue::new(log.value(), format))
                 }
                 Event::Metric(mut metric) => {
                     if self.metric_tag_values == MetricTagValues::Single {
@@ -181,13 +181,13 @@ impl Encoder<Event> for JsonSerializer {
                     serde_json::to_writer_pretty(writer, &metric)
                 }
                 Event::Trace(trace) => {
-                    serde_json::to_writer_pretty(writer, &EncodedValue::new(trace.value(), bytes))
+                    serde_json::to_writer_pretty(writer, &EncodedValue::new(trace.value(), format))
                 }
             }
         } else {
             match event {
                 Event::Log(log) => {
-                    serde_json::to_writer(writer, &EncodedValue::new(log.value(), bytes))
+                    serde_json::to_writer(writer, &EncodedValue::new(log.value(), format))
                 }
                 Event::Metric(mut metric) => {
                     if self.metric_tag_values == MetricTagValues::Single {
@@ -196,7 +196,7 @@ impl Encoder<Event> for JsonSerializer {
                     serde_json::to_writer(writer, &metric)
                 }
                 Event::Trace(trace) => {
-                    serde_json::to_writer(writer, &EncodedValue::new(trace.value(), bytes))
+                    serde_json::to_writer(writer, &EncodedValue::new(trace.value(), format))
                 }
             }
         }
@@ -649,7 +649,7 @@ mod tests {
             JsonSerializerConfig {
                 options: JsonSerializerOptions {
                     pretty,
-                    bytes: JsonBytesEncoding::Base64,
+                    bytes_format: JsonBytesFormat::Base64,
                 },
                 ..Default::default()
             }
@@ -786,7 +786,8 @@ mod tests {
         #[test]
         fn deserialize_encoding_config() {
             let config: EncodingConfig =
-                serde_json::from_str(r#"{"codec":"json","json":{"bytes":"base64"}}"#).unwrap();
+                serde_json::from_str(r#"{"codec":"json","json":{"bytes_format":"base64"}}"#)
+                    .unwrap();
             let mut serializer = config.build().unwrap();
             let mut bytes = BytesMut::new();
             serializer.encode(binary_log(), &mut bytes).unwrap();
@@ -795,11 +796,11 @@ mod tests {
             let config: EncodingConfig = serde_json::from_str(r#"{"codec":"json"}"#).unwrap();
             assert!(matches!(
                 config.config(),
-                SerializerConfig::Json(json) if json.options.bytes == JsonBytesEncoding::LossyUtf8
+                SerializerConfig::Json(json) if json.options.bytes_format == JsonBytesFormat::LossyUtf8
             ));
 
             let error = serde_json::from_str::<EncodingConfig>(
-                r#"{"codec":"json","json":{"bytes":"hex"}}"#,
+                r#"{"codec":"json","json":{"bytes_format":"hex"}}"#,
             )
             .unwrap_err();
             assert!(error.to_string().contains("hex"), "{error}");

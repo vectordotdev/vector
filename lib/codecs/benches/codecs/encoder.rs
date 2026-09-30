@@ -1,7 +1,7 @@
 use bytes::{BufMut, Bytes, BytesMut};
 use codecs::{
     JsonSerializerConfig, MetricTagValues, NewlineDelimitedEncoder,
-    encoding::{Framer, JsonBytesEncoding, JsonSerializerOptions},
+    encoding::{Framer, JsonBytesFormat, JsonSerializerOptions},
 };
 use criterion::{
     BatchSize, BenchmarkGroup, Criterion, Throughput, criterion_group, measurement::WallTime,
@@ -107,11 +107,11 @@ fn encoder(c: &mut Criterion) {
         "message" => Bytes::from((0..4096).map(|i| (i % 256) as u8).collect::<Vec<u8>>()),
         "source_type" => "websocket",
     }));
-    for encoding in [JsonBytesEncoding::LossyUtf8, JsonBytesEncoding::Base64] {
+    for encoding in [JsonBytesFormat::LossyUtf8, JsonBytesFormat::Base64] {
         let config = JsonSerializerConfig::new(
             MetricTagValues::default(),
             JsonSerializerOptions {
-                bytes: encoding,
+                bytes_format: encoding,
                 ..Default::default()
             },
         );

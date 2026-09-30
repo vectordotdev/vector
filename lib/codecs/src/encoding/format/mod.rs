@@ -39,7 +39,7 @@ pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;
 pub use gelf::{GelfSerializer, GelfSerializerConfig};
-pub use json::{JsonBytesEncoding, JsonSerializer, JsonSerializerConfig, JsonSerializerOptions};
+pub use json::{JsonBytesFormat, JsonSerializer, JsonSerializerConfig, JsonSerializerOptions};
 pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
 pub use native::{NativeSerializer, NativeSerializerConfig};
 pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
