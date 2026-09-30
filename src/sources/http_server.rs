@@ -18,10 +18,7 @@ use warp::http::HeaderMap;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
-    config::{
-        GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
-    },
+    config::{Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput},
     event::Event,
     http::KeepaliveConfig,
     serde::{bool_or_struct, default_decoding},
@@ -31,38 +28,6 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
-
-/// Configuration for the `http` source.
-#[configurable_component(source("http", "Host an HTTP endpoint to receive logs."))]
-#[configurable(metadata(deprecated))]
-#[derive(Clone, Debug)]
-pub struct HttpConfig(SimpleHttpConfig);
-
-impl GenerateConfig for HttpConfig {
-    fn generate_config() -> serde_json::Value {
-        <SimpleHttpConfig as GenerateConfig>::generate_config()
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "http")]
-impl SourceConfig for HttpConfig {
-    async fn build(&self, cx: SourceContext) -> vector_lib::Result<super::Source> {
-        self.0.build(cx).await
-    }
-
-    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        self.0.outputs(global_log_namespace)
-    }
-
-    fn resources(&self) -> Vec<Resource> {
-        self.0.resources()
-    }
-
-    fn can_acknowledge(&self) -> bool {
-        self.0.can_acknowledge()
-    }
-}
 
 /// Configuration for the `http_server` source.
 #[configurable_component(source("http_server", "Host an HTTP endpoint to receive logs."))]
@@ -111,7 +76,6 @@ pub struct SimpleHttpConfig {
     /// When using the `custom` strategy, the VRL program may write `%field = value` to enrich
     /// authenticated events. These metadata fields are injected into the event body (legacy
     /// namespace) or under `http_server.<field>` in event metadata (Vector namespace).
-    #[configurable(derived)]
     auth: Option<HttpServerAuthConfig>,
 
     /// Whether or not to treat the configured `path` as an absolute path.
@@ -151,16 +115,12 @@ pub struct SimpleHttpConfig {
     #[serde(default = "default_http_response_code")]
     response_code: StatusCode,
 
-    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
-    #[configurable(derived)]
     framing: Option<FramingConfig>,
 
-    #[configurable(derived)]
     decoding: Option<DeserializerConfig>,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: SourceAcknowledgementsConfig,
 
@@ -169,7 +129,6 @@ pub struct SimpleHttpConfig {
     #[serde(default)]
     log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
 }
@@ -297,8 +256,7 @@ pub fn remove_duplicates(mut list: Vec<String>, list_name: &str) -> Vec<String> 
     for (idx, name) in list.iter().enumerate() {
         if idx < list.len() - 1 && list[idx] == list[idx + 1] {
             warn!(
-                "`{}` configuration contains duplicate entry for `{}`. Removing duplicate.",
-                list_name, name
+                "`{list_name}` configuration contains duplicate entry for `{name}`. Removing duplicate."
             );
             dedup = true;
         }
@@ -728,13 +686,13 @@ mod tests {
                 SimpleHttpConfig::NAME.into()
             );
             assert_eq!(log["http_path"], "/".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body 2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -769,13 +727,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body 2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -811,7 +769,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "foo\nbar".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -890,13 +848,13 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key"], "value".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -995,29 +953,29 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
-    async fn assert_event_metadata(log: &LogEvent) {
+    fn assert_event_metadata(log: &LogEvent) {
         assert!(log.get_timestamp().is_some());
 
         let source_type_key_value = log
@@ -1076,7 +1034,7 @@ mod tests {
             assert_eq!(log["\"Upgrade-Insecure-Requests\""], "false".into());
             assert_eq!(log["\"x-test-header\""], "true".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1121,7 +1079,7 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["\"user-agent\""], "test_client".into());
             assert_eq!(log["\"x-case-sensitive-value\""], "CaseSensitive".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1165,7 +1123,7 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1209,7 +1167,7 @@ mod tests {
             assert_eq!(log["key2"], "value2".into());
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1254,7 +1212,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(*log.get_message().unwrap(), "test body".into());
-            assert_event_metadata(log).await;
+            assert_event_metadata(log);
         }
     }
 
@@ -1631,6 +1589,91 @@ mod tests {
         headers.insert(
             AUTHORIZATION,
             Authorization::basic("test", "test").0.encode(),
+        );
+        assert_eq!(200, send_with_headers(addr, "", headers).await);
+    }
+
+    #[tokio::test]
+    async fn returns_401_when_required_bearer_auth_is_missing() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "GET",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Bearer {
+                token: "my-token".to_string().into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(401, send_request(addr, "GET", "", "/").await);
+    }
+
+    #[tokio::test]
+    async fn returns_401_when_required_bearer_auth_is_wrong() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Bearer {
+                token: "my-token".to_string().into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            Authorization::bearer("wrong-token").unwrap().0.encode(),
+        );
+        assert_eq!(401, send_with_headers(addr, "", headers).await);
+    }
+
+    #[tokio::test]
+    async fn http_post_with_correct_bearer_auth() {
+        components::init_test();
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "remote_ip",
+            "/",
+            "POST",
+            StatusCode::OK,
+            Some(HttpServerAuthConfig::Bearer {
+                token: "my-token".to_string().into(),
+            }),
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            Authorization::bearer("my-token").unwrap().0.encode(),
         );
         assert_eq!(200, send_with_headers(addr, "", headers).await);
     }

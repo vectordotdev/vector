@@ -69,12 +69,6 @@ impl From<UnconfinedTemplate> for String {
     }
 }
 
-impl fmt::Display for UnconfinedTemplate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.src.fmt(f)
-    }
-}
-
 // This is safe because we literally defer to `String` for the schema of `UnconfinedTemplate`.
 impl ConfigurableString for UnconfinedTemplate {}
 
@@ -187,10 +181,9 @@ impl UnconfinedTemplate {
         self.src.split_at(i).0
     }
 
-    #[allow(clippy::missing_const_for_fn)] // Adding `const` results in https://doc.rust-lang.org/error_codes/E0015.html
     /// Returns a reference to the template string.
-    pub fn get_ref(&self) -> &str {
-        &self.src
+    pub const fn get_ref(&self) -> &str {
+        self.src.as_str()
     }
 
     /// Returns `true` if this template string has a length of zero, and `false` otherwise.

@@ -118,7 +118,7 @@ impl DatabendService {
         })
     }
 
-    async fn new_stage_location(&self) -> String {
+    fn new_stage_location(&self) -> String {
         let now = Utc::now().timestamp();
         let database = self
             .client
@@ -129,11 +129,11 @@ impl DatabendService {
             .take(8)
             .map(char::from)
             .collect::<String>();
-        format!("@~/vector/{}/{}/{}-{}", database, self.table, now, suffix,)
+        format!("@~/vector/{database}/{}/{now}-{suffix}", self.table,)
     }
 
     pub(crate) async fn insert_with_stage(&self, data: Bytes) -> Result<(), DatabendError> {
-        let stage = self.new_stage_location().await;
+        let stage = self.new_stage_location();
         let size = data.len() as u64;
         let reader = Box::new(Cursor::new(data));
         self.client.upload_to_stage(&stage, reader, size).await?;

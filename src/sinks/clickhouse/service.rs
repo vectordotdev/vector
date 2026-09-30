@@ -1,30 +1,31 @@
 //! Service implementation for the `Clickhouse` sink.
 
 use bytes::Bytes;
-use http::{
-    Request, StatusCode, Uri,
+use http::{StatusCode, Uri};
+use http_1::{
+    Request,
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use snafu::ResultExt;
+use tracing::debug;
 
 use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
-    http::{Auth, HttpError},
+    http::{Auth, client_v1::HttpError},
     sinks::{
-        HTTPRequestBuilderSnafu, UriParseSnafu,
+        UriParseSnafu,
         clickhouse::config::Format,
         prelude::*,
         util::{
-            http::{HttpRequest, HttpResponse, HttpRetryLogic, HttpServiceRequestBuilder},
+            http::{HttpRequest, RetryStrategy},
+            http_v1::{HttpResponse, HttpServiceRequestBuilder},
             retries::RetryAction,
         },
     },
 };
 
 #[derive(Debug, Default, Clone)]
-pub struct ClickhouseRetryLogic {
-    inner: HttpRetryLogic<HttpRequest<PartitionKey>>,
-}
+pub(crate) struct ClickhouseRetryLogic;
 
 impl RetryLogic for ClickhouseRetryLogic {
     type Error = HttpError;
@@ -32,11 +33,22 @@ impl RetryLogic for ClickhouseRetryLogic {
     type Response = HttpResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        self.inner.is_retriable_error(error)
+        error.is_retriable()
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
-        match response.http_response.status() {
+        let status = StatusCode::from_u16(response.http_response.status().as_u16())
+            .expect("HTTP status codes are valid u16 values");
+
+        if !status.is_success() {
+            debug!(
+                message = "HTTP response.",
+                %status,
+                body = %String::from_utf8_lossy(response.http_response.body()),
+            );
+        }
+
+        match status {
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let body = response.http_response.body();
 
@@ -56,7 +68,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                     RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
                 }
             }
-            _ => self.inner.should_retry_response(&response.http_response),
+            _ => RetryStrategy::Default.retry_action(status),
         }
     }
 }
@@ -90,8 +102,6 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             self.query_settings,
         )?;
 
-        let auth: Option<Auth> = self.auth.clone();
-
         // Extract format before taking payload to avoid borrow checker issues
         let format = metadata.format;
         let payload = request.take_payload();
@@ -102,31 +112,29 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
             _ => "application/x-ndjson",
         };
 
-        let mut builder = Request::post(&uri)
+        let mut builder = Request::post(uri.to_string())
             .header(CONTENT_TYPE, content_type)
             .header(CONTENT_LENGTH, payload.len());
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header(CONTENT_ENCODING, ce);
         }
-        if let Some(auth) = auth {
-            builder = auth.apply_builder(builder);
+        let mut request = builder.body(payload).map_err(crate::Error::from)?;
+        if let Some(auth) = &self.auth {
+            auth.apply_v1(&mut request);
         }
 
-        builder
-            .body(payload)
-            .context(HTTPRequestBuilderSnafu)
-            .map_err(Into::into)
+        Ok(request)
     }
 }
 
 fn append_param<T: ToString>(uri: &mut String, key: &str, value: Option<T>) {
     if let Some(val) = value {
-        uri.push_str(&format!("{}={}&", key, val.to_string()));
+        uri.push_str(&format!("{key}={}&", val.to_string()));
     }
 }
 fn append_param_bool(uri: &mut String, key: &str, value: Option<bool>) {
     if let Some(val) = value {
-        uri.push_str(&format!("{}={}&", key, if val { 1 } else { 0 }));
+        uri.push_str(&format!("{key}={}&", if val { 1 } else { 0 }));
     }
 }
 
@@ -146,10 +154,7 @@ fn set_uri_query(
     let query = url::form_urlencoded::Serializer::new(String::new())
         .append_pair(
             "query",
-            &format!(
-                "INSERT INTO {{database:Identifier}}.{{table:Identifier}} FORMAT {}",
-                format
-            ),
+            &format!("INSERT INTO {{database:Identifier}}.{{table:Identifier}} FORMAT {format}"),
         )
         .append_pair("param_database", database)
         .append_pair("param_table", table)

@@ -10,7 +10,11 @@ use vector_common::{
     },
 };
 
-use crate::{EventCount, encoding::FixedEncodable};
+use crate::{Bufferable, EventCount, encoding::FixedEncodable};
+
+impl Bufferable for SizedRecord {}
+impl Bufferable for UndecodableRecord {}
+impl Bufferable for MultiEventRecord {}
 
 macro_rules! message_wrapper {
     ($id:ident: $ty:ty, $event_count:expr) => {
@@ -170,8 +174,7 @@ impl FixedEncodable for SizedRecord {
         let minimum_len = self.encoded_len();
         if buffer.remaining_mut() < minimum_len {
             return Err(io::Error::other(format!(
-                "not enough capacity to encode record: need {}, only have {}",
-                minimum_len,
+                "not enough capacity to encode record: need {minimum_len}, only have {}",
                 buffer.remaining_mut()
             )));
         }

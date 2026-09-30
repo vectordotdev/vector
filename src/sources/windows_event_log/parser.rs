@@ -427,7 +427,7 @@ impl EventLogParser {
                     })?,
                     _ => {
                         return Err(WindowsEventLogError::FilterError {
-                            message: format!("Cannot convert {:?} to integer", value),
+                            message: format!("Cannot convert {value:?} to integer"),
                         });
                     }
                 };
@@ -447,7 +447,7 @@ impl EventLogParser {
                     })?,
                     _ => {
                         return Err(WindowsEventLogError::FilterError {
-                            message: format!("Cannot convert {:?} to float", value),
+                            message: format!("Cannot convert {value:?} to float"),
                         });
                     }
                 };
@@ -466,7 +466,7 @@ impl EventLogParser {
                     }
                     _ => {
                         return Err(WindowsEventLogError::FilterError {
-                            message: format!("Cannot convert {:?} to boolean", value),
+                            message: format!("Cannot convert {value:?} to boolean"),
                         });
                     }
                 };

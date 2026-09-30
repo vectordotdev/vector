@@ -41,7 +41,7 @@ mod integration_test {
     }
 
     fn kafka_address(port: u16) -> String {
-        format!("{}:{}", kafka_host(), port)
+        format!("{}:{port}", kafka_host())
     }
 
     // Tests exercise the sink itself, not confinement; build a checkerless confined topic.
@@ -337,7 +337,7 @@ mod integration_test {
 
         assert_sink_compliance(&SINK_TAGS, async move {
             let topic_prefix = format!("test-trace-{}", random_string(10));
-            let topic_now = format!("{}-{}", topic_prefix, chrono::Utc::now().format("%Y%m%d"));
+            let topic_now = format!("{topic_prefix}-{}", chrono::Utc::now().format("%Y%m%d"));
             let topic = Template::try_from(format!("{topic_prefix}-%Y%m%d")).unwrap();
             let key_field = ConfigTargetPath::try_from("trace_key".to_string()).unwrap();
             let headers_key = ConfigTargetPath::try_from("trace_headers".to_string()).unwrap();
@@ -497,7 +497,7 @@ mod integration_test {
             acknowledgements: Default::default(),
             confinement: Default::default(),
         };
-        let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
+        let topic = format!("{topic}-{}", chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {topic:?}");
 
         let num_events = 1000;

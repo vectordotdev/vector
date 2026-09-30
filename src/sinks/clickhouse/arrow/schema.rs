@@ -5,14 +5,17 @@ use std::str::FromStr;
 use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
 use bytes::Bytes;
-use http::{Request, StatusCode};
-use hyper::Body;
+use http_1::{Request, StatusCode};
+use http_body_util::BodyExt;
 use serde::Deserialize;
 use url::form_urlencoded;
 use vector_lib::codecs::encoding::ArrowIpcCompression;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
-use crate::http::{Auth, HttpClient};
+use crate::http::{
+    Auth,
+    client_v1::{HttpClient, empty_body},
+};
 
 use super::parser::ClickHouseType;
 
@@ -59,11 +62,11 @@ async fn get_query_bytes(
 ) -> crate::Result<Bytes> {
     let uri = format!("{endpoint}?{query_string}");
     let mut request = Request::get(&uri)
-        .body(Body::empty())
+        .body(empty_body())
         .map_err(|e| format!("Failed to build request: {e}"))?;
 
     if let Some(auth) = auth {
-        auth.apply(&mut request);
+        auth.apply_v1(&mut request);
     }
 
     let response = client.send(request).await?;
@@ -72,9 +75,7 @@ async fn get_query_bytes(
         return Err(format!("{context}: HTTP {}", response.status()).into());
     }
 
-    Ok(http_body::Body::collect(response.into_body())
-        .await?
-        .to_bytes())
+    Ok(response.into_body().collect().await?.to_bytes())
 }
 
 /// Fetches the schema for a ClickHouse table and converts it to an Arrow schema.

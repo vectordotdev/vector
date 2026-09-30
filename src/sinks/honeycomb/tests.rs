@@ -4,7 +4,7 @@ use futures::{future::ready, stream};
 
 use super::config::HoneycombConfig;
 use crate::{
-    sinks::prelude::*,
+    sinks::{prelude::*, util::HttpEndpoint},
     test_util::{
         components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
@@ -22,7 +22,7 @@ async fn component_spec_compliance() {
 
     let mut config: HoneycombConfig =
         serde_json::from_value(HoneycombConfig::generate_config()).expect("config should be valid");
-    config.endpoint = mock_endpoint.to_string();
+    config.endpoint = HttpEndpoint::parse(&mock_endpoint.to_string()).unwrap();
 
     let context = SinkContext::default();
     let (sink, _healthcheck) = config.build(context).await.unwrap();

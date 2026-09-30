@@ -60,14 +60,13 @@ components: sinks: gcp_stackdriver_logs: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.gcp_stackdriver_logs.configuration & {
 		resource: type: object: examples: [{
 			type:       "gce_instance"
 			instanceId: "Twilight"
-			zone:       "{{ zone }}"
+			zone:       "zone-{{ zone }}"
 		}]
 		project_id: type: string: examples: ["my-project"]
 		log_id: type: string: examples: ["my-log"]

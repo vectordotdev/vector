@@ -64,7 +64,6 @@ components: sinks: gcp_chronicle_unstructured: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.gcp_chronicle_unstructured.configuration

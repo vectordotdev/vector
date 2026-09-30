@@ -18,7 +18,7 @@ pub mod grpc;
 pub mod http;
 #[cfg(any(
     feature = "sources-http_client",
-    feature = "sources-prometheus-scrape",
+    feature = "sources-prometheus_scrape",
     feature = "sources-okta"
 ))]
 pub mod http_client;
@@ -66,8 +66,8 @@ pub use self::http::add_headers;
 #[cfg(feature = "sources-utils-http-query")]
 pub use self::http::add_query_parameters;
 #[cfg(any(
-    feature = "sources-prometheus-scrape",
-    feature = "sources-prometheus-remote-write",
+    feature = "sources-prometheus_scrape",
+    feature = "sources-prometheus_remote_write",
     feature = "sources-utils-http-encoding"
 ))]
 pub use self::http::decompress_body;

@@ -462,13 +462,13 @@ mod tests {
         .unwrap();
 
         CsvSerializerConfig::new(CsvSerializerOptions {
-            fields: fields.clone(),
+            fields,
             quote_style: QuoteStyle::NonNumeric,
             ..Default::default()
         })
         .build()
         .unwrap()
-        .encode(event.clone(), &mut non_numeric_bytes)
+        .encode(event, &mut non_numeric_bytes)
         .unwrap();
 
         assert_eq!(

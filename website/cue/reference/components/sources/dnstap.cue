@@ -47,7 +47,6 @@ components: sources: dnstap: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sources.dnstap.configuration & {

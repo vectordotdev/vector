@@ -65,7 +65,6 @@ components: sinks: axiom: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.axiom.configuration

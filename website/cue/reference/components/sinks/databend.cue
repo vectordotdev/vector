@@ -71,7 +71,6 @@ components: sinks: databend: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.databend.configuration

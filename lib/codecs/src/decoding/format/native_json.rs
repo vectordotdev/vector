@@ -7,7 +7,7 @@ use vector_core::{
     event::Event,
     schema,
 };
-use vrl::value::{Kind, kind::Collection};
+use vrl::value::{Kind, kind::Collection, value::simdutf_bytes_utf8_lossy};
 
 use super::{Deserializer, default_lossy};
 
@@ -96,7 +96,7 @@ impl Deserializer for NativeJsonDeserializer {
         }
 
         let json: serde_json::Value = match self.lossy {
-            true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
+            true => serde_json::from_str(&simdutf_bytes_utf8_lossy(&bytes)),
             false => serde_json::from_slice(&bytes),
         }
         .map_err(|error| format!("Error parsing JSON: {error:?}"))?;

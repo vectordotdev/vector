@@ -51,7 +51,7 @@ reduction and improved data quality for observability infrastructure.
 When working on Vector's Rust codebase, follow this iterative development cycle:
 
 1. Make code changes
-2. Run `make check-clippy` to check for linting issues
+2. Run the appropriate Clippy command described under Rust Development below.
 3. Fix any issues found (use `make clippy-fix` for auto-fixes)
 4. Continue to next task or mark current task complete
 
@@ -63,7 +63,7 @@ After the task is complete run the following `make` commands to check for errors
 targets.
 
 1. Run `make fmt` to format your code.
-2. Run `make test SCOPE="<scope>"` to run tests. `<scope>` is a test filter passed to `cargo nextest`.
+2. Run the narrowest relevant tests using the minimum feature set as described below.
 
 ## Code change workflows and validation
 
@@ -71,26 +71,39 @@ targets.
 
 If you're working on Vector's Rust codebase:
 
+When building and running Vector with a configuration file, use `cargo vdev run <config>`. It
+automatically selects the minimum set of features required by the configuration, reducing compile
+times.
+
+If `cargo vdev run <config>` fails, fall back to `cargo run -- --config <config>`.
+
+Run `FEATURES="<features>" make check-clippy` to narrow down the feature list and disable default
+features. If a representative configuration exists, derive its features with
+`cargo vdev features <config>`. Do not infer features from file names; use `make check-clippy`
+without `FEATURES` for full-feature validation.
+
 #### Running tests
 
+For most Rust changes, specify the relevant component feature directly:
+
 ```bash
-# Run all tests
-make test
+make test FEATURES="sources-file" SCOPE="truncate"
+```
 
-# Target a single test
-make test SCOPE="test_some_function"
+If you have a representative configuration file, derive its required features automatically:
 
-# Filter to a specific package
-make test SCOPE="-p vector"
+```bash
+cargo vdev test --config path/to/config.yaml test_some_function
+```
 
+Other testing methods, from targeted to broad:
+
+```bash
 # Use a nextest filter expression (note the quoting)
 make test SCOPE="-E 'test(foo) and not test(bar)'"
 
-# Run tests for a specific feature only
-make test FEATURES="sources-file"
-
-# Run tests matching a substring for a specific feature only
-make test FEATURES="sources-file" SCOPE="truncate"
+# Run all tests
+make test
 ```
 
 #### Running integration tests
@@ -125,6 +138,9 @@ Requires `dd-rust-license-tool`
 make build-licenses
 ```
 
+#### If editing any GitHub Actions workflows or embedded scripts
+
+Run `make check-actionlint`.
 
 #### Before committing (recommended checks)
 
@@ -134,36 +150,9 @@ make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
 make check-markdown           # Check markdown files
 make check-generated-docs     # Check generated documentation
+make check-actionlint         # Lint GitHub Actions workflows
 make check-changelog-fragments  # Verify changelog
 ```
-
-### Website/Docs Development (Separate Process)
-
-If you're working on vector.dev website or documentation content:
-
-**Prerequisites:**
-
-- Hugo static site generator
-- CUE CLI tool
-- Node.js and Yarn
-- htmltest
-
-**Run the site locally:**
-
-```bash
-make generate-docs
-cd website && make serve
-# Navigate to http://localhost:1313
-```
-
-**Build website:**
-
-```bash
-cd website
-make cue-build
-```
-
-**Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
 
 ## Configuration Format
 
@@ -185,6 +174,8 @@ cargo vdev int test <name>    # Integration tests
 cargo vdev fmt                # Format code
 ```
 
+For new tooling that will be used by future developers, add a `vdev` subcommand instead of a shell or Python script. Do not introduce new top-level subcommands unless none of the existing ones are appropriate.
+
 ### Pre-Push Hook (Optional but Recommended)
 
 Create `.git/hooks/pre-push` with:
@@ -200,6 +191,7 @@ echo "Running pre-push checks..."
 make check-licenses
 make check-fmt
 make check-clippy
+make check-actionlint
 make check-markdown
 make check-generated-docs
 make check-changelog-fragments

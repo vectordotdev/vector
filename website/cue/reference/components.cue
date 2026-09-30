@@ -560,13 +560,6 @@ components: {
 		// For example, a transform might be known to have performance issues
 		// or a lack of support for specific features, etc.
 		warnings: [...string] | null // Allow for empty list
-
-		// `notices` communicates useful information to the user that is neither
-		// a requirement or a warning.
-		//
-		// For example, the `lua` transform offers a Lua version notice that
-		// communicate which version of Lua is embedded.
-		notices: [...string] | null // Allow for empty list
 	}
 
 	sources:    #Components

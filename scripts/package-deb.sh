@@ -72,7 +72,11 @@ cat LICENSE NOTICE >"$PROJECT_ROOT/target/debian-license.txt"
 #   --no-build
 #     because this step should follow a build
 
-cargo deb --target "$TARGET" --deb-version "${PACKAGE_VERSION}-1" --variant "$TARGET" --no-build --no-strip --profile "$PROFILE"
+# Debian uses `~` to order prereleases before the corresponding stable version,
+# mirroring `scripts/package-rpm.sh`. Without this, a `0.59.0-dev-1` package
+# would sort newer than the eventual stable `0.59.0-1` release.
+DEB_VERSION="${PACKAGE_VERSION/-/\~}"
+cargo deb --target "$TARGET" --deb-version "${DEB_VERSION}-1" --variant "$TARGET" --no-build --no-strip --profile "$PROFILE"
 
 # Rename the resulting .deb file to remove TARGET from name.
 for file in target/"${TARGET}"/debian/*.deb; do

@@ -67,7 +67,6 @@ impl From<ArrowIpcCompression> for Option<CompressionType> {
 pub struct ArrowStreamSerializerConfig {
     /// The Arrow schema to use for encoding
     #[serde(skip)]
-    #[configurable(derived)]
     pub schema: Option<arrow::datatypes::Schema>,
 
     /// Allow null values for non-nullable fields in the schema.
@@ -79,14 +78,12 @@ pub struct ArrowStreamSerializerConfig {
     /// When disabled (default), missing values for non-nullable fields results in encoding errors. This is to
     /// help ensure all required data is present before sending it to the sink.
     #[serde(default)]
-    #[configurable(derived)]
     pub allow_nullable_fields: bool,
 
     /// Block-level compression applied to the Arrow IPC record batch buffers.
     ///
     /// Compresses each buffer inside the IPC stream.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
-    #[configurable(derived)]
     pub compression: ArrowIpcCompression,
 }
 
@@ -442,8 +439,7 @@ mod tests {
         events: Vec<Event>,
         schema: SchemaRef,
     ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
-        let bytes =
-            encode_events_to_arrow_ipc_stream(&events, schema.clone(), ArrowIpcCompression::None)?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, schema, ArrowIpcCompression::None)?;
         let cursor = Cursor::new(bytes);
         let mut reader = StreamReader::try_new(cursor, None)?;
         Ok(reader.next().unwrap()?)
