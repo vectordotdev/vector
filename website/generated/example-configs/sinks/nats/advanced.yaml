@@ -7,5 +7,5 @@ sinks:
     dangerously_allow_unconfined_template_resolution: false
     encoding:
       codec: json
-    subject: "{{ host }}"
+    subject: events-{{ host }}
     url: nats://demo.nats.io

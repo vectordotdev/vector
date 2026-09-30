@@ -15,7 +15,7 @@ use crate::{
     event::{Event, Value},
     internal_events::AwsCloudwatchLogsMessageSizeError,
     sinks::{aws_cloudwatch_logs::CloudwatchKey, util::metadata::RequestMetadataBuilder},
-    template::ConfinedTemplate,
+    template::{ConfinedTemplate, UnconfinedTemplate},
 };
 
 // Estimated maximum size of InputLogEvent is 50 bytes with an empty message
@@ -52,7 +52,7 @@ impl MetaDescriptive for CloudwatchRequest {
 
 pub struct CloudwatchRequestBuilder {
     pub group_template: ConfinedTemplate,
-    pub stream_template: ConfinedTemplate,
+    pub stream_template: UnconfinedTemplate,
     pub transformer: Transformer,
     pub encoder: Encoder<()>,
 }
@@ -143,7 +143,7 @@ mod tests {
     use vector_lib::{config::log_schema, event::LogEvent};
 
     use super::{CloudwatchRequestBuilder, MAX_MESSAGE_SIZE};
-    use crate::template::{ConfinedTemplate, ConfinementConfig, Template};
+    use crate::template::{ConfinedTemplate, ConfinementConfig, Template, UnconfinedTemplate};
 
     fn confined(src: &str, field: &'static str) -> ConfinedTemplate {
         Template::try_from(src)
@@ -152,11 +152,15 @@ mod tests {
             .unwrap()
     }
 
+    fn unconfined(src: &str) -> UnconfinedTemplate {
+        UnconfinedTemplate::try_from(src).unwrap()
+    }
+
     #[test]
     fn test() {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: confined("group", "group_name"),
-            stream_template: confined("stream", "stream_name"),
+            stream_template: unconfined("stream"),
             transformer: Default::default(),
             encoder: Default::default(),
         };
@@ -174,7 +178,7 @@ mod tests {
     fn test_rejects_oversized_log_event() {
         let mut request_builder = CloudwatchRequestBuilder {
             group_template: confined("group", "group_name"),
-            stream_template: confined("stream", "stream_name"),
+            stream_template: unconfined("stream"),
             transformer: Default::default(),
             encoder: Default::default(),
         };

@@ -57,7 +57,6 @@ components: sinks: databricks_zerobus: {
 				""",
 		]
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.databricks_zerobus.configuration

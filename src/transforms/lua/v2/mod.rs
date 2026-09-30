@@ -94,7 +94,6 @@ pub struct LuaConfig {
     #[configurable(metadata(docs::human_name = "Search Directories"))]
     search_dirs: Vec<PathBuf>,
 
-    #[configurable(derived)]
     hooks: HooksConfig,
 
     /// A list of timers which should be configured and executed periodically.
@@ -263,6 +262,7 @@ impl Lua {
     pub fn new(config: &LuaConfig, key: ComponentKey) -> crate::Result<Self> {
         // In order to support loading C modules in Lua, we need to create unsafe instance
         // without debug library.
+        // SAFETY: Native modules loaded by Lua must be trusted not to violate memory safety.
         let lua = unsafe {
             mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
         };
@@ -863,8 +863,7 @@ mod tests {
         let err = format_error(&err);
         assert!(
             err.contains("error converting Lua boolean to String"),
-            "{}",
-            err
+            "{err}"
         );
         Ok(())
     }
@@ -912,7 +911,7 @@ mod tests {
             .process_single(LogEvent::default().into())
             .unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("this is an error"), "{}", err);
+        assert!(err.contains("this is an error"), "{err}");
         Ok(())
     }
 
@@ -929,7 +928,7 @@ mod tests {
         .unwrap_err()
         .to_string();
 
-        assert!(err.contains("syntax error:"), "{}", err);
+        assert!(err.contains("syntax error:"), "{err}");
         Ok(())
     }
 

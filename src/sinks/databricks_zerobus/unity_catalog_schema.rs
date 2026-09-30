@@ -67,28 +67,27 @@ pub async fn fetch_table_schema(
         .collect::<Vec<_>>()
         .join(".");
     let url = format!(
-        "{}/api/2.1/unity-catalog/tables/{}",
-        unity_catalog_endpoint.trim_end_matches('/'),
-        encoded_table_name
+        "{}/api/2.1/unity-catalog/tables/{encoded_table_name}",
+        unity_catalog_endpoint.trim_end_matches('/')
     );
 
     let uri: Uri = url.parse().map_err(|e| ZerobusSinkError::ConfigError {
-        message: format!("Invalid Unity Catalog endpoint URL: {}", e),
+        message: format!("Invalid Unity Catalog endpoint URL: {e}"),
     })?;
 
     let request = Request::get(uri)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Authorization", format!("Bearer {token}"))
         .header("Content-Type", "application/json")
         .body(Body::empty())
         .map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Failed to build request: {}", e),
+            message: format!("Failed to build request: {e}"),
         })?;
 
     let response = http_client
         .send(request)
         .await
         .map_err(|e| ZerobusSinkError::SchemaError {
-            message: format!("Failed to fetch table schema: {}", e),
+            message: format!("Failed to fetch table schema: {e}"),
             retryable: true,
         })?;
 
@@ -102,10 +101,7 @@ pub async fn fetch_table_schema(
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
         return Err(ZerobusSinkError::SchemaError {
-            message: format!(
-                "Unity Catalog API returned error {}: {}",
-                status, error_text
-            ),
+            message: format!("Unity Catalog API returned error {status}: {error_text}"),
             retryable: status_is_retryable(status),
         });
     }
@@ -116,14 +112,14 @@ pub async fn fetch_table_schema(
         .await
         .map(|c| c.to_bytes())
         .map_err(|e| ZerobusSinkError::SchemaError {
-            message: format!("Failed to read response body: {}", e),
+            message: format!("Failed to read response body: {e}"),
             retryable: true,
         })?;
 
     let schema: UnityCatalogTableSchema =
         serde_json::from_reader(body_bytes.reader()).map_err(|e| {
             ZerobusSinkError::ConfigError {
-                message: format!("Failed to parse table schema response: {}", e),
+                message: format!("Failed to parse table schema response: {e}"),
             }
         })?;
 
@@ -145,7 +141,7 @@ async fn get_oauth_token(
     let uri: Uri = token_url
         .parse()
         .map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Invalid token endpoint URL: {}", e),
+            message: format!("Invalid token endpoint URL: {e}"),
         })?;
 
     // Build form-encoded body
@@ -159,14 +155,14 @@ async fn get_oauth_token(
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(Body::from(form_body))
         .map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Failed to build OAuth request: {}", e),
+            message: format!("Failed to build OAuth request: {e}"),
         })?;
 
     let response = http_client
         .send(request)
         .await
         .map_err(|e| ZerobusSinkError::SchemaError {
-            message: format!("Failed to get OAuth token: {}", e),
+            message: format!("Failed to get OAuth token: {e}"),
             retryable: true,
         })?;
 
@@ -180,7 +176,7 @@ async fn get_oauth_token(
             .unwrap_or_default();
         let error_text = String::from_utf8_lossy(&body_bytes);
         return Err(ZerobusSinkError::SchemaError {
-            message: format!("OAuth token request failed {}: {}", status, error_text),
+            message: format!("OAuth token request failed {status}: {error_text}"),
             retryable: status_is_retryable(status),
         });
     }
@@ -191,14 +187,14 @@ async fn get_oauth_token(
         .await
         .map(|c| c.to_bytes())
         .map_err(|e| ZerobusSinkError::SchemaError {
-            message: format!("Failed to read OAuth response body: {}", e),
+            message: format!("Failed to read OAuth response body: {e}"),
             retryable: true,
         })?;
 
     let token_response: OAuthTokenResponse =
         serde_json::from_reader(body_bytes.reader()).map_err(|e| {
             ZerobusSinkError::ConfigError {
-                message: format!("Failed to parse OAuth token response: {}", e),
+                message: format!("Failed to parse OAuth token response: {e}"),
             }
         })?;
 
@@ -220,13 +216,13 @@ pub fn generate_arrow_schema_from_schema(
 ) -> Result<arrow::datatypes::Schema, ZerobusSinkError> {
     let arrow_schema =
         arrow_schema_from_uc_schema(schema).map_err(|e| ZerobusSinkError::ConfigError {
-            message: format!("Failed to convert Unity Catalog schema to Arrow: {}", e),
+            message: format!("Failed to convert Unity Catalog schema to Arrow: {e}"),
         })?;
 
     if tracing::enabled!(tracing::Level::INFO) {
         info!(
-            "Inferred Arrow schema from Unity Catalog table {}.{}.{}:\n{:#?}",
-            schema.catalog_name, schema.schema_name, schema.name, arrow_schema
+            "Inferred Arrow schema from Unity Catalog table {}.{}.{}:\n{arrow_schema:#?}",
+            schema.catalog_name, schema.schema_name, schema.name
         );
     }
 

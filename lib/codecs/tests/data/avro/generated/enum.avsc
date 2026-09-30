@@ -1,1 +1,1 @@
-{"type":"record","name":"test","fields":[{"name":"enum_field","type":{"type":"enum","name":"enum_field","symbols":["Spades","Hearts","Diamonds","Clubs"]}}]}
+{"type":"record","name":"test","fields":[{"name":"enum_field","type":{"type":"enum","name":"Suit","symbols":["Spades","Hearts","Diamonds","Clubs"]}}]}

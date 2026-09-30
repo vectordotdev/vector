@@ -74,7 +74,7 @@ jobs:
       DISABLE_MOLD: true
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
       - run: sudo -E bash scripts/ci-free-disk-space.sh
@@ -85,9 +85,7 @@ jobs:
           cross: true
           mold: false
           cargo-deb: true
-
-      - name: Install packaging dependencies
-        run: timeout 30m sudo apt-get install -y cmark-gfm
+          cmark-gfm: true
 
       - run: VECTOR_VERSION="$(vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
@@ -171,7 +169,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
 
@@ -193,7 +191,7 @@ jobs:
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
 
       - name: Checkout helm-charts
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: vectordotdev/helm-charts
           ref: develop

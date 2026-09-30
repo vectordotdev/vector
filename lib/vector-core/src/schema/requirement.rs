@@ -226,8 +226,7 @@ impl std::fmt::Display for ValidationError {
             ),
             Self::MeaningDuplicate { identifier, paths } => write!(
                 f,
-                "semantic meaning {} pointing to multiple fields: {}",
-                identifier,
+                "semantic meaning {identifier} pointing to multiple fields: {}",
                 paths
                     .iter()
                     .map(ToString::to_string)

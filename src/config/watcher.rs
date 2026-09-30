@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     Error,
-    config::{ComponentConfig, ComponentType},
+    config::{ComponentConfig, ComponentKind},
 };
 
 /// Per notify own documentation, it's advised to have delay of more than 30 sec,
@@ -79,7 +79,7 @@ pub fn spawn_thread<'a>(
     let mut component_config_paths: Vec<_> = component_configs
         .clone()
         .into_iter()
-        .flat_map(|p| p.config_paths.clone())
+        .flat_map(|p| p.config_paths)
         .collect();
 
     config_paths.append(&mut component_config_paths);
@@ -144,7 +144,7 @@ pub fn spawn_thread<'a>(
                             );
                             if changed_components
                                 .iter()
-                                .all(|(_, t)| *t == ComponentType::EnrichmentTable)
+                                .all(|(_, t)| *t == ComponentKind::EnrichmentTable)
                             {
                                 info!("Only enrichment tables have changed.");
                                 _ = signal_tx
@@ -277,7 +277,7 @@ mod tests {
         let component_config = ComponentConfig::new(
             component_file_path.clone(),
             http_component.clone(),
-            ComponentType::Sink,
+            ComponentKind::Sink,
         );
 
         let (signal_tx, signal_rx) = broadcast::channel(128);

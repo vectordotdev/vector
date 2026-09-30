@@ -20,15 +20,12 @@ pub struct ConfigBuilder {
     pub global: GlobalOptions,
 
     #[cfg(feature = "api")]
-    #[configurable(derived)]
     #[serde(default)]
     pub api: api::Options,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub schema: schema::Options,
 
-    #[configurable(derived)]
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
 
@@ -65,7 +62,6 @@ pub struct ConfigBuilder {
     pub provider: Option<Providers>,
 
     /// All configured secrets backends.
-    #[configurable(metadata(docs::additional_props_description = "A secret backend."))]
     #[serde(default)]
     pub secret: IndexMap<ComponentKey, SecretBackends>,
 
@@ -140,7 +136,7 @@ impl ConfigBuilder {
         let (config, warnings) = self.build_with_warnings()?;
 
         for warning in warnings {
-            warn!("{}", warning);
+            warn!("{warning}");
         }
 
         Ok(config)

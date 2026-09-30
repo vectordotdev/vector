@@ -9,7 +9,7 @@ weight: 4
 ## Installation
 
 ```shell
-brew tap vectordotdev/brew && brew install vector
+brew trust vectordotdev/brew && brew tap vectordotdev/brew && brew install vector
 ```
 
 ## Other actions

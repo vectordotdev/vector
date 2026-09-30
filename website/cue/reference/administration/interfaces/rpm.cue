@@ -19,7 +19,7 @@ administration: interfaces: rpm: {
 
 	role_implementations: [Name=string]: {
 		commands: role_implementations._systemd_commands & {
-			install:   "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{version}-1.{arch}.rpm"
+			install:   "sudo rpm -i https://install.datadoghq.com/vector/{version}/vector-{version}-1.{arch}.rpm"
 			uninstall: "sudo rpm -e vector"
 			upgrade:   null
 		}
@@ -42,7 +42,7 @@ administration: interfaces: rpm: {
 		}
 
 		variables: {
-			arch: ["x86_64", "aarch64", "armv7"]
+			arch: ["x86_64", "aarch64", "armv7hl"]
 			version: true
 		}
 	}

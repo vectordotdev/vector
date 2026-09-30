@@ -18,8 +18,8 @@ use crate::{
         util::{
             http::HttpMethod,
             http_client::{
-                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_url, call,
-                default_interval, default_timeout, warn_if_interval_too_low,
+                GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_headers,
+                build_url, call, default_interval, default_timeout, warn_if_interval_too_low,
             },
         },
     },
@@ -88,14 +88,21 @@ pub struct PrometheusScrapeConfig {
     /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
     /// scraping the `/federate` endpoint.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "A query string parameter."))]
     #[configurable(metadata(docs::examples = "query_example()"))]
     query: QueryParameters,
 
-    #[configurable(derived)]
+    /// Headers to apply to the scrape requests.
+    ///
+    /// One or more values for the same header can be provided.
+    #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and its value(s)."
+    ))]
+    #[configurable(metadata(docs::examples = "headers_example()"))]
+    headers: HashMap<String, Vec<String>>,
+
     tls: Option<TlsConfig>,
 
-    #[configurable(derived)]
     auth: Option<Auth>,
 }
 
@@ -105,6 +112,12 @@ fn query_example() -> serde_json::Value {
             "{job=\"somejob\"}",
             "{__name__=~\"job:.*\"}"
         ]
+    })
+}
+
+fn headers_example() -> serde_json::Value {
+    serde_json::json!({
+        "X-My-Header": ["value1", "value2"]
     })
 }
 
@@ -118,6 +131,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             tls: None,
             auth: None,
         })
@@ -136,6 +150,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             .map(|r| r.map(|uri| build_url(&uri, &self.query)))
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
+        let headers = build_headers(&self.headers)?;
 
         let builder = PrometheusScrapeBuilder {
             honor_labels: self.honor_labels,
@@ -149,7 +164,7 @@ impl SourceConfig for PrometheusScrapeConfig {
             urls,
             interval: self.interval,
             timeout: self.timeout,
-            headers: HashMap::new(),
+            headers,
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
             tls,
@@ -344,23 +359,33 @@ mod test {
     async fn test_prometheus_sets_headers() {
         let (_guard, in_addr) = next_addr();
 
-        let dummy_endpoint = warp::path!("metrics").and(warp::header::exact("Accept", "text/plain")).map(|| {
-            r#"
+        let dummy_endpoint = warp::path!("metrics")
+            .and(warp::header::exact("Accept", "application/openmetrics-text"))
+            .and(warp::header::exact("X-My-Header", "custom-value"))
+            .map(|| {
+                r#"
                     promhttp_metric_handler_requests_total{endpoint="http://example.com", instance="localhost:9999", code="200"} 100 1612411516789
                     "#
-        });
+            });
 
         tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            headers: HashMap::from([
+                (
+                    "Accept".to_string(),
+                    vec!["application/openmetrics-text".to_string()],
+                ),
+                ("X-My-Header".to_string(), vec!["custom-value".to_string()]),
+            ]),
             auth: None,
             tls: None,
         };
@@ -388,13 +413,14 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -440,13 +466,14 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -506,13 +533,14 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -561,7 +589,7 @@ mod test {
         wait_for_tcp(in_addr).await;
 
         let config = PrometheusScrapeConfig {
-            endpoints: vec![format!("http://{}/metrics?key1=val1", in_addr)],
+            endpoints: vec![format!("http://{in_addr}/metrics?key1=val1")],
             interval: Duration::from_secs(1),
             timeout: default_timeout(),
             instance_tag: Some("instance".to_string()),
@@ -582,6 +610,7 @@ mod test {
                     ]),
                 ),
             ]),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };
@@ -677,11 +706,12 @@ mod test {
         config.add_source(
             "in",
             PrometheusScrapeConfig {
-                endpoints: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{in_addr}")],
                 instance_tag: None,
                 endpoint_tag: None,
                 honor_labels: false,
                 query: HashMap::new(),
+                headers: HashMap::new(),
                 interval: Duration::from_secs(1),
                 timeout: default_timeout(),
                 tls: None,
@@ -776,6 +806,7 @@ mod integration_tests {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            headers: HashMap::new(),
             auth: None,
             tls: None,
         };

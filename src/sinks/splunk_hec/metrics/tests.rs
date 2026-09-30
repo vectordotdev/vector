@@ -18,7 +18,7 @@ use crate::{
             common::config_host_key,
             metrics::{config::HecMetricsSinkConfig, encoder::HecMetricsEncoder},
         },
-        util::{Compression, test::build_test_server},
+        util::{Compression, HttpEndpoint, test::build_test_server},
     },
     template::{ConfinementConfig, Template},
     test_util::addr::next_addr,
@@ -113,6 +113,30 @@ fn get_event_with_token(token: &str) -> Event {
 #[test]
 fn generate_config() {
     crate::test_util::test_generate_config::<HecMetricsSinkConfig>();
+}
+
+#[test]
+fn validate_rejects_unconfined_template() {
+    use crate::config::ValidatedSink;
+
+    let config = HecMetricsSinkConfig {
+        default_token: "token".to_owned().into(),
+        endpoint: HttpEndpoint::parse("http://localhost:8088").unwrap(),
+        host_key: config_host_key(),
+        index: Some("{{ index }}".try_into().unwrap()),
+        sourcetype: None,
+        source: None,
+        compression: Compression::None,
+        batch: Default::default(),
+        request: Default::default(),
+        tls: None,
+        acknowledgements: Default::default(),
+        default_namespace: None,
+        confinement: Default::default(),
+    };
+
+    let result = config.validate();
+    assert!(result.is_err());
 }
 
 #[test]
@@ -352,7 +376,7 @@ async fn splunk_passthrough_token() {
     let (_guard, addr) = next_addr();
     let config = HecMetricsSinkConfig {
         default_token: "token".to_owned().into(),
-        endpoint: format!("http://{addr}"),
+        endpoint: HttpEndpoint::parse(&format!("http://{addr}")).unwrap(),
         host_key: config_host_key(),
         index: None,
         sourcetype: None,

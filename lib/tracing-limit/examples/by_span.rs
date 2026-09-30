@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use tracing::{Dispatch, info, info_span, trace};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::SubscriberExt;
@@ -31,7 +33,7 @@ fn main() {
                     );
                 }
             }
-            std::thread::sleep(std::time::Duration::from_millis(1000));
+            std::thread::sleep(std::time::Duration::from_secs(1));
         }
-    })
+    });
 }

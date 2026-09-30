@@ -57,20 +57,6 @@ releases: "0.21.0": {
 				for a preview of how this will work.
 				"""
 		},
-		{
-			type: "fix"
-			scopes: ["vrl"]
-			breaking: true
-			description: """
-				VRL now has lexical scoping for blocks. This means that variables defined inside of a block in VRL (e.g.
-				an `if` condition block) are no longer accessible from outside of this block. This breaking change
-				was done to support VRL's forthcoming iteration feature which requires it.
-
-				See the [upgrade guide](/highlights/2022-03-22-0-21-0-upgrade-guide#vrl-lexical-scoping) for how to
-				migrate your VRL programs.
-				"""
-			pr_numbers: [12017]
-		},
 	]
 
 	description: """
@@ -115,6 +101,20 @@ releases: "0.21.0": {
 				implementation in the future once it stabilizes.
 				"""
 			pr_numbers: [11554]
+		},
+		{
+			type: "fix"
+			scopes: ["vrl"]
+			breaking: true
+			description: """
+				VRL now has lexical scoping for blocks. This means that variables defined inside of a block in VRL (e.g.
+				an `if` condition block) are no longer accessible from outside of this block. This breaking change
+				was done to support VRL's forthcoming iteration feature which requires it.
+
+				See the [upgrade guide](/highlights/2022-03-22-0-21-0-upgrade-guide#vrl-lexical-scoping) for how to
+				migrate your VRL programs.
+				"""
+			pr_numbers: [12017]
 		},
 		{
 			type: "enhancement"

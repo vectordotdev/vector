@@ -33,7 +33,7 @@ async fn poll_components(
     mut client: Client,
     tx: state::EventTx,
     interval_ms: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
     initial_components: HashSet<String>,
 ) {
     let mut known_components = initial_components;
@@ -91,7 +91,7 @@ fn component_to_row(component: &Component) -> state::ComponentRow {
     let metrics = component.metrics.as_ref();
 
     state::ComponentRow {
-        key: key.clone(),
+        key,
         kind: match component.component_type() {
             ComponentType::Unspecified => "unknown",
             ComponentType::Source => "source",
@@ -130,7 +130,7 @@ async fn allocated_bytes(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_allocated_bytes(interval as i32)
@@ -159,7 +159,7 @@ async fn received_bytes_totals(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_metrics(MetricName::ReceivedBytesTotal, interval as i32)
@@ -188,7 +188,7 @@ async fn received_bytes_throughputs(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_metrics(MetricName::ReceivedBytesThroughput, interval as i32)
@@ -217,7 +217,7 @@ async fn received_events_totals(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_metrics(MetricName::ReceivedEventsTotal, interval as i32)
@@ -246,7 +246,7 @@ async fn received_events_throughputs(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_metrics(MetricName::ReceivedEventsThroughput, interval as i32)
@@ -275,7 +275,7 @@ async fn sent_bytes_totals(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_metrics(MetricName::SentBytesTotal, interval as i32)
@@ -304,7 +304,7 @@ async fn sent_bytes_throughputs(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_metrics(MetricName::SentBytesThroughput, interval as i32)
@@ -333,7 +333,7 @@ async fn sent_events_totals(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_metrics(MetricName::SentEventsTotal, interval as i32)
@@ -363,7 +363,7 @@ async fn sent_events_throughputs(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_metrics(MetricName::SentEventsThroughput, interval as i32)
@@ -399,7 +399,7 @@ async fn errors_totals(
     mut client: Client,
     tx: state::EventTx,
     interval: i64,
-    components_patterns: Arc<Vec<Pattern>>,
+    components_patterns: Arc<[Pattern]>,
 ) {
     let Ok(mut stream) = client
         .stream_component_metrics(MetricName::ErrorsTotal, interval as i32)
@@ -459,7 +459,7 @@ pub async fn subscribe(
     components_patterns: Vec<Pattern>,
     initial_components: HashSet<String>,
 ) -> Result<SubscribeHandles, vector_api_client::Error> {
-    let components_patterns = Arc::new(components_patterns);
+    let components_patterns = Arc::from(components_patterns);
 
     let mut client = Client::new(uri);
     client.connect().await?;
