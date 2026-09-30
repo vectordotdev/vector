@@ -2,10 +2,12 @@
 
 use std::{collections::HashSet, fs, path::Path, process::Command};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use git2::{BranchType, ErrorCode, Repository};
 
 use crate::app::CommandExt as _;
+
+pub const MASTER_BRANCH: &str = "master";
 
 /// Get the git HEAD tag if it exists
 pub fn git_head() -> Result<std::process::Output> {
@@ -34,33 +36,15 @@ pub fn checkout_or_create_branch(branch_name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn merge_branch(branch_name: &str) -> Result<()> {
-    let _output = run_and_check_output(&["merge", "--ff", branch_name])?;
-    Ok(())
-}
-
-pub fn tag_version(version: &str) -> Result<()> {
-    let _output = run_and_check_output(&["tag", "--annotate", version, "--message", version])?;
-    Ok(())
-}
-
-pub fn push_branch(branch_name: &str) -> Result<()> {
-    let _output = run_and_check_output(&["push", "origin", branch_name])?;
-    Ok(())
-}
-
 pub fn changed_files() -> Result<Vec<String>> {
     let mut files = HashSet::new();
 
-    // Committed e.g.:
-    // A   relative/path/to/file.added
-    // M   relative/path/to/file.modified
-    let output = run_and_check_output(&["diff", "--name-status", "origin/master..."])?;
+    // Use name-only output so renames and copies yield their destination path.
+    let base = format!("origin/{MASTER_BRANCH}...");
+    let output = run_and_check_output(&["diff", "--name-only", &base])?;
     for line in output.lines() {
-        if !is_warning_line(line)
-            && let Some((_, path)) = line.split_once('\t')
-        {
-            files.insert(path.to_string());
+        if !is_warning_line(line) {
+            files.insert(line.to_string());
         }
     }
 
@@ -96,6 +80,25 @@ pub fn get_git_sha() -> Result<String> {
         .map(|output| output.trim_end().to_string())
 }
 
+pub fn ensure_sha(value: &str, label: &str) -> Result<()> {
+    ensure!(
+        value.len() == 40
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()),
+        "{label} must be a 40-character lowercase hexadecimal SHA"
+    );
+    Ok(())
+}
+
+pub fn ensure_worktree_clean() -> Result<()> {
+    ensure!(
+        run_and_check_output(&["status", "--porcelain"])?.is_empty(),
+        "working tree must be clean"
+    );
+    Ok(())
+}
+
 /// Get a list of files that have been modified, as a vector of strings
 pub fn get_modified_files() -> Result<Vec<String>> {
     let args = vec![
@@ -109,6 +112,21 @@ pub fn get_modified_files() -> Result<Vec<String>> {
         .lines()
         .map(str::to_owned)
         .collect())
+}
+
+/// Get a list of files that differ from HEAD, including staged and untracked files.
+pub fn get_files_changed_from_head() -> Result<Vec<String>> {
+    let mut files = HashSet::new();
+
+    let output = run_and_check_output(&["diff", "--name-only", "HEAD"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let output = run_and_check_output(&["ls-files", "--others", "--exclude-standard"])?;
+    files.extend(output.lines().map(str::to_owned));
+
+    let mut files = Vec::from_iter(files);
+    files.sort();
+    Ok(files)
 }
 
 pub fn set_config_value(key: &str, value: &str) -> Result<String> {
@@ -136,6 +154,24 @@ pub fn commit(commit_message: &str) -> Result<String> {
     Command::new("git")
         .args(["commit", "--all", "--message", commit_message])
         .check_output()
+}
+
+/// Returns the latest semver release tag (e.g. `0.55.0`), ignoring `vdev-v…` tags.
+pub fn latest_release_version() -> Result<semver::Version> {
+    let output = Command::new("git")
+        .args(["tag", "--list", "--sort=-v:refname"])
+        .check_output()?;
+    let re = regex::Regex::new(r"^v[0-9]+\.[0-9]+\.[0-9]+$").unwrap();
+    for tag in output.lines() {
+        if tag.starts_with("vdev-v") {
+            continue;
+        }
+        if re.is_match(tag) {
+            return semver::Version::parse(tag.trim_start_matches('v'))
+                .context("Failed to parse version from tag");
+        }
+    }
+    anyhow::bail!("No valid semantic version tag found")
 }
 
 /// Pushes changes from the current repo
@@ -182,7 +218,7 @@ pub fn checkout_branch(branch_name: &str) -> Result<()> {
 }
 
 pub fn checkout_main_branch() -> Result<()> {
-    let _output = run_and_check_output(&["switch", "master"])?;
+    let _output = run_and_check_output(&["switch", MASTER_BRANCH])?;
     Ok(())
 }
 
@@ -199,7 +235,7 @@ pub fn create_branch(branch_name: &str) -> Result<()> {
     let reference = branch.into_reference();
     let full_ref_name = reference
         .name()
-        .ok_or_else(|| git2::Error::from_str("branch reference has no name"))?;
+        .context("branch reference name is not valid UTF-8")?;
     repo.set_head(full_ref_name)?;
     repo.checkout_head(None)?;
 

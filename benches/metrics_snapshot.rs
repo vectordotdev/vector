@@ -1,4 +1,7 @@
 use criterion::{BenchmarkId, Criterion, criterion_group};
+use strum::IntoEnumIterator;
+use vector_lib::counter;
+use vector_lib::internal_event::CounterName;
 
 fn benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("metrics_snapshot");
@@ -22,8 +25,9 @@ fn prepare_metrics(cardinality: usize) -> &'static vector::metrics::Controller {
     let controller = vector::metrics::Controller::get().unwrap();
     controller.reset();
 
+    let name = CounterName::iter().next().unwrap();
     for idx in 0..cardinality {
-        metrics::counter!("test", "idx" => idx.to_string()).increment(1);
+        counter!(name, "idx" => idx.to_string()).increment(1);
     }
 
     controller

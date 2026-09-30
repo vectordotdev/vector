@@ -103,7 +103,7 @@ mod test {
         mpsc::{Receiver, Sender},
     };
     use tokio_stream::wrappers::ReceiverStream;
-    use vrl::core::Value;
+    use vrl::{core::Value, event_path};
 
     use crate::{
         conditions::{AnyCondition, ConditionConfig, VrlConfig},
@@ -123,7 +123,7 @@ mod test {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             send_event(&tx, "flush").await;
-            assert_event("flush", out.recv().await).await;
+            assert_event("flush", out.recv().await);
 
             drop(tx);
             topology.stop().await;
@@ -145,7 +145,7 @@ mod test {
                 create_topology(ReceiverStream::new(rx), transform_config).await;
 
             send_event(&tx, "forward").await;
-            assert_event("forward", out.recv().await).await;
+            assert_event("forward", out.recv().await);
 
             drop(tx);
             topology.stop().await;
@@ -392,16 +392,16 @@ mod test {
         tx.send(Event::from(LogEvent::from(message))).await.unwrap();
     }
 
-    async fn assert_event(message: &str, event: Option<Event>) {
+    fn assert_event(message: &str, event: Option<Event>) {
         assert_eq!(
             &Value::from(message),
-            event.unwrap().as_log().get("message").unwrap()
+            event.unwrap().as_log().get(event_path!("message")).unwrap()
         );
     }
 
     async fn assert_events(messages: &mut [&str], out: &mut Receiver<Event>) {
         for message in messages {
-            assert_event(message, out.recv().await).await;
+            assert_event(message, out.recv().await);
         }
     }
 }

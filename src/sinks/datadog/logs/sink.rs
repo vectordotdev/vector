@@ -2,6 +2,7 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 
 use itertools::Itertools;
 use snafu::Snafu;
+use tracing::Instrument;
 use vector_lib::{
     event::{ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
@@ -9,9 +10,10 @@ use vector_lib::{
 };
 use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 
-use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
+use super::service::LogApiRequest;
 use crate::{
     common::datadog::{DD_RESERVED_SEMANTIC_ATTRS, DDTAGS, MESSAGE, is_reserved_attribute},
+    internal_events::DatadogLogsReservedAttributeConflict,
     sinks::{
         prelude::*,
         util::{Compressor, http::HttpJsonBatchSizer},
@@ -38,6 +40,7 @@ pub struct LogSinkBuilder<S> {
     default_api_key: Arc<str>,
     protocol: String,
     conforms_as_agent: bool,
+    max_payload_bytes: usize,
 }
 
 impl<S> LogSinkBuilder<S> {
@@ -48,6 +51,7 @@ impl<S> LogSinkBuilder<S> {
         batch_settings: BatcherSettings,
         protocol: String,
         conforms_as_agent: bool,
+        max_payload_bytes: usize,
     ) -> Self {
         Self {
             transformer,
@@ -57,6 +61,7 @@ impl<S> LogSinkBuilder<S> {
             compression: None,
             protocol,
             conforms_as_agent,
+            max_payload_bytes,
         }
     }
 
@@ -74,6 +79,7 @@ impl<S> LogSinkBuilder<S> {
             compression: self.compression.unwrap_or_default(),
             protocol: self.protocol,
             conforms_as_agent: self.conforms_as_agent,
+            max_payload_bytes: self.max_payload_bytes,
         }
     }
 }
@@ -98,6 +104,8 @@ pub struct LogSink<S> {
     protocol: String,
     /// Normalize events to agent standard and attach associated HTTP header to request
     conforms_as_agent: bool,
+    /// Maximum uncompressed payload size in bytes
+    max_payload_bytes: usize,
 }
 
 // The Datadog logs intake does not require the fields that are set in this
@@ -108,7 +116,7 @@ pub fn normalize_event(event: &mut Event) {
 
     // Will cast the internal value to an object if it already isn't
     if !log.value().is_object() {
-        log.insert(MESSAGE, log.value().clone());
+        log.insert(event_path!(MESSAGE), log.value().clone());
     }
 
     // Upstream Sources may have semantically defined Datadog reserved attributes outside of their
@@ -174,7 +182,7 @@ pub fn normalize_as_agent_event(event: &mut Event) {
         }
     }
     // .. nest this object at the root under the reserved key named 'message'
-    log.insert(MESSAGE, local_root);
+    log.insert(event_path!(MESSAGE), local_root);
 }
 
 // If an expected reserved attribute is not located in the event root, rename it and handle
@@ -183,7 +191,7 @@ pub fn position_reserved_attr_event_root(
     log: &mut LogEvent,
     current_path: &OwnedTargetPath,
     expected_field_name: &str,
-    meaning: &str,
+    meaning: &'static str,
 ) {
     // the path that DD archives expects this reserved attribute to be in.
     let desired_path = event_path!(expected_field_name);
@@ -195,11 +203,12 @@ pub fn position_reserved_attr_event_root(
         if log.contains(desired_path) {
             let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
-            warn!(
-                message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
-                meaning = meaning,
-                renamed = &rename_attr,
-            );
+            emit!(DatadogLogsReservedAttributeConflict {
+                meaning,
+                source_path: current_path,
+                destination_path: expected_field_name,
+                renamed_existing_to: &rename_attr,
+            });
             log.rename_key(desired_path, rename_path);
         }
 
@@ -244,6 +253,7 @@ struct LogRequestBuilder {
     pub transformer: Transformer,
     pub compression: Compression,
     pub conforms_as_agent: bool,
+    pub max_payload_bytes: usize,
 }
 
 impl LogRequestBuilder {
@@ -270,7 +280,7 @@ impl LogRequestBuilder {
         let mut requests: Vec<LogApiRequest> = Vec::new();
         while !events_with_estimated_size.is_empty() {
             let (events_serialized, body, byte_size) =
-                serialize_with_capacity(&mut events_with_estimated_size)?;
+                serialize_with_capacity(&mut events_with_estimated_size, self.max_payload_bytes)?;
             if events_serialized.is_empty() {
                 // first event was too large for whole request
                 let _too_big = events_with_estimated_size.pop_front();
@@ -324,12 +334,13 @@ impl LogRequestBuilder {
 }
 
 /// Serialize events into a buffer as a JSON array that has a maximum size of
-/// `MAX_PAYLOAD_BYTES`.
+/// `max_payload_bytes`.
 ///
 /// Returns the serialized events, the buffer, and the byte size of the events.
 /// Events that are not serialized remain in the `events` parameter.
 pub fn serialize_with_capacity(
     events: &mut VecDeque<(Event, JsonSize)>,
+    max_payload_bytes: usize,
 ) -> Result<(Vec<Event>, Vec<u8>, GroupedCountByteSize), io::Error> {
     // Compute estimated size, accounting for the size of the brackets and commas.
     let total_estimated =
@@ -353,7 +364,7 @@ pub fn serialize_with_capacity(
         }
         serde_json::to_writer(&mut buf, event.as_log())?;
         // If the buffer is too big, truncate it and break out of the loop.
-        if buf.len() >= MAX_PAYLOAD_BYTES {
+        if buf.len() >= max_payload_bytes {
             events.push_front((event, estimated_json_size));
             buf.truncate(existing_len);
             break;
@@ -384,6 +395,7 @@ where
             transformer: self.transformer,
             compression: self.compression,
             conforms_as_agent: self.conforms_as_agent,
+            max_payload_bytes: self.max_payload_bytes,
         });
 
         let input = input.batched_partitioned(partitioner, batch_settings.timeout, |_| {
@@ -393,12 +405,19 @@ where
             .concurrent_map(default_request_builder_concurrency_limit(), move |input| {
                 let builder = Arc::clone(&builder);
 
-                Box::pin(async move {
-                    let (api_key, events) = input;
-                    let api_key = api_key.unwrap_or_else(|| Arc::clone(&builder.default_api_key));
+                // `concurrent_map` spawns this future on a detached task. The closure itself runs
+                // within `run_inner`'s span, so `in_current_span` captures the sink span here and
+                // re-enters it on the spawned task to preserve the sink's automatic component tags.
+                Box::pin(
+                    async move {
+                        let (api_key, events) = input;
+                        let api_key =
+                            api_key.unwrap_or_else(|| Arc::clone(&builder.default_api_key));
 
-                    builder.build_request(events, api_key)
-                })
+                        builder.build_request(events, api_key)
+                    }
+                    .in_current_span(),
+                )
             })
             .filter_map(|request| async move {
                 match request {
@@ -580,7 +599,7 @@ mod tests {
         assert_normalized_log_has_expected_attrs(event.as_log());
         assert_only_reserved_fields_at_root(event.as_log());
         assert_eq!(
-            event.as_log().get("message"),
+            event.as_log().get(event_path!("message")),
             Some(&value!({"message": "the_message"}))
         );
     }

@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::io::Result;
 
 fn main() -> Result<()> {

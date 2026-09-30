@@ -65,7 +65,7 @@ the [`--skip-healthchecks`][skip_healthchecks] flag:
 vector validate --skip-healthchecks /etc/vector/vector.yaml
 ```
 
-**Note:** The configured `data_dir` must still be writeable.
+**Note:** The configured `data_dir` must still be writable.
 
 [components]: /components
 [no_environment]: /docs/reference/cli/#validate-no-environment

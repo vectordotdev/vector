@@ -7,7 +7,10 @@ const tableOfContents = () => {
       tocSelector: "#toc",
       contentSelector: "#page-content",
       headingSelector: "h2,h3,h4,h5",
-      scrollSmoothDuration: 400
+      scrollSmoothDuration: 400,
+      headingsOffset: 80,
+      scrollSmoothOffset: -80,
+      hasInnerContainers: true
     });
   }
 };

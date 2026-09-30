@@ -13,7 +13,6 @@ use arrow::error::ArrowError;
 use arrow::json::reader::infer_json_schema_from_iterator;
 use arrow::record_batch::RecordBatch;
 use bytes::{BufMut, BytesMut};
-use derivative::Derivative;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::ZstdLevel;
 use parquet::basic::{Compression as ParquetCodecCompression, GzipLevel};
@@ -35,17 +34,20 @@ type EventsDroppedError = ComponentEventsDropped<'static, UNINTENTIONAL>;
 /// Compression algorithm and optional level for archive objects.
 #[configurable_component]
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
+#[configurable(metadata(
+    docs::enum_tag_description = "Compression codec applied per column page inside the Parquet file."
+))]
 #[serde(tag = "algorithm", rename_all = "snake_case")]
 pub enum ParquetCompression {
     /// Zstd compression. Level must be between 1 and 21.
     Zstd {
-        /// Compression level (1–21). This is the range Vector currently supports; higher values compress more but are slower.
+        /// Compression level (1–21). This is the range Vector supports; higher values compress more but are slower.
         #[configurable(validation(range(min = 1, max = 21)))]
         level: u8,
     },
     /// Gzip compression. Level must be between 1 and 9.
     Gzip {
-        /// Compression level (1–9). This is the range Vector currently supports; higher values compress more but are slower.
+        /// Compression level (1–9). This is the range Vector supports; higher values compress more but are slower.
         #[configurable(validation(range(min = 1, max = 9)))]
         level: u8,
     },
@@ -112,12 +114,10 @@ pub struct ParquetSerializerConfig {
 
     /// Compression codec applied per column page inside the Parquet file.
     #[serde(default)]
-    #[configurable(derived)]
     pub compression: ParquetCompression,
 
     /// Controls how events with fields not present in the schema are handled.
     #[serde(default)]
-    #[configurable(derived)]
     pub schema_mode: ParquetSchemaMode,
 }
 
@@ -224,8 +224,7 @@ fn reject_unsupported_arrow_types(
 }
 
 /// Parquet batch serializer.
-#[derive(Derivative)]
-#[derivative(Debug, Clone)]
+#[derive(derive_more::Debug, Clone)]
 pub struct ParquetSerializer {
     schema: SchemaRef,
     writer_props: Arc<WriterProperties>,
@@ -233,7 +232,7 @@ pub struct ParquetSerializer {
     /// Pre-built set of schema field names for O(1) strict-mode lookups.
     schema_field_names: HashSet<String>,
 
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     events_dropped_handle: Registered<EventsDroppedError>,
 }
 
@@ -276,39 +275,29 @@ impl ParquetSerializer {
 
     /// Writes `record_batch` into `buffer` as a complete Parquet file.
     ///
-    /// On failure, emits an [`ArrowWriterError`] internal event (which also
-    /// increments `component_errors_total` and emits the events-dropped metric)
-    /// before returning the error.
+    /// On failure, emits an [`ArrowWriterError`] internal event (which
+    /// increments `component_errors_total`) before returning the error.
+    /// The caller is responsible for emitting `events_dropped`.
     fn write_record_batch(
-        &self,
         record_batch: &RecordBatch,
         buffer: &mut BytesMut,
-        event_count: usize,
+        writer_props: &WriterProperties,
     ) -> Result<(), parquet::errors::ParquetError> {
         let mut writer = ArrowWriter::try_new(
             buffer.writer(),
             Arc::clone(record_batch.schema_ref()),
-            Some((*self.writer_props).clone()),
+            Some(writer_props.clone()),
         )
         .inspect_err(|e| {
-            emit(ArrowWriterError {
-                error: e,
-                batch_count: event_count,
-            });
+            emit(ArrowWriterError { error: e });
         })?;
 
         writer.write(record_batch).inspect_err(|e| {
-            emit(ArrowWriterError {
-                error: e,
-                batch_count: event_count,
-            });
+            emit(ArrowWriterError { error: e });
         })?;
 
         writer.close().inspect_err(|e| {
-            emit(ArrowWriterError {
-                error: e,
-                batch_count: event_count,
-            });
+            emit(ArrowWriterError { error: e });
         })?;
 
         Ok(())
@@ -326,10 +315,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         let json_values = match vector_log_events_to_json_values(&events) {
             Ok(values) => values,
             Err(e) => {
-                emit(JsonSerializationError {
-                    error: &e,
-                    batch_count: events.len(),
-                });
+                emit(JsonSerializationError { error: &e });
                 return Err(Box::new(e));
             }
         };
@@ -358,7 +344,6 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                     {
                         for top_level in object_map.keys() {
                             if !self.schema_field_names.contains(top_level.as_str()) {
-                                self.events_dropped_handle.emit(Count(events.len()));
                                 return Err(Box::new(ArrowEncodingError::SchemaFetchError {
                                     message: format!(
                                         "Strict schema mode: event contains field '{top_level}' not in schema",
@@ -381,8 +366,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         let record_batch =
             build_record_batch(Arc::clone(&self.schema), &json_values).map_err(Box::new)?;
 
-        self.write_record_batch(&record_batch, buffer, json_values.len())
-            .map_err(Box::new)?;
+        Self::write_record_batch(&record_batch, buffer, &self.writer_props).map_err(Box::new)?;
 
         Ok(())
     }
@@ -394,10 +378,7 @@ impl ParquetSchemaGenerator {
     pub fn infer_schema(events: &[serde_json::Value]) -> Result<Schema, Error> {
         let schema = infer_json_schema_from_iterator(events.iter().map(Ok::<_, ArrowError>))
             .map_err(|e| {
-                emit(SchemaGenerationError {
-                    error: &e,
-                    batch_count: events.len(),
-                });
+                emit(SchemaGenerationError { error: &e });
                 Error::new(ErrorKind::InvalidData, e.to_string())
             })?;
 
@@ -453,6 +434,7 @@ mod tests {
     use parquet::record::reader::RowIter;
     use tokio_util::codec::Encoder;
     use vector_core::event::LogEvent;
+    use vrl::event_path;
 
     fn create_event<V>(fields: Vec<(&str, V)>) -> Event
     where
@@ -460,7 +442,7 @@ mod tests {
     {
         let mut log = LogEvent::default();
         for (key, value) in fields {
-            log.insert(key, value.into());
+            log.insert(&vrl::path::parse_target_path(key).unwrap(), value.into());
         }
         Event::Log(log)
     }
@@ -502,14 +484,14 @@ mod tests {
     ) -> Event {
         use vector_core::event::Value;
         let mut log = LogEvent::default();
-        log.insert("host", "localhost");
-        log.insert("message", message);
-        log.insert("service", "vector");
-        log.insert("source_type", "demo_logs");
-        log.insert("timestamp", Value::Timestamp(timestamp));
-        log.insert("random_time", Value::Timestamp(timestamp));
-        log.insert("status_code", Value::Integer(status_code));
-        log.insert("response_time_secs", response_time_secs);
+        log.insert(event_path!("host"), "localhost");
+        log.insert(event_path!("message"), message);
+        log.insert(event_path!("service"), "vector");
+        log.insert(event_path!("source_type"), "demo_logs");
+        log.insert(event_path!("timestamp"), Value::Timestamp(timestamp));
+        log.insert(event_path!("random_time"), Value::Timestamp(timestamp));
+        log.insert(event_path!("status_code"), Value::Integer(status_code));
+        log.insert(event_path!("response_time_secs"), response_time_secs);
         Event::Log(log)
     }
 
@@ -588,9 +570,8 @@ mod tests {
     fn write_temp_schema(name: &str, content: &str) -> std::path::PathBuf {
         use std::io::Write;
         let path = std::env::temp_dir().join(format!(
-            "vector_parquet_test_{}_{}.schema",
+            "vector_parquet_test_{}_{name}.schema",
             std::process::id(),
-            name,
         ));
         let mut f = std::fs::File::create(&path).expect("Failed to create schema file");
         write!(f, "{content}").expect("Failed to write schema");
@@ -679,15 +660,14 @@ mod tests {
             let mut buffer = BytesMut::new();
             serializer
                 .encode(events.clone(), &mut buffer)
-                .unwrap_or_else(|e| panic!("Encoding with {:?} failed: {}", compression, e));
+                .unwrap_or_else(|e| panic!("Encoding with {compression:?} failed: {e}"));
 
             let data = buffer.freeze();
             assert_parquet_magic(&data);
             assert_eq!(
                 parquet_row_count(&data),
                 1,
-                "Wrong row count for {:?}",
-                compression
+                "Wrong row count for {compression:?}"
             );
         }
     }
@@ -776,7 +756,7 @@ mod tests {
             ParquetSerializer::new(config).expect("Should create serializer from schema file");
 
         let mut log = LogEvent::default();
-        log.insert("name", "alice");
+        log.insert(event_path!("name"), "alice");
 
         let mut buffer = BytesMut::new();
         serializer
@@ -877,8 +857,8 @@ mod tests {
         .expect("Failed to create strict serializer");
 
         let mut log = LogEvent::default();
-        log.insert("name", "test");
-        log.insert("level", "info");
+        log.insert(event_path!("name"), "test");
+        log.insert(event_path!("level"), "info");
 
         let mut buffer = BytesMut::new();
         assert!(
@@ -914,6 +894,29 @@ mod tests {
         assert_eq!(parquet_row_count(&data), 1);
         let columns = parquet_column_names(&data);
         assert_eq!(columns, vec!["name"]);
+    }
+
+    #[test]
+    fn test_parquet_type_mismatch_returns_error() {
+        let schema_path =
+            write_temp_schema("type_mismatch", "message logs {\n  required int64 name;\n}");
+
+        let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema_file: Some(schema_path),
+            schema_mode: ParquetSchemaMode::Relaxed,
+            ..Default::default()
+        })
+        .expect("Failed to create serializer");
+
+        let events = vec![create_event(vec![("name", "not_an_integer")])];
+        let mut buffer = BytesMut::new();
+        let result = serializer.encode(events, &mut buffer);
+        assert!(result.is_err(), "Type mismatch should return an error");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Int64"),
+            "Error should mention the expected type, got: {err}"
+        );
     }
 
     #[test]

@@ -20,10 +20,10 @@ use futures_util::future::join_all;
 use indexmap::IndexMap;
 use tokio::{
     fs::{self, remove_file},
-    task::{Id, JoinSet},
     time::sleep,
 };
 
+use tokio_util::task::JoinMap;
 use tracing::{debug, error, info, trace};
 
 use crate::{
@@ -148,7 +148,7 @@ where
         let mut stats = TimingStats::default();
 
         // Spawn the checkpoint writer task
-        let checkpoint_task_handle = tokio::spawn(checkpoint_writer(
+        let checkpoint_task_handle = vector_common::spawn_in_current_span(checkpoint_writer(
             checkpointer,
             self.glob_minimum_cooldown,
             shutdown_checkpointer,
@@ -207,7 +207,14 @@ where
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
+                                    // Inode changed - emit metrics for the old file
+                                    self.emitter.emit_file_unwatched(
+                                        &unwatch_info.path,
+                                        unwatch_info.reached_eof,
+                                        unwatch_info.bytes_unread,
+                                    );
+                                }
                             } else {
                                 info!(
                                     message = "More than one file has the same fingerprint.",
@@ -225,7 +232,15 @@ where
                                         new_modified_time = ?new_modified_time,
                                         old_modified_time = ?old_modified_time,
                                     );
-                                    watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                    if let Ok(Some(unwatch_info)) = watcher.update_path(path).await
+                                    {
+                                        // Inode changed - emit metrics for the old file
+                                        self.emitter.emit_file_unwatched(
+                                            &unwatch_info.path,
+                                            unwatch_info.reached_eof,
+                                            unwatch_info.bytes_unread,
+                                        );
+                                    }
                                 }
                             }
                         } else {
@@ -241,39 +256,25 @@ where
 
             // Cleanup the known_small_files
             if let Some(grace_period) = self.remove_after {
-                let mut set = JoinSet::new();
+                let mut set = JoinMap::new();
 
-                let remove_file_tasks: HashMap<Id, PathBuf> = known_small_files
+                known_small_files
                     .iter()
                     .filter(|&(_path, last_time_open)| last_time_open.elapsed() >= grace_period)
                     .map(|(path, _last_time_open)| path.clone())
-                    .map(|path| {
-                        let path_ = path.clone();
-                        let abort_handle =
-                            set.spawn(async move { (path_.clone(), remove_file(&path_).await) });
-                        (abort_handle.id(), path)
-                    })
-                    .collect();
+                    .for_each(|path| set.spawn(path.clone(), remove_file(path)));
 
-                while let Some(res) = set.join_next().await {
-                    match res {
-                        Ok((path, Ok(()))) => {
+                while let Some((path, result)) = set.join_next().await {
+                    match result.map_err(std::io::Error::other).flatten() {
+                        Ok(()) => {
                             let removed = known_small_files.remove(&path);
 
                             if removed.is_some() {
                                 self.emitter.emit_file_deleted(&path);
                             }
                         }
-                        Ok((path, Err(err))) => {
+                        Err(err) => {
                             self.emitter.emit_file_delete_error(&path, err);
-                        }
-                        Err(join_err) => {
-                            self.emitter.emit_file_delete_error(
-                                remove_file_tasks
-                                    .get(&join_err.id())
-                                    .expect("panicked/cancelled task id not in task id pool"),
-                                std::io::Error::other(join_err),
-                            );
                         }
                     }
                 }
@@ -362,16 +363,24 @@ where
 
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
-            fp_map.retain(|file_id, watcher| {
-                if watcher.dead() {
-                    self.emitter
-                        .emit_file_unwatched(&watcher.path, watcher.reached_eof());
-                    checkpoints.set_dead(*file_id);
-                    false
-                } else {
-                    true
+            // First collect dead file IDs, then process them (get_unwatch_info is async).
+            let dead_file_ids: Vec<_> = fp_map
+                .iter()
+                .filter(|(_, watcher)| watcher.dead())
+                .map(|(file_id, _)| *file_id)
+                .collect();
+
+            for file_id in dead_file_ids {
+                if let Some(watcher) = fp_map.shift_remove(&file_id) {
+                    let unwatch_info = watcher.get_unwatch_info().await;
+                    self.emitter.emit_file_unwatched(
+                        &unwatch_info.path,
+                        unwatch_info.reached_eof,
+                        unwatch_info.bytes_unread,
+                    );
+                    checkpoints.set_dead(file_id);
                 }
-            });
+            }
             self.emitter.emit_files_open(fp_map.len());
 
             let start = time::Instant::now();
@@ -411,7 +420,7 @@ where
             };
             futures::pin_mut!(sleep);
             match select(shutdown_data, sleep).await {
-                Either::Left((_, _)) => {
+                Either::Left((_shutdown_token, _)) => {
                     chans
                         .close()
                         .await
@@ -423,6 +432,8 @@ where
                         error!(?error, "Error writing checkpoints before shutdown");
                     }
                     return Ok(Shutdown);
+                    // _shutdown_token is dropped here, after checkpoints are written,
+                    // which signals shutdown_done to the caller.
                 }
                 Either::Right((_, future)) => shutdown_data = future,
             }
@@ -575,7 +586,7 @@ fn scale(bytes: u64) -> String {
         bytes /= 1000.0;
         i += 1;
     }
-    format!("{:.3}{}/sec", bytes, units[i])
+    format!("{bytes:.3}{}/sec", units[i])
 }
 
 impl Default for TimingStats {

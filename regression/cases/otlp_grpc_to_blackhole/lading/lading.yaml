@@ -39,7 +39,9 @@ generator:
       bytes_per_second: "100 Mb"
       parallel_connections: 5
       maximum_prebuild_cache_size_bytes: "8 Mb"
-      variant: "opentelemetry_logs"
+      maximum_block_size: "8 Mb"
+      variant:
+        opentelemetry_logs: {}
 
 blackhole:
   - tcp:
