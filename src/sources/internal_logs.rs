@@ -505,7 +505,7 @@ mod tests {
         // single-threaded runtime this guarantees the source task cannot poll between emits,
         // so the broadcast overflows and accumulates a lag count.
         for i in 0usize..200 {
-            error!(message = "broadcast lag test", i);
+            error!(message = "Broadcast lag test.", i);
         }
 
         // Yield enough times for the source task to observe the lag and emit
