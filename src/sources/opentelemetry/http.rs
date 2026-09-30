@@ -483,24 +483,45 @@ fn acknowledgement_failure_response(status: AcknowledgementFailure) -> Response 
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, std::convert::Infallible> {
-    if let Some(err_msg) = err.find::<ErrorMessage>() {
-        let reply = protobuf(Status {
-            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: err_msg.message().into(),
-            ..Default::default()
-        });
-
-        Ok(warp::reply::with_status(reply, err_msg.status_code()))
+    let (message, status) = if let Some(err_msg) = err.find::<ErrorMessage>() {
+        (err_msg.message().into(), err_msg.status_code())
+    } else if is_content_type_rejection(&err) {
+        // The route only matches `Content-Type: application/x-protobuf`, so any other (or a
+        // missing) content type is a client error rather than an internal one.
+        (
+            "Unsupported content type; this endpoint requires `application/x-protobuf`.".into(),
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        )
+    } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
+        (
+            "Method not allowed; this endpoint requires `POST`.".into(),
+            StatusCode::METHOD_NOT_ALLOWED,
+        )
+    } else if err.is_not_found() {
+        ("Not found.".into(), StatusCode::NOT_FOUND)
     } else {
-        let reply = protobuf(Status {
-            code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
-            message: format!("{err:?}"),
-            ..Default::default()
-        });
+        (format!("{err:?}"), StatusCode::INTERNAL_SERVER_ERROR)
+    };
 
-        Ok(warp::reply::with_status(
-            reply,
-            StatusCode::INTERNAL_SERVER_ERROR,
-        ))
-    }
+    let reply = protobuf(Status {
+        code: 2, // UNKNOWN - OTLP doesn't require use of status.code, but we can't encode a None here
+        message,
+        ..Default::default()
+    });
+
+    Ok(warp::reply::with_status(reply, status))
+}
+
+/// Returns true if the request was rejected because of its `Content-Type` header.
+///
+/// `warp::header::exact_ignore_case` rejects with `InvalidHeader` both when the header has a
+/// different value and when it is absent; `MissingHeader` is checked as well for robustness.
+fn is_content_type_rejection(err: &Rejection) -> bool {
+    let is_content_type =
+        |name: &str| name.eq_ignore_ascii_case(http::header::CONTENT_TYPE.as_str());
+    err.find::<warp::reject::InvalidHeader>()
+        .is_some_and(|e| is_content_type(e.name()))
+        || err
+            .find::<warp::reject::MissingHeader>()
+            .is_some_and(|e| is_content_type(e.name()))
 }
