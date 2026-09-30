@@ -1,9 +1,11 @@
 use chrono::Utc;
 use futures::{StreamExt, stream};
+use tokio::sync::mpsc;
 use vector_lib::{
     codecs::BytesDeserializerConfig,
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
+    event::LogEvent,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
     schema::Definition,
 };
@@ -17,6 +19,16 @@ use crate::{
     shutdown::ShutdownSignal,
     trace::TraceSubscription,
 };
+
+/// Capacity of the intermediate queue that decouples broadcast consumption from downstream
+/// sending. The drain task pushes into this queue as fast as it can receive from the broadcast
+/// channel; the main task pulls in batches to `send_batch`. Sized to absorb short bursts while
+/// downstream is backpressured without further growing memory.
+const INTERMEDIATE_QUEUE_CAPACITY: usize = 10_000;
+
+/// Maximum number of events the main task will gather into a single batch before calling
+/// `send_batch`. Amortizes per-call overhead (timestamp capture, metrics, chunking).
+const MAX_BATCH_SIZE: usize = 1024;
 
 /// Configuration for the `internal_logs` source.
 #[configurable_component(source(
@@ -151,61 +163,110 @@ async fn run(
 
     // Chain any log events that were captured during early buffering to the front,
     // and then continue with the normal stream of internal log events.
+    //
+    // `shutdown` is cloned so the drain task can terminate its stream via `take_until`, while
+    // the main task still holds a live handle. The `ShutdownSignalToken` must outlive the
+    // entire `run()` scope — the source is only considered complete once every clone is
+    // dropped — so giving the drain task sole ownership would let topology teardown race with
+    // in-flight batches still being processed by the main task.
     let buffered_events = subscription.buffered_events().await;
-    let mut rx = stream::iter(buffered_events.into_iter().flatten())
+    let _shutdown_guard = shutdown.clone();
+    let rx = stream::iter(buffered_events.into_iter().flatten())
         .chain(subscription.into_stream())
         .take_until(shutdown);
+
+    // Decouple broadcast consumption from downstream sending. The drain task consumes the
+    // broadcast as fast as possible and hands events to the main task through a bounded queue;
+    // the main task enriches and `send_batch`es them downstream. When the main task is blocked
+    // on sink backpressure, the drain task can still empty short bursts into the queue, which
+    // keeps the broadcast receiver from lagging. Under sustained overload the queue fills, the
+    // drain task backpressures, and broadcast lag is eventually reported with the next event.
+    //
+    // The drain task is spawned in the current span: `TraceSubscription::into_stream` emits
+    // `ComponentEventsDropped` while the drain task polls it, and the metric takes its
+    // component tags from that span.
+    let (queue_tx, mut queue_rx) = mpsc::channel(INTERMEDIATE_QUEUE_CAPACITY);
+    let drain_task = crate::spawn_in_current_span(drain_broadcast(rx, queue_tx));
 
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs. Broadcast lag is
     // reported by `TraceSubscription::into_stream` itself, after an event
     // has been received, so its log cannot lag the receiver again.
-    while let Some(mut log) = rx.next().await {
-        // TODO: Should this actually be in memory size?
-        let byte_size = log.estimated_json_encoded_size_of().get();
-        let json_byte_size = log.estimated_json_encoded_size_of();
-        // This event doesn't emit any log
-        emit!(InternalLogsBytesReceived { byte_size });
-        emit!(InternalLogsEventsReceived {
-            count: 1,
-            byte_size: json_byte_size,
-        });
+    let mut batch: Vec<LogEvent> = Vec::with_capacity(MAX_BATCH_SIZE);
+    while queue_rx.recv_many(&mut batch, MAX_BATCH_SIZE).await > 0 {
+        let mut events: Vec<Event> = Vec::with_capacity(batch.len());
+        let mut byte_size_total: usize = 0;
+        let mut json_byte_size_total = vector_lib::json_size::JsonSize::zero();
 
-        if let Ok(hostname) = &hostname {
-            let legacy_host_key = host_key.as_ref().map(LegacyKey::Overwrite);
+        let now = Utc::now();
+        for mut log in batch.drain(..) {
+            let byte_size = log.estimated_json_encoded_size_of().get();
+            let json_byte_size = log.estimated_json_encoded_size_of();
+            byte_size_total += byte_size;
+            json_byte_size_total += json_byte_size;
+
+            if let Ok(hostname) = &hostname {
+                let legacy_host_key = host_key.as_ref().map(LegacyKey::Overwrite);
+                log_namespace.insert_source_metadata(
+                    InternalLogsConfig::NAME,
+                    &mut log,
+                    legacy_host_key,
+                    path!("host"),
+                    hostname.to_owned(),
+                );
+            }
+
+            let legacy_pid_key = pid_key.as_ref().map(LegacyKey::Overwrite);
             log_namespace.insert_source_metadata(
                 InternalLogsConfig::NAME,
                 &mut log,
-                legacy_host_key,
-                path!("host"),
-                hostname.to_owned(),
+                legacy_pid_key,
+                path!("pid"),
+                pid,
             );
+
+            log_namespace.insert_standard_vector_source_metadata(
+                &mut log,
+                InternalLogsConfig::NAME,
+                now,
+            );
+
+            events.push(Event::from(log));
         }
 
-        let legacy_pid_key = pid_key.as_ref().map(LegacyKey::Overwrite);
-        log_namespace.insert_source_metadata(
-            InternalLogsConfig::NAME,
-            &mut log,
-            legacy_pid_key,
-            path!("pid"),
-            pid,
-        );
+        emit!(InternalLogsBytesReceived {
+            byte_size: byte_size_total,
+        });
+        emit!(InternalLogsEventsReceived {
+            count: events.len(),
+            byte_size: json_byte_size_total,
+        });
 
-        log_namespace.insert_standard_vector_source_metadata(
-            &mut log,
-            InternalLogsConfig::NAME,
-            Utc::now(),
-        );
-
-        if (out.send_event(Event::from(log)).await).is_err() {
+        let event_count = events.len();
+        if out.send_batch(events).await.is_err() {
             // this wont trigger any infinite loop considering it stops the component
-            emit!(StreamClosedError { count: 1 });
+            emit!(StreamClosedError { count: event_count });
             return Err(());
         }
     }
 
+    // Wait for the drain task to exit cleanly after shutdown.
+    let _ = drain_task.await;
     Ok(())
+}
+
+/// Drains `rx` into `queue_tx` as fast as possible. Runs in a spawned task so broadcast
+/// consumption is decoupled from the main task's downstream send latency.
+async fn drain_broadcast<S>(mut rx: S, queue_tx: mpsc::Sender<LogEvent>)
+where
+    S: futures::Stream<Item = LogEvent> + Unpin,
+{
+    while let Some(log) = rx.next().await {
+        if queue_tx.send(log).await.is_err() {
+            break;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -510,9 +571,11 @@ mod tests {
     //
     // Strategy: run inside a single-threaded tokio runtime (the default for `#[tokio::test]`).
     // While the current task holds the CPU without yielding, no other tokio tasks are scheduled.
-    // We flood the broadcast channel (capacity 99) with more events than it can hold. The source
-    // task cannot poll between emits, so the broadcast overflows and records a lag count. After
-    // we yield, the source observes the lag and emits `ComponentEventsDropped`.
+    // We flood the broadcast channel (capacity 99) with more events than it can hold. The drain
+    // task hasn't polled yet, so the broadcast overflows and records a lag count. After we yield,
+    // the drain task observes the lag and emits `ComponentEventsDropped` with its next event.
+    // We use a non-consuming downstream receiver to ensure `send_batch` eventually blocks,
+    // preventing any events from being silently drained before we check the metric.
     #[tokio::test]
     #[serial]
     async fn broadcast_lag_increments_discarded_metric() {
@@ -520,8 +583,9 @@ mod tests {
         vector_lib::metrics::init_test();
         trace::reset_early_buffer();
 
-        // The downstream receiver is kept alive but never polled, so the source does not stop
-        // on a closed output and no events are consumed downstream before we check the metric.
+        // The downstream receiver is intentionally not polled; this means the source's
+        // send_batch will block once the output channel fills, creating backpressure that
+        // ensures the intermediate queue and broadcast stay full during the flood.
         let (tx, _rx) = SourceSender::new_test();
         let source = InternalLogsConfig::default()
             .build(SourceContext::new_test(tx, None))
@@ -529,8 +593,8 @@ mod tests {
             .unwrap();
         tokio::spawn(source);
 
-        // Yield so the source task subscribes and starts polling the broadcast, then stop early
-        // buffering so new events go to the live broadcast.
+        // Yield twice: once for the drain task to start polling the broadcast, once for the
+        // main task to start polling the queue. Both will block immediately (nothing to read).
         tokio::task::yield_now().await;
         trace::stop_early_buffering();
         tokio::task::yield_now().await;
@@ -540,13 +604,13 @@ mod tests {
         controller.reset();
 
         // Emit more events than the broadcast capacity (99) without yielding. In a
-        // single-threaded runtime this guarantees the source task cannot poll between emits,
+        // single-threaded runtime this guarantees the drain task cannot poll between emits,
         // so the broadcast overflows and accumulates a lag count.
         for i in 0usize..200 {
             error!(message = "Broadcast lag test.", i);
         }
 
-        // Yield enough times for the source task to observe the lag and emit
+        // Yield enough times for the drain task to observe the lag and emit
         // `ComponentEventsDropped`.
         for _ in 0..20 {
             tokio::task::yield_now().await;
