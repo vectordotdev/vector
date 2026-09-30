@@ -629,8 +629,17 @@ mod tests {
             create_event(vec![("ratio", f64::INFINITY)]),
             create_event(vec![("ratio", f64::NEG_INFINITY)]),
         ];
-        let (_schema, num_rows) = encode_autoinfer_and_read_schema(events);
+        let (schema, num_rows) = encode_autoinfer_and_read_schema(events);
         assert_eq!(num_rows, 2);
+        // AutoInfer still round-trips through JSON, which cannot represent non-finite floats,
+        // so the column is inferred as all-null rather than as a float column holding inf/-inf.
+        assert_eq!(
+            schema
+                .field_with_name("ratio")
+                .expect("ratio field should be present")
+                .data_type(),
+            &DataType::Null,
+        );
     }
 
     #[test]
