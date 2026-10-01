@@ -16,13 +16,11 @@ use chrono::Utc;
 use futures::{future::FutureExt, stream::StreamExt};
 use futures_util::Stream;
 use http_1::{HeaderName, HeaderValue};
-use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
 use kube::{
     Client, Config as ClientConfig,
-    api::Api,
     config::{self, KubeConfigOptions},
-    runtime::{WatchStreamExt, reflector, watcher},
+    runtime::{reflector, watcher},
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
@@ -56,7 +54,6 @@ use crate::{
         KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived, PodCountersCache,
         StreamClosedError,
     },
-    kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
     sources,
     sources::kubernetes_logs::partial_events_merger::merge_partial_events,
@@ -71,6 +68,7 @@ mod parser;
 mod partial_events_merger;
 mod path_helpers;
 mod pod_metadata_annotator;
+mod shared_metadata;
 mod transform_utils;
 mod util;
 
@@ -589,6 +587,7 @@ impl SourceConfig for Config {
 #[derive(Clone)]
 struct Source {
     client: Client,
+    client_identity: shared_metadata::ClientIdentity,
     data_dir: PathBuf,
     auto_partial_merge: bool,
     pod_fields_spec: pod_metadata_annotator::FieldsSpec,
@@ -661,6 +660,7 @@ impl Source {
                 .headers
                 .push((HeaderName::from_static("user-agent"), user_agent));
         }
+        let client_identity = shared_metadata::ClientIdentity::new(&client_config)?;
         let client = Client::try_from(client_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
@@ -680,6 +680,7 @@ impl Source {
 
         Ok(Self {
             client,
+            client_identity,
             data_dir,
             auto_partial_merge: config.auto_partial_merge,
             pod_fields_spec: config.pod_annotation_fields.clone(),
@@ -719,6 +720,7 @@ impl Source {
     ) -> crate::Result<()> {
         let Self {
             client,
+            client_identity,
             data_dir,
             auto_partial_merge,
             pod_fields_spec,
@@ -749,87 +751,35 @@ impl Source {
             pod_counters_sweep_interval,
         } = self;
 
-        let mut reflectors = Vec::new();
-
-        let pods = Api::<Pod>::all(client.clone());
-
-        let list_semantic = if use_apiserver_cache {
-            watcher::ListSemantic::Any
-        } else {
-            watcher::ListSemantic::MostRecent
+        let watch_key = |fields: String, labels: String| shared_metadata::WatchKey {
+            identity: client_identity.clone(),
+            fields,
+            labels,
+            use_apiserver_cache,
         };
-
-        let pod_watcher = watcher(
-            pods,
-            watcher::Config {
-                field_selector: Some(field_selector),
-                label_selector: Some(label_selector),
-                list_semantic: list_semantic.clone(),
-                page_size: get_page_size(use_apiserver_cache),
-                ..Default::default()
-            },
-        )
-        .backoff(watcher::DefaultBackoff::default());
-
-        let pod_store_w = reflector::store::Writer::default();
-        let pod_state = pod_store_w.as_reader();
-        let pod_cacher = MetaCache::new();
-
-        reflectors.push(crate::spawn_in_current_span(custom_reflector(
-            pod_store_w,
-            pod_cacher,
-            pod_watcher,
+        let pods = shared_metadata::pods(
+            client.clone(),
+            watch_key(field_selector, label_selector),
             delay_deletion,
-        )));
-
-        // -----------------------------------------------------------------
-
-        let ns_store_w = reflector::store::Writer::default();
-        let ns_state = ns_store_w.as_reader();
-        if insert_namespace_fields {
-            let namespaces = Api::<Namespace>::all(client.clone());
-            let ns_watcher = watcher(
-                namespaces,
-                watcher::Config {
-                    label_selector: Some(namespace_label_selector),
-                    list_semantic: list_semantic.clone(),
-                    page_size: get_page_size(use_apiserver_cache),
-                    ..Default::default()
-                },
-            )
-            .backoff(watcher::DefaultBackoff::default());
-
-            reflectors.push(crate::spawn_in_current_span(custom_reflector(
-                ns_store_w,
-                MetaCache::new(),
-                ns_watcher,
+        );
+        let pod_state = pods.store();
+        let namespaces = insert_namespace_fields.then(|| {
+            shared_metadata::namespaces(
+                client.clone(),
+                watch_key(String::new(), namespace_label_selector),
                 delay_deletion,
-            )));
-        }
-
-        // -----------------------------------------------------------------
-
-        let nodes = Api::<Node>::all(client);
-        let node_watcher = watcher(
-            nodes,
-            watcher::Config {
-                field_selector: Some(node_selector),
-                list_semantic,
-                page_size: get_page_size(use_apiserver_cache),
-                ..Default::default()
-            },
-        )
-        .backoff(watcher::DefaultBackoff::default());
-        let node_store_w = reflector::store::Writer::default();
-        let node_state = node_store_w.as_reader();
-        let node_cacher = MetaCache::new();
-
-        reflectors.push(crate::spawn_in_current_span(custom_reflector(
-            node_store_w,
-            node_cacher,
-            node_watcher,
+            )
+        });
+        let ns_state = namespaces.as_ref().map_or_else(
+            || reflector::store::Writer::default().as_reader(),
+            shared_metadata::Subscription::store,
+        );
+        let nodes = shared_metadata::nodes(
+            client,
+            watch_key(node_selector, String::new()),
             delay_deletion,
-        )));
+        );
+        let node_state = nodes.store();
 
         let paths_provider = K8sPathsProvider::new(
             pod_state.clone(),
@@ -1047,10 +997,9 @@ impl Source {
         }
 
         lifecycle.run(global_shutdown).await;
-        // Stop Kubernetes object reflectors to avoid their leak on vector reload.
-        for reflector in reflectors {
-            reflector.abort();
-        }
+        // Other sources retain their subscriptions; the last subscriber stops
+        // each watch. RAII also handles cancellation before graceful shutdown.
+        drop((pods, namespaces, nodes));
         info!(message = "Done.");
         Ok(())
     }
