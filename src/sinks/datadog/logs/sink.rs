@@ -449,12 +449,10 @@ fn encode_log(
     buf.truncate(existing_len);
     let encoded_size = write_log(buf, event, include_comma)?;
 
-    if encoded_size > truncation.max_log_bytes {
-        buf.truncate(existing_len);
-        return Ok(LogEncoding::Dropped {
-            reason: "Event remains too large after truncation.",
-        });
-    }
+    // The message budget uses the same UTF-8 bytes and JSON sizing as serialization, so a
+    // mismatch here indicates that the size calculation has diverged. Request serialization
+    // separately enforces `max_payload_bytes` in release builds.
+    debug_assert!(encoded_size <= truncation.max_log_bytes);
     emit!(DatadogLogsEventTruncated {
         max_log_bytes: truncation.max_log_bytes,
         original_encoded_size,
