@@ -117,7 +117,7 @@ impl ControlHeader {
             0x04 => Ok(ControlHeader::Ready),
             0x05 => Ok(ControlHeader::Finish),
             _ => {
-                error!("Don't know header value {} (expected 0x01 - 0x05).", val);
+                error!("Don't know header value {val} (expected 0x01 - 0x05).");
                 Err(())
             }
         }
@@ -143,7 +143,7 @@ impl ControlField {
         match val {
             0x01 => Ok(ControlField::ContentType),
             _ => {
-                error!("Don't know field type {} (expected 0x01).", val);
+                error!("Don't know field type {val} (expected 0x01).");
                 Err(())
             }
         }
@@ -341,8 +341,8 @@ impl FrameStreamReader {
         }
 
         error!(
-            "Content types did not match up. Expected {} got {:?}.",
-            self.expected_content_type, content_types
+            "Content types did not match up. Expected {} got {content_types:?}.",
+            self.expected_content_type
         );
         Err(())
     }
@@ -363,7 +363,7 @@ impl FrameStreamReader {
         let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)]);
 
         if let Err(e) = block_on(self.response_sink.lock().unwrap().send_all(&mut stream)) {
-            error!("Encountered error '{:#?}' while sending control frame.", e);
+            error!("Encountered error '{e:#?}' while sending control frame.");
         }
     }
 }
@@ -410,8 +410,6 @@ pub fn build_framestream_tcp_source(
 ) -> crate::Result<Source> {
     let addr = frame_handler.address();
     let tls = frame_handler.tls();
-    let shutdown = shutdown.clone();
-    let out = out.clone();
 
     Ok(Box::pin(async move {
         let listenfd = ListenFd::from_env();
@@ -419,6 +417,7 @@ pub fn build_framestream_tcp_source(
             addr,
             listenfd,
             &tls,
+            None, // tls_reloader: not wired for this source
             frame_handler
                 .allowed_origins()
                 .map(|origins| origins.to_vec()),
@@ -534,7 +533,7 @@ async fn handle_stream(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpSocketTlsConnectionError { error });
+                emit!(TcpSocketTlsConnectionError { error, peer_addr });
                 return;
             }
         },
@@ -693,6 +692,16 @@ pub fn build_framestream_unix_source(
     out: SourceSender,
 ) -> crate::Result<Source> {
     let path = frame_handler.socket_path();
+    let socket_file_mode = frame_handler.socket_file_mode();
+    // Configuration validation must reject invalid modes without touching the socket.
+    if let Some(socket_permission) = socket_file_mode
+        && !(0o700..=0o777).contains(&socket_permission)
+    {
+        return Err(format!(
+            "Invalid Socket permission {socket_permission:#o}. Must between 0o700 and 0o777."
+        )
+        .into());
+    }
 
     // NOTE: Socket setup (removing any stale socket file, binding the listener,
     // adjusting buffer sizes and permissions) is performed inside the returned
@@ -755,17 +764,10 @@ pub fn build_framestream_unix_source(
             );
         }
 
-        // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
-        if let Some(socket_permission) = frame_handler.socket_file_mode() {
-            if !(448..=511).contains(&socket_permission) {
-                error!(
-                    "Invalid Socket permission {socket_permission:#o}. Must between 0o700 and 0o777."
-                );
-                return Err(());
-            }
+        if let Some(socket_permission) = socket_file_mode {
             match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
                 Ok(_) => {
-                    info!("Socket permissions updated to {:#o}.", socket_permission);
+                    info!("Socket permissions updated to {socket_permission:#o}.");
                 }
                 Err(error) => {
                     error!(message = "Failed to update listener socket permissions.", %error);
@@ -782,7 +784,7 @@ pub fn build_framestream_unix_source(
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(e) => {
-                    error!("Failed to accept socket; error = {:?}.", e);
+                    error!("Failed to accept socket; error = {e:?}.");
                     continue;
                 }
                 Ok(s) => s,
@@ -848,7 +850,7 @@ fn build_framestream_source<T: Send + 'static>(
     error_mapper: impl FnMut(std::io::Error) + Send + 'static,
 ) {
     let content_type = frame_handler.content_type();
-    let mut event_sink = out.clone();
+    let mut event_sink = out;
     let (sock_sink, sock_stream) = Framed::new(
         socket,
         length_delimited::Builder::new()
@@ -874,7 +876,7 @@ fn build_framestream_source<T: Send + 'static>(
 
         let handler = async move {
             if let Err(e) = event_sink.send_event_stream(&mut events).await {
-                error!("Error sending event: {:?}.", e);
+                error!("Error sending event: {e:?}.");
             }
 
             info!("Finished sending.");
@@ -919,7 +921,7 @@ async fn spawn_event_handling_tasks(
 ) -> JoinHandle<()> {
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks).await;
 
-    tokio::spawn(async move {
+    crate::spawn_in_current_span(async move {
         future::ready({
             if let Some(evt) = event_handler.handle_event(received_from, event_data)
                 && event_sink.send_event(evt).await.is_err()
@@ -944,6 +946,7 @@ mod test {
     use std::net::SocketAddr;
     #[cfg(unix)]
     use std::{
+        os::unix::fs::MetadataExt,
         path::PathBuf,
         sync::{
             Arc,
@@ -1315,7 +1318,7 @@ mod test {
         sock_sink: &mut S,
         frames: Vec<Result<Bytes, std::io::Error>>,
     ) {
-        let mut stream = stream::iter(frames.into_iter());
+        let mut stream = stream::iter(frames);
         //send and send_all consume the sink
         _ = sock_sink.send_all(&mut stream).await;
     }
@@ -1815,33 +1818,67 @@ mod test {
         );
     }
 
-    // Regression test for https://github.com/vectordotdev/vector/issues/25513:
-    // building the source (as `vector validate` does when instantiating
-    // components) must not delete an existing socket file. The socket should
-    // only be (re)created when the source future is actually run.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn build_unix_source_does_not_remove_existing_socket() {
-        let frame_handler = create_frame_handler(false);
-        let socket_path = frame_handler.socket_path();
+    #[tokio::test]
+    async fn build_unix_source_preserves_existing_socket() {
+        let directory = tempfile::tempdir().unwrap();
+        let socket_path = directory.path().join("dnstap.sock");
+        let _listener = tokio::net::UnixListener::bind(&socket_path).unwrap();
+        let inode = std::fs::metadata(&socket_path).unwrap().ino();
 
-        // Simulate the socket file of an already-running source.
-        std::fs::write(&socket_path, b"in use").expect("Failed to create socket file.");
-        assert!(socket_path.exists());
+        for mode in [None, Some(0o700), Some(0o777), Some(0o600), Some(0o1000)] {
+            let mut frame_handler = MockUnixFrameHandler::new("mock".to_owned(), false, || {});
+            frame_handler.socket_path = socket_path.clone();
+            frame_handler.socket_file_mode = mode;
+            let (tx, _rx) = SourceSender::new_test();
+            let mut shutdown = SourceShutdownCoordinator::default();
+            let (signal, _) = shutdown.register_source(&ComponentKey::from("test_source"), false);
 
-        let (tx, _rx) = SourceSender::new_test();
-        let source_id = ComponentKey::from("test_source");
-        let mut shutdown = SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(&source_id, false);
+            let result = build_framestream_unix_source(frame_handler, signal, tx);
+            assert_eq!(result.is_ok(), !matches!(mode, Some(0o600 | 0o1000)));
+            drop(result);
+            assert_eq!(std::fs::metadata(&socket_path).unwrap().ino(), inode);
+            assert!(tokio::net::UnixStream::connect(&socket_path).await.is_ok());
+        }
+    }
 
-        // Building the source should not touch the existing file...
-        let source = build_framestream_unix_source(frame_handler, shutdown_signal, tx)
-            .expect("Failed to build framestream unix source.");
-        assert!(
-            socket_path.exists(),
-            "Building the source must not delete the existing socket file"
-        );
+    #[tokio::test]
+    async fn build_unix_source_preserves_existing_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let socket_path = directory.path().join("dnstap.sock");
+        std::fs::write(&socket_path, b"in use").unwrap();
+        let inode = std::fs::metadata(&socket_path).unwrap().ino();
+        for mode in [None, Some(0o700), Some(0o777), Some(0o600), Some(0o1000)] {
+            let mut frame_handler = MockUnixFrameHandler::new("mock".to_owned(), false, || {});
+            frame_handler.socket_path = socket_path.clone();
+            frame_handler.socket_file_mode = mode;
+            let (tx, _rx) = SourceSender::new_test();
+            let mut shutdown = SourceShutdownCoordinator::default();
+            let (signal, _) = shutdown.register_source(&ComponentKey::from("test_source"), false);
 
-        // ...the file is only managed once the source future actually runs.
-        drop(source);
+            let result = build_framestream_unix_source(frame_handler, signal, tx);
+            assert_eq!(result.is_ok(), !matches!(mode, Some(0o600 | 0o1000)));
+            drop(result);
+            assert_eq!(std::fs::read(&socket_path).unwrap(), b"in use");
+            assert_eq!(std::fs::metadata(&socket_path).unwrap().ino(), inode);
+        }
+    }
+
+    #[tokio::test]
+    async fn build_unix_source_validates_mode_without_creating_socket() {
+        let directory = tempfile::tempdir().unwrap();
+        let socket_path = directory.path().join("dnstap.sock");
+        for mode in [None, Some(0o700), Some(0o777), Some(0o600), Some(0o1000)] {
+            let mut frame_handler = MockUnixFrameHandler::new("mock".to_owned(), false, || {});
+            frame_handler.socket_path = socket_path.clone();
+            frame_handler.socket_file_mode = mode;
+            let (tx, _rx) = SourceSender::new_test();
+            let mut shutdown = SourceShutdownCoordinator::default();
+            let (signal, _) = shutdown.register_source(&ComponentKey::from("test_source"), false);
+
+            let result = build_framestream_unix_source(frame_handler, signal, tx);
+            assert_eq!(result.is_ok(), !matches!(mode, Some(0o600 | 0o1000)));
+            drop(result);
+            assert!(!socket_path.exists());
+        }
     }
 }

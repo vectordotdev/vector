@@ -25,8 +25,8 @@ pub struct TraceToLogConfig {
 }
 
 impl GenerateConfig for TraceToLogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             log_namespace: None,
         })
         .unwrap()
@@ -78,7 +78,10 @@ mod tests {
     use crate::transforms::test::create_topology;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::event::TraceEvent;
+    use vector_lib::{
+        config::LogNamespace,
+        event::{TraceEvent, TraceLayout},
+    };
 
     #[test]
     fn generate_config() {
@@ -129,6 +132,25 @@ mod tests {
         assert_eq!(
             actual_map, expected_map,
             "Trace data fields should be preserved"
+        );
+    }
+
+    #[tokio::test]
+    async fn drops_trace_layout_marker() {
+        use vrl::btreemap;
+
+        let mut trace = TraceEvent::from(btreemap! {
+            "host" => "a_hostname",
+            "span_id" => "abc123",
+        });
+        trace.metadata_mut().set_trace_layout(TraceLayout::Datadog);
+
+        let log = do_transform(trace).await.unwrap();
+        assert_eq!(log.namespace(), LogNamespace::Legacy);
+        assert_eq!(log.metadata().trace_layout(), None);
+        assert_eq!(
+            log.get(vrl::event_path!("host")),
+            Some(&"a_hostname".into())
         );
     }
 }

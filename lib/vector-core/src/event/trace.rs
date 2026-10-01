@@ -11,7 +11,7 @@ use vrl::path::PathParseError;
 
 use super::{
     BatchNotifier, EstimatedJsonEncodedSizeOf, EventFinalizer, EventFinalizers, EventMetadata,
-    Finalizable, LogEvent, ObjectMap, Value,
+    Finalizable, LogEvent, MergeFinalizable, ObjectMap, Value,
 };
 
 /// Traces are a newtype of `LogEvent`
@@ -132,7 +132,8 @@ impl From<LogEvent> for TraceEvent {
 }
 
 impl From<TraceEvent> for LogEvent {
-    fn from(trace: TraceEvent) -> Self {
+    fn from(mut trace: TraceEvent) -> Self {
+        trace.0.metadata_mut().clear_trace_layout();
         trace.0
     }
 }
@@ -170,6 +171,12 @@ impl EventDataEq for TraceEvent {
 impl Finalizable for TraceEvent {
     fn take_finalizers(&mut self) -> EventFinalizers {
         self.0.take_finalizers()
+    }
+}
+
+impl MergeFinalizable for TraceEvent {
+    fn merge_finalizers(&mut self, finalizers: EventFinalizers) {
+        self.0.merge_finalizers(finalizers);
     }
 }
 

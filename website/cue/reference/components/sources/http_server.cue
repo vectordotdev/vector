@@ -4,11 +4,9 @@ components: sources: http_server: {
 	_port: 80
 
 	title: "HTTP Server"
-	alias: "http"
 
 	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
+		delivery: "at_least_once"
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "batch"
@@ -49,7 +47,6 @@ components: sources: http_server: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {
@@ -65,7 +62,7 @@ components: sources: http_server: {
 				fields: {
 					message: {
 						description:   "The raw line from the incoming payload."
-						relevant_when: "encoding == \"text\""
+						relevant_when: "decoding.codec == \"bytes\""
 						required:      true
 						type: string: {
 							examples: ["Hello world"]
@@ -92,9 +89,8 @@ components: sources: http_server: {
 				description: "An individual line from an `application/json` request"
 				fields: {
 					"*": {
-						common:        false
 						description:   "Any field contained in your JSON payload"
-						relevant_when: "encoding != \"text\""
+						relevant_when: "decoding.codec != \"bytes\""
 						required:      false
 						type: "*": {}
 					}
@@ -127,7 +123,7 @@ components: sources: http_server: {
 			configuration: {
 				address: "0.0.0.0:\(_port)"
 				decoding: {
-					codec: "text"
+					codec: "bytes"
 				}
 				framing: {
 					method: "newline_delimited"

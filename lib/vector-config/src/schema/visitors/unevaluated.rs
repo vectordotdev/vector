@@ -42,9 +42,8 @@ impl Visitor for DisallowUnevaluatedPropertiesVisitor {
         let eligible_to_flatten = build_closed_schema_flatten_eligibility_mappings(root);
 
         debug!(
-            "Found {} referents eligible for flattening: {:?}",
+            "Found {} referents eligible for flattening: {eligible_to_flatten:?}",
             eligible_to_flatten.len(),
-            eligible_to_flatten,
         );
 
         self.eligible_to_flatten = eligible_to_flatten;
@@ -233,22 +232,16 @@ fn build_closed_schema_flatten_eligibility_mappings(
             Schema::Object(schema) => schema,
         };
 
-        debug!(
-            "Evaluating schema definition '{}' for markability.",
-            definition_name
-        );
+        debug!("Evaluating schema definition '{definition_name}' for markability.");
 
         // If a schema itself would not be considered markable, then we don't need to consider the
         // eligibility between parent/child since there's nothing to drive the "now unmark the child
         // schemas" logic.
         if !is_markable_schema(&root_schema.definitions, parent_schema) {
-            debug!("Schema definition '{}' not markable.", definition_name);
+            debug!("Schema definition '{definition_name}' not markable.");
             continue;
         } else {
-            debug!(
-                "Schema definition '{}' markable. Collecting referents.",
-                definition_name
-            );
+            debug!("Schema definition '{definition_name}' markable. Collecting referents.");
         }
 
         // Collect all referents for this definition, which includes both property-based referents
@@ -258,10 +251,8 @@ fn build_closed_schema_flatten_eligibility_mappings(
         get_referents(parent_schema, &mut referents);
 
         debug!(
-            "Collected {} referents for '{}': {:?}",
-            referents.len(),
-            definition_name,
-            referents
+            "Collected {} referents for '{definition_name}': {referents:?}",
+            referents.len()
         );
 
         // Store the parent/child mapping.
@@ -359,10 +350,7 @@ fn is_markable_schema(definitions: &Map<String, Schema>, schema: &SchemaObject) 
                 })
                 .and_then(|(name, schema)| schema.as_object().map(|schema| (name, schema)))
                 .is_some_and(|(name, schema)| {
-                    debug!(
-                        "Following schema reference '{}' for subschema markability.",
-                        name
-                    );
+                    debug!("Following schema reference '{name}' for subschema markability.");
                     is_markable_schema(definitions, schema)
                 })
         });

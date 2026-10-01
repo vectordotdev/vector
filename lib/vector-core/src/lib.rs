@@ -16,14 +16,11 @@
 #![deny(unused_extern_crates)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
-#![allow(clippy::cast_possible_wrap)]
-#![allow(clippy::cast_sign_loss)]
 #![allow(clippy::default_trait_access)] // triggers on generated prost code
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wildcard_for_single_variants)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)] // many false positives in this package
-#![allow(clippy::non_ascii_literal)] // using unicode literals is a-okay in vector
 #![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0
 #![allow(clippy::type_complexity)] // long-types happen, especially in async code
 
@@ -46,7 +43,6 @@ mod test_util;
 pub mod time;
 pub mod tls;
 pub mod transform;
-#[cfg(feature = "vrl")]
 pub mod vrl;
 
 use std::path::PathBuf;
@@ -54,7 +50,6 @@ use std::path::PathBuf;
 pub use event::EstimatedJsonEncodedSizeOf;
 use float_eq::FloatEq;
 
-#[cfg(feature = "vrl")]
 pub use crate::vrl::compile_vrl;
 
 #[macro_use]

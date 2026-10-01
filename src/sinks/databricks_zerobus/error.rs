@@ -28,11 +28,6 @@ pub enum ZerobusSinkError {
     #[snafu(display("Record ingestion failed: {}", source))]
     IngestionError { source: ZerobusError },
 
-    /// The SDK returned no offset to wait on, so server acceptance of the
-    /// batch cannot be confirmed. Treated as non-retryable.
-    #[snafu(display("Zerobus ingest returned no offset; cannot confirm server acceptance"))]
-    MissingAckOffset,
-
     /// The shared stream was closed concurrently (by shutdown or retry-driven
     /// replacement) before this ingest could run. Retryable: the next attempt
     /// will create a fresh stream via `get_or_create_stream`.
@@ -55,7 +50,7 @@ impl ZerobusSinkError {
             | Self::IngestionError { source } => source.is_retryable(),
             Self::StreamClosed => true,
             Self::SchemaError { retryable, .. } => *retryable,
-            Self::ConfigError { .. } | Self::EncodingError { .. } | Self::MissingAckOffset => false,
+            Self::ConfigError { .. } | Self::EncodingError { .. } => false,
         }
     }
 

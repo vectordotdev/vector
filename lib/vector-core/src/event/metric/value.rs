@@ -80,10 +80,7 @@ pub enum MetricValue {
     /// Sketches represent the data in a way that queries over it have bounded error guarantees without needing to hold
     /// every single sample in memory. They are also, typically, able to be merged with other sketches of the same type
     /// such that client-side _and_ server-side aggregation can be accomplished without loss of accuracy in the queries.
-    Sketch {
-        #[configurable(derived)]
-        sketch: MetricSketch,
-    },
+    Sketch { sketch: MetricSketch },
 }
 
 impl MetricValue {
@@ -513,7 +510,6 @@ impl From<AgentDDSketch> for MetricValue {
 }
 
 // Currently, VRL can only read the type of the value and doesn't consider any actual metric values.
-#[cfg(feature = "vrl")]
 impl From<MetricValue> for vrl::value::Value {
     fn from(value: MetricValue) -> Self {
         value.as_name().into()
@@ -575,7 +571,6 @@ impl ByteSizeOf for MetricSketch {
 }
 
 // Currently, VRL can only read the type of the value and doesn't consider ny actual metric values.
-#[cfg(feature = "vrl")]
 impl From<MetricSketch> for vrl::value::Value {
     fn from(value: MetricSketch) -> Self {
         value.as_name().into()
@@ -637,6 +632,18 @@ where
 
         fn visit_f64<E: de::Error>(self, value: f64) -> Result<Self::Value, E> {
             Ok(value)
+        }
+
+        // f64 represents integers exactly up to 2^53 (~9 quadrillion), which covers any realistic
+        // histogram bucket boundary. The precision loss only affects values beyond that threshold.
+        #[allow(clippy::cast_precision_loss)]
+        fn visit_i64<E: de::Error>(self, value: i64) -> Result<Self::Value, E> {
+            Ok(value as f64)
+        }
+
+        #[allow(clippy::cast_precision_loss)]
+        fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
+            Ok(value as f64)
         }
 
         fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
@@ -745,5 +752,43 @@ impl Quantile {
 impl ByteSizeOf for Quantile {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bucket_upper_limit_deserializes_integer() {
+        // JSON integers (e.g. 1) must deserialize into Bucket.upper_limit as f64.
+        let bucket: Bucket = serde_json::from_str(r#"{"upper_limit": 1, "count": 5}"#).unwrap();
+        assert_eq!(bucket.upper_limit, 1.0_f64);
+        assert_eq!(bucket.count, 5);
+    }
+
+    #[test]
+    fn bucket_upper_limit_deserializes_negative_integer() {
+        let bucket: Bucket = serde_json::from_str(r#"{"upper_limit": -1, "count": 0}"#).unwrap();
+        assert_eq!(bucket.upper_limit, -1.0_f64);
+    }
+
+    #[test]
+    fn bucket_upper_limit_deserializes_float() {
+        let bucket: Bucket = serde_json::from_str(r#"{"upper_limit": 1.5, "count": 3}"#).unwrap();
+        assert_eq!(bucket.upper_limit, 1.5_f64);
+    }
+
+    #[test]
+    fn bucket_upper_limit_deserializes_special_strings() {
+        let inf: Bucket = serde_json::from_str(r#"{"upper_limit": "inf", "count": 0}"#).unwrap();
+        assert!(inf.upper_limit.is_infinite() && inf.upper_limit > 0.0);
+
+        let neg_inf: Bucket =
+            serde_json::from_str(r#"{"upper_limit": "-inf", "count": 0}"#).unwrap();
+        assert!(neg_inf.upper_limit.is_infinite() && neg_inf.upper_limit < 0.0);
+
+        let nan: Bucket = serde_json::from_str(r#"{"upper_limit": "NaN", "count": 0}"#).unwrap();
+        assert!(nan.upper_limit.is_nan());
     }
 }
