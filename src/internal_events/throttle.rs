@@ -1,4 +1,3 @@
-use metrics::Label;
 use vector_lib::{
     NamedInternalEvent, counter,
     internal_event::{ComponentEventsDropped, CounterName, INTENTIONAL, InternalEvent},
@@ -21,14 +20,12 @@ impl InternalEvent for ThrottleEventDiscarded {
             counter!(CounterName::EventsDiscardedTotal, "key" => self.key.clone()).increment(1);
         }
 
-        let group_tag = self
-            .include_group_tag
-            .then(|| Label::new("group", self.key));
+        let group = self.include_group_tag.then_some(self.key);
         ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: message,
         }
-        .emit_with_tags(group_tag);
+        .emit_with_group(group);
     }
 }
 

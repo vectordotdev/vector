@@ -383,7 +383,7 @@ static RE_EMIT_DROPPED: LazyLock<Regex> = LazyLock::new(|| {
 
 fn emits_component_events_dropped(source: &str) -> bool {
     RE_EMIT_DROPPED.is_match(source)
-        || (source.contains("ComponentEventsDropped") && source.contains(".emit_with_tags("))
+        || (source.contains("ComponentEventsDropped") && source.contains(".emit_with_group("))
 }
 
 /// `emit!(EventName)` / `register!(Path::EventName)` use-counting regex,
@@ -884,7 +884,7 @@ impl Scanner<'_> {
             // Component-events-dropped emission.
             if expr.contains("emit ! (ComponentEventsDropped")
                 || expr.contains("register ! (ComponentEventsDropped")
-                || (expr.contains("ComponentEventsDropped") && expr.contains(". emit_with_tags ("))
+                || (expr.contains("ComponentEventsDropped") && expr.contains(". emit_with_group ("))
             {
                 event.emits_component_events_dropped = true;
             }
@@ -1265,13 +1265,13 @@ mod tests {
     }
 
     #[test]
-    fn recognizes_component_events_dropped_emit_with_tags() {
+    fn recognizes_component_events_dropped_emit_with_group() {
         let source = r#"
             ComponentEventsDropped::<INTENTIONAL> {
                 count: 1,
                 reason: "discarded",
             }
-            .emit_with_tags(group_tag);
+            .emit_with_group(group);
         "#;
 
         assert!(emits_component_events_dropped(source));

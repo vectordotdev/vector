@@ -16,37 +16,28 @@ pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
 
 impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'_, INTENTIONAL> {
     fn emit(self) {
-        self.emit_with_tags([]);
+        self.emit_with_group(None);
     }
 }
 
 impl<'a, const INTENTIONAL: bool> ComponentEventsDropped<'a, INTENTIONAL> {
-    /// Emits the discarded events metric with arbitrary additional labels.
-    ///
-    /// The standard `intentional`, `reason`, and `count` properties are managed by this event and
-    /// cannot be overridden by additional labels.
-    pub fn emit_with_tags(self, tags: impl IntoIterator<Item = Label>) {
+    /// Emits the discarded events metric with an optional `group` label.
+    pub fn emit_with_group(self, group: Option<String>) {
         #[cfg(any(test, feature = "test"))]
         crate::event_test_util::record_internal_event(<Self as super::NamedInternalEvent>::name(
             &self,
         ));
 
         let count = self.count;
-        self.register_with_tags(tags).emit(Count(count));
+        self.register_with_group(group).emit(Count(count));
     }
 
-    fn register_with_tags(
-        self,
-        tags: impl IntoIterator<Item = Label>,
-    ) -> DroppedHandle<'a, INTENTIONAL> {
+    fn register_with_group(self, group: Option<String>) -> DroppedHandle<'a, INTENTIONAL> {
         let tags = std::iter::once(Label::new(
             "intentional",
             if INTENTIONAL { "true" } else { "false" },
         ))
-        .chain(
-            tags.into_iter()
-                .filter(|tag| !matches!(tag.key(), "intentional" | "reason" | "count")),
-        )
+        .chain(group.map(|value| Label::new("group", value)))
         .collect::<Vec<_>>();
 
         DroppedHandle {
@@ -70,7 +61,7 @@ impl<'a, const INTENTIONAL: bool> RegisterInternalEvent
     // ## skip check-validity-events ##
     type Handle = DroppedHandle<'a, INTENTIONAL>;
     fn register(self) -> Self::Handle {
-        self.register_with_tags([])
+        self.register_with_group(None)
     }
 }
 
@@ -139,9 +130,9 @@ mod tests {
         }
     }
 
-    // Drop two events via ordinary emit, empty tags, a reused handle, and custom tags.
-    // Check that each counter totals two, only the last has custom tags, and reserved tags
-    // cannot be overridden. Run for both intentional values with an isolated recorder.
+    // Drop two events via ordinary emit, no group, a reused handle, and a named group.
+    // Check that each counter totals two and only the last has a group tag. Run for both
+    // intentional values with an isolated recorder.
     fn check_emission_paths<const INTENTIONAL: bool>() {
         let recorder = TestRecorder::default();
         metrics::with_local_recorder(&recorder, || {
@@ -150,17 +141,11 @@ mod tests {
                 reason: "test",
             };
             super::super::emit(event());
-            event().emit_with_tags([]);
+            event().emit_with_group(None);
             let handle = event().register();
             handle.emit(Count(1));
             handle.emit(Count(1));
-            event().emit_with_tags([
-                Label::new("group", String::from("alpha")),
-                Label::new("custom", "value"),
-                Label::new("intentional", "override"),
-                Label::new("reason", "override"),
-                Label::new("count", "override"),
-            ]);
+            event().emit_with_group(Some(String::from("alpha")));
         });
 
         let counters = recorder.counters.lock().unwrap();
@@ -171,7 +156,7 @@ mod tests {
             assert_eq!(count.load(Ordering::Relaxed), 2);
             let mut expected = vec![intentional.clone()];
             if index == 3 {
-                expected.extend([Label::new("group", "alpha"), Label::new("custom", "value")]);
+                expected.push(Label::new("group", "alpha"));
             }
             assert_eq!(key.labels().cloned().collect::<Vec<_>>(), expected);
         }
