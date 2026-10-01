@@ -815,13 +815,133 @@ enum Ec2MetadataError {
 
 #[cfg(test)]
 mod test {
+    use std::sync::{Arc, Mutex};
+
     use vector_lib::lookup::OwnedTargetPath;
     use vrl::{owned_value_path, value::Kind};
 
+    use super::*;
     use crate::{
         config::{LogNamespace, OutputId, TransformConfig, schema::Definition},
+        event::{LogEvent, Metric, MetricKind, metric::MetricValue},
+        test_util::http::spawn_blackhole_http_server,
         transforms::aws_ec2_metadata::Ec2Metadata,
     };
+
+    #[tokio::test]
+    async fn additional_categories_are_selected_and_enrich_logs_and_metrics() {
+        const CATEGORIES: [(&str, &str, &str); 7] = [
+            (
+                AVAILABILITY_ZONE_ID_KEY,
+                "/latest/meta-data/placement/availability-zone-id",
+                "use1-az1",
+            ),
+            (PARTITION_KEY, "/latest/meta-data/services/partition", "aws"),
+            (
+                DOMAIN_KEY,
+                "/latest/meta-data/services/domain",
+                "amazonaws.com",
+            ),
+            (
+                PLACEMENT_GROUP_NAME_KEY,
+                "/latest/meta-data/placement/group-name",
+                "test-group",
+            ),
+            (
+                PLACEMENT_PARTITION_NUMBER_KEY,
+                "/latest/meta-data/placement/partition-number",
+                "2",
+            ),
+            (HOST_ID_KEY, "/latest/meta-data/placement/host-id", "h-test"),
+            (
+                AUTOSCALING_TARGET_LIFECYCLE_STATE_KEY,
+                "/latest/meta-data/autoscaling/target-lifecycle-state",
+                "InService",
+            ),
+        ];
+        let all: Vec<_> = CATEGORIES.iter().map(|(field, _, _)| *field).collect();
+        for (selected, missing) in [
+            (all.clone(), None),
+            (vec![PARTITION_KEY], None),
+            (all, Some(HOST_ID_KEY)),
+        ] {
+            let requests = Arc::new(Mutex::new(Vec::new()));
+            let endpoint = spawn_blackhole_http_server({
+                let requests = Arc::clone(&requests);
+                move |request: http::Request<Body>| {
+                    let path = request.uri().path();
+                    requests.lock().unwrap().push(path.to_owned());
+                    let (status, body) = if path == "/latest/api/token" {
+                        assert_eq!(request.method(), http::Method::PUT);
+                        (StatusCode::OK, "test-token")
+                    } else {
+                        assert_eq!(request.headers()["x-aws-ec2-metadata-token"], "test-token");
+                        if path == "/latest/dynamic/instance-identity/document" {
+                            (StatusCode::OK, r#"{"accountId":"test-account","architecture":"x86_64","imageId":"ami-test","instanceId":"i-test","instanceType":"t3.micro","privateIp":"192.0.2.1","region":"us-east-1","version":"2017-09-30"}"#)
+                        } else {
+                            CATEGORIES.iter()
+                                .find(|(field, uri, _)| *uri == path && Some(*field) != missing)
+                                .map_or((StatusCode::NOT_FOUND, ""), |(_, _, value)| (StatusCode::OK, *value))
+                        }
+                    };
+                    std::future::ready(Ok::<_, std::convert::Infallible>(
+                        http::Response::builder().status(status).body(Body::from(body)).unwrap(),
+                    ))
+                }
+            }).await;
+            let state = Arc::new(ArcSwap::from_pointee(Vec::new()));
+            let mut client = MetadataClient::new(
+                HttpClient::new(None, &ProxyConfig::default()).unwrap(),
+                endpoint,
+                Keys::new(Some(
+                    OwnedTargetPath::event(owned_value_path!("ec2")).into(),
+                )),
+                Arc::clone(&state),
+                Duration::from_secs(60),
+                Duration::from_secs(5),
+                selected.iter().map(|field| (*field).to_owned()).collect(),
+                Vec::new(),
+            );
+            client.refresh_metadata().await.unwrap();
+            let mut transform = Ec2MetadataTransform {
+                state: Arc::clone(&state),
+            };
+            let log = transform.transform_one(Event::Log(LogEvent::default()));
+            let metric = transform.transform_one(Event::Metric(Metric::new(
+                "test",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 1.0 },
+            )));
+            let metadata = state.load();
+            assert_eq!(
+                metadata.len(),
+                selected
+                    .iter()
+                    .filter(|field| Some(**field) != missing)
+                    .count()
+            );
+            for (field, uri, value) in CATEGORIES {
+                assert_eq!(
+                    requests.lock().unwrap().iter().any(|path| path == uri),
+                    selected.contains(&field)
+                );
+                if selected.contains(&field) && Some(field) != missing {
+                    let key = metadata
+                        .iter()
+                        .find(|(key, _)| key.metric_tag == format!("ec2.{field}"))
+                        .unwrap();
+                    assert_eq!(
+                        log.as_log().get(&key.0.log_path),
+                        Some(&vrl::value::Value::from(value))
+                    );
+                    assert_eq!(
+                        metric.as_metric().tags().unwrap().get(&key.0.metric_tag),
+                        Some(value)
+                    );
+                }
+            }
+        }
+    }
 
     #[tokio::test]
     async fn schema_def_with_string_input() {
