@@ -89,9 +89,14 @@ test("exact component search supports keyboard navigation", async ({ page }) => 
   await page.locator("#site-search").getByRole("button", { name: "Search", exact: false }).click();
   const search = page.getByRole("searchbox");
   await search.fill("remap transform");
-  await expect(page.locator(".aa-Panel").getByRole("link").first()).toHaveAttribute("href", remap);
+  const options = page.locator(".aa-Panel").getByRole("option");
+  await expect(options.nth(1)).toBeVisible();
+  await expect(options.first().getByRole("link")).toHaveAttribute("href", remap);
+  await expect(options.first()).toHaveAttribute("aria-selected", "true");
   await search.press("ArrowDown");
+  await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
   await search.press("ArrowUp");
+  await expect(options.first()).toHaveAttribute("aria-selected", "true");
   await search.press("Enter");
   await expect(page).toHaveURL(new RegExp(`${remap}$`));
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Remap");

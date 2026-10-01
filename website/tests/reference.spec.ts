@@ -4,8 +4,8 @@ const functions = "/docs/reference/vrl/functions/";
 
 test("VRL function reference renders signatures, arguments, and example results", async ({ page }) => {
   await page.goto(functions);
-  const heading = page.getByRole("heading", { name: "parse_json", exact: true });
-  const reference = heading.locator("xpath=ancestor::div[1]");
+  const reference = page.locator("#parse_json").locator("xpath=ancestor::div[1]");
+  const heading = reference.getByRole("heading", { name: "parse_json", exact: true });
   await heading.scrollIntoViewIfNeeded();
   await expect(heading).toBeInViewport();
   await expect(reference.getByRole("link", { name: "fallible", exact: true })).toBeVisible();
