@@ -16,6 +16,11 @@ jobs:
     name: Website browser tests
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DD_ENV: "ci"
     defaults:
       run:
         shell: bash
@@ -38,6 +43,7 @@ jobs:
           mold: false
           cue: true
           prettier: true
+          datadog-ci: true
 
       - name: Install Hugo extended
         run: |
@@ -53,6 +59,20 @@ jobs:
 
       - name: Build website and run browser tests
         run: make test
+
+      - uses: ./.github/actions/dd-token
+        if: ${{ !cancelled() && hashFiles('website/test-results/junit.xml') != '' }}
+        continue-on-error: true
+
+      - name: Upload test results to Datadog
+        if: ${{ !cancelled() && hashFiles('website/test-results/junit.xml') != '' }}
+        continue-on-error: true
+        run: |
+          if [[ -z "${DD_API_KEY:-}" ]]; then
+            echo "::notice::Skipping Datadog upload: credentials are unavailable"
+            exit 0
+          fi
+          datadog-ci junit upload --service vector-website test-results/junit.xml
 
       - name: Upload browser test report
         if: ${{ !cancelled() }}
