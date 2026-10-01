@@ -41,6 +41,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           mold: false
+          rust: true
+          protoc: true
           cue: true
           prettier: true
           datadog-ci: true
@@ -56,6 +58,12 @@ jobs:
 
       - name: Install Playwright browsers and system dependencies
         run: yarn playwright install --with-deps chromium firefox webkit
+
+      - uses: ./.github/actions/install-vrl-doc-builder
+
+      - name: Generate Vector VRL function documentation
+        working-directory: .
+        run: make generate-vector-vrl-docs
 
       - name: Build website and run browser tests
         run: make test
