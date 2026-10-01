@@ -1,4 +1,3 @@
-use metrics::Label;
 use vector_lib::{
     NamedInternalEvent,
     internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent},
@@ -12,14 +11,14 @@ pub struct SampleEventDiscarded {
 
 impl InternalEvent for SampleEventDiscarded {
     fn emit(self) {
-        let group_tag = self
+        let group = self
             .include_group_tag
-            .then(|| Label::new("group", self.group.unwrap_or_else(|| "None".to_string())));
+            .then(|| self.group.unwrap_or_else(|| "None".to_string()));
         ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
             reason: "Sample discarded.",
         }
-        .emit_with_tags(group_tag);
+        .emit_with_group(group);
     }
 }
 
