@@ -59,20 +59,23 @@ impl SampleMode {
         }
     }
 
-    fn increment(&mut self, group_by_key: Option<String>, value: Option<&Value>) -> bool {
+    fn increment(&mut self, group_by_key: &Option<String>, value: Option<&Value>) -> bool {
         let threshold_exceeded = match self {
             Self::Rate { rate, counters } => {
-                let counter_value = counters.entry(group_by_key).or_default();
-                let old_counter_value = *counter_value;
-                *counter_value += 1;
-                old_counter_value % *rate == 0
+                next_counter_value(counters, group_by_key).is_multiple_of(*rate)
             }
             Self::Ratio {
                 ratio, samplers, ..
-            } => samplers
-                .entry(group_by_key)
-                .or_insert_with(|| RatioSampler::new(*ratio))
-                .sample(),
+            } => {
+                if let Some(sampler) = samplers.get_mut(group_by_key) {
+                    sampler.sample()
+                } else {
+                    let mut sampler = RatioSampler::new(*ratio);
+                    let sampled = sampler.sample();
+                    samplers.insert(group_by_key.clone(), sampler);
+                    sampled
+                }
+            }
         };
         if let Some(value) = value {
             self.hash_within_ratio(value.to_string_lossy().as_bytes())
@@ -90,6 +93,20 @@ impl SampleMode {
                 ..
             } => hash <= *hash_ratio_threshold,
         }
+    }
+}
+
+fn next_counter_value(
+    counters: &mut HashMap<Option<String>, u64>,
+    group_by_key: &Option<String>,
+) -> u64 {
+    if let Some(counter) = counters.get_mut(group_by_key) {
+        let previous = *counter;
+        *counter += 1;
+        previous
+    } else {
+        counters.insert(group_by_key.clone(), 1);
+        0
     }
 }
 
@@ -226,14 +243,8 @@ impl Sample {
         hasher.finish()
     }
 
-    fn sample_with_dynamic_ratio(&mut self, ratio: f64, group_by_key: Option<String>) -> bool {
-        let counter_value = self
-            .dynamic_event_counters
-            .entry(group_by_key.clone())
-            .or_default();
-        let old_counter_value = *counter_value;
-        *counter_value += 1;
-
+    fn sample_with_dynamic_ratio(&mut self, ratio: f64, group_by_key: &Option<String>) -> bool {
+        let old_counter_value = next_counter_value(&mut self.dynamic_event_counters, group_by_key);
         let hash = Self::dynamic_sample_hash(group_by_key.as_deref(), old_counter_value);
         let hash_ratio_threshold = (ratio * (u64::MAX as u128) as f64) as u64;
         hash <= hash_ratio_threshold
@@ -286,13 +297,12 @@ impl Sample {
             .or_else(|| self.event_rate(event).map(EventSampleMode::Rate))
     }
 
-    fn sample_with_dynamic_rate(&mut self, rate: NonZeroU64, group_by_key: Option<String>) -> bool {
-        let counter_value = self
-            .dynamic_event_counters
-            .entry(group_by_key.clone())
-            .or_default();
-        let old_counter_value = *counter_value;
-        *counter_value += 1;
+    fn sample_with_dynamic_rate(
+        &mut self,
+        rate: NonZeroU64,
+        group_by_key: &Option<String>,
+    ) -> bool {
+        let old_counter_value = next_counter_value(&mut self.dynamic_event_counters, group_by_key);
         let hash = Self::dynamic_sample_hash(group_by_key.as_deref(), old_counter_value);
 
         hash.is_multiple_of(rate.get())
@@ -346,10 +356,6 @@ impl FunctionTransform for Sample {
         };
 
         let group_by_key = self.group_by_key(&event);
-        let discarded_group = self
-            .include_group_tag
-            .then(|| group_by_key.clone())
-            .flatten();
         let value = self.static_key_value(&event);
 
         let event_sample_mode = self.event_sample_mode(&event);
@@ -360,10 +366,10 @@ impl FunctionTransform for Sample {
 
         let should_sample = match event_sample_mode {
             Some(EventSampleMode::Ratio(ratio)) => {
-                self.sample_with_dynamic_ratio(ratio, group_by_key)
+                self.sample_with_dynamic_ratio(ratio, &group_by_key)
             }
-            Some(EventSampleMode::Rate(rate)) => self.sample_with_dynamic_rate(rate, group_by_key),
-            None => self.static_mode.increment(group_by_key, value),
+            Some(EventSampleMode::Rate(rate)) => self.sample_with_dynamic_rate(rate, &group_by_key),
+            None => self.static_mode.increment(&group_by_key, value),
         };
 
         if should_sample {
@@ -387,7 +393,11 @@ impl FunctionTransform for Sample {
             output.push(event);
         } else {
             emit!(SampleEventDiscarded {
-                group: discarded_group,
+                group: if self.include_group_tag {
+                    group_by_key
+                } else {
+                    None
+                },
                 include_group_tag: self.include_group_tag,
             });
         }
