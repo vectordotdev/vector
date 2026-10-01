@@ -110,3 +110,9 @@ local-preview-build: clean setup cargo-data structured-data preview-build run-li
 # Generate Lighthouse scores locally
 lighthouse-report:
 	yarn lighthouse
+
+# Browser tests use a static server over the same minified assets as deployment.
+.PHONY: test
+test: cargo-data component-examples
+	$(MAKE) production-build
+	yarn test
