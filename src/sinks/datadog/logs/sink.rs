@@ -337,6 +337,7 @@ impl LogRequestBuilder {
                 &mut event,
                 !events_serialized.is_empty(),
                 self.truncation,
+                self.conforms_as_agent,
             )? {
                 LogEncoding::Unchanged => {}
                 LogEncoding::Truncated => {
@@ -407,6 +408,7 @@ fn encode_log(
     event: &mut Event,
     include_comma: bool,
     truncation: Option<DatadogLogsTruncationConfig>,
+    conforms_as_agent: bool,
 ) -> Result<LogEncoding, io::Error> {
     let existing_len = buf.len();
     let original_encoded_size = write_log(buf, event, include_comma)?;
@@ -416,7 +418,9 @@ fn encode_log(
         return Ok(LogEncoding::Unchanged);
     };
 
-    let Some(message) = message_bytes_mut(event.as_mut_log()).map(|message| message.clone()) else {
+    let Some(message) =
+        message_bytes_mut(event.as_mut_log(), conforms_as_agent).map(|message| message.clone())
+    else {
         buf.truncate(existing_len);
         return Ok(LogEncoding::Dropped {
             reason: "Oversized event has no string message to truncate.",
@@ -439,7 +443,7 @@ fn encode_log(
         });
     };
     if body_len < message.len() {
-        set_truncated_message(event.as_mut_log(), &message, body_len);
+        set_truncated_message(event.as_mut_log(), &message, body_len, conforms_as_agent);
     }
 
     buf.truncate(existing_len);
@@ -496,12 +500,18 @@ fn write_log(buf: &mut Vec<u8>, event: &Event, include_comma: bool) -> Result<us
 const TRUNCATION_MARKER: &str = "...TRUNCATED...";
 const TRUNCATED_TAG: &str = "truncated:single_line";
 
-fn set_truncated_message(log: &mut LogEvent, message: &str, body_len: usize) {
+fn set_truncated_message(
+    log: &mut LogEvent,
+    message: &str,
+    body_len: usize,
+    conforms_as_agent: bool,
+) {
     let marker = TRUNCATION_MARKER.as_bytes();
     let mut truncated = Vec::with_capacity(body_len + marker.len());
     truncated.extend_from_slice(&message.as_bytes()[..body_len]);
     truncated.extend_from_slice(marker);
-    *message_bytes_mut(log).expect("the message was previously found") = Bytes::from(truncated);
+    *message_bytes_mut(log, conforms_as_agent).expect("the message was previously found") =
+        Bytes::from(truncated);
 }
 
 fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> Result<usize, io::Error> {
@@ -532,10 +542,10 @@ fn ensure_truncated_tag(log: &mut LogEvent, encoded_size: usize) -> Result<usize
     })
 }
 
-fn message_bytes_mut(log: &mut LogEvent) -> Option<&mut Bytes> {
+fn message_bytes_mut(log: &mut LogEvent, conforms_as_agent: bool) -> Option<&mut Bytes> {
     match log.as_map_mut()?.get_mut(MESSAGE)? {
         Value::Bytes(message) => Some(message),
-        Value::Object(fields) => match fields.get_mut(MESSAGE)? {
+        Value::Object(fields) if conforms_as_agent => match fields.get_mut(MESSAGE)? {
             Value::Bytes(message) => Some(message),
             _ => None,
         },
@@ -927,6 +937,19 @@ mod tests {
         log.insert(
             event_path!("message"),
             value!({ "body": ("f".repeat(MAX_LOG_BYTES + 1)) }),
+        );
+
+        let logs = encode_logs(vec![Event::Log(log)], true, false);
+
+        assert!(logs.is_empty());
+    }
+
+    #[test]
+    fn drops_oversized_structured_message_without_agent_normalization() {
+        let mut log = LogEvent::default();
+        log.insert(
+            event_path!("message"),
+            value!({ "message": ("f".repeat(MAX_LOG_BYTES + 1)), "other": "preserve-me" }),
         );
 
         let logs = encode_logs(vec![Event::Log(log)], true, false);
