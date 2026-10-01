@@ -1,0 +1,6 @@
+sources:
+  my_source_id:
+    type: exec
+    command:
+      - echo
+    mode: scheduled

@@ -1,4 +1,7 @@
+use std::{any::Any, sync::Arc};
+
 use enum_dispatch::enum_dispatch;
+use indexmap::IndexMap;
 use serde::Serialize;
 use vector_lib::{
     config::GlobalOptions,
@@ -11,22 +14,29 @@ use crate::enrichment_tables::EnrichmentTables;
 
 /// Fully resolved enrichment table component.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct EnrichmentTableOuter<T>
 where
     T: Configurable + Serialize + 'static + ToValue + Clone,
 {
     #[serde(flatten)]
     pub inner: EnrichmentTables,
-    #[configurable(derived)]
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub graph: GraphConfig,
-    #[configurable(derived)]
     #[serde(
         default = "Inputs::<T>::default",
         skip_serializing_if = "Inputs::is_empty"
     )]
     pub inputs: Inputs<T>,
+
+    /// Validated sink state, filled in during config compilation.
+    ///
+    /// Mirrors `SinkOuter::validated` for enrichment tables that double as sinks. It is
+    /// never serialized or diffed, and is shared (via `Arc`) so `as_sink` can hand it to
+    /// the derived `SinkOuter` without cloning the underlying value.
+    #[serde(skip)]
+    #[debug(skip)]
+    pub(crate) validated: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl<T> EnrichmentTableOuter<T>
@@ -42,6 +52,7 @@ where
             inner: inner.into(),
             graph: Default::default(),
             inputs: Inputs::from_iter(inputs),
+            validated: None,
         }
     }
 
@@ -69,6 +80,7 @@ where
                     buffer: Default::default(),
                     proxy: Default::default(),
                     inner: sink,
+                    validated: self.validated.clone(),
                 },
             )
         })
@@ -105,14 +117,37 @@ where
             inputs: Inputs::from_iter(inputs),
             inner: self.inner,
             graph: self.graph,
+            validated: self.validated,
         }
     }
+}
+
+/// Derives source components in table order, retaining their configured source keys.
+pub(crate) fn enrichment_table_sources<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SourceOuter)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+}
+
+/// Derives sink components in table order, retaining their inputs and validated state.
+pub(crate) fn enrichment_table_sinks<T>(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<T>>,
+) -> impl Iterator<Item = (ComponentKey, SinkOuter<T>)> + '_
+where
+    T: Configurable + Serialize + 'static + ToValue + Clone,
+{
+    tables.iter().filter_map(|(key, table)| table.as_sink(key))
 }
 
 /// Generalized interface for describing and building enrichment table components.
 #[enum_dispatch]
 pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync {
-    /// Builds the enrichment table with the given globals.
+    /// Builds the enrichment table with the given globals and previous table state.
     ///
     /// If the enrichment table is built successfully, `Ok(...)` is returned containing the
     /// enrichment table.
@@ -124,7 +159,13 @@ pub trait EnrichmentTableConfig: NamedComponent + core::fmt::Debug + Send + Sync
     async fn build(
         &self,
         globals: &GlobalOptions,
+        prev_state: Option<Box<dyn std::any::Any + Send + Sync>>,
     ) -> crate::Result<Box<dyn vector_lib::enrichment::Table + Send + Sync>>;
+
+    /// Checks whether this table wants previous state, to try and restore it.
+    fn wants_previous_state(&self) -> bool {
+        false
+    }
 
     fn sink_config(
         &self,

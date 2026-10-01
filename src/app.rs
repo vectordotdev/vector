@@ -5,7 +5,7 @@ use std::os::unix::process::ExitStatusExt;
 use std::os::windows::process::ExitStatusExt;
 use std::{
     num::{NonZeroU64, NonZeroUsize},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::ExitStatus,
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
@@ -25,7 +25,7 @@ use crate::api;
 use crate::internal_events::ApiStarted;
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
-    config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
+    config::{self, Component, ComponentConfig, ComponentKind, Config, ConfigPath},
     extra_context::ExtraContext,
     heartbeat,
     internal_events::{
@@ -87,7 +87,6 @@ impl ApplicationConfig {
             opts.require_healthy,
             opts.data_dir.clone(),
             opts.allow_empty_config,
-            !opts.disable_env_var_interpolation,
             graceful_shutdown_duration,
             signal_handler,
         )
@@ -206,6 +205,10 @@ impl Application {
     ) -> Result<(Runtime, Self), ExitCode> {
         opts.root.init_global();
 
+        crate::sources::util::set_max_decompressed_size_bytes(
+            opts.root.max_decompressed_size_bytes,
+        );
+
         let color = opts.root.color.use_color();
 
         init_logging(
@@ -213,7 +216,13 @@ impl Application {
             opts.root.log_format,
             opts.log_level(),
             opts.root.internal_log_rate_limit,
+            opts.root.internal_logs_source_rate_limit,
         );
+
+        #[cfg(unix)]
+        if opts.root.raise_fd_limit {
+            crate::cli::raise_file_descriptor_limit();
+        }
 
         // Set global color preference for downstream modules
         crate::set_global_color(color);
@@ -225,14 +234,29 @@ impl Application {
             );
         }
 
-        let runtime = build_runtime(opts.root.threads, "vector-worker")?;
+        let runtime = build_runtime(
+            opts.root.threads,
+            opts.root.chunk_size_events,
+            "vector-worker",
+        )?;
 
         // Signal handler for OS and provider messages.
         let mut signals = SignalPair::new(&runtime);
 
         if let Some(sub_command) = &opts.sub_command {
-            return Err(runtime.block_on(sub_command.execute(signals, color)));
+            // Combine root and subcommand flags before setting the global once.
+            config::set_env_var_interpolation(
+                opts.root.dangerously_allow_env_var_interpolation
+                    || sub_command.dangerously_allow_env_var_interpolation(),
+            );
+            return Err(runtime.block_on(sub_command.execute(
+                signals,
+                color,
+                opts.root.data_dir.as_deref(),
+            )));
         }
+
+        config::set_env_var_interpolation(opts.root.dangerously_allow_env_var_interpolation);
 
         let config = runtime.block_on(ApplicationConfig::from_opts(
             &opts.root,
@@ -283,7 +307,7 @@ impl Application {
             signals,
             topology_controller,
             allow_empty_config: root_opts.allow_empty_config,
-            interpolate_env: !root_opts.disable_env_var_interpolation,
+            data_dir: root_opts.data_dir,
         })
     }
 }
@@ -295,7 +319,7 @@ pub struct StartedApplication {
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
     pub allow_empty_config: bool,
-    pub interpolate_env: bool,
+    pub data_dir: Option<PathBuf>,
 }
 
 impl StartedApplication {
@@ -311,7 +335,7 @@ impl StartedApplication {
             topology_controller,
             internal_topologies,
             allow_empty_config,
-            interpolate_env,
+            data_dir,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -328,7 +352,7 @@ impl StartedApplication {
                     &config_paths,
                     &mut signal_handler,
                     allow_empty_config,
-                    interpolate_env,
+                    data_dir.as_deref(),
                 ).await {
                     break signal;
                 },
@@ -357,7 +381,7 @@ async fn handle_signal(
     config_paths: &[ConfigPath],
     signal_handler: &mut SignalHandler,
     allow_empty_config: bool,
-    interpolate_env: bool,
+    data_dir: Option<&Path>,
 ) -> Option<SignalTo> {
     match signal {
         Ok(SignalTo::ReloadComponents(components_to_reload)) => {
@@ -376,13 +400,16 @@ async fn handle_signal(
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
-                interpolate_env,
+                data_dir,
             )
             .await;
 
             reload_config_from_result(topology_controller, new_config).await
         }
-        Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
+        Ok(SignalTo::ReloadFromConfigBuilder(mut config_builder)) => {
+            if let Some(data_dir) = data_dir {
+                config_builder.set_data_dir(data_dir);
+            }
             let topology_controller = topology_controller.lock().await;
             reload_config_from_result(topology_controller, config_builder.build()).await
         }
@@ -399,7 +426,7 @@ async fn handle_signal(
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
-                interpolate_env,
+                data_dir,
             )
             .await;
 
@@ -431,7 +458,7 @@ async fn handle_signal(
             None
         }
         Err(RecvError::Lagged(amt)) => {
-            warn!("Overflow, dropped {} signals.", amt);
+            warn!("Overflow, dropped {amt} signals.");
             None
         }
         Err(RecvError::Closed) => Some(SignalTo::Shutdown(None)),
@@ -480,7 +507,9 @@ impl FinishedApplication {
             .into_inner();
 
         let status = match signal {
-            SignalTo::Shutdown(_) => Self::stop(topology_controller, signal_rx).await,
+            SignalTo::Shutdown(triggering_error) => {
+                Self::stop(topology_controller, signal_rx, triggering_error.is_none()).await
+            }
             SignalTo::Quit => Self::quit(),
             _ => unreachable!(),
         };
@@ -492,11 +521,18 @@ impl FinishedApplication {
         status
     }
 
-    async fn stop(topology_controller: TopologyController, mut signal_rx: SignalRx) -> ExitStatus {
+    async fn stop(
+        topology_controller: TopologyController,
+        mut signal_rx: SignalRx,
+        clean_shutdown: bool,
+    ) -> ExitStatus {
         emit!(VectorStopping);
         tokio::select! {
-            _ = topology_controller.stop() => {
+            drained = topology_controller.stop() => {
                 emit!(VectorStopped);
+                if clean_shutdown && drained {
+                    info!("All components shut down gracefully.");
+                }
                 ExitStatus::from_raw({
                     #[cfg(windows)]
                     {
@@ -537,7 +573,11 @@ fn get_log_levels(default: &str) -> String {
         .unwrap_or_else(|_| default.into())
 }
 
-pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtime, ExitCode> {
+pub fn build_runtime(
+    threads: Option<usize>,
+    chunk_size_events: Option<NonZeroUsize>,
+    thread_name: &str,
+) -> Result<Runtime, ExitCode> {
     let mut rt_builder = runtime::Builder::new_multi_thread();
     rt_builder.max_blocking_threads(20_000);
     rt_builder.enable_all().thread_name(thread_name);
@@ -552,7 +592,32 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
         .unwrap_or_else(|_| panic!("double thread initialization"));
     rt_builder.worker_threads(threads);
 
-    debug!(message = "Building runtime.", worker_threads = threads);
+    let chunk_size_events = chunk_size_events
+        .map(NonZeroUsize::get)
+        .unwrap_or(vector_lib::source_sender::DEFAULT_CHUNK_SIZE_EVENTS);
+
+    let Some(source_sender_buffer_size) = threads.checked_mul(chunk_size_events) else {
+        error!(
+            "The `chunk_size_events` argument is too large for the configured number of threads."
+        );
+        return Err(exitcode::CONFIG);
+    };
+    let Some(ready_array_capacity) =
+        chunk_size_events.checked_mul(crate::topology::builder::READY_ARRAY_CAPACITY_CHUNKS)
+    else {
+        error!("The `chunk_size_events` argument is too large.");
+        return Err(exitcode::CONFIG);
+    };
+
+    vector_lib::source_sender::set_chunk_size_events(chunk_size_events);
+    crate::topology::builder::set_source_sender_buffer_size(source_sender_buffer_size);
+    crate::topology::builder::set_ready_array_capacity(ready_array_capacity);
+
+    debug!(
+        message = "Building runtime.",
+        worker_threads = threads,
+        chunk_size_events
+    );
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
@@ -563,7 +628,6 @@ pub async fn load_configs(
     require_healthy: Option<bool>,
     data_dir: Option<PathBuf>,
     allow_empty_config: bool,
-    interpolate_env: bool,
     graceful_shutdown_duration: Option<Duration>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
@@ -583,7 +647,7 @@ pub async fn load_configs(
         &config_paths,
         signal_handler,
         allow_empty_config,
-        interpolate_env,
+        data_dir.as_deref(),
     )
     .await
     .map_err(handle_config_errors)?;
@@ -591,34 +655,30 @@ pub async fn load_configs(
     let mut watched_component_paths = Vec::new();
 
     if let Some(watcher_conf) = watcher_conf {
-        for (name, transform) in config.transforms() {
-            let files = transform.inner.files_to_watch();
+        for (name, component) in config.components() {
+            let files = match &component {
+                Component::Source(_) => continue,
+                Component::Transform(transform) => transform.inner.files_to_watch(),
+                Component::Sink(sink) => sink.inner.files_to_watch(),
+                Component::EnrichmentTable(table) => table.inner.files_to_watch(),
+            };
             let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
+                files.iter().map(|path| (*path).clone()).collect(),
                 name.clone(),
-                ComponentType::Transform,
+                component.kind(),
             );
             watched_component_paths.push(component_config);
-        }
 
-        for (name, sink) in config.sinks() {
-            let files = sink.inner.files_to_watch();
-            let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
-                name.clone(),
-                ComponentType::Sink,
-            );
-            watched_component_paths.push(component_config);
-        }
-
-        for (name, table) in config.enrichment_tables() {
-            let files = table.inner.files_to_watch();
-            let component_config = ComponentConfig::new(
-                files.into_iter().cloned().collect(),
-                name.clone(),
-                ComponentType::EnrichmentTable,
-            );
-            watched_component_paths.push(component_config);
+            if let Component::EnrichmentTable(table) = &component
+                && table.as_sink(name).is_some()
+            {
+                let sink_component_config = ComponentConfig::new(
+                    files.into_iter().cloned().collect(),
+                    name.clone(),
+                    ComponentKind::Sink,
+                );
+                watched_component_paths.push(sink_component_config);
+            }
         }
 
         info!(
@@ -651,31 +711,38 @@ pub async fn load_configs(
         info!("Health checks are disabled.");
     }
     config.healthchecks.set_require_healthy(require_healthy);
-    if let Some(data_dir) = data_dir {
-        debug!(
-            message = "Overriding data_dir from command line.",
-            ?data_dir
-        );
-        config.global.data_dir = Some(data_dir);
-    }
     config.graceful_shutdown_duration = graceful_shutdown_duration;
 
     Ok(config)
 }
 
-pub fn init_logging(color: bool, format: LogFormat, log_level: &str, rate: u64) {
+pub fn init_logging(
+    color: bool,
+    format: LogFormat,
+    log_level: &str,
+    internal_log_rate_limit_secs: u64,
+    internal_logs_source_rate_limit_secs: Option<NonZeroU64>,
+) {
     let level = get_log_levels(log_level);
     let json = match format {
         LogFormat::Text => false,
         LogFormat::Json => true,
     };
 
-    trace::init(color, json, &level, rate);
+    trace::init(
+        color,
+        json,
+        &level,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs,
+    );
     debug!(
         message = "Internal log rate limit configured.",
-        internal_log_rate_secs = rate,
+        internal_log_rate_limit_secs,
+        internal_logs_source_rate_limit_secs =
+            internal_logs_source_rate_limit_secs.map(NonZeroU64::get),
     );
-    info!(message = "Log level is enabled.", level = ?level);
+    info!(message = "Log level is enabled.", ?level);
 }
 
 pub fn watcher_config(
@@ -685,5 +752,137 @@ pub fn watcher_config(
     match method {
         WatchConfigMethod::Recommended => config::watcher::WatcherConfig::RecommendedWatcher,
         WatchConfigMethod::Poll => config::watcher::WatcherConfig::PollWatcher(interval.into()),
+    }
+}
+
+#[cfg(all(test, feature = "sources-demo_logs", feature = "sinks-blackhole"))]
+mod data_dir_tests {
+    use clap::Parser;
+
+    use super::*;
+
+    fn config_text(data_dir: &Path, sink: &str) -> String {
+        let data_dir = serde_json::to_string(data_dir).unwrap();
+        format!(
+            "data_dir: {data_dir}\nsources:\n  input:\n    type: demo_logs\n    format: shuffle\n    lines: [\"log\"]\nsinks:\n  {sink}:\n    type: blackhole\n    inputs: [input]\n"
+        )
+    }
+
+    #[tokio::test]
+    async fn cli_data_dir_survives_topology_reload_signals() {
+        const CHILD: &str = "VECTOR_TEST_DATA_DIR_RELOAD_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .env(CHILD, "1")
+                .env_remove("VECTOR_DATA_DIR")
+                .args([
+                    "--exact",
+                    "app::data_dir_tests::cli_data_dir_survives_topology_reload_signals",
+                    "--nocapture",
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+            );
+            assert!(
+                String::from_utf8_lossy(&output.stdout)
+                    .contains("topology reload assertions completed")
+            );
+            return;
+        }
+
+        crate::test_util::trace_init();
+        let directory = tempfile::tempdir().unwrap();
+        let config_file = directory.path().join("vector.yaml");
+        let override_dir = directory.path().join("override-state");
+        std::fs::create_dir(&override_dir).unwrap();
+        std::fs::write(
+            &config_file,
+            config_text(&directory.path().join("configured-state"), "initial"),
+        )
+        .unwrap();
+        let opts = RootOpts::try_parse_from([
+            "vector",
+            "--config",
+            config_file.to_str().unwrap(),
+            "--data-dir",
+            override_dir.to_str().unwrap(),
+        ])
+        .unwrap();
+        let (mut signals, _receiver) = SignalHandler::new();
+        let application =
+            ApplicationConfig::from_opts(&opts, &mut signals, ExtraContext::default())
+                .await
+                .unwrap();
+        let paths = application.config_paths.clone();
+        let controller = SharedTopologyController::new(TopologyController {
+            topology: application.topology,
+            config_paths: paths.clone(),
+            require_healthy: opts.require_healthy,
+            #[cfg(feature = "api")]
+            api_server: None,
+            extra_context: ExtraContext::default(),
+        });
+
+        for replacement in ["disk", "provider", "components"] {
+            let text = config_text(&directory.path().join(replacement), replacement);
+            let signal = if replacement == "provider" {
+                let builder = config::loading::ConfigBuilderLoader::default()
+                    .load_from_input(text.as_bytes(), config::Format::Yaml)
+                    .unwrap();
+                SignalTo::ReloadFromConfigBuilder(builder)
+            } else {
+                std::fs::write(&config_file, text).unwrap();
+                if replacement == "disk" {
+                    SignalTo::ReloadFromDisk
+                } else {
+                    SignalTo::ReloadComponents(std::collections::HashSet::new())
+                }
+            };
+            let outcome = tokio::time::timeout(
+                Duration::from_secs(10),
+                handle_signal(
+                    Ok(signal),
+                    &controller,
+                    &paths,
+                    &mut signals,
+                    false,
+                    opts.data_dir.as_deref(),
+                ),
+            )
+            .await
+            .expect("topology reload timed out");
+            assert!(outcome.is_none());
+            let current = controller.lock().await;
+            // A retained data_dir alone is insufficient: the new topology must actually
+            // have replaced the old one, rather than rolling back a rejected reload.
+            assert!(
+                current
+                    .topology
+                    .config
+                    .sink(&config::ComponentKey::from(replacement))
+                    .is_some()
+            );
+            assert_eq!(
+                current.topology.config.global.data_dir.as_ref(),
+                Some(&override_dir)
+            );
+        }
+        let controller = controller
+            .try_into_inner()
+            .expect("no other controller owner")
+            .into_inner();
+        assert!(controller.stop().await);
+        #[allow(
+            clippy::print_stdout,
+            reason = "The parent verifies the isolated reload assertions ran."
+        )]
+        {
+            println!("topology reload assertions completed");
+        }
     }
 }

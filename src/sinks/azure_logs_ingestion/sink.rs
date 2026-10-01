@@ -117,12 +117,20 @@ impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
                 chrono::Utc::now()
             };
 
-            log.insert(
-                (PathPrefix::Event, self.timestamp_field.as_str()),
-                serde_json::Value::String(
-                    timestamp.to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
-                ),
-            );
+            // `timestamp_field` is a plain `String` on the config. Parse per-insert
+            // rather than at config load to keep this change scoped to the
+            // `string_path` removal. Silently skipping on parse error matches the
+            // pre-migration behavior, where the JIT parser tolerated unparseable
+            // inputs without panicking. A follow-up should validate this at config
+            // load time (see `ConfigValuePath`/`OptionalValuePath`).
+            if let Ok(ts_path) = vrl::path::parse_value_path(&self.timestamp_field) {
+                log.insert(
+                    (PathPrefix::Event, &ts_path),
+                    serde_json::Value::String(
+                        timestamp.to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+                    ),
+                );
+            }
         }
 
         self.encoder.encode_input(input, writer)

@@ -43,8 +43,7 @@ impl Chunking for GelfChunker {
 
         if chunk_count > GELF_MAX_TOTAL_CHUNKS {
             return Err(vector_common::Error::from(format!(
-                "Too many chunks to generate for GELF: {}, max: {}",
-                chunk_count, GELF_MAX_TOTAL_CHUNKS
+                "Too many chunks to generate for GELF: {chunk_count}, max: {GELF_MAX_TOTAL_CHUNKS}"
             )));
         }
 

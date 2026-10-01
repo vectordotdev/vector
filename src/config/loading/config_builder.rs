@@ -1,9 +1,15 @@
-use std::{collections::HashMap, io::Read};
+use std::{
+    collections::HashMap,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 use indexmap::IndexMap;
-use toml::value::Table;
 
-use super::{ComponentHint, Process, deserialize_table, loader, prepare_input, secret};
+use super::{
+    ComponentHint, Process, deserialize_config_map, loader, prepare_input,
+    representation::ConfigMap, secret,
+};
 use crate::config::{
     ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
     TransformOuter,
@@ -14,9 +20,19 @@ pub struct ConfigBuilderLoader {
     builder: ConfigBuilder,
     secrets: HashMap<String, String>,
     interpolate_env: bool,
+    data_dir: Option<PathBuf>,
 }
 
 impl ConfigBuilderLoader {
+    /// Override the data directory before merging individual configuration files.
+    pub fn data_dir(mut self, data_dir: Option<&Path>) -> Self {
+        self.data_dir = data_dir.map(Path::to_path_buf);
+        if let Some(data_dir) = data_dir {
+            self.builder.set_data_dir(data_dir);
+        }
+        self
+    }
+
     /// Sets whether to interpolate environment variables in the config.
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
@@ -54,13 +70,12 @@ impl ConfigBuilderLoader {
 }
 
 impl Default for ConfigBuilderLoader {
-    /// Creates a new builder with default settings.
-    /// By default, environment variable interpolation is enabled.
     fn default() -> Self {
         Self {
             builder: ConfigBuilder::default(),
             secrets: HashMap::new(),
-            interpolate_env: true,
+            interpolate_env: super::env_var_interpolation_enabled(),
+            data_dir: None,
         }
     }
 }
@@ -76,40 +91,46 @@ impl Process for ConfigBuilderLoader {
         })
     }
 
-    /// Merge a TOML `Table` with a `ConfigBuilder`. Component types extend specific keys.
-    fn merge(&mut self, table: Table, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
+    /// Merge a configuration map with a `ConfigBuilder`. Component types extend specific keys.
+    fn merge(&mut self, map: ConfigMap, hint: Option<ComponentHint>) -> Result<(), Vec<String>> {
         match hint {
             Some(ComponentHint::Source) => {
-                self.builder.sources.extend(deserialize_table::<
-                    IndexMap<ComponentKey, SourceOuter>,
-                >(table)?);
+                self.builder
+                    .sources
+                    .extend(deserialize_config_map::<IndexMap<ComponentKey, SourceOuter>>(map)?);
             }
             Some(ComponentHint::Sink) => {
-                self.builder.sinks.extend(
-                    deserialize_table::<IndexMap<ComponentKey, SinkOuter<_>>>(table)?,
-                );
+                self.builder.sinks.extend(deserialize_config_map::<
+                    IndexMap<ComponentKey, SinkOuter<_>>,
+                >(map)?);
             }
             Some(ComponentHint::Transform) => {
-                self.builder.transforms.extend(deserialize_table::<
+                self.builder.transforms.extend(deserialize_config_map::<
                     IndexMap<ComponentKey, TransformOuter<_>>,
-                >(table)?);
+                >(map)?);
             }
             Some(ComponentHint::EnrichmentTable) => {
-                self.builder.enrichment_tables.extend(deserialize_table::<
-                    IndexMap<ComponentKey, EnrichmentTableOuter<_>>,
-                >(table)?);
+                self.builder
+                    .enrichment_tables
+                    .extend(deserialize_config_map::<
+                        IndexMap<ComponentKey, EnrichmentTableOuter<_>>,
+                    >(map)?);
             }
             Some(ComponentHint::Test) => {
                 // This serializes to a `Vec<TestDefinition<_>>`, so we need to first expand
                 // it to an ordered map, and then pull out the value, ignoring the keys.
                 self.builder.tests.extend(
-                    deserialize_table::<IndexMap<String, TestDefinition<String>>>(table)?
+                    deserialize_config_map::<IndexMap<String, TestDefinition<String>>>(map)?
                         .into_iter()
                         .map(|(_, test)| test),
                 );
             }
             None => {
-                self.builder.append(deserialize_table(table)?)?;
+                let mut builder: ConfigBuilder = deserialize_config_map(map)?;
+                if let Some(data_dir) = &self.data_dir {
+                    builder.set_data_dir(data_dir);
+                }
+                self.builder.append(builder)?;
             }
         };
 
@@ -216,5 +237,56 @@ mod tests {
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod data_dir_tests {
+    use super::*;
+    use crate::config::ConfigPath;
+
+    #[test]
+    fn data_dir_override_precedes_split_config_merge() {
+        let directory = tempfile::tempdir().unwrap();
+        let first = directory.path().join("first.yaml");
+        let second = directory.path().join("second.json");
+        std::fs::write(&first, "data_dir: first-state\n").unwrap();
+        std::fs::write(&second, r#"{"data_dir":"second-state"}"#).unwrap();
+        let paths = [
+            ConfigPath::File(first, None),
+            ConfigPath::File(second, None),
+        ];
+        let override_dir = directory.path().join("override-state");
+        let builder = ConfigBuilderLoader::default()
+            .data_dir(Some(&override_dir))
+            .load_from_paths(&paths)
+            .unwrap();
+        assert_eq!(builder.global.data_dir.as_ref(), Some(&override_dir));
+        assert!(
+            ConfigBuilderLoader::default()
+                .load_from_paths(&paths)
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn data_dir_override_survives_repeated_loads() {
+        let directory = tempfile::tempdir().unwrap();
+        let config_file = directory.path().join("vector.yaml");
+        let paths = [ConfigPath::File(config_file.clone(), None)];
+        let override_dir = directory.path().join("override-state");
+        let (mut signals, _receiver) = crate::signal::SignalHandler::new();
+        for configured_dir in ["first-state", "second-state"] {
+            std::fs::write(&config_file, format!("data_dir: {configured_dir}\n")).unwrap();
+            let config = crate::config::load_from_paths_with_provider_and_secrets(
+                &paths,
+                &mut signals,
+                true,
+                Some(&override_dir),
+            )
+            .await
+            .unwrap();
+            assert_eq!(config.global.data_dir.as_ref(), Some(&override_dir));
+        }
     }
 }
