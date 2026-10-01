@@ -572,26 +572,17 @@ mod housekeeping {
         }
 
         fn prepare(&self) {
-            self.run(
-                &[
-                    "housekeeping-prepare",
-                    "--version",
-                    "0.59.0",
-                    "--release-commit",
-                    &self.release,
-                ],
-                true,
-            );
+            self.run(&["housekeeping-prepare", "--version", "0.59.0"], true);
         }
 
         fn validate(&self, success: bool) -> String {
             let output = self.run(
                 &[
-                    "pr-check",
+                    "housekeeping-validate",
+                    "--version",
+                    "0.59.0",
                     "--base-sha",
                     &self.release,
-                    "--head-ref",
-                    "release/housekeeping-v0.59.0",
                 ],
                 success,
             );
@@ -641,36 +632,24 @@ mod housekeeping {
     }
 
     #[test]
-    fn retries_reuse_the_published_branch_and_skip_open_or_completed_prs() {
+    fn skips_once_master_has_advanced_without_branch_or_resume_state() {
         let fixture = Fixture::new();
-        let output = fixture.state(true);
-        assert!(output.contains("branch=release/housekeeping-v0.59.0\n"));
-        assert!(output.contains("resume=false\nskip=false\n"));
         let repo = fixture.repo.path();
+        let output = fixture.state(true);
+        assert!(output.contains("version=0.59.0\n"));
+        assert!(output.contains("skip=false\n"));
+        // Housekeeping commits directly to master, so there is no branch or
+        // resume state, and once master begins the next development version a
+        // retry of the workflow is a no-op.
+        assert!(!output.contains("branch="));
+        assert!(!output.contains("resume="));
         fixture.prepare();
-        let housekeeping = commit(repo);
-        git(
-            repo,
-            &[
-                "push",
-                "origin",
-                "HEAD:refs/heads/release/housekeeping-v0.59.0",
-            ],
-        );
-        git(repo, &["switch", "--detach", &fixture.release]);
-        assert!(fixture.state(true).contains("resume=true\nskip=false\n"));
-        write(
-            repo,
-            ".git/pr-list.json",
-            r#"[{"isCrossRepository":false,"url":"https://example.invalid/pr/1"}]"#,
-        );
-        assert!(fixture.state(true).contains("skip=true\n"));
-        git(repo, &["switch", "--detach", &housekeeping]);
+        commit(repo);
         assert!(fixture.state(true).contains("skip=true\n"));
     }
 
     #[test]
-    fn requires_the_published_tag_and_frozen_release_commit() {
+    fn requires_the_published_tag_and_tolerates_release_time_pushes() {
         let fixture = Fixture::new();
         let repo = fixture.repo.path();
         write(repo, ".git/associated-prs.json", "[[]]");
@@ -679,12 +658,32 @@ mod housekeeping {
                 .state(false)
                 .contains("expected one merged bot preparation PR")
         );
+        // Restore the merged preparation PR the check accepts; the freeze-time
+        // commit below is then authorized release automation on top of it.
+        write(
+            repo,
+            ".git/associated-prs.json",
+            &json!([[{
+                "merged_at": "2026-09-21T12:00:00Z",
+                "merge_commit_sha": fixture.release,
+                "user": {"login": "vectordotdev-bot[bot]"},
+                "base": {"ref": "master", "repo": {"full_name": "vectordotdev/vector"}},
+                "head": {"ref": "prepare-v-0-59-0-website", "repo": {"full_name": "vectordotdev/vector"}}
+            }]]).to_string(),
+        );
+        // Authorized release-time pushes (e.g. the Kubernetes manifests
+        // refresh) may land on top of the release commit during the freeze;
+        // housekeeping must still succeed so a re-run after such a push can
+        // complete instead of deadlocking on the moved master.
         write(repo, "README.md", "A commit during the freeze\n");
+        commit(repo);
+        assert!(fixture.state(true).contains("skip=false\n"));
+        version(repo, "0.60.0-dev");
         commit(repo);
         assert!(
             fixture
-                .state(false)
-                .contains("master must still match the published release commit")
+                .state(true)
+                .contains("Master has advanced beyond 0.59.0")
         );
         git(repo, &["-c", "tag.gpgsign=false", "tag", "-f", "v0.59.0"]);
         assert!(
@@ -695,7 +694,7 @@ mod housekeeping {
     }
 
     #[test]
-    fn skips_non_minor_releases_and_rejects_generation_from_the_wrong_commit() {
+    fn skips_non_minor_releases_and_rejects_generation_from_the_wrong_version() {
         let fixture = Fixture::new();
         for tag in ["v0.59.1", "v0.60.0-rc.1", "v0.59.0+build"] {
             let output = fixture.run(
@@ -712,17 +711,12 @@ mod housekeeping {
             );
             assert_eq!(String::from_utf8(output.stdout).unwrap(), "skip=true\n");
         }
-        let before = git(fixture.repo.path(), &["rev-parse", "HEAD^"]);
-        fixture.run(
-            &[
-                "housekeeping-prepare",
-                "--version",
-                "0.59.0",
-                "--release-commit",
-                &before,
-            ],
-            false,
-        );
+        // Master no longer carrying the released version is the only state
+        // that can block generation; release-time pushes that keep the
+        // version are tolerated.
+        version(fixture.repo.path(), "0.58.0");
+        commit(fixture.repo.path());
+        fixture.run(&["housekeeping-prepare", "--version", "0.59.0"], false);
         assert!(git(fixture.repo.path(), &["status", "--porcelain"]).is_empty());
     }
 }

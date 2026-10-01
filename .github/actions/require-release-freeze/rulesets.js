@@ -55,7 +55,8 @@ function restrictsMasterUpdates(ruleset, defaultBranch) {
   );
 }
 
-function canManageReleaseBypass(ruleset, defaultBranch) {
+// Identity comes from configuration, not the ruleset's name or bypass actors.
+function isReleasePolicy(ruleset, defaultBranch) {
   const allowed = [
     "creation",
     "required_linear_history",
@@ -65,7 +66,6 @@ function canManageReleaseBypass(ruleset, defaultBranch) {
     "merge_queue"
   ];
   return (
-    ruleset.enforcement === "active" &&
     ruleset.source_type === "Repository" &&
     targetsOnlyMaster(ruleset, defaultBranch) &&
     ruleset.rules?.length > 0 &&
@@ -73,10 +73,16 @@ function canManageReleaseBypass(ruleset, defaultBranch) {
   );
 }
 
+// Granting a bypass requires the policy to be in force; revoking one does not.
+function canManageReleaseBypass(ruleset, defaultBranch) {
+  return ruleset.enforcement === "active" && isReleasePolicy(ruleset, defaultBranch);
+}
+
 module.exports = {
   readRulesetIds,
   isBotActor,
   hasBotBypass,
   restrictsMasterUpdates,
+  isReleasePolicy,
   canManageReleaseBypass
 };

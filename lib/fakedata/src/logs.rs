@@ -85,6 +85,7 @@ const APACHE_ERROR_TIME_FORMAT: &str = "%a %b %d %T %Y";
 const SYSLOG_3164_FORMAT: &str = "%b %d %T";
 const JSON_TIME_FORMAT: &str = "%d/%b/%Y:%T";
 
+#[must_use]
 pub fn apache_common_log_line() -> String {
     // Example log line:
     // 173.159.239.159 - schoen1464 [31/Oct/2020:19:06:10 -0700] "POST /wireless HTTP/2.0" 100 20815
@@ -101,6 +102,7 @@ pub fn apache_common_log_line() -> String {
     )
 }
 
+#[must_use]
 pub fn apache_error_log_line() -> String {
     // Example log line:
     // [Sat Oct 31 19:27:55 2020] [deleniti:crit] [pid 879:tid 9607] [client 169.198.228.174:1364] Something bad happened
@@ -116,6 +118,7 @@ pub fn apache_error_log_line() -> String {
     )
 }
 
+#[must_use]
 pub fn syslog_3164_log_line() -> String {
     format!(
         "<{}>{} {} {}[{}]: {}",
@@ -128,6 +131,7 @@ pub fn syslog_3164_log_line() -> String {
     )
 }
 
+#[must_use]
 pub fn syslog_5424_log_line() -> String {
     // Example log line:
     // <65>2 2020-11-05T18:11:43.975Z chiefubiquitous.io totam 6899 ID44 - Something bad happened
@@ -144,6 +148,7 @@ pub fn syslog_5424_log_line() -> String {
     )
 }
 
+#[must_use]
 pub fn json_log_line() -> String {
     // Borrowed from Flog: https://github.com/mingrammer/flog/blob/master/log.go#L24
     // Example log line:

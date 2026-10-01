@@ -3749,6 +3749,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "datadog-agent-metrics-v3"
+version = "0.1.0"
+source = "git+https://github.com/DataDog/saluki.git?tag=1.3.0#f546aa02aaaef60037c7b24f44756e34a3dcfa3f"
+dependencies = [
+ "foldhash 0.2.0",
+ "protobuf",
+]
+
+[[package]]
 name = "datadog-proto"
 version = "0.1.0"
 dependencies = [
@@ -4118,9 +4127,9 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "0.12.1"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c469892dddfeff64ecfdbc64cf059c77fb0decaeccd4d5d484394bdd6312bac"
+checksum = "5b68712c02bff2348323c1441ab2e8528e32af4f8f9edf29356356290328c8e6"
 dependencies = [
  "bumpalo",
  "bytes",
@@ -4139,9 +4148,9 @@ dependencies = [
 
 [[package]]
 name = "domain-macros"
-version = "0.12.1"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fef7ef74e413e36d5364db163ca577ccb56f2f74377705d5f920ee3e1544127"
+checksum = "4fba8fbc4580c745dfeab102232dcb729f030ac3e2c9ff5374a9dfd6dc9ddf8e"
 dependencies = [
  "proc-macro2 1.0.107",
  "quote 1.0.47",
@@ -9293,6 +9302,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "protobuf"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d65a1d4ddae7d8b5de68153b48f6aa3bba8cb002b243dbdbc55a5afbc98f99f4"
+dependencies = [
+ "bytes",
+ "once_cell",
+ "protobuf-support",
+ "thiserror 1.0.68",
+]
+
+[[package]]
+name = "protobuf-support"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e36c2f31e0a47f9280fb347ef5e461ffcd2c52dd520d8e216b52f93b0b0d7d6"
+dependencies = [
+ "thiserror 1.0.68",
+]
+
+[[package]]
 name = "protoc-bin-vendored"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13300,7 +13330,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.3.22"
+version = "0.3.25"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -13393,6 +13423,7 @@ dependencies = [
  "cuckoo-clock",
  "databend-client",
  "databricks-zerobus-ingest-sdk",
+ "datadog-agent-metrics-v3",
  "datadog-proto",
  "deadpool 0.13.1",
  "derivative",
@@ -13475,6 +13506,7 @@ dependencies = [
  "prost-build 0.12.6",
  "prost-reflect 0.14.7",
  "prost-types 0.12.6",
+ "protobuf",
  "pulsar",
  "quick-junit",
  "quick-xml 0.42.0",

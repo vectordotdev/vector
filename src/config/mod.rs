@@ -30,6 +30,7 @@ use crate::{
 pub mod api;
 mod builder;
 mod compiler;
+mod component;
 mod diff;
 pub mod dot_graph;
 mod enrichment_table;
@@ -44,12 +45,15 @@ mod sink_validated;
 mod source;
 mod transform;
 pub mod unit_test;
+mod unix;
 mod validation;
 pub mod watcher;
 
 pub use builder::ConfigBuilder;
+pub use component::{Component, ComponentKind};
 pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
+pub(crate) use enrichment_table::{enrichment_table_sinks, enrichment_table_sources};
 pub use format::{Format, FormatHint};
 pub use loading::interpolation::{ENVIRONMENT_VARIABLE_INTERPOLATION_REGEX, interpolate};
 pub use loading::{
@@ -66,6 +70,7 @@ pub use transform::{
     BoxedTransform, TransformConfig, TransformContext, TransformOuter, get_transform_output_ids,
 };
 pub use unit_test::{UnitTestResult, build_unit_tests, build_unit_tests_main};
+pub use unix::UnixOnly;
 pub use validation::warnings;
 pub use vector_lib::{
     config::{
@@ -76,25 +81,17 @@ pub use vector_lib::{
 };
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
-// This is not a comprehensive set; variants are added as needed.
-pub enum ComponentType {
-    Transform,
-    Sink,
-    EnrichmentTable,
-}
-
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ComponentConfig {
     pub config_paths: Vec<PathBuf>,
     pub component_key: ComponentKey,
-    pub component_type: ComponentType,
+    pub component_type: ComponentKind,
 }
 
 impl ComponentConfig {
     pub fn new(
         config_paths: Vec<PathBuf>,
         component_key: ComponentKey,
-        component_type: ComponentType,
+        component_type: ComponentKind,
     ) -> Self {
         let canonicalized_paths = config_paths
             .into_iter()
@@ -111,9 +108,9 @@ impl ComponentConfig {
     pub fn contains(
         &self,
         config_paths: &HashSet<PathBuf>,
-    ) -> Option<(ComponentKey, ComponentType)> {
+    ) -> Option<(ComponentKey, ComponentKind)> {
         if config_paths.iter().any(|p| self.config_paths.contains(p)) {
-            return Some((self.component_key.clone(), self.component_type.clone()));
+            return Some((self.component_key.clone(), self.component_type));
         }
         None
     }
@@ -202,12 +199,28 @@ impl Config {
         self.enrichment_tables.get(id)
     }
 
+    /// Configured pipeline components in source, transform, sink, and table order.
+    ///
+    /// Enrichment tables retain their configured identity here. Their derived
+    /// sources and sinks are expanded separately when building the topology.
+    pub fn components(&self) -> impl Iterator<Item = (&ComponentKey, Component<'_>)> {
+        let sources = self.sources().map(|(key, c)| (key, Component::from(c)));
+        let transforms = self.transforms().map(|(key, c)| (key, Component::from(c)));
+        let sinks = self.sinks().map(|(key, c)| (key, Component::from(c)));
+        let tables = self
+            .enrichment_tables()
+            .map(|(key, c)| (key, Component::from(c)));
+
+        sources.chain(transforms).chain(sinks).chain(tables)
+    }
+
     pub fn inputs_for_node(&self, id: &ComponentKey) -> Option<&[OutputId]> {
         self.transforms
             .get(id)
-            .map(|t| &t.inputs[..])
-            .or_else(|| self.sinks.get(id).map(|s| &s.inputs[..]))
-            .or_else(|| self.enrichment_tables.get(id).map(|s| &s.inputs[..]))
+            .map(Component::from)
+            .or_else(|| self.sinks.get(id).map(Component::from))
+            .or_else(|| self.enrichment_tables.get(id).map(Component::from))
+            .and_then(|component| component.inputs())
     }
 
     pub fn propagate_acknowledgements(&mut self) -> Result<(), Vec<String>> {
@@ -426,7 +439,7 @@ pub struct TestDefinition<T: 'static = OutputId> {
 impl TestDefinition<String> {
     fn resolve_outputs(
         self,
-        graph: &graph::Graph,
+        output_map: &HashMap<String, OutputId>,
     ) -> Result<TestDefinition<OutputId>, Vec<String>> {
         let TestDefinition {
             name,
@@ -436,8 +449,6 @@ impl TestDefinition<String> {
             no_outputs_from,
         } = self;
         let mut errors = Vec::new();
-
-        let output_map = graph.input_map().expect("ambiguous outputs");
 
         let outputs = outputs
             .into_iter()
