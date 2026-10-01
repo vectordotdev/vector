@@ -12,7 +12,7 @@ use crate::{
         Compression, EncodedLength, RequestBuilder, metadata::RequestMetadataBuilder,
         request_builder::EncodeResult,
     },
-    template::Template,
+    template::UnconfinedTemplate,
 };
 
 #[derive(Clone)]
@@ -25,14 +25,14 @@ pub(super) struct SSMetadata {
 #[derive(Clone)]
 pub(super) struct SSRequestBuilder {
     encoder: (Transformer, Encoder<()>),
-    message_group_id: Option<Template>,
-    message_deduplication_id: Option<Template>,
+    message_group_id: Option<UnconfinedTemplate>,
+    message_deduplication_id: Option<UnconfinedTemplate>,
 }
 
 impl SSRequestBuilder {
     pub(super) fn new(
-        message_group_id: Option<Template>,
-        message_deduplication_id: Option<Template>,
+        message_group_id: Option<UnconfinedTemplate>,
+        message_deduplication_id: Option<UnconfinedTemplate>,
         encoding_config: EncodingConfig,
     ) -> crate::Result<Self> {
         let transformer = encoding_config.transformer();

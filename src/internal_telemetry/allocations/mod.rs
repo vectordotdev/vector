@@ -206,8 +206,7 @@ pub fn acquire_allocation_group_id(
     }
 
     warn!(
-        "Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.",
-        NUM_GROUPS, component_id
+        "Maximum number of registrable allocation group IDs reached ({NUM_GROUPS}). Allocations for component '{component_id}' will be attributed to the root allocation group."
     );
     AllocationGroupId::ROOT
 }

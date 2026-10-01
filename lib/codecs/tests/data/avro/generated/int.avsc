@@ -1,1 +1,1 @@
-{"name":"test","type":"record","fields":[{"name":"int_field","type":"int"}]}
+{"type":"record","name":"test","fields":[{"name":"int_field","type":"int","default":0}]}

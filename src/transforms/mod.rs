@@ -13,7 +13,7 @@ pub mod aggregate;
 pub mod aws_ec2_metadata;
 #[cfg(feature = "transforms-delay")]
 pub mod delay;
-#[cfg(feature = "transforms-exclusive-route")]
+#[cfg(feature = "transforms-exclusive_route")]
 mod exclusive_route;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
@@ -96,7 +96,7 @@ mod test {
             "out",
             &["transform"],
             UnitTestStreamSinkConfig::new(
-                PollSender::new(tx).sink_map_err(|error| panic!("{}", error)),
+                PollSender::new(tx).sink_map_err(|error| panic!("{error}")),
             ),
         );
 

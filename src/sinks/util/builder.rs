@@ -28,6 +28,12 @@ use super::{
     IncrementalRequestBuilder, Normalizer, RequestBuilder, buffer::metrics::MetricNormalize,
 };
 
+fn metric_ttl(maybe_ttl_secs: Option<f64>) -> Option<Duration> {
+    maybe_ttl_secs
+        .and_then(|ttl| Duration::try_from_secs_f64(ttl).ok())
+        .filter(|ttl| !ttl.is_zero())
+}
+
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
 
 pub trait SinkBuilderExt: Stream {
@@ -231,11 +237,9 @@ pub trait SinkBuilderExt: Stream {
         Self: Stream<Item = Metric> + Unpin + Sized,
         N: MetricNormalize + Default,
     {
-        match maybe_ttl_secs {
+        match metric_ttl(maybe_ttl_secs) {
             None => Normalizer::new(self, N::default()),
-            Some(ttl) => {
-                Normalizer::new_with_ttl(self, N::default(), Duration::from_secs(ttl as u64))
-            }
+            Some(ttl) => Normalizer::new_with_ttl(self, N::default(), ttl),
         }
     }
 
@@ -275,5 +279,24 @@ where
         this.st
             .poll_next(cx)
             .map(|maybe| maybe.map(|result| result.unwrap()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn metric_ttl_preserves_fractional_seconds() {
+        assert_eq!(metric_ttl(Some(0.5)), Some(Duration::from_millis(500)));
+    }
+
+    #[test]
+    fn metric_ttl_ignores_invalid_or_zero_durations() {
+        assert_eq!(metric_ttl(None), None);
+        assert_eq!(metric_ttl(Some(0.0)), None);
+        assert_eq!(metric_ttl(Some(-1.0)), None);
+        assert_eq!(metric_ttl(Some(f64::NAN)), None);
+        assert_eq!(metric_ttl(Some(f64::INFINITY)), None);
     }
 }
