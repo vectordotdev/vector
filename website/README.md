@@ -132,6 +132,52 @@ This builds all the necessary [prereqs](#prerequisites) for the site and starts 
 
 When you make changes to the Markdown sources, Sass/CSS, or JavaScript, the site re-builds and Hugo automatically reloads the page that you're on. If you make changes to the [structured data](#structured-data) sources, however, you need to stop the server and run `make serve` again.
 
+### Run browser tests locally
+
+The browser suite uses [Playwright](https://playwright.dev) to test the built website in Chromium,
+Firefox, and WebKit. It covers globe rendering and rotation, theme persistence, documentation
+navigation, VRL signatures and examples, generated Console sink data, scroll-driven TOC highlighting,
+configuration tabs, exact and full-text search, and mobile navigation. Each test also fails on
+JavaScript errors or missing local assets. No CI workflows run this suite yet.
+
+Install dependencies and browser binaries once from this directory:
+
+```shell
+yarn install --frozen-lockfile
+yarn playwright install chromium firefox webkit
+```
+
+Python 3 is required for the local static server. On Linux, install browser system dependencies with
+`yarn playwright install --with-deps chromium firefox webkit`.
+
+Build the production site and its Pagefind index, then run all browser tests:
+
+```shell
+make test
+```
+
+This uses the existing component-example generator to prepare the documentation data. Playwright
+starts and stops a static server on `127.0.0.1:4173`; that port must be free. Tests use isolated browser
+contexts and do not use an existing Hugo development server.
+
+To run tests again against the current `public/` build, or inspect a failure:
+
+```shell
+yarn test --project=chromium
+yarn test:ui
+yarn test:report
+```
+
+Rebuild with `make test` after website changes; `yarn test` alone does not rebuild the site. To test
+the preview build instead, run `make preview-build` after `make test`, then `yarn test`.
+
+The HTML report is in `playwright-report/`. Failed tests save screenshots and traces in
+`test-results/`; both directories are ignored by Git.
+
+Tests load real local JavaScript, CSS, and search indexes. The search theme comes from the installed
+Yarn package instead of the CDN. External requests are blocked and stubbed out. External services,
+CDN availability, and external fonts and icons are not covered by this suite.
+
 ### Run the site with Docker
 
 If you don't want to install Hugo, CUE, Node.js, Rust, or [vdev] locally, you can use Docker instead. The first startup installs the matching vdev version (or builds the checkout when it is unreleased), then runs `make generate-docs` and generates CUE JSON inside the container.
