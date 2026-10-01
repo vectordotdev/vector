@@ -22,8 +22,12 @@ documentation, or tooling), update those references to `/usr/share/vector/exampl
 
 No action is required for `/etc/vector/vector.yaml` itself. If you already had a
 hand-created file there from before this change (when the package did not own that
-path), it is preserved across the upgrade: the package's maintainer scripts back it up
-before `dpkg` unpacks the new conffile default and restore it immediately after, so
-existing content is never overwritten by the placeholder.
+path), it is preserved across the upgrade without a conffile prompt: `preinst` moves it
+aside before `dpkg` unpacks the new conffile default, and `postinst` restores it after
+unpacking, so existing content is never overwritten by the placeholder.
+
+The old `/etc/vector/examples/*.yaml` conffiles are removed on upgrade with
+`dpkg-maintscript-helper rm_conffile`. Unmodified files are deleted; files you edited
+are kept as `<file>.dpkg-bak`.
 
 authors: yash1262

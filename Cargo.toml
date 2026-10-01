@@ -69,6 +69,8 @@ assets = [
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
 recommends = "datadog-signing-keys (>= 1:1.4.0)"
+# Maintainer scripts call dpkg-maintscript-helper from preinst.
+pre-depends = "dpkg (>= 1.17.14)"
 
 [package.metadata.deb.systemd-units]
 unit-scripts = "distribution/systemd/"

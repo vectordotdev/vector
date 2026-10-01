@@ -4,11 +4,15 @@ set -e
 VECTOR_CONF=/etc/vector/vector.yaml
 VECTOR_CONF_BACKUP=/etc/vector/.vector.yaml.pre-conffile
 
-# Put back the unowned vector.yaml that preinst moved aside before dpkg
-# unpacked the packaged conffile. See preinst for why.
-if [ "$1" = "configure" ] && [ -e "$VECTOR_CONF_BACKUP" ]; then
-  mv -f "$VECTOR_CONF_BACKUP" "$VECTOR_CONF"
-fi
+# If the install or upgrade is abandoned after preinst moved an unowned
+# vector.yaml aside, put it back rather than leaving it hidden.
+case "$1" in
+  abort-install|abort-upgrade)
+    if [ -e "$VECTOR_CONF_BACKUP" ]; then
+      mv -f "$VECTOR_CONF_BACKUP" "$VECTOR_CONF"
+    fi
+    ;;
+esac
 
 # The bundled sample configs moved from /etc/vector/examples/ (where dpkg
 # tracked them as conffiles) to /usr/share/vector/examples/. Remove the old
@@ -28,22 +32,5 @@ for f in \
     wrapped_json.yaml; do
   dpkg-maintscript-helper rm_conffile "/etc/vector/examples/$f" 0.59.0~ vector -- "$@"
 done
-
-# Add Vector to adm group to read /var/logs
-usermod --append --groups adm vector || true
-
-if getent group 'systemd-journal'
-then
-  # Add Vector to systemd-journal to read journald logs
-  usermod --append --groups systemd-journal vector || true
-  systemctl daemon-reload || true
-fi
-
-if getent group 'systemd-journal-remote'
-then
-  # Add Vector to systemd-journal-remote to read remote journald logs
-  usermod --append --groups systemd-journal-remote vector || true
-  systemctl daemon-reload || true
-fi
 
 #DEBHELPER#
