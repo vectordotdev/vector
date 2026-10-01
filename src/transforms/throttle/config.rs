@@ -35,7 +35,7 @@ pub struct ThrottleInternalMetricsConfig {
     ///
     /// If true, the counter will be incremented for each discarded event with the value of
     /// `key_field` associated with the discarded event. If false, the counter will not include
-    /// the `group` tag.
+    /// the `group` tag. If `key_field` is absent or cannot be rendered, the tag value is `None`.
     ///
     /// Note that this defaults to false because the `group` tag has potentially unbounded
     /// cardinality. Only set this to true if you know that the number of unique groups is bounded.
