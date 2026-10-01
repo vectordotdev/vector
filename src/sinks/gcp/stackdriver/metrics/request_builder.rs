@@ -74,8 +74,7 @@ impl encoding::Encoder<Vec<Metric>> for StackdriverMetricsEncoder {
                     .namespace
                     .unwrap_or_else(|| self.default_namespace.clone());
                 let metric_type = format!(
-                    "custom.googleapis.com/{}/metrics/{}",
-                    namespace, series.name.name
+                    "custom.googleapis.com/{namespace}/metrics/{}", series.name.name
                 );
 
                 let end_time = data.time.timestamp.unwrap_or_else(chrono::Utc::now);

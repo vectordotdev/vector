@@ -206,6 +206,7 @@ impl ValidatedSink for NatsSinkConfig {
             .clone()
             .confine(&self.confinement, Self::NAME, "subject")?;
         let server_addresses = self.parse_server_addresses()?;
+        self.encoding.validate()?;
 
         if let Some(tls) = &self.tls {
             validate_tls_cert_key_pair(tls).context(ConfigSnafu)?;

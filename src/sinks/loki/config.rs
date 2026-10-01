@@ -278,6 +278,7 @@ impl ValidatedSink for LokiConfig {
                 settings
             }
         };
+        self.encoding.validate()?;
 
         let transformer = self.encoding.transformer();
 
@@ -324,6 +325,7 @@ impl ValidatedSink for LokiConfig {
         validated: &ValidatedLokiSink,
         cx: SinkContext,
     ) -> crate::Result<(VectorSink, crate::sinks::Healthcheck)> {
+        let healthcheck_uri = cx.healthcheck.uri.clone();
         let client = self.build_client(cx)?;
 
         let sink = LokiSink::from_validated(self, validated.clone(), client.clone())?;
@@ -331,6 +333,7 @@ impl ValidatedSink for LokiConfig {
         let healthcheck = healthcheck(
             validated.base_endpoint.clone(),
             validated.auth.clone(),
+            healthcheck_uri,
             client,
         )
         .boxed();

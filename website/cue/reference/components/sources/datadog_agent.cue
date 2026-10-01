@@ -48,7 +48,6 @@ components: sources: datadog_agent: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	installation: {

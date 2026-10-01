@@ -52,7 +52,7 @@ impl Deserializer for NativeDeserializer {
         if bytes.is_empty() {
             Ok(smallvec![])
         } else {
-            let event_array = EventArray::from(proto::EventArray::decode(bytes)?);
+            let event_array = EventArray::try_from(proto::EventArray::decode(bytes)?)?;
             Ok(event_array.into_events().collect())
         }
     }

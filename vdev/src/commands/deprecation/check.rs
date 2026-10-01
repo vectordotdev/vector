@@ -88,9 +88,8 @@ impl Cli {
 
         let enacted_count = deprecation::validate_enacted(&repo_root)?;
         println!(
-            "{} is up to date ({} enacted entries valid).",
-            json_path.display(),
-            enacted_count
+            "{} is up to date ({enacted_count} enacted entries valid).",
+            json_path.display()
         );
 
         Ok(())

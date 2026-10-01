@@ -50,7 +50,6 @@ impl<T: SourceConfig + 'static> From<T> for BoxedSource {
 
 /// Fully resolved source component.
 #[configurable_component]
-#[configurable(metadata(docs::component_base_type = "source"))]
 #[derive(Clone, Debug)]
 pub struct SourceOuter {
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]

@@ -145,8 +145,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 HttpMethod::Options => warp::options().boxed(),
             };
 
-            // https://github.com/rust-lang/rust-clippy/issues/8148
-            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
@@ -275,7 +273,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .bind(&address)
                 .await
                 .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
+                    error!("An error occurred: {err:?}.");
                 })?
                 .with_keepalive(keepalive_settings.tcp_keepalive);
 
@@ -284,7 +282,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .with_graceful_shutdown(cx.shutdown.map(|_| ()))
                 .await
                 .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
+                    error!("An error occurred: {err:?}.");
                 })?;
 
             Ok(())

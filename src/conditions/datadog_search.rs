@@ -1646,15 +1646,13 @@ mod test {
 
             assert!(
                 cond.check_with_context(pass.clone()).0.is_ok(),
-                "should pass: {}\nevent: {}",
-                source,
+                "should pass: {source}\nevent: {}",
                 serde_json::to_string(&pass.as_log()).unwrap(),
             );
 
             assert!(
                 cond.check_with_context(fail.clone()).0.is_err(),
-                "should fail: {}\nevent: {}",
-                source,
+                "should fail: {source}\nevent: {}",
                 serde_json::to_string(&fail.as_log()).unwrap(),
             );
         }

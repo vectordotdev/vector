@@ -105,6 +105,12 @@ updates:
         update-types:
           - "patch"
           - "minor"
+      opendal:
+        patterns:
+          - "opendal*"
+        update-types:
+          - "patch"
+          - "minor"
       phf:
         patterns:
           - "phf*"
@@ -234,10 +240,9 @@ updates:
     commit-message:
       prefix: "chore(ci)"
     groups:
-      artifact:
+      actions:
         patterns:
-          - "actions/download-artifact"
-          - "actions/upload-artifact"
+          - "*"
   - package-ecosystem: "npm"
     directory: "website/"
     schedule:

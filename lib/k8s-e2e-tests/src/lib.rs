@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![deny(warnings)]
 
 use std::{collections::BTreeMap, env};
@@ -22,6 +23,7 @@ pub const BUSYBOX_IMAGE: &str = "busybox:1.28";
 
 /// Returns the Helm chart repo to use for E2E tests.
 /// Set `HELM_CHART_REPO` to override the default (e.g., a local chart path).
+#[must_use]
 pub fn helm_chart_repo() -> String {
     env::var("HELM_CHART_REPO").unwrap_or_else(|_| "https://helm.vector.dev".to_string())
 }
@@ -30,6 +32,7 @@ pub fn init() {
     _ = env_logger::builder().is_test(true).try_init();
 }
 
+#[must_use]
 pub fn get_namespace() -> String {
     // Generate a random alphanumeric (lowercase) string to ensure each test is run with unique names.
     // There is a 36 ^ 5 chance of a name collision, which is likely to be an acceptable risk.
@@ -38,23 +41,27 @@ pub fn get_namespace() -> String {
     format!("vector-{id}")
 }
 
+#[must_use]
 pub fn get_namespace_appended(namespace: &str, suffix: &str) -> String {
     format!("{namespace}-{suffix}")
 }
 
 /// Gets a name we can use for roles to prevent them conflicting with other tests.
 /// Uses the provided namespace as the root.
+#[must_use]
 pub fn get_override_name(namespace: &str, suffix: &str) -> String {
     format!("{namespace}-{suffix}")
 }
 
 /// Is the MULTINODE environment variable set?
+#[must_use]
 pub fn is_multinode() -> bool {
     env::var("MULTINODE").is_ok()
 }
 
 /// Create config adding fullnameOverride entry. This allows multiple tests
 /// to be run against the same cluster without the role names clashing.
+#[must_use]
 pub fn config_override_name(name: &str, cleanup: bool) -> String {
     let vectordir = if is_multinode() {
         format!("{name}-vector")
@@ -64,11 +71,11 @@ pub fn config_override_name(name: &str, cleanup: bool) -> String {
 
     let volumeconfig = if is_multinode() {
         formatdoc!(
-            r#"
+            r"
             dataVolume:
               hostPath:
                 path: /var/lib/{}/
-            "#,
+            ",
             vectordir,
         )
     } else {
@@ -77,7 +84,7 @@ pub fn config_override_name(name: &str, cleanup: bool) -> String {
 
     let cleanupconfig = if cleanup {
         formatdoc!(
-            r#"
+            r"
         extraVolumeMounts:
           - name: var-lib
             mountPath: /var/writablelib
@@ -90,7 +97,7 @@ pub fn config_override_name(name: &str, cleanup: bool) -> String {
                 - sh
                 - -c
                 - rm -rf /var/writablelib/{}
-                "#,
+                ",
             vectordir,
         )
     } else {
@@ -109,6 +116,12 @@ pub fn config_override_name(name: &str, cleanup: bool) -> String {
     )
 }
 
+/// Create the test framework from the environment.
+///
+/// # Panics
+///
+/// Panics if the test interface environment is invalid.
+#[must_use]
 pub fn make_framework() -> Framework {
     let interface = Interface::from_env().expect("interface is not ready");
     Framework::new(interface)
@@ -127,6 +140,7 @@ pub fn collect_btree<'a>(
     Some(collected)
 }
 
+#[must_use]
 pub fn make_test_container<'a>(name: &'a str, command: &'a str) -> Container {
     Container {
         name: name.to_owned(),
@@ -221,10 +235,16 @@ pub fn make_test_pod<'a>(
     make_test_pod_with_affinity(namespace, name, command, labels, annotations, None, None)
 }
 
+/// Parse a JSON log line.
+///
+/// # Errors
+///
+/// Returns an error if `s` is not valid JSON.
 pub fn parse_json(s: &str) -> Result<serde_json::Value, serde_json::Error> {
     serde_json::from_str(s)
 }
 
+#[must_use]
 pub fn generate_long_string(a: usize, b: usize) -> String {
     (0..a).fold(String::new(), |mut acc, i| {
         let istr = i.to_string();
@@ -238,6 +258,10 @@ pub fn generate_long_string(a: usize, b: usize) -> String {
 /// Read the first line from vector logs and assert that it matches the expected
 /// one.
 /// This allows detecting the situations where things have gone very wrong.
+///
+/// # Panics
+///
+/// Panics if reading fails, the log stream is empty, or the first line does not match the expected startup message.
 pub async fn smoke_check_first_line(log_reader: &mut Reader) {
     // Wait for first line as a smoke check.
     let first_line = log_reader
@@ -256,6 +280,15 @@ pub enum FlowControlCommand {
     Terminate,
 }
 
+/// Read JSON log lines and pass them to the predicate until the reader exits.
+///
+/// # Errors
+///
+/// Returns an error if a complete JSON log line is invalid or terminating the reader fails.
+///
+/// # Panics
+///
+/// Panics if reading output or waiting for the reader process fails, or if the predicate panics.
 pub async fn look_for_log_line<P>(
     log_reader: &mut Reader,
     mut predicate: P,
@@ -265,7 +298,7 @@ where
 {
     let mut lines_till_we_give_up = 10000;
     while let Some(line) = log_reader.read_line().await {
-        debug!("Got line: {:?}", line);
+        debug!("Got line: {line:?}");
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up <= 0 {
@@ -315,6 +348,10 @@ where
 
 /// Create a pod for our other pods to have an affinity to ensure they are all deployed on
 /// the same node.
+///
+/// # Errors
+///
+/// Returns an error if preparing, creating, or waiting for the affinity pod fails.
 pub async fn create_affinity_pod(
     framework: &Framework,
     namespace: &str,

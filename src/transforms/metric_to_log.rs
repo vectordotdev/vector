@@ -350,7 +350,6 @@ mod tests {
     use std::sync::Arc;
 
     use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
-    use futures::executor::block_on;
     use proptest::prelude::*;
     use similar_asserts::assert_eq;
     use tokio::sync::mpsc;
@@ -676,12 +675,12 @@ mod tests {
         #[test]
         fn transform_tag_single_encoding(values: TagValueSet) {
             let name = random_string(16);
-            let tags = block_on(transform_tags(
+            let tags = transform_tags(
                 MetricTagValues::Single,
                 values.iter()
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
-            ));
+            );
             // The resulting tag must be either a single string value or not present.
             let value = values.into_single().map(|value| Value::Bytes(value.into()));
             assert_eq!(tags.get(vrl::path!(&*name)), value.as_ref());
@@ -690,12 +689,12 @@ mod tests {
         #[test]
         fn transform_tag_full_encoding(values: TagValueSet) {
             let name = random_string(16);
-            let tags = block_on(transform_tags(
+            let tags = transform_tags(
                 MetricTagValues::Full,
                 values.iter()
                     .map(|value| (name.clone(), TagValue::from(value.map(String::from))))
                     .collect(),
-            ));
+            );
             let tag = tags.get(vrl::path!(&*name));
             match values.len() {
                 // Empty tag set => missing tag
@@ -712,7 +711,7 @@ mod tests {
         tag.into_option().into()
     }
 
-    async fn transform_tags(metric_tag_values: MetricTagValues, tags: MetricTags) -> Value {
+    fn transform_tags(metric_tag_values: MetricTagValues, tags: MetricTags) -> Value {
         let counter = Metric::new(
             "counter",
             MetricKind::Absolute,

@@ -325,6 +325,7 @@ impl ValidatedSink for ChronicleUnstructuredConfig {
         healthcheck_endpoint.parse::<Uri>()?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
+        self.encoding.validate()?;
 
         Ok(ValidatedChronicleUnstructured {
             endpoint,
@@ -404,14 +405,13 @@ impl ChronicleUnstructuredConfig {
 
     fn create_endpoint(&self, path: &str) -> Result<String, ChronicleError> {
         Ok(format!(
-            "{}/{}",
+            "{}/{path}",
             match (&self.endpoint, self.region) {
                 (Some(endpoint), None) => endpoint.to_string().trim_end_matches('/').to_string(),
                 (None, Some(region)) => region.endpoint().to_string(),
                 (Some(_), Some(_)) => return Err(ChronicleError::BothRegionAndEndpoint),
                 (None, None) => return Err(ChronicleError::RegionOrEndpoint),
-            },
-            path
+            }
         ))
     }
 }

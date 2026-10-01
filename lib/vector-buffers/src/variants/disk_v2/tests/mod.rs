@@ -142,16 +142,14 @@ macro_rules! assert_reader_writer_v2_file_positions {
         assert_eq!(
             u16::try_from($reader).expect("Reader value is out of range"),
             reader,
-            "expected reader file ID of {}, got {} instead",
-            ($reader),
-            reader
+            "expected reader file ID of {}, got {reader} instead",
+            ($reader)
         );
         assert_eq!(
             u16::try_from($writer).expect("Writer value is out of range"),
             writer,
-            "expected writer file ID of {}, got {} instead",
-            ($writer),
-            writer
+            "expected writer file ID of {}, got {writer} instead",
+            ($writer)
         );
     }};
 }
@@ -163,13 +161,13 @@ macro_rules! assert_reader_last_writer_next_positions {
         let writer_actual = $ledger.state().get_next_writer_record_id();
         assert_eq!(
             $reader_expected, reader_actual,
-            "expected reader last read record ID of {}, got {} instead",
-            $reader_expected, reader_actual,
+            "expected reader last read record ID of {}, got {reader_actual} instead",
+            $reader_expected,
         );
         assert_eq!(
             $writer_expected, writer_actual,
-            "expected writer next record ID of {}, got {} instead",
-            $writer_expected, writer_actual,
+            "expected writer next record ID of {}, got {writer_actual} instead",
+            $writer_expected,
         );
     }};
 }

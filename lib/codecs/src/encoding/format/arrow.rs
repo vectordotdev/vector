@@ -389,7 +389,7 @@ mod tests {
         events: Vec<Event>,
         schema: SchemaRef,
     ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
-        let bytes = encode_events_to_arrow_ipc_stream(&events, schema.clone())?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, schema)?;
         let cursor = Cursor::new(bytes);
         let mut reader = StreamReader::try_new(cursor, None)?;
         Ok(reader.next().unwrap()?)

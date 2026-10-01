@@ -93,9 +93,8 @@ pub enum BulkAction {
     Update,
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 impl BulkAction {
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             BulkAction::Index => "index",
             BulkAction::Create => "create",
@@ -103,7 +102,7 @@ impl BulkAction {
         }
     }
 
-    pub const fn as_json_pointer(&self) -> &'static str {
+    pub const fn as_json_pointer(self) -> &'static str {
         match self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
@@ -140,9 +139,8 @@ pub enum VersionType {
     ExternalGte,
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
 impl VersionType {
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Internal => "internal",
             Self::External => "external",

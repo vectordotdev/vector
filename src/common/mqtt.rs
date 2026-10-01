@@ -121,7 +121,7 @@ impl MqttConnector {
     }
 
     /// TODO: Right now there is no way to implement the healthcheck properly: <https://github.com/bytebeamio/rumqtt/issues/562>
-    pub async fn healthcheck(&self) -> crate::Result<()> {
+    pub fn healthcheck(&self) -> crate::Result<()> {
         Ok(())
     }
 }

@@ -294,7 +294,7 @@ impl SplunkConfig {
                 .with_graceful_shutdown(shutdown.map(|_| ()))
                 .await
                 .map_err(|err| {
-                    error!("An error occurred: {:?}.", err);
+                    error!("An error occurred: {err:?}.");
                 })?;
 
             Ok(())
@@ -1812,7 +1812,7 @@ fn raw_event(
             Utc::now(),
         );
 
-        if let Some(batch) = batch.clone() {
+        if let Some(batch) = batch {
             log = log.with_batch_notifier(&batch);
         }
         (vec![Event::from(log)], false)
@@ -2928,8 +2928,7 @@ mod tests {
 
         let b = reqwest::Client::new()
             .post(format!(
-                "http://{}/{}",
-                address, "services/collector/event"
+                "http://{address}/{}", "services/collector/event"
             ))
             .header("Authorization", format!("Splunk {TOKEN}"))
             .body::<&[u8]>(message);

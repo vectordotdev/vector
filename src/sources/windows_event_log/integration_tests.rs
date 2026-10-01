@@ -845,9 +845,8 @@ async fn test_event_data_format_coercion() {
     if let Some(eid) = log.get(event_path!("event_id")) {
         assert!(
             matches!(eid, vrl::value::Value::Bytes(_)),
-            "event_data_format set event_id to String but got {:?}. \
-             Check apply_custom_formatting in parser.",
-            eid
+            "event_data_format set event_id to String but got {eid:?}. \
+             Check apply_custom_formatting in parser."
         );
     }
 }
@@ -1134,8 +1133,7 @@ async fn test_acknowledgements_checkpoint_after_delivery() {
     assert!(
         checkpoint_path.exists(),
         "Checkpoint file should exist after acknowledged delivery. \
-         Path: {:?}",
-        checkpoint_path
+         Path: {checkpoint_path:?}"
     );
 
     // Phase 2: emit a NEW event, run with same data_dir
@@ -1380,9 +1378,7 @@ fn write_custom_log_event(log_name: &str, source: &str, event_id: u32, message: 
             "-NoProfile",
             "-Command",
             &format!(
-                "Write-EventLog -LogName '{}' -Source '{}' -EventId {} -EntryType Information -Message '{}'",
-                log_name, source, event_id, message
-            ),
+                "Write-EventLog -LogName '{log_name}' -Source '{source}' -EventId {event_id} -EntryType Information -Message '{message}'"),
         ])
         .status()
         .expect("failed to run powershell Write-EventLog");
@@ -1665,12 +1661,10 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
     let overlap: HashSet<_> = first_ids.intersection(&second_ids).collect();
     assert!(
         overlap.len() <= batch_size,
-        "Found {} duplicate record_ids between run 1 and run 2 (max allowed: {}): {:?}. \
+        "Found {} duplicate record_ids between run 1 and run 2 (max allowed: {batch_size}): {overlap:?}. \
          Bookmark checkpoint is not preventing re-delivery. \
          Run 1 had {} IDs, run 2 had {} IDs.",
         overlap.len(),
-        batch_size,
-        overlap,
         first_ids.len(),
         second_ids.len()
     );

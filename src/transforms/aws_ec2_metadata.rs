@@ -561,7 +561,7 @@ impl MetadataClient {
                                 .role_name_key
                                 .log_path
                                 .with_index_appended(i as isize),
-                            metric_tag: format!("{}[{}]", self.keys.role_name_key.metric_tag, i),
+                            metric_tag: format!("{}[{i}]", self.keys.role_name_key.metric_tag),
                         },
                         role_name.to_string().into(),
                     ));
@@ -656,7 +656,7 @@ fn create_key(namespace: &Option<OwnedTargetPath>, key: &str) -> MetadataKey {
     if let Some(namespace) = namespace {
         MetadataKey {
             log_path: namespace.with_field_appended(key),
-            metric_tag: format!("{}.{}", create_metric_namespace(namespace), key),
+            metric_tag: format!("{}.{key}", create_metric_namespace(namespace)),
         }
     } else {
         MetadataKey {
@@ -1083,11 +1083,10 @@ mod integration_tests {
             expected_metric.replace_tag(PUBLIC_IPV4_KEY.to_string(), "192.0.2.54".to_string());
             expected_metric.replace_tag(REGION_KEY.to_string(), "us-east-1".to_string());
             expected_metric.replace_tag(
-                format!("{}[{}]", TAGS_KEY, "Name"),
+                format!("{TAGS_KEY}[{}]", "Name"),
                 "test-instance".to_string(),
             );
-            expected_metric
-                .replace_tag(format!("{}[{}]", TAGS_KEY, "Test"), "test-tag".to_string());
+            expected_metric.replace_tag(format!("{TAGS_KEY}[{}]", "Test"), "test-tag".to_string());
 
             tx.send(metric.into()).await.unwrap();
 

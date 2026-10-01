@@ -55,7 +55,6 @@ impl<T: TransformConfig + 'static> From<T> for BoxedTransform {
 
 /// Fully resolved transform component.
 #[configurable_component]
-#[configurable(metadata(docs::component_base_type = "transform"))]
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where
@@ -179,9 +178,6 @@ impl Default for TransformContext {
 }
 
 impl TransformContext {
-    // clippy allow avoids an issue where vrl is flagged off and `globals` is
-    // the sole field in the struct
-    #[allow(clippy::needless_update)]
     pub fn new_with_globals(globals: GlobalOptions) -> Self {
         Self {
             globals,

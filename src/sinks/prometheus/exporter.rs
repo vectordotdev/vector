@@ -31,7 +31,7 @@ use vector_lib::{
     },
 };
 
-use super::collector::{MetricCollector, StringCollector};
+use super::collector::{MetricCollector, StringCollector, metric_identifiers_have_no_line_breaks};
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, Resource, SinkConfig, SinkContext,
@@ -42,7 +42,7 @@ use crate::{
         metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue},
     },
     http::{Auth, build_http_trace_layer},
-    internal_events::PrometheusNormalizationError,
+    internal_events::{PrometheusInvalidMetricError, PrometheusNormalizationError},
     sinks::{
         Healthcheck, VectorSink,
         util::{StreamSink, statistic::validate_quantiles},
@@ -322,7 +322,7 @@ fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
                 Auth::Basic { user, password } => Some(HeaderValue::from_str(
                     format!(
                         "Basic {}",
-                        BASE64_STANDARD.encode(format!("{}:{}", user, password.inner()))
+                        BASE64_STANDARD.encode(format!("{user}:{}", password.inner()))
                     )
                     .as_str(),
                 )),
@@ -457,7 +457,7 @@ impl PrometheusExporter {
             });
 
             let service = ServiceBuilder::new()
-                .layer(build_http_trace_layer(span.clone()))
+                .layer(build_http_trace_layer(span))
                 .layer(CompressionLayer::new())
                 .service(inner);
 
@@ -480,7 +480,7 @@ impl PrometheusExporter {
                 .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
                 .instrument(span)
                 .await
-                .map_err(|error| error!("Server error: {}.", error))?;
+                .map_err(|error| error!("Server error: {error}."))?;
 
             Ok::<(), ()>(())
         });
@@ -544,7 +544,7 @@ impl StreamSink<Event> for PrometheusExporter {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed()
             .await
-            .map_err(|error| error!("Failed to start Prometheus exporter: {}.", error))?;
+            .map_err(|error| error!("Failed to start Prometheus exporter: {error}."))?;
 
         let mut last_flush = Instant::now();
         let flush_period = self.config.flush_period_secs;
@@ -571,6 +571,15 @@ impl StreamSink<Event> for PrometheusExporter {
             // Now process the metric we got.
             let mut metric = event.into_metric();
             let finalizers = metric.take_finalizers();
+
+            if !metric_identifiers_have_no_line_breaks(
+                &metric,
+                self.config.default_namespace.as_deref(),
+            ) {
+                emit!(PrometheusInvalidMetricError {});
+                finalizers.update_status(EventStatus::Rejected);
+                continue;
+            }
 
             match self.normalize(metric) {
                 Some(normalized) => {
@@ -1134,6 +1143,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rejects_invalid_identifiers_before_caching() {
+        let (_guard, address) = next_addr();
+        let config = PrometheusExporterConfig {
+            address,
+            tls: None,
+            ..Default::default()
+        };
+
+        let mut invalid_tags = MetricTags::default();
+        invalid_tags.replace("invalid\nlabel".to_owned(), "value".to_owned());
+        let invalid_metrics = [
+            Metric::new(
+                "invalid\nname",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            ),
+            Metric::new(
+                "valid_name",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("invalid\rnamespace")),
+            Metric::new(
+                "valid_name",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_tags(Some(invalid_tags)),
+        ];
+        let mut events = invalid_metrics
+            .into_iter()
+            .map(Event::Metric)
+            .collect::<Vec<_>>();
+        let mut receiver = BatchNotifier::apply_to(&mut events[..]);
+
+        let valid = Metric::new(
+            "valid_name",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 2.0 },
+        );
+        events.push(Event::Metric(valid.clone()));
+
+        let sink = PrometheusExporter::new(config);
+        let metrics_handle = Arc::clone(&sink.metrics);
+        let sink = VectorSink::from_event_streamsink(sink);
+        sink.run(stream::iter(events).map(Into::into))
+            .await
+            .unwrap();
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+
+        let metrics = metrics_handle.read().unwrap();
+        assert_eq!(metrics.len(), 1);
+        assert!(metrics.contains_key(&MetricRef::from_metric(&valid)));
+    }
+
+    #[tokio::test]
     async fn sink_absolute() {
         let (_guard, address) = next_addr();
         let config = PrometheusExporterConfig {
@@ -1566,11 +1632,7 @@ mod integration_tests {
     }
 
     async fn prometheus_query(query: &str) -> Value {
-        let url = format!(
-            "http://{}/api/v1/query?query={}",
-            prometheus_address(),
-            query
-        );
+        let url = format!("http://{}/api/v1/query?query={query}", prometheus_address());
         let request = Request::post(url)
             .body(Body::empty())
             .expect("Error creating request.");

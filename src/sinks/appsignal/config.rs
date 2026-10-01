@@ -1,9 +1,3 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
-use derivative::Derivative;
 use futures::FutureExt;
 use http::{HeaderValue, Request, header::AUTHORIZATION};
 use hyper::Body;
@@ -147,14 +141,13 @@ impl SinkConfig for AppsignalConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedAppsignal {
     batch_settings: BatcherSettings,
     endpoint: HttpEndpoint,
     healthcheck_endpoint: HttpEndpoint,
     // Omitted: `authorization` embeds the push API key.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     authorization: HeaderValue,
 }
 
