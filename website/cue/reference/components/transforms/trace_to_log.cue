@@ -23,7 +23,6 @@ components: transforms: trace_to_log: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.transforms.trace_to_log.configuration

@@ -49,7 +49,6 @@ components: sinks: nats: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.nats.configuration
@@ -62,7 +61,5 @@ components: sinks: nats: {
 
 	how_it_works: components._nats.how_it_works
 
-	telemetry: metrics: {
-		send_errors_total: components.sources.internal_metrics.output.metrics.send_errors_total
-	}
+	telemetry: metrics: {}
 }

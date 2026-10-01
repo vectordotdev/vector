@@ -1,8 +1,11 @@
 use indexmap::{IndexMap, IndexSet};
+use std::sync::Arc;
+use vector_lib::config::ComponentKey;
 use vector_lib::id::Inputs;
 
 use super::{
-    Config, OutputId, builder::ConfigBuilder, graph::Graph, transform::get_transform_output_ids,
+    Component, Config, DynValidatedSink, OutputId, builder::ConfigBuilder, enrichment_table_sinks,
+    enrichment_table_sources, graph::Graph, sink::SinkOuter, transform::get_transform_output_ids,
     validation,
 };
 
@@ -59,26 +62,22 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     let all_sinks = sinks
         .clone()
         .into_iter()
-        .chain(
-            enrichment_tables
-                .iter()
-                .filter_map(|(key, table)| table.as_sink(key)),
-        )
+        .chain(enrichment_table_sinks(&enrichment_tables))
         .collect::<IndexMap<_, _>>();
     let sources_and_table_sources = sources
         .clone()
         .into_iter()
-        .chain(
-            enrichment_tables
-                .iter()
-                .filter_map(|(key, table)| table.as_source(key)),
-        )
+        .chain(enrichment_table_sources(&enrichment_tables))
         .collect::<IndexMap<_, _>>();
 
+    let graph_sources = sources_and_table_sources
+        .iter()
+        .map(|(key, c)| (key, Component::from(c)));
+    let graph_transforms = transforms.iter().map(|(key, c)| (key, Component::from(c)));
+    let graph_sinks = all_sinks.iter().map(|(key, c)| (key, Component::from(c)));
+
     let graph = match Graph::new(
-        &sources_and_table_sources,
-        &transforms,
-        &all_sinks,
+        graph_sources.chain(graph_transforms).chain(graph_sinks),
         schema,
         global.wildcard_matching.unwrap_or_default(),
     ) {
@@ -88,6 +87,11 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             return Err(errors);
         }
     };
+
+    if let Err(input_errors) = graph.check_inputs() {
+        errors.extend(input_errors);
+        return Err(errors);
+    }
 
     if let Err(type_errors) = graph.typecheck() {
         errors.extend(type_errors);
@@ -99,7 +103,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
 
     // Inputs are resolved from string into OutputIds as part of graph construction, so update them
     // here before adding to the final config (the types require this).
-    let sinks = sinks
+    let sinks: IndexMap<ComponentKey, SinkOuter<OutputId>> = sinks
         .into_iter()
         .map(|(key, sink)| {
             let inputs = graph.inputs_for(&key);
@@ -120,9 +124,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             (key, table.with_inputs(inputs))
         })
         .collect();
+    let output_map = graph.output_map().expect("ambiguous outputs");
     let tests = tests
         .into_iter()
-        .map(|test| test.resolve_outputs(&graph))
+        .map(|test| test.resolve_outputs(&output_map))
         .collect::<Result<Vec<_>, Vec<_>>>()?;
 
     if errors.is_empty() {
@@ -140,6 +145,16 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             secret,
             graceful_shutdown_duration,
         };
+
+        // Validate sinks in place
+        let validate_errors = validate_sinks(&mut config);
+        if !validate_errors.is_empty() {
+            errors.extend(validate_errors);
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
 
         config.propagate_acknowledgements()?;
 
@@ -178,6 +193,39 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
     for (id, sink) in config.sinks.iter_mut() {
         expand_globs_inner(&mut sink.inputs, &id.to_string(), &candidates);
     }
+}
+
+/// Validate all sinks (direct and enrichment-table-derived) in place.
+///
+/// Fills the `validated` field on each sink's `SinkOuter` (and on enrichment tables that
+/// double as sinks) with the erased validated state. Returns a list of errors for sinks
+/// that failed validation. An empty Vec means success.
+fn validate_sinks(config: &mut Config) -> Vec<String> {
+    let mut errors = Vec::new();
+
+    // Validate direct sinks
+    for (key, sink) in config.sinks.iter_mut() {
+        let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
+        match dyn_sink.validate_dyn() {
+            Ok(state) => sink.validated = Some(Arc::from(state)),
+            Err(e) => errors.push(format!("Failed to validate sink \"{key}\": {e}")),
+        }
+    }
+
+    // Validate enrichment table sinks with resolved inputs.
+    for (key, table) in config.enrichment_tables.iter_mut() {
+        if let Some((_, sink)) = table.as_sink(key) {
+            let dyn_sink: &dyn DynValidatedSink = sink.inner.as_ref();
+            match dyn_sink.validate_dyn() {
+                Ok(state) => table.validated = Some(Arc::from(state)),
+                Err(error) => errors.push(format!(
+                    "Failed to validate enrichment table sink \"{key}\": {error}"
+                )),
+            }
+        }
+    }
+
+    errors
 }
 
 enum InputMatcher {

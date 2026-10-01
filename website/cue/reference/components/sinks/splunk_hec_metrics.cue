@@ -18,7 +18,6 @@ components: sinks: splunk_hec_metrics: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -62,7 +61,6 @@ components: sinks: splunk_hec_metrics: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.splunk_hec_metrics.configuration

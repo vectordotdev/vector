@@ -18,7 +18,6 @@ components: sinks: elasticsearch: {
 		send: {
 			batch: {
 				enabled:      true
-				common:       false
 				max_bytes:    10_000_000
 				timeout_secs: 1.0
 			}
@@ -70,13 +69,6 @@ components: sinks: elasticsearch: {
 				"""#,
 		]
 		warnings: []
-		notices: [
-			#"""
-				This sink is compatible with OpenSearch, including both self-managed OpenSearch instances
-				and Amazon OpenSearch Service. For OpenSearch Serverless, set `opensearch_service_type = "serverless"`
-				and use AWS authentication.
-				"""#,
-		]
 	}
 
 	configuration: generated.components.sinks.elasticsearch.configuration

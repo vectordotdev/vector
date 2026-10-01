@@ -43,7 +43,6 @@ components: sources: mongodb_metrics: {
 		]
 
 		warnings: []
-		notices: []
 	}
 
 	installation: {
@@ -148,7 +147,7 @@ components: sources: mongodb_metrics: {
 			tags:              _mongodb_metrics_tags
 		}
 		memory: {
-			description:       "Current memory unsage."
+			description:       "Current memory usage."
 			type:              "gauge"
 			default_namespace: "mongodb"
 			tags: _mongodb_metrics_tags & {

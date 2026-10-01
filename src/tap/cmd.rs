@@ -52,7 +52,7 @@ async fn tap_internal(
     let tap_runner = TapRunner::new(
         &url,
         opts.inputs_of.clone(),
-        opts.outputs_patterns().clone(),
+        opts.outputs_patterns(),
         &output_channel,
     );
 
@@ -89,8 +89,7 @@ async fn tap_internal(
                             break;
                         } else if !opts.no_reconnect {
                             eprintln!(
-                                "[tap] Connection failed with error {:?}. Reconnecting in {:?} seconds.",
-                                tap_executor_error,
+                                "[tap] Connection failed with error {tap_executor_error:?}. Reconnecting in {:?} seconds.",
                                 RECONNECT_DELAY_MS / 1000);
                             tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY_MS)).await;
                         } else {
