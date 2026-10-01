@@ -160,6 +160,9 @@ This uses the existing component-example generator to prepare the documentation 
 starts and stops a static server on `127.0.0.1:4173`; that port must be free. Tests use isolated browser
 contexts and do not use an existing Hugo development server.
 
+In GitHub Actions, `make generate-vector-vrl-docs` runs from the repository root before the website build.
+The browser suite uses one worker when `CI=true` and three workers otherwise.
+
 To run tests again against the current `public/` build, or inspect a failure:
 
 ```shell
