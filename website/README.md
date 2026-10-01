@@ -138,7 +138,7 @@ The browser suite uses [Playwright](https://playwright.dev) to test the built we
 Firefox, and WebKit. It covers globe rendering and rotation, theme persistence, documentation
 navigation, VRL signatures and examples, generated Console sink data, scroll-driven TOC highlighting,
 configuration tabs, exact and full-text search, and mobile navigation. Each test also fails on
-JavaScript errors or missing local assets. No CI workflows run this suite yet.
+JavaScript errors or missing local assets.
 
 Install dependencies and browser binaries once from this directory:
 
