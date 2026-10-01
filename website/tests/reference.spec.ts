@@ -71,7 +71,7 @@ test("console sink renders generated field metadata and configuration", async ({
 
 test("VRL TOC highlight follows scrolling between functions and their examples", async ({ page }) => {
   await page.goto(functions);
-  const toc = page.getByRole("complementary", { name: "Table of contents" });
+  const toc = page.locator("#toc");
   const jsonLink = toc.getByRole("link", { name: "parse_json", exact: true });
   await expect(jsonLink).toBeAttached();
   const inactiveColor = await jsonLink.evaluate((element) => getComputedStyle(element).color);
