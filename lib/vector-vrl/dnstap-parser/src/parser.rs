@@ -977,7 +977,7 @@ impl DnstapParser {
 /// Parse a dnstap socket address (`query_address`/`response_address`) into an [`IpAddr`].
 ///
 /// The dnstap spec says an `INET` (IPv4) address is 4 octets and an `INET6` address is
-/// 16 octets, but in practice some producers (notably CoreDNS, which relies on Go's
+/// 16 octets, but in practice some producers (notably `CoreDNS`, which relies on Go's
 /// `net.IP`) emit the client address as a 16-byte IPv4-mapped IPv6 value (`::ffff:a.b.c.d`)
 /// while still reporting `socket_family = INET`. The previous logic keyed the address
 /// width off `socket_family` alone and so truncated such buffers to their first 4 (zero)
