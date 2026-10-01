@@ -6,7 +6,7 @@ use snafu::Snafu;
 use tracing::Instrument;
 use vector_lib::{
     event::{ObjectMap, Value},
-    internal_event::{ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{ComponentEventsDropped, INTENTIONAL},
     lookup::event_path,
 };
 use vrl::{
@@ -298,7 +298,7 @@ impl LogRequestBuilder {
                 self.serialize_with_capacity(&mut events_with_estimated_size)?;
             if events_serialized.is_empty() {
                 if events_with_estimated_size.pop_front().is_some() {
-                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                    emit!(ComponentEventsDropped::<INTENTIONAL> {
                         count: 1,
                         reason: "Event too large to encode."
                     });
@@ -343,7 +343,7 @@ impl LogRequestBuilder {
                     estimated_json_size = event.estimated_json_encoded_size_of();
                 }
                 LogEncoding::Dropped { reason } => {
-                    emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+                    emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });
                     continue;
                 }
             }
