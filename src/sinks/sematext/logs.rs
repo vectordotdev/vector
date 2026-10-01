@@ -1,10 +1,4 @@
-#![expect(
-    clippy::let_underscore_must_use,
-    reason = "derivative's Debug derive with ignored fields expands to a must_use let binding"
-)]
-
 use async_trait::async_trait;
-use derivative::Derivative;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
@@ -89,12 +83,11 @@ impl SinkConfig for SematextLogsConfig {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct ValidatedSematextLogs {
     endpoint: String,
     // Omitted: `index` is built from the write token and would leak it via Debug.
-    #[derivative(Debug = "ignore")]
+    #[debug(skip)]
     index: Template,
 }
 

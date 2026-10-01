@@ -377,7 +377,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-docs
 check-all: check-examples check-component-features
-check-all: check-scripts check-deny check-generated-docs check-licenses
+check-all: check-actionlint check-scripts check-deny check-generated-docs check-licenses
 
 .PHONY: check-changelog-fragments
 check-changelog-fragments: ## Validate changelog fragments added in this branch/PR
@@ -394,6 +394,10 @@ check-clippy: ## Check code with Clippy; when set, FEATURES is the exact feature
 .PHONY: check-docs
 check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
 	$(VDEV) check docs
+
+.PHONY: check-actionlint
+check-actionlint: ## Check GitHub Actions workflows
+	actionlint
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
@@ -454,11 +458,6 @@ check-generated-docs: generate-docs ## Checks that machine-generated component d
 	$(VDEV) check generated-docs
 	$(VDEV) check component-examples
 
-##@ Rustdoc
-build-rustdoc: ## Build Vector's Rustdocs
-	# This command is mostly intended for use by the build process in vectordotdev/vector-rustdoc
-	cargo doc --no-deps --workspace
-
 ##@ Packaging (forwarded to Makefile.packaging)
 
 # Packaging targets that depend on VERSION live in Makefile.packaging to avoid
@@ -514,8 +513,8 @@ clean: ## Clean everything
 	cargo clean
 
 .PHONY: generate-kubernetes-manifests
-generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
-	$(VDEV) build manifests
+generate-kubernetes-manifests: ## Generate Kubernetes manifests from the latest (or CHART_VERSION) Helm chart
+	$(VDEV) build manifests -- $(if $(CHART_VERSION),--chart-version $(CHART_VERSION))
 
 .PHONY: generate-component-docs
 generate-component-docs: ## Generate per-component Cue docs from the configuration schema.
@@ -555,10 +554,6 @@ signoff: ## Signsoff all previous commits since branch creation
 .PHONY: version
 version: ## Get the current Vector version
 	@$(VDEV) version
-
-.PHONY: git-hooks
-git-hooks: ## Add Vector-local git hooks for commit sign-off
-	@scripts/install-git-hooks.sh
 
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)

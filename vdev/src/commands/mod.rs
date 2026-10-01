@@ -15,6 +15,9 @@ macro_rules! cli_commands {
     ( :: $( $mod:ident, )* :: ) => {
         pastey::paste! {
             #[derive(clap::Subcommand, Debug)]
+            // Command groups such as `update` share a suffix (`opentelemetry-proto`,
+            // `datadog-trace-proto`, `datadog-metrics-proto`) that causes clippy to warn.
+            #[allow(clippy::enum_variant_names)]
             enum Commands {
                 $( [<$mod:camel>]($mod::Cli), )*
             }
@@ -78,7 +81,6 @@ mod features;
 mod fmt;
 mod info;
 mod integration;
-mod meta;
 mod package;
 mod release;
 mod run;
@@ -86,6 +88,7 @@ mod status;
 mod style;
 mod test;
 mod test_vrl;
+mod update;
 mod version;
 
 cli_commands! {
@@ -100,13 +103,13 @@ cli_commands! {
     fmt,
     info,
     integration,
-    meta,
     package,
     release,
     run,
     status,
     test,
     test_vrl,
+    update,
     version,
 }
 

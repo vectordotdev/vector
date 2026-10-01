@@ -554,9 +554,9 @@ mod integration_tests {
             let included1_message = "included 1";
 
             let prefix = format!("vector_test_exclude_containers_{}", uuid::Uuid::new_v4());
-            let included0 = format!("{}_{}", prefix, "include0");
-            let included1 = format!("{}_{}", prefix, "include1");
-            let excluded0 = format!("{}_{}", prefix, "excluded0");
+            let included0 = format!("{prefix}_{}", "include0");
+            let included1 = format!("{prefix}_{}", "include1");
+            let excluded0 = format!("{prefix}_{}", "excluded0");
 
             let docker = docker(None, None).unwrap();
 
@@ -571,7 +571,7 @@ mod integration_tests {
             let id1 = container_log_n(1, &included0, None, included0_message, &docker).await;
             let id2 = container_log_n(1, &included1, None, included1_message, &docker).await;
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let events = collect_ready(out).await;
+            let events = collect_ready(out);
             container_remove(&id0, &docker).await;
             container_remove(&id1, &docker).await;
             container_remove(&id2, &docker).await;

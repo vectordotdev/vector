@@ -364,7 +364,7 @@ impl FunctionTransform for Sample {
                             event,
                             Some(LegacyKey::Overwrite(path)),
                             path,
-                            sample_rate.clone(),
+                            sample_rate,
                         );
                     }
                     Event::Trace(ref mut event) => {

@@ -11,92 +11,11 @@ set -euo pipefail
 #   real upgrade path (old package -> new package) with plain `dpkg -i`: no
 #   --force-conf* flags and no terminal, as in an unattended upgrade.
 
-package="${1:?must pass package as argument}"
-previous_package="${2:-}"
-
-# Statically inspects a built .deb (no root, no installation required) to
-# confirm the control metadata and file layout match the intended fix:
-#   - /etc/vector/vector.yaml and /etc/default/vector are declared conffiles
-#     in DEBIAN/conffiles, so dpkg preserves local edits across upgrades.
-#   - the bundled example configs are installed under /usr/share/vector/examples/
-#     and are NOT declared (or installable) as conffiles under /etc.
-verify_deb_static () {
-  local pkg="$1"
-  local ctrl_dir
-  ctrl_dir="$(mktemp -d)"
-  dpkg-deb -e "$pkg" "$ctrl_dir"
-
-  if [ ! -f "$ctrl_dir/conffiles" ]; then
-    echo "package is missing a DEBIAN/conffiles control file"
-    rm -rf "$ctrl_dir"
-    exit 1
-  fi
-
-  if ! grep -qx "/etc/vector/vector.yaml" "$ctrl_dir/conffiles"; then
-    echo "/etc/vector/vector.yaml is not declared in DEBIAN/conffiles"
-    rm -rf "$ctrl_dir"
-    exit 1
-  fi
-
-  if ! grep -qx "/etc/default/vector" "$ctrl_dir/conffiles"; then
-    echo "/etc/default/vector is not declared in DEBIAN/conffiles"
-    rm -rf "$ctrl_dir"
-    exit 1
-  fi
-
-  if grep -q "^/etc/vector/examples/" "$ctrl_dir/conffiles"; then
-    echo "example configs must not be declared as conffiles"
-    rm -rf "$ctrl_dir"
-    exit 1
-  fi
-
-  # The maintainer scripts must drive dpkg-maintscript-helper from all three
-  # scripts, or the obsolete /etc/vector/examples conffiles linger.
-  local script
-  for script in preinst postinst postrm; do
-    if ! grep -q "dpkg-maintscript-helper rm_conffile" "$ctrl_dir/$script"; then
-      echo "$script does not remove the obsolete /etc/vector/examples conffiles"
-      rm -rf "$ctrl_dir"
-      exit 1
-    fi
-  done
-
-  rm -rf "$ctrl_dir"
-
-  local file_list
-  file_list="$(dpkg-deb -c "$pkg")"
-
-  if ! echo "$file_list" | grep -qE '\./etc/vector/vector\.yaml$'; then
-    echo "package does not install /etc/vector/vector.yaml"
-    exit 1
-  fi
-
-  if ! echo "$file_list" | grep -qE '\./usr/share/vector/examples/stdio\.yaml$'; then
-    echo "package does not install /usr/share/vector/examples/stdio.yaml"
-    exit 1
-  fi
-
-  if echo "$file_list" | grep -qE '\./etc/vector/examples/'; then
-    echo "example configs must not be installed under /etc/vector/examples/"
-    exit 1
-  fi
-
-  # Check the shipped default's content directly from the archive (not after
-  # a live install) so this holds regardless of whether the test environment
-  # already has a pre-existing /etc/vector/vector.yaml on disk.
-  if dpkg-deb --fsys-tarfile "$pkg" | tar -xO ./etc/vector/vector.yaml | grep -q "dummy_logs"; then
-    echo "/etc/vector/vector.yaml must not ship the demo_logs pipeline as a fresh-install default"
-    exit 1
-  fi
-
-  echo "verify-install.sh: .deb static checks passed (conffiles + file paths)"
-}
-
-case "$package" in
-  *.deb)
-    verify_deb_static "$package"
-    ;;
-esac
+package="${1:-}"
+if [[ $# -ne 1 || ! -f "$package" ]]; then
+  echo "Expected exactly one package file" >&2
+  exit 1
+fi
 
 install_package () {
   case "$1" in

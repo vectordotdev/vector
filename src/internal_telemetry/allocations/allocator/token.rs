@@ -27,6 +27,7 @@ impl AllocationGroupId {
     pub const ROOT: Self = AllocationGroupId::from_raw(1);
 
     pub(super) const fn from_raw(raw_group_id: u8) -> Self {
+        // SAFETY: Allocation group IDs are nonzero.
         unsafe { Self(NonZeroU8::new_unchecked(raw_group_id)) }
     }
 

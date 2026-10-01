@@ -54,12 +54,16 @@ static MAX_ZSTD_WINDOW_LOG: OnceLock<Option<u32>> = OnceLock::new();
 ///
 /// See <https://zlib.net/zlib_tech.html> ("the worst case ... can result in an expansion of at
 /// most 13.5%, plus eleven bytes").
-#[allow(clippy::cast_possible_truncation)] // limit derives from a usize; saturating math keeps it in range
 const fn zlib_compressed_frame_limit(decompressed_limit: usize) -> usize {
-    (decompressed_limit as u64)
+    // Split the calculation around the division so the intermediate multiplication cannot
+    // overflow. Multiplying first with saturating arithmetic would underestimate large limits.
+    let whole = decompressed_limit / 1000;
+    let remainder = decompressed_limit % 1000;
+
+    whole
         .saturating_mul(1135)
-        .saturating_div(1000)
-        .saturating_add(11) as usize
+        .saturating_add(remainder * 1135 / 1000)
+        .saturating_add(11)
 }
 
 const DEFAULT_MAX_ZLIB_COMPRESSED_FRAME_SIZE_BYTES: usize =
@@ -403,6 +407,21 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+
+    #[test]
+    fn zlib_compressed_frame_limit_accounts_for_worst_case_expansion() {
+        assert_eq!(zlib_compressed_frame_limit(0), 11);
+        assert_eq!(zlib_compressed_frame_limit(1_000), 1_146);
+        assert_eq!(
+            zlib_compressed_frame_limit(DEFAULT_MAX_DECOMPRESSED_SIZE_BYTES),
+            119_013_387
+        );
+    }
+
+    #[test]
+    fn zlib_compressed_frame_limit_saturates_at_usize_max() {
+        assert_eq!(zlib_compressed_frame_limit(usize::MAX), usize::MAX);
+    }
 
     fn train_dictionary(seed: u64) -> Vec<u8> {
         let samples: Vec<Vec<u8>> = (0..100)

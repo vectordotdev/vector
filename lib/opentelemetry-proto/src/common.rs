@@ -11,12 +11,12 @@ impl From<PBValue> for Value {
             PBValue::StringValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::BoolValue(v) => Value::Boolean(v),
             PBValue::IntValue(v) => Value::Integer(v),
-            PBValue::DoubleValue(v) => NotNan::new(v).map(Value::Float).unwrap_or(Value::Null),
+            PBValue::DoubleValue(v) => NotNan::new(v).map_or(Value::Null, Value::Float),
             PBValue::BytesValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::ArrayValue(arr) => Value::Array(
                 arr.values
                     .into_iter()
-                    .map(|av| av.value.map(Into::into).unwrap_or(Value::Null))
+                    .map(|av| av.value.map_or(Value::Null, Into::into))
                     .collect::<Vec<Value>>(),
             ),
             PBValue::KvlistValue(arr) => kv_list_into_value(arr.values),
@@ -48,6 +48,7 @@ impl From<TagValue> for AnyValue {
     }
 }
 
+#[must_use]
 pub fn str_to_key_value(key: &str, val: TagValue) -> KeyValue {
     KeyValue {
         key: key.to_string(),
@@ -67,24 +68,22 @@ pub fn tag_set_to_any_value(tag_set: TagValueSet) -> Option<AnyValue> {
     }
 }
 
+#[must_use]
 pub fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
     Value::Object(
         arr.into_iter()
             .filter_map(|kv| {
-                kv.value.map(|av| {
-                    (
-                        kv.key.into(),
-                        av.value.map(Into::into).unwrap_or(Value::Null),
-                    )
-                })
+                kv.value
+                    .map(|av| (kv.key.into(), av.value.map_or(Value::Null, Into::into)))
             })
             .collect::<ObjectMap>(),
     )
 }
 
+#[must_use]
 pub fn to_hex(d: &[u8]) -> String {
     if d.is_empty() {
-        return "".to_string();
+        return String::new();
     }
     hex::encode(d)
 }
@@ -108,7 +107,7 @@ mod tests {
         let result = Value::from(inf_value);
         match result {
             Value::Float(f) => {
-                assert!(f.into_inner().is_infinite() && f.into_inner().is_sign_positive())
+                assert!(f.into_inner().is_infinite() && f.into_inner().is_sign_positive());
             }
             _ => panic!("Expected Float value, got {result:?}"),
         }
@@ -117,7 +116,7 @@ mod tests {
         let result = Value::from(neg_inf_value);
         match result {
             Value::Float(f) => {
-                assert!(f.into_inner().is_infinite() && f.into_inner().is_sign_negative())
+                assert!(f.into_inner().is_infinite() && f.into_inner().is_sign_negative());
             }
             _ => panic!("Expected Float value, got {result:?}"),
         }

@@ -1,14 +1,14 @@
-use vector_lib::metric_tags;
+use vector_lib::{internal_event::GaugeName, metric_tags};
 
 use super::HostMetrics;
 
 const COMPONENT: &str = "component";
-const TEMPERATURE_CELSIUS: &str = "temperature_celsius";
-const TEMPERATURE_MAX_CELSIUS: &str = "temperature_max_celsius";
-const TEMPERATURE_CRITICAL_CELSIUS: &str = "temperature_critical_celsius";
+const TEMPERATURE_CELSIUS: GaugeName = GaugeName::TemperatureCelsius;
+const TEMPERATURE_MAX_CELSIUS: GaugeName = GaugeName::TemperatureMaxCelsius;
+const TEMPERATURE_CRITICAL_CELSIUS: GaugeName = GaugeName::TemperatureCriticalCelsius;
 
 impl HostMetrics {
-    pub async fn temperature_metrics(&mut self, output: &mut super::MetricsBuffer) {
+    pub fn temperature_metrics(&mut self, output: &mut super::MetricsBuffer) {
         output.name = "temperature";
         // Refresh the long-lived component list in place. `Component::max()` is
         // derived by sysinfo from successive refreshes when the sensor does not
@@ -57,10 +57,8 @@ mod tests {
     #[tokio::test]
     async fn generates_temperature_metrics() {
         let mut buffer = MetricsBuffer::new(None);
-        HostMetrics::new(HostMetricsConfig::default())
-            .temperature_metrics(&mut buffer)
-            .await;
-        let metrics = buffer.metrics;
+        HostMetrics::new(HostMetricsConfig::default()).temperature_metrics(&mut buffer);
+        let metrics = buffer.into_metrics();
 
         // Temperature sensors are not exposed in many environments (containers,
         // virtual machines, CI runners), so the component list can legitimately

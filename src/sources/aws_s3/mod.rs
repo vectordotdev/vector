@@ -311,8 +311,7 @@ impl AwsS3Config {
                     },
                     multiline,
                     decoder,
-                )
-                .await?;
+                )?;
 
                 Ok(ingestor)
             }

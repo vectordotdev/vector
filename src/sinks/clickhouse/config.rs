@@ -412,10 +412,7 @@ impl ClickhouseConfig {
         let table_str = self.table.get_ref();
         let database_str = database.get_ref();
 
-        debug!(
-            "Fetching schema for table {}.{} at startup.",
-            database_str, table_str
-        );
+        debug!("Fetching schema for table {database_str}.{table_str} at startup.");
 
         let provider = arrow::ClickHouseSchemaProvider::new(
             client.clone(),
@@ -599,8 +596,7 @@ mod tests {
 
             assert!(
                 config.batch_encoding.is_none(),
-                "batch_encoding should be None for format {:?}",
-                format
+                "batch_encoding should be None for format {format:?}"
             );
             assert_eq!(
                 config.format, format,
@@ -633,8 +629,7 @@ mod tests {
         let error = result.unwrap_err().to_string();
         assert!(
             error.contains("'batch_encoding' is only compatible"),
-            "Error message should mention incompatibility: {}",
-            error
+            "Error message should mention incompatibility: {error}"
         );
     }
 
@@ -707,8 +702,7 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("static table and database"),
-            "Error should mention static requirement: {}",
-            err
+            "Error should mention static requirement: {err}"
         );
 
         // Dynamic database
@@ -735,8 +729,7 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("static table and database"),
-            "Error should mention static requirement: {}",
-            err
+            "Error should mention static requirement: {err}"
         );
     }
 
@@ -781,8 +774,7 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("confinement") || err.contains("prefix"),
-            "Error should mention confinement/prefix: {}",
-            err
+            "Error should mention confinement/prefix: {err}"
         );
     }
 }

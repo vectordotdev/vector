@@ -45,6 +45,26 @@ impl EncodingConfig {
     pub fn build(&self) -> vector_common::Result<Serializer> {
         self.encoding.build()
     }
+
+    /// Validate that the configured serializer can be built.
+    ///
+    /// Builds the serializer and discards it, surfacing unbuildable encodings
+    /// during pure config validation instead of at build time.
+    ///
+    /// The protobuf codec is skipped: building it reads the descriptor set
+    /// from `desc_file` on disk, and pure validation must stay
+    /// filesystem-free (it runs under `vector validate --no-environment`).
+    /// A protobuf descriptor that can't be loaded is caught by the
+    /// environment-dependent `build()` phase instead.
+    pub fn validate(&self) -> vector_common::Result<()> {
+        match self.config() {
+            SerializerConfig::Protobuf(_) => Ok(()),
+            _ => self
+                .build()
+                .map(|_| ())
+                .map_err(|error| format!("failed to build encoding serializer: {error}").into()),
+        }
+    }
 }
 
 impl<T> From<T> for EncodingConfig
@@ -147,6 +167,18 @@ impl EncodingConfigWithFraming {
         let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
         Ok((self.transformer(), encoder))
     }
+
+    /// Validate that the configured serializer can be built.
+    ///
+    /// Delegates to [`EncodingConfig::validate`]: the serializer is built and
+    /// discarded to surface unbuildable codecs during pure config validation,
+    /// with the disk-bound protobuf codec assumed valid so validation stays
+    /// filesystem-free (it runs under `vector validate --no-environment`).
+    /// Building the framer is infallible, so there is nothing to validate on
+    /// the framing side.
+    pub fn validate(&self) -> vector_common::Result<()> {
+        self.encoding.validate()
+    }
 }
 
 /// The way a sink processes outgoing events.
@@ -176,6 +208,10 @@ mod test {
 
     use super::*;
     use crate::encoding::TimestampFormat;
+    use crate::encoding::{
+        AvroSerializerOptions, JsonSerializerConfig, ProtobufSerializerConfig,
+        ProtobufSerializerOptions,
+    };
 
     #[test]
     fn deserialize_encoding_config() {
@@ -262,5 +298,94 @@ mod test {
         );
         assert_eq!(transformer.except_fields(), &Some(vec!["ignore_me".into()]));
         assert_eq!(transformer.timestamp_format(), &Some(TimestampFormat::Unix));
+    }
+
+    #[test]
+    fn validate_skips_protobuf_encoding_that_reads_disk() {
+        // Building a protobuf serializer reads `desc_file` from disk; pure
+        // validation must stay filesystem-free, so the codec is assumed valid
+        // here and actually built (and failed) in the build phase.
+        let encoding = EncodingConfig::new(
+            SerializerConfig::Protobuf(ProtobufSerializerConfig {
+                protobuf: ProtobufSerializerOptions {
+                    desc_file: "/nonexistent/protobuf.desc".into(),
+                    message_type: "package.Message".into(),
+                    use_json_names: false,
+                },
+            }),
+            Default::default(),
+        );
+
+        assert!(encoding.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_unbuildable_encoding() {
+        // Avro's schema is inline JSON, so building it is filesystem-free and
+        // pure validation catches a malformed schema.
+        let encoding = EncodingConfig::new(
+            SerializerConfig::Avro {
+                avro: AvroSerializerOptions {
+                    schema: "not a valid avro schema".into(),
+                },
+            },
+            Default::default(),
+        );
+
+        let error = encoding.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_buildable_encoding() {
+        let encoding = EncodingConfig::new(
+            SerializerConfig::Json(JsonSerializerConfig::default()),
+            Default::default(),
+        );
+
+        assert!(encoding.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_with_framing_rejects_unbuildable_encoding() {
+        let encoding = EncodingConfigWithFraming::new(
+            Some(FramingConfig::NewlineDelimited),
+            SerializerConfig::Avro {
+                avro: AvroSerializerOptions {
+                    schema: "not a valid avro schema".into(),
+                },
+            },
+            Default::default(),
+        );
+
+        let error = encoding.validate().unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("failed to build encoding serializer"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn validate_with_framing_skips_protobuf_encoding_that_reads_disk() {
+        let encoding = EncodingConfigWithFraming::new(
+            None,
+            SerializerConfig::Protobuf(ProtobufSerializerConfig {
+                protobuf: ProtobufSerializerOptions {
+                    desc_file: "/nonexistent/protobuf.desc".into(),
+                    message_type: "package.Message".into(),
+                    use_json_names: false,
+                },
+            }),
+            Default::default(),
+        );
+
+        assert!(encoding.validate().is_ok());
     }
 }

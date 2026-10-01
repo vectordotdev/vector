@@ -173,6 +173,7 @@ impl ValidatedSink for DorisConfig {
     type Validated = ValidatedDoris;
 
     fn validate(&self) -> crate::Result<ValidatedDoris> {
+        self.encoding.validate()?;
         if self.endpoints.is_empty() {
             return Err("No endpoints configured.'.".into());
         }
@@ -256,8 +257,7 @@ impl ValidatedSink for DorisConfig {
                         compression,
                         label_prefix,
                         headers,
-                    )
-                    .await;
+                    );
 
                     let doris_client_safe = doris_client.into_thread_safe();
 
@@ -305,8 +305,7 @@ impl ValidatedSink for DorisConfig {
                 self.compression,
                 self.label_prefix.clone(),
                 self.headers.clone(),
-            )
-            .await;
+            );
             doris_client.into_thread_safe()
         };
 

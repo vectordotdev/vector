@@ -213,6 +213,7 @@ impl HecLogsSinkConfig {
             .transpose()?;
 
         let batch_settings = self.batch.into_batcher_settings()?;
+        self.encoding.validate()?;
 
         Ok(ValidatedHecLogsSink {
             index,

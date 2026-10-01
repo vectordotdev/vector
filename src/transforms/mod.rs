@@ -96,7 +96,7 @@ mod test {
             "out",
             &["transform"],
             UnitTestStreamSinkConfig::new(
-                PollSender::new(tx).sink_map_err(|error| panic!("{}", error)),
+                PollSender::new(tx).sink_map_err(|error| panic!("{error}")),
             ),
         );
 
