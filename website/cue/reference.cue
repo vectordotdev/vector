@@ -79,10 +79,22 @@ _values: {
 //                 json: "Encodes the data via application/json"
 //                 text: "Encodes the data via text/plain"
 //                }
-#Enum: [Name=_]: string
+//
+// Deprecated variants use an object form:
+//
+//                enum: {
+//                 v1: { description: "legacy endpoint", deprecated: true }
+//                 v2: "current endpoint"
+//                }
+#EnumVariant: string | {
+	description:         string
+	deprecated?:         bool
+	deprecated_message?: string
+}
+
+#Enum: [Name=_]: #EnumVariant
 
 #EnvVars: #Schema & {[Type=string]: {
-	common:   true
 	required: false
 }}
 
@@ -335,6 +347,24 @@ _values: {
 	//              relevant_when: 'strategy = "fingerprint" or "inode"'
 	relevant_when?: string
 
+	// `required_when` clarifies when an option is required.
+	//
+	// For example, if an option is only required when another option has a
+	// specific value, you can specify that here. We accept a string to allow
+	// for the expression of complex requirements.
+	//
+	//              required_when: 'strategy = "fingerprint"'
+	required_when?: string
+
+	// `required_one_of` documents that exactly one field from the listed group
+	// must be set. All members share the same list. The field itself is optional
+	// in isolation; the constraint is expressed at the schema level via oneOf.
+	required_one_of?: [...string]
+	required_one_of_group?: string
+
+	// `minimal` marks an option as part of the minimal example configuration.
+	minimal?: bool
+
 	// `required` requires the option to be set.
 	required: bool
 
@@ -343,13 +373,6 @@ _values: {
 	// For example, the `tls.verify_hostname` option has a warning about
 	// reduced security if the option is disabled.
 	warnings: [...string] | *[]
-
-	if !required {
-		// `common` specifies that the option is commonly used. It will bring the
-		// option to the top of the documents, surfacing it from other
-		// less common, options.
-		common?: bool
-	}
 
 	// `sort` sorts the option, otherwise options will be sorted alphabetically.
 	sort?: int8
@@ -583,19 +606,11 @@ _values: {
 	//      }
 	enum?: #Enum
 
+	// `examples` demonstrates example values. Enum values are not repeated here;
+	// they are rendered from `enum` as their own table.
 	examples?: [...string]
 
-	if Args.required && enum != _|_ {
-		// `examples` demonstrates example values. This should be used when
-		// examples cannot be derived from the `default` or `enum` options.
-		examples: [string, ...string] | *[
-			for k, v in enum {
-				k
-			},
-		]
-	}
-
-	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "remap_program" | "strftime"
+	syntax: *"literal" | "file_system_path" | "field_path" | "template" | "regex" | "vrl_program" | "lua" | "yaml" | "toml" | "strftime"
 }
 
 #TypeAsciiChar: {

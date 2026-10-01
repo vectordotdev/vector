@@ -37,8 +37,9 @@ use super::{OutputId, compiler::expand_globs, graph::Graph, transform::get_trans
 use crate::{
     conditions::Condition,
     config::{
-        self, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestOutput, loading, loading::ConfigBuilderLoader,
+        self, Component, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
+        TestDefinition, TestInput, TestOutput, enrichment_table_sinks, loading,
+        loading::ConfigBuilderLoader,
     },
     event::{Event, EventMetadata, LogEvent},
     signal,
@@ -93,9 +94,7 @@ fn init_log_schema_from_paths(
     config_paths: &[ConfigPath],
     deny_if_set: bool,
 ) -> Result<(), Vec<String>> {
-    let builder = ConfigBuilderLoader::default()
-        .interpolate_env(true)
-        .load_from_paths(config_paths)?;
+    let builder = ConfigBuilderLoader::default().load_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
@@ -105,17 +104,14 @@ pub async fn build_unit_tests_main(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     init_log_schema_from_paths(paths, false)?;
-    let secrets_backends_loader = loading::loader_from_paths(
-        loading::SecretBackendLoader::default().interpolate_env(true),
-        paths,
-    )?;
+    let secrets_backends_loader =
+        loading::loader_from_paths(loading::SecretBackendLoader::default(), paths)?;
     let secrets = secrets_backends_loader
         .retrieve_secrets(signal_handler)
         .await
         .map_err(|e| vec![e])?;
 
     let config_builder = ConfigBuilderLoader::default()
-        .interpolate_env(true)
         .secrets(secrets)
         .load_from_paths(paths)?;
 
@@ -185,7 +181,7 @@ impl UnitTestBuildMetadata {
 
         let source_ids = available_insert_targets
             .iter()
-            .map(|key| (key.clone(), format!("{}-{}-{}", key, "source", random_id)))
+            .map(|key| (key.clone(), format!("{key}-{}-{random_id}", "source")))
             .collect::<HashMap<_, _>>();
 
         // Map a test source to every transform
@@ -219,10 +215,9 @@ impl UnitTestBuildMetadata {
                 (
                     key.clone(),
                     format!(
-                        "{}-{}-{}",
+                        "{}-{}-{random_id}",
                         key.to_string().replace('.', "-"),
-                        "sink",
-                        random_id
+                        "sink"
                     ),
                 )
             })
@@ -385,23 +380,37 @@ fn get_relevant_test_components(
     }
 }
 
+fn graph_components(
+    config: &ConfigBuilder,
+) -> impl Iterator<Item = (&ComponentKey, Component<'_, String>)> + Clone {
+    let sources = config
+        .sources
+        .iter()
+        .map(|(key, c)| (key, Component::from(c)));
+    let transforms = config
+        .transforms
+        .iter()
+        .map(|(key, c)| (key, Component::from(c)));
+    let sinks = config
+        .sinks
+        .iter()
+        .map(|(key, c)| (key, Component::from(c)));
+
+    sources.chain(transforms).chain(sinks)
+}
+
 async fn build_unit_test(
     metadata: &UnitTestBuildMetadata,
     test: TestDefinition<String>,
     mut config_builder: ConfigBuilder,
 ) -> Result<UnitTest, Vec<String>> {
-    let transform_only_config = config_builder.clone();
-    let transform_only_graph = Graph::new_unchecked(
-        &transform_only_config.sources,
-        &transform_only_config.transforms,
-        &transform_only_config.sinks,
-        transform_only_config.schema,
-        transform_only_config
-            .global
-            .wildcard_matching
-            .unwrap_or_default(),
-    );
-    let test = test.resolve_outputs(&transform_only_graph)?;
+    let graph = Graph::new(
+        graph_components(&config_builder),
+        config_builder.schema,
+        config_builder.global.wildcard_matching.unwrap_or_default(),
+    )?;
+    let output_map = graph.output_map()?;
+    let test = test.resolve_outputs(&output_map)?;
 
     let sources = metadata.hydrate_into_sources(&test.inputs)?;
     let (test_result_rxs, sinks) =
@@ -411,13 +420,14 @@ async fn build_unit_test(
     config_builder.sinks = sinks;
     expand_globs(&mut config_builder);
 
-    let graph = Graph::new_unchecked(
-        &config_builder.sources,
-        &config_builder.transforms,
-        &config_builder.sinks,
+    // Original inputs may reference sources or transforms outside this test.
+    // Inspect the connected paths before pruning those inputs; the final config
+    // build below checks all remaining inputs.
+    let graph = Graph::new(
+        graph_components(&config_builder),
         config_builder.schema,
         config_builder.global.wildcard_matching.unwrap_or_default(),
-    );
+    )?;
 
     let mut valid_components = get_relevant_test_components(
         config_builder.sources.keys().collect::<Vec<_>>().as_ref(),
@@ -438,11 +448,8 @@ async fn build_unit_test(
     // Enrichment tables consume inputs but are referenced dynamically in VRL transforms
     // (via get_enrichment_table_record). Since we can't statically analyze VRL usage,
     // we conservatively include all enrichment table inputs as valid components.
-    config_builder
-        .enrichment_tables
-        .iter()
-        .filter_map(|(key, c)| c.as_sink(key).map(|(_, sink)| sink.inputs))
-        .for_each(|i| valid_components.extend(i));
+    enrichment_table_sinks(&config_builder.enrichment_tables)
+        .for_each(|(_, sink)| valid_components.extend(sink.inputs));
 
     // Remove all transforms that are not relevant to the current test
     config_builder.transforms = config_builder
@@ -452,19 +459,17 @@ async fn build_unit_test(
         .collect();
 
     // Sanitize the inputs of all relevant transforms
-    let graph = Graph::new_unchecked(
-        &config_builder.sources,
-        &config_builder.transforms,
-        &config_builder.sinks,
+    let graph = Graph::new(
+        graph_components(&config_builder),
         config_builder.schema,
         config_builder.global.wildcard_matching.unwrap_or_default(),
-    );
-    let valid_inputs = graph.input_map()?;
+    )?;
+    let valid_outputs = graph.output_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {
         let inputs = std::mem::take(&mut transform.inputs);
         transform.inputs = inputs
             .into_iter()
-            .filter(|input| valid_inputs.contains_key(input))
+            .filter(|input| valid_outputs.contains_key(input))
             .collect();
     }
 
@@ -557,8 +562,8 @@ fn build_and_validate_inputs(
             }
         } else {
             errors.push(format!(
-                "inputs[{}]: unable to locate target transform '{}'",
-                index, input.insert_at
+                "inputs[{index}]: unable to locate target transform '{}'",
+                input.insert_at
             ))
         }
     }
@@ -615,9 +620,8 @@ fn build_outputs(
                 {
                     if prev != new {
                         errors.push(format!(
-                            "conflicting expected_event_count for extract_from {:?}: {} vs {}",
-                            output.extract_from, prev, new
-                        ));
+                            "conflicting expected_event_count for extract_from {:?}: {prev} vs {new}",
+                            output.extract_from));
                     }
                 } else if existing.expected_event_count.is_none() {
                     existing.expected_event_count = expected_event_count;
@@ -658,7 +662,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
         "vrl" => {
             if let Some(source) = &input.source {
                 let result = vrl::compiler::compile(source, &vector_vrl_functions::all())
-                    .map_err(|e| Formatter::new(source, e.clone()).to_string())?;
+                    .map_err(|e| Formatter::new(source, e).to_string())?;
 
                 let mut target = TargetValue {
                     value: value!({}),

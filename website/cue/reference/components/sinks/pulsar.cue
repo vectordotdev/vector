@@ -52,7 +52,6 @@ components: sinks: pulsar: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.pulsar.configuration

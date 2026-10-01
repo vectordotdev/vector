@@ -1,0 +1,11 @@
+sinks:
+  my_sink_id:
+    type: greptimedb_metrics
+    inputs:
+      - my-source-or-transform-id
+    dbname: public
+    endpoint: example.com:4001
+    grpc_compression: none
+    new_naming: false
+    password: password
+    username: username

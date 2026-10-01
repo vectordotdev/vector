@@ -55,7 +55,6 @@ components: sinks: papertrail: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
 	}
 
 	configuration: generated.components.sinks.papertrail.configuration

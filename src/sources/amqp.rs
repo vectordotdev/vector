@@ -89,17 +89,14 @@ pub struct AmqpSourceConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub(crate) framing: FramingConfig,
 
-    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub(crate) decoding: DeserializerConfig,
 
-    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
 
@@ -688,7 +685,7 @@ mod integration_test {
     ) {
         let payload = text.as_bytes();
         let payload_len = payload.len();
-        trace!("Sending message of length {} to {}.", payload_len, exchange,);
+        trace!("Sending message of length {payload_len} to {exchange}.");
 
         channel
             .basic_publish(
@@ -708,7 +705,7 @@ mod integration_test {
         let exchange = format!("test-{}-exchange", random_string(10));
         let queue = format!("test-{}-queue", random_string(10));
         let routing_key = "my_key";
-        trace!("Test exchange name: {}.", exchange);
+        trace!("Test exchange name: {exchange}.");
         let exchange: ShortString = exchange.into();
         let consumer = format!("test-consumer-{}", random_string(10));
 
@@ -773,7 +770,7 @@ mod integration_test {
         assert!(!events.is_empty());
 
         let log = events[0].as_log();
-        trace!("{:?}", log);
+        trace!("{log:?}");
         assert_eq!(*log.get_message().unwrap(), "my message".into());
         assert_eq!(log["routing"], routing_key.into());
         assert_eq!(*log.get_source_type().unwrap(), "amqp".into());

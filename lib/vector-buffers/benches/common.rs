@@ -6,7 +6,7 @@ use metrics_util::{debugging::DebuggingRecorder, layers::Layer};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
-    BufferType, EventCount,
+    BufferType, Bufferable, EventCount,
     encoding::FixedEncodable,
     topology::{
         builder::TopologyBuilder,
@@ -15,7 +15,9 @@ use vector_buffers::{
 };
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable, MergeFinalizable,
+    },
 };
 
 #[derive(Clone, Debug)]
@@ -55,9 +57,17 @@ impl<const N: usize> EventCount for Message<N> {
     }
 }
 
+impl<const N: usize> Bufferable for Message<N> {}
+
 impl<const N: usize> Finalizable for Message<N> {
     fn take_finalizers(&mut self) -> EventFinalizers {
         Default::default() // This benchmark doesn't need finalization
+    }
+}
+
+impl<const N: usize> MergeFinalizable for Message<N> {
+    fn merge_finalizers(&mut self, _finalizers: EventFinalizers) {
+        // This benchmark doesn't need finalization.
     }
 }
 

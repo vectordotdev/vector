@@ -14,10 +14,10 @@ use vector_lib::{
 use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
 use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload};
-use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
+use super::{DatadogAgentSource, RequestHandler};
 use crate::{
     common::{
-        datadog::{DatadogMetricType, DatadogSeriesMetric},
+        datadog::{DATADOG_METRIC_RESOURCE_TAG_PREFIX, DatadogMetricType, DatadogSeriesMetric},
         http::ErrorMessage,
     },
     config::log_schema,
@@ -27,7 +27,7 @@ use crate::{
     },
     internal_events::EventsReceived,
     schema,
-    sources::util::extract_tag_key_and_value,
+    sources::util::{extract_tag_key_and_value, http::capped_body},
 };
 
 #[derive(Deserialize, Serialize)]
@@ -56,30 +56,23 @@ fn sketches_service(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "beta" / "sketches" / ..))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then({
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
-                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
-                    .and_then(|api_key| {
-                        source
-                            .decode(&encoding_header, body, path.as_str())
-                            .and_then(|body| {
-                                decode_datadog_sketches(
-                                    body,
-                                    api_key,
-                                    source.split_metric_namespace,
-                                    &source.events_received,
-                                )
-                            })
+                    .decode(&encoding_header, body, path.as_str())
+                    .and_then(|body| {
+                        decode_datadog_sketches(
+                            body,
+                            api_key,
+                            source.split_metric_namespace,
+                            &source.events_received,
+                        )
                     });
                 handler.clone().handle_request(events, super::METRICS)
             }
@@ -93,33 +86,26 @@ fn series_v1_service(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "v1" / "series" / ..))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then({
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
-                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
-                    .and_then(|api_key| {
-                        source
-                            .decode(&encoding_header, body, path.as_str())
-                            .and_then(|body| {
-                                decode_datadog_series_v1(
-                                    body,
-                                    api_key,
-                                    // Currently metrics do not have schemas defined, so for now we just pass a
-                                    // default one.
-                                    &Arc::new(schema::Definition::default_legacy_namespace()),
-                                    source.split_metric_namespace,
-                                    &source.events_received,
-                                )
-                            })
+                    .decode(&encoding_header, body, path.as_str())
+                    .and_then(|body| {
+                        decode_datadog_series_v1(
+                            body,
+                            api_key,
+                            // Currently metrics do not have schemas defined, so for now we just pass a
+                            // default one.
+                            &Arc::new(schema::Definition::default_legacy_namespace()),
+                            source.split_metric_namespace,
+                            &source.events_received,
+                        )
                     });
                 handler.clone().handle_request(events, super::METRICS)
             }
@@ -133,30 +119,23 @@ fn series_v2_service(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "v2" / "series" / ..))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then({
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
-                    .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)
-                    .and_then(|api_key| {
-                        source
-                            .decode(&encoding_header, body, path.as_str())
-                            .and_then(|body| {
-                                decode_datadog_series_v2(
-                                    body,
-                                    api_key,
-                                    source.split_metric_namespace,
-                                    &source.events_received,
-                                )
-                            })
+                    .decode(&encoding_header, body, path.as_str())
+                    .and_then(|body| {
+                        decode_datadog_series_v2(
+                            body,
+                            api_key,
+                            source.split_metric_namespace,
+                            &source.events_received,
+                        )
                     });
                 handler.clone().handle_request(events, super::METRICS)
             }
@@ -283,8 +262,8 @@ pub(crate) fn decode_ddseries_v2(
             };
 
             serie.resources.into_iter().for_each(|r| {
-                // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
-                // the hostname can be found in MetricSeries::resources and that is the only value stored there.
+                // As per https://github.com/DataDog/datadog-agent/blob/965622d50073913d95176606ebcbd0f7553627b6/pkg/serializer/internal/metrics/iterable_series.go#L201-L264
+                // MetricSeries::resources can contain host, device, and other series resources.
                 if r.r#type.eq("host") {
                     log_schema()
                         .host_key()
@@ -294,8 +273,11 @@ pub(crate) fn decode_ddseries_v2(
                     // and must be preserved as a plain `device` tag to match the v1 series behavior.
                     tags.replace("device".into(), r.name);
                 } else {
-                    // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
-                    tags.replace(format!("resource.{}", r.r#type), r.name);
+                    // Preserve other resources in the generic metric tags.
+                    tags.insert(
+                        format!("{DATADOG_METRIC_RESOURCE_TAG_PREFIX}{}", r.r#type),
+                        r.name,
+                    );
                 }
             });
             (!serie.source_type_name.is_empty())

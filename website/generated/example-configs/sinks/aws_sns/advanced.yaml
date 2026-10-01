@@ -1,0 +1,10 @@
+sinks:
+  my_sink_id:
+    type: aws_sns
+    inputs:
+      - my-source-or-transform-id
+    encoding:
+      codec: json
+    endpoint: http://127.0.0.0:5000/path/to/service
+    region: us-east-1
+    topic_arn: arn:aws:sns:us-east-2:123456789012:MyTopic

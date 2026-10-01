@@ -53,6 +53,7 @@ async fn receive_logs_legacy_namespace() {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
@@ -61,6 +62,8 @@ async fn receive_logs_legacy_namespace() {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: Default::default(),
             use_otlp_decoding: false.into(),
         };
@@ -125,6 +128,7 @@ async fn receive_trace() {
                     trace_id: (1..17).collect_vec(),      //trace_id [u8;16]
                     span_id: (1..9).collect_vec(),        // span_id [u8;8]
                     parent_span_id: (1..9).collect_vec(), // parent_span_id [u8;8]
+                    flags: 0,
                     name: "span".to_string(),
                     kind: 1,
                     start_time_unix_nano: 1713525203000000000,
@@ -152,6 +156,7 @@ async fn receive_trace() {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
@@ -160,6 +165,8 @@ async fn receive_trace() {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: Default::default(),
             use_otlp_decoding: false.into(),
         };
@@ -217,6 +224,7 @@ async fn receive_metric() {
                     name: "some.random.metric".to_string(),
                     description: "Some random metric we use for test".to_string(),
                     unit: "1".to_string(),
+                    metadata: vec![],
                     data: Some(Data::Gauge(Gauge {
                         data_points: vec![NumberDataPoint {
                             attributes: vec![
@@ -257,6 +265,7 @@ async fn receive_metric() {
             grpc: GrpcConfig {
                 address: source_grpc_address().parse().unwrap(),
                 tls: Default::default(),
+                keepalive: Default::default(),
             },
             http: HttpConfig {
                 address: source_http_address().parse().unwrap(),
@@ -265,6 +274,8 @@ async fn receive_metric() {
                 headers: vec![],
             },
             acknowledgements: Default::default(),
+            max_concurrent_requests: None,
+            request_timeout_secs: None,
             log_namespace: Default::default(),
             use_otlp_decoding: false.into(),
         };

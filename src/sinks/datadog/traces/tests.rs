@@ -146,7 +146,7 @@ async fn smoke() {
     );
     assert_eq!(trace_parts.headers.get("DD-API-KEY").unwrap(), "a_key");
 
-    let mut decoded_payload = dd_proto::TracePayload::decode(trace_body).unwrap();
+    let mut decoded_payload = dd_proto::AgentPayload::decode(trace_body).unwrap();
     assert_eq!(decoded_payload.tracer_payloads.len(), 1);
     assert_eq!(decoded_payload.host_name, "a_host");
     assert_eq!(decoded_payload.env, "an_env");
@@ -257,7 +257,7 @@ async fn multiple_traces() {
     );
     assert_eq!(trace_parts.headers.get("DD-API-KEY").unwrap(), "a_key");
 
-    let mut decoded_payload = dd_proto::TracePayload::decode(trace_body).unwrap();
+    let mut decoded_payload = dd_proto::AgentPayload::decode(trace_body).unwrap();
     assert_eq!(decoded_payload.tracer_payloads.len(), 2);
     assert_eq!(decoded_payload.host_name, "a_host");
     assert_eq!(decoded_payload.env, "an_env");

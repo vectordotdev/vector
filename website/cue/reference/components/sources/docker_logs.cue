@@ -2,7 +2,6 @@ package metadata
 
 components: sources: docker_logs: {
 	title: "Docker"
-	alias: "docker"
 
 	classes: {
 		delivery: "best_effort"
@@ -84,7 +83,6 @@ components: sources: docker_logs: {
 				container using [`exclude_containers`](#exclude_containers).
 				""",
 		]
-		notices: []
 	}
 
 	installation: {

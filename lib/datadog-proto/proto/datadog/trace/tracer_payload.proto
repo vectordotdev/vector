@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package datadog.trace;
+
+option go_package="pkg/proto/pbgo/trace";
+
+import "datadog/trace/span.proto";
+
+// TraceChunk represents a list of spans with the same trace ID. In other words, a chunk of a trace.
+message TraceChunk {
+	// priority specifies sampling priority of the trace.
+	// @gotags: json:"priority" msg:"priority"
+	int32 priority = 1;
+	// origin specifies origin product ("lambda", "rum", etc.) of the trace.
+	// @gotags: json:"origin" msg:"origin"
+	string origin = 2;
+	// spans specifies list of containing spans.
+	// @gotags: json:"spans" msg:"spans"
+	repeated Span spans = 3;
+	// tags specifies tags common in all `spans`.
+	// @gotags: json:"tags" msg:"tags"
+	map<string, string> tags = 4;
+	// droppedTrace specifies whether the trace was dropped by samplers or not.
+	// @gotags: json:"dropped_trace" msg:"dropped_trace"
+	bool droppedTrace = 5;
+}
+
+// TracerPayload represents a payload the trace agent receives from tracers.
+message TracerPayload {
+	// containerID specifies the ID of the container where the tracer is running on.
+	// @gotags: json:"container_id" msg:"container_id"
+	string containerID = 1;
+	// languageName specifies language of the tracer.
+	// @gotags: json:"language_name" msg:"language_name"
+	string languageName = 2;
+	// languageVersion specifies language version of the tracer.
+	// @gotags: json:"language_version" msg:"language_version"
+	string languageVersion = 3;
+	// tracerVersion specifies version of the tracer.
+	// @gotags: json:"tracer_version" msg:"tracer_version"
+	string tracerVersion = 4;
+	// runtimeID specifies V4 UUID representation of a tracer session.
+	// @gotags: json:"runtime_id" msg:"runtime_id"
+	string runtimeID = 5;
+	// chunks specifies list of containing trace chunks.
+	// @gotags: json:"chunks" msg:"chunks"
+	repeated TraceChunk chunks = 6;
+	// tags specifies tags common in all `chunks`.
+	// @gotags: json:"tags" msg:"tags"
+	map<string, string> tags = 7;
+	// env specifies `env` tag that set with the tracer.
+	// @gotags: json:"env" msg:"env"
+	string env = 8;
+	// hostname specifies hostname of where the tracer is running.
+	// @gotags: json:"hostname" msg:"hostname"
+	string hostname = 9;
+	// version specifies `version` tag that set with the tracer.
+	// @gotags: json:"app_version" msg:"app_version"
+	string appVersion = 10;
+	// containerDebug holds debug information about the container tags resolution.
+	// @gotags: json:"container_debug,omitempty" msg:"container_debug,omitempty"
+	ContainerDebug containerDebug = 11;
+}
+
+// ContainerDebug holds debug information about the container tags resolution process.
+message ContainerDebug {
+	// error specifies any error that occurred during container tag resolution.
+	// @gotags: json:"error,omitempty" msg:"error,omitempty"
+	string error = 1;
+	// latencyMs specifies the latency in milliseconds of the container tag resolution.
+	// @gotags: json:"latency_ms,omitempty" msg:"latency_ms,omitempty"
+	int64 latencyMs = 2;
+	// wasBuffered specifies whether the payload was buffered while waiting for container tags.
+	// @gotags: json:"was_buffered,omitempty" msg:"was_buffered,omitempty"
+	bool wasBuffered = 3;
+	// bufferMs specifies how long the payload was buffered in milliseconds.
+	// @gotags: json:"buffer_ms,omitempty" msg:"buffer_ms,omitempty"
+	int64 bufferMs = 4;
+	// bufferEvictionReason specifies why the payload was evicted from the buffer.
+	// @gotags: json:"buffer_eviction_reason,omitempty" msg:"buffer_eviction_reason,omitempty"
+	string bufferEvictionReason = 5;
+}

@@ -39,7 +39,10 @@ use dnstap_proto::{
 use vector_core::config::log_schema;
 use vector_lookup::{PathPrefix, lookup_v2::ValuePath};
 
-use crate::{internal_events::DnstapParseWarning, schema::DNSTAP_VALUE_PATHS};
+use crate::{
+    internal_events::DnstapParseWarning, parser::dnstap_proto::HttpProtocol,
+    schema::DNSTAP_VALUE_PATHS,
+};
 
 #[derive(Debug, Snafu)]
 enum DnstapParserError {
@@ -78,6 +81,11 @@ static DNSTAP_MESSAGE_RESPONSE_TYPE_IDS: LazyLock<HashSet<i32>> = LazyLock::new(
 pub struct DnstapParser;
 
 impl DnstapParser {
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API"
+    )]
     fn insert<'a, V>(
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
@@ -90,6 +98,16 @@ impl DnstapParser {
         event.insert((PathPrefix::Event, prefix.concat(path)), value)
     }
 
+    /// Parse a dnstap frame into a log event.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the frame cannot be decoded as a dnstap protobuf message.
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "preserve the owned frame API while retaining bytes for raw-data fallback"
+    )]
     pub fn parse(
         event: &mut LogEvent,
         frame: Bytes,
@@ -103,7 +121,7 @@ impl DnstapParser {
                 event,
                 &root,
                 &DNSTAP_VALUE_PATHS.server_identity,
-                String::from_utf8(server_id.clone()).unwrap_or_default(),
+                String::from_utf8(server_id).unwrap_or_default(),
             );
         }
 
@@ -239,9 +257,18 @@ impl DnstapParser {
             )?;
         }
 
+        if let Some(http_protocol) = dnstap_message.http_protocol {
+            DnstapParser::insert(
+                event,
+                prefix.clone(),
+                &DNSTAP_VALUE_PATHS.http_protocol,
+                to_http_protocol_name(http_protocol)?.to_string(),
+            );
+        }
+
         DnstapParser::parse_dnstap_message_type(
             event,
-            prefix.clone(),
+            prefix,
             dnstap_message_type_id,
             dnstap_message,
             parsing_options,
@@ -250,6 +277,12 @@ impl DnstapParser {
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        clippy::too_many_lines,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API; keep the existing protocol field mapping together; splitting is deferred"
+    )]
     fn parse_dnstap_message_type<'a>(
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
@@ -281,7 +314,7 @@ impl DnstapParser {
                         );
 
                         return Err(error);
-                    };
+                    }
                 }
 
                 if let Some(response_message) = dnstap_message.response_message {
@@ -305,7 +338,7 @@ impl DnstapParser {
                         );
 
                         return Err(error);
-                    };
+                    }
                 }
             }
             13 | 14 => {
@@ -332,7 +365,7 @@ impl DnstapParser {
                         );
 
                         return Err(error);
-                    };
+                    }
                 }
 
                 if let Some(update_response_message) = dnstap_message.response_message {
@@ -356,7 +389,7 @@ impl DnstapParser {
                         );
 
                         return Err(error);
-                    };
+                    }
                 }
             }
             _ => {
@@ -371,24 +404,27 @@ impl DnstapParser {
         Ok(())
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API"
+    )]
     fn parse_dnstap_message_time<'a>(
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
-        time_sec: u64,
-        time_nsec: Option<u32>,
+        seconds: u64,
+        nanoseconds: Option<u32>,
         dnstap_message_type_id: i32,
         message: Option<&Vec<u8>>,
         type_ids: &HashSet<i32>,
     ) -> Result<()> {
-        if time_sec > i64::MAX as u64 {
-            return Err(Error::from("Cannot parse timestamp"));
-        }
+        let seconds = i64::try_from(seconds).map_err(|_| Error::from("Cannot parse timestamp"))?;
 
-        let (time_in_nanosec, query_time_nsec) = match time_nsec {
+        let (time_in_nanosec, query_nanoseconds) = match nanoseconds {
             Some(nsec) => {
-                if let Some(time_in_ns) = (time_sec as i64)
+                if let Some(time_in_ns) = seconds
                     .checked_mul(1_000_000_000)
-                    .and_then(|v| v.checked_add(nsec as i64))
+                    .and_then(|v| v.checked_add(i64::from(nsec)))
                 {
                     (time_in_ns, nsec)
                 } else {
@@ -396,7 +432,7 @@ impl DnstapParser {
                 }
             }
             None => {
-                if let Some(time_in_ns) = (time_sec as i64).checked_mul(1_000_000_000) {
+                if let Some(time_in_ns) = seconds.checked_mul(1_000_000_000) {
                     (time_in_ns, 0)
                 } else {
                     return Err(Error::from("Cannot parse timestamp"));
@@ -407,7 +443,7 @@ impl DnstapParser {
         if type_ids.contains(&dnstap_message_type_id) {
             DnstapParser::log_time(event, prefix.clone(), time_in_nanosec, "ns");
             let timestamp = Utc
-                .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
+                .timestamp_opt(seconds, query_nanoseconds)
                 .single()
                 .ok_or("Invalid timestamp")?;
             if let Some(timestamp_key) = log_schema().timestamp_key() {
@@ -506,11 +542,11 @@ impl DnstapParser {
         if let Some(response_port) = dnstap_message.response_port {
             DnstapParser::insert(
                 event,
-                prefix.clone(),
+                prefix,
                 &DNSTAP_VALUE_PATHS.response_port,
                 response_port,
             );
-        };
+        }
         Ok(())
     }
 
@@ -523,7 +559,7 @@ impl DnstapParser {
         DnstapParser::insert(event, prefix.clone(), &DNSTAP_VALUE_PATHS.time, time);
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.time_precision,
             time_precision.to_string(),
         );
@@ -536,12 +572,17 @@ impl DnstapParser {
     ) {
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.raw_data,
             BASE64_STANDARD.encode(raw_dns_message),
         );
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API"
+    )]
     fn parse_dns_query_message<'a>(
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
@@ -598,7 +639,7 @@ impl DnstapParser {
         DnstapParser::log_edns(
             event,
             prefix.concat(&DNSTAP_VALUE_PATHS.opt_pseudo_section),
-            &msg.opt_pseudo_section,
+            msg.opt_pseudo_section.as_ref(),
         );
 
         Ok(())
@@ -649,18 +690,28 @@ impl DnstapParser {
         );
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.ar_count,
             header.additional_count,
         );
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API"
+    )]
     fn log_dns_query_message_query_section<'a>(
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
         questions: &[QueryQuestion],
     ) {
         for (i, query) in questions.iter().enumerate() {
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[allow(
+                clippy::cast_possible_wrap,
+                reason = "indices come from non-zero-sized DNS record collections bounded by isize::MAX"
+            )]
             let index_segment = path!(i as isize);
             DnstapParser::log_dns_query_question(event, prefix.concat(index_segment), query);
         }
@@ -693,12 +744,17 @@ impl DnstapParser {
         );
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.class,
             question.class.clone(),
         );
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API"
+    )]
     fn parse_dns_update_message<'a>(
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
@@ -801,7 +857,7 @@ impl DnstapParser {
 
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.ad_count,
             header.additional_count,
         );
@@ -834,16 +890,21 @@ impl DnstapParser {
         );
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.zone_class,
             zone.class.clone(),
         );
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API"
+    )]
     fn log_edns<'a>(
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
-        opt_section: &Option<OptPseudoSection>,
+        opt_section: Option<&OptPseudoSection>,
     ) {
         if let Some(edns) = opt_section {
             DnstapParser::insert(
@@ -879,8 +940,15 @@ impl DnstapParser {
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API"
+    )]
     fn log_edns_ede<'a>(event: &mut LogEvent, prefix: impl ValuePath<'a>, options: &[EDE]) {
         options.iter().enumerate().for_each(|(i, entry)| {
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[allow(clippy::cast_possible_wrap, reason = "indices come from non-zero-sized DNS record collections bounded by isize::MAX")]
             let index_segment = path!(i as isize);
             DnstapParser::log_edns_ede_entry(event, prefix.concat(index_segment), entry);
         });
@@ -897,21 +965,23 @@ impl DnstapParser {
             DnstapParser::insert(event, prefix.clone(), &DNSTAP_VALUE_PATHS.purpose, purpose);
         }
         if let Some(extra_text) = entry.extra_text() {
-            DnstapParser::insert(
-                event,
-                prefix.clone(),
-                &DNSTAP_VALUE_PATHS.extra_text,
-                extra_text,
-            );
+            DnstapParser::insert(event, prefix, &DNSTAP_VALUE_PATHS.extra_text, extra_text);
         }
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API"
+    )]
     fn log_edns_options<'a>(
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
         options: &[EdnsOptionEntry],
     ) {
         options.iter().enumerate().for_each(|(i, opt)| {
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[allow(clippy::cast_possible_wrap, reason = "indices come from non-zero-sized DNS record collections bounded by isize::MAX")]
             let index_segment = path!(i as isize);
             DnstapParser::log_edns_opt(event, prefix.concat(index_segment), opt);
         });
@@ -932,18 +1002,28 @@ impl DnstapParser {
         );
         DnstapParser::insert(
             event,
-            prefix.clone(),
+            prefix,
             &DNSTAP_VALUE_PATHS.opt_data,
             opt.opt_data.clone(),
         );
     }
 
+    // https://github.com/vectordotdev/vector/issues/23659
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "accept owned or borrowed ValuePath implementations consistently with the path composition API"
+    )]
     fn log_dns_message_record_section<'a>(
         event: &mut LogEvent,
         prefix: impl ValuePath<'a>,
         records: &[DnsRecord],
     ) {
         for (i, record) in records.iter().enumerate() {
+            // https://github.com/vectordotdev/vector/issues/23659
+            #[allow(
+                clippy::cast_possible_wrap,
+                reason = "indices come from non-zero-sized DNS record collections bounded by isize::MAX"
+            )]
             let index_segment = path!(i as isize);
             DnstapParser::log_dns_record(event, prefix.concat(index_segment), record);
         }
@@ -982,17 +1062,17 @@ impl DnstapParser {
                 event,
                 prefix.clone(),
                 &DNSTAP_VALUE_PATHS.rdata,
-                rdata.to_string(),
+                rdata.clone(),
             );
-        };
+        }
         if let Some(rdata_bytes) = &record.rdata_bytes {
             DnstapParser::insert(
                 event,
-                prefix.clone(),
+                prefix,
                 &DNSTAP_VALUE_PATHS.rdata_bytes,
                 BASE64_STANDARD.encode(rdata_bytes),
             );
-        };
+        }
     }
 }
 
@@ -1011,6 +1091,12 @@ fn to_socket_family_name(socket_family: i32) -> Result<&'static str> {
 fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
     SocketProtocol::try_from(socket_protocol)
         .map_err(|_| Error::from(format!("Unknown socket protocol: {socket_protocol}")))
+        .map(|sp| sp.as_str_name())
+}
+
+fn to_http_protocol_name(http_protocol: i32) -> Result<&'static str> {
+    HttpProtocol::try_from(http_protocol)
+        .map_err(|_| Error::from(format!("Unknown HTTP protocol: {http_protocol}")))
         .map(|sp| sp.as_str_name())
 }
 
@@ -1148,7 +1234,9 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in expected_map {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1203,11 +1291,15 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in no_lowercase_expected {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
         for (exp_key, exp_value) in expected_map {
-            let value = lowercase_log_event.get(exp_key).unwrap();
+            let value = lowercase_log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1242,7 +1334,9 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in expected_map {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1337,7 +1431,9 @@ mod tests {
 
         // The maps need to contain identical keys and values.
         for (exp_key, exp_value) in expected_map {
-            let value = log_event.get(exp_key).unwrap();
+            let value = log_event
+                .get(&vrl::path::parse_target_path(exp_key).unwrap())
+                .unwrap();
             assert_eq!(*value, exp_value);
         }
     }
@@ -1356,12 +1452,18 @@ mod tests {
 
     #[test]
     fn test_parse_dnstap_data_with_invalid_timestamp() {
-        fn test_one_timestamp_parse(time_sec: u64, time_nsec: Option<u32>) -> Result<()> {
+        fn test_one_timestamp_parse(seconds: u64, nanoseconds: Option<u32>) -> Result<()> {
             let mut event = LogEvent::default();
             let root = owned_value_path!();
             let type_ids = HashSet::from([1]);
             DnstapParser::parse_dnstap_message_time(
-                &mut event, &root, time_sec, time_nsec, 1, None, &type_ids,
+                &mut event,
+                &root,
+                seconds,
+                nanoseconds,
+                1,
+                None,
+                &type_ids,
             )
         }
         // okay case
@@ -1377,16 +1479,16 @@ mod tests {
             test_one_timestamp_parse((i64::MAX / 1_000_000_000) as u64, Some(u32::MAX)).is_err()
         );
         // cannot be parsed by timestamp_opt
-        assert!(test_one_timestamp_parse(96, Some(1616928816)).is_err());
+        assert!(test_one_timestamp_parse(96, Some(1_616_928_816)).is_err());
     }
 
     #[test]
     fn test_parse_dnstap_message_socket_family_bad_addr() {
         // while parsing address is optional, but in this function assume otherwise
-        fn test_one_input(socket_family: i32, msg: DnstapMessage) -> Result<()> {
+        fn test_one_input(socket_family: i32, msg: &DnstapMessage) -> Result<()> {
             let mut event = LogEvent::default();
             let root = owned_value_path!();
-            DnstapParser::parse_dnstap_message_socket_family(&mut event, &root, socket_family, &msg)
+            DnstapParser::parse_dnstap_message_socket_family(&mut event, &root, socket_family, msg)
         }
         // all bad cases which can panic
         {
@@ -1394,14 +1496,14 @@ mod tests {
                 query_address: Some(vec![]),
                 ..Default::default()
             };
-            assert!(test_one_input(1, message).is_err());
+            assert!(test_one_input(1, &message).is_err());
         }
         {
             let message = DnstapMessage {
                 query_address: Some(vec![]),
                 ..Default::default()
             };
-            assert!(test_one_input(2, message).is_err());
+            assert!(test_one_input(2, &message).is_err());
         }
 
         {
@@ -1409,14 +1511,14 @@ mod tests {
                 response_address: Some(vec![]),
                 ..Default::default()
             };
-            assert!(test_one_input(1, message).is_err());
+            assert!(test_one_input(1, &message).is_err());
         }
         {
             let message = DnstapMessage {
                 response_address: Some(vec![]),
                 ..Default::default()
             };
-            assert!(test_one_input(2, message).is_err());
+            assert!(test_one_input(2, &message).is_err());
         }
     }
 
@@ -1437,5 +1539,13 @@ mod tests {
         assert_eq!("DNSCryptTCP", to_socket_protocol_name(6).unwrap());
         assert_eq!("DOQ", to_socket_protocol_name(7).unwrap());
         assert!(to_socket_protocol_name(8).is_err());
+    }
+
+    #[test]
+    fn test_get_http_protocol_name() {
+        assert_eq!("HTTP1", to_http_protocol_name(1).unwrap());
+        assert_eq!("HTTP2", to_http_protocol_name(2).unwrap());
+        assert_eq!("HTTP3", to_http_protocol_name(3).unwrap());
+        assert!(to_http_protocol_name(4).is_err());
     }
 }

@@ -1,0 +1,5 @@
+sources:
+  my_source_id:
+    type: gcp_pubsub
+    project: my-log-source-project
+    subscription: my-vector-source-subscription

@@ -12,7 +12,7 @@ use crate::{
     sinks::{
         opendal_common::{OpenDalRequest, OpenDalRequestBuilder},
         util::{
-            Compression,
+            Compression, HttpEndpoint,
             request_builder::{EncodeResult, RequestBuilder},
         },
     },
@@ -22,11 +22,12 @@ fn default_config(encoding: EncodingConfigWithFraming) -> WebHdfsConfig {
     WebHdfsConfig {
         root: "/tmp/".to_string(),
         prefix: "%F/".to_string(),
-        endpoint: "http://127.0.0.1:9870".to_string(),
+        endpoint: HttpEndpoint::parse("http://127.0.0.1:9870").unwrap(),
         encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
         acknowledgements: Default::default(),
+        confinement: Default::default(),
     }
 }
 

@@ -13,8 +13,12 @@ pub struct Cli {
     #[arg(long, default_value_t = true)]
     clippy: bool,
 
-    #[arg(value_name = "FEATURE")]
+    /// Exact feature set to check. Include `default` to enable the default features.
+    #[arg(short = 'F', long, value_delimiter = ',')]
     features: Vec<String>,
+
+    #[arg(long)]
+    no_default_features: bool,
 
     #[arg(long)]
     fix: bool,
@@ -36,14 +40,23 @@ impl Cli {
             Vec::default()
         };
 
-        let feature_args = if self.features.is_empty() {
-            vec!["--all-features".to_string()]
-        } else {
+        let features: Vec<&str> = self
+            .features
+            .iter()
+            .map(String::as_str)
+            .filter(|f| !f.is_empty())
+            .collect();
+
+        let feature_args: Vec<String> = if !features.is_empty() {
             vec![
                 "--no-default-features".to_string(),
                 "--features".to_string(),
-                self.features.join(",").clone(),
+                features.join(","),
             ]
+        } else if self.no_default_features {
+            vec!["--no-default-features".to_string()]
+        } else {
+            vec!["--all-features".to_string()]
         };
 
         [tool.as_ref(), "--workspace", "--all-targets"]
@@ -80,5 +93,55 @@ impl Cli {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(features: &[&str], no_default_features: bool) -> Vec<OsString> {
+        Cli {
+            clippy: true,
+            features: features.iter().map(ToString::to_string).collect(),
+            no_default_features,
+            fix: false,
+        }
+        .build_args(Tool::Clippy)
+    }
+
+    #[test]
+    fn builds_feature_args() {
+        let cases: &[(&[&str], bool, &[&str])] = &[
+            (&[], false, &["--all-features"]),
+            (&[], true, &["--no-default-features"]),
+            (
+                &["sources-file"],
+                false,
+                &["--no-default-features", "--features", "sources-file"],
+            ),
+            (
+                &["default", "sources-file"],
+                false,
+                &[
+                    "--no-default-features",
+                    "--features",
+                    "default,sources-file",
+                ],
+            ),
+        ];
+
+        for (features, no_default_features, feature_args) in cases {
+            let expected = ["clippy", "--workspace", "--all-targets"]
+                .into_iter()
+                .chain(feature_args.iter().copied())
+                .map(OsString::from)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                args(features, *no_default_features),
+                expected,
+                "features={features:?}, no_default_features={no_default_features}"
+            );
+        }
     }
 }

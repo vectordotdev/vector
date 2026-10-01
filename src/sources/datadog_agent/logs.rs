@@ -13,45 +13,31 @@ use vector_lib::{
     lookup::path,
 };
 use vrl::core::Value;
-use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reject::Rejection, reply::Response};
+use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
-use super::{ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg, RequestHandler};
+use super::{DatadogAgentConfig, DatadogAgentSource, LogMsg, RequestHandler};
 use crate::{
     common::{datadog::DDTAGS, http::ErrorMessage},
     event::Event,
     internal_events::DatadogAgentJsonParseError,
+    sources::util::http::capped_body,
 };
 
 pub(super) fn build_warp_filter(
     handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    // Helper filter: extract path, api-key header, query params, validate API key
-    // Returns (FullPath, Option<Arc<str>>, DatadogAgentSource)
-    let validate_and_extract = {
-        let src = source.clone();
-        warp::path::full()
-            .and(warp::header::optional::<String>("dd-api-key"))
-            .and(warp::query::<ApiKeyQueryParams>())
-            .and_then(move |path: FullPath, api_token: Option<String>, query_params: ApiKeyQueryParams| {
-                let source = src.clone();
-                async move {
-                    let api_key = source
-                        .validate_api_key(path.as_str(), api_token, query_params.dd_api_key)?;
-                    Ok::<_, Rejection>((path, api_key, source))
-                }
-            })
-    };
     warp::post()
         .and(warp_path!("v1" / "input" / ..).or(warp_path!("api" / "v2" / "logs" / ..)))
-        .and(validate_and_extract)
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::body::bytes())
+        .and(capped_body())
         .and_then(
-            move |_, extracted: (FullPath, Option<Arc<str>>, DatadogAgentSource),
+            move |_,
+                  path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
                   body: Bytes| {
-                let (path, api_key, source) = extracted;
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| decode_log_body(body, api_key, &source));

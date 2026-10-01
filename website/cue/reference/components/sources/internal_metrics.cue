@@ -26,7 +26,6 @@ components: sources: internal_metrics: {
 	}
 
 	support: {
-		notices: []
 		requirements: []
 		warnings: []
 	}
@@ -65,13 +64,25 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_request_active: {
+			description:       "The number of requests currently being processed by this component."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_request_concurrency_limit: {
+			description:       "The maximum number of requests that can be processed concurrently by this component. The OpenTelemetry source emits this metric only when `max_concurrent_requests` is configured."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		aggregate_events_recorded_total: {
 			description:       "The number of events recorded by the aggregate transform."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		aggregate_failed_updates: {
+		aggregate_failed_updates_total: {
 			description:       "The number of failed metric updates, `incremental` adds, encountered by the aggregate transform."
 			type:              "counter"
 			default_namespace: "vector"
@@ -96,10 +107,16 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		component_timed_out_requests_total: {
-			description:       "The total number of requests for which this source responded with a timeout error."
+			description:       "The total number of requests for which this source responded with a timeout error. The OpenTelemetry source emits this metric only when `request_timeout_secs` is configured."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _request_tags
+		}
+		component_load_shed_requests_total: {
+			description:       "The total number of requests rejected because the component's request concurrency limit was reached. The OpenTelemetry source emits this metric only when `max_concurrent_requests` is configured."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _request_tags
 		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
@@ -315,22 +332,6 @@ components: sources: internal_metrics: {
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
-		}
-		buffer_byte_size: {
-			description:        "The number of bytes currently in the buffer."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _buffer_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
-		}
-		buffer_events: {
-			description:        "The number of events currently in the buffer."
-			type:               "gauge"
-			default_namespace:  "vector"
-			tags:               _buffer_tags
-			deprecated:         true
-			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_events`](#buffer_size_events)."
 		}
 		buffer_size_bytes: {
 			description:       "The number of bytes currently in the buffer."
@@ -562,6 +563,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags: _component_tags & {output: _output}
 		}
+		datadog_logs_reserved_attribute_conflicts_total: {
+			description:       "The total number of conflicts encountered when relocating fields with semantic meaning to a Datadog reserved attribute."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {meaning: _meaning}
+		}
 		internal_metrics_cardinality: {
 			description:       "The total number of metrics emitted from the internal metrics registry."
 			type:              "gauge"
@@ -674,12 +681,47 @@ components: sources: internal_metrics: {
 			}
 		}
 		files_unwatched_total: {
-			description:       "The total number of times Vector has stopped watching a file."
+			description:       "The total number of times Vector has stopped watching a file, regardless of whether the unread-byte count is known. Emitted by the `file` and `kubernetes_logs` sources."
 			type:              "counter"
 			default_namespace: "vector"
-			tags: _internal_metrics_tags & {
-				file: _file
+			tags: _component_tags & {
+				file: {
+					description: "The path of the file Vector stopped watching. Included when `internal_metrics.include_file_tag` is enabled."
+					required:    false
+				}
+				reached_eof: {
+					description: "Whether the reader had reached the end of the file when Vector stopped watching it. This does not indicate whether the unread-byte count is known."
+					required:    true
+					enum: {
+						"true":  "The reader had reached the end of the file."
+						"false": "The reader had not reached the end of the file."
+					}
+				}
 			}
+		}
+		files_unwatched_bytes_unread_total: {
+			description: """
+				The total known number of unread bytes remaining when the `file` or
+				`kubernetes_logs` source stops watching a file. A measured zero means no
+				bytes remained unread at measurement time. Unknown counts are excluded
+				and increment `files_unwatched_with_unknown_bytes_total` instead.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              files_unwatched_total.tags
+		}
+		files_unwatched_with_unknown_bytes_total: {
+			description: """
+				The total number of times the `file` or `kubernetes_logs` source stops
+				watching a file whose unread-byte count cannot be determined. This
+				includes metadata failures, gzipped files, and skipped gzip readers.
+				The counter increments by one per unwatch event; it does not measure
+				unread or lost bytes. Gzip files are not decompressed solely to calculate
+				this telemetry.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              files_unwatched_total.tags
 		}
 		open_files: {
 			description:       "The total number of open files."
@@ -1154,6 +1196,16 @@ components: sources: internal_metrics: {
 			component_id:   _component_id
 			component_type: _component_type
 		}
+		_request_tags: _component_tags & {
+			protocol: {
+				description: "The protocol used to receive the request."
+				required:    false
+				enum: {
+					"grpc": "gRPC"
+					"http": "HTTP"
+				}
+			}
+		}
 
 		// All available tags
 		_collector: {
@@ -1257,6 +1309,20 @@ components: sources: internal_metrics: {
 			description: "The hostname of the originating system."
 			required:    true
 			examples: [_values.local_host]
+		}
+		_meaning: {
+			description: "The semantic meaning."
+			required:    true
+			enum: {
+				service:   "The service typically represents the application that generated the event."
+				message:   "The main text message of the event."
+				timestamp: "The main timestamp of the event."
+				host:      "The hostname of the machine where the event was generated."
+				tags:      "The tags of an event, generally a key-value paired list."
+				source:    "The source of the event."
+				severity:  "The severity of the event."
+				trace_id:  "The Id of the trace associated to the event."
+			}
 		}
 		_mode: {
 			description: "The connection mode used by the component."

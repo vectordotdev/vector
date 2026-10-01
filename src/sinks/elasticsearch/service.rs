@@ -131,7 +131,7 @@ impl HttpRequestBuilder {
         }
 
         for (header, value) in &self.http_request_config.headers {
-            builder = builder.header(&header[..], &value[..]);
+            builder = builder.header(header.as_str(), value.as_str());
         }
 
         let mut request = builder

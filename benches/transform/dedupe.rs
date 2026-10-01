@@ -107,7 +107,7 @@ fn dedupe(c: &mut Criterion) {
         // event.
         Param {
             slug: "field_match_done",
-            input: fixed_stream.clone(),
+            input: fixed_stream,
             dedupe_config: DedupeConfig {
                 cache,
                 fields: Some(FieldMatchConfig::MatchFields(vec![
