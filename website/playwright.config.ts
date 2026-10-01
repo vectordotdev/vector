@@ -6,7 +6,11 @@ export default defineConfig({
   forbidOnly: true,
   retries: 0,
   workers: 3,
-  reporter: [["list"], ["html", { open: "never" }]],
+  reporter: [
+    ["list"],
+    ["html", { open: "never" }],
+    ["junit", { outputFile: "test-results/junit.xml", includeProjectInTestName: true }]
+  ],
   use: {
     baseURL: "http://127.0.0.1:4173",
     colorScheme: "light",
