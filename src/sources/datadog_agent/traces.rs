@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
@@ -12,9 +11,9 @@ use vector_lib::{
     internal_event::{CountByteSize, InternalEventHandle as _},
 };
 use vrl::event_path;
-use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
+use warp::{Filter, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
-use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, ddtrace_proto};
+use super::{DatadogAgentSource, RequestHandler, ddtrace_proto};
 use crate::{
     common::{datadog::encode_u64_id_hex, http::ErrorMessage},
     event::{Event, ObjectMap, TraceEvent, Value},
@@ -26,8 +25,8 @@ pub(super) fn build_warp_filter(
     handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    build_trace_filter(handler, source)
-        .or(build_stats_filter())
+    build_trace_filter(handler, source.clone())
+        .or(build_stats_filter(source))
         .unify()
         .boxed()
 }
@@ -38,30 +37,18 @@ fn build_trace_filter(
 ) -> BoxedFilter<(Response,)> {
     warp::post()
         .and(path!("api" / "v0.2" / "traces" / ..))
-        .and(warp::path::full())
+        .and(source.validated_api_key_filter())
         .and(warp::header::optional::<String>("content-encoding"))
-        .and(warp::header::optional::<String>("dd-api-key"))
-        .and(warp::query::<ApiKeyQueryParams>())
         .and(capped_body())
         .and_then({
             move |path: FullPath,
+                  api_key: Option<Arc<str>>,
                   encoding_header: Option<String>,
-                  api_token: Option<String>,
-                  query_params: ApiKeyQueryParams,
                   body: Bytes| {
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
-                        handle_dd_trace_payload(
-                            body,
-                            source.api_key_extractor.extract(
-                                path.as_str(),
-                                api_token,
-                                query_params.dd_api_key,
-                            ),
-                            &source,
-                        )
-                        .map_err(|error| {
+                        handle_dd_trace_payload(body, api_key, &source).map_err(|error| {
                             ErrorMessage::new(
                                 StatusCode::UNPROCESSABLE_ENTITY,
                                 format!("Error decoding Datadog traces: {error:?}"),
@@ -74,16 +61,20 @@ fn build_trace_filter(
         .boxed()
 }
 
-fn build_stats_filter() -> BoxedFilter<(Response,)> {
-    warp::post()
-        .and(path!("api" / "v0.2" / "stats" / ..))
-        .and_then(|| {
-            // APM stats are discarded on purpose, they will be computed in the `datadog_traces` sink
-            // thus we simply reply with a 200/OK response.
-            let response: Result<Response, Rejection> = Ok(warp::reply().into_response());
-            future::ready(response)
-        })
-        .boxed()
+fn build_stats_filter(source: DatadogAgentSource) -> BoxedFilter<(Response,)> {
+    let route = warp::post().and(path!("api" / "v0.2" / "stats" / ..));
+    // Stats are discarded, so preserve the unconditional response unless credentials
+    // can reject the request. In particular, don't parse unused keys in the default mode.
+    if source.api_key_extractor.drop_on_invalid_api_key
+        && !source.api_key_extractor.valid_api_keys.is_empty()
+    {
+        route
+            .and(source.validated_api_key_filter())
+            .map(|_: FullPath, _: Option<Arc<str>>| warp::reply().into_response())
+            .boxed()
+    } else {
+        route.map(|| warp::reply().into_response()).boxed()
+    }
 }
 
 fn handle_dd_trace_payload(
