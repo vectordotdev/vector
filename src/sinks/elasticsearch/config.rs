@@ -775,6 +775,10 @@ impl ValidatedSink for ElasticsearchConfig {
             return Err(ParseError::RegionRequired.into());
         }
 
+        if let Some(ElasticsearchAuthConfig::ApiKey { api_key }) = &self.auth {
+            http::HeaderValue::from_str(&format!("ApiKey {}", api_key.inner()))?;
+        }
+
         // Run the pure routing-template confinement check for the active mode
         // so unconfined `bulk.index` / `data_stream.*` templates are rejected
         // here. The confined mode itself is reconstructed during build (inside
@@ -1068,6 +1072,24 @@ mod tests {
         );
     }
 
+    #[test]
+    fn validate_rejects_invalid_api_key() {
+        use crate::config::ValidatedSink;
+        let config: ElasticsearchConfig = serde_yaml::from_str(
+            r#"
+            endpoints: ["http://localhost:9200"]
+            auth:
+              strategy: api_key
+              api_key: "invalid\nkey"
+            "#,
+        )
+        .unwrap();
+        let err = config
+            .validate()
+            .expect_err("an invalid api_key header character should be rejected");
+        assert!(!err.to_string().contains("invalid\nkey"));
+    }
+
     #[cfg(feature = "aws-core")]
     #[test]
     fn validate_accepts_serverless_with_aws_auth_and_auto_api_version() {
@@ -1219,6 +1241,7 @@ mod tests {
         assert!(validated.health_config.retry_initial_backoff_secs > 0);
     }
 
+    #[cfg(feature = "aws-core")]
     #[test]
     fn parse_aws_auth() {
         serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
@@ -1235,6 +1258,22 @@ mod tests {
               strategy: aws
         "#})
         .unwrap();
+    }
+
+    #[test]
+    fn parse_api_key_auth() {
+        let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
+            endpoints: ["http://localhost:9200"]
+            auth:
+              strategy: api_key
+              api_key: "dGVzdDprZXk="
+        "#})
+        .unwrap();
+
+        assert!(matches!(
+            config.auth,
+            Some(ElasticsearchAuthConfig::ApiKey { ref api_key }) if api_key.inner() == "dGVzdDprZXk="
+        ));
     }
 
     #[test]
@@ -1303,6 +1342,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "aws-core")]
     #[test]
     fn parse_opensearch_service_type_serverless() {
         let config = serde_yaml::from_str::<ElasticsearchConfig>(indoc::indoc! {r#"
