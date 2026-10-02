@@ -133,6 +133,7 @@ jobs:
             "pulsar",
             "redis",
             "splunk",
+            "syslog",
             "webhdfs"
           ]
     timeout-minutes: 90
