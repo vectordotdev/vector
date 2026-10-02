@@ -111,7 +111,7 @@ test("Pagefind returns full-text results and handles an unmatched query", async 
   await expect(page.locator(".aa-Panel")).toBeHidden();
 });
 
-test.skip("mobile navigation opens, navigates, and closes the docs sidebar", async ({ page }) => {
+test("mobile navigation opens, navigates, and closes the docs sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const menu = page.locator("#mobile-menu");
@@ -120,11 +120,17 @@ test.skip("mobile navigation opens, navigates, and closes the docs sidebar", asy
   await expect(menu).toBeVisible();
   await menu.getByRole("link", { name: "Docs", exact: true }).click();
   await expect(page).toHaveURL(/\/docs\/?$/);
-  await page.getByText("Sidebar", { exact: true }).click();
+  const sidebarToggle = page.getByText("Sidebar", { exact: true });
+  await sidebarToggle.click();
   const sidebar = page.getByRole("dialog").filter({
     has: page.getByRole("button", { name: "Close docs slideover panel" })
   });
   await expect(sidebar).toBeVisible();
+  await expect(sidebarToggle).toBeHidden();
   await sidebar.getByRole("button", { name: "Close docs slideover panel" }).click();
   await expect(sidebar).toBeHidden();
+  await expect(sidebarToggle).toBeVisible();
+  await sidebarToggle.click();
+  await sidebar.getByRole("link", { name: "Vector Remap Language", exact: true }).click();
+  await expect(page).toHaveURL(/\/docs\/reference\/vrl\/?$/);
 });
