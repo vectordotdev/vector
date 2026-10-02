@@ -1059,3 +1059,106 @@ fn static_uri_template_accepts_valid_uri(#[case] uri: &str) {
     let event = Event::Log(LogEvent::from("x"));
     assert_eq!(confined.render_string(&event).unwrap(), uri);
 }
+
+#[test]
+fn confined_template_named_timezone_preserves_confinement() {
+    let template = Template::try_from("safe/%F/{{ tenant }}/")
+        .unwrap()
+        .confine(&ConfinementConfig::default(), "test", "key_prefix")
+        .unwrap()
+        .with_timezone(vector_lib::TimeZone::parse("America/Los_Angeles"));
+    let mut event = LogEvent::from("message");
+    event.insert(
+        vrl::event_path!("timestamp"),
+        Utc.with_ymd_and_hms(2026, 12, 1, 7, 30, 0).unwrap(),
+    );
+    event.insert(vrl::event_path!("tenant"), "tenant-a");
+    assert_eq!(
+        template.render_string(&event).unwrap(),
+        "safe/2026-11-30/tenant-a/"
+    );
+    event.insert(vrl::event_path!("tenant"), "../../escape");
+    assert!(matches!(
+        template.render_string(&event),
+        Err(TemplateRenderingError::Confined { .. })
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn confined_template_local_timezone_uses_event_timestamp() {
+    const CHILD: &str = "VECTOR_TEST_LOCAL_TIMEZONE_CHILD";
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .env(CHILD, "1")
+            .env("TZ", "America/Los_Angeles")
+            .args([
+                "--exact",
+                "template::tests::confined_template_local_timezone_uses_event_timestamp",
+                "--nocapture",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("local-timezone assertions completed")
+        );
+        return;
+    }
+
+    let template = Template::try_from("date=%F/%T/%z/")
+        .unwrap()
+        .confine(&ConfinementConfig::default(), "test", "key_prefix")
+        .unwrap()
+        .with_timezone(Some(vector_lib::TimeZone::Local));
+    for (timestamp, expected) in [
+        ("2026-12-01T07:30:00Z", "date=2026-11-30/23:30:00/-0800/"),
+        ("2026-07-01T07:30:00Z", "date=2026-07-01/00:30:00/-0700/"),
+    ] {
+        let mut event = LogEvent::from("message");
+        event.insert(
+            vrl::event_path!("timestamp"),
+            timestamp.parse::<chrono::DateTime<Utc>>().unwrap(),
+        );
+        assert_eq!(template.render_string(&event).unwrap(), expected);
+    }
+    #[allow(
+        clippy::print_stdout,
+        reason = "The parent verifies that the isolated test actually ran."
+    )]
+    {
+        println!("local-timezone assertions completed");
+    }
+}
+
+#[test]
+fn confined_template_fixed_offset_overrides_named_zone_and_resets_to_utc() {
+    let mut event = LogEvent::from("message");
+    event.insert(
+        vrl::event_path!("timestamp"),
+        Utc.with_ymd_and_hms(2026, 12, 1, 7, 30, 0).unwrap(),
+    );
+    let template = Template::try_from("date=%F/%H-%M-%z/")
+        .unwrap()
+        .confine(&ConfinementConfig::default(), "test", "key_prefix")
+        .unwrap()
+        .with_timezone(vector_lib::TimeZone::parse("America/Los_Angeles"));
+    assert_eq!(
+        template.render_string(&event).unwrap(),
+        "date=2026-11-30/23-30--0800/"
+    );
+    let template = template.with_tz_offset(FixedOffset::east_opt(8 * 3600));
+    assert_eq!(
+        template.render_string(&event).unwrap(),
+        "date=2026-12-01/15-30-+0800/"
+    );
+    let template = template.with_tz_offset(None);
+    assert_eq!(
+        template.render_string(&event).unwrap(),
+        "date=2026-12-01/07-30-+0000/"
+    );
+}

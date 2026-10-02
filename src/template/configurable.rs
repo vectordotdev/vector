@@ -33,7 +33,7 @@ impl Template {
 
     /// Set the tz offset used when rendering strftime specifiers.
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.inner.tz_offset = tz_offset;
+        self.inner.time_zone = TemplateTimeZone::from_offset(tz_offset);
         self
     }
 
@@ -151,7 +151,7 @@ impl UriTemplate {
 impl UriTemplate {
     /// Set the tz offset used when rendering strftime specifiers.
     pub const fn with_tz_offset(mut self, tz_offset: Option<FixedOffset>) -> Self {
-        self.0.inner.tz_offset = tz_offset;
+        self.0.inner.time_zone = TemplateTimeZone::from_offset(tz_offset);
         self
     }
 

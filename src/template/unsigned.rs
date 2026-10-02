@@ -170,9 +170,11 @@ impl UnsignedIntTemplate {
                         }),
                     );
                 }
-                Part::Strftime(items) => {
-                    out.push_str(&render_timestamp(items, event, self.tz_offset))
-                }
+                Part::Strftime(items) => out.push_str(&render_timestamp(
+                    items,
+                    event,
+                    TemplateTimeZone::from_offset(self.tz_offset),
+                )),
             }
         }
         if missing_keys.is_empty() {
