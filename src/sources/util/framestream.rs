@@ -692,73 +692,90 @@ pub fn build_framestream_unix_source(
     out: SourceSender,
 ) -> crate::Result<Source> {
     let path = frame_handler.socket_path();
-
-    //check if the path already exists (and try to delete it)
-    match fs::metadata(&path) {
-        Ok(_) => {
-            //exists, so try to delete it
-            info!(message = "Deleting file.", ?path);
-            fs::remove_file(&path)?;
-        }
-        Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {} //doesn't exist, do nothing
-        Err(e) => {
-            error!("Unable to get socket information; error = {e:?}.");
-            return Err(Box::new(e));
-        }
-    };
-
-    let listener = UnixListener::bind(&path)?;
-
-    // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
-    if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
-        _ = nix::sys::socket::setsockopt(
-            &listener,
-            nix::sys::socket::sockopt::RcvBuf,
-            &(socket_receive_buffer_size),
-        );
-        let rcv_buf_size =
-            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::RcvBuf);
-        info!(
-            "Unix socket receive buffer size modified to {}.",
-            rcv_buf_size.unwrap()
-        );
+    let socket_file_mode = frame_handler.socket_file_mode();
+    // Configuration validation must reject invalid modes without touching the socket.
+    if let Some(socket_permission) = socket_file_mode
+        && !(0o700..=0o777).contains(&socket_permission)
+    {
+        return Err(format!(
+            "Invalid Socket permission {socket_permission:#o}. Must between 0o700 and 0o777."
+        )
+        .into());
     }
 
-    // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
-    if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
-        _ = nix::sys::socket::setsockopt(
-            &listener,
-            nix::sys::socket::sockopt::SndBuf,
-            &(socket_send_buffer_size),
-        );
-        let snd_buf_size =
-            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::SndBuf);
-        info!(
-            "Unix socket buffer send size modified to {}.",
-            snd_buf_size.unwrap()
-        );
-    }
-
-    // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
-    if let Some(socket_permission) = frame_handler.socket_file_mode() {
-        if !(448..=511).contains(&socket_permission) {
-            return Err(format!(
-                "Invalid Socket permission {socket_permission:#o}. Must between 0o700 and 0o777."
-            )
-            .into());
-        }
-        match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
+    // NOTE: Socket setup (removing any stale socket file, binding the listener,
+    // adjusting buffer sizes and permissions) is performed inside the returned
+    // future rather than eagerly. Doing it eagerly would run during component
+    // instantiation — including `vector validate` — and delete the socket file
+    // of an already-running Vector instance. See issue #25513.
+    let fut = async move {
+        //check if the path already exists (and try to delete it)
+        match fs::metadata(&path) {
             Ok(_) => {
-                info!("Socket permissions updated to {socket_permission:#o}.");
+                //exists, so try to delete it
+                info!(message = "Deleting file.", ?path);
+                if let Err(error) = fs::remove_file(&path) {
+                    error!(message = "Unable to remove socket file.", ?path, %error);
+                    return Err(());
+                }
             }
-            Err(e) => {
-                error!("Failed to update listener socket permissions; error = {e:?}.");
-                return Err(Box::new(e));
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {} //doesn't exist, do nothing
+            Err(error) => {
+                error!(message = "Unable to get socket information.", ?path, %error);
+                return Err(());
             }
         };
-    };
 
-    let fut = async move {
+        let listener = match UnixListener::bind(&path) {
+            Ok(listener) => listener,
+            Err(error) => {
+                error!(message = "Unable to bind to socket.", ?path, %error);
+                return Err(());
+            }
+        };
+
+        // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
+        if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
+            _ = nix::sys::socket::setsockopt(
+                &listener,
+                nix::sys::socket::sockopt::RcvBuf,
+                &(socket_receive_buffer_size),
+            );
+            let rcv_buf_size =
+                nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::RcvBuf);
+            info!(
+                "Unix socket receive buffer size modified to {}.",
+                rcv_buf_size.unwrap()
+            );
+        }
+
+        // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
+        if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
+            _ = nix::sys::socket::setsockopt(
+                &listener,
+                nix::sys::socket::sockopt::SndBuf,
+                &(socket_send_buffer_size),
+            );
+            let snd_buf_size =
+                nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::SndBuf);
+            info!(
+                "Unix socket buffer send size modified to {}.",
+                snd_buf_size.unwrap()
+            );
+        }
+
+        if let Some(socket_permission) = socket_file_mode {
+            match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
+                Ok(_) => {
+                    info!("Socket permissions updated to {socket_permission:#o}.");
+                }
+                Err(error) => {
+                    error!(message = "Failed to update listener socket permissions.", %error);
+                    return Err(());
+                }
+            }
+        };
+
         let active_parsing_task_nums = Arc::new(AtomicUsize::new(0));
 
         info!(message = "Listening...", ?path, r#type = "unix");
@@ -929,6 +946,7 @@ mod test {
     use std::net::SocketAddr;
     #[cfg(unix)]
     use std::{
+        os::unix::fs::MetadataExt,
         path::PathBuf,
         sync::{
             Arc,
@@ -1798,5 +1816,69 @@ mod test {
             (max_task_nums_reached_value - max_frame_handling_tasks) < 2,
             "Max number of tasks at any given time should NOT Exceed max_frame_handling_tasks too much"
         );
+    }
+
+    #[tokio::test]
+    async fn build_unix_source_preserves_existing_socket() {
+        let directory = tempfile::tempdir().unwrap();
+        let socket_path = directory.path().join("dnstap.sock");
+        let _listener = tokio::net::UnixListener::bind(&socket_path).unwrap();
+        let inode = std::fs::metadata(&socket_path).unwrap().ino();
+
+        for mode in [None, Some(0o700), Some(0o777), Some(0o600), Some(0o1000)] {
+            let mut frame_handler = MockUnixFrameHandler::new("mock".to_owned(), false, || {});
+            frame_handler.socket_path = socket_path.clone();
+            frame_handler.socket_file_mode = mode;
+            let (tx, _rx) = SourceSender::new_test();
+            let mut shutdown = SourceShutdownCoordinator::default();
+            let (signal, _) = shutdown.register_source(&ComponentKey::from("test_source"), false);
+
+            let result = build_framestream_unix_source(frame_handler, signal, tx);
+            assert_eq!(result.is_ok(), !matches!(mode, Some(0o600 | 0o1000)));
+            drop(result);
+            assert_eq!(std::fs::metadata(&socket_path).unwrap().ino(), inode);
+            assert!(tokio::net::UnixStream::connect(&socket_path).await.is_ok());
+        }
+    }
+
+    #[tokio::test]
+    async fn build_unix_source_preserves_existing_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let socket_path = directory.path().join("dnstap.sock");
+        std::fs::write(&socket_path, b"in use").unwrap();
+        let inode = std::fs::metadata(&socket_path).unwrap().ino();
+        for mode in [None, Some(0o700), Some(0o777), Some(0o600), Some(0o1000)] {
+            let mut frame_handler = MockUnixFrameHandler::new("mock".to_owned(), false, || {});
+            frame_handler.socket_path = socket_path.clone();
+            frame_handler.socket_file_mode = mode;
+            let (tx, _rx) = SourceSender::new_test();
+            let mut shutdown = SourceShutdownCoordinator::default();
+            let (signal, _) = shutdown.register_source(&ComponentKey::from("test_source"), false);
+
+            let result = build_framestream_unix_source(frame_handler, signal, tx);
+            assert_eq!(result.is_ok(), !matches!(mode, Some(0o600 | 0o1000)));
+            drop(result);
+            assert_eq!(std::fs::read(&socket_path).unwrap(), b"in use");
+            assert_eq!(std::fs::metadata(&socket_path).unwrap().ino(), inode);
+        }
+    }
+
+    #[tokio::test]
+    async fn build_unix_source_validates_mode_without_creating_socket() {
+        let directory = tempfile::tempdir().unwrap();
+        let socket_path = directory.path().join("dnstap.sock");
+        for mode in [None, Some(0o700), Some(0o777), Some(0o600), Some(0o1000)] {
+            let mut frame_handler = MockUnixFrameHandler::new("mock".to_owned(), false, || {});
+            frame_handler.socket_path = socket_path.clone();
+            frame_handler.socket_file_mode = mode;
+            let (tx, _rx) = SourceSender::new_test();
+            let mut shutdown = SourceShutdownCoordinator::default();
+            let (signal, _) = shutdown.register_source(&ComponentKey::from("test_source"), false);
+
+            let result = build_framestream_unix_source(frame_handler, signal, tx);
+            assert_eq!(result.is_ok(), !matches!(mode, Some(0o600 | 0o1000)));
+            drop(result);
+            assert!(!socket_path.exists());
+        }
     }
 }
