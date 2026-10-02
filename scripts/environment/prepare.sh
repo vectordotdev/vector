@@ -30,6 +30,7 @@ DEFAULT_MODULES=(
   cargo-llvm-cov
   dd-rust-license-tool
   wasm-pack
+  actionlint
   markdownlint-cli2
   prettier
   datadog-ci
@@ -391,7 +392,7 @@ install_system_packages() {
 # Note: npm ci installs all packages in the lockfile even if only one tool
 # is requested, since it does not support selective installation.
 maybe_install_npm_tools() {
-  local npm_tools=(markdownlint-cli2 prettier datadog-ci)
+  local npm_tools=(actionlint markdownlint-cli2 prettier datadog-ci)
 
   # Early return when no npm tool is requested, so hosts without npm
   # (e.g. tests/e2e/Dockerfile calling prepare.sh --modules=cargo-nextest)

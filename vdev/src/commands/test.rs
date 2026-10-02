@@ -32,12 +32,9 @@ pub struct Cli {
 
 fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
     env.into_iter()
-        .map(|entry| {
-            #[allow(clippy::map_unwrap_or)] // Can't use map_or due to borrowing entry
-            entry
-                .split_once('=')
-                .map(|(k, v)| (k.to_owned(), Some(v.to_owned())))
-                .unwrap_or_else(|| (entry, None))
+        .map(|entry| match entry.split_once('=') {
+            Some((key, value)) => (key.to_owned(), Some(value.to_owned())),
+            None => (entry, None),
         })
         .collect()
 }
@@ -131,12 +128,25 @@ mod tests {
 
     use clap::Parser;
 
-    use super::{Cli, select_features};
+    use super::{Cli, parse_env, select_features};
 
     #[derive(Parser)]
     struct TestCli {
         #[command(flatten)]
         test: Cli,
+    }
+
+    #[test]
+    fn parses_environment_variables() {
+        let environment = parse_env(vec![
+            "FLAG".to_string(),
+            "EMPTY=".to_string(),
+            "VALUE=one=two".to_string(),
+        ]);
+
+        assert_eq!(environment["FLAG"], None);
+        assert_eq!(environment["EMPTY"], Some(String::new()));
+        assert_eq!(environment["VALUE"], Some("one=two".to_string()));
     }
 
     #[test]

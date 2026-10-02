@@ -34,7 +34,7 @@ use crate::{
 // of escaped double-quotes -- but we believe this should be very rare in
 // practice.
 pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
-pub const BATCH_GOAL_BYTES: usize = 4_250_000;
+pub const BATCH_HEADROOM_BYTES: usize = 750_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
 pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
@@ -43,7 +43,8 @@ pub struct DatadogLogsDefaultBatchSettings;
 
 impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
-    const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
+    // No static default: validate() derives the goal from max_payload_bytes at runtime.
+    const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
@@ -75,6 +76,20 @@ pub struct DatadogLogsConfig {
     /// configuration setting.
     #[serde(default)]
     pub conforms_as_agent: bool,
+
+    /// Maximum uncompressed payload size in bytes sent to the endpoint. It is recommended
+    /// to not set it above 5,000,000 (5 MB, the standard Datadog API limit). Increase
+    /// this when targeting a compatible endpoint that accepts larger payloads. The batch
+    /// goal is derived as `max_payload_bytes - 750,000` bytes; events larger than the
+    /// batch goal are sent alone in their batch. Events exceeding `max_payload_bytes` are
+    /// dropped.
+    #[derivative(Default(value = "default_max_payload_bytes()"))]
+    #[serde(default = "default_max_payload_bytes")]
+    pub max_payload_bytes: Option<usize>,
+}
+
+const fn default_max_payload_bytes() -> Option<usize> {
+    Some(MAX_PAYLOAD_BYTES)
 }
 
 const fn default_compression() -> Option<Compression> {
@@ -157,6 +172,7 @@ impl DatadogLogsConfig {
             batch,
             protocol,
             conforms_as_agent,
+            self.max_payload_bytes.unwrap_or(MAX_PAYLOAD_BYTES),
         )
         .compression(self.compression.or_else(default_compression).unwrap())
         .build();
@@ -228,10 +244,28 @@ impl ValidatedSink for DatadogLogsConfig {
         };
         validate_headers(&request_headers)?;
 
-        let batch = self
-            .batch
+        if let Some(max_payload_bytes) = self.max_payload_bytes
+            && max_payload_bytes <= BATCH_HEADROOM_BYTES
+        {
+            return Err(format!(
+                "max_payload_bytes ({max_payload_bytes}) must be greater than the batch headroom ({BATCH_HEADROOM_BYTES})"
+            )
+            .into());
+        }
+
+        let batch_goal_bytes =
+            self.max_payload_bytes.unwrap_or(MAX_PAYLOAD_BYTES) - BATCH_HEADROOM_BYTES;
+
+        // When the user has not set batch.max_bytes, derive it from max_payload_bytes so that
+        // raising the payload limit automatically scales the batch goal.
+        let mut batch_config = self.batch;
+        if batch_config.max_bytes.is_none() {
+            batch_config.max_bytes = Some(batch_goal_bytes);
+        }
+
+        let batch = batch_config
             .validate()?
-            .limit_max_bytes(BATCH_GOAL_BYTES)?
+            .limit_max_bytes(batch_goal_bytes)?
             .limit_max_events(BATCH_MAX_EVENTS)?
             .into_batcher_settings()?;
 
@@ -279,8 +313,74 @@ mod test {
     fn validate_produces_usable_batch_settings() {
         let config = DatadogLogsConfig::default();
         let validated = config.validate().expect("validation should succeed");
-        assert_eq!(validated.batch.size_limit, BATCH_GOAL_BYTES);
+        assert_eq!(
+            validated.batch.size_limit,
+            MAX_PAYLOAD_BYTES - BATCH_HEADROOM_BYTES
+        );
         assert_eq!(validated.batch.item_limit, BATCH_MAX_EVENTS);
+    }
+
+    #[test]
+    fn validate_rejects_max_payload_bytes_below_headroom() {
+        // Any value <= BATCH_HEADROOM_BYTES would underflow the derived batch goal.
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 750000
+        "#})
+        .unwrap();
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn validate_accepts_max_payload_bytes_below_default() {
+        // Values below the standard 5 MB DD limit are allowed (conservative configuration).
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 1000000
+        "#})
+        .unwrap();
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_derives_batch_goal_from_max_payload_bytes() {
+        // When batch.max_bytes is omitted the goal should be derived automatically.
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 10000000
+        "#})
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(
+            validated.batch.size_limit,
+            10_000_000 - BATCH_HEADROOM_BYTES
+        );
+    }
+
+    #[test]
+    fn validate_accepts_explicit_batch_max_bytes_within_payload_limit() {
+        // An explicit batch.max_bytes below the cap should be respected as-is.
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 10000000
+            batch:
+              max_bytes: 7000000
+        "#})
+        .unwrap();
+        let validated = config.validate().expect("validation should succeed");
+        assert_eq!(validated.batch.size_limit, 7_000_000);
+    }
+
+    #[test]
+    fn validate_rejects_batch_max_bytes_above_payload_limit() {
+        let config: DatadogLogsConfig = serde_yaml::from_str(indoc::indoc! {r#"
+            default_api_key: "test_key"
+            max_payload_bytes: 10000000
+            batch:
+              max_bytes: 11000000
+        "#})
+        .unwrap();
+        assert!(config.validate().is_err());
     }
 
     #[test]

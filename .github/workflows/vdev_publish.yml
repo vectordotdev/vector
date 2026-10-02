@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup
         with:
@@ -45,7 +45,7 @@ jobs:
           BIN="${BIN_ROOT}/${{ matrix.target }}/release/vdev"
           if [[ ! -f "$BIN" ]]; then
               echo "Binary not found at: $BIN"
-              find ${BIN_ROOT} -type -d
+              find "${BIN_ROOT}" -type -d
               exit 1
           fi
 
@@ -67,7 +67,7 @@ jobs:
       DISABLE_MOLD: true
     steps:
       - name: Checkout Vector
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: ./.github/actions/setup
         with:

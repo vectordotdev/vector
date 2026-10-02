@@ -55,7 +55,6 @@ impl<T: TransformConfig + 'static> From<T> for BoxedTransform {
 
 /// Fully resolved transform component.
 #[configurable_component]
-#[configurable(metadata(docs::component_base_type = "transform"))]
 #[derive(Clone, Debug)]
 pub struct TransformOuter<T>
 where

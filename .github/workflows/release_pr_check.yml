@@ -15,6 +15,8 @@ jobs:
     # Only the new bot-authored minor-release path uses this validator. Existing manual
     # releases (including patch releases) keep their current checks; patch automation is
     # separate work. Keep this trigger broad: vdev owns branch-format and version validation.
+    # Post-release housekeeping never opens a PR; it validates its own commit before
+    # pushing to master, so this workflow only sees preparation PRs.
     # Release PRs must be directly squash-merged during the freeze, never queued.
     # Skipped merge-group runs emit the required check for ordinary queued PRs only.
     if: >-
@@ -34,7 +36,7 @@ jobs:
             }
 
       - name: Checkout trusted base
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
@@ -45,17 +47,11 @@ jobs:
         with:
           cargo-cache: true
           rust: true
-          # The published binary may predate these helpers. Build the exact trusted base below.
-          vdev: false
+          vdev: true
 
-      - name: Build trusted release validator
-        run: |
-          cargo build --locked --package vdev
-          cp target/debug/vdev "$RUNNER_TEMP/release-vdev"
-
-      # Build and set up exclusively from the base before inspecting PR-controlled files.
+      # Install the base's pinned vdev before inspecting PR-controlled files.
       - name: Checkout PR head
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
@@ -66,6 +62,6 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_REF: ${{ github.head_ref }}
         run: >-
-          "$RUNNER_TEMP/release-vdev" release workflow pr-check
+          "$VDEV" release workflow pr-check
           --base-sha "$BASE_SHA"
           --head-ref "$HEAD_REF"

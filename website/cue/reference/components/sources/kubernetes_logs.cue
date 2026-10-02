@@ -457,7 +457,10 @@ components: sources: kubernetes_logs: {
 	}
 
 	telemetry: metrics: {
-		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
-		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
+		files_unwatched_bytes_unread_total:       components.sources.internal_metrics.output.metrics.files_unwatched_bytes_unread_total
+		files_unwatched_total:                    components.sources.internal_metrics.output.metrics.files_unwatched_total
+		files_unwatched_with_unknown_bytes_total: components.sources.internal_metrics.output.metrics.files_unwatched_with_unknown_bytes_total
+		k8s_format_picker_edge_cases_total:       components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
+		k8s_docker_format_parse_failures_total:   components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
 	}
 }

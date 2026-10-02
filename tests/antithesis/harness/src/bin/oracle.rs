@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 //! oracle: the conservation judge. Mints unique ids, records which ids the
 //! pipeline acked, and checks they all come back — an acked id that never
 //! returns is loss.
@@ -6,7 +8,7 @@
 //!   POST /claim          -> one fresh id (body is the id)
 //!   POST /acked          -> newline-separated ids the pipeline acked (must come back)
 //!   POST /ingest         -> the pipeline's egress sink delivers the round trip here
-//!   GET  /report         -> JSON: issued/acked/delivered/delivered_total/missing/spurious/corrupted
+//!   GET  /report         -> JSON: `issued/acked/delivered/delivered_total/missing/spurious/corrupted`
 //!   GET  /delivered?id=X -> "1" if returned, else "0"
 //!
 //! /ingest fails on arrival if a delivered id was never issued or its payload
@@ -240,7 +242,7 @@ async fn main() {
         .layer(DefaultBodyLimit::disable())
         .with_state(state);
 
-    wait_for_vector(&args.metrics_url, time::Duration::from_secs(180)).await;
+    wait_for_vector(&args.metrics_url, time::Duration::from_mins(3)).await;
 
     let server = axum::Server::bind(&args.addr).serve(app.into_make_service());
     lifecycle::setup_complete(&json!({ "component": args.scenario }));
