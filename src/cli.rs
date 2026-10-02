@@ -128,6 +128,15 @@ pub struct RootOpts {
     #[arg(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
     pub require_healthy: Option<bool>,
 
+    /// The directory used for persisting Vector state data.
+    ///
+    /// This overrides the `data_dir` global option set in the configuration file. It is
+    /// useful for keeping deployment-specific paths out of the configuration file, for
+    /// example when validating a configuration in a CI environment where the configured
+    /// `data_dir` may not exist.
+    #[arg(long, env = "VECTOR_DATA_DIR", global = true)]
+    pub data_dir: Option<PathBuf>,
+
     /// Number of threads to use for processing (default is number of available cores)
     #[arg(short, long, env = "VECTOR_THREADS")]
     pub threads: Option<usize>,
@@ -496,22 +505,23 @@ impl SubCommand {
         &self,
         mut signals: signal::SignalPair,
         color: bool,
+        data_dir: Option<&std::path::Path>,
     ) -> exitcode::ExitCode {
         match self {
             Self::Completion(s) => completion::cmd(s),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
             Self::GenerateSchema(opts) => generate_schema::cmd(opts),
-            Self::Graph(g) => graph::cmd(g),
+            Self::Graph(g) => graph::cmd(g, data_dir),
             Self::List(l) => list::cmd(l),
             #[cfg(windows)]
-            Self::Service(s) => service::cmd(s),
+            Self::Service(s) => service::cmd(s, data_dir),
             #[cfg(feature = "api-client")]
             Self::Tap(t) => tap::cmd(t, signals.receiver).await,
-            Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
+            Self::Test(t) => unit_test::cmd(t, &mut signals.handler, data_dir).await,
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
-            Self::Validate(v) => validate::validate(v, &mut signals.handler, color).await,
+            Self::Validate(v) => validate::validate(v, &mut signals.handler, color, data_dir).await,
             Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }
@@ -565,6 +575,98 @@ pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use clap::Parser;
+
+    use super::RootOpts;
+
+    #[test]
+    fn data_dir_defaults_to_none() {
+        if data_dir_test_in_subprocess("cli::tests::data_dir_defaults_to_none", None) {
+            return;
+        }
+        let opts = RootOpts::try_parse_from(["vector"]).unwrap();
+        assert_eq!(opts.data_dir, None);
+        #[allow(
+            clippy::print_stdout,
+            reason = "The parent verifies that the isolated test actually ran."
+        )]
+        {
+            println!("data-dir test completed");
+        }
+    }
+
+    #[test]
+    fn data_dir_flag_overrides_environment() {
+        if data_dir_test_in_subprocess(
+            "cli::tests::data_dir_flag_overrides_environment",
+            Some("environment-state"),
+        ) {
+            return;
+        }
+        let opts = super::Opts::try_parse_from([
+            "vector",
+            "validate",
+            "--data-dir",
+            "flag-state",
+            "vector.yaml",
+        ])
+        .unwrap();
+        assert_eq!(opts.root.data_dir, Some(PathBuf::from("flag-state")));
+        #[allow(
+            clippy::print_stdout,
+            reason = "The parent verifies that the isolated test actually ran."
+        )]
+        {
+            println!("data-dir test completed");
+        }
+    }
+
+    fn data_dir_test_in_subprocess(test_name: &str, value: Option<&str>) -> bool {
+        const CHILD: &str = "VECTOR_DATA_DIR_TEST_CHILD";
+        if std::env::var(CHILD).as_deref() == Ok(test_name) {
+            return false;
+        }
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command.env(CHILD, test_name).env_remove("VECTOR_DATA_DIR");
+        if let Some(value) = value {
+            command.env("VECTOR_DATA_DIR", value);
+        }
+        let output = command
+            .args(["--exact", test_name, "--nocapture"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("data-dir test completed"));
+        true
+    }
+
+    #[test]
+    fn data_dir_parsed_from_flag() {
+        let opts = RootOpts::try_parse_from(["vector", "--data-dir", "/tmp/vector"]).unwrap();
+        assert_eq!(opts.data_dir, Some(PathBuf::from("/tmp/vector")));
+    }
+
+    #[test]
+    fn data_dir_is_global_for_validate() {
+        for args in [
+            ["vector", "--data-dir", "state", "validate", "vector.yaml"],
+            ["vector", "validate", "--data-dir", "state", "vector.yaml"],
+        ] {
+            let opts = super::Opts::try_parse_from(args).unwrap();
+            assert_eq!(opts.root.data_dir, Some(PathBuf::from("state")));
+            assert!(matches!(
+                opts.sub_command,
+                Some(super::SubCommand::Validate(_))
+            ));
+        }
+    }
+
     #[cfg(unix)]
     fn run_in_subprocess(test_name: &str) {
         let exe = std::env::current_exe().unwrap();

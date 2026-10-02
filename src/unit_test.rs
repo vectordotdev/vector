@@ -2,7 +2,7 @@
 use std::{
     fs::File,
     io::prelude::*,
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 
@@ -145,7 +145,11 @@ impl<'a> JUnitReporter<'a> {
     }
 }
 
-pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exitcode::ExitCode {
+pub async fn cmd(
+    opts: &Opts,
+    signal_handler: &mut signal::SignalHandler,
+    data_dir: Option<&Path>,
+) -> exitcode::ExitCode {
     let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();
@@ -160,7 +164,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
     {
         println!("Running tests");
     }
-    match config::build_unit_tests_main(&paths, signal_handler).await {
+    match config::build_unit_tests_main(&paths, signal_handler, data_dir).await {
         Ok(tests) => {
             if tests.is_empty() {
                 #[allow(clippy::print_stdout)]

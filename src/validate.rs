@@ -1,6 +1,11 @@
 #![allow(missing_docs)]
 
-use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fmt,
+    fs::remove_dir_all,
+    path::{Path, PathBuf},
+};
 
 use clap::Parser;
 use colored::*;
@@ -171,12 +176,13 @@ pub async fn validate(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
     color: bool,
+    data_dir: Option<&Path>,
 ) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
 
-    let mut config = match validate_config(opts, signal_handler, &mut fmt).await {
+    let mut config = match validate_config(opts, signal_handler, &mut fmt, data_dir).await {
         Some(config) => config,
         None => return exitcode::CONFIG,
     };
@@ -205,6 +211,7 @@ pub async fn validate_config(
     opts: &Opts,
     signal_handler: &mut crate::signal::SignalHandler,
     fmt: &mut Formatter,
+    data_dir: Option<&Path>,
 ) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
@@ -228,9 +235,17 @@ pub async fn validate_config(
     // `SECRET[...]` placeholders stay in place. Otherwise resolve them like
     // the run path, so validation checks the config that would actually run.
     let builder = if opts.no_environment && !opts.resolve_secrets {
-        ConfigBuilderLoader::default().load_from_paths(&paths)
+        ConfigBuilderLoader::default()
+            .data_dir(data_dir)
+            .load_from_paths(&paths)
     } else {
-        config::loading::load_builder_from_paths_with_secrets(&paths, signal_handler, false).await
+        config::loading::load_builder_from_paths_with_secrets(
+            &paths,
+            signal_handler,
+            false,
+            data_dir,
+        )
+        .await
     }
     .map_err(&mut report_error)
     .ok()?;
