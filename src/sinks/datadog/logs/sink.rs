@@ -428,6 +428,7 @@ fn encode_log(
     };
     let message = simdutf_bytes_utf8_lossy(&message);
     let message_encoded_size = json_string_encoded_size(&message);
+    let previous_tags = event.as_log().get(event_path!(DDTAGS)).cloned();
     let tagged_encoded_size = ensure_truncated_tag(event.as_mut_log(), original_encoded_size)?;
     // The encoded event consists of a fixed non-message portion and the message value. Size them
     // separately so the final message can be selected without repeatedly encoding the whole event.
@@ -437,10 +438,13 @@ fn encode_log(
         .checked_sub(non_message_encoded_size)
         .and_then(|budget| select_message_body_len(&message, message_encoded_size, budget))
     else {
-        buf.truncate(existing_len);
-        return Ok(LogEncoding::Dropped {
-            reason: "Event remains too large after truncation.",
-        });
+        if let Some(tags) = previous_tags {
+            event.as_mut_log().insert(event_path!(DDTAGS), tags);
+        } else {
+            // Remove the temporary tag that `ensure_truncated_tag` inserted for size calculation.
+            event.as_mut_log().remove(event_path!(DDTAGS));
+        }
+        return Ok(LogEncoding::Unchanged);
     };
     if body_len < message.len() {
         set_truncated_message(event.as_mut_log(), &message, body_len, conforms_as_agent);
@@ -673,6 +677,7 @@ mod tests {
         sinks::{
             datadog::logs::config::{
                 DEFAULT_MAX_LOG_BYTES as MAX_LOG_BYTES, DatadogLogsTruncationConfig,
+                MAX_PAYLOAD_BYTES,
             },
             util::Compression,
         },
@@ -832,14 +837,18 @@ mod tests {
     }
 
     #[test]
-    fn drops_log_when_custom_fields_leave_no_room_for_message() {
+    fn forwards_log_when_custom_fields_leave_no_room_for_message() {
         let mut log = LogEvent::from("hello");
         log.insert(event_path!("service"), "payments");
         log.insert(event_path!("custom"), "\u{0001}".repeat(200_000));
 
         let logs = encode_logs(vec![Event::Log(log)], true, false);
 
-        assert!(logs.is_empty());
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0]["message"], "hello");
+        assert_eq!(logs[0]["service"], "payments");
+        assert_eq!(logs[0]["custom"], "\u{0001}".repeat(200_000));
+        assert!(logs[0].get("ddtags").is_none());
     }
 
     #[test]
@@ -874,10 +883,10 @@ mod tests {
     }
 
     #[test]
-    fn drops_log_that_remains_oversized_after_reduction() {
+    fn drops_log_that_exceeds_payload_limit_after_best_effort_truncation() {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let mut log = LogEvent::from("e".repeat(MAX_LOG_BYTES + 1)).with_batch_notifier(&batch);
-        log.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
+        log.insert(event_path!("service"), "x".repeat(MAX_PAYLOAD_BYTES + 1));
         drop(batch);
 
         let requests = build_requests(
@@ -906,7 +915,7 @@ mod tests {
     }
 
     #[test]
-    fn counts_irreducible_log_drop_once() {
+    fn does_not_count_best_effort_log_as_dropped() {
         vector_lib::metrics::init_test();
         let controller = vector_lib::metrics::Controller::get().unwrap();
         controller.reset();
@@ -916,7 +925,7 @@ mod tests {
 
         let logs = encode_logs(vec![Event::Log(log)], true, false);
 
-        assert!(logs.is_empty());
+        assert_eq!(logs.len(), 1);
         let discarded_events = controller
             .capture_metrics()
             .iter()
@@ -926,7 +935,7 @@ mod tests {
                 _ => panic!("discarded events metric must be a counter"),
             })
             .sum::<f64>();
-        assert_eq!(discarded_events, 1.0);
+        assert_eq!(discarded_events, 0.0);
     }
 
     #[test]
@@ -1069,15 +1078,17 @@ mod tests {
     }
 
     #[test]
-    fn delivers_following_log_after_dropping_irreducible_log() {
+    fn delivers_following_log_after_forwarding_best_effort_log() {
         let mut oversized = LogEvent::from("i".repeat(MAX_LOG_BYTES + 1));
         oversized.insert(event_path!("service"), "x".repeat(MAX_LOG_BYTES + 1));
         let small = LogEvent::from("ok");
 
         let logs = encode_logs(vec![Event::Log(oversized), Event::Log(small)], true, false);
 
-        assert_eq!(logs.len(), 1);
-        assert_eq!(logs[0]["message"], "ok");
+        assert_eq!(logs.len(), 2);
+        assert_eq!(logs[0]["message"], "i".repeat(MAX_LOG_BYTES + 1));
+        assert!(logs[0].get("ddtags").is_none());
+        assert_eq!(logs[1]["message"], "ok");
     }
 
     fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {
